@@ -179,7 +179,7 @@ pub fn setup_three_users() -> (
 
 /// Assert that a Vauchi has a specific number of contacts.
 pub fn assert_contact_count(wb: &Vauchi, expected: usize) {
-    let contacts = wb.storage().list_contacts().unwrap();
+    let contacts = wb.storage().contacts().list_contacts().unwrap();
     assert_eq!(
         contacts.len(),
         expected,

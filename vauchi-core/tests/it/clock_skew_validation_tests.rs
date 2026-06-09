@@ -144,10 +144,11 @@ fn test_replay_nonce_persisted_to_storage() {
 
     let nonce = [0xABu8; 32];
     storage
+        .replay()
         .save_replay_nonce("contact-001", &nonce, 1000)
         .unwrap();
 
-    let nonces = storage.load_replay_nonces("contact-001").unwrap();
+    let nonces = storage.replay().load_replay_nonces("contact-001").unwrap();
     assert_eq!(nonces.len(), 1);
     assert_eq!(nonces[0].0, nonce);
     assert_eq!(nonces[0].1, 1000);
@@ -162,14 +163,16 @@ fn test_replay_nonces_multiple_contacts() {
     let nonce_b = [0x02u8; 32];
 
     storage
+        .replay()
         .save_replay_nonce("contact-a", &nonce_a, 1000)
         .unwrap();
     storage
+        .replay()
         .save_replay_nonce("contact-b", &nonce_b, 2000)
         .unwrap();
 
-    let nonces_a = storage.load_replay_nonces("contact-a").unwrap();
-    let nonces_b = storage.load_replay_nonces("contact-b").unwrap();
+    let nonces_a = storage.replay().load_replay_nonces("contact-a").unwrap();
+    let nonces_b = storage.replay().load_replay_nonces("contact-b").unwrap();
     assert_eq!(nonces_a.len(), 1);
     assert_eq!(nonces_b.len(), 1);
 }
@@ -183,17 +186,19 @@ fn test_replay_nonces_cleanup_old() {
     let recent_nonce = [0x02u8; 32];
 
     storage
+        .replay()
         .save_replay_nonce("contact-1", &old_nonce, 1000)
         .unwrap();
     storage
+        .replay()
         .save_replay_nonce("contact-1", &recent_nonce, 5000)
         .unwrap();
 
     // Cleanup nonces older than 3000
-    let removed = storage.cleanup_replay_nonces(3000).unwrap();
+    let removed = storage.replay().cleanup_replay_nonces(3000).unwrap();
     assert_eq!(removed, 1, "Should remove 1 old nonce");
 
-    let remaining = storage.load_replay_nonces("contact-1").unwrap();
+    let remaining = storage.replay().load_replay_nonces("contact-1").unwrap();
     assert_eq!(remaining.len(), 1);
     assert_eq!(remaining[0].0, recent_nonce);
 }
@@ -211,12 +216,13 @@ fn test_replay_detector_roundtrip_via_storage() {
     assert!(detector.check_replay("contact-x", &nonce, timestamp));
 
     storage
+        .replay()
         .save_replay_nonce("contact-x", &nonce, timestamp)
         .unwrap();
 
     // Simulate restart: create new detector and load from storage
     let mut detector2 = ReplayDetector::new(3600);
-    let nonces = storage.load_replay_nonces("contact-x").unwrap();
+    let nonces = storage.replay().load_replay_nonces("contact-x").unwrap();
     for (stored_nonce, stored_ts) in &nonces {
         // Pre-populate the detector from storage
         detector2.check_replay("contact-x", stored_nonce, *stored_ts);
@@ -235,14 +241,16 @@ fn test_duplicate_nonce_insert_is_idempotent() {
     let nonce = [0xFFu8; 32];
 
     storage
+        .replay()
         .save_replay_nonce("contact-1", &nonce, 1000)
         .unwrap();
     // Inserting same nonce again should not fail (OR IGNORE)
     storage
+        .replay()
         .save_replay_nonce("contact-1", &nonce, 1000)
         .unwrap();
 
-    let nonces = storage.load_replay_nonces("contact-1").unwrap();
+    let nonces = storage.replay().load_replay_nonces("contact-1").unwrap();
     assert_eq!(nonces.len(), 1, "Duplicate insert should be idempotent");
 }
 

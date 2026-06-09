@@ -35,7 +35,10 @@ fn create_test_delivery(storage: &Storage, message_id: &str, status: DeliverySta
         updated_at: ts,
         expires_at: None,
     };
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 }
 
 // === ACK Handling Tests ===
@@ -57,7 +60,11 @@ fn test_handle_stored_ack_updates_delivery_record() {
         )
         .unwrap();
 
-    let record = storage.get_delivery_record("msg-1").unwrap().unwrap();
+    let record = storage
+        .deliveries()
+        .get_delivery_record("msg-1")
+        .unwrap()
+        .unwrap();
     assert_eq!(
         record.status,
         DeliveryStatus::Stored,
@@ -83,7 +90,7 @@ fn test_handle_delivered_ack_removes_retry_entry() {
         created_at: ts,
         max_attempts: 10,
     };
-    storage.create_retry_entry(&retry).unwrap();
+    storage.retries().create_retry_entry(&retry).unwrap();
 
     service
         .handle_ack(
@@ -94,14 +101,22 @@ fn test_handle_delivered_ack_removes_retry_entry() {
         )
         .unwrap();
 
-    let record = storage.get_delivery_record("msg-1").unwrap().unwrap();
+    let record = storage
+        .deliveries()
+        .get_delivery_record("msg-1")
+        .unwrap()
+        .unwrap();
     assert_eq!(
         record.status,
         DeliveryStatus::Delivered,
         "Delivered ACK should update delivery record status to Delivered"
     );
     assert!(
-        storage.get_retry_entry("msg-1").unwrap().is_none(),
+        storage
+            .retries()
+            .get_retry_entry("msg-1")
+            .unwrap()
+            .is_none(),
         "Retry entry should be removed on successful delivery"
     );
 }
@@ -125,7 +140,11 @@ fn test_handle_failed_ack_schedules_retry() {
         )
         .unwrap();
 
-    let record = storage.get_delivery_record("msg-1").unwrap().unwrap();
+    let record = storage
+        .deliveries()
+        .get_delivery_record("msg-1")
+        .unwrap()
+        .unwrap();
     assert_eq!(
         record.status,
         DeliveryStatus::Failed {
@@ -134,7 +153,7 @@ fn test_handle_failed_ack_schedules_retry() {
         "Failed ACK should update delivery record status to Failed with reason"
     );
 
-    let retry = storage.get_retry_entry("msg-1").unwrap();
+    let retry = storage.retries().get_retry_entry("msg-1").unwrap();
     assert!(
         retry.is_some(),
         "Failed delivery should schedule a retry entry"
@@ -231,7 +250,10 @@ fn create_delivery_with_expiry(
         updated_at: created_at,
         expires_at,
     };
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 }
 
 // @scenario: message_delivery :: Expired messages are cleaned up automatically
@@ -272,16 +294,25 @@ fn test_run_cleanup_expires_old_records() {
     assert_eq!(result.expired, 1, "One record should be expired");
     assert_eq!(result.cleaned_up, 0, "No records old enough for cleanup");
 
-    let expired = storage.get_delivery_record("msg-expired").unwrap().unwrap();
+    let expired = storage
+        .deliveries()
+        .get_delivery_record("msg-expired")
+        .unwrap()
+        .unwrap();
     assert_eq!(
         expired.status,
         DeliveryStatus::Expired,
         "Past-expiry record should be marked Expired"
     );
 
-    let valid = storage.get_delivery_record("msg-valid").unwrap().unwrap();
+    let valid = storage
+        .deliveries()
+        .get_delivery_record("msg-valid")
+        .unwrap()
+        .unwrap();
     assert_eq!(valid.status, DeliveryStatus::Sent);
     let no_exp = storage
+        .deliveries()
         .get_delivery_record("msg-no-expiry")
         .unwrap()
         .unwrap();
@@ -305,6 +336,7 @@ fn test_run_cleanup_removes_old_terminal_records() {
         None,
     );
     storage
+        .deliveries()
         .update_delivery_status(
             "msg-old-delivered",
             &DeliveryStatus::Delivered,
@@ -329,6 +361,7 @@ fn test_run_cleanup_removes_old_terminal_records() {
 
     assert!(
         storage
+            .deliveries()
             .get_delivery_record("msg-old-delivered")
             .unwrap()
             .is_none(),
@@ -337,6 +370,7 @@ fn test_run_cleanup_removes_old_terminal_records() {
 
     assert!(
         storage
+            .deliveries()
             .get_delivery_record("msg-recent-delivered")
             .unwrap()
             .is_some(),
@@ -354,7 +388,10 @@ fn create_device_record(storage: &Storage, message_id: &str, device_id: &str, re
         status: DeviceDeliveryStatus::Pending,
         updated_at: now(),
     };
-    storage.create_device_delivery(&record).unwrap();
+    storage
+        .device_deliveries()
+        .create_device_delivery(&record)
+        .unwrap();
 }
 
 // @scenario: message_delivery :: Per-device ACK tracking aggregates to full delivery
@@ -387,7 +424,11 @@ fn test_handle_device_ack_tracks_per_device_delivery() {
     );
 
     // Message-level status should still be Stored (not yet fully delivered)
-    let record = storage.get_delivery_record("msg-multi").unwrap().unwrap();
+    let record = storage
+        .deliveries()
+        .get_delivery_record("msg-multi")
+        .unwrap()
+        .unwrap();
     assert_eq!(record.status, DeliveryStatus::Stored);
 
     // ACK device-b → still not fully delivered
@@ -420,7 +461,11 @@ fn test_handle_device_ack_tracks_per_device_delivery() {
         "3/3 devices — fully delivered"
     );
 
-    let record = storage.get_delivery_record("msg-multi").unwrap().unwrap();
+    let record = storage
+        .deliveries()
+        .get_delivery_record("msg-multi")
+        .unwrap()
+        .unwrap();
     assert_eq!(
         record.status,
         DeliveryStatus::Delivered,
@@ -478,7 +523,11 @@ fn test_handle_device_ack_failed_device_not_fully_delivered() {
     assert_eq!(summary.failed_devices, 1);
     assert!(!summary.is_fully_delivered());
 
-    let record = storage.get_delivery_record("msg-fail").unwrap().unwrap();
+    let record = storage
+        .deliveries()
+        .get_delivery_record("msg-fail")
+        .unwrap()
+        .unwrap();
     assert_ne!(
         record.status,
         DeliveryStatus::Delivered,

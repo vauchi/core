@@ -106,10 +106,15 @@ fn test_device_info_encrypted_roundtrip() {
 
     let device_id = [0x42; 32];
     storage
+        .device()
         .save_device_info(&device_id, 1, "Test Phone", 1000)
         .unwrap();
 
-    let loaded = storage.load_device_info().unwrap().expect("Should exist");
+    let loaded = storage
+        .device()
+        .load_device_info()
+        .unwrap()
+        .expect("Should exist");
     assert_eq!(loaded.0, device_id);
     assert_eq!(loaded.1, 1);
     assert_eq!(loaded.2, "Test Phone");
@@ -123,6 +128,7 @@ fn test_device_info_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
 
     storage
+        .device()
         .save_device_info(&[0x42; 32], 1, "SecretDevice", 1000)
         .unwrap();
 
@@ -161,9 +167,10 @@ fn test_version_vector_encrypted_roundtrip() {
     vector.increment(&[0x01; 32]);
     vector.increment(&[0x02; 32]);
 
-    storage.save_version_vector(&vector).unwrap();
+    storage.sync().save_version_vector(&vector).unwrap();
 
     let loaded = storage
+        .sync()
         .load_version_vector()
         .unwrap()
         .expect("Should exist");
@@ -179,7 +186,7 @@ fn test_version_vector_stored_as_encrypted_blob() {
 
     let mut vector = VersionVector::new();
     vector.increment(&[0x01; 32]);
-    storage.save_version_vector(&vector).unwrap();
+    storage.sync().save_version_vector(&vector).unwrap();
 
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -214,10 +221,12 @@ fn test_contact_sync_timestamps_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
 
     storage
+        .sync()
         .set_contact_last_sync("contact-1", 1234567890)
         .unwrap();
 
     let loaded = storage
+        .sync()
         .get_contact_last_sync("contact-1")
         .unwrap()
         .expect("Should exist");
@@ -230,6 +239,7 @@ fn test_contact_sync_timestamps_stored_encrypted() {
     let (dir, storage) = open_storage();
 
     storage
+        .sync()
         .set_contact_last_sync("contact-1", 1234567890)
         .unwrap();
 
@@ -266,9 +276,10 @@ fn test_pending_update_encrypted_roundtrip() {
         target_relay_url: None,
     };
 
-    storage.queue_update(&update).unwrap();
+    storage.pending().queue_update(&update).unwrap();
 
     let loaded = storage
+        .pending()
         .get_pending_update("upd-1")
         .unwrap()
         .expect("Should exist");
@@ -294,7 +305,7 @@ fn test_pending_update_payload_stored_encrypted() {
         target_relay_url: None,
     };
 
-    storage.queue_update(&update).unwrap();
+    storage.pending().queue_update(&update).unwrap();
 
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -333,9 +344,10 @@ fn test_retry_entry_encrypted_roundtrip() {
         max_attempts: 10,
     };
 
-    storage.create_retry_entry(&entry).unwrap();
+    storage.retries().create_retry_entry(&entry).unwrap();
 
     let loaded = storage
+        .retries()
         .get_retry_entry("msg-1")
         .unwrap()
         .expect("Should exist");
@@ -359,7 +371,7 @@ fn test_retry_entry_payload_stored_encrypted() {
         max_attempts: 10,
     };
 
-    storage.create_retry_entry(&entry).unwrap();
+    storage.retries().create_retry_entry(&entry).unwrap();
 
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -386,10 +398,12 @@ fn test_device_sync_checkpoint_encrypted_roundtrip() {
     let target_device_id = [0xAA; 32];
     let items = vec![]; // Empty items list for simplicity
     storage
+        .sync()
         .save_sync_checkpoint(&target_device_id, &items, 0)
         .unwrap();
 
     let loaded = storage
+        .sync()
         .load_sync_checkpoint(&target_device_id)
         .unwrap()
         .expect("Should exist");
@@ -404,6 +418,7 @@ fn test_device_sync_checkpoint_stored_encrypted() {
 
     let target_device_id = [0xAA; 32];
     storage
+        .sync()
         .save_sync_checkpoint(&target_device_id, &[], 5)
         .unwrap();
 
@@ -440,10 +455,12 @@ fn test_recovery_response_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
 
     storage
+        .recovery()
         .save_recovery_response("claim-1", "contact-1", "accepted", Some(5000))
         .unwrap();
 
     let loaded = storage
+        .recovery()
         .get_recovery_response("claim-1")
         .unwrap()
         .expect("Should exist");
@@ -458,6 +475,7 @@ fn test_recovery_response_stored_encrypted() {
     let (dir, storage) = open_storage();
 
     storage
+        .recovery()
         .save_recovery_response("claim-1", "contact-1", "accepted", Some(5000))
         .unwrap();
 
@@ -497,9 +515,9 @@ fn test_deletion_state_encrypted_roundtrip() {
         scheduled_at: 1000,
         execute_at: 2000,
     };
-    storage.save_deletion_state(&state).unwrap();
+    storage.consent().save_deletion_state(&state).unwrap();
 
-    let loaded = storage.load_deletion_state().unwrap();
+    let loaded = storage.consent().load_deletion_state().unwrap();
     assert_eq!(loaded, state);
 }
 
@@ -513,7 +531,7 @@ fn test_deletion_state_stored_encrypted() {
         scheduled_at: 1000,
         execute_at: 2000,
     };
-    storage.save_deletion_state(&state).unwrap();
+    storage.consent().save_deletion_state(&state).unwrap();
 
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -548,10 +566,12 @@ fn test_sync_checkpoint_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
 
     storage
+        .sync()
         .save_batch_checkpoint("batch-1", 10, 5, r#"{"step":"half"}"#)
         .unwrap();
 
     let loaded = storage
+        .sync()
         .load_batch_checkpoint("batch-1")
         .unwrap()
         .expect("Should exist");
@@ -566,6 +586,7 @@ fn test_sync_checkpoint_stored_encrypted() {
     let (dir, storage) = open_storage();
 
     storage
+        .sync()
         .save_batch_checkpoint("batch-1", 10, 5, r#"{"step":"half"}"#)
         .unwrap();
 
@@ -603,13 +624,18 @@ fn test_rekey_preserves_device_info() {
     let (_dir, mut storage) = open_storage();
 
     storage
+        .device()
         .save_device_info(&[0x42; 32], 1, "RekeyDevice", 1000)
         .unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let loaded = storage.load_device_info().unwrap().expect("Should exist");
+    let loaded = storage
+        .device()
+        .load_device_info()
+        .unwrap()
+        .expect("Should exist");
     assert_eq!(loaded.0, [0x42; 32]);
     assert_eq!(loaded.2, "RekeyDevice");
 }
@@ -621,12 +647,13 @@ fn test_rekey_preserves_version_vector() {
 
     let mut vector = VersionVector::new();
     vector.increment(&[0x01; 32]);
-    storage.save_version_vector(&vector).unwrap();
+    storage.sync().save_version_vector(&vector).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
     let loaded = storage
+        .sync()
         .load_version_vector()
         .unwrap()
         .expect("Should exist");
@@ -648,12 +675,13 @@ fn test_rekey_preserves_pending_updates() {
         status: UpdateStatus::Pending,
         target_relay_url: None,
     };
-    storage.queue_update(&update).unwrap();
+    storage.pending().queue_update(&update).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
     let loaded = storage
+        .pending()
         .get_pending_update("upd-1")
         .unwrap()
         .expect("Should exist");
@@ -674,12 +702,13 @@ fn test_rekey_preserves_retry_entries() {
         created_at: 1000,
         max_attempts: 10,
     };
-    storage.create_retry_entry(&entry).unwrap();
+    storage.retries().create_retry_entry(&entry).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
     let loaded = storage
+        .retries()
         .get_retry_entry("msg-1")
         .unwrap()
         .expect("Should exist");
@@ -695,11 +724,11 @@ fn test_rekey_preserves_deletion_state() {
         scheduled_at: 1000,
         execute_at: 2000,
     };
-    storage.save_deletion_state(&state).unwrap();
+    storage.consent().save_deletion_state(&state).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let loaded = storage.load_deletion_state().unwrap();
+    let loaded = storage.consent().load_deletion_state().unwrap();
     assert_eq!(loaded, state);
 }

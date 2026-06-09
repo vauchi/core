@@ -89,7 +89,7 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
     let now = storage.clock().unix_seconds();
 
     // Export contacts
-    let contacts = storage.list_contacts()?;
+    let contacts = storage.contacts().list_contacts()?;
     let gdpr_contacts: Vec<GdprContact> = contacts
         .iter()
         .map(|c| {
@@ -116,11 +116,13 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
 
     // Export own card
     let own_card = storage
+        .contacts()
         .load_own_card()?
         .map(|card| serde_json::to_value(&card).unwrap_or(serde_json::Value::Null));
 
     // Export consent records
     let consent_records = storage
+        .consent()
         .list_consent_records_with_version()?
         .into_iter()
         .map(|(id, ct, granted, ts, pv)| {
@@ -147,6 +149,7 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
     // Export audit log (Art 15 — access to all personal data)
     // Filter sensitive key material from details before export (#21)
     let audit_log = storage
+        .consent()
         .list_audit_log()?
         .into_iter()
         .map(|(event_type, details, timestamp)| {
@@ -160,7 +163,9 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
         .collect();
 
     // Log the export event itself
-    storage.log_audit_event("gdpr_data_export", None)?;
+    storage
+        .consent()
+        .log_audit_event("gdpr_data_export", None)?;
 
     Ok(GdprExport {
         version: 3,
@@ -243,7 +248,7 @@ fn redact_hex_strings(text: &str) -> String {
 fn export_devices(storage: &Storage) -> Option<Vec<GdprDevice>> {
     // Try to load device registry from storage
     // Returns empty list if no devices registered
-    match storage.load_device_registry_json() {
+    match storage.device().load_device_registry_json() {
         Ok(Some(json)) => {
             // Parse device registry JSON
             if let Ok(registry) = serde_json::from_str::<serde_json::Value>(&json)

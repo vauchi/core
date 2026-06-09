@@ -30,6 +30,7 @@ fn test_delivery_status_screen_shows_records_from_storage() {
 
     vauchi
         .storage()
+        .deliveries()
         .create_delivery_record(&DeliveryRecord {
             message_id: "msg-pending".to_string(),
             recipient_id: "contact-bob".to_string(),
@@ -42,6 +43,7 @@ fn test_delivery_status_screen_shows_records_from_storage() {
 
     vauchi
         .storage()
+        .deliveries()
         .create_delivery_record(&DeliveryRecord {
             message_id: "msg-failed".to_string(),
             recipient_id: "contact-carol".to_string(),
@@ -56,6 +58,7 @@ fn test_delivery_status_screen_shows_records_from_storage() {
 
     vauchi
         .storage()
+        .deliveries()
         .create_delivery_record(&DeliveryRecord {
             message_id: "msg-delivered".to_string(),
             recipient_id: "contact-dave".to_string(),
@@ -128,6 +131,7 @@ fn test_delivery_status_screen_shows_retry_for_failed() {
 
     vauchi
         .storage()
+        .deliveries()
         .create_delivery_record(&DeliveryRecord {
             message_id: "msg-fail".to_string(),
             recipient_id: "contact-eve".to_string(),
@@ -164,6 +168,7 @@ fn test_delivery_status_maps_statuses_correctly() {
     // Queued → Pending
     vauchi
         .storage()
+        .deliveries()
         .create_delivery_record(&DeliveryRecord {
             message_id: "msg-queued".to_string(),
             recipient_id: "contact-a".to_string(),
@@ -177,6 +182,7 @@ fn test_delivery_status_maps_statuses_correctly() {
     // Delivered → Success
     vauchi
         .storage()
+        .deliveries()
         .create_delivery_record(&DeliveryRecord {
             message_id: "msg-delivered".to_string(),
             recipient_id: "contact-b".to_string(),
@@ -190,6 +196,7 @@ fn test_delivery_status_maps_statuses_correctly() {
     // Failed → Failed
     vauchi
         .storage()
+        .deliveries()
         .create_delivery_record(&DeliveryRecord {
             message_id: "msg-failed".to_string(),
             recipient_id: "contact-c".to_string(),

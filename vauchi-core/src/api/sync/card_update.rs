@@ -102,7 +102,7 @@ pub fn process_card_updates(
     // Anonymous IDs (HKDF-derived, rotating hourly) are resolved to real
     // contact IDs using shared keys. Old-format messages with real identity
     // fingerprints pass through unchanged via the fallback path.
-    let contacts = storage.list_contacts().unwrap_or_default();
+    let contacts = storage.contacts().list_contacts().unwrap_or_default();
 
     for (sender_id, ciphertext) in updates {
         let resolved_id = resolve_sender_id(&contacts, &sender_id, storage.clock().unix_seconds())
@@ -136,12 +136,13 @@ pub fn process_single_card_update(
     ciphertext: &[u8],
 ) -> Result<(), CardUpdateError> {
     // 1. Reject updates from revoked senders
-    if storage.is_sender_revoked(sender_id)? {
+    if storage.contacts().is_sender_revoked(sender_id)? {
         return Err(CardUpdateError::SenderRevoked);
     }
 
     // 2. Load contact and reject if blocked
     let mut contact = storage
+        .contacts()
         .load_contact(sender_id)?
         .ok_or(CardUpdateError::ContactNotFound)?;
 
@@ -151,6 +152,7 @@ pub fn process_single_card_update(
 
     // 3. Load ratchet state and decrypt
     let (mut ratchet, is_initiator) = storage
+        .ratchets()
         .load_ratchet_state(sender_id)?
         .ok_or(CardUpdateError::NoRatchetState)?;
 
@@ -177,7 +179,7 @@ pub fn process_single_card_update(
     }
 
     // 7. Replay detection
-    if storage.is_replay_nonce(sender_id, &delta.nonce)? {
+    if storage.replay().is_replay_nonce(sender_id, &delta.nonce)? {
         return Err(CardUpdateError::ReplayDetected);
     }
 
@@ -203,7 +205,9 @@ pub fn process_single_card_update(
             // best-effort orphan cleanup: note may already be absent;
             // either way, the card update below is the source of truth
             #[allow(clippy::let_underscore_must_use)]
-            let _ = storage.delete_contact_field_note(sender_id, field_id);
+            let _ = storage
+                .field_notes()
+                .delete_contact_field_note(sender_id, field_id);
         }
     }
 
@@ -215,9 +219,13 @@ pub fn process_single_card_update(
     // state advances past a message that was never applied.
     storage.begin_transaction()?;
     let txn_result = (|| -> Result<(), CardUpdateError> {
-        storage.save_ratchet_state(sender_id, &ratchet, is_initiator)?;
-        storage.save_replay_nonce(sender_id, &delta.nonce, delta.timestamp)?;
-        storage.save_contact(&contact)?;
+        storage
+            .ratchets()
+            .save_ratchet_state(sender_id, &ratchet, is_initiator)?;
+        storage
+            .replay()
+            .save_replay_nonce(sender_id, &delta.nonce, delta.timestamp)?;
+        storage.contacts().save_contact(&contact)?;
         Ok(())
     })();
 

@@ -242,7 +242,10 @@ fn test_load_password_config_returns_none_initially() {
     let storage =
         Storage::in_memory(vauchi_core::SymmetricKey::generate()).expect("storage should open");
 
-    let config = storage.load_password_config().expect("load should succeed");
+    let config = storage
+        .identity()
+        .load_password_config()
+        .expect("load should succeed");
     assert!(
         config.is_none(),
         "password config should be None before any password is set"
@@ -259,12 +262,14 @@ fn test_save_load_app_password_roundtrip() {
     // Create identity row so password columns can be updated
     let backup_data = b"dummy-backup-data";
     storage
+        .identity()
         .save_identity(backup_data, "Test User")
         .expect("save identity should succeed");
 
     let password_config =
         AppPasswordConfig::create("test-password").expect("create should succeed");
     storage
+        .identity()
         .save_app_password(
             password_config.password_hash(),
             password_config.password_salt(),
@@ -272,6 +277,7 @@ fn test_save_load_app_password_roundtrip() {
         .expect("save should succeed");
 
     let loaded = storage
+        .identity()
         .load_password_config()
         .expect("load should succeed")
         .expect("should have password config");
@@ -291,12 +297,14 @@ fn test_save_load_duress_password_roundtrip() {
     // Create identity row so password columns can be updated
     let backup_data = b"dummy-backup-data";
     storage
+        .identity()
         .save_identity(backup_data, "Test User")
         .expect("save identity should succeed");
 
     let mut password_config =
         AppPasswordConfig::create("test-password").expect("create should succeed");
     storage
+        .identity()
         .save_app_password(
             password_config.password_hash(),
             password_config.password_salt(),
@@ -307,6 +315,7 @@ fn test_save_load_duress_password_roundtrip() {
         .setup_duress("duress-pin")
         .expect("setup duress should succeed");
     storage
+        .identity()
         .save_duress_password(
             password_config
                 .duress_hash()
@@ -318,6 +327,7 @@ fn test_save_load_duress_password_roundtrip() {
         .expect("save duress should succeed");
 
     let loaded = storage
+        .identity()
         .load_password_config()
         .expect("load should succeed")
         .expect("should have password config");
@@ -336,12 +346,14 @@ fn test_disable_duress_clears_data() {
     // Create identity row so password columns can be updated
     let backup_data = b"dummy-backup-data";
     storage
+        .identity()
         .save_identity(backup_data, "Test User")
         .expect("save identity should succeed");
 
     let mut password_config =
         AppPasswordConfig::create("test-password").expect("create should succeed");
     storage
+        .identity()
         .save_app_password(
             password_config.password_hash(),
             password_config.password_salt(),
@@ -351,15 +363,20 @@ fn test_disable_duress_clears_data() {
         .setup_duress("duress-pin")
         .expect("setup duress should succeed");
     storage
+        .identity()
         .save_duress_password(
             password_config.duress_hash().expect("duress hash"),
             password_config.duress_salt().expect("duress salt"),
         )
         .expect("save duress should succeed");
 
-    storage.disable_duress().expect("disable should succeed");
+    storage
+        .identity()
+        .disable_duress()
+        .expect("disable should succeed");
 
     let loaded = storage
+        .identity()
         .load_password_config()
         .expect("load should succeed")
         .expect("should have password config");
@@ -378,7 +395,10 @@ fn test_load_decoy_contacts_empty_initially() {
     let storage =
         Storage::in_memory(vauchi_core::SymmetricKey::generate()).expect("storage should open");
 
-    let contacts = storage.load_decoy_contacts().expect("load should succeed");
+    let contacts = storage
+        .decoy()
+        .load_decoy_contacts()
+        .expect("load should succeed");
     assert!(
         contacts.is_empty(),
         "decoy contacts should be empty initially"
@@ -394,10 +414,14 @@ fn test_save_load_decoy_contact() {
 
     let card = ContactCard::new("Fake Alice");
     storage
+        .decoy()
         .save_decoy_contact("decoy-1", "Fake Alice", &card)
         .expect("save should succeed");
 
-    let contacts = storage.load_decoy_contacts().expect("load should succeed");
+    let contacts = storage
+        .decoy()
+        .load_decoy_contacts()
+        .expect("load should succeed");
     assert_eq!(contacts.len(), 1);
     assert_eq!(contacts[0].0, "decoy-1"); // id
     assert_eq!(contacts[0].1, "Fake Alice"); // display_name
@@ -412,14 +436,19 @@ fn test_delete_decoy_contact() {
 
     let card = ContactCard::new("Fake Alice");
     storage
+        .decoy()
         .save_decoy_contact("decoy-1", "Fake Alice", &card)
         .expect("save should succeed");
 
     storage
+        .decoy()
         .delete_decoy_contact("decoy-1")
         .expect("delete should succeed");
 
-    let contacts = storage.load_decoy_contacts().expect("load should succeed");
+    let contacts = storage
+        .decoy()
+        .load_decoy_contacts()
+        .expect("load should succeed");
     assert!(
         contacts.is_empty(),
         "decoy contacts should be empty after delete"
@@ -435,17 +464,23 @@ fn test_clear_all_decoy_contacts() {
     let card1 = ContactCard::new("Fake Alice");
     let card2 = ContactCard::new("Fake Bob");
     storage
+        .decoy()
         .save_decoy_contact("decoy-1", "Fake Alice", &card1)
         .expect("save 1 should succeed");
     storage
+        .decoy()
         .save_decoy_contact("decoy-2", "Fake Bob", &card2)
         .expect("save 2 should succeed");
 
     storage
+        .decoy()
         .clear_all_decoy_contacts()
         .expect("clear should succeed");
 
-    let contacts = storage.load_decoy_contacts().expect("load should succeed");
+    let contacts = storage
+        .decoy()
+        .load_decoy_contacts()
+        .expect("load should succeed");
     assert!(
         contacts.is_empty(),
         "decoy contacts should be empty after clear"
@@ -660,6 +695,7 @@ fn test_change_app_password_persists_across_storage_reload() {
     // Reload via load_password_config — same path Vauchi::authenticate uses
     let reloaded = wb
         .storage()
+        .identity()
         .load_password_config()
         .expect("load")
         .expect("config exists");

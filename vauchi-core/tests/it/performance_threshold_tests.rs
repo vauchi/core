@@ -87,11 +87,11 @@ fn test_query_under_50ms_with_1000_contacts() {
         .unwrap();
         let shared = SymmetricKey::generate();
         let contact = Contact::from_exchange(pk, card, shared, 0);
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
     let start = Instant::now();
-    let results = storage.search_contacts("User 05").unwrap();
+    let results = storage.contacts().search_contacts("User 05").unwrap();
     let elapsed = start.elapsed();
 
     // "User 05" matches User 050..User 059, User 050x..User 059x = 100 contacts
@@ -127,7 +127,7 @@ fn test_pagination_under_100ms_per_page() {
         let card = ContactCard::new(&format!("Contact {:04}", i));
         let shared = SymmetricKey::generate();
         let contact = Contact::from_exchange(pk, card, shared, 0);
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
     let page_size = 50;
@@ -136,7 +136,10 @@ fn test_pagination_under_100ms_per_page() {
     for page in 0..num_pages {
         let offset = page * page_size;
         let start = Instant::now();
-        let results = storage.list_contacts_paginated(offset, page_size).unwrap();
+        let results = storage
+            .contacts()
+            .list_contacts_paginated(offset, page_size)
+            .unwrap();
         let elapsed = start.elapsed();
 
         assert_eq!(
@@ -193,11 +196,11 @@ fn test_list_1000_contacts_under_500ms() {
         let card = ContactCard::new(&format!("Contact {:04}", i));
         let shared = SymmetricKey::generate();
         let contact = Contact::from_exchange(pk, card, shared, 0);
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
     let start = Instant::now();
-    let contacts = storage.list_contacts().unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
     let elapsed = start.elapsed();
 
     assert_eq!(contacts.len(), 1000, "Should load all 1000 contacts");
@@ -227,11 +230,11 @@ fn test_list_100_contacts_under_100ms() {
         let card = ContactCard::new(&format!("Person {:04}", i));
         let shared = SymmetricKey::generate();
         let contact = Contact::from_exchange(pk, card, shared, 0);
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
     let start = Instant::now();
-    let contacts = storage.list_contacts().unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
     let elapsed = start.elapsed();
 
     assert_eq!(contacts.len(), 100);
@@ -266,12 +269,12 @@ fn test_queue_100_pending_updates_under_2s() {
             status: UpdateStatus::Pending,
             target_relay_url: Some("https://relay.vauchi.app".to_string()),
         };
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
     let queue_elapsed = start_queue.elapsed();
 
     let start_list = Instant::now();
-    let pending = storage.get_all_pending_updates().unwrap();
+    let pending = storage.pending().get_all_pending_updates().unwrap();
     let list_elapsed = start_list.elapsed();
 
     assert_eq!(pending.len(), 100, "Should retrieve all 100 updates");

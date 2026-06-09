@@ -37,14 +37,14 @@ impl<'a> ContactManager<'a> {
 
     /// Gets the user's own contact card.
     pub fn get_own_card(&self) -> VauchiResult<Option<ContactCard>> {
-        Ok(self.storage.load_own_card()?)
+        Ok(self.storage.contacts().load_own_card()?)
     }
 
     /// Updates the user's own contact card.
     ///
     /// Returns the list of changed field names.
     pub fn update_own_card(&self, card: &ContactCard) -> VauchiResult<Vec<String>> {
-        let old_card = self.storage.load_own_card()?;
+        let old_card = self.storage.contacts().load_own_card()?;
         let changed_fields = match &old_card {
             Some(old) => Self::compute_changed_fields(old, card),
             None => card
@@ -54,7 +54,7 @@ impl<'a> ContactManager<'a> {
                 .collect(),
         };
 
-        self.storage.save_own_card(card)?;
+        self.storage.contacts().save_own_card(card)?;
 
         if !changed_fields.is_empty() {
             self.events.dispatch(VauchiEvent::OwnCardUpdated {
@@ -70,20 +70,20 @@ impl<'a> ContactManager<'a> {
     /// During onboarding (before identity creation), creates an empty card
     /// if none exists yet so fields can be added incrementally.
     pub fn add_field_to_own_card(&self, field: ContactField) -> VauchiResult<()> {
-        let mut card = match self.storage.load_own_card()? {
+        let mut card = match self.storage.contacts().load_own_card()? {
             Some(c) => c,
             None => {
                 // During onboarding the card doesn't exist yet — create empty.
                 // Identity creation later links this card to the signing keys.
                 let empty = ContactCard::new("");
-                self.storage.save_own_card(&empty)?;
+                self.storage.contacts().save_own_card(&empty)?;
                 empty
             }
         };
 
         card.add_field(field.clone())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.storage.save_own_card(&card)?;
+        self.storage.contacts().save_own_card(&card)?;
 
         self.events.dispatch(VauchiEvent::OwnCardUpdated {
             changed_fields: vec![field.label().to_string()],
@@ -96,6 +96,7 @@ impl<'a> ContactManager<'a> {
     pub fn remove_field_from_own_card(&self, label: &str) -> VauchiResult<bool> {
         let mut card = self
             .storage
+            .contacts()
             .load_own_card()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
@@ -113,7 +114,7 @@ impl<'a> ContactManager<'a> {
         card.remove_field(&field_id)
             .map_err(|_| VauchiError::InvalidState("Field not found".into()))?;
 
-        self.storage.save_own_card(&card)?;
+        self.storage.contacts().save_own_card(&card)?;
         self.events.dispatch(VauchiEvent::OwnCardUpdated {
             changed_fields: vec![label.to_string()],
         });
@@ -125,12 +126,13 @@ impl<'a> ContactManager<'a> {
 
     /// Gets a contact by ID.
     pub fn get_contact(&self, id: &str) -> VauchiResult<Option<Contact>> {
-        Ok(self.storage.load_contact(id)?)
+        Ok(self.storage.contacts().load_contact(id)?)
     }
 
     /// Gets a contact by ID, returning error if not found.
     pub fn get_contact_required(&self, id: &str) -> VauchiResult<Contact> {
         self.storage
+            .contacts()
             .load_contact(id)?
             .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))
     }
@@ -140,7 +142,7 @@ impl<'a> ContactManager<'a> {
     /// Hidden contacts are excluded from the main list and only
     /// accessible via `Vauchi::list_hidden_contacts()`.
     pub fn list_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         Ok(contacts.into_iter().filter(|c| !c.is_hidden()).collect())
     }
 
@@ -152,7 +154,7 @@ impl<'a> ContactManager<'a> {
         offset: usize,
         limit: usize,
     ) -> VauchiResult<Vec<Contact>> {
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         let visible: Vec<Contact> = contacts.into_iter().filter(|c| !c.is_hidden()).collect();
         Ok(visible.into_iter().skip(offset).take(limit).collect())
     }
@@ -160,7 +162,7 @@ impl<'a> ContactManager<'a> {
     /// Searches visible (non-hidden) contacts by display name (case-insensitive).
     pub fn search_contacts(&self, query: &str) -> VauchiResult<Vec<Contact>> {
         let query_lower = query.to_lowercase();
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
 
         Ok(contacts
             .into_iter()
@@ -175,7 +177,7 @@ impl<'a> ContactManager<'a> {
     /// deduplicated. Hidden contacts are excluded.
     pub fn find_contact_fuzzy(&self, query: &str) -> VauchiResult<Vec<Contact>> {
         let query_lower = query.to_lowercase();
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
 
         let mut seen_ids = std::collections::HashSet::new();
         let mut results = Vec::new();
@@ -202,7 +204,7 @@ impl<'a> ContactManager<'a> {
     /// If no name match is found, tries matching on label ID prefix.
     /// Returns the first match, or `None` if no label matches.
     pub fn find_group_fuzzy(&self, query: &str) -> VauchiResult<Option<crate::contact::Group>> {
-        let labels = self.storage.load_all_groups()?;
+        let labels = self.storage.labels().load_all_groups()?;
         let query_lower = query.to_lowercase();
 
         // First: try case-insensitive name match
@@ -227,6 +229,7 @@ impl<'a> ContactManager<'a> {
     pub fn contact_count(&self) -> VauchiResult<usize> {
         Ok(self
             .storage
+            .contacts()
             .list_contacts()?
             .into_iter()
             .filter(|c| !c.is_hidden())
@@ -241,7 +244,7 @@ impl<'a> ContactManager<'a> {
         let contact_id = contact.id().to_string();
 
         // Check if already exists
-        if self.storage.load_contact(&contact_id)?.is_some() {
+        if self.storage.contacts().load_contact(&contact_id)?.is_some() {
             return Err(VauchiError::InvalidState(format!(
                 "Contact {} already exists",
                 contact_id
@@ -249,13 +252,13 @@ impl<'a> ContactManager<'a> {
         }
 
         // Enforce contact limit
-        let current_count = self.storage.count_contacts()?;
-        let max_contacts = self.storage.get_contact_limit()?;
+        let current_count = self.storage.contacts().count_contacts()?;
+        let max_contacts = self.storage.contacts().get_contact_limit()?;
         if current_count >= max_contacts {
             return Err(VauchiError::ContactLimitReached(max_contacts));
         }
 
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
 
         self.events.dispatch(VauchiEvent::ContactAdded {
             contact_id,
@@ -271,12 +274,13 @@ impl<'a> ContactManager<'a> {
 
         let old_contact = self
             .storage
+            .contacts()
             .load_contact(&contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.clone()))?;
 
         let changed_fields = Self::compute_changed_fields(old_contact.card(), contact.card());
 
-        self.storage.save_contact(contact)?;
+        self.storage.contacts().save_contact(contact)?;
 
         if !changed_fields.is_empty() {
             self.events.dispatch(VauchiEvent::ContactUpdated {
@@ -307,7 +311,7 @@ impl<'a> ContactManager<'a> {
         contact
             .mark_fingerprint_verified()
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         Ok(())
     }
 
@@ -322,7 +326,7 @@ impl<'a> ContactManager<'a> {
                 "Visibility rules require an exchanged contact".into(),
             ))?
             .set_everyone(field);
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         Ok(())
     }
 
@@ -335,7 +339,7 @@ impl<'a> ContactManager<'a> {
                 "Visibility rules require an exchanged contact".into(),
             ))?
             .set_nobody(field);
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         Ok(())
     }
 
@@ -355,7 +359,7 @@ impl<'a> ContactManager<'a> {
                 "Visibility rules require an exchanged contact".into(),
             ))?
             .set_contacts(field, allowed_set);
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         Ok(())
     }
 
@@ -374,7 +378,7 @@ impl<'a> ContactManager<'a> {
         }
         let now = self.storage.clock().unix_seconds();
         contact.soft_delete(now);
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactSoftDeleted {
             contact_id: id.to_string(),
         });
@@ -388,7 +392,7 @@ impl<'a> ContactManager<'a> {
     pub fn undo_delete_imported_contact(&self, id: &str) -> VauchiResult<()> {
         let mut contact = self.get_contact_required(id)?;
         contact.undo_soft_delete();
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         Ok(())
     }
 
@@ -424,7 +428,7 @@ impl<'a> ContactManager<'a> {
         }
         let now = self.storage.clock().unix_seconds();
         contact.archive(now);
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactArchived {
             contact_id: id.to_string(),
         });
@@ -435,7 +439,7 @@ impl<'a> ContactManager<'a> {
     pub fn unarchive_contact(&self, id: &str) -> VauchiResult<()> {
         let mut contact = self.get_contact_required(id)?;
         contact.unarchive();
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactUnarchived {
             contact_id: id.to_string(),
         });
@@ -444,7 +448,7 @@ impl<'a> ContactManager<'a> {
 
     /// Lists all archived contacts.
     pub fn list_archived_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        Ok(self.storage.list_archived_contacts()?)
+        Ok(self.storage.contacts().list_archived_contacts()?)
     }
 
     // === Helper Methods ===

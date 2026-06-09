@@ -52,14 +52,16 @@ impl ActivityLogWriter {
                     created_at: now_secs,
                 };
 
-                let was_inserted = storage.activity_log_insert(&row)?;
+                let was_inserted = storage.activity_log().activity_log_insert(&row)?;
                 if was_inserted {
                     inserted.push((event_key, entry));
                 }
             }
         }
 
-        storage.activity_log_prune(now_secs, RETENTION_SECS)?;
+        storage
+            .activity_log()
+            .activity_log_prune(now_secs, RETENTION_SECS)?;
 
         Ok(inserted)
     }

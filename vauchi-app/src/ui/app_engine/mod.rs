@@ -1405,6 +1405,7 @@ impl AppEngine {
         let name_resolver = |contact_id: &str| {
             self.vauchi
                 .storage()
+                .contacts()
                 .load_contact(contact_id)
                 .ok()
                 .flatten()

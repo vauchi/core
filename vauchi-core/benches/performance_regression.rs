@@ -86,7 +86,7 @@ fn create_populated_storage(contact_count: usize) -> Storage {
 
     for i in 0..contact_count {
         let contact = create_test_contact(i);
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
     storage
@@ -142,7 +142,10 @@ fn bench_cold_start(c: &mut Criterion) {
                 let key = SymmetricKey::generate();
                 let storage = Storage::in_memory(key.clone()).unwrap();
                 for i in 0..100 {
-                    storage.save_contact(&create_test_contact(i)).unwrap();
+                    storage
+                        .contacts()
+                        .save_contact(&create_test_contact(i))
+                        .unwrap();
                 }
                 // Return storage for measurement (simulating "reopening")
                 // In real file-based test, we'd reopen the file
@@ -150,7 +153,7 @@ fn bench_cold_start(c: &mut Criterion) {
             },
             |(storage, _key)| {
                 // Measure: load all contacts (simulates app startup data load)
-                let contacts = storage.list_contacts().unwrap();
+                let contacts = storage.contacts().list_contacts().unwrap();
                 hint_black_box(contacts);
             },
             criterion::BatchSize::SmallInput,
@@ -177,7 +180,7 @@ fn bench_warm_start(c: &mut Criterion) {
 
     group.bench_function("warm_start_list_100_contacts", |b| {
         b.iter(|| {
-            let contacts = storage.list_contacts().unwrap();
+            let contacts = storage.contacts().list_contacts().unwrap();
             hint_black_box(contacts);
         })
     });
@@ -185,7 +188,7 @@ fn bench_warm_start(c: &mut Criterion) {
     // Warm start with paginated list (more realistic UI scenario)
     group.bench_function("warm_start_first_page_50", |b| {
         b.iter(|| {
-            let contacts = storage.list_contacts_paginated(0, 50).unwrap();
+            let contacts = storage.contacts().list_contacts_paginated(0, 50).unwrap();
             hint_black_box(contacts);
         })
     });
@@ -216,7 +219,10 @@ fn bench_contact_list_scroll(c: &mut Criterion) {
             &offset,
             |b, &offset| {
                 b.iter(|| {
-                    let contacts = storage.list_contacts_paginated(offset, 50).unwrap();
+                    let contacts = storage
+                        .contacts()
+                        .list_contacts_paginated(offset, 50)
+                        .unwrap();
                     hint_black_box(contacts);
                 })
             },
@@ -226,7 +232,10 @@ fn bench_contact_list_scroll(c: &mut Criterion) {
     // Benchmark search within 500 contacts
     group.bench_function("search_500_contacts", |b| {
         b.iter(|| {
-            let contacts = storage.search_contacts(black_box("Contact 25")).unwrap();
+            let contacts = storage
+                .contacts()
+                .search_contacts(black_box("Contact 25"))
+                .unwrap();
             hint_black_box(contacts);
         })
     });
@@ -235,7 +244,10 @@ fn bench_contact_list_scroll(c: &mut Criterion) {
     group.bench_function("scroll_10_pages_sequential", |b| {
         b.iter(|| {
             for page in 0..10 {
-                let contacts = storage.list_contacts_paginated(page * 50, 50).unwrap();
+                let contacts = storage
+                    .contacts()
+                    .list_contacts_paginated(page * 50, 50)
+                    .unwrap();
                 hint_black_box(contacts);
             }
         })
@@ -269,7 +281,7 @@ fn bench_memory_500_contacts(c: &mut Criterion) {
         b.iter_batched(
             || create_populated_storage(500),
             |storage| {
-                let contacts = storage.list_contacts().unwrap();
+                let contacts = storage.contacts().list_contacts().unwrap();
                 hint_black_box(contacts);
             },
             criterion::BatchSize::SmallInput,
@@ -483,8 +495,8 @@ fn bench_regression_markers(c: &mut Criterion) {
                 (storage, contact)
             },
             |(storage, contact)| {
-                storage.save_contact(&contact).unwrap();
-                let loaded = storage.load_contact(contact.id()).unwrap();
+                storage.contacts().save_contact(&contact).unwrap();
+                let loaded = storage.contacts().load_contact(contact.id()).unwrap();
                 hint_black_box(loaded);
             },
             criterion::BatchSize::SmallInput,
@@ -501,8 +513,8 @@ fn bench_regression_markers(c: &mut Criterion) {
                 (storage, card)
             },
             |(storage, card)| {
-                storage.save_own_card(&card).unwrap();
-                let loaded = storage.load_own_card().unwrap();
+                storage.contacts().save_own_card(&card).unwrap();
+                let loaded = storage.contacts().load_own_card().unwrap();
                 hint_black_box(loaded);
             },
             criterion::BatchSize::SmallInput,
@@ -514,7 +526,7 @@ fn bench_regression_markers(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let storage = create_populated_storage(100);
-                let contacts = storage.list_contacts().unwrap();
+                let contacts = storage.contacts().list_contacts().unwrap();
                 let id = contacts[50].id().to_string();
                 (storage, id)
             },

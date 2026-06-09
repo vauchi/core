@@ -29,10 +29,10 @@ impl Vauchi {
         &self,
         moment_type: AhaMomentType,
     ) -> VauchiResult<Option<AhaMoment>> {
-        let mut tracker = self.storage.load_or_create_aha_tracker()?;
+        let mut tracker = self.storage.ux().load_or_create_aha_tracker()?;
         let moment = tracker.try_trigger(moment_type);
         if moment.is_some() {
-            self.storage.save_aha_tracker(&tracker)?;
+            self.storage.ux().save_aha_tracker(&tracker)?;
         }
         Ok(moment)
     }
@@ -45,31 +45,31 @@ impl Vauchi {
         moment_type: AhaMomentType,
         context: String,
     ) -> VauchiResult<Option<AhaMoment>> {
-        let mut tracker = self.storage.load_or_create_aha_tracker()?;
+        let mut tracker = self.storage.ux().load_or_create_aha_tracker()?;
         let moment = tracker.try_trigger_with_context(moment_type, context);
         if moment.is_some() {
-            self.storage.save_aha_tracker(&tracker)?;
+            self.storage.ux().save_aha_tracker(&tracker)?;
         }
         Ok(moment)
     }
 
     /// Checks if an aha moment has been seen.
     pub fn has_seen_aha_moment(&self, moment_type: AhaMomentType) -> VauchiResult<bool> {
-        let tracker = self.storage.load_or_create_aha_tracker()?;
+        let tracker = self.storage.ux().load_or_create_aha_tracker()?;
         Ok(tracker.has_seen(moment_type))
     }
 
     /// Gets the number of aha moments seen.
     pub fn aha_moments_seen_count(&self) -> VauchiResult<usize> {
-        let tracker = self.storage.load_or_create_aha_tracker()?;
+        let tracker = self.storage.ux().load_or_create_aha_tracker()?;
         Ok(tracker.seen_count())
     }
 
     /// Resets all aha moments (for testing or demo replay).
     pub fn reset_aha_moments(&self) -> VauchiResult<()> {
-        let mut tracker = self.storage.load_or_create_aha_tracker()?;
+        let mut tracker = self.storage.ux().load_or_create_aha_tracker()?;
         tracker.reset();
-        self.storage.save_aha_tracker(&tracker)?;
+        self.storage.ux().save_aha_tracker(&tracker)?;
         Ok(())
     }
 
@@ -77,17 +77,17 @@ impl Vauchi {
 
     /// Gets the current demo contact state.
     pub fn demo_contact_state(&self) -> VauchiResult<DemoContactState> {
-        Ok(self.storage.load_or_create_demo_contact_state()?)
+        Ok(self.storage.ux().load_or_create_demo_contact_state()?)
     }
 
     /// Checks if the demo contact is active.
     pub fn is_demo_contact_active(&self) -> VauchiResult<bool> {
-        Ok(self.storage.is_demo_contact_active()?)
+        Ok(self.storage.ux().is_demo_contact_active()?)
     }
 
     /// Gets the current demo contact card (if active).
     pub fn demo_contact_card(&self) -> VauchiResult<Option<DemoContactCard>> {
-        let state = self.storage.load_or_create_demo_contact_state()?;
+        let state = self.storage.ux().load_or_create_demo_contact_state()?;
         if !state.is_active {
             return Ok(None);
         }
@@ -101,36 +101,36 @@ impl Vauchi {
     ///
     /// Returns the new tip if successful.
     pub fn advance_demo_contact(&self) -> VauchiResult<Option<DemoTip>> {
-        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        let mut state = self.storage.ux().load_or_create_demo_contact_state()?;
         if !state.is_active {
             return Ok(None);
         }
         let tip = state.advance_to_next_tip(self.clock.unix_seconds());
-        self.storage.save_demo_contact_state(&state)?;
+        self.storage.ux().save_demo_contact_state(&state)?;
         Ok(tip)
     }
 
     /// Dismisses the demo contact (user-initiated).
     pub fn dismiss_demo_contact(&self) -> VauchiResult<()> {
-        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        let mut state = self.storage.ux().load_or_create_demo_contact_state()?;
         state.dismiss();
-        self.storage.save_demo_contact_state(&state)?;
+        self.storage.ux().save_demo_contact_state(&state)?;
         Ok(())
     }
 
     /// Auto-removes the demo contact (after first real exchange).
     pub fn auto_remove_demo_contact(&self) -> VauchiResult<()> {
-        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        let mut state = self.storage.ux().load_or_create_demo_contact_state()?;
         state.auto_remove();
-        self.storage.save_demo_contact_state(&state)?;
+        self.storage.ux().save_demo_contact_state(&state)?;
         Ok(())
     }
 
     /// Restores the demo contact from settings.
     pub fn restore_demo_contact(&self) -> VauchiResult<()> {
-        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        let mut state = self.storage.ux().load_or_create_demo_contact_state()?;
         state.restore();
-        self.storage.save_demo_contact_state(&state)?;
+        self.storage.ux().save_demo_contact_state(&state)?;
         Ok(())
     }
 
@@ -144,7 +144,7 @@ impl Vauchi {
         }
 
         let state = DemoContactState::new_active(self.clock.unix_seconds());
-        self.storage.save_demo_contact_state(&state)?;
+        self.storage.ux().save_demo_contact_state(&state)?;
         Ok(())
     }
 
@@ -177,10 +177,11 @@ impl Vauchi {
     pub fn hide_contact(&self, id: &str) -> VauchiResult<()> {
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(id)?
             .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
         contact.hide();
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactHidden {
             contact_id: id.to_string(),
         });
@@ -191,10 +192,11 @@ impl Vauchi {
     pub fn unhide_contact(&self, id: &str) -> VauchiResult<()> {
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(id)?
             .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
         contact.unhide();
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactUnhidden {
             contact_id: id.to_string(),
         });
@@ -203,7 +205,7 @@ impl Vauchi {
 
     /// Lists all hidden contacts.
     pub fn list_hidden_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         Ok(contacts.into_iter().filter(|c| c.is_hidden()).collect())
     }
 
@@ -216,10 +218,11 @@ impl Vauchi {
     pub fn block_contact(&self, id: &str) -> VauchiResult<()> {
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(id)?
             .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
         contact.block();
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactBlocked {
             contact_id: id.to_string(),
         });
@@ -230,10 +233,11 @@ impl Vauchi {
     pub fn unblock_contact(&self, id: &str) -> VauchiResult<()> {
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(id)?
             .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
         contact.unblock();
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactUnblocked {
             contact_id: id.to_string(),
         });
@@ -242,7 +246,7 @@ impl Vauchi {
 
     /// Lists all blocked contacts.
     pub fn list_blocked_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         Ok(contacts.into_iter().filter(|c| c.is_blocked()).collect())
     }
 
@@ -309,7 +313,7 @@ impl Vauchi {
     /// configured recovery threshold. Replaces inline readiness computation
     /// in CLI contacts.rs and recovery.rs (ADR-021 Tier 1).
     pub fn get_recovery_readiness(&self) -> VauchiResult<RecoveryReadiness> {
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         let trusted_count = contacts.iter().filter(|c| c.is_recovery_trusted()).count();
         let threshold = self.config.recovery.threshold;
 
@@ -380,7 +384,9 @@ impl Vauchi {
         label_id: &str,
         contact_id: &str,
     ) -> VauchiResult<()> {
-        self.storage.add_contact_to_group(label_id, contact_id)?;
+        self.storage
+            .labels()
+            .add_contact_to_group(label_id, contact_id)?;
         self.repropagate_to_contact(contact_id)
     }
 
@@ -393,6 +399,7 @@ impl Vauchi {
         contact_id: &str,
     ) -> VauchiResult<()> {
         self.storage
+            .labels()
             .remove_contact_from_group(label_id, contact_id)?;
         self.repropagate_to_contact(contact_id)
     }
@@ -407,10 +414,11 @@ impl Vauchi {
         is_visible: bool,
     ) -> VauchiResult<()> {
         self.storage
+            .labels()
             .set_group_field_visibility(label_id, field_id, is_visible)?;
 
         // Re-propagate to all contacts in this label
-        let label = self.storage.load_group(label_id)?;
+        let label = self.storage.labels().load_group(label_id)?;
         for contact_id in label.contacts() {
             self.repropagate_to_contact(contact_id)?;
         }
@@ -427,6 +435,7 @@ impl Vauchi {
         is_visible: bool,
     ) -> VauchiResult<()> {
         self.storage
+            .labels()
             .save_contact_override(contact_id, field_id, is_visible)?;
         self.repropagate_to_contact(contact_id)
     }
@@ -441,7 +450,7 @@ impl Vauchi {
     /// (see `2026-06-08-card-revocation-not-propagated`). Idempotent and
     /// best-effort: a missing own card / unknown contact is a no-op.
     pub fn initialize_sent_baseline(&self, contact_id: &str) -> VauchiResult<()> {
-        let own_card = match self.storage.load_own_card()? {
+        let own_card = match self.storage.contacts().load_own_card()? {
             Some(c) => c,
             None => return Ok(()),
         };
@@ -455,6 +464,7 @@ impl Vauchi {
             })
             .collect();
         self.storage
+            .contacts()
             .save_last_sent_visible_fields(contact_id, &visible)?;
         Ok(())
     }
@@ -475,19 +485,22 @@ impl Vauchi {
 
         let own_card = self
             .storage
+            .contacts()
             .load_own_card()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
 
         // Skip contacts without ratchet (not yet synced)
-        let (mut ratchet, is_initiator) = match self.storage.load_ratchet_state(contact_id)? {
-            Some(r) => r,
-            None => return Ok(()),
-        };
+        let (mut ratchet, is_initiator) =
+            match self.storage.ratchets().load_ratchet_state(contact_id)? {
+                Some(r) => r,
+                None => return Ok(()),
+            };
 
         // The fields currently visible to this contact (effective, group-aware)
         // — also the new last-sent baseline.
@@ -512,7 +525,11 @@ impl Vauchi {
         // the contact last saw but may no longer see get an explicit `Removed`
         // change so the peer drops them. `None` baseline (first send) → no
         // removals (we have no record of what was previously shared).
-        if let Some(prev) = self.storage.load_last_sent_visible_fields(contact_id)? {
+        if let Some(prev) = self
+            .storage
+            .contacts()
+            .load_last_sent_visible_fields(contact_id)?
+        {
             for revoked in prev.difference(&new_visible) {
                 delta
                     .changes
@@ -526,6 +543,7 @@ impl Vauchi {
             // Nothing to add or remove; still record the baseline so a later
             // revocation has a reference point.
             self.storage
+                .contacts()
                 .save_last_sent_visible_fields(contact_id, &new_visible)?;
             return Ok(());
         }
@@ -555,7 +573,7 @@ impl Vauchi {
             };
 
             contact.set_cek(new_cek);
-            self.storage.save_contact(&contact)?;
+            self.storage.contacts().save_contact(&contact)?;
             VersionedPayload::encode_cek(&wrapped)
         } else {
             delta_bytes
@@ -570,6 +588,7 @@ impl Vauchi {
 
         // Save updated ratchet state
         self.storage
+            .ratchets()
             .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
 
         // Queue for delivery
@@ -585,11 +604,12 @@ impl Vauchi {
             status: UpdateStatus::Pending,
             target_relay_url: None,
         };
-        self.storage.queue_update(&update)?;
+        self.storage.pending().queue_update(&update)?;
 
         // Record the visible-field baseline this send established, so a later
         // revocation can diff against it (fix C).
         self.storage
+            .contacts()
             .save_last_sent_visible_fields(contact_id, &new_visible)?;
 
         Ok(())

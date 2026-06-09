@@ -317,20 +317,24 @@ fn test_ratchet_state_serialization() {
 
     alice_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&bob_contact_id, &alice_ratchet, true)
         .unwrap();
     bob_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&alice_contact_id, &bob_ratchet, false)
         .unwrap();
 
     let (loaded_alice, is_initiator_a) = alice_wb
         .storage()
+        .ratchets()
         .load_ratchet_state(&bob_contact_id)
         .unwrap()
         .unwrap();
     let (loaded_bob, is_initiator_b) = bob_wb
         .storage()
+        .ratchets()
         .load_ratchet_state(&alice_contact_id)
         .unwrap()
         .unwrap();

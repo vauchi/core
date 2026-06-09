@@ -362,7 +362,7 @@ fn test_visibility_all_fields_hidden() {
     contact.visibility_rules_mut().unwrap().set_nobody("field2");
     contact.visibility_rules_mut().unwrap().set_nobody("field3");
 
-    wb.storage().save_contact(&contact).unwrap();
+    wb.storage().contacts().save_contact(&contact).unwrap();
 
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     let rules = loaded.visibility_rules();
@@ -549,7 +549,7 @@ fn test_saving_contact_twice_updates() {
     card.update_field_value(&field_id, "updated@test.com", 0)
         .unwrap();
     contact.update_card(card, 0);
-    wb.storage().save_contact(&contact).unwrap();
+    wb.storage().contacts().save_contact(&contact).unwrap();
 
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     let email = loaded

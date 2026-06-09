@@ -170,6 +170,7 @@ impl AppEngine {
         let registry = self
             .vauchi
             .storage()
+            .device()
             .load_device_registry()
             .map_err(|e| e.to_string())?
             .unwrap_or_else(|| identity.initial_device_registry());

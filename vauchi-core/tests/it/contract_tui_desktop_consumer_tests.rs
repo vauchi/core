@@ -38,9 +38,12 @@ fn provider_contract_storage_save_load_identity() {
     let storage = Storage::open(dir.path().join("p.db").to_str().unwrap(), key).unwrap();
 
     let data = b"identity-backup-bytes".to_vec();
-    storage.save_identity(&data, "ProviderTest").unwrap();
+    storage
+        .identity()
+        .save_identity(&data, "ProviderTest")
+        .unwrap();
 
-    let loaded = storage.load_identity().unwrap();
+    let loaded = storage.identity().load_identity().unwrap();
     assert!(loaded.is_some(), "expected Some value");
     let (loaded_data, loaded_name) = loaded.unwrap();
     assert_eq!(loaded_data, data);
@@ -68,9 +71,9 @@ fn provider_contract_storage_save_load_own_card_with_fields() {
         0,
     ))
     .unwrap();
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
 
-    let loaded = storage.load_own_card().unwrap().unwrap();
+    let loaded = storage.contacts().load_own_card().unwrap().unwrap();
     assert_eq!(loaded.display_name(), "ProviderCard");
     assert_eq!(loaded.fields().len(), 2);
 }
@@ -85,7 +88,7 @@ fn provider_contract_storage_list_contacts_returns_vec() {
     let dir = tempfile::tempdir().unwrap();
     let key = SymmetricKey::generate();
     let storage = Storage::open(dir.path().join("p.db").to_str().unwrap(), key).unwrap();
-    let contacts = storage.list_contacts().unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
     assert!(contacts.is_empty());
 }
 
@@ -95,7 +98,7 @@ fn provider_contract_storage_search_contacts_returns_vec() {
     let dir = tempfile::tempdir().unwrap();
     let key = SymmetricKey::generate();
     let storage = Storage::open(dir.path().join("p.db").to_str().unwrap(), key).unwrap();
-    let results = storage.search_contacts("test").unwrap();
+    let results = storage.contacts().search_contacts("test").unwrap();
     assert!(results.is_empty());
 }
 

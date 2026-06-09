@@ -38,10 +38,11 @@ fn haversine_known_distance_is_accurate() {
 fn create_place_round_trips_through_get() {
     let storage = open_storage();
     let created = storage
+        .places()
         .create_place("The Anchor Bar", ANCHOR_LAT, ANCHOR_LON)
         .unwrap();
 
-    let loaded = storage.get_place(&created.id).unwrap().unwrap();
+    let loaded = storage.places().get_place(&created.id).unwrap().unwrap();
     assert_eq!(loaded.name, "The Anchor Bar", "name must decrypt back");
     assert!((loaded.latitude - ANCHOR_LAT).abs() < 1e-9);
     assert!((loaded.longitude - ANCHOR_LON).abs() < 1e-9);
@@ -53,11 +54,13 @@ fn create_place_round_trips_through_get() {
 fn find_place_near_matches_within_radius_only() {
     let storage = open_storage();
     let anchor = storage
+        .places()
         .create_place("The Anchor Bar", ANCHOR_LAT, ANCHOR_LON)
         .unwrap();
 
     // ~30 m north (0.00027° lat) — within the 100 m radius.
     let near = storage
+        .places()
         .find_place_near(ANCHOR_LAT + 0.00027, ANCHOR_LON)
         .unwrap();
     assert_eq!(
@@ -68,6 +71,7 @@ fn find_place_near_matches_within_radius_only() {
 
     // ~1 km away — outside the radius, no match.
     let far = storage
+        .places()
         .find_place_near(ANCHOR_LAT + 0.01, ANCHOR_LON)
         .unwrap();
     assert!(far.is_none(), "a point ~1 km away must not match");
@@ -79,13 +83,18 @@ fn find_place_near_matches_within_radius_only() {
 fn find_place_near_returns_closest_of_several() {
     let storage = open_storage();
     let _far = storage
+        .places()
         .create_place("Far Cafe", ANCHOR_LAT + 0.0008, ANCHOR_LON)
         .unwrap(); // ~89 m
     let close = storage
+        .places()
         .create_place("Close Bar", ANCHOR_LAT + 0.0001, ANCHOR_LON)
         .unwrap(); // ~11 m
 
-    let found = storage.find_place_near(ANCHOR_LAT, ANCHOR_LON).unwrap();
+    let found = storage
+        .places()
+        .find_place_near(ANCHOR_LAT, ANCHOR_LON)
+        .unwrap();
     assert_eq!(
         found.map(|p| p.id),
         Some(close.id),
@@ -99,14 +108,20 @@ fn find_place_near_returns_closest_of_several() {
 #[test]
 fn delete_and_list_places() {
     let storage = open_storage();
-    let a = storage.create_place("A", ANCHOR_LAT, ANCHOR_LON).unwrap();
-    storage.create_place("B", ANCHOR_LAT, ANCHOR_LON).unwrap();
+    let a = storage
+        .places()
+        .create_place("A", ANCHOR_LAT, ANCHOR_LON)
+        .unwrap();
+    storage
+        .places()
+        .create_place("B", ANCHOR_LAT, ANCHOR_LON)
+        .unwrap();
 
-    assert_eq!(storage.list_places().unwrap().len(), 2);
-    assert!(storage.delete_place(&a.id).unwrap());
-    assert_eq!(storage.list_places().unwrap().len(), 1);
+    assert_eq!(storage.places().list_places().unwrap().len(), 2);
+    assert!(storage.places().delete_place(&a.id).unwrap());
+    assert_eq!(storage.places().list_places().unwrap().len(), 1);
     assert!(
-        !storage.delete_place(&a.id).unwrap(),
+        !storage.places().delete_place(&a.id).unwrap(),
         "second delete absent"
     );
 }
@@ -117,6 +132,7 @@ fn delete_and_list_places() {
 fn place_name_and_coords_encrypted_at_rest() {
     let storage = open_storage();
     let p = storage
+        .places()
         .create_place("Secret Therapist Office", ANCHOR_LAT, ANCHOR_LON)
         .unwrap();
 
@@ -142,12 +158,13 @@ fn place_name_and_coords_encrypted_at_rest() {
 fn place_survives_storage_rekey() {
     let mut storage = open_storage();
     let p = storage
+        .places()
         .create_place("The Anchor Bar", ANCHOR_LAT, ANCHOR_LON)
         .unwrap();
 
     storage.rekey(SymmetricKey::generate()).unwrap();
 
-    let loaded = storage.get_place(&p.id).unwrap().unwrap();
+    let loaded = storage.places().get_place(&p.id).unwrap().unwrap();
     assert_eq!(loaded.name, "The Anchor Bar", "name decrypts after rekey");
     assert!(
         (loaded.latitude - ANCHOR_LAT).abs() < 1e-9,
@@ -162,8 +179,8 @@ fn save_place_preserves_id_for_sync() {
     let storage = open_storage();
     let original = Place::new("Synced Spot", ANCHOR_LAT, ANCHOR_LON, 42);
 
-    storage.save_place(&original).unwrap();
-    let loaded = storage.get_place(&original.id).unwrap().unwrap();
+    storage.places().save_place(&original).unwrap();
+    let loaded = storage.places().get_place(&original.id).unwrap().unwrap();
 
     assert_eq!(loaded.id, original.id, "save_place keeps the supplied id");
     assert_eq!(loaded.created_at, 42);

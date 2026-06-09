@@ -58,21 +58,21 @@ impl Vauchi {
     pub fn get_setup_progress(&self) -> VauchiResult<SetupProgress> {
         let identity_created = self.has_identity();
 
-        let card_has_fields = match self.storage.load_own_card()? {
+        let card_has_fields = match self.storage.contacts().load_own_card()? {
             Some(card) => !card.fields().is_empty(),
             None => false,
         };
 
-        let contact_count = self.storage.list_contacts()?.len();
+        let contact_count = self.storage.contacts().list_contacts()?.len();
         let has_contacts = contact_count > 0;
         let has_three_contacts = contact_count >= 3;
 
-        let device_linked = match self.storage.load_device_registry()? {
+        let device_linked = match self.storage.device().load_device_registry()? {
             Some(registry) => registry.device_count() > 1,
             None => false,
         };
 
-        let password_set = self.storage.load_password_config()?.is_some();
+        let password_set = self.storage.identity().load_password_config()?.is_some();
 
         // Count completed steps
         let steps = [
@@ -108,7 +108,7 @@ impl Vauchi {
         }
 
         // Also check storage — identity might be persisted but not loaded
-        let has_stored_id = self.storage.has_identity()?;
+        let has_stored_id = self.storage.identity().has_identity()?;
         if has_stored_id {
             return Ok(false);
         }

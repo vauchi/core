@@ -53,7 +53,7 @@ impl RetryScheduler {
         rng: &dyn crate::rng::SecureRng,
     ) -> Result<RetryTickResult, StorageError> {
         let now = storage.clock().unix_seconds();
-        let due_entries = storage.get_due_retries(now)?;
+        let due_entries = storage.retries().get_due_retries(now)?;
 
         let mut result = RetryTickResult {
             due: due_entries.len(),
@@ -63,11 +63,11 @@ impl RetryScheduler {
         for entry in due_entries {
             if entry.is_max_attempts_exceeded() {
                 // Remove permanently failed entry
-                storage.delete_retry_entry(&entry.message_id)?;
+                storage.retries().delete_retry_entry(&entry.message_id)?;
                 // Update delivery status to permanent failure —
                 // propagate so the user sees "Failed" instead of "Pending"
                 // (was silently dropped before 2026-05-21).
-                storage.update_delivery_status(
+                storage.deliveries().update_delivery_status(
                     &entry.message_id,
                     &DeliveryStatus::Failed {
                         reason: "max retries exceeded".to_string(),
@@ -80,7 +80,9 @@ impl RetryScheduler {
                 let next_retry =
                     self.retry_queue
                         .next_retry_time_with_jitter(now, entry.attempt + 1, rng);
-                storage.increment_retry_attempt(&entry.message_id, next_retry)?;
+                storage
+                    .retries()
+                    .increment_retry_attempt(&entry.message_id, next_retry)?;
                 result.ready_ids.push(entry.message_id);
                 result.rescheduled += 1;
             }

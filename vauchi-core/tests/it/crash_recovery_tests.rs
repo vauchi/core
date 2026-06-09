@@ -37,10 +37,11 @@ fn test_checkpoint_save_and_load() {
     let items = create_batch_items(50);
 
     storage
+        .sync()
         .save_sync_checkpoint(&target_device, &items, 25)
         .unwrap();
 
-    let loaded = storage.load_sync_checkpoint(&target_device).unwrap();
+    let loaded = storage.sync().load_sync_checkpoint(&target_device).unwrap();
     assert!(loaded.is_some(), "Checkpoint should be loaded");
 
     let (loaded_items, sent_count) = loaded.unwrap();
@@ -58,11 +59,13 @@ fn test_checkpoint_resume_from_correct_position() {
 
     // Simulate: save checkpoint at 25, "crash", resume
     storage
+        .sync()
         .save_sync_checkpoint(&target_device, &items, 25)
         .unwrap();
 
     // Simulate resume: load checkpoint and continue from sent_count
     let (loaded_items, sent_count) = storage
+        .sync()
         .load_sync_checkpoint(&target_device)
         .unwrap()
         .unwrap();
@@ -89,15 +92,18 @@ fn test_checkpoint_update_progress() {
     let items = create_batch_items(50);
 
     storage
+        .sync()
         .save_sync_checkpoint(&target_device, &items, 10)
         .unwrap();
 
     // Update to 30 (simulating continued progress)
     storage
+        .sync()
         .save_sync_checkpoint(&target_device, &items, 30)
         .unwrap();
 
     let (_, sent_count) = storage
+        .sync()
         .load_sync_checkpoint(&target_device)
         .unwrap()
         .unwrap();
@@ -112,12 +118,16 @@ fn test_checkpoint_clear_after_completion() {
     let items = create_batch_items(50);
 
     storage
+        .sync()
         .save_sync_checkpoint(&target_device, &items, 50)
         .unwrap();
 
-    storage.clear_sync_checkpoint(&target_device).unwrap();
+    storage
+        .sync()
+        .clear_sync_checkpoint(&target_device)
+        .unwrap();
 
-    let loaded = storage.load_sync_checkpoint(&target_device).unwrap();
+    let loaded = storage.sync().load_sync_checkpoint(&target_device).unwrap();
     assert!(loaded.is_none(), "Checkpoint should be cleared");
 }
 
@@ -127,7 +137,7 @@ fn test_no_checkpoint_returns_none() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let target_device = [0xEEu8; 32];
 
-    let loaded = storage.load_sync_checkpoint(&target_device).unwrap();
+    let loaded = storage.sync().load_sync_checkpoint(&target_device).unwrap();
     assert!(
         loaded.is_none(),
         "Non-existent checkpoint should return None"
@@ -145,14 +155,24 @@ fn test_multiple_device_checkpoints_independent() {
     let items_b = create_batch_items(40);
 
     storage
+        .sync()
         .save_sync_checkpoint(&device_a, &items_a, 15)
         .unwrap();
     storage
+        .sync()
         .save_sync_checkpoint(&device_b, &items_b, 20)
         .unwrap();
 
-    let (loaded_a, count_a) = storage.load_sync_checkpoint(&device_a).unwrap().unwrap();
-    let (loaded_b, count_b) = storage.load_sync_checkpoint(&device_b).unwrap().unwrap();
+    let (loaded_a, count_a) = storage
+        .sync()
+        .load_sync_checkpoint(&device_a)
+        .unwrap()
+        .unwrap();
+    let (loaded_b, count_b) = storage
+        .sync()
+        .load_sync_checkpoint(&device_b)
+        .unwrap()
+        .unwrap();
 
     assert_eq!(loaded_a.len(), 30);
     assert_eq!(count_a, 15);
@@ -160,10 +180,20 @@ fn test_multiple_device_checkpoints_independent() {
     assert_eq!(count_b, 20);
 
     // Clearing one doesn't affect the other
-    storage.clear_sync_checkpoint(&device_a).unwrap();
-    assert!(storage.load_sync_checkpoint(&device_a).unwrap().is_none());
+    storage.sync().clear_sync_checkpoint(&device_a).unwrap();
     assert!(
-        storage.load_sync_checkpoint(&device_b).unwrap().is_some(),
+        storage
+            .sync()
+            .load_sync_checkpoint(&device_a)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        storage
+            .sync()
+            .load_sync_checkpoint(&device_b)
+            .unwrap()
+            .is_some(),
         "expected Some value"
     );
 }
@@ -179,10 +209,11 @@ fn test_batch_checkpoint_save_and_load() {
     let batch_id = "batch-001";
 
     storage
+        .sync()
         .save_batch_checkpoint(batch_id, 50, 25, "{\"state\":\"mid\"}")
         .unwrap();
 
-    let loaded = storage.load_batch_checkpoint(batch_id).unwrap();
+    let loaded = storage.sync().load_batch_checkpoint(batch_id).unwrap();
     assert!(loaded.is_some(), "expected Some value");
 
     let (total, processed, state) = loaded.unwrap();
@@ -198,14 +229,20 @@ fn test_batch_checkpoint_update_progress() {
     let batch_id = "batch-002";
 
     storage
+        .sync()
         .save_batch_checkpoint(batch_id, 100, 10, "{\"step\":1}")
         .unwrap();
 
     storage
+        .sync()
         .update_batch_checkpoint(batch_id, 50, "{\"step\":5}")
         .unwrap();
 
-    let (total, processed, state) = storage.load_batch_checkpoint(batch_id).unwrap().unwrap();
+    let (total, processed, state) = storage
+        .sync()
+        .load_batch_checkpoint(batch_id)
+        .unwrap()
+        .unwrap();
     assert_eq!(total, 100, "Total should be unchanged");
     assert_eq!(processed, 50, "Processed should be updated");
     assert_eq!(state, "{\"step\":5}", "State should be updated");
@@ -218,12 +255,13 @@ fn test_batch_checkpoint_clear() {
     let batch_id = "batch-003";
 
     storage
+        .sync()
         .save_batch_checkpoint(batch_id, 50, 50, "{\"done\":true}")
         .unwrap();
 
-    storage.clear_batch_checkpoint(batch_id).unwrap();
+    storage.sync().clear_batch_checkpoint(batch_id).unwrap();
 
-    let loaded = storage.load_batch_checkpoint(batch_id).unwrap();
+    let loaded = storage.sync().load_batch_checkpoint(batch_id).unwrap();
     assert!(loaded.is_none(), "Checkpoint should be cleared");
 }
 
@@ -236,6 +274,7 @@ fn test_batch_checkpoint_crash_resume_scenario() {
 
     // Step 1: Start batch, checkpoint at 25
     storage
+        .sync()
         .save_batch_checkpoint(batch_id, items.len(), 25, "{\"last_item\":24}")
         .unwrap();
 
@@ -243,6 +282,7 @@ fn test_batch_checkpoint_crash_resume_scenario() {
 
     // Step 3: Resume - load checkpoint
     let (total, processed, _state) = storage
+        .sync()
         .load_batch_checkpoint(batch_id)
         .unwrap()
         .expect("Checkpoint should survive crash");
@@ -256,12 +296,19 @@ fn test_batch_checkpoint_crash_resume_scenario() {
 
     // Step 5: Update checkpoint to completion
     storage
+        .sync()
         .update_batch_checkpoint(batch_id, 50, "{\"done\":true}")
         .unwrap();
 
     // Step 6: Clear checkpoint
-    storage.clear_batch_checkpoint(batch_id).unwrap();
-    assert!(storage.load_batch_checkpoint(batch_id).unwrap().is_none());
+    storage.sync().clear_batch_checkpoint(batch_id).unwrap();
+    assert!(
+        storage
+            .sync()
+            .load_batch_checkpoint(batch_id)
+            .unwrap()
+            .is_none()
+    );
 }
 
 // @internal
@@ -269,14 +316,30 @@ fn test_batch_checkpoint_crash_resume_scenario() {
 fn test_batch_checkpoint_no_orphans() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
-    storage.save_batch_checkpoint("b1", 50, 25, "{}").unwrap();
-    storage.save_batch_checkpoint("b2", 100, 50, "{}").unwrap();
+    storage
+        .sync()
+        .save_batch_checkpoint("b1", 50, 25, "{}")
+        .unwrap();
+    storage
+        .sync()
+        .save_batch_checkpoint("b2", 100, 50, "{}")
+        .unwrap();
 
-    storage.clear_batch_checkpoint("b1").unwrap();
+    storage.sync().clear_batch_checkpoint("b1").unwrap();
 
-    assert!(storage.load_batch_checkpoint("b1").unwrap().is_none());
     assert!(
-        storage.load_batch_checkpoint("b2").unwrap().is_some(),
+        storage
+            .sync()
+            .load_batch_checkpoint("b1")
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        storage
+            .sync()
+            .load_batch_checkpoint("b2")
+            .unwrap()
+            .is_some(),
         "expected Some value"
     );
 }

@@ -26,7 +26,7 @@ fn open_storage() -> Storage {
 fn create_local_group() {
     let storage = open_storage();
 
-    let group = storage.create_local_group("Team Alpha").unwrap();
+    let group = storage.groups().create_local_group("Team Alpha").unwrap();
 
     assert!(!group.id.is_empty(), "group ID must be a non-empty UUID");
     assert_eq!(group.name, "Team Alpha");
@@ -39,7 +39,7 @@ fn create_local_group() {
         "created_at must be a non-zero unix timestamp"
     );
 
-    let loaded = storage.get_local_group(&group.id).unwrap();
+    let loaded = storage.groups().get_local_group(&group.id).unwrap();
     assert!(loaded.is_some(), "created group must be retrievable");
     let loaded = loaded.unwrap();
     assert_eq!(loaded.id, group.id);
@@ -51,12 +51,19 @@ fn create_local_group() {
 #[test]
 fn add_contact_to_group() {
     let storage = open_storage();
-    let group = storage.create_local_group("VIPs").unwrap();
+    let group = storage.groups().create_local_group("VIPs").unwrap();
     let contact_id = "some-contact-uuid-abc";
 
-    storage.add_to_local_group(&group.id, contact_id).unwrap();
+    storage
+        .groups()
+        .add_to_local_group(&group.id, contact_id)
+        .unwrap();
 
-    let loaded = storage.get_local_group(&group.id).unwrap().unwrap();
+    let loaded = storage
+        .groups()
+        .get_local_group(&group.id)
+        .unwrap()
+        .unwrap();
     assert!(
         loaded.contact_ids.contains(contact_id),
         "contact_id must be present after add"
@@ -69,13 +76,23 @@ fn add_contact_to_group() {
 #[test]
 fn add_contact_to_group_idempotent() {
     let storage = open_storage();
-    let group = storage.create_local_group("Idempotent").unwrap();
+    let group = storage.groups().create_local_group("Idempotent").unwrap();
     let contact_id = "dup-uuid";
 
-    storage.add_to_local_group(&group.id, contact_id).unwrap();
-    storage.add_to_local_group(&group.id, contact_id).unwrap();
+    storage
+        .groups()
+        .add_to_local_group(&group.id, contact_id)
+        .unwrap();
+    storage
+        .groups()
+        .add_to_local_group(&group.id, contact_id)
+        .unwrap();
 
-    let loaded = storage.get_local_group(&group.id).unwrap().unwrap();
+    let loaded = storage
+        .groups()
+        .get_local_group(&group.id)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         loaded.contact_ids.len(),
         1,
@@ -88,15 +105,28 @@ fn add_contact_to_group_idempotent() {
 #[test]
 fn remove_contact_from_group() {
     let storage = open_storage();
-    let group = storage.create_local_group("Removals").unwrap();
+    let group = storage.groups().create_local_group("Removals").unwrap();
     let id_a = "contact-a";
     let id_b = "contact-b";
 
-    storage.add_to_local_group(&group.id, id_a).unwrap();
-    storage.add_to_local_group(&group.id, id_b).unwrap();
-    storage.remove_from_local_group(&group.id, id_a).unwrap();
+    storage
+        .groups()
+        .add_to_local_group(&group.id, id_a)
+        .unwrap();
+    storage
+        .groups()
+        .add_to_local_group(&group.id, id_b)
+        .unwrap();
+    storage
+        .groups()
+        .remove_from_local_group(&group.id, id_a)
+        .unwrap();
 
-    let loaded = storage.get_local_group(&group.id).unwrap().unwrap();
+    let loaded = storage
+        .groups()
+        .get_local_group(&group.id)
+        .unwrap()
+        .unwrap();
     assert!(
         !loaded.contact_ids.contains(id_a),
         "removed contact must not be present"
@@ -112,14 +142,19 @@ fn remove_contact_from_group() {
 #[test]
 fn remove_nonmember_contact_is_noop() {
     let storage = open_storage();
-    let group = storage.create_local_group("Noop").unwrap();
+    let group = storage.groups().create_local_group("Noop").unwrap();
 
     // Remove from empty group — must not error
     storage
+        .groups()
         .remove_from_local_group(&group.id, "nonexistent-id")
         .unwrap();
 
-    let loaded = storage.get_local_group(&group.id).unwrap().unwrap();
+    let loaded = storage
+        .groups()
+        .get_local_group(&group.id)
+        .unwrap()
+        .unwrap();
     assert!(loaded.contact_ids.is_empty());
 }
 
@@ -129,11 +164,11 @@ fn remove_nonmember_contact_is_noop() {
 fn list_groups() {
     let storage = open_storage();
 
-    let g1 = storage.create_local_group("Alpha").unwrap();
-    let g2 = storage.create_local_group("Beta").unwrap();
-    let g3 = storage.create_local_group("Gamma").unwrap();
+    let g1 = storage.groups().create_local_group("Alpha").unwrap();
+    let g2 = storage.groups().create_local_group("Beta").unwrap();
+    let g3 = storage.groups().create_local_group("Gamma").unwrap();
 
-    let groups = storage.list_local_groups().unwrap();
+    let groups = storage.groups().list_local_groups().unwrap();
     assert_eq!(groups.len(), 3, "must list all 3 groups");
 
     let ids: Vec<&str> = groups.iter().map(|g| g.id.as_str()).collect();
@@ -147,15 +182,15 @@ fn list_groups() {
 #[test]
 fn delete_group() {
     let storage = open_storage();
-    let group = storage.create_local_group("Temporary").unwrap();
+    let group = storage.groups().create_local_group("Temporary").unwrap();
 
-    let deleted = storage.delete_local_group(&group.id).unwrap();
+    let deleted = storage.groups().delete_local_group(&group.id).unwrap();
     assert!(deleted, "delete must return true for an existing group");
 
-    let after = storage.get_local_group(&group.id).unwrap();
+    let after = storage.groups().get_local_group(&group.id).unwrap();
     assert!(after.is_none(), "deleted group must not be findable");
 
-    let deleted_again = storage.delete_local_group(&group.id).unwrap();
+    let deleted_again = storage.groups().delete_local_group(&group.id).unwrap();
     assert!(
         !deleted_again,
         "delete of non-existent group must return false"
@@ -195,7 +230,9 @@ fn group_has_no_visibility_fields() {
 #[test]
 fn add_to_nonexistent_group_returns_not_found() {
     let storage = open_storage();
-    let result = storage.add_to_local_group("non-existent-group-id", "contact-id");
+    let result = storage
+        .groups()
+        .add_to_local_group("non-existent-group-id", "contact-id");
     assert!(
         result.is_err(),
         "adding to a non-existent group must return an error"

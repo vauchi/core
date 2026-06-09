@@ -59,8 +59,8 @@ fn test_execute_deletion_returns_revocations_for_all_contacts() {
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
     let carol = make_contact_with_cek([0xCC; 32], "Carol");
-    storage.save_contact(&bob).unwrap();
-    storage.save_contact(&carol).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&carol).unwrap();
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -77,7 +77,7 @@ fn test_execute_deletion_revocations_have_correct_sender_id() {
     let identity = Identity::create("Alice", 0);
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
-    storage.save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -100,8 +100,8 @@ fn test_execute_deletion_revocations_have_correct_recipient_ids() {
     let carol = make_contact_with_cek([0xCC; 32], "Carol");
     let bob_id = bob.id().to_string();
     let carol_id = carol.id().to_string();
-    storage.save_contact(&bob).unwrap();
-    storage.save_contact(&carol).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&carol).unwrap();
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -124,7 +124,7 @@ fn test_execute_deletion_revocations_verify_with_identity() {
     let identity = Identity::create("Alice", 0);
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
-    storage.save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -151,15 +151,17 @@ fn test_execute_deletion_shreds_all_ceks() {
     let carol = make_contact_with_cek([0xCC; 32], "Carol");
     let bob_id = bob.id().to_string();
     let carol_id = carol.id().to_string();
-    storage.save_contact(&bob).unwrap();
-    storage.save_contact(&carol).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&carol).unwrap();
 
     // Verify CEKs exist before deletion
     storage
+        .contacts()
         .load_contact_cek(&bob_id)
         .unwrap()
         .expect("expected Some");
     storage
+        .contacts()
         .load_contact_cek(&carol_id)
         .unwrap()
         .expect("expected Some");
@@ -170,11 +172,11 @@ fn test_execute_deletion_shreds_all_ceks() {
 
     // Contacts fully deleted (#48) — CEKs and rows removed
     assert!(
-        storage.load_contact_cek(&bob_id).is_err(),
+        storage.contacts().load_contact_cek(&bob_id).is_err(),
         "Bob's contact should be deleted"
     );
     assert!(
-        storage.load_contact_cek(&carol_id).is_err(),
+        storage.contacts().load_contact_cek(&carol_id).is_err(),
         "Carol's contact should be deleted"
     );
 }
@@ -189,7 +191,7 @@ fn test_execute_deletion_contacts_still_exist_after_shredding() {
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
     let bob_id = bob.id().to_string();
-    storage.save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -197,7 +199,7 @@ fn test_execute_deletion_contacts_still_exist_after_shredding() {
 
     // Contact row still exists (DB not deleted yet)
     // But loading it will fail because CEK is shredded and card can't be decrypted
-    let result = storage.load_contact(&bob_id);
+    let result = storage.contacts().load_contact(&bob_id);
     // The load will either return None (contact deleted) or fail to decrypt
     // Either outcome proves crypto-shredding worked
     assert!(
@@ -274,7 +276,7 @@ fn test_execute_deletion_legacy_contacts_get_revocations() {
     let identity = Identity::create("Alice", 0);
 
     let bob = make_legacy_contact([0xBB; 32], "Bob");
-    storage.save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -292,8 +294,8 @@ fn test_execute_deletion_mixed_cek_and_legacy_contacts() {
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
     let carol = make_legacy_contact([0xCC; 32], "Carol");
     let bob_id = bob.id().to_string();
-    storage.save_contact(&bob).unwrap();
-    storage.save_contact(&carol).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&carol).unwrap();
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -304,6 +306,7 @@ fn test_execute_deletion_mixed_cek_and_legacy_contacts() {
 
     // Bob's contact fully deleted (#48)
     storage
+        .contacts()
         .load_contact_cek(&bob_id)
         .expect_err("expected error");
 }
@@ -321,7 +324,7 @@ fn test_execute_deletion_produces_decodable_deliveries() {
     let storage = test_storage();
     let identity = Identity::create("Alice", 0);
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
-    storage.save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();

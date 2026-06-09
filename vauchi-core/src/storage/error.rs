@@ -347,7 +347,7 @@ impl OfflineQueue {
 
     /// Checks if the queue is full.
     pub fn is_full(&self, storage: &super::Storage) -> Result<bool, super::StorageError> {
-        let count = storage.count_all_pending_updates()?;
+        let count = storage.pending().count_all_pending_updates()?;
         Ok(count >= self.max_queue_size)
     }
 
@@ -361,7 +361,7 @@ impl OfflineQueue {
         &self,
         storage: &super::Storage,
     ) -> Result<usize, super::StorageError> {
-        let count = storage.count_all_pending_updates()?;
+        let count = storage.pending().count_all_pending_updates()?;
         Ok(self.max_queue_size.saturating_sub(count))
     }
 }

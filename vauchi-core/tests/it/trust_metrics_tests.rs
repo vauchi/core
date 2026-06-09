@@ -372,8 +372,8 @@ fn test_storage_roundtrip_preserves_exchange_transport() {
     );
     let id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     assert_eq!(
         loaded.exchange_transport(),
@@ -397,8 +397,8 @@ fn test_storage_roundtrip_preserves_has_recovered() {
     contact.accept_recovery([99u8; 32], test_key(), 0).unwrap();
     let id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     assert!(
         loaded.has_recovered(),
@@ -422,8 +422,8 @@ fn test_storage_roundtrip_preserves_card_updated_at() {
     let id = contact.id().to_string();
     let expected_ts = contact.card_updated_at().unwrap();
 
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     assert_eq!(
         loaded.card_updated_at(),
@@ -439,8 +439,8 @@ fn test_storage_roundtrip_default_trust_fields() {
     let contact = Contact::from_exchange(test_public_key(), test_card(), test_key(), 0);
     let id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     assert_eq!(
         loaded.exchange_transport(),
@@ -590,8 +590,8 @@ fn storage_roundtrip_preserves_trust_metrics() {
     contact.set_trust_metrics(Some(metrics));
     let id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     let m = loaded.trust_metrics().expect("must survive roundtrip");
     assert_eq!(m.transport, ExchangeTransport::Ble);
@@ -608,8 +608,8 @@ fn storage_roundtrip_preserves_none_trust_metrics() {
     let contact = make_contact(|_| {});
     let id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     assert!(
         loaded.trust_metrics().is_none(),
@@ -631,8 +631,8 @@ fn list_contacts_preserves_trust_metrics() {
     );
     contact.set_trust_metrics(Some(metrics));
 
-    storage.save_contact(&contact).unwrap();
-    let contacts = storage.list_contacts().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
 
     assert_eq!(contacts.len(), 1);
     let m = contacts[0].trust_metrics().expect("must survive list");

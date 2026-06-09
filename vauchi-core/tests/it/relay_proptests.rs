@@ -126,8 +126,8 @@ proptest! {
         let mut contact = Contact::from_exchange(public_key, card, shared_key, 0);
         contact.set_relay_url(Some(relay_url.clone()));
 
-        storage.save_contact(&contact).unwrap();
-        let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
+        let loaded = storage.contacts().load_contact(contact.id()).unwrap().unwrap();
 
         prop_assert_eq!(loaded.relay_url().unwrap(), &relay_url);
     }
@@ -145,8 +145,8 @@ proptest! {
         let mut contact = Contact::from_exchange(public_key, card, shared_key, 0);
         contact.set_relay_noise_pubkey(Some(pubkey));
 
-        storage.save_contact(&contact).unwrap();
-        let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
+        let loaded = storage.contacts().load_contact(contact.id()).unwrap().unwrap();
 
         prop_assert_eq!(loaded.relay_noise_pubkey().unwrap(), &pubkey);
     }

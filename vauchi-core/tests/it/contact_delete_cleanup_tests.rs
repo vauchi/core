@@ -38,13 +38,17 @@ fn hard_delete_clears_all_relationship_scoped_side_tables() {
     let storage = open_storage();
     let contact = make_contact("Alice");
     let id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Populate every per-contact side table that neither cascades nor lives
     // on the contacts row.
-    storage.set_contact_last_sync(&id, 12_345).unwrap();
-    storage.save_contact_override(&id, "phone", true).unwrap();
+    storage.sync().set_contact_last_sync(&id, 12_345).unwrap();
     storage
+        .labels()
+        .save_contact_override(&id, "phone", true)
+        .unwrap();
+    storage
+        .pending()
         .queue_update(&PendingUpdate {
             id: "update-1".to_string(),
             contact_id: id.clone(),
@@ -56,13 +60,32 @@ fn hard_delete_clears_all_relationship_scoped_side_tables() {
             target_relay_url: None,
         })
         .unwrap();
-    storage.dismiss_duplicate(&id, "other-contact").unwrap();
+    storage
+        .contacts()
+        .dismiss_duplicate(&id, "other-contact")
+        .unwrap();
 
     // Sanity: rows exist before deletion (guards against a vacuous test).
-    assert_eq!(storage.get_contact_last_sync(&id).unwrap(), Some(12_345));
-    assert!(!storage.load_contact_overrides(&id).unwrap().is_empty());
-    assert_eq!(storage.count_pending_updates(&id).unwrap(), 1);
-    assert_eq!(storage.load_dismissed_duplicates().unwrap().len(), 1);
+    assert_eq!(
+        storage.sync().get_contact_last_sync(&id).unwrap(),
+        Some(12_345)
+    );
+    assert!(
+        !storage
+            .labels()
+            .load_contact_overrides(&id)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(storage.pending().count_pending_updates(&id).unwrap(), 1);
+    assert_eq!(
+        storage
+            .contacts()
+            .load_dismissed_duplicates()
+            .unwrap()
+            .len(),
+        1
+    );
 
     // Hard delete the contact.
     assert!(
@@ -72,21 +95,29 @@ fn hard_delete_clears_all_relationship_scoped_side_tables() {
 
     // Every relationship-scoped side table must now be empty for this contact.
     assert_eq!(
-        storage.get_contact_last_sync(&id).unwrap(),
+        storage.sync().get_contact_last_sync(&id).unwrap(),
         None,
         "contact_sync_timestamps must be cleared (stale last_sync wrongly gates sync on id reuse)"
     );
     assert!(
-        storage.load_contact_overrides(&id).unwrap().is_empty(),
+        storage
+            .labels()
+            .load_contact_overrides(&id)
+            .unwrap()
+            .is_empty(),
         "contact_visibility_overrides must be cleared"
     );
     assert_eq!(
-        storage.count_pending_updates(&id).unwrap(),
+        storage.pending().count_pending_updates(&id).unwrap(),
         0,
         "pending_updates must be cleared"
     );
     assert!(
-        storage.load_dismissed_duplicates().unwrap().is_empty(),
+        storage
+            .contacts()
+            .load_dismissed_duplicates()
+            .unwrap()
+            .is_empty(),
         "dismissed_duplicates referencing the contact must be cleared"
     );
 }
@@ -101,16 +132,26 @@ fn hard_delete_imported_contact_cleans_its_rows_and_no_ops_exchange_only_tables(
     let storage = open_storage();
     let contact = Contact::from_import(ContactCard::new("Bob"), ImportSource::VcardFile, None, 0);
     let id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // A duplicate suggestion can pair an imported contact with another contact.
-    storage.dismiss_duplicate(&id, "some-exchanged-id").unwrap();
-    assert_eq!(storage.load_dismissed_duplicates().unwrap().len(), 1);
+    storage
+        .contacts()
+        .dismiss_duplicate(&id, "some-exchanged-id")
+        .unwrap();
+    assert_eq!(
+        storage
+            .contacts()
+            .load_dismissed_duplicates()
+            .unwrap()
+            .len(),
+        1
+    );
 
     // HR-1: an imported contact has no sync cursor or queued updates — the
     // exchange-only tables are empty going in, so their deletes are no-ops.
-    assert_eq!(storage.get_contact_last_sync(&id).unwrap(), None);
-    assert_eq!(storage.count_pending_updates(&id).unwrap(), 0);
+    assert_eq!(storage.sync().get_contact_last_sync(&id).unwrap(), None);
+    assert_eq!(storage.pending().count_pending_updates(&id).unwrap(), 0);
 
     assert!(
         storage.delete_contact(&id).unwrap(),
@@ -120,13 +161,17 @@ fn hard_delete_imported_contact_cleans_its_rows_and_no_ops_exchange_only_tables(
     // Contact gone; its dismissed-duplicate pair cleared; the no-op deletes on
     // the exchange-only tables neither erred nor affected anything.
     assert!(
-        storage.load_contact(&id).unwrap().is_none(),
+        storage.contacts().load_contact(&id).unwrap().is_none(),
         "imported contact must be removed"
     );
     assert!(
-        storage.load_dismissed_duplicates().unwrap().is_empty(),
+        storage
+            .contacts()
+            .load_dismissed_duplicates()
+            .unwrap()
+            .is_empty(),
         "dismissed_duplicates pair referencing the imported contact must be cleared"
     );
-    assert_eq!(storage.get_contact_last_sync(&id).unwrap(), None);
-    assert_eq!(storage.count_pending_updates(&id).unwrap(), 0);
+    assert_eq!(storage.sync().get_contact_last_sync(&id).unwrap(), None);
+    assert_eq!(storage.pending().count_pending_updates(&id).unwrap(), 0);
 }

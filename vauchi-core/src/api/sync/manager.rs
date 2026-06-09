@@ -133,7 +133,7 @@ impl<'a> SyncManager<'a> {
             target_relay_url: None,
         };
 
-        self.storage.queue_update(&update)?;
+        self.storage.pending().queue_update(&update)?;
 
         Ok(update_id)
     }
@@ -162,33 +162,35 @@ impl<'a> SyncManager<'a> {
             target_relay_url: None,
         };
 
-        self.storage.queue_update(&update)?;
+        self.storage.pending().queue_update(&update)?;
 
         Ok(update_id)
     }
 
     /// Gets pending updates for a specific contact.
     pub fn get_pending(&self, contact_id: &str) -> Result<Vec<PendingUpdate>, SyncError> {
-        Ok(self.storage.get_pending_updates(contact_id)?)
+        Ok(self.storage.pending().get_pending_updates(contact_id)?)
     }
 
     /// Gets all pending updates across all contacts.
     pub fn get_all_pending(&self) -> Result<Vec<PendingUpdate>, SyncError> {
-        Ok(self.storage.get_all_pending_updates()?)
+        Ok(self.storage.pending().get_all_pending_updates()?)
     }
 
     /// Marks an update as successfully delivered.
     ///
     /// Also updates the contact's last sync timestamp.
     pub fn mark_delivered(&self, update_id: &str) -> Result<bool, SyncError> {
-        if let Some(update) = self.storage.get_pending_update(update_id)? {
+        if let Some(update) = self.storage.pending().get_pending_update(update_id)? {
             let contact_id = update.contact_id;
 
-            let deleted = self.storage.mark_update_sent(update_id)?;
+            let deleted = self.storage.pending().mark_update_sent(update_id)?;
 
             if deleted {
                 let now = self.storage.clock().unix_seconds();
-                self.storage.set_contact_last_sync(&contact_id, now)?;
+                self.storage
+                    .sync()
+                    .set_contact_last_sync(&contact_id, now)?;
             }
 
             Ok(deleted)
@@ -212,7 +214,7 @@ impl<'a> SyncManager<'a> {
 
         let retry_at = now + delay;
 
-        Ok(self.storage.update_pending_status(
+        Ok(self.storage.pending().update_pending_status(
             update_id,
             UpdateStatus::Failed {
                 error: error.to_string(),
@@ -224,10 +226,14 @@ impl<'a> SyncManager<'a> {
 
     /// Gets the sync state for a specific contact.
     pub fn get_sync_state(&self, contact_id: &str) -> Result<SyncState, SyncError> {
-        let pending = self.storage.get_pending_updates(contact_id)?;
+        let pending = self.storage.pending().get_pending_updates(contact_id)?;
 
         if pending.is_empty() {
-            let last_sync = self.storage.get_contact_last_sync(contact_id)?.unwrap_or(0);
+            let last_sync = self
+                .storage
+                .sync()
+                .get_contact_last_sync(contact_id)?
+                .unwrap_or(0);
             return Ok(SyncState::Synced { last_sync });
         }
 
@@ -269,7 +275,7 @@ impl<'a> SyncManager<'a> {
 
     /// Gets the sync status for all contacts with pending updates.
     pub fn sync_status(&self) -> Result<HashMap<String, SyncState>, SyncError> {
-        let all_pending = self.storage.get_all_pending_updates()?;
+        let all_pending = self.storage.pending().get_all_pending_updates()?;
 
         let mut by_contact: HashMap<String, Vec<&PendingUpdate>> = HashMap::new();
         for update in &all_pending {
@@ -293,7 +299,7 @@ impl<'a> SyncManager<'a> {
     /// This reduces network traffic by combining multiple small updates
     /// into one larger update before transmission.
     pub fn coalesce_updates(&self, contact_id: &str) -> Result<Option<String>, SyncError> {
-        let pending = self.storage.get_pending_updates(contact_id)?;
+        let pending = self.storage.pending().get_pending_updates(contact_id)?;
 
         let card_updates: Vec<_> = pending
             .iter()
@@ -348,9 +354,9 @@ impl<'a> SyncManager<'a> {
         };
 
         for update in card_updates {
-            self.storage.mark_update_sent(&update.id)?;
+            self.storage.pending().mark_update_sent(&update.id)?;
         }
-        self.storage.queue_update(&merged_update)?;
+        self.storage.pending().queue_update(&merged_update)?;
 
         Ok(Some(merged_id))
     }
@@ -379,7 +385,7 @@ impl<'a> SyncManager<'a> {
     pub fn get_ready_for_retry(&self) -> Result<Vec<PendingUpdate>, SyncError> {
         let now = self.storage.clock().unix_seconds();
 
-        let all_pending = self.storage.get_all_pending_updates()?;
+        let all_pending = self.storage.pending().get_all_pending_updates()?;
 
         Ok(all_pending
             .into_iter()

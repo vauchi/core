@@ -559,7 +559,7 @@ mod tests {
 
         let shared_key = SymmetricKey::generate();
         let contact = Contact::from_exchange(public_key, card, shared_key, 0);
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
     #[test]

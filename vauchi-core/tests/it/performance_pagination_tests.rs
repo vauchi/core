@@ -35,7 +35,7 @@ fn create_numbered_contact(n: usize) -> Contact {
 fn populate_contacts(storage: &Storage, count: usize) {
     for i in 0..count {
         let contact = create_numbered_contact(i);
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 }
 
@@ -49,11 +49,11 @@ fn test_list_contacts_paginated_returns_correct_subset() {
     populate_contacts(&storage, 100);
 
     // Page 1: offset=0, limit=10
-    let page1 = storage.list_contacts_paginated(0, 10).unwrap();
+    let page1 = storage.contacts().list_contacts_paginated(0, 10).unwrap();
     assert_eq!(page1.len(), 10, "First page should have 10 contacts");
 
     // Page 2: offset=10, limit=10
-    let page2 = storage.list_contacts_paginated(10, 10).unwrap();
+    let page2 = storage.contacts().list_contacts_paginated(10, 10).unwrap();
     assert_eq!(page2.len(), 10, "Second page should have 10 contacts");
 
     let page1_ids: Vec<String> = page1.iter().map(|c| c.id().to_string()).collect();
@@ -70,7 +70,7 @@ fn test_list_contacts_paginated_respects_ordering() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 50);
 
-    let page = storage.list_contacts_paginated(0, 50).unwrap();
+    let page = storage.contacts().list_contacts_paginated(0, 50).unwrap();
     for i in 1..page.len() {
         assert!(
             page[i - 1].display_name() <= page[i].display_name(),
@@ -86,7 +86,7 @@ fn test_list_contacts_paginated_last_page_partial() {
     populate_contacts(&storage, 25);
 
     // Request page starting at offset 20 with limit 10
-    let page = storage.list_contacts_paginated(20, 10).unwrap();
+    let page = storage.contacts().list_contacts_paginated(20, 10).unwrap();
     assert_eq!(page.len(), 5, "Last page should have remaining contacts");
 }
 
@@ -96,7 +96,7 @@ fn test_list_contacts_paginated_beyond_range_returns_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 10);
 
-    let page = storage.list_contacts_paginated(100, 10).unwrap();
+    let page = storage.contacts().list_contacts_paginated(100, 10).unwrap();
     assert!(page.is_empty(), "Beyond-range offset should return empty");
 }
 
@@ -106,7 +106,7 @@ fn test_list_contacts_paginated_zero_limit_returns_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 10);
 
-    let page = storage.list_contacts_paginated(0, 0).unwrap();
+    let page = storage.contacts().list_contacts_paginated(0, 0).unwrap();
     assert!(page.is_empty(), "Zero limit should return empty");
 }
 
@@ -120,7 +120,10 @@ fn test_list_contacts_paginated_all_contacts_across_pages() {
     let page_size = 10;
     let mut offset = 0;
     loop {
-        let page = storage.list_contacts_paginated(offset, page_size).unwrap();
+        let page = storage
+            .contacts()
+            .list_contacts_paginated(offset, page_size)
+            .unwrap();
         if page.is_empty() {
             break;
         }
@@ -149,7 +152,7 @@ fn test_search_contacts_by_name() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 100);
 
-    let results = storage.search_contacts("0042").unwrap();
+    let results = storage.contacts().search_contacts("0042").unwrap();
     assert_eq!(results.len(), 1, "Should find exactly one match for '0042'");
     assert_eq!(results[0].display_name(), "Contact 0042");
 }
@@ -160,7 +163,7 @@ fn test_search_contacts_partial_match() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 100);
 
-    let results = storage.search_contacts("Contact 00").unwrap();
+    let results = storage.contacts().search_contacts("Contact 00").unwrap();
     assert!(
         results.len() >= 10,
         "Partial match should return multiple results, got {}",
@@ -174,7 +177,7 @@ fn test_search_contacts_case_insensitive() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 10);
 
-    let results = storage.search_contacts("contact").unwrap();
+    let results = storage.contacts().search_contacts("contact").unwrap();
     assert_eq!(results.len(), 10, "Search should be case-insensitive");
 }
 
@@ -184,7 +187,10 @@ fn test_search_contacts_no_match_returns_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 10);
 
-    let results = storage.search_contacts("zzz_nonexistent").unwrap();
+    let results = storage
+        .contacts()
+        .search_contacts("zzz_nonexistent")
+        .unwrap();
     assert!(results.is_empty(), "Non-matching query should return empty");
 }
 
@@ -194,7 +200,7 @@ fn test_search_contacts_empty_query_returns_all() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 10);
 
-    let results = storage.search_contacts("").unwrap();
+    let results = storage.contacts().search_contacts("").unwrap();
     assert_eq!(results.len(), 10, "Empty query should return all contacts");
 }
 
@@ -205,7 +211,7 @@ fn test_search_contacts_with_1000_contacts() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 1000);
 
-    let results = storage.search_contacts("Contact 0500").unwrap();
+    let results = storage.contacts().search_contacts("Contact 0500").unwrap();
     assert_eq!(
         results.len(),
         1,
@@ -223,7 +229,7 @@ fn test_count_contacts_for_pagination() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 150);
 
-    let total = storage.count_contacts().unwrap();
+    let total = storage.contacts().count_contacts().unwrap();
     assert_eq!(total, 150);
 
     // Calculate total pages with page size 50

@@ -450,16 +450,19 @@ fn test_audit_log_export() {
     let storage = Storage::open(&db_path, encryption_key).unwrap();
 
     storage
+        .consent()
         .log_audit_event("exchange_initiated", Some("contact_id_123"))
         .unwrap();
     storage
+        .consent()
         .log_audit_event("exchange_completed", Some("contact_id_123"))
         .unwrap();
     storage
+        .consent()
         .log_audit_event("signature_verification_failed", Some("attacker_key_xyz"))
         .unwrap();
 
-    let audit_entries = storage.list_audit_log().unwrap();
+    let audit_entries = storage.consent().list_audit_log().unwrap();
 
     assert_eq!(audit_entries.len(), 3, "Should have 3 audit entries");
 
@@ -489,10 +492,11 @@ fn test_audit_log_no_sensitive_data() {
     let storage = Storage::open(&db_path, encryption_key).unwrap();
 
     storage
+        .consent()
         .log_audit_event("test_event", Some("safe_details"))
         .unwrap();
 
-    let audit_entries = storage.list_audit_log().unwrap();
+    let audit_entries = storage.consent().list_audit_log().unwrap();
     assert_eq!(audit_entries.len(), 1);
 
     let (event_type, details, _) = &audit_entries[0];

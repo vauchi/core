@@ -260,28 +260,38 @@ fn test_visibility_propagation_offline() {
     let bob_update = create_visibility_update("update-1", bob_id, "work-email");
     let carol_update = create_visibility_update("update-2", carol_id, "personal-phone");
 
-    storage.queue_update(&bob_update).unwrap();
-    storage.queue_update(&carol_update).unwrap();
+    storage.pending().queue_update(&bob_update).unwrap();
+    storage.pending().queue_update(&carol_update).unwrap();
 
     assert_eq!(
-        storage.count_all_pending_updates().unwrap(),
+        storage.pending().count_all_pending_updates().unwrap(),
         2,
         "Both visibility updates should be queued"
     );
 
-    let bob_updates = storage.get_pending_updates(bob_id).unwrap();
+    let bob_updates = storage.pending().get_pending_updates(bob_id).unwrap();
     assert_eq!(bob_updates.len(), 1);
     assert_eq!(bob_updates[0].update_type, "visibility_change");
 
-    let carol_updates = storage.get_pending_updates(carol_id).unwrap();
+    let carol_updates = storage.pending().get_pending_updates(carol_id).unwrap();
     assert_eq!(carol_updates.len(), 1);
 
     // Simulate Bob coming online and receiving the update
-    storage.mark_update_sent(&bob_update.id).unwrap();
+    storage.pending().mark_update_sent(&bob_update.id).unwrap();
 
-    assert_eq!(storage.get_pending_updates(bob_id).unwrap().len(), 0);
-    assert_eq!(storage.get_pending_updates(carol_id).unwrap().len(), 1);
-    assert_eq!(storage.count_all_pending_updates().unwrap(), 1);
+    assert_eq!(
+        storage.pending().get_pending_updates(bob_id).unwrap().len(),
+        0
+    );
+    assert_eq!(
+        storage
+            .pending()
+            .get_pending_updates(carol_id)
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(storage.pending().count_all_pending_updates().unwrap(), 1);
 }
 
 /// Tests that multiple visibility changes for the same contact are queued in order.
@@ -313,10 +323,10 @@ fn test_visibility_propagation_multiple_changes() {
             status: UpdateStatus::Pending,
             target_relay_url: None,
         };
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
-    let pending = storage.get_pending_updates(contact_id).unwrap();
+    let pending = storage.pending().get_pending_updates(contact_id).unwrap();
     assert_eq!(pending.len(), 3);
     assert_eq!(pending[0].id, "update-1"); // earliest
     assert_eq!(pending[1].id, "update-2");
@@ -335,14 +345,14 @@ fn test_visibility_propagation_queue_limits() {
 
     for i in 0..5 {
         let update = create_visibility_update(&format!("update-{}", i), "contact", "field");
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
     assert!(queue.is_full(&storage).unwrap());
     assert!(!queue.can_queue(&storage).unwrap());
     assert_eq!(queue.remaining_capacity(&storage).unwrap(), 0);
 
-    storage.delete_pending_update("update-0").unwrap();
+    storage.pending().delete_pending_update("update-0").unwrap();
 
     assert!(!queue.is_full(&storage).unwrap());
     assert!(queue.can_queue(&storage).unwrap());
@@ -361,23 +371,36 @@ fn test_visibility_propagation_flush_contact_queue() {
     // Queue updates for multiple contacts
     for i in 0..3 {
         let update = create_visibility_update(&format!("alice-{}", i), "alice", "field");
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
     for i in 0..2 {
         let update = create_visibility_update(&format!("bob-{}", i), "bob", "field");
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
-    assert_eq!(storage.count_all_pending_updates().unwrap(), 5);
+    assert_eq!(storage.pending().count_all_pending_updates().unwrap(), 5);
 
     // Flush all updates for Alice (e.g., if Alice is blocked)
-    let deleted = storage.delete_pending_updates_for_contact("alice").unwrap();
+    let deleted = storage
+        .pending()
+        .delete_pending_updates_for_contact("alice")
+        .unwrap();
     assert_eq!(deleted, 3);
 
     // Only Bob's updates remain
-    assert_eq!(storage.count_all_pending_updates().unwrap(), 2);
-    assert_eq!(storage.get_pending_updates("alice").unwrap().len(), 0);
-    assert_eq!(storage.get_pending_updates("bob").unwrap().len(), 2);
+    assert_eq!(storage.pending().count_all_pending_updates().unwrap(), 2);
+    assert_eq!(
+        storage
+            .pending()
+            .get_pending_updates("alice")
+            .unwrap()
+            .len(),
+        0
+    );
+    assert_eq!(
+        storage.pending().get_pending_updates("bob").unwrap().len(),
+        2
+    );
 }
 
 // =============================================================================

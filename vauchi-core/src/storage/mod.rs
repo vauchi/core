@@ -7,19 +7,10 @@
 //! Provides encrypted local storage for contacts, identity, and sync state.
 //! Uses SQLite with application-level encryption for sensitive data.
 
-#[cfg(feature = "testing")]
-pub mod consent;
-#[cfg(not(feature = "testing"))]
-mod consent;
-
 mod connection;
+mod device;
 
 mod contact_row;
-
-#[cfg(feature = "testing")]
-pub mod contact_ops;
-#[cfg(not(feature = "testing"))]
-mod contact_ops;
 
 #[cfg(feature = "testing")]
 pub mod contacts;
@@ -27,71 +18,11 @@ pub mod contacts;
 mod contacts;
 
 #[cfg(feature = "testing")]
-pub mod field_notes;
-#[cfg(not(feature = "testing"))]
-mod field_notes;
-
-#[cfg(feature = "testing")]
-pub mod device;
-#[cfg(not(feature = "testing"))]
-mod device;
-
-#[cfg(feature = "testing")]
 pub mod error;
 #[cfg(not(feature = "testing"))]
 mod error;
 
-#[cfg(feature = "testing")]
-pub mod identity;
-#[cfg(not(feature = "testing"))]
-mod identity;
-
-#[cfg(feature = "testing")]
-pub mod labels;
-#[cfg(not(feature = "testing"))]
-mod labels;
-
-#[cfg(feature = "testing")]
-pub mod pending;
-#[cfg(not(feature = "testing"))]
-mod pending;
-
-#[cfg(feature = "testing")]
-pub mod delivery;
-#[cfg(not(feature = "testing"))]
-mod delivery;
-
-#[cfg(feature = "testing")]
-pub mod retry;
-#[cfg(not(feature = "testing"))]
-mod retry;
-
-#[cfg(feature = "testing")]
-pub mod device_delivery;
-#[cfg(not(feature = "testing"))]
-mod device_delivery;
-
-#[cfg(feature = "testing")]
-pub mod ratchet;
-#[cfg(not(feature = "testing"))]
-mod ratchet;
-
-#[cfg(feature = "testing")]
-pub mod recovery;
-#[cfg(not(feature = "testing"))]
-mod recovery;
-
 mod rekey;
-
-#[cfg(feature = "testing")]
-pub mod local_groups;
-#[cfg(not(feature = "testing"))]
-mod local_groups;
-
-#[cfg(feature = "testing")]
-pub mod tags;
-#[cfg(not(feature = "testing"))]
-mod tags;
 
 #[cfg(feature = "testing")]
 pub mod places;
@@ -99,35 +30,12 @@ pub mod places;
 mod places;
 
 #[cfg(feature = "testing")]
-pub mod ux;
-#[cfg(not(feature = "testing"))]
-mod ux;
-
-#[cfg(feature = "testing")]
-pub mod decoy;
-#[cfg(not(feature = "testing"))]
-mod decoy;
-
-#[cfg(feature = "testing")]
-pub mod duress_settings;
-#[cfg(not(feature = "testing"))]
-mod duress_settings;
-
-#[cfg(feature = "testing")]
-pub mod emergency;
-#[cfg(not(feature = "testing"))]
-mod emergency;
-
-#[cfg(feature = "testing")]
 pub mod activity_log;
 #[cfg(not(feature = "testing"))]
 mod activity_log;
 
-mod contact_display_ops;
 pub mod local_keys;
 pub mod migration;
-mod ohttp_cache;
-mod pin_cache;
 pub mod secure;
 mod stores;
 

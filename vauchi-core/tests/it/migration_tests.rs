@@ -146,14 +146,21 @@ fn test_schema_has_all_expected_tables() {
     // Since we can't access conn directly, we verify by attempting operations
     // that would fail if tables don't exist
 
-    temp_storage.list_contacts().expect("expected success");
+    temp_storage
+        .contacts()
+        .list_contacts()
+        .expect("expected success");
 
     temp_storage
+        .pending()
         .get_all_pending_updates()
         .expect("expected success");
 
     // Verify own_card table works (returns None if empty, but no error)
-    temp_storage.load_own_card().expect("expected success");
+    temp_storage
+        .contacts()
+        .load_own_card()
+        .expect("expected success");
 
     drop(storage);
     drop(conn);
@@ -357,7 +364,7 @@ fn test_own_card_persistence() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
 
-    assert!(storage.load_own_card().unwrap().is_none());
+    assert!(storage.contacts().load_own_card().unwrap().is_none());
 
     let mut card = ContactCard::new("Test User");
     card.add_field(vauchi_core::ContactField::new(
@@ -368,9 +375,9 @@ fn test_own_card_persistence() {
     ))
     .unwrap();
 
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
 
-    let loaded = storage.load_own_card().unwrap().unwrap();
+    let loaded = storage.contacts().load_own_card().unwrap().unwrap();
     assert_eq!(loaded.display_name(), "Test User");
     assert_eq!(loaded.fields().len(), 1);
     assert_eq!(loaded.fields()[0].value(), "test@example.com");
@@ -384,7 +391,13 @@ fn test_pending_updates_persistence() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
 
-    assert!(storage.get_all_pending_updates().unwrap().is_empty());
+    assert!(
+        storage
+            .pending()
+            .get_all_pending_updates()
+            .unwrap()
+            .is_empty()
+    );
 
     let update = PendingUpdate {
         id: "test-update-1".to_string(),
@@ -397,17 +410,23 @@ fn test_pending_updates_persistence() {
         target_relay_url: None,
     };
 
-    storage.queue_update(&update).unwrap();
+    storage.pending().queue_update(&update).unwrap();
 
-    let loaded = storage.get_all_pending_updates().unwrap();
+    let loaded = storage.pending().get_all_pending_updates().unwrap();
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0].id, "test-update-1");
     assert_eq!(loaded[0].contact_id, "contact-123");
     assert_eq!(loaded[0].payload, vec![1, 2, 3, 4, 5]);
 
     // Mark as sent (delete)
-    storage.mark_update_sent("test-update-1").unwrap();
-    assert!(storage.get_all_pending_updates().unwrap().is_empty());
+    storage.pending().mark_update_sent("test-update-1").unwrap();
+    assert!(
+        storage
+            .pending()
+            .get_all_pending_updates()
+            .unwrap()
+            .is_empty()
+    );
 }
 
 // @internal
@@ -433,9 +452,13 @@ fn test_contact_persistence_roundtrip() {
 
     let contact = Contact::from_exchange(public_key, card, shared_key, 0);
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(contact.id())
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.card().display_name(), "Alice");
     assert_eq!(loaded.card().fields().len(), 1);
 }
@@ -450,14 +473,14 @@ fn test_create_table_if_not_exists_is_idempotent() {
     let storage1 = Storage::in_memory(key1).unwrap();
 
     let card = vauchi_core::ContactCard::new("Test");
-    storage1.save_own_card(&card).unwrap();
+    storage1.contacts().save_own_card(&card).unwrap();
 
     // Opening storage again (simulating restart) should work
     // Note: in-memory storage doesn't persist, so this just verifies
     // the schema creation is safe to run multiple times
     let key2 = SymmetricKey::generate();
     let storage2 = Storage::in_memory(key2).unwrap();
-    assert!(storage2.load_own_card().unwrap().is_none()); // Different instance, no data
+    assert!(storage2.contacts().load_own_card().unwrap().is_none()); // Different instance, no data
 }
 
 // @internal
@@ -475,9 +498,13 @@ fn test_nullable_columns_work() {
     let public_key = [0u8; 32];
 
     let contact = Contact::from_exchange(public_key, card, shared_key, 0);
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(contact.id())
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.card().display_name(), "Bob");
 }
 
@@ -501,9 +528,9 @@ fn test_default_column_values() {
         target_relay_url: None,
     };
 
-    storage.queue_update(&update).unwrap();
+    storage.pending().queue_update(&update).unwrap();
 
-    let loaded = storage.get_all_pending_updates().unwrap();
+    let loaded = storage.pending().get_all_pending_updates().unwrap();
     assert_eq!(loaded[0].retry_count, 0);
     assert!(matches!(loaded[0].status, UpdateStatus::Pending));
 }
@@ -903,13 +930,13 @@ fn test_rekey_is_atomic() {
     let mut storage = Storage::in_memory(key).unwrap();
 
     let card = vauchi_core::ContactCard::new("AtomicTest");
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
     // Data should still be loadable (re-encrypted with new key)
-    let loaded = storage.load_own_card().unwrap();
+    let loaded = storage.contacts().load_own_card().unwrap();
     assert!(loaded.is_some(), "Card should be loadable after rekey");
     assert_eq!(loaded.unwrap().display_name(), "AtomicTest");
 }

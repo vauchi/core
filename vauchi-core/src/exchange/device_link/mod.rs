@@ -456,7 +456,7 @@ mod tests {
         let storage = create_test_storage();
 
         let contact = create_test_contact("Bob");
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
 
         let mut own_card = ContactCard::new("Alice");
         // Test setup: ignore field-add result (test focuses on sync below)
@@ -467,7 +467,7 @@ mod tests {
             "alice@example.com",
             0,
         ));
-        storage.save_own_card(&own_card).unwrap();
+        storage.contacts().save_own_card(&own_card).unwrap();
 
         let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string(), 0);
         let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry.clone());
@@ -629,7 +629,7 @@ mod tests {
         let storage = create_test_storage();
 
         let contact = create_test_contact("Bob");
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
 
         let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string(), 0);
         let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry.clone());

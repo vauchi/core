@@ -43,14 +43,14 @@ fn create_pending_update(id: &str, contact_id: &str) -> PendingUpdate {
 fn test_count_all_pending_updates() {
     let storage = test_storage();
 
-    assert_eq!(storage.count_all_pending_updates().unwrap(), 0);
+    assert_eq!(storage.pending().count_all_pending_updates().unwrap(), 0);
 
     for i in 0..5 {
         let update = create_pending_update(&format!("update-{}", i), &format!("contact-{}", i % 3));
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
-    assert_eq!(storage.count_all_pending_updates().unwrap(), 5);
+    assert_eq!(storage.pending().count_all_pending_updates().unwrap(), 5);
 }
 
 // @scenario: sync_updates :: Large sync queue handling
@@ -79,13 +79,13 @@ fn test_is_queue_full() {
 
     for i in 0..4 {
         let update = create_pending_update(&format!("update-{}", i), "contact");
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
     assert!(!queue.is_full(&storage).unwrap());
 
     let update = create_pending_update("update-4", "contact");
-    storage.queue_update(&update).unwrap();
+    storage.pending().queue_update(&update).unwrap();
 
     assert!(queue.is_full(&storage).unwrap());
 }
@@ -99,13 +99,13 @@ fn test_can_queue_update() {
 
     for i in 0..3 {
         let update = create_pending_update(&format!("update-{}", i), "contact");
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
     // Can't queue more when full
     assert!(!queue.can_queue(&storage).unwrap());
 
-    storage.delete_pending_update("update-0").unwrap();
+    storage.pending().delete_pending_update("update-0").unwrap();
 
     assert!(queue.can_queue(&storage).unwrap());
 }
@@ -122,7 +122,7 @@ fn test_queue_size_remaining() {
 
     for i in 0..3 {
         let update = create_pending_update(&format!("update-{}", i), "contact");
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
     // 7 remaining
@@ -156,10 +156,10 @@ fn test_pending_updates_ordered_by_creation() {
             status: UpdateStatus::Pending,
             target_relay_url: None,
         };
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
-    let all = storage.get_all_pending_updates().unwrap();
+    let all = storage.pending().get_all_pending_updates().unwrap();
     assert_eq!(all.len(), 3);
     assert_eq!(all[0].id, "msg-1"); // created_at + 10
     assert_eq!(all[1].id, "msg-2"); // created_at + 20
@@ -176,20 +176,33 @@ fn test_flush_pending_updates_for_contact() {
 
     for i in 0..3 {
         let update = create_pending_update(&format!("alice-{}", i), "alice");
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
     for i in 0..2 {
         let update = create_pending_update(&format!("bob-{}", i), "bob");
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
-    let deleted = storage.delete_pending_updates_for_contact("alice").unwrap();
+    let deleted = storage
+        .pending()
+        .delete_pending_updates_for_contact("alice")
+        .unwrap();
     assert_eq!(deleted, 3);
 
     // Only bob's updates remain
-    assert_eq!(storage.count_all_pending_updates().unwrap(), 2);
-    assert_eq!(storage.get_pending_updates("alice").unwrap().len(), 0);
-    assert_eq!(storage.get_pending_updates("bob").unwrap().len(), 2);
+    assert_eq!(storage.pending().count_all_pending_updates().unwrap(), 2);
+    assert_eq!(
+        storage
+            .pending()
+            .get_pending_updates("alice")
+            .unwrap()
+            .len(),
+        0
+    );
+    assert_eq!(
+        storage.pending().get_pending_updates("bob").unwrap().len(),
+        2
+    );
 }
 
 // @scenario: sync_updates :: Sync survives app restart
@@ -201,15 +214,15 @@ fn test_clear_all_pending_updates() {
 
     for i in 0..10 {
         let update = create_pending_update(&format!("update-{}", i), &format!("contact-{}", i % 3));
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
-    assert_eq!(storage.count_all_pending_updates().unwrap(), 10);
+    assert_eq!(storage.pending().count_all_pending_updates().unwrap(), 10);
 
-    let cleared = storage.clear_all_pending_updates().unwrap();
+    let cleared = storage.pending().clear_all_pending_updates().unwrap();
     assert_eq!(cleared, 10);
 
-    assert_eq!(storage.count_all_pending_updates().unwrap(), 0);
+    assert_eq!(storage.pending().count_all_pending_updates().unwrap(), 0);
 }
 
 // === Status Transition Tests ===
@@ -244,16 +257,25 @@ fn test_get_pending_by_status() {
             status,
             target_relay_url: None,
         };
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
-    let pending = storage.get_pending_updates_by_status("pending").unwrap();
+    let pending = storage
+        .pending()
+        .get_pending_updates_by_status("pending")
+        .unwrap();
     assert_eq!(pending.len(), 2);
 
-    let sending = storage.get_pending_updates_by_status("sending").unwrap();
+    let sending = storage
+        .pending()
+        .get_pending_updates_by_status("sending")
+        .unwrap();
     assert_eq!(sending.len(), 1);
 
-    let failed = storage.get_pending_updates_by_status("failed").unwrap();
+    let failed = storage
+        .pending()
+        .get_pending_updates_by_status("failed")
+        .unwrap();
     assert_eq!(failed.len(), 1);
 }
 
@@ -276,12 +298,15 @@ fn test_get_pending_updates_grouped_by_relay() {
     let mut u4 = create_pending_update("u4", "dave");
     u4.target_relay_url = None; // home relay
 
-    storage.queue_update(&u1).unwrap();
-    storage.queue_update(&u2).unwrap();
-    storage.queue_update(&u3).unwrap();
-    storage.queue_update(&u4).unwrap();
+    storage.pending().queue_update(&u1).unwrap();
+    storage.pending().queue_update(&u2).unwrap();
+    storage.pending().queue_update(&u3).unwrap();
+    storage.pending().queue_update(&u4).unwrap();
 
-    let grouped = storage.get_pending_updates_grouped_by_relay().unwrap();
+    let grouped = storage
+        .pending()
+        .get_pending_updates_grouped_by_relay()
+        .unwrap();
 
     // 3 groups: relay-a (2), relay-b (1), None/home (1)
     assert_eq!(grouped.len(), 3);
@@ -310,10 +335,13 @@ fn test_grouped_by_relay_all_same_relay() {
     for i in 0..3 {
         let mut update = create_pending_update(&format!("u-{i}"), &format!("c-{i}"));
         update.target_relay_url = Some("https://relay.example.com".to_string());
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
-    let grouped = storage.get_pending_updates_grouped_by_relay().unwrap();
+    let grouped = storage
+        .pending()
+        .get_pending_updates_grouped_by_relay()
+        .unwrap();
     assert_eq!(grouped.len(), 1);
 
     let relay = grouped
@@ -329,10 +357,13 @@ fn test_grouped_by_relay_all_home() {
 
     for i in 0..3 {
         let update = create_pending_update(&format!("u-{i}"), &format!("c-{i}"));
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
-    let grouped = storage.get_pending_updates_grouped_by_relay().unwrap();
+    let grouped = storage
+        .pending()
+        .get_pending_updates_grouped_by_relay()
+        .unwrap();
     assert_eq!(grouped.len(), 1);
 
     let home = grouped.get(&None).unwrap();
@@ -344,6 +375,9 @@ fn test_grouped_by_relay_all_home() {
 fn test_grouped_by_relay_empty() {
     let storage = test_storage();
 
-    let grouped = storage.get_pending_updates_grouped_by_relay().unwrap();
+    let grouped = storage
+        .pending()
+        .get_pending_updates_grouped_by_relay()
+        .unwrap();
     assert!(grouped.is_empty());
 }

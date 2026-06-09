@@ -369,7 +369,7 @@ impl Vauchi {
         // reads a consistent value that survives restart
         // (settings-toggle-not-persisting P1). Absent/unreadable flags
         // leave the caller-provided config untouched.
-        if let Ok(Some(flags)) = storage.load_settings_flags() {
+        if let Ok(Some(flags)) = storage.ux().load_settings_flags() {
             config.delivery_receipts_enabled = flags.delivery_receipts_enabled;
             config.suppress_presence = flags.suppress_presence;
             config.contact_added_notifications = flags.contact_added_notifications;
@@ -378,7 +378,7 @@ impl Vauchi {
         let events = Arc::new(EventDispatcher::new());
 
         // Try to load a persisted identity from storage
-        let identity = match storage.load_identity() {
+        let identity = match storage.identity().load_identity() {
             Ok(Some((bytes, _display_name))) => {
                 Identity::from_storage_bytes(&bytes, clock.unix_seconds()).ok()
             }
@@ -539,7 +539,7 @@ impl Vauchi {
             None => return,
         };
 
-        let registry = match self.storage.load_device_registry() {
+        let registry = match self.storage.device().load_device_registry() {
             Ok(Some(r)) if r.device_count() > 1 => r,
             _ => return,
         };

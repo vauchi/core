@@ -85,7 +85,7 @@ fn test_boot_with_smk_derived_sek_opens_storage() {
     {
         let storage = Storage::open(&db_path, sek).unwrap();
         let card = ContactCard::new("Alice");
-        storage.save_own_card(&card).unwrap();
+        storage.contacts().save_own_card(&card).unwrap();
     }
 
     // Simulate reboot: load SMK from SecureStorage → derive SEK → open Storage
@@ -94,7 +94,11 @@ fn test_boot_with_smk_derived_sek_opens_storage() {
     let sek_rebooted = smk_rebooted.derive_sek();
 
     let storage = Storage::open(&db_path, sek_rebooted).unwrap();
-    let loaded = storage.load_own_card().unwrap().expect("Card should exist");
+    let loaded = storage
+        .contacts()
+        .load_own_card()
+        .unwrap()
+        .expect("Card should exist");
     assert_eq!(loaded.display_name(), "Alice");
 }
 
@@ -112,7 +116,7 @@ fn test_migrate_old_key_to_smk_preserves_data() {
     {
         let storage = Storage::open(&db_path, old_key.clone()).unwrap();
         let card = ContactCard::new("MigrationUser");
-        storage.save_own_card(&card).unwrap();
+        storage.contacts().save_own_card(&card).unwrap();
     }
 
     // Step 2: Open with old key, migrate to SMK
@@ -137,7 +141,11 @@ fn test_migrate_old_key_to_smk_preserves_data() {
     let sek_loaded = smk_loaded.derive_sek();
 
     let storage = Storage::open(&db_path, sek_loaded).unwrap();
-    let loaded = storage.load_own_card().unwrap().expect("Card should exist");
+    let loaded = storage
+        .contacts()
+        .load_own_card()
+        .unwrap()
+        .expect("Card should exist");
     assert_eq!(loaded.display_name(), "MigrationUser");
 }
 
@@ -147,7 +155,7 @@ fn test_migrate_smk_stored_before_rekey_for_safety() {
     let old_key = SymmetricKey::generate();
     let (dir, storage) = open_storage_with_key(old_key.clone());
     let card = ContactCard::new("SafetyTest");
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
     drop(storage);
 
     let identity = Identity::create("SafetyTest", 0);
@@ -165,7 +173,11 @@ fn test_migrate_smk_stored_before_rekey_for_safety() {
     storage.rekey(sek).unwrap();
 
     // Verify data accessible via SMK → SEK
-    let loaded = storage.load_own_card().unwrap().expect("Card should exist");
+    let loaded = storage
+        .contacts()
+        .load_own_card()
+        .unwrap()
+        .expect("Card should exist");
     assert_eq!(loaded.display_name(), "SafetyTest");
 }
 
@@ -180,7 +192,7 @@ fn test_after_migration_old_key_cannot_decrypt() {
     {
         let storage = Storage::open(&db_path, old_key.clone()).unwrap();
         let card = ContactCard::new("OldKeyTest");
-        storage.save_own_card(&card).unwrap();
+        storage.contacts().save_own_card(&card).unwrap();
     }
 
     let smk = ShreddingMasterKey::derive_from_seed(&[0x42; 32]);
@@ -191,7 +203,7 @@ fn test_after_migration_old_key_cannot_decrypt() {
     }
 
     let old_storage = Storage::open(&db_path, old_key).unwrap();
-    match old_storage.load_own_card() {
+    match old_storage.contacts().load_own_card() {
         Ok(None) => {} // Plaintext fallback returns empty string
         Ok(Some(_)) => panic!("Old key should not decrypt after migration"),
         Err(_) => {} // Decryption error — expected
@@ -215,7 +227,7 @@ fn test_smk_destruction_makes_data_irrecoverable() {
     {
         let storage = Storage::open(&db_path, sek).unwrap();
         let card = ContactCard::new("ShredTest");
-        storage.save_own_card(&card).unwrap();
+        storage.contacts().save_own_card(&card).unwrap();
     }
 
     secure.secure_delete_key(SMK_KEY_NAME).unwrap();
@@ -223,7 +235,7 @@ fn test_smk_destruction_makes_data_irrecoverable() {
 
     // Without SMK, we can't derive SEK → can't decrypt
     let random_storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
-    match random_storage.load_own_card() {
+    match random_storage.contacts().load_own_card() {
         Ok(None) => {} // Plaintext fallback returns empty
         Ok(Some(_)) => panic!("Should not be able to decrypt without SMK"),
         Err(_) => {} // Expected: decryption error
@@ -298,7 +310,7 @@ fn test_vauchi_migrate_existing_to_smk() {
     {
         let storage = Storage::open(&db_path, old_key.clone()).unwrap();
         let card = ContactCard::new("MigrateMe");
-        storage.save_own_card(&card).unwrap();
+        storage.contacts().save_own_card(&card).unwrap();
         drop(storage);
     }
 

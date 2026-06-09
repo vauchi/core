@@ -34,9 +34,13 @@ fn test_storage_save_load_contact() {
     let contact = create_test_contact("Alice");
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .unwrap();
 
     assert_eq!(loaded.id(), contact.id());
     assert_eq!(loaded.display_name(), "Alice");
@@ -57,10 +61,10 @@ fn test_storage_list_contacts() {
     contact1 = Contact::from_exchange(pk1, contact1.card().clone(), SymmetricKey::generate(), 0);
     contact2 = Contact::from_exchange(pk2, contact2.card().clone(), SymmetricKey::generate(), 0);
 
-    storage.save_contact(&contact1).unwrap();
-    storage.save_contact(&contact2).unwrap();
+    storage.contacts().save_contact(&contact1).unwrap();
+    storage.contacts().save_contact(&contact2).unwrap();
 
-    let contacts = storage.list_contacts().unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
     assert_eq!(contacts.len(), 2);
 }
 
@@ -71,23 +75,33 @@ fn test_storage_delete_contact() {
     let contact = create_test_contact("Alice");
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
     assert!(
-        storage.load_contact(&contact_id).unwrap().is_some(),
+        storage
+            .contacts()
+            .load_contact(&contact_id)
+            .unwrap()
+            .is_some(),
         "expected Some value"
     );
 
     let deleted = storage.delete_contact(&contact_id).unwrap();
     assert!(deleted);
 
-    assert!(storage.load_contact(&contact_id).unwrap().is_none());
+    assert!(
+        storage
+            .contacts()
+            .load_contact(&contact_id)
+            .unwrap()
+            .is_none()
+    );
 }
 
 // @internal
 #[test]
 fn test_storage_contact_not_found() {
     let storage = create_test_storage();
-    let result = storage.load_contact("nonexistent").unwrap();
+    let result = storage.contacts().load_contact("nonexistent").unwrap();
     assert!(result.is_none());
 }
 
@@ -104,9 +118,9 @@ fn test_storage_save_load_own_card() {
         0,
     ));
 
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
 
-    let loaded = storage.load_own_card().unwrap().unwrap();
+    let loaded = storage.contacts().load_own_card().unwrap().unwrap();
     assert_eq!(loaded.display_name(), "My Card");
     assert_eq!(loaded.fields().len(), 1);
 }
@@ -115,7 +129,7 @@ fn test_storage_save_load_own_card() {
 #[test]
 fn test_storage_own_card_not_found() {
     let storage = create_test_storage();
-    let result = storage.load_own_card().unwrap();
+    let result = storage.contacts().load_own_card().unwrap();
     assert!(result.is_none());
 }
 
@@ -124,7 +138,7 @@ fn test_storage_own_card_not_found() {
 fn test_storage_pending_updates() {
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let update = PendingUpdate {
         id: "update-1".to_string(),
@@ -137,9 +151,9 @@ fn test_storage_pending_updates() {
         target_relay_url: None,
     };
 
-    storage.queue_update(&update).unwrap();
+    storage.pending().queue_update(&update).unwrap();
 
-    let pending = storage.get_pending_updates(contact.id()).unwrap();
+    let pending = storage.pending().get_pending_updates(contact.id()).unwrap();
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].id, "update-1");
     assert_eq!(pending[0].payload, vec![1, 2, 3, 4]);
@@ -150,7 +164,7 @@ fn test_storage_pending_updates() {
 fn test_storage_mark_update_sent() {
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let update = PendingUpdate {
         id: "update-1".to_string(),
@@ -163,11 +177,23 @@ fn test_storage_mark_update_sent() {
         target_relay_url: None,
     };
 
-    storage.queue_update(&update).unwrap();
-    assert_eq!(storage.count_pending_updates(contact.id()).unwrap(), 1);
+    storage.pending().queue_update(&update).unwrap();
+    assert_eq!(
+        storage
+            .pending()
+            .count_pending_updates(contact.id())
+            .unwrap(),
+        1
+    );
 
-    storage.mark_update_sent("update-1").unwrap();
-    assert_eq!(storage.count_pending_updates(contact.id()).unwrap(), 0);
+    storage.pending().mark_update_sent("update-1").unwrap();
+    assert_eq!(
+        storage
+            .pending()
+            .count_pending_updates(contact.id())
+            .unwrap(),
+        0
+    );
 }
 
 // @internal
@@ -175,7 +201,7 @@ fn test_storage_mark_update_sent() {
 fn test_storage_update_status() {
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let update = PendingUpdate {
         id: "update-1".to_string(),
@@ -188,9 +214,10 @@ fn test_storage_update_status() {
         target_relay_url: None,
     };
 
-    storage.queue_update(&update).unwrap();
+    storage.pending().queue_update(&update).unwrap();
 
     storage
+        .pending()
         .update_pending_status(
             "update-1",
             UpdateStatus::Failed {
@@ -201,7 +228,7 @@ fn test_storage_update_status() {
         )
         .unwrap();
 
-    let pending = storage.get_pending_updates(contact.id()).unwrap();
+    let pending = storage.pending().get_pending_updates(contact.id()).unwrap();
     assert_eq!(pending[0].retry_count, 1);
     assert!(matches!(pending[0].status, UpdateStatus::Failed { .. }));
 }
@@ -215,7 +242,7 @@ fn test_storage_save_load_ratchet_state() {
 
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Create ratchet state (as initiator)
     let shared_secret = SymmetricKey::generate();
@@ -224,10 +251,15 @@ fn test_storage_save_load_ratchet_state() {
         DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key()).unwrap();
 
     storage
+        .ratchets()
         .save_ratchet_state(contact.id(), &ratchet, true)
         .unwrap();
 
-    let (loaded, is_initiator) = storage.load_ratchet_state(contact.id()).unwrap().unwrap();
+    let (loaded, is_initiator) = storage
+        .ratchets()
+        .load_ratchet_state(contact.id())
+        .unwrap()
+        .unwrap();
 
     assert!(is_initiator);
     assert_eq!(loaded.dh_generation(), ratchet.dh_generation());
@@ -243,7 +275,7 @@ fn test_storage_ratchet_state_encryption() {
 
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
@@ -253,9 +285,14 @@ fn test_storage_ratchet_state_encryption() {
     let _msg = ratchet.encrypt(b"test message").unwrap();
 
     storage
+        .ratchets()
         .save_ratchet_state(contact.id(), &ratchet, true)
         .unwrap();
-    let (mut loaded, _) = storage.load_ratchet_state(contact.id()).unwrap().unwrap();
+    let (mut loaded, _) = storage
+        .ratchets()
+        .load_ratchet_state(contact.id())
+        .unwrap()
+        .unwrap();
 
     let msg2 = loaded.encrypt(b"another message").unwrap();
     assert!(!msg2.ciphertext.is_empty());
@@ -271,7 +308,7 @@ fn test_storage_ratchet_deleted_with_contact() {
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
     let contact_id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
@@ -279,24 +316,38 @@ fn test_storage_ratchet_deleted_with_contact() {
         DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key()).unwrap();
 
     storage
+        .ratchets()
         .save_ratchet_state(&contact_id, &ratchet, true)
         .unwrap();
 
     assert!(
-        storage.load_ratchet_state(&contact_id).unwrap().is_some(),
+        storage
+            .ratchets()
+            .load_ratchet_state(&contact_id)
+            .unwrap()
+            .is_some(),
         "expected Some value"
     );
 
     storage.delete_contact(&contact_id).unwrap();
 
-    assert!(storage.load_ratchet_state(&contact_id).unwrap().is_none());
+    assert!(
+        storage
+            .ratchets()
+            .load_ratchet_state(&contact_id)
+            .unwrap()
+            .is_none()
+    );
 }
 
 // @internal
 #[test]
 fn test_storage_ratchet_not_found() {
     let storage = create_test_storage();
-    let result = storage.load_ratchet_state("nonexistent").unwrap();
+    let result = storage
+        .ratchets()
+        .load_ratchet_state("nonexistent")
+        .unwrap();
     assert!(result.is_none());
 }
 
@@ -325,14 +376,15 @@ fn test_storage_ratchet_per_contact_key_isolation() {
         SymmetricKey::generate(),
         0,
     );
-    storage.save_contact(&alice).unwrap();
-    storage.save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&alice).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
 
     let secret_a = SymmetricKey::generate();
     let dh_a = X3DHKeyPair::generate();
     let ratchet_a =
         DoubleRatchetState::initialize_initiator(&secret_a, *dh_a.public_key()).unwrap();
     storage
+        .ratchets()
         .save_ratchet_state(alice.id(), &ratchet_a, true)
         .unwrap();
 
@@ -341,17 +393,26 @@ fn test_storage_ratchet_per_contact_key_isolation() {
     let ratchet_b =
         DoubleRatchetState::initialize_initiator(&secret_b, *dh_b.public_key()).unwrap();
     storage
+        .ratchets()
         .save_ratchet_state(bob.id(), &ratchet_b, false)
         .unwrap();
 
     // Load Alice's ratchet — must succeed and match
-    let (loaded_a, is_init_a) = storage.load_ratchet_state(alice.id()).unwrap().unwrap();
+    let (loaded_a, is_init_a) = storage
+        .ratchets()
+        .load_ratchet_state(alice.id())
+        .unwrap()
+        .unwrap();
     assert!(is_init_a);
     assert_eq!(loaded_a.dh_generation(), ratchet_a.dh_generation());
     assert_eq!(loaded_a.our_public_key(), ratchet_a.our_public_key());
 
     // Load Bob's ratchet — must succeed and match
-    let (loaded_b, is_init_b) = storage.load_ratchet_state(bob.id()).unwrap().unwrap();
+    let (loaded_b, is_init_b) = storage
+        .ratchets()
+        .load_ratchet_state(bob.id())
+        .unwrap()
+        .unwrap();
     assert!(!is_init_b);
     assert_eq!(loaded_b.dh_generation(), ratchet_b.dh_generation());
     assert_eq!(loaded_b.our_public_key(), ratchet_b.our_public_key());
@@ -367,16 +428,17 @@ fn test_storage_save_load_device_info() {
     let device_name = "My Phone";
     let created_at = 1234567890u64;
 
-    assert!(!storage.has_device_info().unwrap());
+    assert!(!storage.device().has_device_info().unwrap());
 
     storage
+        .device()
         .save_device_info(&device_id, device_index, device_name, created_at)
         .unwrap();
 
-    assert!(storage.has_device_info().unwrap());
+    assert!(storage.device().has_device_info().unwrap());
 
     let (loaded_id, loaded_index, loaded_name, loaded_created) =
-        storage.load_device_info().unwrap().unwrap();
+        storage.device().load_device_info().unwrap().unwrap();
 
     assert_eq!(loaded_id, device_id);
     assert_eq!(loaded_index, device_index);
@@ -390,13 +452,15 @@ fn test_storage_device_info_update() {
     let storage = create_test_storage();
 
     storage
+        .device()
         .save_device_info(&[1u8; 32], 0, "Old Name", 100)
         .unwrap();
     storage
+        .device()
         .save_device_info(&[2u8; 32], 1, "New Name", 200)
         .unwrap();
 
-    let (id, index, name, _) = storage.load_device_info().unwrap().unwrap();
+    let (id, index, name, _) = storage.device().load_device_info().unwrap().unwrap();
     assert_eq!(id, [2u8; 32]);
     assert_eq!(index, 1);
     assert_eq!(name, "New Name");
@@ -415,13 +479,13 @@ fn test_storage_save_load_device_registry() {
     let device = DeviceInfo::derive(&master_seed, 0, "Primary".to_string(), 0);
     let registry = DeviceRegistry::new(device.to_registered(&master_seed), &signing_key);
 
-    assert!(!storage.has_device_registry().unwrap());
+    assert!(!storage.device().has_device_registry().unwrap());
 
-    storage.save_device_registry(&registry).unwrap();
+    storage.device().save_device_registry(&registry).unwrap();
 
-    assert!(storage.has_device_registry().unwrap());
+    assert!(storage.device().has_device_registry().unwrap());
 
-    let loaded = storage.load_device_registry().unwrap().unwrap();
+    let loaded = storage.device().load_device_registry().unwrap().unwrap();
     assert_eq!(loaded.version(), registry.version());
     assert_eq!(loaded.active_count(), 1);
     assert!(loaded.verify(&signing_key.public_key()));
@@ -445,8 +509,8 @@ fn test_storage_device_registry_roundtrip() {
         .add_device(device1.to_registered(&master_seed), &signing_key)
         .unwrap();
 
-    storage.save_device_registry(&registry).unwrap();
-    let loaded = storage.load_device_registry().unwrap().unwrap();
+    storage.device().save_device_registry(&registry).unwrap();
+    let loaded = storage.device().load_device_registry().unwrap().unwrap();
 
     assert_eq!(loaded.version(), 2);
     assert_eq!(loaded.active_count(), 2);
@@ -479,9 +543,13 @@ fn test_storage_save_load_device_sync_state() {
         timestamp: 2000,
     });
 
-    storage.save_device_sync_state(&state).unwrap();
+    storage.sync().save_device_sync_state(&state).unwrap();
 
-    let loaded = storage.load_device_sync_state(&device_id).unwrap().unwrap();
+    let loaded = storage
+        .sync()
+        .load_device_sync_state(&device_id)
+        .unwrap()
+        .unwrap();
 
     assert_eq!(loaded.device_id(), &device_id);
     assert_eq!(loaded.pending_items().len(), 2);
@@ -514,10 +582,10 @@ fn test_storage_list_device_sync_states() {
         timestamp: 2000,
     });
 
-    storage.save_device_sync_state(&state_a).unwrap();
-    storage.save_device_sync_state(&state_b).unwrap();
+    storage.sync().save_device_sync_state(&state_a).unwrap();
+    storage.sync().save_device_sync_state(&state_b).unwrap();
 
-    let states = storage.list_device_sync_states().unwrap();
+    let states = storage.sync().list_device_sync_states().unwrap();
     assert_eq!(states.len(), 2);
 }
 
@@ -537,9 +605,9 @@ fn test_storage_save_load_version_vector() {
     vector.increment(&device_a);
     vector.increment(&device_b);
 
-    storage.save_version_vector(&vector).unwrap();
+    storage.sync().save_version_vector(&vector).unwrap();
 
-    let loaded = storage.load_version_vector().unwrap().unwrap();
+    let loaded = storage.sync().load_version_vector().unwrap().unwrap();
 
     assert_eq!(loaded.get(&device_a), 2);
     assert_eq!(loaded.get(&device_b), 1);
@@ -557,15 +625,15 @@ fn test_storage_version_vector_update() {
 
     let mut vector1 = VersionVector::new();
     vector1.increment(&device_a);
-    storage.save_version_vector(&vector1).unwrap();
+    storage.sync().save_version_vector(&vector1).unwrap();
 
     let mut vector2 = VersionVector::new();
     vector2.increment(&device_a);
     vector2.increment(&device_a);
     vector2.increment(&device_a);
-    storage.save_version_vector(&vector2).unwrap();
+    storage.sync().save_version_vector(&vector2).unwrap();
 
-    let loaded = storage.load_version_vector().unwrap().unwrap();
+    let loaded = storage.sync().load_version_vector().unwrap().unwrap();
     assert_eq!(loaded.get(&device_a), 3);
 }
 
@@ -593,15 +661,23 @@ fn test_storage_recovery_trusted_persistence() {
     );
 
     let contact_id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .unwrap();
     assert!(loaded.is_recovery_trusted());
 
     contact.untrust_for_recovery().unwrap();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .unwrap();
     assert!(!loaded.is_recovery_trusted());
 }
 
@@ -615,7 +691,7 @@ fn test_storage_recovery_trusted_persistence() {
 #[test]
 fn test_get_contact_limit_default() {
     let storage = create_test_storage();
-    let limit = storage.get_contact_limit().unwrap();
+    let limit = storage.contacts().get_contact_limit().unwrap();
     assert_eq!(limit, 10_000);
 }
 
@@ -627,9 +703,9 @@ fn test_last_delta_version_default() {
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
     let contact_id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let version = storage.last_delta_version(&contact_id).unwrap();
+    let version = storage.contacts().last_delta_version(&contact_id).unwrap();
     assert_eq!(version, 0);
 }
 
@@ -641,14 +717,20 @@ fn test_record_and_load_delta_version() {
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
     let contact_id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    storage.record_delta_version(&contact_id, 42).unwrap();
-    let version = storage.last_delta_version(&contact_id).unwrap();
+    storage
+        .contacts()
+        .record_delta_version(&contact_id, 42)
+        .unwrap();
+    let version = storage.contacts().last_delta_version(&contact_id).unwrap();
     assert_eq!(version, 42);
 
-    storage.record_delta_version(&contact_id, 100).unwrap();
-    let version = storage.last_delta_version(&contact_id).unwrap();
+    storage
+        .contacts()
+        .record_delta_version(&contact_id, 100)
+        .unwrap();
+    let version = storage.contacts().last_delta_version(&contact_id).unwrap();
     assert_eq!(version, 100);
 }
 
@@ -658,7 +740,7 @@ fn test_record_and_load_delta_version() {
 #[test]
 fn test_last_delta_version_nonexistent_contact() {
     let storage = create_test_storage();
-    let result = storage.last_delta_version("nonexistent");
+    let result = storage.contacts().last_delta_version("nonexistent");
     assert!(result.is_err(), "expected error");
 }
 
@@ -671,13 +753,14 @@ fn test_wipe_device_data() {
 
     let device_id = [0x42u8; 32];
     storage
+        .device()
         .save_device_info(&device_id, 0, "Test Device", 1000)
         .unwrap();
-    assert!(storage.has_device_info().unwrap());
+    assert!(storage.device().has_device_info().unwrap());
 
     storage.wipe_device_data().unwrap();
 
-    assert!(!storage.has_device_info().unwrap());
+    assert!(!storage.device().has_device_info().unwrap());
 }
 
 /// Test is_replay_nonce detects duplicates
@@ -690,17 +773,33 @@ fn test_is_replay_nonce() {
     let nonce = [0xAAu8; 32];
 
     // Fresh nonce is not a replay
-    assert!(!storage.is_replay_nonce("contact-1", &nonce).unwrap());
+    assert!(
+        !storage
+            .replay()
+            .is_replay_nonce("contact-1", &nonce)
+            .unwrap()
+    );
 
     storage
+        .replay()
         .save_replay_nonce("contact-1", &nonce, 1000)
         .unwrap();
 
     // Now it's a replay
-    assert!(storage.is_replay_nonce("contact-1", &nonce).unwrap());
+    assert!(
+        storage
+            .replay()
+            .is_replay_nonce("contact-1", &nonce)
+            .unwrap()
+    );
 
     // Same nonce for different contact is NOT a replay
-    assert!(!storage.is_replay_nonce("contact-2", &nonce).unwrap());
+    assert!(
+        !storage
+            .replay()
+            .is_replay_nonce("contact-2", &nonce)
+            .unwrap()
+    );
 }
 
 /// Test cleanup_replay_nonces removes old entries
@@ -713,15 +812,21 @@ fn test_cleanup_replay_nonces() {
     let old_nonce = [0x11u8; 32];
     let new_nonce = [0x22u8; 32];
 
-    storage.save_replay_nonce("c1", &old_nonce, 1000).unwrap();
-    storage.save_replay_nonce("c1", &new_nonce, 5000).unwrap();
+    storage
+        .replay()
+        .save_replay_nonce("c1", &old_nonce, 1000)
+        .unwrap();
+    storage
+        .replay()
+        .save_replay_nonce("c1", &new_nonce, 5000)
+        .unwrap();
 
     // Cleanup nonces older than 3000
-    let removed = storage.cleanup_replay_nonces(3000).unwrap();
+    let removed = storage.replay().cleanup_replay_nonces(3000).unwrap();
     assert_eq!(removed, 1);
 
-    assert!(!storage.is_replay_nonce("c1", &old_nonce).unwrap());
-    assert!(storage.is_replay_nonce("c1", &new_nonce).unwrap());
+    assert!(!storage.replay().is_replay_nonce("c1", &old_nonce).unwrap());
+    assert!(storage.replay().is_replay_nonce("c1", &new_nonce).unwrap());
 }
 
 /// Test load_device_registry_json returns structured JSON
@@ -734,16 +839,16 @@ fn test_load_device_registry_json() {
 
     let storage = create_test_storage();
 
-    let json = storage.load_device_registry_json().unwrap();
+    let json = storage.device().load_device_registry_json().unwrap();
     assert!(json.is_none());
 
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
     let device = DeviceInfo::derive(&master_seed, 0, "Test".to_string(), 0);
     let registry = DeviceRegistry::new(device.to_registered(&master_seed), &signing_key);
-    storage.save_device_registry(&registry).unwrap();
+    storage.device().save_device_registry(&registry).unwrap();
 
-    let json = storage.load_device_registry_json().unwrap();
+    let json = storage.device().load_device_registry_json().unwrap();
     assert!(json.is_some(), "expected Some value");
     let json_str = json.unwrap();
     assert!(json_str.contains("device_id"));
@@ -791,9 +896,13 @@ fn test_proposal_trusted_storage_roundtrip() {
     contact.set_proposal_trusted(true).unwrap();
 
     let contact_id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .unwrap();
     assert!(
         loaded.is_proposal_trusted(),
         "proposal_trusted must survive save/load roundtrip"
@@ -826,9 +935,13 @@ fn test_proposal_trusted_false_persists() {
     // Explicitly leave proposal_trusted as false (the default)
 
     let contact_id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .unwrap();
     assert!(
         !loaded.is_proposal_trusted(),
         "proposal_trusted = false must persist correctly"
@@ -836,13 +949,21 @@ fn test_proposal_trusted_false_persists() {
 
     // Toggle true → save → load → false
     contact.set_proposal_trusted(true).unwrap();
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .unwrap();
     assert!(loaded.is_proposal_trusted());
 
     contact.set_proposal_trusted(false).unwrap();
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .unwrap();
     assert!(
         !loaded.is_proposal_trusted(),
         "proposal_trusted must be updatable back to false"

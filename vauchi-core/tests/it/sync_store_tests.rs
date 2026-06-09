@@ -42,7 +42,7 @@ fn test_sync_store_contact_last_sync_roundtrip() {
     );
     // Same row is visible through the legacy forwarding API — one connection.
     assert_eq!(
-        storage.get_contact_last_sync("contact-a").unwrap(),
+        storage.sync().get_contact_last_sync("contact-a").unwrap(),
         Some(4242)
     );
 }

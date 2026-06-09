@@ -59,7 +59,7 @@ fn apply_sync_deletion_scheduled_writes_state_to_storage() {
         .unwrap();
 
     assert_eq!(applied, 1);
-    let state = wb.storage().load_deletion_state().unwrap();
+    let state = wb.storage().consent().load_deletion_state().unwrap();
     match state {
         DeletionState::Scheduled {
             scheduled_at: got_scheduled,
@@ -77,6 +77,7 @@ fn apply_sync_deletion_scheduled_writes_state_to_storage() {
 fn apply_sync_deletion_cancelled_clears_state() {
     let wb = make_vauchi();
     wb.storage()
+        .consent()
         .save_deletion_state(&DeletionState::Scheduled {
             scheduled_at: 100,
             execute_at: 200,
@@ -88,7 +89,7 @@ fn apply_sync_deletion_cancelled_clears_state() {
         .unwrap();
 
     assert_eq!(applied, 1);
-    let state = wb.storage().load_deletion_state().unwrap();
+    let state = wb.storage().consent().load_deletion_state().unwrap();
     assert!(
         matches!(state, DeletionState::None),
         "DeletionCancelled must clear scheduled state to None, got {state:?}"
@@ -169,7 +170,11 @@ fn apply_sync_personal_note_changed_persists_note() {
         .unwrap();
 
     assert_eq!(applied, 1);
-    let note_bytes = wb.storage().load_personal_notes(&bob_id).unwrap();
+    let note_bytes = wb
+        .storage()
+        .contacts()
+        .load_personal_notes(&bob_id)
+        .unwrap();
     let note = String::from_utf8(note_bytes.unwrap_or_default()).unwrap();
     assert_eq!(note, "met at conference");
 }
@@ -280,10 +285,10 @@ fn apply_sync_label_change_with_is_deleted_removes_label() {
     // create_group(label_name), which assigns its own internal ID
     // (UUID). To exercise the is_deleted branch we need the real ID.
     // First create directly so we know the ID.
-    let label = wb.storage().create_group("ToBeDeleted").unwrap();
+    let label = wb.storage().labels().create_group("ToBeDeleted").unwrap();
     let real_label_id = label.id().to_string();
     assert!(
-        wb.storage().load_group(&real_label_id).is_ok(),
+        wb.storage().labels().load_group(&real_label_id).is_ok(),
         "precondition"
     );
 
@@ -299,7 +304,7 @@ fn apply_sync_label_change_with_is_deleted_removes_label() {
         .unwrap();
     assert_eq!(applied, 1);
     assert!(
-        wb.storage().load_group(&real_label_id).is_err(),
+        wb.storage().labels().load_group(&real_label_id).is_err(),
         "label must be deleted from storage"
     );
 }

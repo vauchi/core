@@ -102,7 +102,11 @@ fn test_sync_update_propagation_happy_path() {
     let mut card_copy = alice_card_at_bob.card().clone();
     received_delta.apply(&mut card_copy, 0).unwrap();
     alice_card_at_bob.update_card(card_copy, 0);
-    bob_wb.storage().save_contact(&alice_card_at_bob).unwrap();
+    bob_wb
+        .storage()
+        .contacts()
+        .save_contact(&alice_card_at_bob)
+        .unwrap();
 
     // Step 7: Verify Bob has updated card
     let alice_in_bob = bob_wb.get_contact(&alice_contact_id).unwrap().unwrap();
@@ -265,7 +269,11 @@ fn test_full_three_user_workflow() {
         .visibility_rules_mut()
         .unwrap()
         .set_nobody("personal");
-    alice_wb.storage().save_contact(&bob_contact).unwrap();
+    alice_wb
+        .storage()
+        .contacts()
+        .save_contact(&bob_contact)
+        .unwrap();
 
     let bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
     let carol_contact = alice_wb.get_contact(&carol_id).unwrap().unwrap();

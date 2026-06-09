@@ -72,9 +72,9 @@ fn test_create_and_retrieve_retry_entry() {
         max_attempts: 10,
     };
 
-    storage.create_retry_entry(&entry).unwrap();
+    storage.retries().create_retry_entry(&entry).unwrap();
 
-    let retrieved = storage.get_retry_entry("retry-msg-001").unwrap();
+    let retrieved = storage.retries().get_retry_entry("retry-msg-001").unwrap();
     assert!(retrieved.is_some(), "expected Some value");
 
     let retrieved = retrieved.unwrap();
@@ -107,10 +107,10 @@ fn test_get_due_retries() {
             created_at: now_ts,
             max_attempts: 10,
         };
-        storage.create_retry_entry(&entry).unwrap();
+        storage.retries().create_retry_entry(&entry).unwrap();
     }
 
-    let due = storage.get_due_retries(now_ts).unwrap();
+    let due = storage.retries().get_due_retries(now_ts).unwrap();
     assert_eq!(due.len(), 2);
 
     let due_ids: Vec<_> = due.iter().map(|e| e.message_id.as_str()).collect();
@@ -133,14 +133,19 @@ fn test_increment_retry_attempt() {
         created_at: timestamp,
         max_attempts: 10,
     };
-    storage.create_retry_entry(&entry).unwrap();
+    storage.retries().create_retry_entry(&entry).unwrap();
 
     let new_next_retry = timestamp + 100;
     storage
+        .retries()
         .increment_retry_attempt("retry-inc", new_next_retry)
         .unwrap();
 
-    let retrieved = storage.get_retry_entry("retry-inc").unwrap().unwrap();
+    let retrieved = storage
+        .retries()
+        .get_retry_entry("retry-inc")
+        .unwrap()
+        .unwrap();
     assert_eq!(retrieved.attempt, 1);
     assert_eq!(retrieved.next_retry, new_next_retry);
 }
@@ -160,17 +165,27 @@ fn test_delete_retry_entry() {
         created_at: timestamp,
         max_attempts: 10,
     };
-    storage.create_retry_entry(&entry).unwrap();
+    storage.retries().create_retry_entry(&entry).unwrap();
 
     assert!(
-        storage.get_retry_entry("to-delete").unwrap().is_some(),
+        storage
+            .retries()
+            .get_retry_entry("to-delete")
+            .unwrap()
+            .is_some(),
         "expected Some value"
     );
 
-    let deleted = storage.delete_retry_entry("to-delete").unwrap();
+    let deleted = storage.retries().delete_retry_entry("to-delete").unwrap();
     assert!(deleted);
 
-    assert!(storage.get_retry_entry("to-delete").unwrap().is_none());
+    assert!(
+        storage
+            .retries()
+            .get_retry_entry("to-delete")
+            .unwrap()
+            .is_none()
+    );
 }
 
 // @internal
@@ -188,17 +203,26 @@ fn test_max_attempts_exceeded() {
         created_at: timestamp,
         max_attempts: 10,
     };
-    storage.create_retry_entry(&entry).unwrap();
+    storage.retries().create_retry_entry(&entry).unwrap();
 
-    let retrieved = storage.get_retry_entry("max-retry").unwrap().unwrap();
+    let retrieved = storage
+        .retries()
+        .get_retry_entry("max-retry")
+        .unwrap()
+        .unwrap();
     assert!(!retrieved.is_max_attempts_exceeded()); // 9 < 10
 
     // Increment to 10
     storage
+        .retries()
         .increment_retry_attempt("max-retry", timestamp + 100)
         .unwrap();
 
-    let retrieved = storage.get_retry_entry("max-retry").unwrap().unwrap();
+    let retrieved = storage
+        .retries()
+        .get_retry_entry("max-retry")
+        .unwrap()
+        .unwrap();
     assert!(retrieved.is_max_attempts_exceeded()); // 10 >= 10
 }
 
@@ -218,10 +242,10 @@ fn test_get_all_retry_entries() {
             created_at: timestamp,
             max_attempts: 10,
         };
-        storage.create_retry_entry(&entry).unwrap();
+        storage.retries().create_retry_entry(&entry).unwrap();
     }
 
-    let all = storage.get_all_retry_entries().unwrap();
+    let all = storage.retries().get_all_retry_entries().unwrap();
     assert_eq!(all.len(), 5);
 }
 
@@ -231,7 +255,7 @@ fn test_count_retry_entries() {
     let storage = test_storage();
     let timestamp = now();
 
-    assert_eq!(storage.count_retry_entries().unwrap(), 0);
+    assert_eq!(storage.retries().count_retry_entries().unwrap(), 0);
 
     for i in 0..3 {
         let entry = RetryEntry {
@@ -243,10 +267,10 @@ fn test_count_retry_entries() {
             created_at: timestamp,
             max_attempts: 10,
         };
-        storage.create_retry_entry(&entry).unwrap();
+        storage.retries().create_retry_entry(&entry).unwrap();
     }
 
-    assert_eq!(storage.count_retry_entries().unwrap(), 3);
+    assert_eq!(storage.retries().count_retry_entries().unwrap(), 3);
 }
 
 // @internal
@@ -265,7 +289,7 @@ fn test_retry_entry_for_recipient() {
             created_at: timestamp,
             max_attempts: 10,
         };
-        storage.create_retry_entry(&entry).unwrap();
+        storage.retries().create_retry_entry(&entry).unwrap();
     }
 
     for i in 0..2 {
@@ -278,13 +302,19 @@ fn test_retry_entry_for_recipient() {
             created_at: timestamp,
             max_attempts: 10,
         };
-        storage.create_retry_entry(&entry).unwrap();
+        storage.retries().create_retry_entry(&entry).unwrap();
     }
 
-    let alice_entries = storage.get_retry_entries_for_recipient("alice").unwrap();
+    let alice_entries = storage
+        .retries()
+        .get_retry_entries_for_recipient("alice")
+        .unwrap();
     assert_eq!(alice_entries.len(), 3);
 
-    let bob_entries = storage.get_retry_entries_for_recipient("bob").unwrap();
+    let bob_entries = storage
+        .retries()
+        .get_retry_entries_for_recipient("bob")
+        .unwrap();
     assert_eq!(bob_entries.len(), 2);
 }
 
@@ -385,24 +415,39 @@ fn test_retry_lifecycle() {
         created_at: timestamp,
         max_attempts: 3,
     };
-    storage.create_retry_entry(&entry).unwrap();
+    storage.retries().create_retry_entry(&entry).unwrap();
 
     // 2. Simulate retry attempts (need 3 increments to reach max_attempts=3)
     for expected_attempt in 1..=3 {
         let next_retry = queue.next_retry_time(timestamp, expected_attempt);
         storage
+            .retries()
             .increment_retry_attempt("lifecycle", next_retry)
             .unwrap();
 
-        let entry = storage.get_retry_entry("lifecycle").unwrap().unwrap();
+        let entry = storage
+            .retries()
+            .get_retry_entry("lifecycle")
+            .unwrap()
+            .unwrap();
         assert_eq!(entry.attempt, expected_attempt);
     }
 
     // 3. After max attempts (attempt=3, max=3), entry should be marked for removal
-    let entry = storage.get_retry_entry("lifecycle").unwrap().unwrap();
+    let entry = storage
+        .retries()
+        .get_retry_entry("lifecycle")
+        .unwrap()
+        .unwrap();
     assert!(entry.is_max_attempts_exceeded()); // 3 >= 3 is true
 
     // 4. Delete after max attempts
-    storage.delete_retry_entry("lifecycle").unwrap();
-    assert!(storage.get_retry_entry("lifecycle").unwrap().is_none());
+    storage.retries().delete_retry_entry("lifecycle").unwrap();
+    assert!(
+        storage
+            .retries()
+            .get_retry_entry("lifecycle")
+            .unwrap()
+            .is_none()
+    );
 }

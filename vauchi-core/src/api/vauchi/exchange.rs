@@ -52,6 +52,7 @@ impl Vauchi {
 
         let our_card = self
             .storage
+            .contacts()
             .load_own_card()?
             .unwrap_or_else(|| ContactCard::new(identity.display_name()));
 

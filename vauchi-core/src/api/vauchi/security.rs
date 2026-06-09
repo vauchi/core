@@ -40,6 +40,7 @@ impl Vauchi {
     ) -> VauchiResult<Vec<crate::storage::DeliveryRecord>> {
         Ok(self
             .storage
+            .deliveries()
             .get_delivery_records_for_recipient(contact_id)?)
     }
 
@@ -48,7 +49,7 @@ impl Vauchi {
     /// Returns delivery records with `Failed` status, useful for showing
     /// the user which messages need attention or retry.
     pub fn get_failed_deliveries(&self) -> VauchiResult<Vec<crate::storage::DeliveryRecord>> {
-        Ok(self.storage.get_delivery_records_by_status(
+        Ok(self.storage.deliveries().get_delivery_records_by_status(
             &crate::storage::DeliveryStatus::Failed {
                 reason: String::new(),
             },
@@ -99,6 +100,7 @@ impl Vauchi {
     pub fn authenticate(&mut self, password: &str) -> VauchiResult<AuthMode> {
         let config = self
             .storage
+            .identity()
             .load_password_config()?
             .ok_or_else(|| VauchiError::InvalidState("no password configured".into()))?;
 
@@ -171,12 +173,13 @@ impl Vauchi {
 
         // Ensure the identity row exists in DB (may not yet if create_identity
         // only stored the own_card). Insert a placeholder row if missing.
-        if !self.storage.has_identity()? {
-            self.storage.save_identity(b"", "")?;
+        if !self.storage.identity().has_identity()? {
+            self.storage.identity().save_identity(b"", "")?;
         }
 
         let config = AppPasswordConfig::create(password)?;
         self.storage
+            .identity()
             .save_app_password(config.password_hash(), config.password_salt())?;
 
         Ok(())
@@ -206,6 +209,7 @@ impl Vauchi {
 
         let mut config = self
             .storage
+            .identity()
             .load_password_config()?
             .ok_or_else(|| VauchiError::InvalidState("no password configured".into()))?;
 
@@ -219,6 +223,7 @@ impl Vauchi {
         config.change_password(new_password)?;
 
         self.storage
+            .identity()
             .save_app_password(config.password_hash(), config.password_salt())?;
 
         Ok(())
@@ -228,9 +233,13 @@ impl Vauchi {
     ///
     /// Requires an app password to be configured first.
     pub fn setup_duress_password(&mut self, duress_password: &str) -> VauchiResult<()> {
-        let mut config = self.storage.load_password_config()?.ok_or_else(|| {
-            VauchiError::InvalidState("app password must be set before duress PIN".into())
-        })?;
+        let mut config = self
+            .storage
+            .identity()
+            .load_password_config()?
+            .ok_or_else(|| {
+                VauchiError::InvalidState("app password must be set before duress PIN".into())
+            })?;
 
         config.setup_duress(duress_password)?;
 
@@ -242,6 +251,7 @@ impl Vauchi {
             .ok_or_else(|| VauchiError::InvalidState("duress salt not set".into()))?;
 
         self.storage
+            .identity()
             .save_duress_password(duress_hash, duress_salt)?;
 
         Ok(())
@@ -249,7 +259,7 @@ impl Vauchi {
 
     /// Returns whether an app password has been configured.
     pub fn is_password_enabled(&self) -> VauchiResult<bool> {
-        Ok(self.storage.load_password_config()?.is_some())
+        Ok(self.storage.identity().load_password_config()?.is_some())
     }
 
     /// Returns the activity log entries newer than `since_secs`.
@@ -263,12 +273,15 @@ impl Vauchi {
         now: u64,
     ) -> VauchiResult<Vec<ActivityLogRow>> {
         let max_age = now.saturating_sub(since_secs);
-        Ok(self.storage.activity_log_query_recent(now, max_age)?)
+        Ok(self
+            .storage
+            .activity_log()
+            .activity_log_query_recent(now, max_age)?)
     }
 
     /// Returns whether duress mode is enabled.
     pub fn is_duress_enabled(&self) -> VauchiResult<bool> {
-        match self.storage.load_password_config()? {
+        match self.storage.identity().load_password_config()? {
             Some(config) => Ok(config.duress_enabled()),
             None => Ok(false),
         }
@@ -276,7 +289,7 @@ impl Vauchi {
 
     /// Disables duress mode and clears duress hash/salt.
     pub fn disable_duress(&mut self) -> VauchiResult<()> {
-        self.storage.disable_duress()?;
+        self.storage.identity().disable_duress()?;
         Ok(())
     }
 
@@ -284,7 +297,7 @@ impl Vauchi {
 
     /// Saves duress alert settings (trusted contacts, message, location).
     pub fn save_duress_settings(&self, settings: &DuressSettings) -> VauchiResult<()> {
-        self.storage.save_duress_settings(settings)?;
+        self.storage.duress().save_duress_settings(settings)?;
         Ok(())
     }
 
@@ -292,12 +305,12 @@ impl Vauchi {
     ///
     /// Returns `None` if no settings have been configured.
     pub fn load_duress_settings(&self) -> VauchiResult<Option<DuressSettings>> {
-        Ok(self.storage.load_duress_settings()?)
+        Ok(self.storage.duress().load_duress_settings()?)
     }
 
     /// Deletes duress alert settings.
     pub fn delete_duress_settings(&self) -> VauchiResult<()> {
-        self.storage.delete_duress_settings()?;
+        self.storage.duress().delete_duress_settings()?;
         Ok(())
     }
 
@@ -319,7 +332,7 @@ impl Vauchi {
     /// connects, it drains this queue and sends alerts as card updates
     /// (indistinguishable from normal sync traffic).
     pub(super) fn queue_duress_alert(&mut self) -> VauchiResult<()> {
-        let settings = self.storage.load_duress_settings()?;
+        let settings = self.storage.duress().load_duress_settings()?;
         if let Some(_settings) = settings {
             let now = self.clock.unix_seconds();
 

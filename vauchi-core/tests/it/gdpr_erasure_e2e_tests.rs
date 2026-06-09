@@ -39,7 +39,7 @@ fn add_test_contact(storage: &Storage, contact_id: &str) {
 
     let shared_key = SymmetricKey::generate();
     let contact = Contact::from_exchange(public_key, card, shared_key, 0);
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 }
 
 fn setup_shred_env() -> (tempfile::TempDir, Storage, MemoryKeyStorage, Identity) {
@@ -74,7 +74,7 @@ fn test_erasure_blocked_during_grace_period() {
 
     // Seed storage with a contact to confirm it survives the blocked attempt.
     add_test_contact(&storage, "contact_blocked");
-    let contacts_before = storage.list_contacts().unwrap();
+    let contacts_before = storage.contacts().list_contacts().unwrap();
     assert_eq!(
         contacts_before.len(),
         1,
@@ -92,7 +92,7 @@ fn test_erasure_blocked_during_grace_period() {
     );
 
     // Data must be intact.
-    let contacts_after = storage.list_contacts().unwrap();
+    let contacts_after = storage.contacts().list_contacts().unwrap();
     assert_eq!(
         contacts_after.len(),
         1,
@@ -163,7 +163,7 @@ fn test_full_erasure_after_grace_period() {
     );
 
     // Contacts must be gone (deletion clears the rows).
-    let remaining = storage.list_contacts().unwrap();
+    let remaining = storage.contacts().list_contacts().unwrap();
     assert_eq!(
         remaining.len(),
         0,
@@ -205,7 +205,7 @@ fn test_cancellation_restores_full_access() {
     );
 
     // All contacts must still be present.
-    let contacts = storage.list_contacts().unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
     assert_eq!(
         contacts.len(),
         2,

@@ -48,7 +48,7 @@ impl Vauchi {
             include_location,
         };
 
-        self.storage.save_emergency_config(&config)?;
+        self.storage.emergency().save_emergency_config(&config)?;
         Ok(())
     }
 
@@ -56,7 +56,7 @@ impl Vauchi {
     ///
     /// Returns `None` if no configuration has been set.
     pub fn load_emergency_config(&self) -> VauchiResult<Option<EmergencyBroadcastConfig>> {
-        Ok(self.storage.load_emergency_config()?)
+        Ok(self.storage.emergency().load_emergency_config()?)
     }
 
     /// Sends an emergency broadcast to all trusted contacts.
@@ -71,9 +71,13 @@ impl Vauchi {
         use crate::network::EmergencyAlert;
         use crate::storage::{PendingUpdate, UpdateStatus};
 
-        let config = self.storage.load_emergency_config()?.ok_or_else(|| {
-            VauchiError::InvalidState("emergency broadcast not configured".into())
-        })?;
+        let config = self
+            .storage
+            .emergency()
+            .load_emergency_config()?
+            .ok_or_else(|| {
+                VauchiError::InvalidState("emergency broadcast not configured".into())
+            })?;
 
         let identity = self
             .identity
@@ -88,7 +92,7 @@ impl Vauchi {
 
         for contact_id in &config.trusted_contact_ids {
             // Skip contacts that don't exist locally
-            let contact = match self.storage.load_contact(contact_id)? {
+            let contact = match self.storage.contacts().load_contact(contact_id)? {
                 Some(c) => c,
                 None => continue,
             };
@@ -99,10 +103,11 @@ impl Vauchi {
             }
 
             // Skip contacts without ratchet (can't encrypt)
-            let (mut ratchet, is_initiator) = match self.storage.load_ratchet_state(contact_id)? {
-                Some(r) => r,
-                None => continue,
-            };
+            let (mut ratchet, is_initiator) =
+                match self.storage.ratchets().load_ratchet_state(contact_id)? {
+                    Some(r) => r,
+                    None => continue,
+                };
 
             // Create the emergency alert payload
             let alert = EmergencyAlert {
@@ -125,6 +130,7 @@ impl Vauchi {
 
             // Save updated ratchet state
             self.storage
+                .ratchets()
                 .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
 
             // Queue for delivery (update_type = "emergency_alert" internally,
@@ -139,7 +145,7 @@ impl Vauchi {
                 status: UpdateStatus::Pending,
                 target_relay_url: None,
             };
-            self.storage.queue_update(&update)?;
+            self.storage.pending().queue_update(&update)?;
             sent += 1;
         }
 
@@ -154,7 +160,7 @@ impl Vauchi {
 
     /// Deletes the emergency broadcast configuration.
     pub fn delete_emergency_config(&mut self) -> VauchiResult<()> {
-        self.storage.delete_emergency_config()?;
+        self.storage.emergency().delete_emergency_config()?;
         Ok(())
     }
 
@@ -166,10 +172,10 @@ impl Vauchi {
     /// - Whether a deletion (shred) is scheduled or executed
     /// - Whether the user has at least one trusted contact
     pub fn get_emergency_wipe_status(&self) -> VauchiResult<EmergencyWipeStatus> {
-        let broadcast_configured = self.storage.load_emergency_config()?.is_some();
-        let duress_configured = self.storage.load_duress_settings()?.is_some();
+        let broadcast_configured = self.storage.emergency().load_emergency_config()?.is_some();
+        let duress_configured = self.storage.duress().load_duress_settings()?.is_some();
 
-        let deletion_state = self.storage.load_deletion_state()?;
+        let deletion_state = self.storage.consent().load_deletion_state()?;
         let deletion_scheduled = matches!(
             deletion_state,
             crate::storage::DeletionState::Scheduled { .. }
@@ -179,11 +185,11 @@ impl Vauchi {
             crate::storage::DeletionState::Executed { .. }
         );
 
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         let trusted_contact_count = contacts.iter().filter(|c| c.is_recovery_trusted()).count();
         let has_trusted_contacts = trusted_contact_count > 0;
 
-        let password_enabled = self.storage.load_password_config()?.is_some();
+        let password_enabled = self.storage.identity().load_password_config()?.is_some();
 
         Ok(EmergencyWipeStatus {
             broadcast_configured,
@@ -219,35 +225,36 @@ impl Vauchi {
         #[cfg(feature = "network-http")]
         if let Some(identity) = self.identity.as_ref() {
             let now = self.clock.unix_seconds();
-            let contacts = self.storage.list_contacts()?;
+            let contacts = self.storage.contacts().list_contacts()?;
             let deliveries =
                 crate::api::deletion::build_revocation_deliveries(identity, &contacts, now);
             let _ = self.broadcast_identity_revocations(&deliveries);
         }
 
         // Clear all contacts
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         for contact in &contacts {
             self.storage.delete_contact(contact.id())?;
         }
 
         // Clear own card
         let empty_card = ContactCard::new("");
-        self.storage.save_own_card(&empty_card)?;
+        self.storage.contacts().save_own_card(&empty_card)?;
 
         // Clear decoy contacts
-        self.storage.clear_all_decoy_contacts()?;
+        self.storage.decoy().clear_all_decoy_contacts()?;
 
         // Clear emergency config — propagate failure so callers know the
         // wipe was incomplete (was silently dropped before 2026-05-21).
-        self.storage.delete_emergency_config()?;
+        self.storage.emergency().delete_emergency_config()?;
 
         // Clear duress settings — same: incomplete wipe must surface.
-        self.storage.delete_duress_settings()?;
+        self.storage.duress().delete_duress_settings()?;
 
         // Mark deletion as executed
         let now = self.clock.unix_seconds();
         self.storage
+            .consent()
             .save_deletion_state(&crate::storage::DeletionState::Executed { executed_at: now })?;
 
         // Clear identity — both in-memory and the persisted row.
@@ -256,7 +263,7 @@ impl Vauchi {
         // still return true and the user's master seed would survive a
         // restart.
         self.identity = None;
-        self.storage.delete_identity()?;
+        self.storage.identity().delete_identity()?;
 
         Ok(())
     }
@@ -270,24 +277,26 @@ impl Vauchi {
         display_name: &str,
         card: &ContactCard,
     ) -> VauchiResult<()> {
-        self.storage.save_decoy_contact(id, display_name, card)?;
+        self.storage
+            .decoy()
+            .save_decoy_contact(id, display_name, card)?;
         Ok(())
     }
 
     /// Removes a decoy contact.
     pub fn remove_decoy_contact(&self, id: &str) -> VauchiResult<()> {
-        self.storage.delete_decoy_contact(id)?;
+        self.storage.decoy().delete_decoy_contact(id)?;
         Ok(())
     }
 
     /// Lists all decoy contacts as (id, display_name, card) tuples.
     pub fn list_decoy_contacts(&self) -> VauchiResult<Vec<(String, String, ContactCard)>> {
-        Ok(self.storage.load_decoy_contacts()?)
+        Ok(self.storage.decoy().load_decoy_contacts()?)
     }
 
     /// Clears all decoy contacts.
     pub fn clear_decoy_contacts(&self) -> VauchiResult<()> {
-        self.storage.clear_all_decoy_contacts()?;
+        self.storage.decoy().clear_all_decoy_contacts()?;
         Ok(())
     }
 

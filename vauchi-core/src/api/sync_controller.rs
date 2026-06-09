@@ -225,7 +225,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
             // update MUST be skipped. Pre-2026-05-23 this path fell back to
             // `update.contact_id.clone()` — a stable plaintext id — under any
             // storage fault, missing contact, or incomplete exchange.
-            let shared_key = match self.storage.load_contact(&update.contact_id) {
+            let shared_key = match self.storage.contacts().load_contact(&update.contact_id) {
                 Ok(Some(c)) => c.shared_key().map(|k| *k.as_bytes()),
                 Ok(None) => {
                     result.failed += 1;
@@ -333,7 +333,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
         // a typed error rather than fall back to `contact_id.to_string()`
         // (a stable plaintext id). Pre-2026-05-23 this path also produced
         // the ADR-029 violation.
-        let shared_key = match self.storage.load_contact(contact_id)? {
+        let shared_key = match self.storage.contacts().load_contact(contact_id)? {
             Some(c) => c.shared_key().map(|k| *k.as_bytes()),
             None => {
                 return Err(VauchiError::ContactNotFound(contact_id.to_string()));

@@ -31,14 +31,18 @@ fn test_save_and_load_field_note() {
     let contact = create_test_contact(0x01, "Alice");
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let note_bytes = b"encrypted-note-data";
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, "f1", note_bytes)
         .unwrap();
 
-    let notes = storage.load_contact_field_notes(&contact_id).unwrap();
+    let notes = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
 
     assert_eq!(notes.len(), 1, "Expected exactly one field note");
     assert_eq!(
@@ -55,9 +59,12 @@ fn test_load_field_notes_empty() {
     let contact = create_test_contact(0x02, "Bob");
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let notes = storage.load_contact_field_notes(&contact_id).unwrap();
+    let notes = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
 
     assert!(
         notes.is_empty(),
@@ -72,20 +79,28 @@ fn test_delete_field_note() {
     let contact = create_test_contact(0x03, "Carol");
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, "f1", b"some-encrypted-data")
         .unwrap();
 
-    let notes_before = storage.load_contact_field_notes(&contact_id).unwrap();
+    let notes_before = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
     assert_eq!(notes_before.len(), 1, "Expected 1 note before delete");
 
     storage
+        .field_notes()
         .delete_contact_field_note(&contact_id, "f1")
         .unwrap();
 
-    let notes_after = storage.load_contact_field_notes(&contact_id).unwrap();
+    let notes_after = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
     assert!(notes_after.is_empty(), "Expected empty after delete");
 }
 
@@ -96,19 +111,26 @@ fn test_cascade_on_contact_delete() {
     let contact = create_test_contact(0x04, "Dave");
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, "f1", b"note-bytes")
         .unwrap();
 
-    let notes = storage.load_contact_field_notes(&contact_id).unwrap();
+    let notes = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
     assert_eq!(notes.len(), 1, "Expected 1 note before contact delete");
 
     // Delete the contact (CASCADE should remove notes)
     storage.delete_contact(&contact_id).unwrap();
 
     // Notes should be empty — ON DELETE CASCADE
-    let notes_after = storage.load_contact_field_notes(&contact_id).unwrap();
+    let notes_after = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
     assert!(
         notes_after.is_empty(),
         "Field notes should be deleted via CASCADE when contact is deleted"
@@ -122,17 +144,22 @@ fn test_update_existing_note() {
     let contact = create_test_contact(0x05, "Eve");
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, "f1", b"original-data")
         .unwrap();
 
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, "f1", b"updated-data")
         .unwrap();
 
-    let notes = storage.load_contact_field_notes(&contact_id).unwrap();
+    let notes = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
     assert_eq!(notes.len(), 1, "Should still be 1 note after update");
     assert_eq!(
         notes.get("f1").expect("f1 should exist"),
@@ -148,16 +175,21 @@ fn test_multiple_field_notes_per_contact() {
     let contact = create_test_contact(0x06, "Frank");
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, "field-1", b"note-for-field-1")
         .unwrap();
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, "field-2", b"note-for-field-2")
         .unwrap();
 
-    let notes = storage.load_contact_field_notes(&contact_id).unwrap();
+    let notes = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
 
     assert_eq!(notes.len(), 2, "Expected 2 field notes");
     assert_eq!(
@@ -181,18 +213,26 @@ fn test_field_notes_isolated_per_contact() {
     let id1 = contact1.id().to_string();
     let id2 = contact2.id().to_string();
 
-    storage.save_contact(&contact1).unwrap();
-    storage.save_contact(&contact2).unwrap();
+    storage.contacts().save_contact(&contact1).unwrap();
+    storage.contacts().save_contact(&contact2).unwrap();
 
     storage
+        .field_notes()
         .save_contact_field_note(&id1, "f1", b"grace-note")
         .unwrap();
     storage
+        .field_notes()
         .save_contact_field_note(&id2, "f1", b"henry-note")
         .unwrap();
 
-    let notes1 = storage.load_contact_field_notes(&id1).unwrap();
-    let notes2 = storage.load_contact_field_notes(&id2).unwrap();
+    let notes1 = storage
+        .field_notes()
+        .load_contact_field_notes(&id1)
+        .unwrap();
+    let notes2 = storage
+        .field_notes()
+        .load_contact_field_notes(&id2)
+        .unwrap();
 
     assert_eq!(
         notes1.get("f1").expect("grace f1 should exist"),
@@ -213,20 +253,26 @@ fn test_delete_leaves_other_fields_intact() {
     let contact = create_test_contact(0x09, "Iris");
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, "f1", b"note-1")
         .unwrap();
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, "f2", b"note-2")
         .unwrap();
 
     storage
+        .field_notes()
         .delete_contact_field_note(&contact_id, "f1")
         .unwrap();
 
-    let notes = storage.load_contact_field_notes(&contact_id).unwrap();
+    let notes = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
     assert_eq!(notes.len(), 1, "Only f2 should remain after deleting f1");
     assert!(
         !notes.contains_key("f1"),

@@ -35,11 +35,11 @@ pub(crate) fn resolve_label_contacts(
     let mut stale: u32 = 0;
 
     for id in contact_ids {
-        match storage.load_contact(id) {
+        match storage.contacts().load_contact(id) {
             Ok(Some(contact)) => {
-                let nickname = storage.load_contact_nickname(id).ok().flatten();
-                let shared_names = storage.list_shared_names(id).unwrap_or_default();
-                let (name_pref, _) = storage.load_display_preferences(id).unwrap_or((
+                let nickname = storage.contacts().load_contact_nickname(id).ok().flatten();
+                let shared_names = storage.contacts().list_shared_names(id).unwrap_or_default();
+                let (name_pref, _) = storage.contacts().load_display_preferences(id).unwrap_or((
                     vauchi_core::DisplayNamePreference::Primary,
                     vauchi_core::AvatarPreference::Primary,
                 ));

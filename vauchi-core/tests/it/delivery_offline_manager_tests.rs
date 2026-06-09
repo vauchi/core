@@ -47,7 +47,7 @@ fn test_send_or_queue_offline_enqueues() {
     let result = manager.send_or_queue(&storage, test_update("msg-1", "alice"), false);
     assert!(result.is_ok(), "Queuing while offline should succeed");
 
-    let pending = storage.get_all_pending_updates().unwrap();
+    let pending = storage.pending().get_all_pending_updates().unwrap();
     assert_eq!(pending.len(), 1, "One update should be queued");
     assert_eq!(pending[0].id, "msg-1");
 }
@@ -63,7 +63,7 @@ fn test_send_or_queue_online_marks_sending() {
     result.expect("expected success");
 
     // The update is queued with Sending status (caller is responsible for actual send)
-    let pending = storage.get_pending_update("msg-1").unwrap();
+    let pending = storage.pending().get_pending_update("msg-1").unwrap();
     assert!(
         pending.is_some(),
         "Online update should be queued for the caller to send"

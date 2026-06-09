@@ -378,7 +378,7 @@ fn test_sync_get_ready_grouped_by_relay() {
             status: UpdateStatus::Pending,
             target_relay_url: relay_url.map(String::from),
         };
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
     let grouped = manager.get_ready_grouped_by_relay().unwrap();
@@ -438,8 +438,8 @@ fn test_sync_grouped_excludes_not_ready_failed() {
         target_relay_url: Some("https://relay.example.com".to_string()),
     };
 
-    storage.queue_update(&u1).unwrap();
-    storage.queue_update(&u2).unwrap();
+    storage.pending().queue_update(&u1).unwrap();
+    storage.pending().queue_update(&u2).unwrap();
 
     let grouped = manager.get_ready_grouped_by_relay().unwrap();
 

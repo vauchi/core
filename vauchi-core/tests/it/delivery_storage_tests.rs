@@ -37,9 +37,12 @@ fn test_create_and_retrieve_delivery_record() {
         expires_at: Some(timestamp + 604800), // 7 days
     };
 
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 
-    let retrieved = storage.get_delivery_record("msg-001").unwrap();
+    let retrieved = storage.deliveries().get_delivery_record("msg-001").unwrap();
     assert!(retrieved.is_some(), "expected Some value");
 
     let retrieved = retrieved.unwrap();
@@ -54,7 +57,10 @@ fn test_create_and_retrieve_delivery_record() {
 fn test_get_delivery_record_not_found() {
     let storage = test_storage();
 
-    let retrieved = storage.get_delivery_record("nonexistent").unwrap();
+    let retrieved = storage
+        .deliveries()
+        .get_delivery_record("nonexistent")
+        .unwrap();
     assert!(retrieved.is_none());
 }
 
@@ -75,27 +81,45 @@ fn test_update_delivery_status() {
         expires_at: None,
     };
 
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 
     let updated = storage
+        .deliveries()
         .update_delivery_status("msg-002", &DeliveryStatus::Sent, timestamp + 1)
         .unwrap();
     assert!(updated);
 
-    let retrieved = storage.get_delivery_record("msg-002").unwrap().unwrap();
+    let retrieved = storage
+        .deliveries()
+        .get_delivery_record("msg-002")
+        .unwrap()
+        .unwrap();
     assert_eq!(retrieved.status, DeliveryStatus::Sent);
     assert_eq!(retrieved.updated_at, timestamp + 1);
 
     storage
+        .deliveries()
         .update_delivery_status("msg-002", &DeliveryStatus::Stored, timestamp + 2)
         .unwrap();
-    let retrieved = storage.get_delivery_record("msg-002").unwrap().unwrap();
+    let retrieved = storage
+        .deliveries()
+        .get_delivery_record("msg-002")
+        .unwrap()
+        .unwrap();
     assert_eq!(retrieved.status, DeliveryStatus::Stored);
 
     storage
+        .deliveries()
         .update_delivery_status("msg-002", &DeliveryStatus::Delivered, timestamp + 3)
         .unwrap();
-    let retrieved = storage.get_delivery_record("msg-002").unwrap().unwrap();
+    let retrieved = storage
+        .deliveries()
+        .get_delivery_record("msg-002")
+        .unwrap()
+        .unwrap();
     assert_eq!(retrieved.status, DeliveryStatus::Delivered);
 }
 
@@ -115,16 +139,24 @@ fn test_delivery_status_failed_with_reason() {
         expires_at: None,
     };
 
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 
     let failed_status = DeliveryStatus::Failed {
         reason: "Connection timeout".to_string(),
     };
     storage
+        .deliveries()
         .update_delivery_status("msg-003", &failed_status, timestamp + 1)
         .unwrap();
 
-    let retrieved = storage.get_delivery_record("msg-003").unwrap().unwrap();
+    let retrieved = storage
+        .deliveries()
+        .get_delivery_record("msg-003")
+        .unwrap()
+        .unwrap();
     match retrieved.status {
         DeliveryStatus::Failed { reason } => {
             assert_eq!(reason, "Connection timeout");
@@ -149,7 +181,10 @@ fn test_get_delivery_records_for_recipient() {
             updated_at: timestamp + i as u64,
             expires_at: None,
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
     for i in 0..2 {
@@ -161,16 +196,26 @@ fn test_get_delivery_records_for_recipient() {
             updated_at: timestamp + i as u64,
             expires_at: None,
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
-    let alice_records = storage.get_delivery_records_for_recipient("alice").unwrap();
+    let alice_records = storage
+        .deliveries()
+        .get_delivery_records_for_recipient("alice")
+        .unwrap();
     assert_eq!(alice_records.len(), 3);
 
-    let bob_records = storage.get_delivery_records_for_recipient("bob").unwrap();
+    let bob_records = storage
+        .deliveries()
+        .get_delivery_records_for_recipient("bob")
+        .unwrap();
     assert_eq!(bob_records.len(), 2);
 
     let empty_records = storage
+        .deliveries()
         .get_delivery_records_for_recipient("charlie")
         .unwrap();
     assert_eq!(empty_records.len(), 0);
@@ -206,10 +251,13 @@ fn test_get_pending_deliveries() {
             updated_at: timestamp,
             expires_at: None,
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
-    let pending = storage.get_pending_deliveries().unwrap();
+    let pending = storage.deliveries().get_pending_deliveries().unwrap();
     // Should only include Queued, Sent, Stored (non-terminal)
     assert_eq!(pending.len(), 3);
 
@@ -235,7 +283,10 @@ fn test_count_deliveries_by_status() {
             updated_at: timestamp,
             expires_at: None,
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
     for i in 0..2 {
@@ -247,7 +298,10 @@ fn test_count_deliveries_by_status() {
             updated_at: timestamp,
             expires_at: None,
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
     let record = DeliveryRecord {
@@ -260,22 +314,28 @@ fn test_count_deliveries_by_status() {
         updated_at: timestamp,
         expires_at: None,
     };
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 
     assert_eq!(
         storage
+            .deliveries()
             .count_deliveries_by_status(&DeliveryStatus::Stored)
             .unwrap(),
         3
     );
     assert_eq!(
         storage
+            .deliveries()
             .count_deliveries_by_status(&DeliveryStatus::Delivered)
             .unwrap(),
         2
     );
     assert_eq!(
         storage
+            .deliveries()
             .count_deliveries_by_status(&DeliveryStatus::Queued)
             .unwrap(),
         0
@@ -307,19 +367,34 @@ fn test_expire_old_deliveries() {
             updated_at: created,
             expires_at: expires,
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
-    let expired_count = storage.expire_old_deliveries(now_ts).unwrap();
+    let expired_count = storage.deliveries().expire_old_deliveries(now_ts).unwrap();
     assert_eq!(expired_count, 1);
 
-    let expired_record = storage.get_delivery_record("expired").unwrap().unwrap();
+    let expired_record = storage
+        .deliveries()
+        .get_delivery_record("expired")
+        .unwrap()
+        .unwrap();
     assert_eq!(expired_record.status, DeliveryStatus::Expired);
 
-    let active_record = storage.get_delivery_record("active").unwrap().unwrap();
+    let active_record = storage
+        .deliveries()
+        .get_delivery_record("active")
+        .unwrap()
+        .unwrap();
     assert_eq!(active_record.status, DeliveryStatus::Stored);
 
-    let no_expiry_record = storage.get_delivery_record("no-expiry").unwrap().unwrap();
+    let no_expiry_record = storage
+        .deliveries()
+        .get_delivery_record("no-expiry")
+        .unwrap()
+        .unwrap();
     assert_eq!(no_expiry_record.status, DeliveryStatus::Stored);
 }
 
@@ -337,19 +412,38 @@ fn test_delete_delivery_record() {
         updated_at: timestamp,
         expires_at: None,
     };
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 
     assert!(
-        storage.get_delivery_record("to-delete").unwrap().is_some(),
+        storage
+            .deliveries()
+            .get_delivery_record("to-delete")
+            .unwrap()
+            .is_some(),
         "expected Some value"
     );
 
-    let deleted = storage.delete_delivery_record("to-delete").unwrap();
+    let deleted = storage
+        .deliveries()
+        .delete_delivery_record("to-delete")
+        .unwrap();
     assert!(deleted);
 
-    assert!(storage.get_delivery_record("to-delete").unwrap().is_none());
+    assert!(
+        storage
+            .deliveries()
+            .get_delivery_record("to-delete")
+            .unwrap()
+            .is_none()
+    );
 
-    let deleted = storage.delete_delivery_record("nonexistent").unwrap();
+    let deleted = storage
+        .deliveries()
+        .delete_delivery_record("nonexistent")
+        .unwrap();
     assert!(!deleted);
 }
 
@@ -369,7 +463,10 @@ fn test_delivery_status_progression() {
         updated_at: timestamp,
         expires_at: Some(timestamp + 604800),
     };
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 
     let statuses = [
         DeliveryStatus::Sent,
@@ -379,10 +476,12 @@ fn test_delivery_status_progression() {
 
     for (i, status) in statuses.iter().enumerate() {
         storage
+            .deliveries()
             .update_delivery_status("lifecycle-test", status, timestamp + i as u64 + 1)
             .unwrap();
 
         let record = storage
+            .deliveries()
             .get_delivery_record("lifecycle-test")
             .unwrap()
             .unwrap();
@@ -428,7 +527,10 @@ fn test_message_expiration_warning() {
             updated_at: now_ts - thirty_days + one_day,
             expires_at: Some(expires_at),
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
     // Also add one with no expiry
@@ -440,10 +542,13 @@ fn test_message_expiration_warning() {
         updated_at: now_ts - thirty_days + one_day,
         expires_at: None,
     };
-    storage.create_delivery_record(&no_expiry).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&no_expiry)
+        .unwrap();
 
     // Query all pending records and filter for approaching expiration
-    let pending = storage.get_pending_deliveries().unwrap();
+    let pending = storage.deliveries().get_pending_deliveries().unwrap();
     let warning_threshold = now_ts + 3 * one_day; // Warn if expiring within 3 days
 
     let approaching_expiry: Vec<_> = pending
@@ -493,25 +598,42 @@ fn test_ttl_extension_request() {
         updated_at: now_ts - 29 * one_day,
         expires_at: Some(original_expiry),
     };
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 
-    let before = storage.get_delivery_record("msg-extend").unwrap().unwrap();
+    let before = storage
+        .deliveries()
+        .get_delivery_record("msg-extend")
+        .unwrap()
+        .unwrap();
     assert_eq!(before.expires_at, Some(original_expiry));
 
     // Extend by 7 days
     let extended = storage
+        .deliveries()
         .extend_delivery_ttl("msg-extend", seven_days)
         .unwrap();
     assert!(extended);
 
-    let after = storage.get_delivery_record("msg-extend").unwrap().unwrap();
+    let after = storage
+        .deliveries()
+        .get_delivery_record("msg-extend")
+        .unwrap()
+        .unwrap();
     assert_eq!(after.expires_at, Some(original_expiry + seven_days));
 
     // Extend again (multiple extensions allowed)
     storage
+        .deliveries()
         .extend_delivery_ttl("msg-extend", seven_days)
         .unwrap();
-    let final_record = storage.get_delivery_record("msg-extend").unwrap().unwrap();
+    let final_record = storage
+        .deliveries()
+        .get_delivery_record("msg-extend")
+        .unwrap()
+        .unwrap();
     assert_eq!(
         final_record.expires_at,
         Some(original_expiry + 2 * seven_days)
@@ -534,14 +656,23 @@ fn test_ttl_extension_edge_cases() {
         updated_at: now_ts,
         expires_at: None,
     };
-    storage.create_delivery_record(&no_expiry).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&no_expiry)
+        .unwrap();
 
     // Extending TTL on record with no expiry returns false
-    let extended = storage.extend_delivery_ttl("msg-no-ttl", 86400).unwrap();
+    let extended = storage
+        .deliveries()
+        .extend_delivery_ttl("msg-no-ttl", 86400)
+        .unwrap();
     assert!(!extended);
 
     // Extending non-existent record returns false
-    let extended = storage.extend_delivery_ttl("nonexistent", 86400).unwrap();
+    let extended = storage
+        .deliveries()
+        .extend_delivery_ttl("nonexistent", 86400)
+        .unwrap();
     assert!(!extended);
 }
 
@@ -576,11 +707,15 @@ fn test_delivery_receipt_privacy() {
             updated_at: timestamp,
             expires_at: None,
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
     // Query by recipient - privacy: we track delivery TO recipient, not FROM sender
     let bob_deliveries = storage
+        .deliveries()
         .get_delivery_records_for_recipient("recipient-bob")
         .unwrap();
     assert_eq!(bob_deliveries.len(), 2);
@@ -632,35 +767,45 @@ fn test_relay_quota_exceeded() {
             updated_at: timestamp + i as u64,
             expires_at: Some(timestamp + 604800), // 7 days
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
-    let pending = storage.get_pending_deliveries().unwrap();
+    let pending = storage.deliveries().get_pending_deliveries().unwrap();
     assert_eq!(pending.len(), 5);
 
     // At quota limit, new messages should be handled gracefully
     // The application layer checks capacity before adding:
     let count = storage
+        .deliveries()
         .count_deliveries_by_status(&DeliveryStatus::Queued)
         .unwrap();
     assert_eq!(count, 5);
 
     // Simulate quota handling: oldest acknowledged can be removed
     storage
+        .deliveries()
         .update_delivery_status("msg-0", &DeliveryStatus::Delivered, timestamp + 100)
         .unwrap();
 
     let queued_count = storage
+        .deliveries()
         .count_deliveries_by_status(&DeliveryStatus::Queued)
         .unwrap();
     let delivered_count = storage
+        .deliveries()
         .count_deliveries_by_status(&DeliveryStatus::Delivered)
         .unwrap();
     assert_eq!(queued_count, 4);
     assert_eq!(delivered_count, 1);
 
     // Remove delivered (acknowledged) to make room
-    storage.delete_delivery_record("msg-0").unwrap();
+    storage
+        .deliveries()
+        .delete_delivery_record("msg-0")
+        .unwrap();
 
     let new_record = DeliveryRecord {
         message_id: "msg-5".to_string(),
@@ -670,10 +815,13 @@ fn test_relay_quota_exceeded() {
         updated_at: timestamp + 5,
         expires_at: Some(timestamp + 604800),
     };
-    storage.create_delivery_record(&new_record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&new_record)
+        .unwrap();
 
     // Back to 5 pending
-    let pending = storage.get_pending_deliveries().unwrap();
+    let pending = storage.deliveries().get_pending_deliveries().unwrap();
     assert_eq!(pending.len(), 5);
 }
 
@@ -710,10 +858,14 @@ fn test_delivery_order_verification() {
             updated_at: *created_at,
             expires_at: None,
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
     let bob_records = storage
+        .deliveries()
         .get_delivery_records_for_recipient("contact-bob")
         .unwrap();
 
@@ -759,11 +911,15 @@ fn test_out_of_order_delivery_reordering() {
             updated_at: *created_at,
             expires_at: None,
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
     // Query by status returns ordered by created_at ASC
     let delivered = storage
+        .deliveries()
         .get_delivery_records_by_status(&DeliveryStatus::Delivered)
         .unwrap();
 
@@ -809,7 +965,10 @@ fn test_startup_maintenance_cleans_old_terminal_records() {
             updated_at: thirty_one_days_ago,
             expires_at: None,
         };
-        storage.create_delivery_record(&record).unwrap();
+        storage
+            .deliveries()
+            .create_delivery_record(&record)
+            .unwrap();
     }
 
     // Recent terminal record (should be kept)
@@ -821,7 +980,10 @@ fn test_startup_maintenance_cleans_old_terminal_records() {
         updated_at: ten_days_ago,
         expires_at: None,
     };
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 
     // Non-terminal record (should be kept regardless of age)
     let record = DeliveryRecord {
@@ -832,9 +994,12 @@ fn test_startup_maintenance_cleans_old_terminal_records() {
         updated_at: thirty_one_days_ago,
         expires_at: None,
     };
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 
-    let cleaned = storage.run_startup_maintenance();
+    let cleaned = storage.deliveries().run_startup_maintenance();
     assert!(
         cleaned.is_ok(),
         "Maintenance should succeed: {:?}",
@@ -845,26 +1010,39 @@ fn test_startup_maintenance_cleans_old_terminal_records() {
 
     assert!(
         storage
+            .deliveries()
             .get_delivery_record("old-delivered")
             .unwrap()
             .is_none()
     );
     assert!(
         storage
+            .deliveries()
             .get_delivery_record("old-expired")
             .unwrap()
             .is_none()
     );
-    assert!(storage.get_delivery_record("old-failed").unwrap().is_none());
+    assert!(
+        storage
+            .deliveries()
+            .get_delivery_record("old-failed")
+            .unwrap()
+            .is_none()
+    );
 
     assert!(
         storage
+            .deliveries()
             .get_delivery_record("recent-delivered")
             .unwrap()
             .is_some()
     );
     assert!(
-        storage.get_delivery_record("old-queued").unwrap().is_some(),
+        storage
+            .deliveries()
+            .get_delivery_record("old-queued")
+            .unwrap()
+            .is_some(),
         "expected Some value"
     );
 }
@@ -874,6 +1052,6 @@ fn test_startup_maintenance_cleans_old_terminal_records() {
 #[test]
 fn test_startup_maintenance_empty_database() {
     let storage = test_storage();
-    let count = storage.run_startup_maintenance().unwrap();
+    let count = storage.deliveries().run_startup_maintenance().unwrap();
     assert_eq!(count, 0, "Empty database should have nothing to clean");
 }

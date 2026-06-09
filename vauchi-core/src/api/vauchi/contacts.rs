@@ -20,7 +20,7 @@ impl Vauchi {
 
     /// Converts decoy contact tuples into `Contact` objects (display-only).
     fn decoy_contacts_as_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        let decoys = self.storage.load_decoy_contacts()?;
+        let decoys = self.storage.decoy().load_decoy_contacts()?;
         Ok(decoys
             .into_iter()
             .map(|(id, _display_name, card)| {
@@ -118,7 +118,10 @@ impl Vauchi {
 
     /// Checks if a contact's sender has been revoked (they deleted their identity).
     pub fn is_contact_revoked(&self, contact_id: &str) -> bool {
-        self.storage.is_sender_revoked(contact_id).unwrap_or(false)
+        self.storage
+            .contacts()
+            .is_sender_revoked(contact_id)
+            .unwrap_or(false)
     }
 
     /// Returns the number of contacts.
@@ -126,7 +129,7 @@ impl Vauchi {
     /// In duress mode, returns the decoy contact count.
     pub fn contact_count(&self) -> VauchiResult<usize> {
         if self.auth_mode == AuthMode::Duress {
-            return Ok(self.storage.load_decoy_contacts()?.len());
+            return Ok(self.storage.decoy().load_decoy_contacts()?.len());
         }
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.contact_count()
@@ -154,7 +157,7 @@ impl Vauchi {
 
         // Check if contact already exists
         let public_id = hex::encode(identity_key);
-        if self.storage.load_contact(&public_id)?.is_some() {
+        if self.storage.contacts().load_contact(&public_id)?.is_some() {
             return Err(VauchiError::Configuration(format!(
                 "Contact {} already exists",
                 public_id
@@ -285,13 +288,13 @@ impl Vauchi {
 
     /// Updates an existing contact.
     pub fn update_contact(&self, contact: &Contact) -> VauchiResult<()> {
-        self.storage.save_contact(contact)?;
+        self.storage.contacts().save_contact(contact)?;
         Ok(())
     }
 
     /// Returns the contact limit.
     pub fn get_contact_limit(&self) -> VauchiResult<usize> {
-        Ok(self.storage.get_contact_limit()?)
+        Ok(self.storage.contacts().get_contact_limit()?)
     }
 
     /// Toggles recovery trust for a contact.
@@ -300,6 +303,7 @@ impl Vauchi {
     pub fn toggle_recovery_trust(&self, contact_id: &str) -> VauchiResult<bool> {
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::InvalidState("Contact not found".into()))?;
 
@@ -320,7 +324,7 @@ impl Vauchi {
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         }
 
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
 
         // Upload updated guardian entries to relay after trust change
         #[cfg(feature = "network-http")]
@@ -346,12 +350,13 @@ impl Vauchi {
     pub fn unverify_contact_fingerprint(&self, id: &str) -> VauchiResult<()> {
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(id)?
             .ok_or_else(|| VauchiError::NotFound(format!("contact: {}", id)))?;
         contact
             .mark_fingerprint_unverified()
             .map_err(|e| VauchiError::InvalidState(format!("unverify fingerprint: {}", e)))?;
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         Ok(())
     }
 
@@ -412,7 +417,11 @@ impl Vauchi {
 
     /// Gets the Double Ratchet state for a contact.
     pub fn get_ratchet_state(&self, contact_id: &str) -> VauchiResult<Option<DoubleRatchetState>> {
-        Ok(self.storage.load_ratchet_state(contact_id)?.map(|(r, _)| r))
+        Ok(self
+            .storage
+            .ratchets()
+            .load_ratchet_state(contact_id)?
+            .map(|(r, _)| r))
     }
 
     /// Saves a Double Ratchet state for a contact.
@@ -426,10 +435,12 @@ impl Vauchi {
         // Load existing to preserve is_initiator flag
         let is_initiator = self
             .storage
+            .ratchets()
             .load_ratchet_state(contact_id)?
             .map(|(_, i)| i)
             .unwrap_or(true);
         self.storage
+            .ratchets()
             .save_ratchet_state(contact_id, state, is_initiator)?;
         Ok(())
     }
@@ -444,6 +455,7 @@ impl Vauchi {
         let ratchet = DoubleRatchetState::initialize_initiator(shared_secret, their_dh_public)
             .map_err(|e| crate::api::VauchiError::Crypto(e.to_string()))?;
         self.storage
+            .ratchets()
             .save_ratchet_state(contact_id, &ratchet, true)?;
         Ok(())
     }
@@ -457,6 +469,7 @@ impl Vauchi {
     ) -> VauchiResult<()> {
         let ratchet = DoubleRatchetState::initialize_responder(shared_secret, our_dh);
         self.storage
+            .ratchets()
             .save_ratchet_state(contact_id, &ratchet, false)?;
         Ok(())
     }
@@ -474,6 +487,7 @@ impl Vauchi {
         is_initiator: bool,
     ) -> VauchiResult<()> {
         self.storage
+            .ratchets()
             .save_ratchet_state(contact_id, ratchet, is_initiator)?;
         Ok(())
     }
@@ -489,6 +503,7 @@ impl Vauchi {
 
         let contact = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
         let shared_key = contact
@@ -496,7 +511,9 @@ impl Vauchi {
             .ok_or_else(|| VauchiError::Configuration("Contact has no shared key".into()))?;
         let encrypted = encrypt(shared_key, note_text.as_bytes())
             .map_err(|e| VauchiError::Configuration(format!("Encryption failed: {}", e)))?;
-        self.storage.save_personal_notes(contact_id, &encrypted)?;
+        self.storage
+            .contacts()
+            .save_personal_notes(contact_id, &encrypted)?;
         Ok(())
     }
 
@@ -506,12 +523,13 @@ impl Vauchi {
     pub fn read_personal_note(&self, contact_id: &str) -> VauchiResult<Option<String>> {
         use crate::crypto::decrypt;
 
-        let encrypted = match self.storage.load_personal_notes(contact_id)? {
+        let encrypted = match self.storage.contacts().load_personal_notes(contact_id)? {
             Some(data) => data,
             None => return Ok(None),
         };
         let contact = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
         let shared_key = contact
@@ -533,6 +551,7 @@ impl Vauchi {
         notes_encrypted: &[u8],
     ) -> VauchiResult<()> {
         self.storage
+            .contacts()
             .save_personal_notes(contact_id, notes_encrypted)?;
         Ok(())
     }
@@ -541,12 +560,12 @@ impl Vauchi {
     ///
     /// Low-level API for sync/migration. Prefer `read_personal_note()`.
     pub fn load_personal_notes(&self, contact_id: &str) -> VauchiResult<Option<Vec<u8>>> {
-        Ok(self.storage.load_personal_notes(contact_id)?)
+        Ok(self.storage.contacts().load_personal_notes(contact_id)?)
     }
 
     /// Deletes personal notes for a contact.
     pub fn delete_personal_notes(&self, contact_id: &str) -> VauchiResult<()> {
-        self.storage.delete_personal_notes(contact_id)?;
+        self.storage.contacts().delete_personal_notes(contact_id)?;
         Ok(())
     }
 
@@ -564,6 +583,7 @@ impl Vauchi {
             ));
         }
         self.storage
+            .contacts()
             .save_contact_nickname(contact_id, trimmed.as_bytes())?;
         Ok(())
     }
@@ -572,10 +592,16 @@ impl Vauchi {
     ///
     /// Resets display name preference to Primary if it was Custom.
     pub fn clear_contact_nickname(&self, contact_id: &str) -> VauchiResult<()> {
-        self.storage.delete_contact_nickname(contact_id)?;
-        let (name_pref, _) = self.storage.load_display_preferences(contact_id)?;
+        self.storage
+            .contacts()
+            .delete_contact_nickname(contact_id)?;
+        let (name_pref, _) = self
+            .storage
+            .contacts()
+            .load_display_preferences(contact_id)?;
         if name_pref == DisplayNamePreference::Custom {
             self.storage
+                .contacts()
                 .save_display_name_preference(contact_id, &DisplayNamePreference::Primary)?;
         }
         Ok(())
@@ -583,7 +609,7 @@ impl Vauchi {
 
     /// Returns the local nickname for a contact, or None if unset.
     pub fn get_contact_nickname(&self, contact_id: &str) -> VauchiResult<Option<String>> {
-        Ok(self.storage.load_contact_nickname(contact_id)?)
+        Ok(self.storage.contacts().load_contact_nickname(contact_id)?)
     }
 
     // === Contact Custom Avatar Operations ===
@@ -596,7 +622,9 @@ impl Vauchi {
         let webp = normalize_avatar(data).map_err(|e: crate::contact_card::ContactCardError| {
             VauchiError::InvalidState(e.to_string())
         })?;
-        self.storage.save_contact_custom_avatar(contact_id, &webp)?;
+        self.storage
+            .contacts()
+            .save_contact_custom_avatar(contact_id, &webp)?;
         Ok(())
     }
 
@@ -604,10 +632,16 @@ impl Vauchi {
     ///
     /// Resets avatar preference to Primary if it was Custom.
     pub fn clear_contact_custom_avatar(&self, contact_id: &str) -> VauchiResult<()> {
-        self.storage.delete_contact_custom_avatar(contact_id)?;
-        let (_, avatar_pref) = self.storage.load_display_preferences(contact_id)?;
+        self.storage
+            .contacts()
+            .delete_contact_custom_avatar(contact_id)?;
+        let (_, avatar_pref) = self
+            .storage
+            .contacts()
+            .load_display_preferences(contact_id)?;
         if avatar_pref == AvatarPreference::Custom {
             self.storage
+                .contacts()
                 .save_avatar_preference(contact_id, &AvatarPreference::Primary)?;
         }
         Ok(())
@@ -615,7 +649,10 @@ impl Vauchi {
 
     /// Returns the custom avatar for a contact, or None if unset.
     pub fn get_contact_custom_avatar(&self, contact_id: &str) -> VauchiResult<Option<Vec<u8>>> {
-        Ok(self.storage.load_contact_custom_avatar(contact_id)?)
+        Ok(self
+            .storage
+            .contacts()
+            .load_contact_custom_avatar(contact_id)?)
     }
 
     // === Shared Name Operations (internal, called by sync layer) ===
@@ -627,13 +664,17 @@ impl Vauchi {
         name: &str,
         is_primary: bool,
     ) -> VauchiResult<()> {
-        self.storage.add_shared_name(contact_id, name, is_primary)?;
+        self.storage
+            .contacts()
+            .add_shared_name(contact_id, name, is_primary)?;
         Ok(())
     }
 
     /// Removes a shared name for a contact from an inbound sync delta.
     pub fn remove_contact_shared_name(&self, contact_id: &str, name: &str) -> VauchiResult<()> {
-        self.storage.remove_shared_name(contact_id, name)?;
+        self.storage
+            .contacts()
+            .remove_shared_name(contact_id, name)?;
         Ok(())
     }
 
@@ -642,7 +683,7 @@ impl Vauchi {
         &self,
         contact_id: &str,
     ) -> VauchiResult<Vec<crate::contact::display::SharedName>> {
-        Ok(self.storage.list_shared_names(contact_id)?)
+        Ok(self.storage.contacts().list_shared_names(contact_id)?)
     }
 
     /// Adds a shared avatar for a contact from an inbound sync delta.
@@ -655,6 +696,7 @@ impl Vauchi {
         use sha2::{Digest, Sha256};
         let hash = hex::encode(Sha256::digest(avatar_data));
         self.storage
+            .contacts()
             .add_shared_avatar(contact_id, &hash, avatar_data, is_primary)?;
         Ok(())
     }
@@ -665,7 +707,9 @@ impl Vauchi {
         contact_id: &str,
         avatar_hash: &str,
     ) -> VauchiResult<()> {
-        self.storage.remove_shared_avatar(contact_id, avatar_hash)?;
+        self.storage
+            .contacts()
+            .remove_shared_avatar(contact_id, avatar_hash)?;
         Ok(())
     }
 
@@ -674,7 +718,7 @@ impl Vauchi {
         &self,
         contact_id: &str,
     ) -> VauchiResult<Vec<crate::contact::display::SharedAvatar>> {
-        Ok(self.storage.list_shared_avatars(contact_id)?)
+        Ok(self.storage.contacts().list_shared_avatars(contact_id)?)
     }
 
     // === Display Preference Operations ===
@@ -691,7 +735,7 @@ impl Vauchi {
         match &pref {
             DisplayNamePreference::Primary => {}
             DisplayNamePreference::Custom => {
-                let nick = self.storage.load_contact_nickname(contact_id)?;
+                let nick = self.storage.contacts().load_contact_nickname(contact_id)?;
                 if nick.is_none() {
                     return Err(VauchiError::InvalidState(
                         "Cannot set Custom name preference without a nickname".into(),
@@ -699,7 +743,7 @@ impl Vauchi {
                 }
             }
             DisplayNamePreference::SharedName { name } => {
-                let names = self.storage.list_shared_names(contact_id)?;
+                let names = self.storage.contacts().list_shared_names(contact_id)?;
                 if !names.iter().any(|n| n.name == *name) {
                     return Err(VauchiError::InvalidState(format!(
                         "Shared name '{}' not found",
@@ -709,6 +753,7 @@ impl Vauchi {
             }
         }
         self.storage
+            .contacts()
             .save_display_name_preference(contact_id, &pref)?;
         Ok(())
     }
@@ -725,7 +770,10 @@ impl Vauchi {
         match &pref {
             AvatarPreference::Primary => {}
             AvatarPreference::Custom => {
-                let has = self.storage.has_contact_custom_avatar(contact_id)?;
+                let has = self
+                    .storage
+                    .contacts()
+                    .has_contact_custom_avatar(contact_id)?;
                 if !has {
                     return Err(VauchiError::InvalidState(
                         "Cannot set Custom avatar preference without a custom avatar".into(),
@@ -733,7 +781,7 @@ impl Vauchi {
                 }
             }
             AvatarPreference::SharedAvatar { hash } => {
-                let avatars = self.storage.list_shared_avatars(contact_id)?;
+                let avatars = self.storage.contacts().list_shared_avatars(contact_id)?;
                 if !avatars.iter().any(|a| a.avatar_hash == *hash) {
                     return Err(VauchiError::InvalidState(format!(
                         "Shared avatar '{}' not found",
@@ -742,7 +790,9 @@ impl Vauchi {
                 }
             }
         }
-        self.storage.save_avatar_preference(contact_id, &pref)?;
+        self.storage
+            .contacts()
+            .save_avatar_preference(contact_id, &pref)?;
         Ok(())
     }
 
@@ -755,13 +805,20 @@ impl Vauchi {
 
         let _contact = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
-        let nickname = self.storage.load_contact_nickname(contact_id)?;
-        let shared_names = self.storage.list_shared_names(contact_id)?;
-        let shared_avatars = self.storage.list_shared_avatars(contact_id)?;
-        let (name_pref, avatar_pref) = self.storage.load_display_preferences(contact_id)?;
-        let has_custom_avatar = self.storage.has_contact_custom_avatar(contact_id)?;
+        let nickname = self.storage.contacts().load_contact_nickname(contact_id)?;
+        let shared_names = self.storage.contacts().list_shared_names(contact_id)?;
+        let shared_avatars = self.storage.contacts().list_shared_avatars(contact_id)?;
+        let (name_pref, avatar_pref) = self
+            .storage
+            .contacts()
+            .load_display_preferences(contact_id)?;
+        let has_custom_avatar = self
+            .storage
+            .contacts()
+            .has_contact_custom_avatar(contact_id)?;
 
         // Build name options: shared names + custom nickname
         let mut names: Vec<NameOption> = shared_names
@@ -829,6 +886,7 @@ impl Vauchi {
     ) -> VauchiResult<()> {
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(id)?
             .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
         if contact.is_exchanged() {
@@ -840,7 +898,7 @@ impl Vauchi {
         card.update_field_value(field_id, new_value, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         contact.update_card(card, 0);
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         Ok(())
     }
 
@@ -856,6 +914,7 @@ impl Vauchi {
     ) -> VauchiResult<()> {
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(id)?
             .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
         if contact.is_exchanged() {
@@ -872,7 +931,7 @@ impl Vauchi {
         ))
         .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         contact.update_card(card, 0);
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         Ok(())
     }
 
@@ -882,6 +941,7 @@ impl Vauchi {
     pub fn remove_imported_contact_field(&self, id: &str, field_id: &str) -> VauchiResult<()> {
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(id)?
             .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
         if contact.is_exchanged() {
@@ -893,7 +953,7 @@ impl Vauchi {
         card.remove_field(field_id)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         contact.update_card(card, 0);
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         Ok(())
     }
 
@@ -907,6 +967,7 @@ impl Vauchi {
         note_encrypted: &[u8],
     ) -> VauchiResult<()> {
         self.storage
+            .field_notes()
             .save_contact_field_note(contact_id, field_id, note_encrypted)?;
         Ok(())
     }
@@ -919,12 +980,16 @@ impl Vauchi {
         &self,
         contact_id: &str,
     ) -> VauchiResult<std::collections::HashMap<String, Vec<u8>>> {
-        Ok(self.storage.load_contact_field_notes(contact_id)?)
+        Ok(self
+            .storage
+            .field_notes()
+            .load_contact_field_notes(contact_id)?)
     }
 
     /// Deletes the encrypted note for a specific `(contact_id, field_id)` pair.
     pub fn delete_contact_field_note(&self, contact_id: &str, field_id: &str) -> VauchiResult<()> {
         self.storage
+            .field_notes()
             .delete_contact_field_note(contact_id, field_id)?;
         Ok(())
     }
@@ -936,7 +1001,7 @@ impl Vauchi {
     pub fn cleanup_stale_soft_deletes(&self) -> VauchiResult<usize> {
         let now = self.clock.unix_seconds();
         let threshold = now.saturating_sub(30);
-        let stale_ids = self.storage.find_stale_soft_deletes(threshold)?;
+        let stale_ids = self.storage.contacts().find_stale_soft_deletes(threshold)?;
         let count = stale_ids.len();
         for id in stale_ids {
             self.storage.delete_contact(id.as_str())?;
@@ -952,14 +1017,17 @@ impl Vauchi {
     pub fn expire_pending_reciprocity(&self) -> VauchiResult<usize> {
         use crate::exchange::reciprocity::Reciprocity;
 
-        let pending = self.storage.list_contacts_by_reciprocity("pending")?;
+        let pending = self
+            .storage
+            .contacts()
+            .list_contacts_by_reciprocity("pending")?;
         let now = self.clock.unix_seconds();
         let mut count = 0;
         for mut contact in pending {
             let ts = contact.exchange_timestamp().unwrap_or(0);
             if now > ts + 7 * 24 * 60 * 60 {
                 contact.set_reciprocity(Reciprocity::Unreciprocated);
-                self.storage.save_contact(&contact)?;
+                self.storage.contacts().save_contact(&contact)?;
                 count += 1;
             }
         }

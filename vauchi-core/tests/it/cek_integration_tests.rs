@@ -90,7 +90,7 @@ fn test_propagate_with_cek_rotates_cek() {
     let old_cek_bytes = old_cek.to_bytes();
     let mut bob = alice.get_contact(&bob_id).unwrap().unwrap();
     bob.set_cek(old_cek);
-    alice.storage().save_contact(&bob).unwrap();
+    alice.storage().contacts().save_contact(&bob).unwrap();
 
     let old_card = alice.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
@@ -106,6 +106,7 @@ fn test_propagate_with_cek_rotates_cek() {
 
     let new_cek = alice
         .storage()
+        .contacts()
         .load_contact_cek(&bob_id)
         .unwrap()
         .expect("CEK should exist after propagation");
@@ -134,7 +135,14 @@ fn test_propagate_without_cek_generates_one() {
     let (alice, bob_id) = setup_alice_as_sender_to_bob();
 
     // No CEK set for Bob initially
-    assert!(alice.storage().load_contact_cek(&bob_id).unwrap().is_none());
+    assert!(
+        alice
+            .storage()
+            .contacts()
+            .load_contact_cek(&bob_id)
+            .unwrap()
+            .is_none()
+    );
 
     let old_card = alice.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
@@ -149,7 +157,14 @@ fn test_propagate_without_cek_generates_one() {
     assert_eq!(queued, 1);
 
     // CEK must now be set (always-CEK format)
-    assert!(alice.storage().load_contact_cek(&bob_id).unwrap().is_some());
+    assert!(
+        alice
+            .storage()
+            .contacts()
+            .load_contact_cek(&bob_id)
+            .unwrap()
+            .is_some()
+    );
 }
 
 // =============================================================================
@@ -195,6 +210,7 @@ fn test_process_cek_wrapped_update_saves_cek() {
     // Verify CEK was saved
     let stored_cek = alice
         .storage()
+        .contacts()
         .load_contact_cek(&bob_id)
         .unwrap()
         .expect("CEK should be saved after processing CEK-wrapped update");
@@ -254,6 +270,7 @@ fn test_process_update_from_revoked_sender_rejected() {
 
     alice
         .storage()
+        .contacts()
         .record_revoked_sender(&bob_id, 1700000000)
         .unwrap();
 
@@ -390,7 +407,14 @@ fn test_migrate_contacts_generates_cek() {
     let (alice, bob_id) = setup_alice_as_sender_to_bob();
 
     // Bob has no CEK (legacy contact)
-    assert!(alice.storage().load_contact_cek(&bob_id).unwrap().is_none());
+    assert!(
+        alice
+            .storage()
+            .contacts()
+            .load_contact_cek(&bob_id)
+            .unwrap()
+            .is_none()
+    );
 
     let migrated = alice.migrate_contacts_to_cek().unwrap();
     assert_eq!(migrated, 1);
@@ -398,6 +422,7 @@ fn test_migrate_contacts_generates_cek() {
     // Bob should now have a CEK
     alice
         .storage()
+        .contacts()
         .load_contact_cek(&bob_id)
         .unwrap()
         .expect("expected Some");
@@ -411,7 +436,11 @@ fn test_migrate_contacts_queues_updates() {
     let migrated = alice.migrate_contacts_to_cek().unwrap();
     assert_eq!(migrated, 1);
 
-    let pending = alice.storage().get_pending_updates(&bob_id).unwrap();
+    let pending = alice
+        .storage()
+        .pending()
+        .get_pending_updates(&bob_id)
+        .unwrap();
     assert_eq!(
         pending.len(),
         1,
@@ -430,13 +459,18 @@ fn test_migrate_skips_contacts_with_existing_cek() {
     let cek_bytes = cek.to_bytes();
     let mut bob = alice.get_contact(&bob_id).unwrap().unwrap();
     bob.set_cek(cek);
-    alice.storage().save_contact(&bob).unwrap();
+    alice.storage().contacts().save_contact(&bob).unwrap();
 
     // Run migration — should skip Bob
     let migrated = alice.migrate_contacts_to_cek().unwrap();
     assert_eq!(migrated, 0);
 
-    let stored = alice.storage().load_contact_cek(&bob_id).unwrap().unwrap();
+    let stored = alice
+        .storage()
+        .contacts()
+        .load_contact_cek(&bob_id)
+        .unwrap()
+        .unwrap();
     assert_eq!(stored.to_bytes(), cek_bytes);
 }
 
@@ -497,7 +531,11 @@ fn test_cek_wrapped_end_to_end_flow() {
     {
         let mut bob_on_alice = alice.get_contact(&bob_id).unwrap().unwrap();
         bob_on_alice.set_cek(initial_cek);
-        alice.storage().save_contact(&bob_on_alice).unwrap();
+        alice
+            .storage()
+            .contacts()
+            .save_contact(&bob_on_alice)
+            .unwrap();
     }
 
     let alice_contact = Contact::from_exchange(
@@ -527,7 +565,11 @@ fn test_cek_wrapped_end_to_end_flow() {
     let queued = alice.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1);
 
-    let pending = alice.storage().get_pending_updates(&bob_id).unwrap();
+    let pending = alice
+        .storage()
+        .pending()
+        .get_pending_updates(&bob_id)
+        .unwrap();
     assert_eq!(pending.len(), 1);
 
     let changed = bob
@@ -538,6 +580,7 @@ fn test_cek_wrapped_end_to_end_flow() {
     // Bob should now have Alice's CEK stored
     let bob_alice_cek = bob
         .storage()
+        .contacts()
         .load_contact_cek(&alice_id)
         .unwrap()
         .expect("Bob should have Alice's CEK after processing CEK-wrapped update");

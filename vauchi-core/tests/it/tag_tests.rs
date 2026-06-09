@@ -86,8 +86,8 @@ fn remove_contact_reports_presence() {
 fn create_tag_round_trips_through_get() {
     let storage = open_storage();
 
-    let created = storage.create_tag("climbing-gym").unwrap();
-    let loaded = storage.get_tag(&created.id).unwrap().unwrap();
+    let created = storage.tags().create_tag("climbing-gym").unwrap();
+    let loaded = storage.tags().get_tag(&created.id).unwrap().unwrap();
 
     assert_eq!(loaded.id, created.id);
     assert_eq!(loaded.name, "climbing-gym", "name must decrypt back");
@@ -99,7 +99,7 @@ fn create_tag_round_trips_through_get() {
 #[test]
 fn get_missing_tag_returns_none() {
     let storage = open_storage();
-    assert!(storage.get_tag("does-not-exist").unwrap().is_none());
+    assert!(storage.tags().get_tag("does-not-exist").unwrap().is_none());
 }
 
 // @scenario: contact-annotations.feature - Create a new tag on a contact
@@ -107,10 +107,11 @@ fn get_missing_tag_returns_none() {
 #[test]
 fn list_tags_returns_all_created() {
     let storage = open_storage();
-    storage.create_tag("work").unwrap();
-    storage.create_tag("family").unwrap();
+    storage.tags().create_tag("work").unwrap();
+    storage.tags().create_tag("family").unwrap();
 
     let names: Vec<String> = storage
+        .tags()
         .list_tags()
         .unwrap()
         .into_iter()
@@ -127,18 +128,18 @@ fn list_tags_returns_all_created() {
 #[test]
 fn add_and_remove_membership_persists() {
     let storage = open_storage();
-    let tag = storage.create_tag("berlin-trip").unwrap();
+    let tag = storage.tags().create_tag("berlin-trip").unwrap();
 
-    storage.add_to_tag(&tag.id, "c1").unwrap();
-    storage.add_to_tag(&tag.id, "c1").unwrap(); // idempotent
-    storage.add_to_tag(&tag.id, "c2").unwrap();
+    storage.tags().add_to_tag(&tag.id, "c1").unwrap();
+    storage.tags().add_to_tag(&tag.id, "c1").unwrap(); // idempotent
+    storage.tags().add_to_tag(&tag.id, "c2").unwrap();
 
-    let loaded = storage.get_tag(&tag.id).unwrap().unwrap();
+    let loaded = storage.tags().get_tag(&tag.id).unwrap().unwrap();
     assert_eq!(loaded.contact_ids.len(), 2, "no duplicate membership");
     assert!(loaded.contains("c1") && loaded.contains("c2"));
 
-    storage.remove_from_tag(&tag.id, "c1").unwrap();
-    let after = storage.get_tag(&tag.id).unwrap().unwrap();
+    storage.tags().remove_from_tag(&tag.id, "c1").unwrap();
+    let after = storage.tags().get_tag(&tag.id).unwrap().unwrap();
     assert!(!after.contains("c1"));
     assert!(after.contains("c2"));
 }
@@ -148,15 +149,15 @@ fn add_and_remove_membership_persists() {
 #[test]
 fn delete_tag_reports_existence_and_removes() {
     let storage = open_storage();
-    let tag = storage.create_tag("temp").unwrap();
+    let tag = storage.tags().create_tag("temp").unwrap();
 
     assert!(
-        storage.delete_tag(&tag.id).unwrap(),
+        storage.tags().delete_tag(&tag.id).unwrap(),
         "delete reports existed"
     );
-    assert!(storage.get_tag(&tag.id).unwrap().is_none());
+    assert!(storage.tags().get_tag(&tag.id).unwrap().is_none());
     assert!(
-        !storage.delete_tag(&tag.id).unwrap(),
+        !storage.tags().delete_tag(&tag.id).unwrap(),
         "second delete reports absent"
     );
 }
@@ -166,7 +167,7 @@ fn delete_tag_reports_existence_and_removes() {
 #[test]
 fn tag_name_is_encrypted_at_rest() {
     let storage = open_storage();
-    let tag = storage.create_tag("ex-colleague").unwrap();
+    let tag = storage.tags().create_tag("ex-colleague").unwrap();
 
     // Read the raw BLOB straight from the table — it must NOT contain the
     // plaintext name (ADR-051: tag names encrypted at rest).
@@ -191,13 +192,13 @@ fn tag_name_is_encrypted_at_rest() {
 #[test]
 fn tag_name_survives_storage_rekey() {
     let mut storage = open_storage();
-    let tag = storage.create_tag("berlin-trip").unwrap();
-    storage.add_to_tag(&tag.id, "c1").unwrap();
+    let tag = storage.tags().create_tag("berlin-trip").unwrap();
+    storage.tags().add_to_tag(&tag.id, "c1").unwrap();
 
     // Rotate the storage key — rekey must re-encrypt the tag name.
     storage.rekey(SymmetricKey::generate()).unwrap();
 
-    let loaded = storage.get_tag(&tag.id).unwrap().unwrap();
+    let loaded = storage.tags().get_tag(&tag.id).unwrap().unwrap();
     assert_eq!(loaded.name, "berlin-trip", "name must decrypt after rekey");
     assert!(loaded.contains("c1"), "membership preserved across rekey");
 }
@@ -220,11 +221,11 @@ fn create_tag_round_trips_adversarial_names() {
         "\u{202e}rtl-override",         // unicode control char
     ];
     for name in payloads {
-        let tag = storage.create_tag(name).unwrap();
-        let loaded = storage.get_tag(&tag.id).unwrap().unwrap();
+        let tag = storage.tags().create_tag(name).unwrap();
+        let loaded = storage.tags().get_tag(&tag.id).unwrap().unwrap();
         assert_eq!(&loaded.name, name, "name must round-trip exactly: {name:?}");
     }
-    assert_eq!(storage.list_tags().unwrap().len(), payloads.len());
+    assert_eq!(storage.tags().list_tags().unwrap().len(), payloads.len());
 }
 
 // ── Property: TagSyncData round-trips (CC-04) ─────────────────────────────────
@@ -270,23 +271,23 @@ proptest! {
     ) {
         let storage = open_storage();
         let tag_ids: Vec<String> = (0..3)
-            .map(|i| storage.create_tag(&format!("t{i}")).unwrap().id)
+            .map(|i| storage.tags().create_tag(&format!("t{i}")).unwrap().id)
             .collect();
         let contacts = ["c0", "c1", "c2"];
 
         let mut model: BTreeSet<(usize, usize)> = BTreeSet::new();
         for (t, c, add) in ops {
             if add {
-                storage.add_to_tag(&tag_ids[t], contacts[c]).unwrap();
+                storage.tags().add_to_tag(&tag_ids[t], contacts[c]).unwrap();
                 model.insert((t, c));
             } else {
-                storage.remove_from_tag(&tag_ids[t], contacts[c]).unwrap();
+                storage.tags().remove_from_tag(&tag_ids[t], contacts[c]).unwrap();
                 model.remove(&(t, c));
             }
         }
 
         for (t, tid) in tag_ids.iter().enumerate() {
-            let tag = storage.get_tag(tid).unwrap().unwrap();
+            let tag = storage.tags().get_tag(tid).unwrap().unwrap();
             for (c, cid) in contacts.iter().enumerate() {
                 prop_assert_eq!(tag.contains(cid), model.contains(&(t, c)));
             }

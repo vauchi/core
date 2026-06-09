@@ -39,7 +39,10 @@ fn test_vauchi_find_device_by_prefix_with_registry() {
     let hex_id = primary.device_id_hex();
     let prefix = &hex_id[..8];
 
-    wb.storage().save_device_registry(&registry).unwrap();
+    wb.storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
 
     // Find device by prefix through the facade
     let found = wb.find_device_by_prefix(prefix).unwrap();
@@ -100,9 +103,18 @@ fn test_get_delivery_status_for_contact_returns_matching_records() {
         expires_at: None,
     };
 
-    wb.storage().create_delivery_record(&record1).unwrap();
-    wb.storage().create_delivery_record(&record2).unwrap();
-    wb.storage().create_delivery_record(&record3).unwrap();
+    wb.storage()
+        .deliveries()
+        .create_delivery_record(&record1)
+        .unwrap();
+    wb.storage()
+        .deliveries()
+        .create_delivery_record(&record2)
+        .unwrap();
+    wb.storage()
+        .deliveries()
+        .create_delivery_record(&record3)
+        .unwrap();
 
     let results = wb.get_delivery_status_for_contact("contact-aaa").unwrap();
     assert_eq!(
@@ -181,7 +193,7 @@ fn test_get_failed_deliveries_returns_only_failed() {
     ];
 
     for r in &records {
-        wb.storage().create_delivery_record(r).unwrap();
+        wb.storage().deliveries().create_delivery_record(r).unwrap();
     }
 
     let failed = wb.get_failed_deliveries().unwrap();

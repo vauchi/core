@@ -88,7 +88,7 @@ impl Vauchi {
                 // same stale-key error and retry this same path
                 let relay_url = self.http_relay_url();
                 #[allow(clippy::let_underscore_must_use)]
-                let _ = self.storage.clear_ohttp_key(&relay_url);
+                let _ = self.storage.ohttp_cache().clear_ohttp_key(&relay_url);
                 let key_bytes = self.resolve_ohttp_key(&relay_url)?;
                 let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
                 self.ohttp_key = Some(client);
@@ -114,7 +114,7 @@ impl Vauchi {
             .expect("ohttp_key checked in sync()");
 
         // Load contacts once — shared by register_tokens, receive, and send phases.
-        let contacts = self.storage.list_contacts().unwrap_or_default();
+        let contacts = self.storage.contacts().list_contacts().unwrap_or_default();
 
         let mut adapter = self.create_ohttp_adapter(ohttp_key)?;
 
@@ -463,7 +463,8 @@ impl Vauchi {
             if !contact.is_exchanged() || contact.is_blocked() {
                 continue;
             }
-            if let Ok(Some((ratchet, is_initiator))) = self.storage.load_ratchet_state(contact.id())
+            if let Ok(Some((ratchet, is_initiator))) =
+                self.storage.ratchets().load_ratchet_state(contact.id())
             {
                 initiator_flags.insert(contact.id().to_string(), is_initiator);
                 ctrl.register_ratchet(contact.id(), ratchet);
@@ -506,9 +507,10 @@ impl Vauchi {
                 .get(contact_id.as_str())
                 .copied()
                 .unwrap_or(false);
-            if let Err(e) = self
-                .storage
-                .save_ratchet_state(contact_id, ratchet, is_initiator)
+            if let Err(e) =
+                self.storage
+                    .ratchets()
+                    .save_ratchet_state(contact_id, ratchet, is_initiator)
             {
                 // Ratchet save failure causes desync on next cycle —
                 // collect and surface via SyncResult instead of dropping
@@ -595,7 +597,8 @@ impl Vauchi {
     /// to the relay on first use, preventing client IP leakage.
     fn resolve_ohttp_key(&self, relay_url: &str) -> VauchiResult<Vec<u8>> {
         // 1. Try loading from cache — use if still within TTL
-        if let Some((cached_bytes, fetched_at)) = self.storage.load_ohttp_key(relay_url)?
+        if let Some((cached_bytes, fetched_at)) =
+            self.storage.ohttp_cache().load_ohttp_key(relay_url)?
             && self.is_ohttp_key_fresh(fetched_at)
         {
             return Ok(cached_bytes);
@@ -642,7 +645,9 @@ impl Vauchi {
     fn fetch_and_cache_ohttp_key(&self, relay_url: &str) -> VauchiResult<Vec<u8>> {
         let transport = self.create_bootstrap_transport_direct();
         let key_bytes = transport.fetch_ohttp_key().map_err(VauchiError::Network)?;
-        self.storage.save_ohttp_key(relay_url, &key_bytes)?;
+        self.storage
+            .ohttp_cache()
+            .save_ohttp_key(relay_url, &key_bytes)?;
         Ok(key_bytes)
     }
 
@@ -667,7 +672,8 @@ impl Vauchi {
         let relay_url = self.http_relay_url();
 
         // Try loading cached pins (best-effort — cache miss is fine)
-        if let Ok(Some((cached_pins, fetched_at))) = self.storage.load_pin_cache(&relay_url)
+        if let Ok(Some((cached_pins, fetched_at))) =
+            self.storage.pin_cache().load_pin_cache(&relay_url)
             && self.is_pin_cache_fresh(fetched_at)
         {
             merge_pins(&mut pins, &cached_pins);
@@ -699,7 +705,7 @@ impl Vauchi {
         let pins = transport
             .fetch_pin_config(verify_key)
             .map_err(VauchiError::Network)?;
-        self.storage.save_pin_cache(relay_url, &pins)?;
+        self.storage.pin_cache().save_pin_cache(relay_url, &pins)?;
         Ok(pins)
     }
 

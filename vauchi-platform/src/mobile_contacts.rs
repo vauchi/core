@@ -19,10 +19,16 @@ pub(crate) fn enrich_contact(
     contact: &vauchi_core::Contact,
 ) -> MobileContact {
     let cid = contact.id();
-    let nickname = storage.load_contact_nickname(cid).ok().flatten();
-    let has_custom_avatar = storage.has_contact_custom_avatar(cid).unwrap_or(false);
-    let shared_names = storage.list_shared_names(cid).unwrap_or_default();
-    let (name_pref, _avatar_pref) = storage.load_display_preferences(cid).unwrap_or((
+    let nickname = storage.contacts().load_contact_nickname(cid).ok().flatten();
+    let has_custom_avatar = storage
+        .contacts()
+        .has_contact_custom_avatar(cid)
+        .unwrap_or(false);
+    let shared_names = storage
+        .contacts()
+        .list_shared_names(cid)
+        .unwrap_or_default();
+    let (name_pref, _avatar_pref) = storage.contacts().load_display_preferences(cid).unwrap_or((
         vauchi_core::DisplayNamePreference::Primary,
         vauchi_core::AvatarPreference::Primary,
     ));
@@ -52,10 +58,19 @@ pub(crate) fn enrich_contacts_batch(
     }
     let ids: Vec<&str> = contacts.iter().map(|c| c.id()).collect();
 
-    let shared_names_map = storage.batch_shared_names(&ids).unwrap_or_default();
-    let nicknames_map = storage.batch_nicknames(&ids).unwrap_or_default();
-    let prefs_map = storage.batch_display_preferences(&ids).unwrap_or_default();
-    let has_avatar_set = storage.batch_has_custom_avatar(&ids).unwrap_or_default();
+    let shared_names_map = storage
+        .contacts()
+        .batch_shared_names(&ids)
+        .unwrap_or_default();
+    let nicknames_map = storage.contacts().batch_nicknames(&ids).unwrap_or_default();
+    let prefs_map = storage
+        .contacts()
+        .batch_display_preferences(&ids)
+        .unwrap_or_default();
+    let has_avatar_set = storage
+        .contacts()
+        .batch_has_custom_avatar(&ids)
+        .unwrap_or_default();
 
     contacts
         .iter()

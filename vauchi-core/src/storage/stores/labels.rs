@@ -595,9 +595,9 @@ mod tests {
         label.add_visible_field("phone", 0);
         label.add_visible_field("address", 0);
 
-        storage.save_group(&label).unwrap();
+        storage.labels().save_group(&label).unwrap();
 
-        let loaded = storage.load_group(label.id()).unwrap();
+        let loaded = storage.labels().load_group(label.id()).unwrap();
 
         assert_eq!(loaded.name(), "Family");
         assert!(loaded.contains_contact("alice-id"));
@@ -614,11 +614,11 @@ mod tests {
         let label2 = Group::new("Friends", 0);
         let label3 = Group::new("Work", 0);
 
-        storage.save_group(&label1).unwrap();
-        storage.save_group(&label2).unwrap();
-        storage.save_group(&label3).unwrap();
+        storage.labels().save_group(&label1).unwrap();
+        storage.labels().save_group(&label2).unwrap();
+        storage.labels().save_group(&label3).unwrap();
 
-        let labels = storage.load_all_groups().unwrap();
+        let labels = storage.labels().load_all_groups().unwrap();
 
         assert_eq!(labels.len(), 3);
         assert_eq!(labels[0].name(), "Family");
@@ -631,11 +631,11 @@ mod tests {
         let storage = test_storage();
 
         let label = Group::new("Temporary", 0);
-        storage.save_group(&label).unwrap();
+        storage.labels().save_group(&label).unwrap();
 
-        storage.delete_group(label.id()).unwrap();
+        storage.labels().delete_group(label.id()).unwrap();
 
-        let result = storage.load_group(label.id());
+        let result = storage.labels().load_group(label.id());
         result.expect_err("expected error");
     }
 
@@ -644,21 +644,24 @@ mod tests {
         let storage = test_storage();
 
         storage
+            .labels()
             .save_contact_override("alice-id", "phone", true)
             .unwrap();
         storage
+            .labels()
             .save_contact_override("alice-id", "address", false)
             .unwrap();
         storage
+            .labels()
             .save_contact_override("bob-id", "email", true)
             .unwrap();
 
-        let alice_overrides = storage.load_contact_overrides("alice-id").unwrap();
+        let alice_overrides = storage.labels().load_contact_overrides("alice-id").unwrap();
         assert_eq!(alice_overrides.len(), 2);
         assert_eq!(alice_overrides.get("phone"), Some(&true));
         assert_eq!(alice_overrides.get("address"), Some(&false));
 
-        let bob_overrides = storage.load_contact_overrides("bob-id").unwrap();
+        let bob_overrides = storage.labels().load_contact_overrides("bob-id").unwrap();
         assert_eq!(bob_overrides.len(), 1);
         assert_eq!(bob_overrides.get("email"), Some(&true));
     }
@@ -668,13 +671,15 @@ mod tests {
         let storage = test_storage();
 
         storage
+            .labels()
             .save_contact_override("alice-id", "phone", true)
             .unwrap();
         storage
+            .labels()
             .delete_contact_override("alice-id", "phone")
             .unwrap();
 
-        let overrides = storage.load_contact_overrides("alice-id").unwrap();
+        let overrides = storage.labels().load_contact_overrides("alice-id").unwrap();
         assert!(overrides.is_empty());
     }
 
@@ -683,15 +688,20 @@ mod tests {
         let storage = test_storage();
 
         storage
+            .labels()
             .save_contact_override("alice-id", "phone", true)
             .unwrap();
         storage
+            .labels()
             .save_contact_override("alice-id", "address", false)
             .unwrap();
 
-        storage.delete_all_contact_overrides("alice-id").unwrap();
+        storage
+            .labels()
+            .delete_all_contact_overrides("alice-id")
+            .unwrap();
 
-        let overrides = storage.load_contact_overrides("alice-id").unwrap();
+        let overrides = storage.labels().load_contact_overrides("alice-id").unwrap();
         assert!(overrides.is_empty());
     }
 
@@ -699,10 +709,10 @@ mod tests {
     fn test_create_label() {
         let storage = test_storage();
 
-        let label = storage.create_group("New Label").unwrap();
+        let label = storage.labels().create_group("New Label").unwrap();
         assert_eq!(label.name(), "New Label");
 
-        let loaded = storage.load_group(label.id()).unwrap();
+        let loaded = storage.labels().load_group(label.id()).unwrap();
         assert_eq!(loaded.name(), "New Label");
     }
 
@@ -710,8 +720,8 @@ mod tests {
     fn test_create_duplicate_label() {
         let storage = test_storage();
 
-        storage.create_group("Unique").unwrap();
-        let result = storage.create_group("Unique");
+        storage.labels().create_group("Unique").unwrap();
+        let result = storage.labels().create_group("Unique");
 
         assert!(matches!(result, Err(StorageError::AlreadyExists(_))));
     }
@@ -720,10 +730,13 @@ mod tests {
     fn test_rename_label() {
         let storage = test_storage();
 
-        let label = storage.create_group("Old Name").unwrap();
-        storage.rename_group(label.id(), "New Name").unwrap();
+        let label = storage.labels().create_group("Old Name").unwrap();
+        storage
+            .labels()
+            .rename_group(label.id(), "New Name")
+            .unwrap();
 
-        let loaded = storage.load_group(label.id()).unwrap();
+        let loaded = storage.labels().load_group(label.id()).unwrap();
         assert_eq!(loaded.name(), "New Name");
     }
 
@@ -731,19 +744,21 @@ mod tests {
     fn test_add_remove_contact_from_label() {
         let storage = test_storage();
 
-        let label = storage.create_group("Test").unwrap();
+        let label = storage.labels().create_group("Test").unwrap();
         storage
+            .labels()
             .add_contact_to_group(label.id(), "alice-id")
             .unwrap();
 
-        let loaded = storage.load_group(label.id()).unwrap();
+        let loaded = storage.labels().load_group(label.id()).unwrap();
         assert!(loaded.contains_contact("alice-id"));
 
         storage
+            .labels()
             .remove_contact_from_group(label.id(), "alice-id")
             .unwrap();
 
-        let loaded = storage.load_group(label.id()).unwrap();
+        let loaded = storage.labels().load_group(label.id()).unwrap();
         assert!(!loaded.contains_contact("alice-id"));
     }
 
@@ -751,24 +766,30 @@ mod tests {
     fn test_remove_contact_from_all_labels() {
         let storage = test_storage();
 
-        let label1 = storage.create_group("Label1").unwrap();
-        let label2 = storage.create_group("Label2").unwrap();
+        let label1 = storage.labels().create_group("Label1").unwrap();
+        let label2 = storage.labels().create_group("Label2").unwrap();
 
         storage
+            .labels()
             .add_contact_to_group(label1.id(), "alice-id")
             .unwrap();
         storage
+            .labels()
             .add_contact_to_group(label2.id(), "alice-id")
             .unwrap();
         storage
+            .labels()
             .save_contact_override("alice-id", "phone", true)
             .unwrap();
 
-        storage.remove_contact_from_all_groups("alice-id").unwrap();
+        storage
+            .labels()
+            .remove_contact_from_all_groups("alice-id")
+            .unwrap();
 
-        let loaded1 = storage.load_group(label1.id()).unwrap();
-        let loaded2 = storage.load_group(label2.id()).unwrap();
-        let overrides = storage.load_contact_overrides("alice-id").unwrap();
+        let loaded1 = storage.labels().load_group(label1.id()).unwrap();
+        let loaded2 = storage.labels().load_group(label2.id()).unwrap();
+        let overrides = storage.labels().load_contact_overrides("alice-id").unwrap();
 
         assert!(!loaded1.contains_contact("alice-id"));
         assert!(!loaded2.contains_contact("alice-id"));
@@ -779,24 +800,27 @@ mod tests {
     fn test_set_label_field_visibility() {
         let storage = test_storage();
 
-        let label = storage.create_group("Test").unwrap();
+        let label = storage.labels().create_group("Test").unwrap();
 
         storage
+            .labels()
             .set_group_field_visibility(label.id(), "phone", true)
             .unwrap();
         storage
+            .labels()
             .set_group_field_visibility(label.id(), "address", true)
             .unwrap();
 
-        let loaded = storage.load_group(label.id()).unwrap();
+        let loaded = storage.labels().load_group(label.id()).unwrap();
         assert!(loaded.is_field_visible("phone"));
         assert!(loaded.is_field_visible("address"));
 
         storage
+            .labels()
             .set_group_field_visibility(label.id(), "phone", false)
             .unwrap();
 
-        let loaded = storage.load_group(label.id()).unwrap();
+        let loaded = storage.labels().load_group(label.id()).unwrap();
         assert!(!loaded.is_field_visible("phone"));
         assert!(loaded.is_field_visible("address"));
     }
@@ -812,9 +836,9 @@ mod tests {
             .set_display_name_override(Some("Dr. Egloff"), 0)
             .unwrap();
 
-        storage.save_group(&label).unwrap();
+        storage.labels().save_group(&label).unwrap();
 
-        let loaded = storage.load_group(label.id()).unwrap();
+        let loaded = storage.labels().load_group(label.id()).unwrap();
 
         assert_eq!(loaded.name(), "Professional");
         assert!(loaded.contains_contact("alice-id"));
@@ -827,9 +851,9 @@ mod tests {
         let storage = test_storage();
 
         let label = Group::new("Friends", 0);
-        storage.save_group(&label).unwrap();
+        storage.labels().save_group(&label).unwrap();
 
-        let loaded = storage.load_group(label.id()).unwrap();
+        let loaded = storage.labels().load_group(label.id()).unwrap();
         assert_eq!(loaded.display_name_override(), None);
     }
 
@@ -842,10 +866,10 @@ mod tests {
 
         let label2 = Group::new("Work", 0);
 
-        storage.save_group(&label1).unwrap();
-        storage.save_group(&label2).unwrap();
+        storage.labels().save_group(&label1).unwrap();
+        storage.labels().save_group(&label2).unwrap();
 
-        let labels = storage.load_all_groups().unwrap();
+        let labels = storage.labels().load_all_groups().unwrap();
         assert_eq!(labels.len(), 2);
 
         let family = labels.iter().find(|l| l.name() == "Family").unwrap();
@@ -863,16 +887,16 @@ mod tests {
         label
             .set_display_name_override(Some("Dr. Egloff"), 0)
             .unwrap();
-        storage.save_group(&label).unwrap();
+        storage.labels().save_group(&label).unwrap();
 
-        let loaded = storage.load_group(label.id()).unwrap();
+        let loaded = storage.labels().load_group(label.id()).unwrap();
         assert_eq!(loaded.display_name_override(), Some("Dr. Egloff"));
 
         let mut updated = loaded;
         updated.set_display_name_override(None, 0).unwrap();
-        storage.save_group(&updated).unwrap();
+        storage.labels().save_group(&updated).unwrap();
 
-        let reloaded = storage.load_group(label.id()).unwrap();
+        let reloaded = storage.labels().load_group(label.id()).unwrap();
         assert_eq!(reloaded.display_name_override(), None);
     }
 
@@ -880,18 +904,20 @@ mod tests {
     fn test_get_labels_for_contact() {
         let storage = test_storage();
 
-        let label1 = storage.create_group("Family").unwrap();
-        let label2 = storage.create_group("Friends").unwrap();
-        let _label3 = storage.create_group("Work").unwrap();
+        let label1 = storage.labels().create_group("Family").unwrap();
+        let label2 = storage.labels().create_group("Friends").unwrap();
+        let _label3 = storage.labels().create_group("Work").unwrap();
 
         storage
+            .labels()
             .add_contact_to_group(label1.id(), "alice-id")
             .unwrap();
         storage
+            .labels()
             .add_contact_to_group(label2.id(), "alice-id")
             .unwrap();
 
-        let alice_labels = storage.get_groups_for_contact("alice-id").unwrap();
+        let alice_labels = storage.labels().get_groups_for_contact("alice-id").unwrap();
         assert_eq!(alice_labels.len(), 2);
 
         let names: Vec<_> = alice_labels.iter().map(|l| l.name()).collect();

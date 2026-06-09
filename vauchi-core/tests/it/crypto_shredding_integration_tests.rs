@@ -220,10 +220,11 @@ fn test_storage_keyed_by_sek() {
 
     let backup_data = identity.signing_public_key().to_vec();
     storage
+        .identity()
         .save_identity(&backup_data, identity.display_name())
         .unwrap();
 
-    let loaded = storage.load_identity().unwrap();
+    let loaded = storage.identity().load_identity().unwrap();
     assert!(loaded.is_some(), "Identity should be loadable");
     let (loaded_data, _) = loaded.unwrap();
     assert_eq!(loaded_data, backup_data, "Loaded data should match saved");
@@ -234,7 +235,7 @@ fn test_storage_keyed_by_sek() {
 
     // Opening with wrong key: encrypted data cannot be decrypted
     let storage2 = Storage::open(&db_path, different_sek).unwrap();
-    let loaded2 = storage2.load_identity();
+    let loaded2 = storage2.identity().load_identity();
 
     // Must either error or return None — never return the original data
     match loaded2 {

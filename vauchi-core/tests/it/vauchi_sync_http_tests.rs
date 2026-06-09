@@ -230,9 +230,12 @@ fn test_ohttp_cache_roundtrip_via_storage() {
     let relay_url = "https://relay.example.test";
     let key_bytes: Vec<u8> = vec![0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE];
 
-    storage.save_ohttp_key(relay_url, &key_bytes).unwrap();
+    storage
+        .ohttp_cache()
+        .save_ohttp_key(relay_url, &key_bytes)
+        .unwrap();
 
-    let loaded = storage.load_ohttp_key(relay_url).unwrap();
+    let loaded = storage.ohttp_cache().load_ohttp_key(relay_url).unwrap();
     assert!(loaded.is_some(), "loaded key must be present after save");
 
     let (loaded_bytes, fetched_at) = loaded.unwrap();

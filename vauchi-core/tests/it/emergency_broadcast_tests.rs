@@ -296,10 +296,12 @@ fn test_storage_save_load_emergency_config_roundtrip() {
     };
 
     storage
+        .emergency()
         .save_emergency_config(&config)
         .expect("save should succeed");
 
     let loaded = storage
+        .emergency()
         .load_emergency_config()
         .expect("load should succeed")
         .expect("should have config");
@@ -315,6 +317,7 @@ fn test_storage_load_emergency_config_returns_none_initially() {
     let storage = Storage::in_memory(SymmetricKey::generate()).expect("storage should open");
 
     let config = storage
+        .emergency()
         .load_emergency_config()
         .expect("load should succeed");
     assert!(config.is_none());
@@ -332,14 +335,17 @@ fn test_storage_delete_emergency_config() {
     };
 
     storage
+        .emergency()
         .save_emergency_config(&config)
         .expect("save should succeed");
 
     storage
+        .emergency()
         .delete_emergency_config()
         .expect("delete should succeed");
 
     let loaded = storage
+        .emergency()
         .load_emergency_config()
         .expect("load should succeed");
     assert!(loaded.is_none());

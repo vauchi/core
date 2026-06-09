@@ -21,7 +21,7 @@ impl Vauchi {
 
     /// Lists all named places, oldest first.
     pub fn list_places(&self) -> VauchiResult<Vec<Place>> {
-        Ok(self.storage.list_places()?)
+        Ok(self.storage.places().list_places()?)
     }
 
     /// Creates a named place at the given coordinates. Rejects an empty name.
@@ -37,20 +37,23 @@ impl Vauchi {
                 "Place name cannot be empty".into(),
             ));
         }
-        Ok(self.storage.create_place(name, latitude, longitude)?)
+        Ok(self
+            .storage
+            .places()
+            .create_place(name, latitude, longitude)?)
     }
 
     /// Deletes a named place. Returns `true` if it existed. Contacts that
     /// referenced it keep their raw coordinates; only the name link dangles.
     pub fn delete_place(&self, place_id: &str) -> VauchiResult<bool> {
-        Ok(self.storage.delete_place(place_id)?)
+        Ok(self.storage.places().delete_place(place_id)?)
     }
 
     /// Suggests the nearest named place within the proximity radius of the
     /// given coordinates, or `None` — the proximity-autocomplete read used when
     /// recording a new exchange location (T2.4). Named-place match only.
     pub fn suggest_place_near(&self, latitude: f64, longitude: f64) -> VauchiResult<Option<Place>> {
-        Ok(self.storage.find_place_near(latitude, longitude)?)
+        Ok(self.storage.places().find_place_near(latitude, longitude)?)
     }
 
     /// Returns the named place whose name matches (trimmed, case-insensitive),
@@ -62,6 +65,7 @@ impl Vauchi {
         }
         Ok(self
             .storage
+            .places()
             .list_places()?
             .into_iter()
             .find(|p| p.name.to_lowercase() == needle))
@@ -77,7 +81,7 @@ impl Vauchi {
         latitude: f64,
         longitude: f64,
     ) -> VauchiResult<()> {
-        if self.storage.load_contact(contact_id)?.is_none() {
+        if self.storage.contacts().load_contact(contact_id)?.is_none() {
             return Err(VauchiError::ContactNotFound(contact_id.to_string()));
         }
         let loc = ExchangeLocation {
@@ -123,6 +127,7 @@ impl Vauchi {
             Some(existing) => existing,
             None => self
                 .storage
+                .places()
                 .create_place(name, loc.latitude, loc.longitude)?,
         };
 

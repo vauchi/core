@@ -79,9 +79,13 @@ fn test_contact_clear_cek() {
 fn test_save_load_contact_with_cek_roundtrip() {
     let storage = test_storage();
     let contact = make_contact_with_cek("Alice Smith");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(contact.id())
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.display_name(), "Alice Smith");
     assert_eq!(loaded.card().display_name(), "Alice Smith");
     assert!(loaded.cek().is_some(), "CEK should be loaded with contact");
@@ -94,9 +98,13 @@ fn test_legacy_contact_still_loads_without_cek() {
     let contact = make_contact("Bob Legacy");
     assert!(contact.cek().is_none());
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(contact.id())
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.display_name(), "Bob Legacy");
     assert!(loaded.cek().is_none(), "Legacy contact should have no CEK");
 }
@@ -106,9 +114,9 @@ fn test_legacy_contact_still_loads_without_cek() {
 fn test_list_contacts_includes_cek_contacts() {
     let storage = test_storage();
     let contact = make_contact_with_cek("CEK Contact");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let all = storage.list_contacts().unwrap();
+    let all = storage.contacts().list_contacts().unwrap();
     assert_eq!(all.len(), 1);
     assert_eq!(all[0].display_name(), "CEK Contact");
     all[0].cek().expect("expected Some");
@@ -121,7 +129,7 @@ fn test_list_contacts_includes_cek_contacts() {
 fn test_cek_contact_display_name_empty_in_db() {
     let storage = test_storage();
     let contact = make_contact_with_cek("Secret Name");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Read display_name column directly — should be empty for CEK contacts
     // (no plaintext personal data in DB; name is inside CEK-encrypted card)
@@ -146,7 +154,7 @@ fn test_cek_contact_display_name_empty_in_db() {
 fn test_legacy_contact_has_plaintext_display_name() {
     let storage = test_storage();
     let contact = make_contact("Public Name");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let display_name: String = storage
         .connection()
@@ -167,7 +175,7 @@ fn test_legacy_contact_has_plaintext_display_name() {
 fn test_cek_contact_card_not_decryptable_with_storage_key_alone() {
     let storage = test_storage();
     let contact = make_contact_with_cek("Alice CEK");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let card_encrypted: Vec<u8> = storage
         .connection()
@@ -193,17 +201,21 @@ fn test_cek_contact_card_not_decryptable_with_storage_key_alone() {
 fn test_crypto_shred_makes_card_unreadable() {
     let storage = test_storage();
     let contact = make_contact_with_cek("Carol Shredded");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Verify card is readable before shredding
-    let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(contact.id())
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.display_name(), "Carol Shredded");
 
     // Crypto-shred: delete the CEK
-    storage.delete_contact_cek(contact.id()).unwrap();
+    storage.contacts().delete_contact_cek(contact.id()).unwrap();
 
     // After shredding, loading the contact should fail (card is encrypted with CEK that's gone)
-    let result = storage.load_contact(contact.id());
+    let result = storage.contacts().load_contact(contact.id());
     assert!(
         result.is_err() || result.unwrap().is_none(),
         "Contact should be unloadable after crypto-shredding"
@@ -219,23 +231,23 @@ fn test_search_contacts_finds_cek_protected_name() {
 
     // CEK contact — display_name is NULL in DB but available after decryption
     let contact = make_contact_with_cek("Alice Encrypted");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Legacy contact with different public key to avoid ID collision
     let pk2 = [0x43u8; 32];
     let card2 = ContactCard::new("Bob Plaintext");
     let legacy = Contact::from_exchange(pk2, card2, SymmetricKey::generate(), 0);
-    storage.save_contact(&legacy).unwrap();
+    storage.contacts().save_contact(&legacy).unwrap();
 
-    let results = storage.search_contacts("Alice").unwrap();
+    let results = storage.contacts().search_contacts("Alice").unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].display_name(), "Alice Encrypted");
 
-    let results = storage.search_contacts("Bob").unwrap();
+    let results = storage.contacts().search_contacts("Bob").unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].display_name(), "Bob Plaintext");
 
-    let all = storage.search_contacts("").unwrap();
+    let all = storage.contacts().search_contacts("").unwrap();
     assert_eq!(all.len(), 2);
 }
 
@@ -246,15 +258,19 @@ fn test_search_contacts_finds_cek_protected_name() {
 fn test_save_contact_with_rotated_cek() {
     let storage = test_storage();
     let mut contact = make_contact_with_cek("Dave Rotated");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Rotate CEK
     let new_cek = ContentEncryptionKey::generate();
     contact.set_cek(new_cek);
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Should still load correctly with the new CEK
-    let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(contact.id())
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.display_name(), "Dave Rotated");
     loaded.cek().expect("expected Some");
 }

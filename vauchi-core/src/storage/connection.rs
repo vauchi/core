@@ -55,7 +55,7 @@ impl Storage {
         // best-effort: maintenance failure leaves stale rows that will
         // be cleaned on the next startup; no data integrity impact
         #[allow(clippy::let_underscore_must_use)]
-        let _ = storage.run_startup_maintenance();
+        let _ = storage.deliveries().run_startup_maintenance();
         // F4 audit fix: remove pre-migration .bak files after successful migration
         if let Some(ref db) = storage.db_path {
             Self::cleanup_migration_backups(db);

@@ -1165,11 +1165,13 @@ impl PlatformAppEngine {
             // ── Demo Contact (B7 batch 5) ──
             DomainCommand::InitDemoContactIfNeeded => {
                 let storage = engine.vauchi().storage();
-                let contacts = storage
-                    .list_contacts()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?;
+                let contacts =
+                    storage
+                        .contacts()
+                        .list_contacts()
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })?;
                 if !contacts.is_empty() {
                     return Ok(DomainCommandResult::DemoContactOpt { contact: None });
                 }
@@ -1273,6 +1275,7 @@ impl PlatformAppEngine {
                 let card = engine
                     .vauchi()
                     .storage()
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1291,6 +1294,7 @@ impl PlatformAppEngine {
             } => {
                 let storage = engine.vauchi().storage();
                 let mut card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1310,6 +1314,7 @@ impl PlatformAppEngine {
                         detail: e.to_string(),
                     })?;
                 storage
+                    .contacts()
                     .save_own_card(&card)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1320,6 +1325,7 @@ impl PlatformAppEngine {
             DomainCommand::UpdateField { label, new_value } => {
                 let storage = engine.vauchi().storage();
                 let mut card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1343,6 +1349,7 @@ impl PlatformAppEngine {
                         detail: e.to_string(),
                     })?;
                 storage
+                    .contacts()
                     .save_own_card(&card)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1353,6 +1360,7 @@ impl PlatformAppEngine {
             DomainCommand::RemoveField { label } => {
                 let storage = engine.vauchi().storage();
                 let mut card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1370,6 +1378,7 @@ impl PlatformAppEngine {
                         detail: e.to_string(),
                     })?;
                 storage
+                    .contacts()
                     .save_own_card(&card)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1397,6 +1406,7 @@ impl PlatformAppEngine {
             DomainCommand::SetOwnAvatar { avatar_bytes } => {
                 let storage = engine.vauchi().storage();
                 let mut card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1410,6 +1420,7 @@ impl PlatformAppEngine {
                         detail: e.to_string(),
                     })?;
                 storage
+                    .contacts()
                     .save_own_card(&card)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1420,6 +1431,7 @@ impl PlatformAppEngine {
             DomainCommand::ClearOwnAvatar => {
                 let storage = engine.vauchi().storage();
                 let mut card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1429,6 +1441,7 @@ impl PlatformAppEngine {
                     })?;
                 card.clear_avatar();
                 storage
+                    .contacts()
                     .save_own_card(&card)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1438,22 +1451,24 @@ impl PlatformAppEngine {
             }
             DomainCommand::ListContacts => {
                 let storage = engine.vauchi().storage();
-                let contacts = storage
-                    .list_contacts()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?;
+                let contacts =
+                    storage
+                        .contacts()
+                        .list_contacts()
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })?;
                 Ok(DomainCommandResult::Contacts {
                     contacts: crate::mobile_contacts::enrich_contacts_batch(storage, &contacts),
                 })
             }
             DomainCommand::GetContact { id } => {
                 let storage = engine.vauchi().storage();
-                let contact = storage
-                    .load_contact(&id)
-                    .map_err(|e| MobileError::StorageError {
+                let contact = storage.contacts().load_contact(&id).map_err(|e| {
+                    MobileError::StorageError {
                         detail: e.to_string(),
-                    })?;
+                    }
+                })?;
                 Ok(DomainCommandResult::ContactOpt {
                     contact: contact
                         .as_ref()
@@ -1462,12 +1477,11 @@ impl PlatformAppEngine {
             }
             DomainCommand::SearchContacts { query } => {
                 let storage = engine.vauchi().storage();
-                let contacts =
-                    storage
-                        .search_contacts(&query)
-                        .map_err(|e| MobileError::StorageError {
-                            detail: e.to_string(),
-                        })?;
+                let contacts = storage.contacts().search_contacts(&query).map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
                 Ok(DomainCommandResult::Contacts {
                     contacts: crate::mobile_contacts::enrich_contacts_batch(storage, &contacts),
                 })
@@ -1476,6 +1490,7 @@ impl PlatformAppEngine {
                 let count = engine
                     .vauchi()
                     .storage()
+                    .contacts()
                     .list_contacts()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1840,11 +1855,13 @@ impl PlatformAppEngine {
                     detail: format!("Proof validation failed: {e}"),
                 })?;
 
-                let contacts = storage
-                    .list_contacts()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?;
+                let contacts =
+                    storage
+                        .contacts()
+                        .list_contacts()
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })?;
                 let contact_pks: std::collections::HashSet<[u8; 32]> = contacts
                     .iter()
                     .filter_map(|c| c.public_key().copied())
@@ -1918,6 +1935,7 @@ impl PlatformAppEngine {
             DomainCommand::TrustContactForRecovery { contact_id } => {
                 let storage = engine.vauchi().storage();
                 let mut contact = storage
+                    .contacts()
                     .load_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1937,11 +1955,11 @@ impl PlatformAppEngine {
                         field: String::new(),
                         detail: e.to_string(),
                     })?;
-                storage
-                    .save_contact(&contact)
-                    .map_err(|e| MobileError::StorageError {
+                storage.contacts().save_contact(&contact).map_err(|e| {
+                    MobileError::StorageError {
                         detail: e.to_string(),
-                    })?;
+                    }
+                })?;
                 engine.invalidate_screen(&AppScreen::Recovery);
                 engine.invalidate_screen(&AppScreen::ContactDetail {
                     contact_id: contact_id.clone(),
@@ -1951,6 +1969,7 @@ impl PlatformAppEngine {
             DomainCommand::UntrustContactForRecovery { contact_id } => {
                 let storage = engine.vauchi().storage();
                 let mut contact = storage
+                    .contacts()
                     .load_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1964,11 +1983,11 @@ impl PlatformAppEngine {
                         field: String::new(),
                         detail: e.to_string(),
                     })?;
-                storage
-                    .save_contact(&contact)
-                    .map_err(|e| MobileError::StorageError {
+                storage.contacts().save_contact(&contact).map_err(|e| {
+                    MobileError::StorageError {
                         detail: e.to_string(),
-                    })?;
+                    }
+                })?;
                 engine.invalidate_screen(&AppScreen::Recovery);
                 engine.invalidate_screen(&AppScreen::ContactDetail {
                     contact_id: contact_id.clone(),
@@ -1979,6 +1998,7 @@ impl PlatformAppEngine {
                 let count = engine
                     .vauchi()
                     .storage()
+                    .contacts()
                     .list_contacts()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -1995,11 +2015,14 @@ impl PlatformAppEngine {
             // Groups / GroupDetail / ContactDetail / ContactVisibility
             // screens. Reads invalidate nothing.
             DomainCommand::ListLabels => {
-                let labels = engine.vauchi().storage().load_all_groups().map_err(|e| {
-                    MobileError::StorageError {
+                let labels = engine
+                    .vauchi()
+                    .storage()
+                    .labels()
+                    .load_all_groups()
+                    .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
-                    }
-                })?;
+                    })?;
                 Ok(DomainCommandResult::Labels {
                     labels: labels
                         .iter()
@@ -2008,11 +2031,14 @@ impl PlatformAppEngine {
                 })
             }
             DomainCommand::CreateLabel { name } => {
-                let label = engine.vauchi().storage().create_group(&name).map_err(|e| {
-                    MobileError::Other {
+                let label = engine
+                    .vauchi()
+                    .storage()
+                    .labels()
+                    .create_group(&name)
+                    .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
-                    }
-                })?;
+                    })?;
                 engine.invalidate_screen(&AppScreen::Groups);
                 Ok(DomainCommandResult::Label {
                     label: crate::types::MobileVisibilityLabel::from(&label),
@@ -2020,12 +2046,11 @@ impl PlatformAppEngine {
             }
             DomainCommand::GetLabel { label_id } => {
                 let storage = engine.vauchi().storage();
-                let label =
-                    storage
-                        .load_group(&label_id)
-                        .map_err(|e| MobileError::StorageError {
-                            detail: e.to_string(),
-                        })?;
+                let label = storage.labels().load_group(&label_id).map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
                 let mut detail = crate::types::MobileVisibilityLabelDetail::from(&label);
                 let (rows, stale_count) =
                     crate::mobile_visibility::resolve_label_contacts(storage, &detail.contact_ids);
@@ -2037,6 +2062,7 @@ impl PlatformAppEngine {
                 engine
                     .vauchi()
                     .storage()
+                    .labels()
                     .rename_group(&label_id, &new_name)
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
@@ -2051,6 +2077,7 @@ impl PlatformAppEngine {
                 engine
                     .vauchi()
                     .storage()
+                    .labels()
                     .delete_group(&label_id)
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
@@ -2068,6 +2095,7 @@ impl PlatformAppEngine {
                 engine
                     .vauchi()
                     .storage()
+                    .labels()
                     .add_contact_to_group(&label_id, &contact_id)
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
@@ -2088,6 +2116,7 @@ impl PlatformAppEngine {
                 engine
                     .vauchi()
                     .storage()
+                    .labels()
                     .remove_contact_from_group(&label_id, &contact_id)
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
@@ -2105,6 +2134,7 @@ impl PlatformAppEngine {
                 let labels = engine
                     .vauchi()
                     .storage()
+                    .labels()
                     .get_groups_for_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2123,6 +2153,7 @@ impl PlatformAppEngine {
             } => {
                 let storage = engine.vauchi().storage();
                 let card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2141,6 +2172,7 @@ impl PlatformAppEngine {
                     .id()
                     .to_string();
                 storage
+                    .labels()
                     .set_group_field_visibility(&label_id, &field_id, is_visible)
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
@@ -2158,6 +2190,7 @@ impl PlatformAppEngine {
             } => {
                 let storage = engine.vauchi().storage();
                 let card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2176,6 +2209,7 @@ impl PlatformAppEngine {
                     .id()
                     .to_string();
                 storage
+                    .labels()
                     .save_contact_override(&contact_id, &field_id, is_visible)
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
@@ -2194,6 +2228,7 @@ impl PlatformAppEngine {
             } => {
                 let storage = engine.vauchi().storage();
                 let card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2212,6 +2247,7 @@ impl PlatformAppEngine {
                     .id()
                     .to_string();
                 storage
+                    .labels()
                     .delete_contact_override(&contact_id, &field_id)
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
@@ -2230,6 +2266,7 @@ impl PlatformAppEngine {
             } => {
                 let storage = engine.vauchi().storage();
                 let mut contact = storage
+                    .contacts()
                     .load_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2238,6 +2275,7 @@ impl PlatformAppEngine {
                         detail: format!("Contact not found: {contact_id}"),
                     })?;
                 let card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2262,11 +2300,11 @@ impl PlatformAppEngine {
                         detail: "Visibility rules require an exchanged contact".into(),
                     })?
                     .set_nobody(&field_id);
-                storage
-                    .save_contact(&contact)
-                    .map_err(|e| MobileError::StorageError {
+                storage.contacts().save_contact(&contact).map_err(|e| {
+                    MobileError::StorageError {
                         detail: e.to_string(),
-                    })?;
+                    }
+                })?;
                 engine.invalidate_screen(&AppScreen::ContactVisibility {
                     contact_id: contact_id.clone(),
                 });
@@ -2281,6 +2319,7 @@ impl PlatformAppEngine {
             } => {
                 let storage = engine.vauchi().storage();
                 let mut contact = storage
+                    .contacts()
                     .load_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2289,6 +2328,7 @@ impl PlatformAppEngine {
                         detail: format!("Contact not found: {contact_id}"),
                     })?;
                 let card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2313,11 +2353,11 @@ impl PlatformAppEngine {
                         detail: "Visibility rules require an exchanged contact".into(),
                     })?
                     .set_everyone(&field_id);
-                storage
-                    .save_contact(&contact)
-                    .map_err(|e| MobileError::StorageError {
+                storage.contacts().save_contact(&contact).map_err(|e| {
+                    MobileError::StorageError {
                         detail: e.to_string(),
-                    })?;
+                    }
+                })?;
                 engine.invalidate_screen(&AppScreen::ContactVisibility {
                     contact_id: contact_id.clone(),
                 });
@@ -2332,6 +2372,7 @@ impl PlatformAppEngine {
             } => {
                 let storage = engine.vauchi().storage();
                 let contact = storage
+                    .contacts()
                     .load_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2340,6 +2381,7 @@ impl PlatformAppEngine {
                         detail: format!("Contact not found: {contact_id}"),
                     })?;
                 let card = storage
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2544,18 +2586,21 @@ impl PlatformAppEngine {
             // nothing.
             DomainCommand::PendingUpdateCount => {
                 let storage = engine.vauchi().storage();
-                let contacts = storage
-                    .list_contacts()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?;
+                let contacts =
+                    storage
+                        .contacts()
+                        .list_contacts()
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })?;
                 let mut total: u32 = 0;
                 for contact in contacts {
-                    let pending = storage.get_pending_updates(contact.id()).map_err(|e| {
-                        MobileError::StorageError {
+                    let pending = storage
+                        .pending()
+                        .get_pending_updates(contact.id())
+                        .map_err(|e| MobileError::StorageError {
                             detail: e.to_string(),
-                        }
-                    })?;
+                        })?;
                     total += pending.len() as u32;
                 }
                 Ok(DomainCommandResult::Count { value: total })
@@ -2564,6 +2609,7 @@ impl PlatformAppEngine {
                 let record = engine
                     .vauchi()
                     .storage()
+                    .deliveries()
                     .get_delivery_record(&message_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2578,6 +2624,7 @@ impl PlatformAppEngine {
                 let records = engine
                     .vauchi()
                     .storage()
+                    .deliveries()
                     .get_all_delivery_records()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2593,6 +2640,7 @@ impl PlatformAppEngine {
                 let records = engine
                     .vauchi()
                     .storage()
+                    .deliveries()
                     .get_delivery_records_for_recipient(&recipient_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2608,6 +2656,7 @@ impl PlatformAppEngine {
                 let count = engine
                     .vauchi()
                     .storage()
+                    .deliveries()
                     .count_deliveries_by_status(&vauchi_core::storage::DeliveryStatus::Failed {
                         reason: String::new(),
                     })
@@ -2622,6 +2671,7 @@ impl PlatformAppEngine {
                 let records = engine
                     .vauchi()
                     .storage()
+                    .deliveries()
                     .get_delivery_records_by_status(&vauchi_core::storage::DeliveryStatus::Failed {
                         reason: String::new(),
                     })
@@ -2637,11 +2687,12 @@ impl PlatformAppEngine {
             }
             DomainCommand::ManualRetry { message_id } => {
                 let storage = engine.vauchi().storage();
-                let entry = storage.get_retry_entry(&message_id).map_err(|e| {
-                    MobileError::StorageError {
+                let entry = storage
+                    .retries()
+                    .get_retry_entry(&message_id)
+                    .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
-                    }
-                })?;
+                    })?;
                 if entry.is_none() {
                     return Ok(DomainCommandResult::Bool { value: false });
                 }
@@ -2650,6 +2701,7 @@ impl PlatformAppEngine {
                     .map(|d| d.as_secs())
                     .unwrap_or(0);
                 storage
+                    .retries()
                     .update_retry_next_time(&message_id, now)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2661,6 +2713,7 @@ impl PlatformAppEngine {
                 let records = engine
                     .vauchi()
                     .storage()
+                    .deliveries()
                     .get_pending_deliveries()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2687,6 +2740,7 @@ impl PlatformAppEngine {
                 let count = engine
                     .vauchi()
                     .storage()
+                    .deliveries()
                     .count_deliveries_by_status(&core_status)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2703,6 +2757,7 @@ impl PlatformAppEngine {
                 let entries = engine
                     .vauchi()
                     .storage()
+                    .retries()
                     .get_due_retries(now)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2718,6 +2773,7 @@ impl PlatformAppEngine {
                 let entries = engine
                     .vauchi()
                     .storage()
+                    .retries()
                     .get_retry_entries_for_recipient(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2733,6 +2789,7 @@ impl PlatformAppEngine {
                 let count = engine
                     .vauchi()
                     .storage()
+                    .retries()
                     .count_retry_entries()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2745,6 +2802,7 @@ impl PlatformAppEngine {
                 let deleted = engine
                     .vauchi()
                     .storage()
+                    .retries()
                     .delete_retry_entry(&message_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2764,6 +2822,7 @@ impl PlatformAppEngine {
                 let count = engine
                     .vauchi()
                     .storage()
+                    .pending()
                     .count_all_pending_updates()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2796,6 +2855,7 @@ impl PlatformAppEngine {
                 let count = engine
                     .vauchi()
                     .storage()
+                    .pending()
                     .delete_pending_updates_for_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2812,6 +2872,7 @@ impl PlatformAppEngine {
                 let summary = engine
                     .vauchi()
                     .storage()
+                    .device_deliveries()
                     .get_delivery_summary(&message_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2824,6 +2885,7 @@ impl PlatformAppEngine {
                 let records = engine
                     .vauchi()
                     .storage()
+                    .device_deliveries()
                     .get_device_deliveries_for_message(&message_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2839,6 +2901,7 @@ impl PlatformAppEngine {
                 let records = engine
                     .vauchi()
                     .storage()
+                    .device_deliveries()
                     .get_pending_device_deliveries()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2876,6 +2939,7 @@ impl PlatformAppEngine {
                 let value = engine
                     .vauchi()
                     .storage()
+                    .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2912,17 +2976,20 @@ impl PlatformAppEngine {
             }
             DomainCommand::ResetOnboarding => {
                 let storage = engine.vauchi().storage();
-                let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
-                    MobileError::StorageError {
-                        detail: e.to_string(),
-                    }
-                })?;
+                let mut progress =
+                    storage
+                        .ux()
+                        .load_or_create_onboarding_progress()
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })?;
                 progress.reset(engine.vauchi().clock().unix_seconds());
-                storage.save_onboarding_progress(&progress).map_err(|e| {
-                    MobileError::StorageError {
+                storage
+                    .ux()
+                    .save_onboarding_progress(&progress)
+                    .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
-                    }
-                })?;
+                    })?;
                 engine.invalidate_screen(&AppScreen::Onboarding);
                 Ok(DomainCommandResult::Unit)
             }
@@ -2931,6 +2998,7 @@ impl PlatformAppEngine {
             DomainCommand::VerifyContact { id } => {
                 let storage = engine.vauchi().storage();
                 let mut contact = storage
+                    .contacts()
                     .load_contact(&id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2944,11 +3012,11 @@ impl PlatformAppEngine {
                         field: String::new(),
                         detail: e.to_string(),
                     })?;
-                storage
-                    .save_contact(&contact)
-                    .map_err(|e| MobileError::StorageError {
+                storage.contacts().save_contact(&contact).map_err(|e| {
+                    MobileError::StorageError {
                         detail: e.to_string(),
-                    })?;
+                    }
+                })?;
                 engine.invalidate_screen(&AppScreen::ContactDetail {
                     contact_id: id.clone(),
                 });
@@ -2960,6 +3028,7 @@ impl PlatformAppEngine {
             } => {
                 let storage = engine.vauchi().storage();
                 let mut contact = storage
+                    .contacts()
                     .load_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -2973,11 +3042,11 @@ impl PlatformAppEngine {
                         field: String::new(),
                         detail: e.to_string(),
                     })?;
-                storage
-                    .save_contact(&contact)
-                    .map_err(|e| MobileError::StorageError {
+                storage.contacts().save_contact(&contact).map_err(|e| {
+                    MobileError::StorageError {
                         detail: e.to_string(),
-                    })?;
+                    }
+                })?;
                 engine.invalidate_screen(&AppScreen::ContactDetail {
                     contact_id: contact_id.clone(),
                 });
@@ -3015,6 +3084,7 @@ impl PlatformAppEngine {
                 engine
                     .vauchi()
                     .storage()
+                    .contacts()
                     .save_personal_notes(&contact_id, note.as_bytes())
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3028,6 +3098,7 @@ impl PlatformAppEngine {
                 let bytes = engine
                     .vauchi()
                     .storage()
+                    .contacts()
                     .load_personal_notes(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3040,6 +3111,7 @@ impl PlatformAppEngine {
                 engine
                     .vauchi()
                     .storage()
+                    .contacts()
                     .delete_personal_notes(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3057,6 +3129,7 @@ impl PlatformAppEngine {
                 engine
                     .vauchi()
                     .storage()
+                    .field_notes()
                     .save_contact_field_note(&contact_id, &field_id, note.as_bytes())
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3070,6 +3143,7 @@ impl PlatformAppEngine {
                 let map = engine
                     .vauchi()
                     .storage()
+                    .field_notes()
                     .load_contact_field_notes(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3092,6 +3166,7 @@ impl PlatformAppEngine {
                 engine
                     .vauchi()
                     .storage()
+                    .field_notes()
                     .delete_contact_field_note(&contact_id, &field_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3201,6 +3276,7 @@ impl PlatformAppEngine {
                 let contact = engine
                     .vauchi()
                     .storage()
+                    .contacts()
                     .load_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3376,6 +3452,7 @@ impl PlatformAppEngine {
                 let progress = engine
                     .vauchi()
                     .storage()
+                    .ux()
                     .load_or_create_onboarding_progress()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3388,6 +3465,7 @@ impl PlatformAppEngine {
                 let progress = engine
                     .vauchi()
                     .storage()
+                    .ux()
                     .load_or_create_onboarding_progress()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3400,6 +3478,7 @@ impl PlatformAppEngine {
                 let progress = engine
                     .vauchi()
                     .storage()
+                    .ux()
                     .load_or_create_onboarding_progress()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3410,34 +3489,40 @@ impl PlatformAppEngine {
             }
             DomainCommand::AdvanceOnboarding => {
                 let storage = engine.vauchi().storage();
-                let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
-                    MobileError::StorageError {
-                        detail: e.to_string(),
-                    }
-                })?;
+                let mut progress =
+                    storage
+                        .ux()
+                        .load_or_create_onboarding_progress()
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })?;
                 progress.advance(engine.vauchi().clock().unix_seconds());
-                storage.save_onboarding_progress(&progress).map_err(|e| {
-                    MobileError::StorageError {
+                storage
+                    .ux()
+                    .save_onboarding_progress(&progress)
+                    .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
-                    }
-                })?;
+                    })?;
                 Ok(DomainCommandResult::OnboardingProgress {
                     progress: crate::types::MobileOnboardingProgress::from(&progress),
                 })
             }
             DomainCommand::SkipOnboardingStep => {
                 let storage = engine.vauchi().storage();
-                let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
-                    MobileError::StorageError {
-                        detail: e.to_string(),
-                    }
-                })?;
+                let mut progress =
+                    storage
+                        .ux()
+                        .load_or_create_onboarding_progress()
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })?;
                 progress.skip_step(engine.vauchi().clock().unix_seconds());
-                storage.save_onboarding_progress(&progress).map_err(|e| {
-                    MobileError::StorageError {
+                storage
+                    .ux()
+                    .save_onboarding_progress(&progress)
+                    .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
-                    }
-                })?;
+                    })?;
                 Ok(DomainCommandResult::OnboardingProgress {
                     progress: crate::types::MobileOnboardingProgress::from(&progress),
                 })
@@ -3503,6 +3588,7 @@ impl PlatformAppEngine {
             DomainCommand::ListContactsPaginated { offset, limit } => {
                 let storage = engine.vauchi().storage();
                 let contacts = storage
+                    .contacts()
                     .list_contacts_paginated(offset as usize, limit as usize)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3521,6 +3607,7 @@ impl PlatformAppEngine {
                 };
                 let storage = engine.vauchi().storage();
                 let contact = storage
+                    .contacts()
                     .load_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
@@ -3668,15 +3755,14 @@ impl PlatformAppEngine {
             }
             DomainCommand::GetDeviceCount => {
                 let storage = engine.vauchi().storage();
-                let count =
-                    match storage
-                        .load_device_registry()
-                        .map_err(|e| MobileError::StorageError {
-                            detail: e.to_string(),
-                        })? {
-                        Some(r) => r.device_count() as u32,
-                        None => 1,
-                    };
+                let count = match storage.device().load_device_registry().map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })? {
+                    Some(r) => r.device_count() as u32,
+                    None => 1,
+                };
                 Ok(DomainCommandResult::Count { value: count })
             }
             DomainCommand::GetDevices => {
@@ -3688,27 +3774,26 @@ impl PlatformAppEngine {
                     })?;
                 let storage = engine.vauchi().storage();
 
-                let registry =
-                    match storage
-                        .load_device_registry()
-                        .map_err(|e| MobileError::StorageError {
-                            detail: e.to_string(),
-                        })? {
-                        Some(r) => r,
-                        None => {
-                            let device_info = identity.device_info();
-                            return Ok(DomainCommandResult::Devices {
-                                devices: vec![crate::types::MobileDeviceInfo {
-                                    device_index: device_info.device_index(),
-                                    device_name: device_info.device_name().to_string(),
-                                    is_current: true,
-                                    is_active: true,
-                                    public_key_prefix: hex::encode(&device_info.device_id()[..8]),
-                                    created_at: device_info.created_at(),
-                                }],
-                            });
-                        }
-                    };
+                let registry = match storage.device().load_device_registry().map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })? {
+                    Some(r) => r,
+                    None => {
+                        let device_info = identity.device_info();
+                        return Ok(DomainCommandResult::Devices {
+                            devices: vec![crate::types::MobileDeviceInfo {
+                                device_index: device_info.device_index(),
+                                device_name: device_info.device_name().to_string(),
+                                is_current: true,
+                                is_active: true,
+                                public_key_prefix: hex::encode(&device_info.device_id()[..8]),
+                                created_at: device_info.created_at(),
+                            }],
+                        });
+                    }
+                };
 
                 let current_device_id = identity.device_info().device_id();
                 let devices = registry
@@ -3739,15 +3824,14 @@ impl PlatformAppEngine {
                     })?;
                 let storage = engine.vauchi().storage();
 
-                let mut registry =
-                    match storage
-                        .load_device_registry()
-                        .map_err(|e| MobileError::StorageError {
-                            detail: e.to_string(),
-                        })? {
-                        Some(r) => r,
-                        None => return Ok(DomainCommandResult::Bool { value: false }),
-                    };
+                let mut registry = match storage.device().load_device_registry().map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })? {
+                    Some(r) => r,
+                    None => return Ok(DomainCommandResult::Bool { value: false }),
+                };
 
                 let devices = registry.all_devices();
                 if device_index as usize >= devices.len() {
@@ -3768,11 +3852,12 @@ impl PlatformAppEngine {
                     storage.clock().unix_seconds(),
                 ) {
                     Ok(()) => {
-                        storage.save_device_registry(&registry).map_err(|e| {
-                            MobileError::StorageError {
+                        storage
+                            .device()
+                            .save_device_registry(&registry)
+                            .map_err(|e| MobileError::StorageError {
                                 detail: e.to_string(),
-                            }
-                        })?;
+                            })?;
                         true
                     }
                     Err(_) => false,
@@ -4001,11 +4086,14 @@ impl PlatformAppEngine {
                     }
                 })?;
 
-                let contacts = engine.vauchi().storage().list_contacts().map_err(|e| {
-                    MobileError::StorageError {
+                let contacts = engine
+                    .vauchi()
+                    .storage()
+                    .contacts()
+                    .list_contacts()
+                    .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
-                    }
-                })?;
+                    })?;
                 let trusted_keys: std::collections::HashSet<[u8; 32]> = contacts
                     .iter()
                     .filter(|c| c.is_recovery_trusted())

@@ -100,6 +100,7 @@ fn drain_writes_to_activity_log() {
     let rows = engine
         .vauchi()
         .storage()
+        .activity_log()
         .activity_log_query_recent(1_700_100_000, 200_000)
         .expect("query activity log");
     assert_eq!(rows.len(), 1, "one activity log entry persisted");

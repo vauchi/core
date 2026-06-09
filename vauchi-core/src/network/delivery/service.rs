@@ -79,25 +79,36 @@ impl DeliveryService {
         status: DeliveryAckStatus,
         rng: &dyn crate::rng::SecureRng,
     ) -> Result<(), StorageError> {
-        let record = storage.get_delivery_record(message_id)?.ok_or_else(|| {
-            StorageError::NotFound(format!("Delivery record not found: {}", message_id))
-        })?;
+        let record = storage
+            .deliveries()
+            .get_delivery_record(message_id)?
+            .ok_or_else(|| {
+                StorageError::NotFound(format!("Delivery record not found: {}", message_id))
+            })?;
 
         let now = storage.clock().unix_seconds();
 
         match status {
             DeliveryAckStatus::Stored => {
-                storage.update_delivery_status(message_id, &DeliveryStatus::Stored, now)?;
+                storage.deliveries().update_delivery_status(
+                    message_id,
+                    &DeliveryStatus::Stored,
+                    now,
+                )?;
             }
             DeliveryAckStatus::Delivered => {
-                storage.update_delivery_status(message_id, &DeliveryStatus::Delivered, now)?;
+                storage.deliveries().update_delivery_status(
+                    message_id,
+                    &DeliveryStatus::Delivered,
+                    now,
+                )?;
                 // Clean up any existing retry entry —
                 // propagate so a stuck retry queue surfaces instead of
                 // growing forever (was silently dropped before 2026-05-21).
-                storage.delete_retry_entry(message_id)?;
+                storage.retries().delete_retry_entry(message_id)?;
             }
             DeliveryAckStatus::Failed { reason } => {
-                storage.update_delivery_status(
+                storage.deliveries().update_delivery_status(
                     message_id,
                     &DeliveryStatus::Failed { reason },
                     now,
@@ -113,7 +124,7 @@ impl DeliveryService {
                     created_at: now,
                     max_attempts: 10,
                 };
-                storage.create_retry_entry(&entry)?;
+                storage.retries().create_retry_entry(&entry)?;
             }
         }
 
@@ -135,21 +146,32 @@ impl DeliveryService {
         status: DeviceDeliveryStatus,
     ) -> Result<DeliverySummary, StorageError> {
         // Verify the message-level record exists
-        storage.get_delivery_record(message_id)?.ok_or_else(|| {
-            StorageError::NotFound(format!("Delivery record not found: {}", message_id))
-        })?;
+        storage
+            .deliveries()
+            .get_delivery_record(message_id)?
+            .ok_or_else(|| {
+                StorageError::NotFound(format!("Delivery record not found: {}", message_id))
+            })?;
 
         let now = storage.clock().unix_seconds();
 
         // Update the individual device status
-        storage.update_device_delivery_status(message_id, device_id, status, now)?;
+        storage
+            .device_deliveries()
+            .update_device_delivery_status(message_id, device_id, status, now)?;
 
         // Recompute aggregate
-        let summary = storage.get_delivery_summary(message_id)?;
+        let summary = storage
+            .device_deliveries()
+            .get_delivery_summary(message_id)?;
 
         // If all devices delivered, promote message-level status
         if summary.is_fully_delivered() {
-            storage.update_delivery_status(message_id, &DeliveryStatus::Delivered, now)?;
+            storage.deliveries().update_delivery_status(
+                message_id,
+                &DeliveryStatus::Delivered,
+                now,
+            )?;
         }
 
         Ok(summary)
@@ -163,8 +185,8 @@ impl DeliveryService {
     pub fn run_cleanup(&self, storage: &Storage) -> Result<CleanupResult, StorageError> {
         let now = storage.clock().unix_seconds();
 
-        let expired = storage.expire_old_deliveries(now)?;
-        let cleaned_up = storage.run_startup_maintenance()?;
+        let expired = storage.deliveries().expire_old_deliveries(now)?;
+        let cleaned_up = storage.deliveries().run_startup_maintenance()?;
 
         Ok(CleanupResult {
             expired,

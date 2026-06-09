@@ -51,8 +51,12 @@ fn test_own_card_encrypted_roundtrip() {
         0,
     ));
 
-    storage.save_own_card(&card).unwrap();
-    let loaded = storage.load_own_card().unwrap().expect("Card should exist");
+    storage.contacts().save_own_card(&card).unwrap();
+    let loaded = storage
+        .contacts()
+        .load_own_card()
+        .unwrap()
+        .expect("Card should exist");
 
     assert_eq!(loaded.display_name(), card.display_name());
     assert_eq!(loaded.fields().len(), card.fields().len());
@@ -65,7 +69,7 @@ fn test_own_card_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
 
     let card = ContactCard::new("SecretName");
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
 
     // Read the raw database to verify data is encrypted (not plaintext)
     let db_path = dir.path().join("vauchi.db");
@@ -100,9 +104,10 @@ fn test_device_registry_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
 
     let registry = make_test_registry();
-    storage.save_device_registry(&registry).unwrap();
+    storage.device().save_device_registry(&registry).unwrap();
 
     let loaded = storage
+        .device()
         .load_device_registry()
         .unwrap()
         .expect("Registry should exist");
@@ -115,7 +120,7 @@ fn test_device_registry_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
 
     let registry = make_test_registry();
-    storage.save_device_registry(&registry).unwrap();
+    storage.device().save_device_registry(&registry).unwrap();
 
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -141,9 +146,10 @@ fn test_device_sync_state_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
 
     let state = InterDeviceSyncState::new([0xAA; 32]);
-    storage.save_device_sync_state(&state).unwrap();
+    storage.sync().save_device_sync_state(&state).unwrap();
 
     let loaded = storage
+        .sync()
         .load_device_sync_state(&[0xAA; 32])
         .unwrap()
         .expect("State should exist");
@@ -158,7 +164,7 @@ fn test_device_sync_state_stored_as_encrypted_blob() {
 
     let device_id: [u8; 32] = [0xBB; 32];
     let state = InterDeviceSyncState::new(device_id);
-    storage.save_device_sync_state(&state).unwrap();
+    storage.sync().save_device_sync_state(&state).unwrap();
 
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -183,10 +189,10 @@ fn test_list_device_sync_states_encrypted() {
     let state1 = InterDeviceSyncState::new([0x01; 32]);
     let state2 = InterDeviceSyncState::new([0x02; 32]);
 
-    storage.save_device_sync_state(&state1).unwrap();
-    storage.save_device_sync_state(&state2).unwrap();
+    storage.sync().save_device_sync_state(&state1).unwrap();
+    storage.sync().save_device_sync_state(&state2).unwrap();
 
-    let all = storage.list_device_sync_states().unwrap();
+    let all = storage.sync().list_device_sync_states().unwrap();
     assert_eq!(all.len(), 2);
 }
 
@@ -198,9 +204,9 @@ fn test_visibility_label_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
 
     let label = Group::new("Close Friends", 0);
-    storage.save_group(&label).unwrap();
+    storage.labels().save_group(&label).unwrap();
 
-    let loaded = storage.load_group(label.id()).unwrap();
+    let loaded = storage.labels().load_group(label.id()).unwrap();
     assert_eq!(loaded.name(), "Close Friends");
     assert_eq!(loaded.contacts(), label.contacts());
 }
@@ -211,7 +217,7 @@ fn test_visibility_label_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
 
     let label = Group::new("Work Colleagues", 0);
-    storage.save_group(&label).unwrap();
+    storage.labels().save_group(&label).unwrap();
 
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -247,10 +253,10 @@ fn test_load_all_labels_encrypted() {
     let label1 = Group::new("Group A", 0);
     let label2 = Group::new("Group B", 0);
 
-    storage.save_group(&label1).unwrap();
-    storage.save_group(&label2).unwrap();
+    storage.labels().save_group(&label1).unwrap();
+    storage.labels().save_group(&label2).unwrap();
 
-    let all = storage.load_all_groups().unwrap();
+    let all = storage.labels().load_all_groups().unwrap();
     assert_eq!(all.len(), 2);
 }
 
@@ -330,7 +336,7 @@ fn test_migration_v13_fallback_reads_plaintext() {
     // Step 2: Re-open — should be able to read the card via plaintext fallback
     {
         let storage = Storage::open(&db_path, key).unwrap();
-        let card = storage.load_own_card().unwrap();
+        let card = storage.contacts().load_own_card().unwrap();
         assert!(
             card.is_some(),
             "Should be able to load card via plaintext fallback"
@@ -345,10 +351,11 @@ fn test_device_registry_json_export_with_encrypted_storage() {
     let (_dir, storage) = open_storage();
 
     let registry = make_test_registry();
-    storage.save_device_registry(&registry).unwrap();
+    storage.device().save_device_registry(&registry).unwrap();
 
     // GDPR export uses load_device_registry_json — verify it still works
     let json = storage
+        .device()
         .load_device_registry_json()
         .unwrap()
         .expect("JSON export should work");
@@ -365,12 +372,16 @@ fn test_rekey_preserves_own_card() {
     let (_dir, mut storage) = open_storage();
 
     let card = ContactCard::new("ReKeyTest");
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let loaded = storage.load_own_card().unwrap().expect("Card should exist");
+    let loaded = storage
+        .contacts()
+        .load_own_card()
+        .unwrap()
+        .expect("Card should exist");
     assert_eq!(loaded.display_name(), "ReKeyTest");
 }
 
@@ -380,12 +391,13 @@ fn test_rekey_preserves_device_registry() {
     let (_dir, mut storage) = open_storage();
 
     let registry = make_test_registry();
-    storage.save_device_registry(&registry).unwrap();
+    storage.device().save_device_registry(&registry).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
     let loaded = storage
+        .device()
         .load_device_registry()
         .unwrap()
         .expect("Registry should exist");
@@ -398,12 +410,13 @@ fn test_rekey_preserves_device_sync_state() {
     let (_dir, mut storage) = open_storage();
 
     let state = InterDeviceSyncState::new([0xCC; 32]);
-    storage.save_device_sync_state(&state).unwrap();
+    storage.sync().save_device_sync_state(&state).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
     let loaded = storage
+        .sync()
         .load_device_sync_state(&[0xCC; 32])
         .unwrap()
         .expect("State should exist");
@@ -416,12 +429,12 @@ fn test_rekey_preserves_visibility_labels() {
     let (_dir, mut storage) = open_storage();
 
     let label = Group::new("Rekey Group", 0);
-    storage.save_group(&label).unwrap();
+    storage.labels().save_group(&label).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let loaded = storage.load_group(label.id()).unwrap();
+    let loaded = storage.labels().load_group(label.id()).unwrap();
     assert_eq!(loaded.name(), "Rekey Group");
 }
 
@@ -432,7 +445,7 @@ fn test_rekey_old_key_cannot_decrypt() {
     let (dir, mut storage) = open_storage();
 
     let card = ContactCard::new("OldKeyTest");
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key.clone()).unwrap();
@@ -440,7 +453,7 @@ fn test_rekey_old_key_cannot_decrypt() {
     // Open a fresh storage with the OLD key — should fail to decrypt
     let db_path = dir.path().join("vauchi.db");
     let old_storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
-    let result = old_storage.load_own_card();
+    let result = old_storage.contacts().load_own_card();
     // Either returns None (empty card_json) or an error (decryption failed)
     match result {
         Ok(None) => {} // Empty plaintext fallback, encrypted column can't be decrypted
@@ -451,6 +464,7 @@ fn test_rekey_old_key_cannot_decrypt() {
     // But with the correct new key, it works
     let correct_storage = Storage::open(&db_path, new_key).unwrap();
     let loaded = correct_storage
+        .contacts()
         .load_own_card()
         .unwrap()
         .expect("Should decrypt with correct key");
@@ -465,7 +479,7 @@ fn test_rekey_with_smk_derived_sek() {
     let (_dir, mut storage) = open_storage();
 
     let card = ContactCard::new("SMK Test");
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
 
     // Simulate SMK-based rekey: derive SEK from a master seed
     let smk = ShreddingMasterKey::derive_from_seed(&[0x42; 32]);
@@ -474,6 +488,10 @@ fn test_rekey_with_smk_derived_sek() {
     storage.rekey(sek).unwrap();
 
     // Data is now encrypted under SMK-derived SEK
-    let loaded = storage.load_own_card().unwrap().expect("Card should exist");
+    let loaded = storage
+        .contacts()
+        .load_own_card()
+        .unwrap()
+        .expect("Card should exist");
     assert_eq!(loaded.display_name(), "SMK Test");
 }

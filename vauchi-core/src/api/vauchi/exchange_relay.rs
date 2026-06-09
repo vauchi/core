@@ -239,7 +239,7 @@ impl Vauchi {
 
         // 5. Check contact doesn't already exist
         let public_id = hex::encode(their_identity_key);
-        if self.storage.load_contact(&public_id)?.is_some() {
+        if self.storage.contacts().load_contact(&public_id)?.is_some() {
             return Err(VauchiError::Configuration(format!(
                 "Contact {public_id} already exists"
             )));
@@ -336,7 +336,7 @@ impl Vauchi {
 
         // Check contact doesn't already exist
         let public_id = hex::encode(their_identity_key);
-        if self.storage.load_contact(&public_id)?.is_some() {
+        if self.storage.contacts().load_contact(&public_id)?.is_some() {
             return Err(VauchiError::Configuration(format!(
                 "Contact {public_id} already exists"
             )));

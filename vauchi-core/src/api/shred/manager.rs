@@ -193,7 +193,7 @@ impl<'a> ShredManager<'a> {
             use base64::Engine;
             let now = self.storage.clock().unix_seconds();
             let day_epoch = crate::network::mailbox_token::current_day_epoch(now);
-            let contacts = self.storage.list_contacts().unwrap_or_default();
+            let contacts = self.storage.contacts().list_contacts().unwrap_or_default();
             let mut d = Vec::with_capacity(contacts.len());
             for c in &contacts {
                 if let Some(shared) = c.shared_key() {

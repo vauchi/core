@@ -301,7 +301,7 @@ fn bench_storage(c: &mut Criterion) {
                 let contact = create_test_contact();
                 (storage, contact)
             },
-            |(storage, contact)| storage.save_contact(black_box(&contact)),
+            |(storage, contact)| storage.contacts().save_contact(black_box(&contact)),
             criterion::BatchSize::SmallInput,
         )
     });
@@ -312,10 +312,10 @@ fn bench_storage(c: &mut Criterion) {
                 let key = SymmetricKey::generate();
                 let storage = Storage::in_memory(key).unwrap();
                 let contact = create_test_contact();
-                storage.save_contact(&contact).unwrap();
+                storage.contacts().save_contact(&contact).unwrap();
                 (storage, contact.id().to_string())
             },
-            |(storage, id)| storage.load_contact(black_box(&id)),
+            |(storage, id)| storage.contacts().load_contact(black_box(&id)),
             criterion::BatchSize::SmallInput,
         )
     });
@@ -327,11 +327,11 @@ fn bench_storage(c: &mut Criterion) {
                 let storage = Storage::in_memory(key).unwrap();
                 for _ in 0..10 {
                     let contact = create_test_contact();
-                    storage.save_contact(&contact).unwrap();
+                    storage.contacts().save_contact(&contact).unwrap();
                 }
                 storage
             },
-            |storage| storage.list_contacts(),
+            |storage| storage.contacts().list_contacts(),
             criterion::BatchSize::SmallInput,
         )
     });
@@ -344,7 +344,7 @@ fn bench_storage(c: &mut Criterion) {
                 let key = SymmetricKey::generate();
                 Storage::in_memory(key).unwrap()
             },
-            |storage| storage.save_own_card(black_box(&card)),
+            |storage| storage.contacts().save_own_card(black_box(&card)),
             criterion::BatchSize::SmallInput,
         )
     });
@@ -354,10 +354,10 @@ fn bench_storage(c: &mut Criterion) {
             || {
                 let key = SymmetricKey::generate();
                 let storage = Storage::in_memory(key).unwrap();
-                storage.save_own_card(&card).unwrap();
+                storage.contacts().save_own_card(&card).unwrap();
                 storage
             },
-            |storage| storage.load_own_card(),
+            |storage| storage.contacts().load_own_card(),
             criterion::BatchSize::SmallInput,
         )
     });
@@ -452,11 +452,18 @@ fn bench_pagination(c: &mut Criterion) {
                     let key = SymmetricKey::generate();
                     let storage = Storage::in_memory(key).unwrap();
                     for i in 0..count {
-                        storage.save_contact(&create_contact_n(i)).unwrap();
+                        storage
+                            .contacts()
+                            .save_contact(&create_contact_n(i))
+                            .unwrap();
                     }
                     storage
                 },
-                |storage| storage.list_contacts_paginated(black_box(0), black_box(50)),
+                |storage| {
+                    storage
+                        .contacts()
+                        .list_contacts_paginated(black_box(0), black_box(50))
+                },
                 criterion::BatchSize::SmallInput,
             )
         });
@@ -470,11 +477,14 @@ fn bench_pagination(c: &mut Criterion) {
                     let key = SymmetricKey::generate();
                     let storage = Storage::in_memory(key).unwrap();
                     for i in 0..count {
-                        storage.save_contact(&create_contact_n(i)).unwrap();
+                        storage
+                            .contacts()
+                            .save_contact(&create_contact_n(i))
+                            .unwrap();
                     }
                     storage
                 },
-                |storage| storage.search_contacts(black_box("Contact 05")),
+                |storage| storage.contacts().search_contacts(black_box("Contact 05")),
                 criterion::BatchSize::SmallInput,
             )
         });

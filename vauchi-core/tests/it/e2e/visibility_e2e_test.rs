@@ -73,7 +73,11 @@ fn test_visibility_control_happy_path() {
         .visibility_rules_mut()
         .unwrap()
         .set_nobody("personal");
-    alice_wb.storage().save_contact(&bob_contact).unwrap();
+    alice_wb
+        .storage()
+        .contacts()
+        .save_contact(&bob_contact)
+        .unwrap();
 
     // Step 4: Get Alice's card filtered for each contact
     let alice_card = alice_wb.own_card().unwrap().unwrap();
@@ -126,7 +130,11 @@ fn test_visibility_control_happy_path() {
         .visibility_rules_mut()
         .unwrap()
         .set_everyone("personal");
-    alice_wb.storage().save_contact(&bob_contact).unwrap();
+    alice_wb
+        .storage()
+        .contacts()
+        .save_contact(&bob_contact)
+        .unwrap();
 
     let bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
     let bob_rules = bob_contact.visibility_rules().unwrap();

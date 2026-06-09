@@ -95,9 +95,9 @@ fn reciprocity_storage_roundtrip() {
 
     contact.set_reciprocity(Reciprocity::Pending);
     contact.set_confirmation_channel(ConfirmationChannel::RelayEscrow);
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
     assert_eq!(loaded.reciprocity(0), Reciprocity::Pending);
     assert_eq!(
         loaded.confirmation_channel(),
@@ -112,9 +112,9 @@ fn reciprocity_storage_null_defaults_to_unknown() {
     let contact = make_test_contact();
     let id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
     assert_eq!(loaded.reciprocity(0), Reciprocity::Unknown);
     assert_eq!(loaded.confirmation_channel(), None);
 }
@@ -128,7 +128,7 @@ fn list_contacts_by_reciprocity_filters_correctly() {
 
     let mut c1 = make_contact_with_timestamp(1000);
     c1.set_reciprocity(Reciprocity::Pending);
-    storage.save_contact(&c1).unwrap();
+    storage.contacts().save_contact(&c1).unwrap();
 
     let mut c2 = Contact::from_sync_data(
         [2u8; 32],
@@ -139,17 +139,26 @@ fn list_contacts_by_reciprocity_filters_correctly() {
         VisibilityRules::new(),
     );
     c2.set_reciprocity(Reciprocity::Confirmed);
-    storage.save_contact(&c2).unwrap();
+    storage.contacts().save_contact(&c2).unwrap();
 
-    let pending = storage.list_contacts_by_reciprocity("pending").unwrap();
+    let pending = storage
+        .contacts()
+        .list_contacts_by_reciprocity("pending")
+        .unwrap();
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].display_name(), "Alice");
 
-    let confirmed = storage.list_contacts_by_reciprocity("confirmed").unwrap();
+    let confirmed = storage
+        .contacts()
+        .list_contacts_by_reciprocity("confirmed")
+        .unwrap();
     assert_eq!(confirmed.len(), 1);
     assert_eq!(confirmed[0].display_name(), "Bob");
 
-    let empty = storage.list_contacts_by_reciprocity("unknown").unwrap();
+    let empty = storage
+        .contacts()
+        .list_contacts_by_reciprocity("unknown")
+        .unwrap();
     assert!(empty.is_empty());
 }
 
@@ -161,7 +170,7 @@ fn confirmation_state_persistence_roundtrip() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let contact = make_test_contact();
     let id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let state = ConfirmationState {
         our_token: [0xAA; 32],
@@ -173,10 +182,15 @@ fn confirmation_state_persistence_roundtrip() {
     };
     let state_bytes = serde_json::to_vec(&state).unwrap();
     storage
+        .contacts()
         .update_confirmation_state(&id, &state_bytes)
         .unwrap();
 
-    let loaded_bytes = storage.load_confirmation_state(&id).unwrap().unwrap();
+    let loaded_bytes = storage
+        .contacts()
+        .load_confirmation_state(&id)
+        .unwrap()
+        .unwrap();
     let loaded: ConfirmationState = serde_json::from_slice(&loaded_bytes).unwrap();
     assert_eq!(loaded.our_token, [0xAA; 32]);
     assert_eq!(loaded.gate_hash, "gate123");
@@ -189,9 +203,9 @@ fn confirmation_state_none_for_new_contact() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let contact = make_test_contact();
     let id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_confirmation_state(&id).unwrap();
+    let loaded = storage.contacts().load_confirmation_state(&id).unwrap();
     assert!(loaded.is_none());
 }
 

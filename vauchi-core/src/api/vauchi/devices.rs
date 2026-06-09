@@ -46,7 +46,7 @@ impl Vauchi {
 
         let current_device_id = identity.device_id();
 
-        if let Some(registry) = self.storage.load_device_registry()? {
+        if let Some(registry) = self.storage.device().load_device_registry()? {
             Ok(registry
                 .all_devices()
                 .iter()
@@ -82,6 +82,7 @@ impl Vauchi {
 
         let registry = self
             .storage
+            .device()
             .load_device_registry()?
             .unwrap_or_else(|| identity.initial_device_registry());
 
@@ -111,6 +112,7 @@ impl Vauchi {
 
         let mut registry = self
             .storage
+            .device()
             .load_device_registry()?
             .ok_or_else(|| VauchiError::InvalidState("No device registry found".into()))?;
 
@@ -145,18 +147,19 @@ impl Vauchi {
                 self.storage.now_secs(),
             )
             .map_err(|e| VauchiError::InvalidState(format!("Revoke failed: {:?}", e)))?;
-        self.storage.save_device_registry(&registry)?;
+        self.storage.device().save_device_registry(&registry)?;
 
         Ok(device_name)
     }
 
     /// Returns the count of pending outbound updates across all contacts.
     pub fn pending_update_count(&self) -> VauchiResult<u32> {
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         let mut total = 0u32;
         for contact in &contacts {
             let pending = self
                 .storage
+                .pending()
                 .get_pending_updates(contact.id())
                 .unwrap_or_default();
             total += pending.len() as u32;

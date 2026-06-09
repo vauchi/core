@@ -68,7 +68,12 @@ fn revoking_last_visible_field_queues_a_removal_update() {
     // baseline ({work}).
     wb.add_contact_to_group_and_repropagate(label.id(), &bob_id)
         .unwrap();
-    let after_grant = wb.storage().get_pending_updates(&bob_id).unwrap().len();
+    let after_grant = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&bob_id)
+        .unwrap()
+        .len();
     assert!(
         after_grant >= 1,
         "Granting `work` should queue an add update"
@@ -78,7 +83,12 @@ fn revoking_last_visible_field_queues_a_removal_update() {
     // be told to REMOVE `work`, not silently left with the stale value.
     wb.set_group_field_visibility_and_repropagate(label.id(), &work, false)
         .unwrap();
-    let after_revoke = wb.storage().get_pending_updates(&bob_id).unwrap().len();
+    let after_revoke = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&bob_id)
+        .unwrap()
+        .len();
 
     assert!(
         after_revoke > after_grant,
@@ -104,13 +114,23 @@ fn revoking_exchange_shared_field_as_first_repropagation_emits_removal() {
     // Simulate exchange completion: snapshot the shared baseline ({work})
     // WITHOUT any repropagation (mirrors persist_*_exchanged_contact).
     wb.initialize_sent_baseline(&bob_id).unwrap();
-    let before = wb.storage().get_pending_updates(&bob_id).unwrap().len();
+    let before = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&bob_id)
+        .unwrap()
+        .len();
 
     // Revoke as the FIRST repropagation — the baseline must let it emit a
     // removal (without exchange-init this queued nothing).
     wb.remove_contact_from_group_and_repropagate(label.id(), &bob_id)
         .unwrap();
-    let after = wb.storage().get_pending_updates(&bob_id).unwrap().len();
+    let after = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&bob_id)
+        .unwrap()
+        .len();
 
     assert!(
         after > before,

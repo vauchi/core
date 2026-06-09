@@ -117,12 +117,12 @@ impl<'a> DeletionManager<'a> {
 
     /// Returns the current deletion state.
     pub fn deletion_state(&self) -> Result<DeletionState, DeletionError> {
-        Ok(self.storage.load_deletion_state()?)
+        Ok(self.storage.consent().load_deletion_state()?)
     }
 
     /// Schedules identity deletion with a 7-day grace period.
     pub fn schedule_deletion(&self) -> Result<(), DeletionError> {
-        let current = self.storage.load_deletion_state()?;
+        let current = self.storage.consent().load_deletion_state()?;
         if matches!(current, DeletionState::Scheduled { .. }) {
             return Err(DeletionError::AlreadyScheduled);
         }
@@ -133,7 +133,7 @@ impl<'a> DeletionManager<'a> {
             scheduled_at: now,
             execute_at,
         };
-        self.storage.save_deletion_state(&state)?;
+        self.storage.consent().save_deletion_state(&state)?;
         Ok(())
     }
 
@@ -147,13 +147,15 @@ impl<'a> DeletionManager<'a> {
             scheduled_at,
             execute_at,
         };
-        self.storage.save_deletion_state(&state)?;
+        self.storage.consent().save_deletion_state(&state)?;
         Ok(())
     }
 
     /// Cancels a scheduled deletion during the grace period.
     pub fn cancel_deletion(&self) -> Result<(), DeletionError> {
-        self.storage.save_deletion_state(&DeletionState::None)?;
+        self.storage
+            .consent()
+            .save_deletion_state(&DeletionState::None)?;
         Ok(())
     }
 
@@ -172,7 +174,7 @@ impl<'a> DeletionManager<'a> {
     /// CEKs are destroyed before the state is marked as Executed, so even if the
     /// process is interrupted, card data is already unreadable.
     pub fn execute_deletion(&self, identity: &Identity) -> Result<DeletionResult, DeletionError> {
-        let current = self.storage.load_deletion_state()?;
+        let current = self.storage.consent().load_deletion_state()?;
         match current {
             DeletionState::Scheduled { execute_at, .. } => {
                 let now = self.storage.clock().unix_seconds();
@@ -183,6 +185,7 @@ impl<'a> DeletionManager<'a> {
                 // Load all contacts
                 let contacts = self
                     .storage
+                    .contacts()
                     .list_contacts()
                     .map_err(|e| DeletionError::DeletionFailed(e.to_string()))?;
 
@@ -197,6 +200,7 @@ impl<'a> DeletionManager<'a> {
                     // Crypto-shred: delete CEK (card becomes permanently unreadable)
                     // This runs BEFORE state is marked Executed for crash safety
                     self.storage
+                        .contacts()
                         .delete_contact_cek(contact.id())
                         .map_err(|e| DeletionError::DeletionFailed(e.to_string()))?;
 
@@ -215,7 +219,7 @@ impl<'a> DeletionManager<'a> {
 
                 // Mark state as executed
                 let state = DeletionState::Executed { executed_at: now };
-                self.storage.save_deletion_state(&state)?;
+                self.storage.consent().save_deletion_state(&state)?;
 
                 Ok(DeletionResult {
                     revocations,

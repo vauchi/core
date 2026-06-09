@@ -39,9 +39,15 @@ fn test_create_device_delivery_record() {
         updated_at: timestamp,
     };
 
-    storage.create_device_delivery(&record).unwrap();
+    storage
+        .device_deliveries()
+        .create_device_delivery(&record)
+        .unwrap();
 
-    let retrieved = storage.get_device_delivery("msg-001", "device-1").unwrap();
+    let retrieved = storage
+        .device_deliveries()
+        .get_device_delivery("msg-001", "device-1")
+        .unwrap();
     assert!(retrieved.is_some(), "expected Some value");
 
     let retrieved = retrieved.unwrap();
@@ -68,10 +74,14 @@ fn test_track_multiple_devices_for_message() {
             status: DeviceDeliveryStatus::Pending,
             updated_at: timestamp,
         };
-        storage.create_device_delivery(&record).unwrap();
+        storage
+            .device_deliveries()
+            .create_device_delivery(&record)
+            .unwrap();
     }
 
     let records = storage
+        .device_deliveries()
         .get_device_deliveries_for_message("msg-001")
         .unwrap();
     assert_eq!(records.len(), 3);
@@ -91,9 +101,13 @@ fn test_update_device_delivery_status() {
         status: DeviceDeliveryStatus::Pending,
         updated_at: timestamp,
     };
-    storage.create_device_delivery(&record).unwrap();
+    storage
+        .device_deliveries()
+        .create_device_delivery(&record)
+        .unwrap();
 
     storage
+        .device_deliveries()
         .update_device_delivery_status(
             "msg-002",
             "device-1",
@@ -103,6 +117,7 @@ fn test_update_device_delivery_status() {
         .unwrap();
 
     let retrieved = storage
+        .device_deliveries()
         .get_device_delivery("msg-002", "device-1")
         .unwrap()
         .unwrap();
@@ -132,10 +147,16 @@ fn test_get_delivery_summary() {
             status,
             updated_at: timestamp,
         };
-        storage.create_device_delivery(&record).unwrap();
+        storage
+            .device_deliveries()
+            .create_device_delivery(&record)
+            .unwrap();
     }
 
-    let summary = storage.get_delivery_summary("msg-003").unwrap();
+    let summary = storage
+        .device_deliveries()
+        .get_delivery_summary("msg-003")
+        .unwrap();
     assert_eq!(summary.total_devices, 3);
     assert_eq!(summary.delivered_devices, 2);
     assert!(!summary.is_fully_delivered());
@@ -156,10 +177,16 @@ fn test_is_fully_delivered() {
             status: DeviceDeliveryStatus::Delivered,
             updated_at: timestamp,
         };
-        storage.create_device_delivery(&record).unwrap();
+        storage
+            .device_deliveries()
+            .create_device_delivery(&record)
+            .unwrap();
     }
 
-    let summary = storage.get_delivery_summary("msg-full").unwrap();
+    let summary = storage
+        .device_deliveries()
+        .get_delivery_summary("msg-full")
+        .unwrap();
     assert!(summary.is_fully_delivered());
 }
 
@@ -177,11 +204,15 @@ fn test_delete_device_deliveries_for_message() {
             status: DeviceDeliveryStatus::Pending,
             updated_at: timestamp,
         };
-        storage.create_device_delivery(&record).unwrap();
+        storage
+            .device_deliveries()
+            .create_device_delivery(&record)
+            .unwrap();
     }
 
     assert_eq!(
         storage
+            .device_deliveries()
             .get_device_deliveries_for_message("msg-delete")
             .unwrap()
             .len(),
@@ -189,12 +220,14 @@ fn test_delete_device_deliveries_for_message() {
     );
 
     let deleted = storage
+        .device_deliveries()
         .delete_device_deliveries_for_message("msg-delete")
         .unwrap();
     assert_eq!(deleted, 3);
 
     assert_eq!(
         storage
+            .device_deliveries()
             .get_device_deliveries_for_message("msg-delete")
             .unwrap()
             .len(),
@@ -228,10 +261,16 @@ fn test_get_pending_device_deliveries() {
             status,
             updated_at: timestamp,
         };
-        storage.create_device_delivery(&record).unwrap();
+        storage
+            .device_deliveries()
+            .create_device_delivery(&record)
+            .unwrap();
     }
 
-    let pending = storage.get_pending_device_deliveries().unwrap();
+    let pending = storage
+        .device_deliveries()
+        .get_pending_device_deliveries()
+        .unwrap();
     assert_eq!(pending.len(), 3); // 3 pending records
 }
 
@@ -250,9 +289,13 @@ fn test_device_delivery_status_transitions() {
         status: DeviceDeliveryStatus::Pending,
         updated_at: timestamp,
     };
-    storage.create_device_delivery(&record).unwrap();
+    storage
+        .device_deliveries()
+        .create_device_delivery(&record)
+        .unwrap();
 
     storage
+        .device_deliveries()
         .update_device_delivery_status(
             "msg-trans",
             "device-1",
@@ -262,12 +305,14 @@ fn test_device_delivery_status_transitions() {
         .unwrap();
 
     let r = storage
+        .device_deliveries()
         .get_device_delivery("msg-trans", "device-1")
         .unwrap()
         .unwrap();
     assert_eq!(r.status, DeviceDeliveryStatus::Stored);
 
     storage
+        .device_deliveries()
         .update_device_delivery_status(
             "msg-trans",
             "device-1",
@@ -277,6 +322,7 @@ fn test_device_delivery_status_transitions() {
         .unwrap();
 
     let r = storage
+        .device_deliveries()
         .get_device_delivery("msg-trans", "device-1")
         .unwrap()
         .unwrap();
@@ -305,23 +351,29 @@ fn test_count_device_deliveries_by_status() {
             status,
             updated_at: timestamp,
         };
-        storage.create_device_delivery(&record).unwrap();
+        storage
+            .device_deliveries()
+            .create_device_delivery(&record)
+            .unwrap();
     }
 
     assert_eq!(
         storage
+            .device_deliveries()
             .count_device_deliveries_by_status(DeviceDeliveryStatus::Pending)
             .unwrap(),
         2
     );
     assert_eq!(
         storage
+            .device_deliveries()
             .count_device_deliveries_by_status(DeviceDeliveryStatus::Delivered)
             .unwrap(),
         1
     );
     assert_eq!(
         storage
+            .device_deliveries()
             .count_device_deliveries_by_status(DeviceDeliveryStatus::Failed)
             .unwrap(),
         1

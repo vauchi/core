@@ -406,7 +406,7 @@ fn imported_contact_multiple_field_add_and_remove() {
 #[test]
 fn import_vcf_respects_contact_limit() {
     let wb = new_vauchi();
-    wb.storage().set_contact_limit(1).unwrap();
+    wb.storage().contacts().set_contact_limit(1).unwrap();
 
     let vcf = b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alice\r\nEND:VCARD\r\n\
                 BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Bob\r\nEND:VCARD\r\n";

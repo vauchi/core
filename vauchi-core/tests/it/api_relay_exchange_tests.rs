@@ -67,7 +67,7 @@ fn test_accept_relay_exchange_initializes_ratchet() {
         .unwrap();
 
     // Verify ratchet was initialized (can load from storage)
-    let ratchet = wb.storage().load_ratchet_state(&contact_id);
+    let ratchet = wb.storage().ratchets().load_ratchet_state(&contact_id);
     assert!(
         ratchet.is_ok() && ratchet.unwrap().is_some(),
         "Ratchet must be initialized after accept_relay_exchange"

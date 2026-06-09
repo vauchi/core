@@ -73,15 +73,15 @@ fn test_sequential_contact_operations() {
     for i in 0..100 {
         let contact = create_test_contact(&format!("User {}", i));
         let id = contact.id().to_string();
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
         contact_ids.push(id);
     }
 
-    let contacts = storage.list_contacts().unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
     assert_eq!(contacts.len(), 100);
 
     for id in &contact_ids {
-        let loaded = storage.load_contact(id).unwrap();
+        let loaded = storage.contacts().load_contact(id).unwrap();
         assert!(loaded.is_some(), "expected Some value");
     }
 
@@ -89,7 +89,7 @@ fn test_sequential_contact_operations() {
         storage.delete_contact(id).unwrap();
     }
 
-    let remaining = storage.list_contacts().unwrap();
+    let remaining = storage.contacts().list_contacts().unwrap();
     assert_eq!(remaining.len(), 50);
 }
 
@@ -112,18 +112,21 @@ fn test_sequential_pending_update_operations() {
             status: UpdateStatus::Pending,
             target_relay_url: None,
         };
-        storage.queue_update(&update).unwrap();
+        storage.pending().queue_update(&update).unwrap();
     }
 
-    let updates = storage.get_all_pending_updates().unwrap();
+    let updates = storage.pending().get_all_pending_updates().unwrap();
     assert_eq!(updates.len(), 50);
 
     // Mark some as sent (delete)
     for i in 0..25 {
-        storage.mark_update_sent(&format!("update-{}", i)).unwrap();
+        storage
+            .pending()
+            .mark_update_sent(&format!("update-{}", i))
+            .unwrap();
     }
 
-    let remaining = storage.get_all_pending_updates().unwrap();
+    let remaining = storage.pending().get_all_pending_updates().unwrap();
     assert_eq!(remaining.len(), 25);
 }
 
@@ -141,12 +144,12 @@ fn test_multiple_connections_same_file() {
     {
         let storage1 = Storage::open(&db_path, key.clone()).unwrap();
         let contact = create_test_contact("Alice");
-        storage1.save_contact(&contact).unwrap();
+        storage1.contacts().save_contact(&contact).unwrap();
     }
 
     {
         let storage2 = Storage::open(&db_path, key.clone()).unwrap();
-        let contacts = storage2.list_contacts().unwrap();
+        let contacts = storage2.contacts().list_contacts().unwrap();
         assert_eq!(contacts.len(), 1);
         assert_eq!(contacts[0].card().display_name(), "Alice");
     }
@@ -154,12 +157,12 @@ fn test_multiple_connections_same_file() {
     {
         let storage3 = Storage::open(&db_path, key.clone()).unwrap();
         let contact = create_test_contact("Bob");
-        storage3.save_contact(&contact).unwrap();
+        storage3.contacts().save_contact(&contact).unwrap();
     }
 
     {
         let storage4 = Storage::open(&db_path, key).unwrap();
-        let contacts = storage4.list_contacts().unwrap();
+        let contacts = storage4.contacts().list_contacts().unwrap();
         assert_eq!(contacts.len(), 2);
     }
 }
@@ -176,7 +179,7 @@ fn test_concurrent_readers_file_based() {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
         for i in 0..10 {
             let contact = create_test_contact(&format!("Contact {}", i));
-            storage.save_contact(&contact).unwrap();
+            storage.contacts().save_contact(&contact).unwrap();
         }
     }
 
@@ -194,12 +197,12 @@ fn test_concurrent_readers_file_based() {
         let handle = thread::spawn(move || {
             let storage = open_with_retry(&thread_path, thread_key, 5);
 
-            let contacts = storage.list_contacts().unwrap();
+            let contacts = storage.contacts().list_contacts().unwrap();
 
             assert_eq!(contacts.len(), 10, "Thread {} saw wrong count", thread_id);
 
             for contact in &contacts {
-                let loaded = storage.load_contact(contact.id()).unwrap();
+                let loaded = storage.contacts().load_contact(contact.id()).unwrap();
                 assert!(loaded.is_some(), "expected Some value");
             }
 
@@ -224,7 +227,7 @@ fn test_sequential_writers_file_based() {
 
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
-        let _ = storage.list_contacts().unwrap(); // Just init
+        let _ = storage.contacts().list_contacts().unwrap(); // Just init
     }
 
     // Writers from different threads — opens are retried to handle
@@ -241,7 +244,7 @@ fn test_sequential_writers_file_based() {
 
             for i in 0..10 {
                 let contact = create_test_contact(&format!("Thread{}Contact{}", thread_id, i));
-                storage.save_contact(&contact).unwrap();
+                storage.contacts().save_contact(&contact).unwrap();
             }
         });
         handles.push(handle);
@@ -252,7 +255,7 @@ fn test_sequential_writers_file_based() {
     }
 
     let storage = Storage::open(&db_path, key).unwrap();
-    let contacts = storage.list_contacts().unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
 
     assert_eq!(contacts.len(), 50);
 }
@@ -272,13 +275,13 @@ fn test_read_after_write_consistency() {
     let contact_id = contact.id().to_string();
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
     // Immediately read from new connection
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
-        let loaded = storage.load_contact(&contact_id).unwrap();
+        let loaded = storage.contacts().load_contact(&contact_id).unwrap();
         assert!(loaded.is_some(), "expected Some value");
         assert_eq!(loaded.unwrap().card().display_name(), "Consistency Test");
     }
@@ -297,22 +300,22 @@ fn test_update_visibility_consistency() {
 
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
         let card = ContactCard::new("Updated Name");
-        storage.save_own_card(&card).unwrap();
+        storage.contacts().save_own_card(&card).unwrap();
     }
 
     {
         let storage = Storage::open(&db_path, key).unwrap();
 
-        let loaded = storage.load_contact(&contact_id).unwrap();
+        let loaded = storage.contacts().load_contact(&contact_id).unwrap();
         assert!(loaded.is_some(), "expected Some value");
 
-        let own_card = storage.load_own_card().unwrap();
+        let own_card = storage.contacts().load_own_card().unwrap();
         assert!(own_card.is_some(), "expected Some value");
         assert_eq!(own_card.unwrap().display_name(), "Updated Name");
     }
@@ -332,13 +335,13 @@ fn test_rapid_open_close_cycles() {
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
         let contact = create_test_contact("Initial");
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
     // Rapid open/read/close cycles with retry for SQLite contention
     for i in 0..50 {
         let storage = open_with_retry(&db_path, key.clone(), 5);
-        let contacts = storage.list_contacts().unwrap();
+        let contacts = storage.contacts().list_contacts().unwrap();
         assert!(!contacts.is_empty(), "Iteration {} found no contacts", i);
     }
 }
@@ -360,12 +363,12 @@ fn test_interleaved_reads_writes() {
         {
             let storage = open_with_retry(&db_path, key.clone(), 5);
             let contact = create_test_contact(&format!("Contact {}", i));
-            storage.save_contact(&contact).unwrap();
+            storage.contacts().save_contact(&contact).unwrap();
         }
 
         {
             let storage = open_with_retry(&db_path, key.clone(), 5);
-            let contacts = storage.list_contacts().unwrap();
+            let contacts = storage.contacts().list_contacts().unwrap();
             assert_eq!(contacts.len(), i + 1, "Wrong count after iteration {}", i);
         }
     }
@@ -408,9 +411,9 @@ fn test_double_save_overwrites() {
     let contact = Contact::from_exchange([1u8; 32], card, shared_key, 0);
     let id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
     assert_eq!(loaded.card().display_name(), "Original Name");
 
     let mut card2 = ContactCard::new("Updated Name");
@@ -426,8 +429,8 @@ fn test_double_save_overwrites() {
     let contact2 = Contact::from_exchange([1u8; 32], card2, shared_key2, 0);
 
     // Save should overwrite (upsert behavior)
-    storage.save_contact(&contact2).unwrap();
+    storage.contacts().save_contact(&contact2).unwrap();
 
-    let loaded2 = storage.load_contact(&id).unwrap().unwrap();
+    let loaded2 = storage.contacts().load_contact(&id).unwrap().unwrap();
     assert_eq!(loaded2.card().display_name(), "Updated Name");
 }

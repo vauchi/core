@@ -77,6 +77,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
         // Load existing sync states from storage
         let stored_states = storage
+            .sync()
             .list_device_sync_states()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
 
@@ -86,6 +87,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
         // Load version vector if exists
         if let Some(vector) = storage
+            .sync()
             .load_version_vector()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
         {
@@ -97,6 +99,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         // a reloaded orchestrator starts empty and an older incoming change
         // would overwrite a newer local one.
         orchestrator.field_timestamps = storage
+            .sync()
             .load_field_timestamps()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
 
@@ -136,13 +139,16 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         let result = (|| {
             for state in self.device_states.values() {
                 self.storage
+                    .sync()
                     .save_device_sync_state(state)
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
             self.storage
+                .sync()
                 .save_version_vector(&self.version_vector)
                 .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             self.storage
+                .sync()
                 .save_field_timestamps(&self.field_timestamps)
                 .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             Ok(())
@@ -188,6 +194,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         if let Some(state) = self.device_states.get_mut(device_id) {
             state.mark_synced(version);
             self.storage
+                .sync()
                 .save_device_sync_state(state)
                 .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
         }
@@ -201,12 +208,14 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         // Load contacts from storage
         let contacts = self
             .storage
+            .contacts()
             .list_contacts()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
 
         // Load own card from storage
         let own_card = self
             .storage
+            .contacts()
             .load_own_card()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
             .unwrap_or_else(|| ContactCard::new(""));
@@ -214,6 +223,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         // Load owner-private tags (ADR-051)
         let tags: Vec<TagSyncData> = self
             .storage
+            .tags()
             .list_tags()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
             .iter()
@@ -223,6 +233,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         // Load named places + per-contact exchange locations (ADR-051)
         let places: Vec<PlaceSyncData> = self
             .storage
+            .places()
             .list_places()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
             .iter()
@@ -260,6 +271,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                 let own_card: ContactCard = serde_json::from_str(&payload.own_card_json)
                     .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
                 self.storage
+                    .contacts()
                     .save_own_card(&own_card)
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
@@ -268,6 +280,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             for contact_data in &payload.contacts {
                 let contact = contact_data.to_contact()?;
                 self.storage
+                    .contacts()
                     .save_contact(&contact)
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
@@ -276,6 +289,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             for imported_data in &payload.imported_contacts {
                 let contact = imported_data.to_contact()?;
                 self.storage
+                    .contacts()
                     .save_contact(&contact)
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
@@ -283,6 +297,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             // Restore owner-private tags (ADR-051), preserving their ids.
             for tag_data in &payload.tags {
                 self.storage
+                    .tags()
                     .save_tag(&tag_data.to_tag())
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
@@ -290,6 +305,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             // Restore named places (ADR-051), preserving their ids.
             for place_data in &payload.places {
                 self.storage
+                    .places()
                     .save_place(&place_data.to_place())
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
@@ -306,6 +322,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                 .increment(self.current_device.device_id());
 
             self.storage
+                .sync()
                 .save_version_vector(&self.version_vector)
                 .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
 
@@ -352,6 +369,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     pub fn remove_device(&mut self, device_id: &[u8; 32]) -> Result<(), DeviceSyncError> {
         self.device_states.remove(device_id);
         self.storage
+            .sync()
             .delete_device_sync_state(device_id)
             .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
         Ok(())
@@ -452,6 +470,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         // Persist the updated timestamps so the LWW gate survives a reload
         // (G3). Idempotent when nothing applied.
         self.storage
+            .sync()
             .save_field_timestamps(&self.field_timestamps)
             .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
 
@@ -533,6 +552,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         sent_count: usize,
     ) -> Result<(), DeviceSyncError> {
         self.storage
+            .sync()
             .save_sync_checkpoint(target_device_id, items, sent_count)
             .map_err(|e| DeviceSyncError::Serialization(e.to_string()))
     }
@@ -547,6 +567,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         target_device_id: &[u8; 32],
     ) -> Result<Option<(Vec<SyncItem>, usize)>, DeviceSyncError> {
         self.storage
+            .sync()
             .load_sync_checkpoint(target_device_id)
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))
     }
@@ -557,6 +578,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     /// target device.
     pub fn clear_checkpoint(&self, target_device_id: &[u8; 32]) -> Result<(), DeviceSyncError> {
         self.storage
+            .sync()
             .clear_sync_checkpoint(target_device_id)
             .map_err(|e| DeviceSyncError::Serialization(e.to_string()))
     }
@@ -641,6 +663,7 @@ pub fn build_device_sync_envelopes(
     storage: &Storage,
 ) -> Result<Vec<Vec<u8>>, DeviceSyncError> {
     let registry = match storage
+        .device()
         .load_device_registry()
         .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
     {

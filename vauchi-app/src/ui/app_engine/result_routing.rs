@@ -198,10 +198,11 @@ impl AppEngine {
         let now = self.vauchi.clock().unix_seconds();
         let mut rescheduled = 0u32;
         for id in message_ids {
-            if let Ok(Some(_)) = self.vauchi.storage().get_retry_entry(id)
+            if let Ok(Some(_)) = self.vauchi.storage().retries().get_retry_entry(id)
                 && self
                     .vauchi
                     .storage()
+                    .retries()
                     .update_retry_next_time(id, now)
                     .is_ok()
             {

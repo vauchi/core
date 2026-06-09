@@ -10,50 +10,11 @@
 //! locations are a column on the `contacts` row, so they stay here pending the
 //! ContactStore extraction.
 
-use crate::contact::place::{ExchangeLocation, Place};
+use crate::contact::place::ExchangeLocation;
 
 use super::{Storage, StorageError};
 
 impl Storage {
-    /// Forwards to [`PlaceStore::create_place`].
-    pub fn create_place(
-        &self,
-        name: &str,
-        latitude: f64,
-        longitude: f64,
-    ) -> Result<Place, StorageError> {
-        self.places().create_place(name, latitude, longitude)
-    }
-
-    /// Forwards to [`PlaceStore::save_place`].
-    pub fn save_place(&self, place: &Place) -> Result<(), StorageError> {
-        self.places().save_place(place)
-    }
-
-    /// Forwards to [`PlaceStore::get_place`].
-    pub fn get_place(&self, id: &str) -> Result<Option<Place>, StorageError> {
-        self.places().get_place(id)
-    }
-
-    /// Forwards to [`PlaceStore::list_places`].
-    pub fn list_places(&self) -> Result<Vec<Place>, StorageError> {
-        self.places().list_places()
-    }
-
-    /// Forwards to [`PlaceStore::delete_place`].
-    pub fn delete_place(&self, id: &str) -> Result<bool, StorageError> {
-        self.places().delete_place(id)
-    }
-
-    /// Forwards to [`PlaceStore::find_place_near`].
-    pub fn find_place_near(
-        &self,
-        latitude: f64,
-        longitude: f64,
-    ) -> Result<Option<Place>, StorageError> {
-        self.places().find_place_near(latitude, longitude)
-    }
-
     /// Saves a contact's exchange location, encrypted at rest with the storage
     /// key (ADR-051). Overwrites any existing value.
     pub fn save_exchange_location(

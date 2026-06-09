@@ -133,10 +133,10 @@ fn test_orchestrator_create_full_sync_payload() {
         "alice@example.com",
         0,
     ));
-    storage.save_own_card(&own_card).unwrap();
+    storage.contacts().save_own_card(&own_card).unwrap();
 
     let contact = create_test_contact("Bob");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
@@ -167,10 +167,10 @@ fn test_orchestrator_apply_full_sync() {
 
     orchestrator.apply_full_sync(payload).unwrap();
 
-    let loaded_card = storage.load_own_card().unwrap().unwrap();
+    let loaded_card = storage.contacts().load_own_card().unwrap().unwrap();
     assert_eq!(loaded_card.display_name(), "Alice");
 
-    let contacts = storage.list_contacts().unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
     assert_eq!(contacts.len(), 1);
     assert_eq!(contacts[0].display_name(), "Bob");
 }
@@ -186,9 +186,9 @@ fn test_orchestrator_syncs_tags_round_trip() {
     let device_a = create_test_device(&master_seed, 0, "Device A");
     let registry_a = create_test_registry(&master_seed, &device_a);
     let contact = create_test_contact("Bob");
-    storage_a.save_contact(&contact).unwrap();
-    let tag = storage_a.create_tag("berlin-trip").unwrap();
-    storage_a.add_to_tag(&tag.id, contact.id()).unwrap();
+    storage_a.contacts().save_contact(&contact).unwrap();
+    let tag = storage_a.tags().create_tag("berlin-trip").unwrap();
+    storage_a.tags().add_to_tag(&tag.id, contact.id()).unwrap();
 
     let orchestrator_a = DeviceSyncOrchestrator::new(&storage_a, device_a, registry_a);
     let payload = orchestrator_a.create_full_sync_payload().unwrap();
@@ -203,6 +203,7 @@ fn test_orchestrator_syncs_tags_round_trip() {
 
     // Device B has the same tag — same id, name, and membership.
     let synced = storage_b
+        .tags()
         .get_tag(&tag.id)
         .unwrap()
         .expect("tag synced with its original id");
@@ -222,8 +223,9 @@ fn test_orchestrator_syncs_places_and_exchange_locations() {
     let device_a = create_test_device(&master_seed, 0, "Device A");
     let registry_a = create_test_registry(&master_seed, &device_a);
     let contact = create_test_contact("Bob");
-    storage_a.save_contact(&contact).unwrap();
+    storage_a.contacts().save_contact(&contact).unwrap();
     let place = storage_a
+        .places()
         .create_place("The Anchor Bar", 52.52, 13.405)
         .unwrap();
     storage_a
@@ -251,6 +253,7 @@ fn test_orchestrator_syncs_places_and_exchange_locations() {
 
     // Place + per-contact location restored with ids intact.
     let synced_place = storage_b
+        .places()
         .get_place(&place.id)
         .unwrap()
         .expect("place synced");

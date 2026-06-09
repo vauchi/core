@@ -388,8 +388,8 @@ fn test_storage_save_load_roundtrip() {
     progress.advance(0); // IdentityCheck -> LinkChoice
     progress.advance(0); // LinkChoice -> DefaultName
 
-    storage.save_onboarding_progress(&progress).unwrap();
-    let loaded = storage.load_onboarding_progress().unwrap().unwrap();
+    storage.ux().save_onboarding_progress(&progress).unwrap();
+    let loaded = storage.ux().load_onboarding_progress().unwrap().unwrap();
 
     assert_eq!(loaded.current_step(), OnboardingStep::DefaultName);
     assert_eq!(loaded.completed_steps.len(), 2);
@@ -406,7 +406,7 @@ fn test_storage_save_load_roundtrip() {
 fn test_storage_load_returns_none_when_empty() {
     let storage = vauchi_core::Storage::in_memory(vauchi_core::SymmetricKey::generate()).unwrap();
 
-    let loaded = storage.load_onboarding_progress().unwrap();
+    let loaded = storage.ux().load_onboarding_progress().unwrap();
     assert!(loaded.is_none(), "Should return None when no state exists");
 }
 
@@ -415,14 +415,14 @@ fn test_storage_load_returns_none_when_empty() {
 fn test_storage_load_or_create() {
     let storage = vauchi_core::Storage::in_memory(vauchi_core::SymmetricKey::generate()).unwrap();
 
-    let progress = storage.load_or_create_onboarding_progress().unwrap();
+    let progress = storage.ux().load_or_create_onboarding_progress().unwrap();
     assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
 
     let mut progress = progress;
     progress.advance(0);
-    storage.save_onboarding_progress(&progress).unwrap();
+    storage.ux().save_onboarding_progress(&progress).unwrap();
 
-    let loaded = storage.load_or_create_onboarding_progress().unwrap();
+    let loaded = storage.ux().load_or_create_onboarding_progress().unwrap();
     assert_eq!(loaded.current_step(), OnboardingStep::LinkChoice);
 }
 
@@ -433,13 +433,13 @@ fn test_storage_overwrite_replaces_previous() {
 
     let mut progress = OnboardingProgress::new(0);
     progress.advance(0);
-    storage.save_onboarding_progress(&progress).unwrap();
+    storage.ux().save_onboarding_progress(&progress).unwrap();
 
     progress.advance(0);
     progress.advance(0);
-    storage.save_onboarding_progress(&progress).unwrap();
+    storage.ux().save_onboarding_progress(&progress).unwrap();
 
-    let loaded = storage.load_onboarding_progress().unwrap().unwrap();
+    let loaded = storage.ux().load_onboarding_progress().unwrap().unwrap();
     assert_eq!(
         loaded.current_step(),
         OnboardingStep::GroupsSetup,

@@ -40,7 +40,7 @@ fn test_device_store_info_roundtrip() {
     assert_eq!(device_index_via_scoped_view(&storage.device()), Some(3));
     assert!(storage.device().has_device_info().unwrap());
     // Visible through the legacy forwarding API — one connection.
-    let (id, index, name, created) = storage.load_device_info().unwrap().unwrap();
+    let (id, index, name, created) = storage.device().load_device_info().unwrap().unwrap();
     assert_eq!(id, device_id);
     assert_eq!(index, 3);
     assert_eq!(name, "Pixel");

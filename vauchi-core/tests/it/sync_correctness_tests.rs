@@ -418,10 +418,14 @@ fn test_checkpoint_save_load_roundtrip() {
 
     // Save checkpoint at sent_count = 1 (first item sent)
     storage
+        .sync()
         .save_sync_checkpoint(&target_device_id, &items, 1)
         .unwrap();
 
-    let loaded = storage.load_sync_checkpoint(&target_device_id).unwrap();
+    let loaded = storage
+        .sync()
+        .load_sync_checkpoint(&target_device_id)
+        .unwrap();
     assert!(loaded.is_some(), "Checkpoint should exist");
 
     let (loaded_items, sent_count) = loaded.unwrap();
@@ -447,20 +451,26 @@ fn test_checkpoint_clear() {
     }];
 
     storage
+        .sync()
         .save_sync_checkpoint(&target_device_id, &items, 0)
         .unwrap();
 
     assert!(
         storage
+            .sync()
             .load_sync_checkpoint(&target_device_id)
             .unwrap()
             .is_some()
     );
 
-    storage.clear_sync_checkpoint(&target_device_id).unwrap();
+    storage
+        .sync()
+        .clear_sync_checkpoint(&target_device_id)
+        .unwrap();
 
     assert!(
         storage
+            .sync()
             .load_sync_checkpoint(&target_device_id)
             .unwrap()
             .is_none(),
@@ -481,7 +491,10 @@ fn test_checkpoint_overwrite() {
         timestamp: 100,
     }];
 
-    storage.save_sync_checkpoint(&target, &items_v1, 0).unwrap();
+    storage
+        .sync()
+        .save_sync_checkpoint(&target, &items_v1, 0)
+        .unwrap();
 
     let items_v2 = vec![
         SyncItem::CardUpdated {
@@ -496,9 +509,16 @@ fn test_checkpoint_overwrite() {
         },
     ];
 
-    storage.save_sync_checkpoint(&target, &items_v2, 1).unwrap();
+    storage
+        .sync()
+        .save_sync_checkpoint(&target, &items_v2, 1)
+        .unwrap();
 
-    let (loaded, sent) = storage.load_sync_checkpoint(&target).unwrap().unwrap();
+    let (loaded, sent) = storage
+        .sync()
+        .load_sync_checkpoint(&target)
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.len(), 2, "Should have v2 items, not v1");
     assert_eq!(sent, 1, "Should have v2 sent_count");
 }

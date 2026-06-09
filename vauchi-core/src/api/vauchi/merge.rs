@@ -22,11 +22,11 @@ impl Vauchi {
     /// Returns duplicate pairs ordered by similarity (highest first),
     /// excluding pairs the user has previously dismissed.
     pub fn find_duplicates(&self) -> VauchiResult<Vec<DuplicatePair>> {
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         let all_duplicates = find_duplicates(&contacts);
 
         // Load dismissed pairs and filter them out
-        let dismissed = self.storage.load_dismissed_duplicates()?;
+        let dismissed = self.storage.contacts().load_dismissed_duplicates()?;
         Ok(filter_dismissed(all_duplicates, &dismissed))
     }
 
@@ -37,10 +37,12 @@ impl Vauchi {
     pub fn get_duplicate_score(&self, id1: &str, id2: &str) -> VauchiResult<f64> {
         let contact1 = self
             .storage
+            .contacts()
             .load_contact(id1)?
             .ok_or_else(|| VauchiError::ContactNotFound(id1.to_string()))?;
         let contact2 = self
             .storage
+            .contacts()
             .load_contact(id2)?
             .ok_or_else(|| VauchiError::ContactNotFound(id2.to_string()))?;
 
@@ -53,7 +55,7 @@ impl Vauchi {
     /// same as dismissing (B, A).
     pub fn dismiss_duplicate(&self, id1: &str, id2: &str) -> VauchiResult<()> {
         let (norm1, norm2) = normalize_pair_key(id1, id2);
-        self.storage.dismiss_duplicate(&norm1, &norm2)?;
+        self.storage.contacts().dismiss_duplicate(&norm1, &norm2)?;
         Ok(())
     }
 
@@ -74,10 +76,12 @@ impl Vauchi {
     ) -> VauchiResult<crate::contact::Contact> {
         let primary = self
             .storage
+            .contacts()
             .load_contact(primary_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(primary_id.to_string()))?;
         let secondary = self
             .storage
+            .contacts()
             .load_contact(secondary_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(secondary_id.to_string()))?;
 
@@ -91,7 +95,7 @@ impl Vauchi {
         let merged = merge_contacts(&primary, &secondary);
 
         // Save merged contact
-        self.storage.save_contact(&merged)?;
+        self.storage.contacts().save_contact(&merged)?;
 
         // Delete secondary
         self.storage.delete_contact(secondary_id)?;

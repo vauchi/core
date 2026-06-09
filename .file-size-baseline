@@ -173,7 +173,12 @@ vauchi-core/src/network/http_transport.rs 1253
 # (+32 for last_sync_unix_seconds capture in update_timing_after_sync +
 #  inline FakeClock test; humble-UI follow-up to ios!472 lets MyInfoEngine
 #  render "Last synced X ago" without the frontend owning the timestamp)
-vauchi-core/src/api/vauchi/sync_http.rs 1148
+# Phase 2 (2026-06-09, storage per-domain stores): per-domain accessor
+# insertion (self.storage.contacts().m()) wraps long call lines; the
+# four entries below absorbed the mechanical growth. Candidate for a
+# follow-up tidy using local `let c = self.storage.contacts();` bindings.
+vauchi-core/src/api/vauchi/sync_http.rs 1154
+vauchi-core/src/api/vauchi/contacts.rs 1036
 
 # EXEMPT — security-critical: crypto + verification belong together
 vauchi-core/src/recovery/mod.rs 1253
@@ -291,7 +296,7 @@ vauchi-core/src/storage/mod.rs 1079
 #  `#[cfg(test)] mod factory_filter_tests;` declaration with its
 #  INLINE_TEST_REQUIRED marker —
 #  2026-06-08-exchange-card-not-group-filtered G2 Slice 3.)
-vauchi-app/src/ui/app_engine/mod.rs 1483
+vauchi-app/src/ui/app_engine/mod.rs 1484
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -376,7 +381,7 @@ vauchi-app/src/ui/app_engine/routing.rs 595
 #  wiring — 2026-06-08-exchange-card-not-group-filtered G2 Slice 3. The
 #  68-line factory wiring test lives in factory_filter_tests.rs, not inline,
 #  to keep this grandfathered factory from growing.)
-vauchi-app/src/ui/app_engine/screens.rs 1604
+vauchi-app/src/ui/app_engine/screens.rs 1607
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

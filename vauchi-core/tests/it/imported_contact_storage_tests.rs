@@ -43,8 +43,8 @@ fn save_and_load_imported_contact() {
     let contact = make_imported("Alice Import", ImportSource::VcardFile);
     let id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     assert_eq!(loaded.id(), id);
     assert_eq!(loaded.display_name(), "Alice Import");
@@ -64,10 +64,10 @@ fn list_contacts_includes_both_kinds() {
     let exchanged_id = exchanged.id().to_string();
     let imported_id = imported.id().to_string();
 
-    storage.save_contact(&exchanged).unwrap();
-    storage.save_contact(&imported).unwrap();
+    storage.contacts().save_contact(&exchanged).unwrap();
+    storage.contacts().save_contact(&imported).unwrap();
 
-    let contacts = storage.list_contacts().unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
     assert_eq!(contacts.len(), 2, "Both exchanged and imported must appear");
 
     let ids: Vec<&str> = contacts.iter().map(|c| c.id()).collect();
@@ -88,9 +88,9 @@ fn search_contacts_finds_imported() {
     let storage = open_storage();
 
     let imported = make_imported("Diana Searchable", ImportSource::IosPlatform);
-    storage.save_contact(&imported).unwrap();
+    storage.contacts().save_contact(&imported).unwrap();
 
-    let results = storage.search_contacts("Diana").unwrap();
+    let results = storage.contacts().search_contacts("Diana").unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].display_name(), "Diana Searchable");
     assert!(results[0].is_imported());
@@ -106,8 +106,8 @@ fn delete_imported_contact() {
     let imported = make_imported("Eve Deletable", ImportSource::Manual);
     let id = imported.id().to_string();
 
-    storage.save_contact(&imported).unwrap();
-    assert!(storage.load_contact(&id).unwrap().is_some());
+    storage.contacts().save_contact(&imported).unwrap();
+    assert!(storage.contacts().load_contact(&id).unwrap().is_some());
 
     let deleted = storage.delete_contact(&id).unwrap();
     assert!(
@@ -116,7 +116,7 @@ fn delete_imported_contact() {
     );
 
     assert!(
-        storage.load_contact(&id).unwrap().is_none(),
+        storage.contacts().load_contact(&id).unwrap().is_none(),
         "Deleted contact must not be loadable"
     );
 }
@@ -135,8 +135,8 @@ fn imported_contact_roundtrip_preserves_metadata() {
     let original_imported_at = original_data.imported_at;
     let original_uid = original_data.original_uid.clone();
 
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     let loaded_data = loaded
         .kind()
@@ -168,8 +168,8 @@ fn existing_exchanged_contacts_unaffected() {
     let original_pk = exchanged.public_key().unwrap().to_owned();
     let original_display = exchanged.display_name().to_string();
 
-    storage.save_contact(&exchanged).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&exchanged).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     assert!(loaded.is_exchanged(), "Must still be exchanged after load");
     assert_eq!(
@@ -192,8 +192,8 @@ fn imported_contact_has_no_crypto_fields() {
     let imported = make_imported("Hank NoCrypto", ImportSource::VcardFile);
     let id = imported.id().to_string();
 
-    storage.save_contact(&imported).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&imported).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     assert!(
         loaded.public_key().is_none(),
@@ -216,19 +216,23 @@ fn list_contacts_paginated_includes_imported() {
 
     for i in 0..5 {
         let name = format!("Exchanged-{:02}", i);
-        storage.save_contact(&make_exchanged(&name)).unwrap();
+        storage
+            .contacts()
+            .save_contact(&make_exchanged(&name))
+            .unwrap();
     }
     for i in 0..3 {
         let name = format!("Imported-{:02}", i);
         storage
+            .contacts()
             .save_contact(&make_imported(&name, ImportSource::Manual))
             .unwrap();
     }
 
-    let all = storage.list_contacts().unwrap();
+    let all = storage.contacts().list_contacts().unwrap();
     assert_eq!(all.len(), 8, "Should have 5 exchanged + 3 imported");
 
-    let page = storage.list_contacts_paginated(0, 100).unwrap();
+    let page = storage.contacts().list_contacts_paginated(0, 100).unwrap();
     assert_eq!(page.len(), 8);
 }
 
@@ -244,8 +248,8 @@ fn imported_contact_flags_survive_roundtrip() {
     imported.set_blocked(true);
     let id = imported.id().to_string();
 
-    storage.save_contact(&imported).unwrap();
-    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    storage.contacts().save_contact(&imported).unwrap();
+    let loaded = storage.contacts().load_contact(&id).unwrap().unwrap();
 
     assert!(loaded.is_favorite(), "Favorite flag must survive roundtrip");
     assert!(loaded.is_blocked(), "Blocked flag must survive roundtrip");

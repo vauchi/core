@@ -387,7 +387,7 @@ impl DeviceLinkInitiatorMachine {
 
         if let Some(ctx) = &self.persistence {
             let save = Storage::open(&ctx.storage_path, ctx.storage_key.clone())
-                .and_then(|s| s.save_device_registry(&registry));
+                .and_then(|s| s.device().save_device_registry(&registry));
             if let Err(e) = save {
                 self.state = State::Failed;
                 return InitiatorEvent::Failed {

@@ -59,9 +59,11 @@ fn test_full_path_exchange_to_card_update() {
     let (alice_ratchet, bob_ratchet) = setup_ratchets(&shared_secret);
     alice
         .storage()
+        .ratchets()
         .save_ratchet_state(&bob_contact_id, &alice_ratchet, true)
         .unwrap();
     bob.storage()
+        .ratchets()
         .save_ratchet_state(&alice_contact_id, &bob_ratchet, false)
         .unwrap();
 

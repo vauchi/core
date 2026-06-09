@@ -26,7 +26,7 @@ fn normalise_name(name: &str) -> &str {
 impl Vauchi {
     /// Lists all tags in the owner's vocabulary, oldest first.
     pub fn list_tags(&self) -> VauchiResult<Vec<Tag>> {
-        Ok(self.storage.list_tags()?)
+        Ok(self.storage.tags().list_tags()?)
     }
 
     /// Creates a new tag with the given name.
@@ -39,13 +39,13 @@ impl Vauchi {
         if name.is_empty() {
             return Err(VauchiError::InvalidState("Tag name cannot be empty".into()));
         }
-        Ok(self.storage.create_tag(name)?)
+        Ok(self.storage.tags().create_tag(name)?)
     }
 
     /// Deletes a tag from the vocabulary. Tagged contacts simply lose the tag.
     /// Returns `true` if the tag existed.
     pub fn delete_tag(&self, tag_id: &str) -> VauchiResult<bool> {
-        Ok(self.storage.delete_tag(tag_id)?)
+        Ok(self.storage.tags().delete_tag(tag_id)?)
     }
 
     /// Returns the existing tag whose name matches `name` (trimmed,
@@ -58,6 +58,7 @@ impl Vauchi {
         }
         Ok(self
             .storage
+            .tags()
             .list_tags()?
             .into_iter()
             .find(|t| t.name.to_lowercase() == needle))
@@ -76,18 +77,19 @@ impl Vauchi {
             return Err(VauchiError::InvalidState("Tag name cannot be empty".into()));
         }
         // Validate the contact exists (avoid orphan membership).
-        if self.storage.load_contact(contact_id)?.is_none() {
+        if self.storage.contacts().load_contact(contact_id)?.is_none() {
             return Err(VauchiError::ContactNotFound(contact_id.to_string()));
         }
 
         let tag = match self.find_tag_by_name(name)? {
             Some(existing) => existing,
-            None => self.storage.create_tag(name)?,
+            None => self.storage.tags().create_tag(name)?,
         };
-        self.storage.add_to_tag(&tag.id, contact_id)?;
+        self.storage.tags().add_to_tag(&tag.id, contact_id)?;
 
         // Return the up-to-date tag (with the new membership reflected).
         self.storage
+            .tags()
             .get_tag(&tag.id)?
             .ok_or_else(|| VauchiError::NotFound("Tag vanished after creation".into()))
     }
@@ -96,13 +98,14 @@ impl Vauchi {
     /// exist. The tag itself stays in the vocabulary (use [`Vauchi::delete_tag`]
     /// to remove it entirely).
     pub fn remove_tag_from_contact(&self, tag_id: &str, contact_id: &str) -> VauchiResult<()> {
-        Ok(self.storage.remove_from_tag(tag_id, contact_id)?)
+        Ok(self.storage.tags().remove_from_tag(tag_id, contact_id)?)
     }
 
     /// Returns the tags applied to a given contact, oldest first.
     pub fn tags_for_contact(&self, contact_id: &str) -> VauchiResult<Vec<Tag>> {
         Ok(self
             .storage
+            .tags()
             .list_tags()?
             .into_iter()
             .filter(|t| t.contains(contact_id))
@@ -117,6 +120,7 @@ impl Vauchi {
         let needle = normalise_name(prefix).to_lowercase();
         Ok(self
             .storage
+            .tags()
             .list_tags()?
             .into_iter()
             .filter(|t| needle.is_empty() || t.name.to_lowercase().starts_with(&needle))
@@ -152,13 +156,14 @@ impl Vauchi {
     pub fn begin_tag_promotion(&self, tag_id: &str) -> VauchiResult<GroupDraft> {
         let tag = self
             .storage
+            .tags()
             .get_tag(tag_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("tag: {tag_id}")))?;
 
         let mut contact_ids: Vec<String> = tag.contact_ids.into_iter().collect();
         contact_ids.sort();
 
-        let mut visible_fields: Vec<String> = match self.storage.load_own_card()? {
+        let mut visible_fields: Vec<String> = match self.storage.contacts().load_own_card()? {
             Some(card) => card
                 .field_visibility()
                 .everyone_field_ids()
@@ -193,19 +198,20 @@ impl Vauchi {
     ) -> VauchiResult<String> {
         let tag = self
             .storage
+            .tags()
             .get_tag(tag_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("tag: {tag_id}")))?;
 
         let now = self.clock.unix_seconds();
-        let mut group = self.storage.create_group(&tag.name)?;
+        let mut group = self.storage.labels().create_group(&tag.name)?;
         for contact_id in &tag.contact_ids {
             group.add_contact(contact_id, now);
         }
         group.set_visible_fields(visible_fields.into_iter().collect(), now);
-        self.storage.save_group(&group)?;
+        self.storage.labels().save_group(&group)?;
 
         // Replace: consume the tag now that the group is fully persisted.
-        self.storage.delete_tag(tag_id)?;
+        self.storage.tags().delete_tag(tag_id)?;
 
         Ok(group.id().to_string())
     }

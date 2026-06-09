@@ -54,12 +54,15 @@ fn test_schema_version_is_13() {
 fn test_save_and_load_cek() {
     let storage = test_storage();
     let contact = test_contact("alice");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let cek = ContentEncryptionKey::generate();
-    storage.save_contact_cek(contact.id(), &cek).unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(contact.id(), &cek)
+        .unwrap();
 
-    let loaded = storage.load_contact_cek(contact.id()).unwrap();
+    let loaded = storage.contacts().load_contact_cek(contact.id()).unwrap();
     assert!(loaded.is_some(), "CEK should be loaded");
 
     // Verify the loaded CEK can decrypt what the original encrypted
@@ -74,10 +77,10 @@ fn test_save_and_load_cek() {
 fn test_load_cek_returns_none_for_legacy_contact() {
     let storage = test_storage();
     let contact = test_contact("bob");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // No CEK saved — legacy contact
-    let loaded = storage.load_contact_cek(contact.id()).unwrap();
+    let loaded = storage.contacts().load_contact_cek(contact.id()).unwrap();
     assert!(loaded.is_none(), "Legacy contact should have no CEK");
 }
 
@@ -86,22 +89,32 @@ fn test_load_cek_returns_none_for_legacy_contact() {
 fn test_delete_cek_crypto_shreds() {
     let storage = test_storage();
     let contact = test_contact("carol");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let cek = ContentEncryptionKey::generate();
-    storage.save_contact_cek(contact.id(), &cek).unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(contact.id(), &cek)
+        .unwrap();
 
     // Verify CEK exists
     storage
+        .contacts()
         .load_contact_cek(contact.id())
         .unwrap()
         .expect("expected Some");
 
     // Delete CEK (crypto-shred)
-    storage.delete_contact_cek(contact.id()).unwrap();
+    storage.contacts().delete_contact_cek(contact.id()).unwrap();
 
     // Verify CEK is gone
-    assert!(storage.load_contact_cek(contact.id()).unwrap().is_none());
+    assert!(
+        storage
+            .contacts()
+            .load_contact_cek(contact.id())
+            .unwrap()
+            .is_none()
+    );
 }
 
 // @internal
@@ -109,10 +122,13 @@ fn test_delete_cek_crypto_shreds() {
 fn test_cek_stored_encrypted_with_storage_key() {
     let storage = test_storage();
     let contact = test_contact("dave");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let cek = ContentEncryptionKey::generate();
-    storage.save_contact_cek(contact.id(), &cek).unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(contact.id(), &cek)
+        .unwrap();
 
     // Read raw cek_encrypted column — it should not be the raw CEK bytes
     let raw: Vec<u8> = storage
@@ -136,7 +152,7 @@ fn test_save_cek_nonexistent_contact_fails() {
     let storage = test_storage();
     let cek = ContentEncryptionKey::generate();
 
-    let result = storage.save_contact_cek("nonexistent", &cek);
+    let result = storage.contacts().save_contact_cek("nonexistent", &cek);
     result.expect_err("expected error");
 }
 
@@ -145,16 +161,26 @@ fn test_save_cek_nonexistent_contact_fails() {
 fn test_cek_rotation_replaces_old() {
     let storage = test_storage();
     let contact = test_contact("eve");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let cek_v1 = ContentEncryptionKey::generate();
     let cek_v2 = ContentEncryptionKey::generate();
 
-    storage.save_contact_cek(contact.id(), &cek_v1).unwrap();
-    storage.save_contact_cek(contact.id(), &cek_v2).unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(contact.id(), &cek_v1)
+        .unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(contact.id(), &cek_v2)
+        .unwrap();
 
     // Only the latest CEK should be stored
-    let loaded = storage.load_contact_cek(contact.id()).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact_cek(contact.id())
+        .unwrap()
+        .unwrap();
 
     let plaintext = b"new card version";
     let ct = cek_v2.encrypt(plaintext).unwrap();
@@ -172,11 +198,14 @@ fn test_cek_rotation_replaces_old() {
 fn test_deleted_cek_renders_encrypted_data_unreadable() {
     let storage = test_storage();
     let contact = test_contact("integration-alice");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Encrypt card data with CEK
     let cek = ContentEncryptionKey::generate();
-    storage.save_contact_cek(contact.id(), &cek).unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(contact.id(), &cek)
+        .unwrap();
 
     let card_data = b"sensitive card payload with email and phone";
     let ciphertext = cek.encrypt(card_data).unwrap();
@@ -185,10 +214,10 @@ fn test_deleted_cek_renders_encrypted_data_unreadable() {
     assert_eq!(cek.decrypt(&ciphertext).unwrap(), card_data);
 
     // Crypto-shred: delete the CEK
-    storage.delete_contact_cek(contact.id()).unwrap();
+    storage.contacts().delete_contact_cek(contact.id()).unwrap();
 
     // The stored CEK is gone — no way to decrypt
-    let loaded_cek = storage.load_contact_cek(contact.id()).unwrap();
+    let loaded_cek = storage.contacts().load_contact_cek(contact.id()).unwrap();
     assert!(
         loaded_cek.is_none(),
         "CEK must be gone after crypto-shredding"
@@ -208,22 +237,32 @@ fn test_deleted_cek_renders_encrypted_data_unreadable() {
 fn test_cek_rotation_old_cek_cannot_decrypt_new_data() {
     let storage = test_storage();
     let contact = test_contact("integration-bob");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Initial CEK
     let cek_v1 = ContentEncryptionKey::generate();
-    storage.save_contact_cek(contact.id(), &cek_v1).unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(contact.id(), &cek_v1)
+        .unwrap();
     let data_v1 = b"card version 1";
     let ct_v1 = cek_v1.encrypt(data_v1).unwrap();
 
     // Rotate CEK
     let cek_v2 = ContentEncryptionKey::generate();
-    storage.save_contact_cek(contact.id(), &cek_v2).unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(contact.id(), &cek_v2)
+        .unwrap();
     let data_v2 = b"card version 2";
     let ct_v2 = cek_v2.encrypt(data_v2).unwrap();
 
     // New CEK can decrypt new data
-    let loaded = storage.load_contact_cek(contact.id()).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact_cek(contact.id())
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.decrypt(&ct_v2).unwrap(), data_v2);
 
     // New CEK cannot decrypt old data (different key)
@@ -261,13 +300,19 @@ fn test_multi_contact_cek_isolation() {
         .unwrap();
         Contact::from_exchange([0x02; 32], card, SymmetricKey::generate(), 0)
     };
-    storage.save_contact(&alice).unwrap();
-    storage.save_contact(&bob).unwrap();
+    storage.contacts().save_contact(&alice).unwrap();
+    storage.contacts().save_contact(&bob).unwrap();
 
     let cek_alice = ContentEncryptionKey::generate();
     let cek_bob = ContentEncryptionKey::generate();
-    storage.save_contact_cek(alice.id(), &cek_alice).unwrap();
-    storage.save_contact_cek(bob.id(), &cek_bob).unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(alice.id(), &cek_alice)
+        .unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(bob.id(), &cek_bob)
+        .unwrap();
 
     let alice_data = b"alice card data";
     let bob_data = b"bob card data";
@@ -275,13 +320,23 @@ fn test_multi_contact_cek_isolation() {
     let ct_bob = cek_bob.encrypt(bob_data).unwrap();
 
     // Crypto-shred Alice's CEK
-    storage.delete_contact_cek(alice.id()).unwrap();
+    storage.contacts().delete_contact_cek(alice.id()).unwrap();
 
     // Alice's CEK is gone
-    assert!(storage.load_contact_cek(alice.id()).unwrap().is_none());
+    assert!(
+        storage
+            .contacts()
+            .load_contact_cek(alice.id())
+            .unwrap()
+            .is_none()
+    );
 
     // Bob's CEK is unaffected
-    let loaded_bob = storage.load_contact_cek(bob.id()).unwrap().unwrap();
+    let loaded_bob = storage
+        .contacts()
+        .load_contact_cek(bob.id())
+        .unwrap()
+        .unwrap();
     assert_eq!(
         loaded_bob.decrypt(&ct_bob).unwrap(),
         bob_data,
@@ -297,17 +352,32 @@ fn test_multi_contact_cek_isolation() {
 fn test_cek_deletion_is_idempotent() {
     let storage = test_storage();
     let contact = test_contact("idempotent-carol");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let cek = ContentEncryptionKey::generate();
-    storage.save_contact_cek(contact.id(), &cek).unwrap();
+    storage
+        .contacts()
+        .save_contact_cek(contact.id(), &cek)
+        .unwrap();
 
-    storage.delete_contact_cek(contact.id()).unwrap();
-    assert!(storage.load_contact_cek(contact.id()).unwrap().is_none());
+    storage.contacts().delete_contact_cek(contact.id()).unwrap();
+    assert!(
+        storage
+            .contacts()
+            .load_contact_cek(contact.id())
+            .unwrap()
+            .is_none()
+    );
 
     // Delete again — should not error
-    storage.delete_contact_cek(contact.id()).unwrap();
-    assert!(storage.load_contact_cek(contact.id()).unwrap().is_none());
+    storage.contacts().delete_contact_cek(contact.id()).unwrap();
+    assert!(
+        storage
+            .contacts()
+            .load_contact_cek(contact.id())
+            .unwrap()
+            .is_none()
+    );
 }
 
 // === Revoked Senders ===
@@ -317,14 +387,15 @@ fn test_cek_deletion_is_idempotent() {
 fn test_record_and_check_revoked_sender() {
     let storage = test_storage();
 
-    assert!(!storage.is_sender_revoked("alice_pk").unwrap());
+    assert!(!storage.contacts().is_sender_revoked("alice_pk").unwrap());
 
     storage
+        .contacts()
         .record_revoked_sender("alice_pk", 1700000000)
         .unwrap();
 
-    assert!(storage.is_sender_revoked("alice_pk").unwrap());
-    assert!(!storage.is_sender_revoked("bob_pk").unwrap());
+    assert!(storage.contacts().is_sender_revoked("alice_pk").unwrap());
+    assert!(!storage.contacts().is_sender_revoked("bob_pk").unwrap());
 }
 
 // @internal
@@ -332,14 +403,15 @@ fn test_record_and_check_revoked_sender() {
 fn test_revoked_sender_persists_after_contact_deletion() {
     let storage = test_storage();
     let contact = test_contact("frank");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     storage
+        .contacts()
         .record_revoked_sender(contact.id(), 1700000000)
         .unwrap();
     storage.delete_contact(contact.id()).unwrap();
 
-    assert!(storage.is_sender_revoked(contact.id()).unwrap());
+    assert!(storage.contacts().is_sender_revoked(contact.id()).unwrap());
 }
 
 // @internal
@@ -348,11 +420,13 @@ fn test_revoked_sender_idempotent() {
     let storage = test_storage();
 
     storage
+        .contacts()
         .record_revoked_sender("alice_pk", 1700000000)
         .unwrap();
     storage
+        .contacts()
         .record_revoked_sender("alice_pk", 1700000001)
         .unwrap();
 
-    assert!(storage.is_sender_revoked("alice_pk").unwrap());
+    assert!(storage.contacts().is_sender_revoked("alice_pk").unwrap());
 }

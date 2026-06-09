@@ -49,7 +49,7 @@ impl Vauchi {
         // Create initial contact card, or update display name on existing card.
         // During onboarding, fields may already be saved to the card before
         // identity creation — preserve them by loading the existing card.
-        let card = match self.storage.load_own_card()? {
+        let card = match self.storage.contacts().load_own_card()? {
             Some(mut existing) => {
                 // Propagate validation errors so the user sees why their
                 // display name was rejected instead of seeing the old name
@@ -61,7 +61,7 @@ impl Vauchi {
             }
             None => ContactCard::new(display_name),
         };
-        self.storage.save_own_card(&card)?;
+        self.storage.contacts().save_own_card(&card)?;
 
         // If SecureStorage is available, derive and store SMK, then rekey storage
         if let Some(ref ss) = self.secure_storage {
@@ -80,6 +80,7 @@ impl Vauchi {
 
         // Persist identity to storage so it survives restart
         self.storage
+            .identity()
             .save_identity(&identity.to_storage_bytes(), identity.display_name())?;
 
         self.identity = Some(identity);
@@ -198,12 +199,12 @@ impl Vauchi {
         let name = identity.display_name().to_string();
 
         // Persist to storage
-        self.storage.save_identity(&bytes, &name)?;
+        self.storage.identity().save_identity(&bytes, &name)?;
 
         // Create contact card if none exists
-        if self.storage.load_own_card()?.is_none() {
+        if self.storage.contacts().load_own_card()?.is_none() {
             let card = crate::contact_card::ContactCard::new(&name);
-            self.storage.save_own_card(&card)?;
+            self.storage.contacts().save_own_card(&card)?;
         }
 
         self.identity = Some(identity);
@@ -226,9 +227,9 @@ impl Vauchi {
             device_name: identity.device_info().device_name().to_string(),
         };
 
-        let contacts = self.storage.list_contacts()?;
-        let own_card = self.storage.load_own_card()?;
-        let groups = self.storage.load_all_groups()?;
+        let contacts = self.storage.contacts().list_contacts()?;
+        let own_card = self.storage.contacts().load_own_card()?;
+        let groups = self.storage.labels().load_all_groups()?;
         let labels: Vec<(String, String, Vec<String>)> = groups
             .iter()
             .map(|g| {
@@ -288,21 +289,22 @@ impl Vauchi {
             .export_backup(password)
             .map_err(|e| VauchiError::Configuration(format!("Identity re-export failed: {e:?}")))?;
         self.storage
+            .identity()
             .save_identity(id_backup.as_bytes(), identity.display_name())?;
 
         // Restore own card
         if let Some(card) = &envelope.sections.own_card {
-            self.storage.save_own_card(card)?;
+            self.storage.contacts().save_own_card(card)?;
         } else {
             let card = crate::contact_card::ContactCard::new(identity.display_name());
-            self.storage.save_own_card(&card)?;
+            self.storage.contacts().save_own_card(&card)?;
         }
 
         // Restore contacts
         let contacts = crate::backup::restore_contacts_from_envelope(&envelope)
             .map_err(|e| VauchiError::Configuration(format!("Contact restore failed: {e}")))?;
         for contact in &contacts {
-            self.storage.save_contact(contact)?;
+            self.storage.contacts().save_contact(contact)?;
         }
 
         // Restore labels
@@ -319,7 +321,7 @@ impl Vauchi {
                 now,
                 now,
             );
-            self.storage.save_group(&group)?;
+            self.storage.labels().save_group(&group)?;
         }
 
         self.identity = Some(identity);
@@ -374,7 +376,7 @@ impl Vauchi {
         if self.identity.is_some() {
             return true;
         }
-        matches!(self.storage.load_identity(), Ok(Some(_)))
+        matches!(self.storage.identity().load_identity(), Ok(Some(_)))
     }
 
     /// Re-load identity from storage into `self.identity` if currently None.
@@ -392,7 +394,7 @@ impl Vauchi {
         if self.identity.is_some() {
             return;
         }
-        if let Ok(Some((bytes, _display_name))) = self.storage.load_identity()
+        if let Ok(Some((bytes, _display_name))) = self.storage.identity().load_identity()
             && let Ok(identity) = Identity::from_storage_bytes(&bytes, self.clock.unix_seconds())
         {
             self.identity = Some(identity);
@@ -432,12 +434,13 @@ impl Vauchi {
         // Update contact card display name
         let mut card = self
             .storage
+            .contacts()
             .load_own_card()?
             .unwrap_or_else(|| ContactCard::new(name));
         let old_name = card.display_name().to_string();
         card.set_display_name(name)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.storage.save_own_card(&card)?;
+        self.storage.contacts().save_own_card(&card)?;
 
         if old_name != name {
             self.events.dispatch(VauchiEvent::OwnCardUpdated {
@@ -452,7 +455,7 @@ impl Vauchi {
 
     /// Gets the user's own contact card.
     pub fn own_card(&self) -> VauchiResult<Option<ContactCard>> {
-        Ok(self.storage.load_own_card()?)
+        Ok(self.storage.contacts().load_own_card()?)
     }
 
     /// Updates the user's own contact card.
@@ -509,6 +512,7 @@ impl Vauchi {
     pub fn remove_own_field_by_id(&self, field_id: &str) -> VauchiResult<bool> {
         let card = self
             .storage
+            .contacts()
             .load_own_card()?
             .ok_or_else(|| VauchiError::InvalidState("No own card found".into()))?;
         let label = card
@@ -530,10 +534,11 @@ impl Vauchi {
     pub fn set_field_shown(&self, field_id: &str, shown: bool) -> VauchiResult<()> {
         let mut card = self
             .storage
+            .contacts()
             .load_own_card()?
             .ok_or_else(|| VauchiError::InvalidState("No own card found".into()))?;
         card.set_field_shown(field_id, shown);
-        self.storage.save_own_card(&card)?;
+        self.storage.contacts().save_own_card(&card)?;
         Ok(())
     }
 
@@ -542,6 +547,7 @@ impl Vauchi {
     /// Loads backup reminder state, returning defaults if none persisted.
     pub fn load_backup_reminder_state(&self) -> VauchiResult<BackupReminderState> {
         self.storage
+            .ux()
             .load_backup_reminder_state()
             .map(|opt| opt.unwrap_or_default())
             .map_err(Into::into)
@@ -550,6 +556,7 @@ impl Vauchi {
     /// Loads persisted settings flags, returning defaults if none persisted.
     pub fn load_settings_flags(&self) -> VauchiResult<SettingsFlags> {
         self.storage
+            .ux()
             .load_settings_flags()
             .map(|opt| opt.unwrap_or_default())
             .map_err(Into::into)
@@ -557,12 +564,16 @@ impl Vauchi {
 
     /// Saves settings flags to encrypted storage.
     pub fn save_settings_flags(&self, flags: &SettingsFlags) -> VauchiResult<()> {
-        self.storage.save_settings_flags(flags).map_err(Into::into)
+        self.storage
+            .ux()
+            .save_settings_flags(flags)
+            .map_err(Into::into)
     }
 
     /// Saves backup reminder state to encrypted storage.
     pub fn save_backup_reminder_state(&self, state: &BackupReminderState) -> VauchiResult<()> {
         self.storage
+            .ux()
             .save_backup_reminder_state(state)
             .map_err(Into::into)
     }

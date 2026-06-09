@@ -97,14 +97,18 @@ impl Vauchi {
         let mut warnings = Vec::new();
 
         // C3: Enforce contact limit — compute remaining budget once before the loop.
-        let current_count = self.storage.count_contacts()?;
-        let max_contacts = self.storage.get_contact_limit()?;
+        let current_count = self.storage.contacts().count_contacts()?;
+        let max_contacts = self.storage.contacts().get_contact_limit()?;
         let mut remaining_budget = max_contacts.saturating_sub(current_count);
 
         for (card, uid) in entries {
             // W7: Skip if a contact with this original_uid already exists.
             if let Some(ref uid_val) = uid
-                && self.storage.find_imported_by_uid(uid_val)?.is_some()
+                && self
+                    .storage
+                    .contacts()
+                    .find_imported_by_uid(uid_val)?
+                    .is_some()
             {
                 skipped += 1;
                 warnings.push(ImportWarning::DuplicateUid {
@@ -124,7 +128,7 @@ impl Vauchi {
             }
 
             let contact = Contact::from_import(card, ImportSource::VcardFile, uid, 0);
-            match self.storage.save_contact(&contact) {
+            match self.storage.contacts().save_contact(&contact) {
                 Ok(_) => {
                     imported += 1;
                     remaining_budget = remaining_budget.saturating_sub(1);
@@ -163,12 +167,12 @@ impl Vauchi {
     pub fn import_received_link_card(&self, card: ContactCard) -> VauchiResult<String> {
         let uid = card.id().to_string();
         // Idempotent dedup: the card id is the key.
-        if let Some(existing_id) = self.storage.find_imported_by_uid(&uid)? {
+        if let Some(existing_id) = self.storage.contacts().find_imported_by_uid(&uid)? {
             return Ok(existing_id);
         }
         // C3 — enforce the per-identity contact limit.
-        let count = self.storage.count_contacts()?;
-        let limit = self.storage.get_contact_limit()?;
+        let count = self.storage.contacts().count_contacts()?;
+        let limit = self.storage.contacts().get_contact_limit()?;
         if count >= limit {
             return Err(VauchiError::InvalidState(format!(
                 "contact limit reached ({limit})"
@@ -176,7 +180,7 @@ impl Vauchi {
         }
         let now = self.clock.unix_seconds();
         let contact = Contact::from_import(card, ImportSource::LinkExchange, Some(uid), now);
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         Ok(contact.id().to_string())
     }
 
@@ -247,13 +251,13 @@ impl Vauchi {
 
         // Idempotent: keep the existing contact and its ratchet — re-keying
         // would desync an already-established channel.
-        if self.storage.load_contact(&contact_id)?.is_some() {
+        if self.storage.contacts().load_contact(&contact_id)?.is_some() {
             return Ok(contact_id);
         }
 
         // Enforce the per-identity contact limit (C3) — mirrors the import path.
-        let count = self.storage.count_contacts()?;
-        let limit = self.storage.get_contact_limit()?;
+        let count = self.storage.contacts().count_contacts()?;
+        let limit = self.storage.contacts().get_contact_limit()?;
         if count >= limit {
             return Err(VauchiError::InvalidState(format!(
                 "contact limit reached ({limit})"

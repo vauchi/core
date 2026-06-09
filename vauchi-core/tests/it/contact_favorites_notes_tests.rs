@@ -99,9 +99,13 @@ fn test_contact_favorite_persists_in_storage() {
     let contact_id = contact.id().to_string();
 
     contact.set_favorite(true);
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .unwrap();
     assert!(
         loaded.is_favorite(),
         "Favorite status should persist through storage round-trip"
@@ -117,12 +121,16 @@ fn test_contact_remove_favorite_persists_in_storage() {
     let contact_id = contact.id().to_string();
 
     contact.set_favorite(true);
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     contact.set_favorite(false);
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .unwrap();
     assert!(
         !loaded.is_favorite(),
         "Non-favorite status should persist through storage round-trip"
@@ -163,16 +171,17 @@ fn test_contact_set_note_stores_note() {
     let contact = create_test_contact_with_name("Carol", 0x03);
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let note = "Met at conference 2024";
     let note_encrypted =
         vauchi_core::crypto::encrypt(&SymmetricKey::generate(), note.as_bytes()).unwrap();
     storage
+        .contacts()
         .save_personal_notes(&contact_id, &note_encrypted)
         .unwrap();
 
-    let loaded_notes = storage.load_personal_notes(&contact_id).unwrap();
+    let loaded_notes = storage.contacts().load_personal_notes(&contact_id).unwrap();
     assert!(
         loaded_notes.is_some(),
         "Personal notes should be present after saving"
@@ -193,11 +202,12 @@ fn test_contact_edit_note_updates_note() {
     let contact_id = contact.id().to_string();
     let enc_key = SymmetricKey::generate();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let note1 = "Met at conference 2024";
     let note1_enc = vauchi_core::crypto::encrypt(&enc_key, note1.as_bytes()).unwrap();
     storage
+        .contacts()
         .save_personal_notes(&contact_id, &note1_enc)
         .unwrap();
 
@@ -205,11 +215,16 @@ fn test_contact_edit_note_updates_note() {
     let note2 = "Met at tech conference, works at Acme";
     let note2_enc = vauchi_core::crypto::encrypt(&enc_key, note2.as_bytes()).unwrap();
     storage
+        .contacts()
         .save_personal_notes(&contact_id, &note2_enc)
         .unwrap();
 
     // Load back — should be updated
-    let loaded = storage.load_personal_notes(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_personal_notes(&contact_id)
+        .unwrap()
+        .unwrap();
 
     let decrypted = vauchi_core::crypto::decrypt(&enc_key, &loaded).unwrap();
     assert_eq!(
@@ -227,16 +242,22 @@ fn test_contact_delete_note_removes_note() {
     let contact = create_test_contact_with_name("Carol", 0x03);
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let note_enc = vauchi_core::crypto::encrypt(&SymmetricKey::generate(), b"Some note").unwrap();
-    storage.save_personal_notes(&contact_id, &note_enc).unwrap();
+    storage
+        .contacts()
+        .save_personal_notes(&contact_id, &note_enc)
+        .unwrap();
 
     // Delete note by saving NULL (empty bytes to clear)
-    storage.delete_personal_notes(&contact_id).unwrap();
+    storage
+        .contacts()
+        .delete_personal_notes(&contact_id)
+        .unwrap();
 
     // Load back — should be None
-    let loaded = storage.load_personal_notes(&contact_id).unwrap();
+    let loaded = storage.contacts().load_personal_notes(&contact_id).unwrap();
     assert!(
         loaded.is_none(),
         "Personal notes should be None after deletion"
@@ -263,14 +284,21 @@ fn test_contact_notes_not_included_in_exchange_payload() {
     let contact = create_test_contact_with_name("Bob", 0x02);
     let contact_id = contact.id().to_string();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let note_enc =
         vauchi_core::crypto::encrypt(&SymmetricKey::generate(), b"Secret note about Bob").unwrap();
-    storage.save_personal_notes(&contact_id, &note_enc).unwrap();
+    storage
+        .contacts()
+        .save_personal_notes(&contact_id, &note_enc)
+        .unwrap();
 
     // Load the contact back — the Contact struct should NOT expose notes
-    let loaded_contact = storage.load_contact(&contact_id).unwrap().unwrap();
+    let loaded_contact = storage
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .unwrap();
 
     // The ContactCard (the shared data) must not contain personal notes
     let card = loaded_contact.card();
@@ -285,7 +313,7 @@ fn test_contact_notes_not_included_in_exchange_payload() {
     );
 
     // Notes are only accessible through the separate storage API
-    let notes = storage.load_personal_notes(&contact_id).unwrap();
+    let notes = storage.contacts().load_personal_notes(&contact_id).unwrap();
     assert!(
         notes.is_some(),
         "Notes should be accessible through storage API"
@@ -305,7 +333,7 @@ fn test_contact_note_unicode_edge_cases() {
     let contact_id = contact.id().to_string();
     let enc_key = SymmetricKey::generate();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let test_cases = vec![
         ("emoji", "\u{1F600}\u{1F60D}\u{1F4A9}"),
@@ -328,9 +356,16 @@ fn test_contact_note_unicode_edge_cases() {
 
     for (label, note_text) in test_cases {
         let note_enc = vauchi_core::crypto::encrypt(&enc_key, note_text.as_bytes()).unwrap();
-        storage.save_personal_notes(&contact_id, &note_enc).unwrap();
+        storage
+            .contacts()
+            .save_personal_notes(&contact_id, &note_enc)
+            .unwrap();
 
-        let loaded = storage.load_personal_notes(&contact_id).unwrap().unwrap();
+        let loaded = storage
+            .contacts()
+            .load_personal_notes(&contact_id)
+            .unwrap()
+            .unwrap();
         let decrypted = vauchi_core::crypto::decrypt(&enc_key, &loaded).unwrap();
         assert_eq!(
             decrypted,
@@ -350,14 +385,21 @@ fn test_contact_note_max_length() {
     let contact_id = contact.id().to_string();
     let enc_key = SymmetricKey::generate();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Test with a very large note (10KB)
     let large_note = "A".repeat(10_000);
     let note_enc = vauchi_core::crypto::encrypt(&enc_key, large_note.as_bytes()).unwrap();
-    storage.save_personal_notes(&contact_id, &note_enc).unwrap();
+    storage
+        .contacts()
+        .save_personal_notes(&contact_id, &note_enc)
+        .unwrap();
 
-    let loaded = storage.load_personal_notes(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_personal_notes(&contact_id)
+        .unwrap()
+        .unwrap();
     let decrypted = vauchi_core::crypto::decrypt(&enc_key, &loaded).unwrap();
     assert_eq!(
         decrypted.len(),
@@ -380,14 +422,21 @@ fn test_contact_note_empty_string() {
     let contact_id = contact.id().to_string();
     let enc_key = SymmetricKey::generate();
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Save an empty string note (encrypted empty bytes)
     let empty_note = "";
     let note_enc = vauchi_core::crypto::encrypt(&enc_key, empty_note.as_bytes()).unwrap();
-    storage.save_personal_notes(&contact_id, &note_enc).unwrap();
+    storage
+        .contacts()
+        .save_personal_notes(&contact_id, &note_enc)
+        .unwrap();
 
-    let loaded = storage.load_personal_notes(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_personal_notes(&contact_id)
+        .unwrap()
+        .unwrap();
     let decrypted = vauchi_core::crypto::decrypt(&enc_key, &loaded).unwrap();
     assert_eq!(
         decrypted.len(),

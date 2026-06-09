@@ -221,10 +221,12 @@ fn test_field_modification_and_removal_propagation() {
 
         alice_wb
             .storage()
+            .ratchets()
             .save_ratchet_state(&bob_id, &alice_ratchet, true)
             .unwrap();
         bob_wb
             .storage()
+            .ratchets()
             .save_ratchet_state(&alice_id, &bob_ratchet, false)
             .unwrap();
 
@@ -244,11 +246,16 @@ fn test_field_modification_and_removal_propagation() {
             .unwrap();
         assert_eq!(queued, 1, "Should queue update for Bob");
 
-        let pending = alice_wb.storage().get_pending_updates(&bob_id).unwrap();
+        let pending = alice_wb
+            .storage()
+            .pending()
+            .get_pending_updates(&bob_id)
+            .unwrap();
         assert!(!pending.is_empty(), "Should have pending update");
 
         let (mut ratchet, _) = bob_wb
             .storage()
+            .ratchets()
             .load_ratchet_state(&alice_id)
             .unwrap()
             .unwrap();

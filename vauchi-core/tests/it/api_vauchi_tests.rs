@@ -291,7 +291,11 @@ fn test_propagate_card_update_to_contacts() {
     let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1);
 
-    let pending = wb.storage().get_pending_updates(&contact_id).unwrap();
+    let pending = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&contact_id)
+        .unwrap();
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].update_type, "card_delta");
 }
@@ -351,7 +355,11 @@ fn test_propagate_empty_delta_not_queued() {
     let queued = wb.propagate_card_update(&card, &card).unwrap();
     assert_eq!(queued, 0);
 
-    let pending = wb.storage().get_pending_updates(&contact_id).unwrap();
+    let pending = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&contact_id)
+        .unwrap();
     assert!(pending.is_empty());
 }
 
@@ -442,7 +450,11 @@ fn test_propagate_partial_visibility() {
     let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1, "Update should be queued for visible field");
 
-    let pending = wb.storage().get_pending_updates(&contact_id).unwrap();
+    let pending = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&contact_id)
+        .unwrap();
     assert_eq!(pending.len(), 1);
 }
 

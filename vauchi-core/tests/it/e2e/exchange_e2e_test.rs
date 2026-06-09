@@ -91,10 +91,12 @@ fn test_contact_exchange_happy_path() {
 
     alice_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&bob_contact_id, &alice_ratchet, true)
         .unwrap();
     bob_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&alice_contact_id, &bob_ratchet, false)
         .unwrap();
 
@@ -111,12 +113,14 @@ fn test_contact_exchange_happy_path() {
 
     let alice_ratchet_loaded = alice_wb
         .storage()
+        .ratchets()
         .load_ratchet_state(&bob_contact_id)
         .unwrap();
     assert!(alice_ratchet_loaded.is_some(), "expected Some value");
 
     let bob_ratchet_loaded = bob_wb
         .storage()
+        .ratchets()
         .load_ratchet_state(&alice_contact_id)
         .unwrap();
     assert!(bob_ratchet_loaded.is_some(), "expected Some value");

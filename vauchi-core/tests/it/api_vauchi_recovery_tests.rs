@@ -85,7 +85,10 @@ fn create_recovery_claim_persists_progress_with_default_threshold() {
 fn create_recovery_claim_honors_custom_threshold() {
     let wb = vauchi_with_identity("Alice");
     let custom = RecoverySettings::new(5, 2).unwrap();
-    wb.storage().save_recovery_settings(&custom).unwrap();
+    wb.storage()
+        .recovery()
+        .save_recovery_settings(&custom)
+        .unwrap();
 
     let _ = wb.create_recovery_claim(&[2u8; 32]).unwrap();
 
@@ -222,6 +225,7 @@ fn save_recovery_response_action_persists_to_storage() {
 
     let row = wb
         .storage()
+        .recovery()
         .get_recovery_response("claim-id-1")
         .unwrap()
         .expect("response must exist after save");
@@ -243,6 +247,7 @@ fn save_recovery_response_action_records_remind_at() {
 
     let (contact_id, response, remind_at) = wb
         .storage()
+        .recovery()
         .get_recovery_response("claim-2")
         .unwrap()
         .expect("response must exist after save");

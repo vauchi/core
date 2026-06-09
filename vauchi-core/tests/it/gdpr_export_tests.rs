@@ -28,7 +28,7 @@ fn setup_storage_with_contacts() -> Storage {
     .unwrap();
     let shared_key = SymmetricKey::generate();
     let contact = Contact::from_exchange([1u8; 32], card, shared_key, 0);
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let mut own_card = ContactCard::new("My Name");
     own_card
@@ -39,7 +39,7 @@ fn setup_storage_with_contacts() -> Storage {
             0,
         ))
         .unwrap();
-    storage.save_own_card(&own_card).unwrap();
+    storage.contacts().save_own_card(&own_card).unwrap();
 
     storage
 }
@@ -114,9 +114,11 @@ fn test_export_includes_consent_records() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
     storage
+        .consent()
         .execute_consent_upsert("consent-1", "data_processing", true, 1000)
         .unwrap();
     storage
+        .consent()
         .execute_consent_upsert("consent-2", "contact_sharing", true, 1001)
         .unwrap();
 
@@ -175,7 +177,7 @@ fn test_export_version_bumped_to_3() {
 fn test_list_audit_log_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
-    let log = storage.list_audit_log().unwrap();
+    let log = storage.consent().list_audit_log().unwrap();
     assert!(log.is_empty(), "Empty DB should return empty audit log");
 }
 
@@ -184,12 +186,16 @@ fn test_list_audit_log_empty() {
 fn test_list_audit_log_roundtrip() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
-    storage.log_audit_event("consent_granted", None).unwrap();
     storage
+        .consent()
+        .log_audit_event("consent_granted", None)
+        .unwrap();
+    storage
+        .consent()
         .log_audit_event("data_exported", Some("full export"))
         .unwrap();
 
-    let log = storage.list_audit_log().unwrap();
+    let log = storage.consent().list_audit_log().unwrap();
     assert_eq!(log.len(), 2);
 
     assert_eq!(log[0].0, "consent_granted");
@@ -207,10 +213,11 @@ fn test_list_audit_log_decrypts_details() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
     storage
+        .consent()
         .log_audit_event("sensitive_op", Some("secret details"))
         .unwrap();
 
-    let log = storage.list_audit_log().unwrap();
+    let log = storage.consent().list_audit_log().unwrap();
     assert_eq!(log.len(), 1);
     assert_eq!(
         log[0].1.as_deref(),
@@ -226,9 +233,11 @@ fn test_export_includes_audit_log() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
     storage
+        .consent()
         .log_audit_event("consent_granted", Some("data_processing"))
         .unwrap();
     storage
+        .consent()
         .log_audit_event("contact_added", Some("alice"))
         .unwrap();
 

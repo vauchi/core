@@ -637,6 +637,7 @@ impl AppEngine {
                 let now = vauchi.clock().unix_seconds();
                 let rows = vauchi
                     .storage()
+                    .activity_log()
                     .activity_log_query_recent(now, 7 * 86400)
                     .unwrap_or_default();
                 let contacts: std::collections::HashMap<String, String> = vauchi
@@ -1260,6 +1261,7 @@ impl AppEngine {
     fn load_delivery_items(vauchi: &Vauchi) -> Vec<DeliveryItem> {
         let records = vauchi
             .storage()
+            .deliveries()
             .get_all_delivery_records()
             .unwrap_or_default();
 
@@ -1314,7 +1316,11 @@ impl AppEngine {
     }
 
     fn load_retry_entries(vauchi: &Vauchi) -> Vec<RetryEntry> {
-        let entries = vauchi.storage().get_all_retry_entries().unwrap_or_default();
+        let entries = vauchi
+            .storage()
+            .retries()
+            .get_all_retry_entries()
+            .unwrap_or_default();
 
         let contacts: HashMap<String, String> = vauchi
             .list_contacts()

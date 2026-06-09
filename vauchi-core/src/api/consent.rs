@@ -88,6 +88,7 @@ impl<'a> ConsentManager<'a> {
         let now = self.storage.clock().unix_seconds();
 
         self.storage
+            .consent()
             .execute_consent_upsert(&id, consent_type.as_str(), true, now)
     }
 
@@ -97,12 +98,13 @@ impl<'a> ConsentManager<'a> {
         let now = self.storage.clock().unix_seconds();
 
         self.storage
+            .consent()
             .execute_consent_upsert(&id, consent_type.as_str(), false, now)
     }
 
     /// Checks whether consent is currently granted for a type.
     pub fn check(&self, consent_type: &ConsentType) -> Result<bool, crate::storage::StorageError> {
-        self.storage.check_consent(consent_type.as_str())
+        self.storage.consent().check_consent(consent_type.as_str())
     }
 
     /// Grants consent with a specific policy version.
@@ -114,7 +116,7 @@ impl<'a> ConsentManager<'a> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = self.storage.clock().unix_seconds();
 
-        self.storage.execute_consent_upsert_with_version(
+        self.storage.consent().execute_consent_upsert_with_version(
             &id,
             consent_type.as_str(),
             true,
@@ -125,7 +127,7 @@ impl<'a> ConsentManager<'a> {
 
     /// Exports all consent records.
     pub fn export_consent_log(&self) -> Result<Vec<ConsentRecord>, crate::storage::StorageError> {
-        let rows = self.storage.list_consent_records()?;
+        let rows = self.storage.consent().list_consent_records()?;
         let records = rows
             .into_iter()
             .filter_map(|(id, ct_str, granted, ts)| {
@@ -145,7 +147,7 @@ impl<'a> ConsentManager<'a> {
     pub fn export_consent_log_with_version(
         &self,
     ) -> Result<Vec<ConsentRecord>, crate::storage::StorageError> {
-        let rows = self.storage.list_consent_records_with_version()?;
+        let rows = self.storage.consent().list_consent_records_with_version()?;
         let records = rows
             .into_iter()
             .filter_map(|(id, ct_str, granted, ts, pv)| {

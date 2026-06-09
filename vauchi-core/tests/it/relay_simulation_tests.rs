@@ -290,10 +290,12 @@ fn test_full_update_propagation() {
 
     alice_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&bob_id, &alice_ratchet, true)
         .unwrap();
     bob_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&alice_id, &bob_ratchet, false)
         .unwrap();
 
@@ -313,11 +315,16 @@ fn test_full_update_propagation() {
         .unwrap();
     assert_eq!(queued, 1);
 
-    let pending = alice_wb.storage().get_pending_updates(&bob_id).unwrap();
+    let pending = alice_wb
+        .storage()
+        .pending()
+        .get_pending_updates(&bob_id)
+        .unwrap();
     assert_eq!(pending.len(), 1);
 
     let (mut bob_ratchet, _) = bob_wb
         .storage()
+        .ratchets()
         .load_ratchet_state(&alice_id)
         .unwrap()
         .unwrap();

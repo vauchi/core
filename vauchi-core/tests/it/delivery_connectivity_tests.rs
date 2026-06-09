@@ -38,7 +38,7 @@ fn create_retry(storage: &Storage, msg_id: &str, attempt: u32, next_retry: u64) 
         created_at: ts,
         max_attempts: 5,
     };
-    storage.create_retry_entry(&entry).unwrap();
+    storage.retries().create_retry_entry(&entry).unwrap();
 }
 
 fn create_offline_update(storage: &Storage, manager: &OfflineManager, id: &str) {
@@ -124,7 +124,10 @@ fn test_combined_retry_and_offline_counts() {
         updated_at: ts,
         expires_at: None,
     };
-    storage.create_delivery_record(&delivery).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&delivery)
+        .unwrap();
 
     // 3 offline updates
     create_offline_update(&storage, &offline_manager, "q-1");

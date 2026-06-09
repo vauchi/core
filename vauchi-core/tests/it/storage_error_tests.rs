@@ -84,10 +84,11 @@ fn load_replay_nonces_returns_err_when_nonce_blob_has_wrong_length() {
     // simulates either DB tampering or single-row corruption that the
     // current `nonce_vec.try_into().ok()?` silently filters out.
     storage
+        .replay()
         .test_insert_malformed_replay_nonce("contact-1", &[0xAAu8; 31], 100)
         .expect("test helper insert should succeed");
 
-    let result = storage.load_replay_nonces("contact-1");
+    let result = storage.replay().load_replay_nonces("contact-1");
     assert!(
         result.is_err(),
         "malformed replay-nonce row must surface as Err (ADR-029 replay defense), got {:?}",
@@ -100,13 +101,15 @@ fn load_replay_nonces_returns_err_when_nonce_blob_has_wrong_length() {
 fn load_replay_nonces_happy_path_returns_inserted_nonces_in_order() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     storage
+        .replay()
         .save_replay_nonce("contact-1", &[0x11u8; 32], 100)
         .unwrap();
     storage
+        .replay()
         .save_replay_nonce("contact-1", &[0x22u8; 32], 200)
         .unwrap();
 
-    let nonces = storage.load_replay_nonces("contact-1").unwrap();
+    let nonces = storage.replay().load_replay_nonces("contact-1").unwrap();
     assert_eq!(nonces.len(), 2, "both inserted nonces should load");
     assert_eq!(nonces[0], ([0x11u8; 32], 100));
     assert_eq!(nonces[1], ([0x22u8; 32], 200));
@@ -154,16 +157,17 @@ fn load_contact_returns_err_when_exchange_transport_column_is_garbage() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut contact = make_contact("Alice");
     contact.set_exchange_transport(ExchangeTransport::Nfc);
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Corrupt the exchange_transport column to a value not in the
     // serde enum. Pre-fix the load silently fell back to Default (`Qr`)
     // and the contact appeared with a wrong trust badge.
     storage
+        .contacts()
         .test_corrupt_contact_text_column(contact.id(), "exchange_transport", "GarbageTransport!!")
         .expect("test helper should succeed");
 
-    let result = storage.load_contact(contact.id());
+    let result = storage.contacts().load_contact(contact.id());
     assert!(
         result.is_err(),
         "corrupt exchange_transport must surface as Err (ADR-034 trust-badge correctness), got {:?}",
@@ -176,9 +180,10 @@ fn load_contact_returns_err_when_exchange_transport_column_is_garbage() {
 fn load_contact_succeeds_with_logged_warning_when_trust_metrics_column_is_garbage() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let contact = make_contact("Bob");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     storage
+        .contacts()
         .test_corrupt_contact_text_column(contact.id(), "trust_metrics", "not-valid-json{")
         .expect("test helper should succeed");
 
@@ -186,6 +191,7 @@ fn load_contact_succeeds_with_logged_warning_when_trust_metrics_column_is_garbag
     // can still see Bob's name and re-exchange to repair the metrics).
     // The corruption is surfaced via tracing, not asserted in tests.
     let loaded = storage
+        .contacts()
         .load_contact(contact.id())
         .expect("trust_metrics corruption must not fail the load")
         .expect("contact must load");
@@ -200,13 +206,15 @@ fn load_contact_succeeds_with_logged_warning_when_trust_metrics_column_is_garbag
 fn load_contact_succeeds_with_logged_warning_when_reciprocity_column_is_garbage() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let contact = make_contact("Carol");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     storage
+        .contacts()
         .test_corrupt_contact_text_column(contact.id(), "reciprocity", "not-a-reciprocity-enum")
         .expect("test helper should succeed");
 
     let loaded = storage
+        .contacts()
         .load_contact(contact.id())
         .expect("reciprocity corruption must not fail the load")
         .expect("contact must load");

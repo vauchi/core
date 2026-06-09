@@ -399,7 +399,7 @@ fn test_sync_controller_sync_contact_with_ratchet() {
     let shared_key = SymmetricKey::generate();
     let contact = vauchi_core::contact::Contact::from_exchange(public_key, card, shared_key, 0);
     let contact_id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     // Register ratchet under the same contact_id.
     let ratchet = create_test_ratchet();
@@ -499,6 +499,7 @@ fn sync_skips_update_when_load_contact_returns_none_adr029() {
         target_relay_url: None,
     };
     storage
+        .pending()
         .queue_update(&update)
         .expect("queue_update should succeed");
 

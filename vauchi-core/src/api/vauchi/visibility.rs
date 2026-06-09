@@ -12,17 +12,17 @@ impl Vauchi {
 
     /// Lists all visibility labels.
     pub fn list_groups(&self) -> VauchiResult<Vec<crate::contact::Group>> {
-        Ok(self.storage.load_all_groups()?)
+        Ok(self.storage.labels().load_all_groups()?)
     }
 
     /// Creates a new visibility label.
     pub fn create_group(&self, name: &str) -> VauchiResult<crate::contact::Group> {
-        Ok(self.storage.create_group(name)?)
+        Ok(self.storage.labels().create_group(name)?)
     }
 
     /// Renames a visibility label.
     pub fn rename_group(&self, label_id: &str, new_name: &str) -> VauchiResult<()> {
-        Ok(self.storage.rename_group(label_id, new_name)?)
+        Ok(self.storage.labels().rename_group(label_id, new_name)?)
     }
 
     /// Sets or clears the per-group display name override.
@@ -35,11 +35,11 @@ impl Vauchi {
         label_id: &str,
         name_override: Option<&str>,
     ) -> VauchiResult<()> {
-        let mut label = self.storage.load_group(label_id)?;
+        let mut label = self.storage.labels().load_group(label_id)?;
         label
             .set_display_name_override(name_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.storage.save_group(&label)?;
+        self.storage.labels().save_group(&label)?;
         Ok(())
     }
 
@@ -60,22 +60,22 @@ impl Vauchi {
     /// fields before deletion.
     pub fn delete_group(&self, label_id: &str) -> VauchiResult<()> {
         // Load the label before deletion to capture its visible fields
-        let label = self.storage.load_group(label_id)?;
+        let label = self.storage.labels().load_group(label_id)?;
         let visible_fields = label.visible_fields().clone();
 
         // Delete the label from storage
-        self.storage.delete_group(label_id)?;
+        self.storage.labels().delete_group(label_id)?;
 
         // Check if this was the last label
-        let remaining_labels = self.storage.load_all_groups()?;
+        let remaining_labels = self.storage.labels().load_all_groups()?;
         if remaining_labels.is_empty() && !visible_fields.is_empty() {
             // Transitioning to no-group mode:
             // Migrate visible fields from the deleted label to field_visibility
-            if let Some(mut card) = self.storage.load_own_card()? {
+            if let Some(mut card) = self.storage.contacts().load_own_card()? {
                 for field_id in &visible_fields {
                     card.set_field_shown(field_id, true);
                 }
-                self.storage.save_own_card(&card)?;
+                self.storage.contacts().save_own_card(&card)?;
             }
         }
 
@@ -84,7 +84,7 @@ impl Vauchi {
 
     /// Gets a visibility label by ID.
     pub fn get_group(&self, label_id: &str) -> VauchiResult<crate::contact::Group> {
-        Ok(self.storage.load_group(label_id)?)
+        Ok(self.storage.labels().load_group(label_id)?)
     }
 
     /// Gets all contacts that are members of a visibility label.
@@ -93,10 +93,10 @@ impl Vauchi {
     /// `Contact` objects. Contacts that no longer exist in storage are
     /// silently skipped.
     pub fn get_group_members(&self, label_id: &str) -> VauchiResult<Vec<crate::contact::Contact>> {
-        let label = self.storage.load_group(label_id)?;
+        let label = self.storage.labels().load_group(label_id)?;
         let mut members = Vec::new();
         for contact_id in label.contacts() {
-            if let Some(contact) = self.storage.load_contact(contact_id)? {
+            if let Some(contact) = self.storage.contacts().load_contact(contact_id)? {
                 members.push(contact);
             }
         }
@@ -105,13 +105,17 @@ impl Vauchi {
 
     /// Adds a contact to a visibility label.
     pub fn add_contact_to_group(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
-        Ok(self.storage.add_contact_to_group(label_id, contact_id)?)
+        Ok(self
+            .storage
+            .labels()
+            .add_contact_to_group(label_id, contact_id)?)
     }
 
     /// Removes a contact from a visibility label.
     pub fn remove_contact_from_group(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
         Ok(self
             .storage
+            .labels()
             .remove_contact_from_group(label_id, contact_id)?)
     }
 
@@ -120,7 +124,7 @@ impl Vauchi {
         &self,
         contact_id: &str,
     ) -> VauchiResult<Vec<crate::contact::Group>> {
-        Ok(self.storage.get_groups_for_contact(contact_id)?)
+        Ok(self.storage.labels().get_groups_for_contact(contact_id)?)
     }
 
     /// Sets field visibility for a label.
@@ -135,6 +139,7 @@ impl Vauchi {
     ) -> VauchiResult<()> {
         Ok(self
             .storage
+            .labels()
             .set_group_field_visibility(label_id, field_id, is_visible)?)
     }
 
@@ -149,6 +154,7 @@ impl Vauchi {
     ) -> VauchiResult<()> {
         Ok(self
             .storage
+            .labels()
             .save_contact_override(contact_id, field_id, is_visible)?)
     }
 
@@ -158,7 +164,10 @@ impl Vauchi {
         contact_id: &str,
         field_id: &str,
     ) -> VauchiResult<()> {
-        Ok(self.storage.delete_contact_override(contact_id, field_id)?)
+        Ok(self
+            .storage
+            .labels()
+            .delete_contact_override(contact_id, field_id)?)
     }
 
     /// Gets all per-contact visibility overrides for a contact.
@@ -166,7 +175,7 @@ impl Vauchi {
         &self,
         contact_id: &str,
     ) -> VauchiResult<std::collections::HashMap<String, bool>> {
-        Ok(self.storage.load_contact_overrides(contact_id)?)
+        Ok(self.storage.labels().load_contact_overrides(contact_id)?)
     }
 
     /// Determines the effective visibility of a field for a contact.
@@ -183,17 +192,18 @@ impl Vauchi {
         // Load the contact's visibility rules as fallback
         let contact = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("contact: {}", contact_id)))?;
 
         // Check per-contact override first
-        let overrides = self.storage.load_contact_overrides(contact_id)?;
+        let overrides = self.storage.labels().load_contact_overrides(contact_id)?;
         if let Some(&is_visible) = overrides.get(field_id) {
             return Ok(is_visible);
         }
 
         // A group the contact is in that exposes this field grants it (Layer B).
-        let labels = self.storage.get_groups_for_contact(contact_id)?;
+        let labels = self.storage.labels().get_groups_for_contact(contact_id)?;
         if labels.iter().any(|l| l.is_field_visible(field_id)) {
             return Ok(true);
         }
@@ -204,7 +214,7 @@ impl Vauchi {
         // (2026-06-08-sync-card-update-not-group-filtered, decision A). Before
         // this, the Layer-A `can_see` fallback below ran unconditionally and
         // leaked ungranted fields (default `Everyone`) to grouped contacts.
-        if !self.storage.load_all_groups()?.is_empty() {
+        if !self.storage.labels().load_all_groups()?.is_empty() {
             return Ok(false);
         }
 
@@ -227,6 +237,7 @@ impl Vauchi {
     ) -> VauchiResult<bool> {
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::InvalidState("Contact not found".into()))?;
 
@@ -247,7 +258,7 @@ impl Vauchi {
                 .set_everyone(field_label);
         }
 
-        self.storage.save_contact(&contact)?;
+        self.storage.contacts().save_contact(&contact)?;
         let new_visible = !current_can_see;
         self.record_sync_item(crate::sync::SyncItem::VisibilityChanged {
             contact_id: contact_id.to_string(),

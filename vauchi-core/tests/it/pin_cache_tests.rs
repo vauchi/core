@@ -23,8 +23,8 @@ fn save_and_load_pin_cache() {
         PinnedCertificate::new([0xBB; 32]),
     ];
 
-    storage.save_pin_cache(relay, &pins).unwrap();
-    let cached = storage.load_pin_cache(relay).unwrap();
+    storage.pin_cache().save_pin_cache(relay, &pins).unwrap();
+    let cached = storage.pin_cache().load_pin_cache(relay).unwrap();
 
     assert!(cached.is_some(), "cached pins must be present after save");
     let (loaded_pins, fetched_at) = cached.unwrap();
@@ -39,7 +39,10 @@ fn save_and_load_pin_cache() {
 #[test]
 fn load_pin_cache_returns_none_when_empty() {
     let storage = open_storage();
-    let cached = storage.load_pin_cache("https://no-such-relay.com").unwrap();
+    let cached = storage
+        .pin_cache()
+        .load_pin_cache("https://no-such-relay.com")
+        .unwrap();
     assert!(cached.is_none());
 }
 
@@ -50,12 +53,13 @@ fn clear_pin_cache_removes_entry() {
     let storage = open_storage();
     let relay = "https://relay.vauchi.app";
     storage
+        .pin_cache()
         .save_pin_cache(relay, &[PinnedCertificate::new([0xCC; 32])])
         .unwrap();
 
-    storage.clear_pin_cache(relay).unwrap();
+    storage.pin_cache().clear_pin_cache(relay).unwrap();
 
-    let cached = storage.load_pin_cache(relay).unwrap();
+    let cached = storage.pin_cache().load_pin_cache(relay).unwrap();
     assert!(cached.is_none(), "cache must be empty after clear");
 }
 
@@ -72,10 +76,10 @@ fn save_pin_cache_upserts() {
         PinnedCertificate::new([0x33; 32]),
     ];
 
-    storage.save_pin_cache(relay, &pins_v1).unwrap();
-    storage.save_pin_cache(relay, &pins_v2).unwrap();
+    storage.pin_cache().save_pin_cache(relay, &pins_v1).unwrap();
+    storage.pin_cache().save_pin_cache(relay, &pins_v2).unwrap();
 
-    let (loaded, _) = storage.load_pin_cache(relay).unwrap().unwrap();
+    let (loaded, _) = storage.pin_cache().load_pin_cache(relay).unwrap().unwrap();
     assert_eq!(loaded.len(), 2, "upsert must replace with latest pins");
     assert_eq!(loaded[0], pins_v2[0]);
     assert_eq!(loaded[1], pins_v2[1]);
@@ -88,12 +92,14 @@ fn clear_pin_cache_does_not_affect_other_relays() {
     let storage = open_storage();
 
     storage
+        .pin_cache()
         .save_pin_cache(
             "https://relay-a.example.com",
             &[PinnedCertificate::new([0xAA; 32])],
         )
         .unwrap();
     storage
+        .pin_cache()
         .save_pin_cache(
             "https://relay-b.example.com",
             &[PinnedCertificate::new([0xBB; 32])],
@@ -101,15 +107,18 @@ fn clear_pin_cache_does_not_affect_other_relays() {
         .unwrap();
 
     storage
+        .pin_cache()
         .clear_pin_cache("https://relay-a.example.com")
         .unwrap();
 
     let b = storage
+        .pin_cache()
         .load_pin_cache("https://relay-b.example.com")
         .unwrap();
     assert!(b.is_some(), "relay-b pins must survive relay-a clear");
 
     let a = storage
+        .pin_cache()
         .load_pin_cache("https://relay-a.example.com")
         .unwrap();
     assert!(a.is_none(), "relay-a pins must be gone after clear");
@@ -125,7 +134,7 @@ fn save_empty_pin_list_roundtrips() {
     let storage = open_storage();
     let relay = "https://relay.vauchi.app";
 
-    storage.save_pin_cache(relay, &[]).unwrap();
-    let (loaded, _) = storage.load_pin_cache(relay).unwrap().unwrap();
+    storage.pin_cache().save_pin_cache(relay, &[]).unwrap();
+    let (loaded, _) = storage.pin_cache().load_pin_cache(relay).unwrap().unwrap();
     assert!(loaded.is_empty(), "empty pin list must roundtrip");
 }

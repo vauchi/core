@@ -47,7 +47,10 @@ pub fn process_revocation(
     revocation: &IdentityRevoked,
     storage: &Storage,
 ) -> Result<bool, crate::storage::StorageError> {
-    let contact = match storage.load_contact(revocation.sender_id.as_str())? {
+    let contact = match storage
+        .contacts()
+        .load_contact(revocation.sender_id.as_str())?
+    {
         Some(c) => c,
         None => return Ok(false), // No such contact — no-op
     };
@@ -68,12 +71,16 @@ pub fn process_revocation(
     }
 
     // Crypto-shred: delete CEK (card becomes permanently unreadable)
-    storage.delete_contact_cek(revocation.sender_id.as_str())?;
+    storage
+        .contacts()
+        .delete_contact_cek(revocation.sender_id.as_str())?;
 
     storage.delete_contact(revocation.sender_id.as_str())?;
 
     // Record tombstone (prevents future updates from revoked sender)
-    storage.record_revoked_sender(revocation.sender_id.as_str(), revocation.timestamp)?;
+    storage
+        .contacts()
+        .record_revoked_sender(revocation.sender_id.as_str(), revocation.timestamp)?;
 
     Ok(true)
 }

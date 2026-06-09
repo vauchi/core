@@ -17,8 +17,8 @@ fn test_ohttp_cache_save_and_load() {
     let storage = open_storage();
     let relay = "https://relay.example.com";
     let key = vec![1, 2, 3, 4];
-    storage.save_ohttp_key(relay, &key).unwrap();
-    let cached = storage.load_ohttp_key(relay).unwrap();
+    storage.ohttp_cache().save_ohttp_key(relay, &key).unwrap();
+    let cached = storage.ohttp_cache().load_ohttp_key(relay).unwrap();
     assert!(cached.is_some());
     let (bytes, fetched_at) = cached.unwrap();
     assert_eq!(bytes, key);
@@ -29,7 +29,10 @@ fn test_ohttp_cache_save_and_load() {
 #[test]
 fn test_ohttp_cache_returns_none_when_empty() {
     let storage = open_storage();
-    let cached = storage.load_ohttp_key("https://no-such-relay.com").unwrap();
+    let cached = storage
+        .ohttp_cache()
+        .load_ohttp_key("https://no-such-relay.com")
+        .unwrap();
     assert!(cached.is_none());
 }
 
@@ -38,9 +41,12 @@ fn test_ohttp_cache_returns_none_when_empty() {
 fn test_ohttp_cache_clear() {
     let storage = open_storage();
     let relay = "https://relay.example.com";
-    storage.save_ohttp_key(relay, &[1, 2, 3]).unwrap();
-    storage.clear_ohttp_key(relay).unwrap();
-    let cached = storage.load_ohttp_key(relay).unwrap();
+    storage
+        .ohttp_cache()
+        .save_ohttp_key(relay, &[1, 2, 3])
+        .unwrap();
+    storage.ohttp_cache().clear_ohttp_key(relay).unwrap();
+    let cached = storage.ohttp_cache().load_ohttp_key(relay).unwrap();
     assert!(cached.is_none());
 }
 
@@ -49,9 +55,19 @@ fn test_ohttp_cache_clear() {
 fn test_ohttp_cache_upsert_overwrites() {
     let storage = open_storage();
     let relay = "https://relay.example.com";
-    storage.save_ohttp_key(relay, &[1, 2]).unwrap();
-    storage.save_ohttp_key(relay, &[3, 4]).unwrap();
-    let (bytes, _) = storage.load_ohttp_key(relay).unwrap().unwrap();
+    storage
+        .ohttp_cache()
+        .save_ohttp_key(relay, &[1, 2])
+        .unwrap();
+    storage
+        .ohttp_cache()
+        .save_ohttp_key(relay, &[3, 4])
+        .unwrap();
+    let (bytes, _) = storage
+        .ohttp_cache()
+        .load_ohttp_key(relay)
+        .unwrap()
+        .unwrap();
     assert_eq!(bytes, vec![3, 4]);
 }
 
@@ -66,18 +82,22 @@ fn test_ohttp_cache_clear_does_not_affect_other_relays() {
     let storage = open_storage();
 
     storage
+        .ohttp_cache()
         .save_ohttp_key("https://relay-a.example.com", &[1, 2])
         .unwrap();
     storage
+        .ohttp_cache()
         .save_ohttp_key("https://relay-b.example.com", &[3, 4])
         .unwrap();
 
     storage
+        .ohttp_cache()
         .clear_ohttp_key("https://relay-a.example.com")
         .unwrap();
 
     // relay-b must be unaffected.
     let b = storage
+        .ohttp_cache()
         .load_ohttp_key("https://relay-b.example.com")
         .unwrap();
     assert!(
@@ -92,6 +112,7 @@ fn test_ohttp_cache_clear_does_not_affect_other_relays() {
 
     // relay-a must be gone.
     let a = storage
+        .ohttp_cache()
         .load_ohttp_key("https://relay-a.example.com")
         .unwrap();
     assert!(

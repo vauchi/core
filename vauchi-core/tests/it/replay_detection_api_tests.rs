@@ -152,7 +152,11 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
 
     // The important integration property is: after a successful process_card_update,
     // the nonce is persisted in storage, and it's the same nonce from the delta.
-    let nonces = alice.storage().load_replay_nonces(&bob_id).unwrap();
+    let nonces = alice
+        .storage()
+        .replay()
+        .load_replay_nonces(&bob_id)
+        .unwrap();
     assert!(
         !nonces.is_empty(),
         "Nonce should be persisted after successful update"
@@ -186,7 +190,11 @@ fn test_replay_accepts_fresh_nonces() {
     let result2 = alice.process_card_update(&bob_id, &encrypted2);
     assert!(result2.is_ok(), "Second fresh nonce should succeed");
 
-    let nonces = alice.storage().load_replay_nonces(&bob_id).unwrap();
+    let nonces = alice
+        .storage()
+        .replay()
+        .load_replay_nonces(&bob_id)
+        .unwrap();
     assert_eq!(nonces.len(), 2, "Two distinct nonces should be persisted");
 }
 
@@ -196,7 +204,11 @@ fn test_replay_nonce_persisted_after_successful_update() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
     let alice_pk = alice.identity().unwrap().signing_public_key();
 
-    let nonces_before = alice.storage().load_replay_nonces(&bob_id).unwrap();
+    let nonces_before = alice
+        .storage()
+        .replay()
+        .load_replay_nonces(&bob_id)
+        .unwrap();
     assert!(nonces_before.is_empty(), "No nonces before any update");
 
     let encrypted = create_encrypted_update(
@@ -208,7 +220,11 @@ fn test_replay_nonce_persisted_after_successful_update() {
     );
     alice.process_card_update(&bob_id, &encrypted).unwrap();
 
-    let nonces_after = alice.storage().load_replay_nonces(&bob_id).unwrap();
+    let nonces_after = alice
+        .storage()
+        .replay()
+        .load_replay_nonces(&bob_id)
+        .unwrap();
     assert_eq!(
         nonces_after.len(),
         1,

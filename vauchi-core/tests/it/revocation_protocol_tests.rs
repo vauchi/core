@@ -171,7 +171,7 @@ fn test_process_revocation_deletes_contact_and_records_tombstone() {
 
     // We are Bob. Store Alice as our contact.
     let alice_contact = make_contact_with_pk(*identity.signing_public_key(), "Alice");
-    storage.save_contact(&alice_contact).unwrap();
+    storage.contacts().save_contact(&alice_contact).unwrap();
 
     // Use a future timestamp (must be >= exchange_timestamp to not be stale)
     let future_ts = alice_contact.exchange_timestamp().unwrap() + 1;
@@ -180,9 +180,20 @@ fn test_process_revocation_deletes_contact_and_records_tombstone() {
     let result = process_revocation(&revoked, &storage);
     result.expect("expected success");
 
-    assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
+    assert!(
+        storage
+            .contacts()
+            .load_contact(alice_contact.id())
+            .unwrap()
+            .is_none()
+    );
 
-    assert!(storage.is_sender_revoked(alice_contact.id()).unwrap());
+    assert!(
+        storage
+            .contacts()
+            .is_sender_revoked(alice_contact.id())
+            .unwrap()
+    );
 }
 
 // @scenario: privacy_compliance :: Spoofed revocation signal is rejected
@@ -196,7 +207,7 @@ fn test_process_revocation_rejects_invalid_signature() {
     let bob_id = hex::encode(bob_pk);
 
     let alice_contact = make_contact_with_pk(*identity.signing_public_key(), "Alice");
-    storage.save_contact(&alice_contact).unwrap();
+    storage.contacts().save_contact(&alice_contact).unwrap();
 
     let future_ts = alice_contact.exchange_timestamp().unwrap() + 1;
     let mut spoofed = IdentityRevoked::create(&mallory, &bob_id, future_ts);
@@ -207,6 +218,7 @@ fn test_process_revocation_rejects_invalid_signature() {
 
     // Alice's contact should still exist (signature didn't verify)
     storage
+        .contacts()
         .load_contact(alice_contact.id())
         .unwrap()
         .expect("expected Some");
@@ -222,7 +234,7 @@ fn test_process_revocation_stale_rejected() {
     let bob_id = hex::encode(bob_pk);
 
     let alice_contact = make_contact_with_pk(*identity.signing_public_key(), "Alice");
-    storage.save_contact(&alice_contact).unwrap();
+    storage.contacts().save_contact(&alice_contact).unwrap();
 
     // Revocation with timestamp 0 (before any possible exchange)
     let stale_revoked = IdentityRevoked::create(&identity, &bob_id, 0);
@@ -232,6 +244,7 @@ fn test_process_revocation_stale_rejected() {
 
     // Alice's contact should still exist (stale revocation ignored)
     storage
+        .contacts()
         .load_contact(alice_contact.id())
         .unwrap()
         .expect("expected Some");
@@ -258,10 +271,11 @@ fn test_update_after_revocation_discarded_via_tombstone() {
     let storage = test_storage();
 
     storage
+        .contacts()
         .record_revoked_sender("alice_id", 1700000000)
         .unwrap();
 
-    assert!(storage.is_sender_revoked("alice_id").unwrap());
+    assert!(storage.contacts().is_sender_revoked("alice_id").unwrap());
 }
 
 // @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
@@ -277,7 +291,7 @@ fn test_revocation_only_deletes_matching_sender() {
 
     // Store Alice (with Alice's public key)
     let alice_contact = make_contact_with_pk(*alice.signing_public_key(), "Alice");
-    storage.save_contact(&alice_contact).unwrap();
+    storage.contacts().save_contact(&alice_contact).unwrap();
 
     // Bob revokes, using Alice's ID as recipient (Bob is the one sending revocation)
     let revocation = IdentityRevoked::create(&bob, &bob_id, 1700000000);
@@ -286,6 +300,7 @@ fn test_revocation_only_deletes_matching_sender() {
 
     // Alice should still be there (revocation was from unknown sender)
     storage
+        .contacts()
         .load_contact(alice_contact.id())
         .unwrap()
         .expect("expected Some");
@@ -301,7 +316,7 @@ fn test_revocation_with_future_timestamp() {
     let bob_id = hex::encode(bob_pk);
 
     let alice_contact = make_contact_with_pk(*alice.signing_public_key(), "Alice");
-    storage.save_contact(&alice_contact).unwrap();
+    storage.contacts().save_contact(&alice_contact).unwrap();
 
     let exchange_ts = alice_contact.exchange_timestamp().unwrap();
     let future_ts = exchange_ts + 10000;
@@ -311,7 +326,13 @@ fn test_revocation_with_future_timestamp() {
     process_revocation(&revocation, &storage).unwrap();
 
     // Alice contact should be deleted (revocation is valid)
-    assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
+    assert!(
+        storage
+            .contacts()
+            .load_contact(alice_contact.id())
+            .unwrap()
+            .is_none()
+    );
 }
 
 // @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
@@ -324,7 +345,7 @@ fn test_revocation_with_minimum_valid_timestamp() {
     let bob_id = hex::encode(bob_pk);
 
     let alice_contact = make_contact_with_pk(*alice.signing_public_key(), "Alice");
-    storage.save_contact(&alice_contact).unwrap();
+    storage.contacts().save_contact(&alice_contact).unwrap();
 
     let exchange_ts = alice_contact.exchange_timestamp().unwrap();
     // Minimum valid timestamp (equal to exchange_timestamp, not less than)
@@ -335,7 +356,13 @@ fn test_revocation_with_minimum_valid_timestamp() {
     process_revocation(&revocation, &storage).unwrap();
 
     // Alice contact should be deleted (timestamp equals exchange_timestamp, so >= condition is true)
-    assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
+    assert!(
+        storage
+            .contacts()
+            .load_contact(alice_contact.id())
+            .unwrap()
+            .is_none()
+    );
 }
 
 // @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
@@ -410,11 +437,17 @@ fn test_process_revocation_reports_outcome() {
 
     // Known contact, valid signature -> Ok(true) and the contact is shredded.
     let alice_contact = make_contact_with_pk(*identity.signing_public_key(), "Alice");
-    storage.save_contact(&alice_contact).unwrap();
+    storage.contacts().save_contact(&alice_contact).unwrap();
     let future_ts = alice_contact.exchange_timestamp().unwrap() + 1;
     let valid = IdentityRevoked::create(&identity, &bob_id, future_ts);
     assert!(process_revocation(&valid, &storage).unwrap());
-    assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
+    assert!(
+        storage
+            .contacts()
+            .load_contact(alice_contact.id())
+            .unwrap()
+            .is_none()
+    );
 }
 
 // @scenario: privacy_compliance :: A received revocation blob shreds the contact
@@ -425,7 +458,7 @@ fn test_revocation_blob_decode_then_process_shreds_contact() {
     let identity = Identity::create("Alice", 0);
     let bob_id = hex::encode([0xBBu8; 32]);
     let alice_contact = make_contact_with_pk(*identity.signing_public_key(), "Alice");
-    storage.save_contact(&alice_contact).unwrap();
+    storage.contacts().save_contact(&alice_contact).unwrap();
     let future_ts = alice_contact.exchange_timestamp().unwrap() + 1;
 
     // Simulate the receive path: encode -> blob -> decode -> process.
@@ -433,8 +466,19 @@ fn test_revocation_blob_decode_then_process_shreds_contact() {
     let decoded = decode_revocation_blob(&blob).expect("decode");
     assert!(process_revocation(&decoded, &storage).unwrap());
 
-    assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
-    assert!(storage.is_sender_revoked(alice_contact.id()).unwrap());
+    assert!(
+        storage
+            .contacts()
+            .load_contact(alice_contact.id())
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        storage
+            .contacts()
+            .is_sender_revoked(alice_contact.id())
+            .unwrap()
+    );
 }
 
 // End-to-end: Alice deletes her identity (GDPR), and Bob — her contact —
@@ -466,7 +510,10 @@ fn test_gdpr_deletion_revocation_shreds_at_recipient() {
         SymmetricKey::generate(),
         1_700_000_000,
     );
-    alice_storage.save_contact(&alice_bob_contact).unwrap();
+    alice_storage
+        .contacts()
+        .save_contact(&alice_bob_contact)
+        .unwrap();
 
     let dm = DeletionManager::new(&alice_storage);
     dm.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -477,9 +524,13 @@ fn test_gdpr_deletion_revocation_shreds_at_recipient() {
     // Bob's side: he has Alice as a contact, keyed by Alice's signing key.
     let bob_storage = test_storage();
     let bob_alice_contact = make_contact_with_pk(*alice.signing_public_key(), "Alice");
-    bob_storage.save_contact(&bob_alice_contact).unwrap();
+    bob_storage
+        .contacts()
+        .save_contact(&bob_alice_contact)
+        .unwrap();
     assert!(
         bob_storage
+            .contacts()
             .load_contact(bob_alice_contact.id())
             .unwrap()
             .is_some()
@@ -498,6 +549,7 @@ fn test_gdpr_deletion_revocation_shreds_at_recipient() {
     // Alice is crypto-shredded from Bob's contacts + tombstoned.
     assert!(
         bob_storage
+            .contacts()
             .load_contact(bob_alice_contact.id())
             .unwrap()
             .is_none(),
@@ -505,6 +557,7 @@ fn test_gdpr_deletion_revocation_shreds_at_recipient() {
     );
     assert!(
         bob_storage
+            .contacts()
             .is_sender_revoked(bob_alice_contact.id())
             .unwrap(),
         "Alice must be tombstoned"

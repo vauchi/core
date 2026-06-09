@@ -51,6 +51,7 @@ fn contact_added_event_creates_log_entry() {
 
     // Verify the row is queryable from storage.
     let rows = storage
+        .activity_log()
         .activity_log_query_recent(NOW, 7 * 24 * 3600)
         .unwrap();
     assert_eq!(rows.len(), 1);
@@ -80,6 +81,7 @@ fn duplicate_event_returns_empty() {
 
     // Only one row should exist in storage.
     let rows = storage
+        .activity_log()
         .activity_log_query_recent(NOW, 7 * 24 * 3600)
         .unwrap();
     assert_eq!(rows.len(), 1, "storage must contain only one row");
@@ -114,6 +116,7 @@ fn emergency_alert_creates_log_entry() {
     }
 
     let rows = storage
+        .activity_log()
         .activity_log_query_recent(NOW, 7 * 24 * 3600)
         .unwrap();
     assert_eq!(rows.len(), 1);
@@ -145,6 +148,7 @@ fn unrelated_events_produce_no_entries() {
     assert_eq!(result.len(), 0, "no entries expected for unrelated events");
 
     let rows = storage
+        .activity_log()
         .activity_log_query_recent(NOW, 7 * 24 * 3600)
         .unwrap();
     assert_eq!(rows.len(), 0);

@@ -26,7 +26,7 @@ fn test_add_contact_at_limit_minus_one_succeeds() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
 
     // Set a low limit for testing (avoid creating 10,000 contacts in a unit test)
-    wb.storage().set_contact_limit(3).unwrap();
+    wb.storage().contacts().set_contact_limit(3).unwrap();
 
     wb.add_contact(make_contact("Bob")).unwrap();
     wb.add_contact(make_contact("Carol")).unwrap();
@@ -43,7 +43,7 @@ fn test_add_contact_at_limit_minus_one_succeeds() {
 fn test_add_contact_reaches_exact_limit() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
 
-    wb.storage().set_contact_limit(2).unwrap();
+    wb.storage().contacts().set_contact_limit(2).unwrap();
 
     wb.add_contact(make_contact("Bob")).unwrap();
     let result = wb.add_contact(make_contact("Carol"));
@@ -60,7 +60,7 @@ fn test_add_contact_reaches_exact_limit() {
 fn test_add_contact_exceeds_limit_returns_error() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
 
-    wb.storage().set_contact_limit(2).unwrap();
+    wb.storage().contacts().set_contact_limit(2).unwrap();
 
     wb.add_contact(make_contact("Bob")).unwrap();
     wb.add_contact(make_contact("Carol")).unwrap();
@@ -78,7 +78,7 @@ fn test_add_contact_exceeds_limit_returns_error() {
 #[test]
 fn test_exceed_limit_error_message_includes_limit() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
-    wb.storage().set_contact_limit(1).unwrap();
+    wb.storage().contacts().set_contact_limit(1).unwrap();
 
     wb.add_contact(make_contact("Bob")).unwrap();
 
@@ -101,7 +101,7 @@ fn test_exceed_limit_error_message_includes_limit() {
 #[test]
 fn test_exceed_limit_contact_not_persisted() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
-    wb.storage().set_contact_limit(1).unwrap();
+    wb.storage().contacts().set_contact_limit(1).unwrap();
 
     wb.add_contact(make_contact("Bob")).unwrap();
     let _ = wb.add_contact(make_contact("Carol")); // Should fail
@@ -117,7 +117,7 @@ fn test_exceed_limit_contact_not_persisted() {
 #[test]
 fn test_add_contact_after_removal_succeeds() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
-    wb.storage().set_contact_limit(2).unwrap();
+    wb.storage().contacts().set_contact_limit(2).unwrap();
 
     let bob = make_contact("Bob");
     let bob_id = bob.id().to_string();
@@ -137,7 +137,7 @@ fn test_add_contact_after_removal_succeeds() {
 #[test]
 fn test_default_limit_is_10000() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
-    let limit = wb.storage().get_contact_limit().unwrap();
+    let limit = wb.storage().contacts().get_contact_limit().unwrap();
     assert_eq!(limit, 10_000, "Default contact limit should be 10,000");
 }
 
@@ -146,7 +146,7 @@ fn test_default_limit_is_10000() {
 #[test]
 fn test_zero_limit_rejects_all_contacts() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
-    wb.storage().set_contact_limit(0).unwrap();
+    wb.storage().contacts().set_contact_limit(0).unwrap();
 
     let result = wb.add_contact(make_contact("Bob"));
     assert!(

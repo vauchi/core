@@ -34,7 +34,7 @@ fn create_retry(storage: &Storage, msg_id: &str, attempt: u32, next_retry: u64) 
         created_at: ts,
         max_attempts: 5,
     };
-    storage.create_retry_entry(&entry).unwrap();
+    storage.retries().create_retry_entry(&entry).unwrap();
 }
 
 fn create_delivery(storage: &Storage, msg_id: &str) {
@@ -47,7 +47,10 @@ fn create_delivery(storage: &Storage, msg_id: &str) {
         updated_at: ts,
         expires_at: None,
     };
-    storage.create_delivery_record(&record).unwrap();
+    storage
+        .deliveries()
+        .create_delivery_record(&record)
+        .unwrap();
 }
 
 // === Tick Processing Tests ===
@@ -75,7 +78,11 @@ fn test_tick_processes_due_retries_only() {
     );
     assert_eq!(result.expired, 0, "No entries should be expired");
 
-    let future = storage.get_retry_entry("future").unwrap().unwrap();
+    let future = storage
+        .retries()
+        .get_retry_entry("future")
+        .unwrap()
+        .unwrap();
     assert_eq!(future.attempt, 0, "Future entry should not be touched");
 }
 
@@ -92,7 +99,11 @@ fn test_tick_increments_attempt_count() {
         .tick(&storage, &vauchi_core::rng::OsSecureRng::new())
         .unwrap();
 
-    let entry = storage.get_retry_entry("retry-inc").unwrap().unwrap();
+    let entry = storage
+        .retries()
+        .get_retry_entry("retry-inc")
+        .unwrap()
+        .unwrap();
     assert_eq!(
         entry.attempt, 3,
         "Attempt count should be incremented from 2 to 3"
@@ -125,18 +136,30 @@ fn test_tick_removes_max_attempt_entries() {
     assert_eq!(result.rescheduled, 1, "One entry should be rescheduled");
 
     assert!(
-        storage.get_retry_entry("max-out").unwrap().is_none(),
+        storage
+            .retries()
+            .get_retry_entry("max-out")
+            .unwrap()
+            .is_none(),
         "Max-attempt retry entry should be deleted"
     );
 
-    let delivery = storage.get_delivery_record("max-out").unwrap().unwrap();
+    let delivery = storage
+        .deliveries()
+        .get_delivery_record("max-out")
+        .unwrap()
+        .unwrap();
     assert!(
         matches!(delivery.status, DeliveryStatus::Failed { .. }),
         "Delivery status should be Failed after max retries, got: {:?}",
         delivery.status
     );
 
-    let still_ok = storage.get_retry_entry("still-ok").unwrap().unwrap();
+    let still_ok = storage
+        .retries()
+        .get_retry_entry("still-ok")
+        .unwrap()
+        .unwrap();
     assert_eq!(still_ok.attempt, 3);
 }
 

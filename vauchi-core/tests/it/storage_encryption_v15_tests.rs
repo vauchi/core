@@ -131,8 +131,8 @@ fn test_aha_tracker_roundtrip_encrypted() {
     tracker.mark_seen(AhaMomentType::CardCreationComplete);
     tracker.mark_seen(AhaMomentType::FirstEdit);
 
-    storage.save_aha_tracker(&tracker).unwrap();
-    let loaded = storage.load_aha_tracker().unwrap().unwrap();
+    storage.ux().save_aha_tracker(&tracker).unwrap();
+    let loaded = storage.ux().load_aha_tracker().unwrap().unwrap();
 
     assert!(loaded.has_seen(AhaMomentType::CardCreationComplete));
     assert!(loaded.has_seen(AhaMomentType::FirstEdit));
@@ -148,8 +148,8 @@ fn test_demo_contact_state_roundtrip_encrypted() {
     state.advance_to_next_tip(0);
     state.advance_to_next_tip(0);
 
-    storage.save_demo_contact_state(&state).unwrap();
-    let loaded = storage.load_demo_contact_state().unwrap().unwrap();
+    storage.ux().save_demo_contact_state(&state).unwrap();
+    let loaded = storage.ux().load_demo_contact_state().unwrap().unwrap();
 
     assert!(loaded.is_active);
     assert_eq!(loaded.update_count, 2);
@@ -166,9 +166,9 @@ fn test_ux_state_combined_roundtrip_encrypted() {
     let mut demo_state = DemoContactState::new_active(0);
     demo_state.advance_to_next_tip(0);
 
-    storage.save_ux_state(&tracker, &demo_state).unwrap();
+    storage.ux().save_ux_state(&tracker, &demo_state).unwrap();
 
-    let (loaded_tracker, loaded_demo) = storage.load_ux_state().unwrap();
+    let (loaded_tracker, loaded_demo) = storage.ux().load_ux_state().unwrap();
     assert!(loaded_tracker.has_seen(AhaMomentType::CardCreationComplete));
     assert!(loaded_demo.is_active);
     assert_eq!(loaded_demo.update_count, 1);
@@ -183,7 +183,7 @@ fn test_ux_state_encrypted_in_db() {
     tracker.mark_seen(AhaMomentType::FirstEdit);
 
     let demo_state = DemoContactState::new_active(0);
-    storage.save_ux_state(&tracker, &demo_state).unwrap();
+    storage.ux().save_ux_state(&tracker, &demo_state).unwrap();
     drop(storage);
 
     let db_path = dir.path().join("vauchi.db");
@@ -231,9 +231,13 @@ fn test_audit_log_roundtrip() {
     let (_dir, storage) = open_storage();
 
     storage
+        .consent()
         .log_audit_event("test_event", Some("detailed info here"))
         .unwrap();
-    storage.log_audit_event("another_event", None).unwrap();
+    storage
+        .consent()
+        .log_audit_event("another_event", None)
+        .unwrap();
 }
 
 // @internal
@@ -242,6 +246,7 @@ fn test_audit_log_encrypted_in_db() {
     let (dir, storage) = open_storage();
 
     storage
+        .consent()
         .log_audit_event("data_deleted", Some("Deleted contact John"))
         .unwrap();
     drop(storage);
@@ -273,7 +278,10 @@ fn test_audit_log_encrypted_in_db() {
 fn test_audit_log_null_details_no_encryption() {
     let (dir, storage) = open_storage();
 
-    storage.log_audit_event("simple_event", None).unwrap();
+    storage
+        .consent()
+        .log_audit_event("simple_event", None)
+        .unwrap();
     drop(storage);
 
     let db_path = dir.path().join("vauchi.db");
@@ -302,12 +310,12 @@ fn test_rekey_preserves_ux_state() {
     let mut tracker = AhaMomentTracker::new();
     tracker.mark_seen(AhaMomentType::FirstContactAdded);
     let demo_state = DemoContactState::new_active(0);
-    storage.save_ux_state(&tracker, &demo_state).unwrap();
+    storage.ux().save_ux_state(&tracker, &demo_state).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let (loaded_tracker, loaded_demo) = storage.load_ux_state().unwrap();
+    let (loaded_tracker, loaded_demo) = storage.ux().load_ux_state().unwrap();
     assert!(loaded_tracker.has_seen(AhaMomentType::FirstContactAdded));
     assert!(loaded_demo.is_active);
 }
@@ -318,6 +326,7 @@ fn test_rekey_preserves_audit_log() {
     let (dir, mut storage) = open_storage();
 
     storage
+        .consent()
         .log_audit_event("test_event", Some("sensitive details"))
         .unwrap();
 
@@ -341,7 +350,7 @@ fn test_rekey_preserves_audit_log() {
 fn test_rekey_heals_plaintext_personal_notes() {
     let (dir, mut storage) = open_storage();
     let contact = make_contact("Notes Rekey");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
     let contact_id = contact.id().to_string();
 
     // Write plaintext directly to the DB column, simulating the legacy gap
@@ -362,7 +371,11 @@ fn test_rekey_heals_plaintext_personal_notes() {
     storage.rekey(new_key).unwrap();
 
     // Data should be readable after rekey (load decrypts transparently).
-    let loaded = storage.load_personal_notes(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_personal_notes(&contact_id)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         String::from_utf8(loaded).unwrap(),
         "Met at conference",
@@ -393,19 +406,24 @@ fn test_rekey_heals_plaintext_personal_notes() {
 fn test_rekey_preserves_encrypted_personal_notes() {
     let (_dir, mut storage) = open_storage();
     let contact = make_contact("Enc Notes Rekey");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
     let contact_id = contact.id().to_string();
 
     // Write notes through the API (encrypts at storage layer).
     let note_text = "Properly encrypted note";
     storage
+        .contacts()
         .save_personal_notes(&contact_id, note_text.as_bytes())
         .unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let loaded = storage.load_personal_notes(&contact_id).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_personal_notes(&contact_id)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         String::from_utf8(loaded).unwrap(),
         note_text,
@@ -419,7 +437,7 @@ fn test_rekey_preserves_encrypted_personal_notes() {
 fn test_rekey_heals_plaintext_field_notes() {
     let (dir, mut storage) = open_storage();
     let contact = make_contact("Field Notes Rekey");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
     let contact_id = contact.id().to_string();
     let field_id = "email-1";
 
@@ -438,7 +456,10 @@ fn test_rekey_heals_plaintext_field_notes() {
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let loaded = storage.load_contact_field_notes(&contact_id).unwrap();
+    let loaded = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
     assert_eq!(loaded.len(), 1, "Should have one field note");
     assert_eq!(
         String::from_utf8(loaded[field_id].clone()).unwrap(),
@@ -469,19 +490,23 @@ fn test_rekey_heals_plaintext_field_notes() {
 fn test_rekey_preserves_encrypted_field_notes() {
     let (_dir, mut storage) = open_storage();
     let contact = make_contact("Enc Field Rekey");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
     let contact_id = contact.id().to_string();
     let field_id = "phone-1";
 
     // Write notes through the API (encrypts at storage layer).
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, field_id, b"personal phone")
         .unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let loaded = storage.load_contact_field_notes(&contact_id).unwrap();
+    let loaded = storage
+        .field_notes()
+        .load_contact_field_notes(&contact_id)
+        .unwrap();
     assert_eq!(
         String::from_utf8(loaded[field_id].clone()).unwrap(),
         "personal phone",
@@ -495,13 +520,15 @@ fn test_rekey_preserves_encrypted_field_notes() {
 fn test_notes_stored_encrypted_at_rest() {
     let (dir, storage) = open_storage();
     let contact = make_contact("AtRest Test");
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
     let contact_id = contact.id().to_string();
 
     storage
+        .contacts()
         .save_personal_notes(&contact_id, b"secret note")
         .unwrap();
     storage
+        .field_notes()
         .save_contact_field_note(&contact_id, "f1", b"field secret")
         .unwrap();
     drop(storage);

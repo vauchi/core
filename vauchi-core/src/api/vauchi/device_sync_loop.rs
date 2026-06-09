@@ -101,7 +101,7 @@ impl Vauchi {
         identity: &Identity,
     ) -> VauchiResult<usize> {
         // Gate: a sync target requires ≥2 registered devices.
-        let registry = match self.storage.load_device_registry() {
+        let registry = match self.storage.device().load_device_registry() {
             Ok(Some(r)) if r.device_count() > 1 => r,
             _ => return Ok(0),
         };
@@ -156,7 +156,7 @@ impl Vauchi {
         identity: &Identity,
         ciphertext: &[u8],
     ) -> VauchiResult<usize> {
-        let registry = match self.storage.load_device_registry() {
+        let registry = match self.storage.device().load_device_registry() {
             Ok(Some(r)) if r.device_count() > 1 => r,
             _ => return Ok(0),
         };
@@ -270,7 +270,10 @@ mod tests {
         registry
             .add_device_unsigned(device_a.to_registered(&seed_a))
             .unwrap();
-        b.storage().save_device_registry(&registry).unwrap();
+        b.storage()
+            .device()
+            .save_device_registry(&registry)
+            .unwrap();
 
         // A seals a ContactAdded item for B's exchange public key.
         let items = vec![SyncItem::ContactAdded {
@@ -308,7 +311,10 @@ mod tests {
         registry
             .add_device_unsigned(device_a.to_registered(&seed_a))
             .unwrap();
-        b.storage().save_device_registry(&registry).unwrap();
+        b.storage()
+            .device()
+            .save_device_registry(&registry)
+            .unwrap();
 
         let applied = b
             .apply_device_sync_blob(identity_b, b"not-a-valid-ciphertext")

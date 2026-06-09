@@ -68,7 +68,7 @@ fn test_set_field_private_queues_update() {
 
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
 
-    let pending_before = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let pending_before = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert!(
         pending_before.is_empty(),
         "No pending updates before visibility change"
@@ -77,7 +77,7 @@ fn test_set_field_private_queues_update() {
     wb.set_field_private_and_repropagate(&bob_id, "work")
         .unwrap();
 
-    let pending_after = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let pending_after = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert!(
         !pending_after.is_empty(),
         "Should queue re-propagation update after visibility change"
@@ -103,7 +103,7 @@ fn test_set_field_public_queues_update() {
     wb.set_field_public_and_repropagate(&bob_id, "mobile")
         .unwrap();
 
-    let pending = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let pending = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert!(
         !pending.is_empty(),
         "Setting field public should queue a re-propagation update"
@@ -141,7 +141,11 @@ fn test_repropagate_skips_no_ratchet() {
     );
 
     // No pending updates (no ratchet to encrypt with)
-    let pending = wb.storage().get_pending_updates(&carol_id).unwrap();
+    let pending = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&carol_id)
+        .unwrap();
     assert!(
         pending.is_empty(),
         "No update should be queued for contact without ratchet"
@@ -182,7 +186,7 @@ fn test_set_field_restricted_queues_update() {
     )
     .unwrap();
 
-    let pending = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let pending = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert!(
         !pending.is_empty(),
         "Restricted visibility change should queue an update"
@@ -212,13 +216,13 @@ fn test_add_contact_to_label_triggers_repropagate() {
     wb.set_group_field_visibility(label.id(), &work, true)
         .unwrap();
 
-    let pending_before = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let pending_before = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert!(pending_before.is_empty());
 
     wb.add_contact_to_group_and_repropagate(label.id(), &bob_id)
         .unwrap();
 
-    let pending_after = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let pending_after = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert!(
         !pending_after.is_empty(),
         "Adding contact to label should queue a re-propagation update"
@@ -285,8 +289,12 @@ fn test_set_label_field_visibility_repropagates_to_all_members() {
     wb.set_group_field_visibility_and_repropagate(label.id(), &work, true)
         .unwrap();
 
-    let bob_pending = wb.storage().get_pending_updates(&bob_id).unwrap();
-    let carol_pending = wb.storage().get_pending_updates(&carol_id).unwrap();
+    let bob_pending = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
+    let carol_pending = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&carol_id)
+        .unwrap();
 
     assert!(
         !bob_pending.is_empty(),
@@ -313,13 +321,13 @@ fn test_set_contact_override_triggers_repropagate() {
 
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
 
-    let pending_before = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let pending_before = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert!(pending_before.is_empty());
 
     wb.set_contact_visibility_override_and_repropagate(&bob_id, "personal", false)
         .unwrap();
 
-    let pending_after = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let pending_after = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert!(
         !pending_after.is_empty(),
         "Per-contact override should queue a re-propagation update"
@@ -372,7 +380,7 @@ fn test_repropagate_uses_effective_visibility() {
     wb.set_field_public_and_repropagate(&bob_id, &work).unwrap();
 
     // Should have queued an update (the re-propagation uses effective visibility)
-    let pending = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let pending = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert!(
         !pending.is_empty(),
         "Re-propagation should queue update using effective visibility"

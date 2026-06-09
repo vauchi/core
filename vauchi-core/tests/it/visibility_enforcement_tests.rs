@@ -105,8 +105,12 @@ fn test_new_field_propagated_to_all_contacts_by_default() {
     let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 2, "New field should be propagated to both contacts");
 
-    let bob_pending = wb.storage().get_pending_updates(&bob_id).unwrap();
-    let carol_pending = wb.storage().get_pending_updates(&carol_id).unwrap();
+    let bob_pending = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
+    let carol_pending = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&carol_id)
+        .unwrap();
     assert_eq!(bob_pending.len(), 1);
     assert_eq!(carol_pending.len(), 1);
 }
@@ -142,7 +146,7 @@ fn test_contacts_variant_enforced_at_propagation() {
     let _queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
 
     // Bob should get the update (default visibility = Everyone)
-    let bob_pending = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let bob_pending = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert_eq!(
         bob_pending.len(),
         1,
@@ -150,7 +154,11 @@ fn test_contacts_variant_enforced_at_propagation() {
     );
 
     // Carol should NOT get the update (email restricted, not in allowed set)
-    let carol_pending = wb.storage().get_pending_updates(&carol_id).unwrap();
+    let carol_pending = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&carol_id)
+        .unwrap();
     assert_eq!(
         carol_pending.len(),
         0,
@@ -327,14 +335,22 @@ fn test_mixed_visibility_propagation() {
     );
 
     // Bob gets phone + display name (not email)
-    let bob_pending = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let bob_pending = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert_eq!(bob_pending.len(), 1);
 
     // Carol gets email + display name (not phone)
-    let carol_pending = wb.storage().get_pending_updates(&carol_id).unwrap();
+    let carol_pending = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&carol_id)
+        .unwrap();
     assert_eq!(carol_pending.len(), 1);
 
     // Dave gets display name only (both fields hidden)
-    let dave_pending = wb.storage().get_pending_updates(&dave_id).unwrap();
+    let dave_pending = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&dave_id)
+        .unwrap();
     assert_eq!(dave_pending.len(), 1);
 }

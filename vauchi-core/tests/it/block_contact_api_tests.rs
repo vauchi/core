@@ -262,13 +262,21 @@ fn test_propagate_skips_blocked_contacts() {
 
     assert_eq!(queued, 1, "Only unblocked contacts should receive updates");
 
-    let bob_pending = alice.storage().get_pending_updates(&bob_id).unwrap();
+    let bob_pending = alice
+        .storage()
+        .pending()
+        .get_pending_updates(&bob_id)
+        .unwrap();
     assert!(
         bob_pending.is_empty(),
         "Blocked Bob should have no pending updates"
     );
 
-    let carol_pending = alice.storage().get_pending_updates(&carol_id).unwrap();
+    let carol_pending = alice
+        .storage()
+        .pending()
+        .get_pending_updates(&carol_id)
+        .unwrap();
     assert!(
         !carol_pending.is_empty(),
         "Unblocked Carol should have pending updates"

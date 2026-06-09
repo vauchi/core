@@ -31,7 +31,7 @@ proptest! {
         let now: u64 = 1_000_000;
 
         for key in &keys {
-            let _ = storage.activity_log_insert(&ActivityLogRow {
+            let _ = storage.activity_log().activity_log_insert(&ActivityLogRow {
                 event_key: key.clone(),
                 category: "test".into(),
                 contact_id: None,
@@ -40,7 +40,7 @@ proptest! {
             });
         }
 
-        let entries = storage.activity_log_query_recent(now, 86400).unwrap();
+        let entries = storage.activity_log().activity_log_query_recent(now, 86400).unwrap();
         let unique_keys: std::collections::HashSet<_> =
             entries.iter().map(|e| &e.event_key).collect();
         prop_assert_eq!(entries.len(), unique_keys.len());
@@ -58,7 +58,7 @@ proptest! {
         let now: u64 = 30 * 86400; // anchor point: day 30
 
         for (i, age) in ages_days.iter().enumerate() {
-            let _ = storage.activity_log_insert(&ActivityLogRow {
+            let _ = storage.activity_log().activity_log_insert(&ActivityLogRow {
                 event_key: format!("test:{i}"),
                 category: "test".into(),
                 contact_id: None,
@@ -67,9 +67,9 @@ proptest! {
             });
         }
 
-        storage.activity_log_prune(now, 7 * 86400).unwrap();
+        storage.activity_log().activity_log_prune(now, 7 * 86400).unwrap();
         // Query ALL remaining entries (use very large window)
-        let remaining = storage.activity_log_query_recent(now, now).unwrap();
+        let remaining = storage.activity_log().activity_log_query_recent(now, now).unwrap();
 
         for entry in &remaining {
             let age_secs = now - entry.created_at;

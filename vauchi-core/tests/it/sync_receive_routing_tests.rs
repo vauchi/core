@@ -55,9 +55,11 @@ fn link_contacts(
     let host_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, host_dh);
 
     host.storage()
+        .ratchets()
         .save_ratchet_state(&peer_contact_id, &host_ratchet, false)
         .unwrap();
     peer.storage()
+        .ratchets()
         .save_ratchet_state(&host_contact_id, &peer_ratchet, true)
         .unwrap();
 
@@ -100,12 +102,14 @@ fn encrypt_update(
 
     let (mut sender_ratchet, is_init) = sender
         .storage()
+        .ratchets()
         .load_ratchet_state(recipient_contact_id)
         .unwrap()
         .unwrap();
     let ratchet_msg = sender_ratchet.encrypt(&payload).unwrap();
     sender
         .storage()
+        .ratchets()
         .save_ratchet_state(recipient_contact_id, &sender_ratchet, is_init)
         .unwrap();
     serde_json::to_vec(&ratchet_msg).unwrap()
@@ -150,7 +154,7 @@ fn test_receive_routes_via_mailbox_token_fast_path() {
 
     let blobs = vec![("blob-1".to_string(), bob_token, ciphertext)];
 
-    let contacts = alice.storage().list_contacts().unwrap();
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
     let outcomes =
         process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
 
@@ -161,6 +165,7 @@ fn test_receive_routes_via_mailbox_token_fast_path() {
     // Card on Alice's side reflects Bob's update.
     let bob_at_alice = alice
         .storage()
+        .contacts()
         .load_contact(&bob_link.peer_contact_id)
         .unwrap()
         .unwrap();
@@ -205,6 +210,7 @@ fn test_receive_drops_blob_when_token_missing() {
     // Snapshot Bob's ratchet state BEFORE — drop path must not advance it.
     let (ratchet_before, _) = alice
         .storage()
+        .ratchets()
         .load_ratchet_state(&bob_link.peer_contact_id)
         .unwrap()
         .unwrap();
@@ -212,7 +218,7 @@ fn test_receive_drops_blob_when_token_missing() {
 
     let blobs = vec![("blob-2".to_string(), String::new(), ciphertext)];
 
-    let contacts = alice.storage().list_contacts().unwrap();
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
     let outcomes =
         process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
 
@@ -226,6 +232,7 @@ fn test_receive_drops_blob_when_token_missing() {
     // Bob's card must be untouched — there was no successful decrypt.
     let bob_at_alice = alice
         .storage()
+        .contacts()
         .load_contact(&bob_link.peer_contact_id)
         .unwrap()
         .unwrap();
@@ -244,6 +251,7 @@ fn test_receive_drops_blob_when_token_missing() {
     // would silently regress without this assertion.
     let (ratchet_after, _) = alice
         .storage()
+        .ratchets()
         .load_ratchet_state(&bob_link.peer_contact_id)
         .unwrap()
         .unwrap();
@@ -287,7 +295,7 @@ fn test_receive_drops_blob_when_token_unknown() {
     let unknown_token = "ff".repeat(32);
     let blobs = vec![("blob-3".to_string(), unknown_token, ciphertext)];
 
-    let contacts = alice.storage().list_contacts().unwrap();
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
     let outcomes =
         process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
 
@@ -303,6 +311,7 @@ fn test_receive_drops_blob_when_token_unknown() {
 
     let bob_at_alice = alice
         .storage()
+        .contacts()
         .load_contact(&bob_link.peer_contact_id)
         .unwrap()
         .unwrap();
@@ -333,7 +342,7 @@ fn test_receive_reports_undecryptable_blob() {
         b"not a real ratchet message".to_vec(),
     )];
 
-    let contacts = alice.storage().list_contacts().unwrap();
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
     let outcomes =
         process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
 
@@ -404,7 +413,7 @@ fn test_receive_fast_path_handles_all_in_spec_input() {
         blobs.push((format!("blob-{i}"), token, ciphertext));
     }
 
-    let contacts = alice.storage().list_contacts().unwrap();
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
     let outcomes =
         process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
 
@@ -421,6 +430,7 @@ fn test_receive_fast_path_handles_all_in_spec_input() {
     for (i, link) in links.iter().enumerate() {
         let contact = alice
             .storage()
+            .contacts()
             .load_contact(&link.peer_contact_id)
             .unwrap()
             .unwrap();
@@ -473,7 +483,7 @@ fn test_receive_rejects_replayed_blob() {
         current_day_epoch(alice.storage().clock().unix_seconds()),
     ));
 
-    let contacts = alice.storage().list_contacts().unwrap();
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
 
     // First submission — must succeed.
     let first = process_received_blobs(
@@ -491,6 +501,7 @@ fn test_receive_rejects_replayed_blob() {
     // Snapshot card and ratchet state after the first submission.
     let card_after_first = alice
         .storage()
+        .contacts()
         .load_contact(&bob_link.peer_contact_id)
         .unwrap()
         .unwrap()
@@ -498,6 +509,7 @@ fn test_receive_rejects_replayed_blob() {
         .clone();
     let (ratchet_after_first, _) = alice
         .storage()
+        .ratchets()
         .load_ratchet_state(&bob_link.peer_contact_id)
         .unwrap()
         .unwrap();
@@ -522,6 +534,7 @@ fn test_receive_rejects_replayed_blob() {
     // Card and ratchet state must NOT have changed on the second pass.
     let card_after_second = alice
         .storage()
+        .contacts()
         .load_contact(&bob_link.peer_contact_id)
         .unwrap()
         .unwrap()
@@ -529,6 +542,7 @@ fn test_receive_rejects_replayed_blob() {
         .clone();
     let (ratchet_after_second, _) = alice
         .storage()
+        .ratchets()
         .load_ratchet_state(&bob_link.peer_contact_id)
         .unwrap()
         .unwrap();
@@ -623,7 +637,7 @@ fn test_receive_mixed_batch_preserves_order() {
         ("idx-3-charlie-ok".to_string(), charlie_token, charlie_ct),
     ];
 
-    let contacts = alice.storage().list_contacts().unwrap();
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
     let outcomes =
         process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
 
@@ -655,6 +669,7 @@ fn test_receive_mixed_batch_preserves_order() {
 
     let bob_at_alice = alice
         .storage()
+        .contacts()
         .load_contact(&bob_link.peer_contact_id)
         .unwrap()
         .unwrap();
@@ -668,6 +683,7 @@ fn test_receive_mixed_batch_preserves_order() {
     );
     let charlie_at_alice = alice
         .storage()
+        .contacts()
         .load_contact(&charlie_link.peer_contact_id)
         .unwrap()
         .unwrap();

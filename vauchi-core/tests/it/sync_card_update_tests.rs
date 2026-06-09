@@ -62,12 +62,14 @@ fn setup_exchange_with_ratchets() -> (
     // Store Alice's ratchet for Bob in Alice's storage
     alice_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&bob_contact_id, &alice_ratchet, false)
         .unwrap();
 
     // Store Bob's ratchet for Alice in Bob's storage
     bob_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&alice_contact_id, &bob_ratchet, true)
         .unwrap();
 
@@ -112,12 +114,14 @@ fn create_valid_update(
 
     let (mut bob_ratchet, is_init) = bob_wb
         .storage()
+        .ratchets()
         .load_ratchet_state(alice_contact_id)
         .unwrap()
         .unwrap();
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     bob_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(alice_contact_id, &bob_ratchet, is_init)
         .unwrap();
 
@@ -175,6 +179,7 @@ fn test_process_single_valid_update() {
 
     let contact = alice_wb
         .storage()
+        .contacts()
         .load_contact(&bob_contact_id)
         .unwrap()
         .unwrap();
@@ -206,6 +211,7 @@ fn test_sender_revoked_rejected() {
 
     alice_wb
         .storage()
+        .contacts()
         .record_revoked_sender(&bob_contact_id, 1000)
         .unwrap();
 
@@ -400,12 +406,14 @@ fn test_signature_invalid_rejected() {
 
     let (mut bob_ratchet, is_init) = bob_wb
         .storage()
+        .ratchets()
         .load_ratchet_state(&alice_contact_id)
         .unwrap()
         .unwrap();
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     bob_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&alice_contact_id, &bob_ratchet, is_init)
         .unwrap();
 
@@ -469,6 +477,7 @@ fn test_replay_detected() {
     let test_nonce = [42u8; 32];
     alice_wb
         .storage()
+        .replay()
         .save_replay_nonce(&bob_contact_id, &test_nonce, 1000)
         .unwrap();
 
@@ -499,12 +508,14 @@ fn test_replay_detected() {
 
     let (mut bob_ratchet2, is_init2) = bob_wb
         .storage()
+        .ratchets()
         .load_ratchet_state(&alice_contact_id)
         .unwrap()
         .unwrap();
     let ratchet_msg2 = bob_ratchet2.encrypt(&payload2).unwrap();
     bob_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&alice_contact_id, &bob_ratchet2, is_init2)
         .unwrap();
 
@@ -627,12 +638,14 @@ fn test_decode_versioned_payload_cek_wrapped() {
 
     let (mut bob_ratchet, is_init) = bob_wb
         .storage()
+        .ratchets()
         .load_ratchet_state(&alice_contact_id)
         .unwrap()
         .unwrap();
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     bob_wb
         .storage()
+        .ratchets()
         .save_ratchet_state(&alice_contact_id, &bob_ratchet, is_init)
         .unwrap();
 
@@ -691,6 +704,7 @@ fn test_process_card_update_resolves_anonymous_sender_id() {
     // Compute Bob's anonymous sender ID using the shared key Alice has for Bob
     let bob_contact = alice_wb
         .storage()
+        .contacts()
         .load_contact(&bob_contact_id)
         .unwrap()
         .unwrap();
@@ -782,14 +796,20 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
     // Persist the initial card into Alice's storage so her contact reflects it.
     let mut alice_bob_contact = alice_wb
         .storage()
+        .contacts()
         .load_contact(&bob_contact_id)
         .unwrap()
         .unwrap();
     alice_bob_contact.update_card(old_card.clone(), 0);
-    alice_wb.storage().save_contact(&alice_bob_contact).unwrap();
+    alice_wb
+        .storage()
+        .contacts()
+        .save_contact(&alice_bob_contact)
+        .unwrap();
 
     alice_wb
         .storage()
+        .field_notes()
         .save_contact_field_note(
             &bob_contact_id,
             &removed_field_id,
@@ -798,11 +818,13 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
         .unwrap();
     alice_wb
         .storage()
+        .field_notes()
         .save_contact_field_note(&bob_contact_id, &retained_field_id, b"best number to call")
         .unwrap();
 
     let notes_before = alice_wb
         .storage()
+        .field_notes()
         .load_contact_field_notes(&bob_contact_id)
         .unwrap();
     assert_eq!(
@@ -853,6 +875,7 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
     // but the note for the retained field must survive.
     let notes_after = alice_wb
         .storage()
+        .field_notes()
         .load_contact_field_notes(&bob_contact_id)
         .unwrap();
     assert!(

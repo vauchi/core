@@ -53,7 +53,7 @@ impl OfflineManager {
             update.status = UpdateStatus::Pending;
         }
 
-        storage.queue_update(&update)
+        storage.pending().queue_update(&update)
     }
 
     /// Returns all pending updates for sending (flush on reconnect).
@@ -61,7 +61,7 @@ impl OfflineManager {
     /// Updates are returned in insertion order. The caller is responsible
     /// for sending them and removing them from the queue on success.
     pub fn flush_queue(&self, storage: &Storage) -> Result<Vec<PendingUpdate>, StorageError> {
-        storage.get_pending_updates_by_status("pending")
+        storage.pending().get_pending_updates_by_status("pending")
     }
 
     /// Returns the remaining capacity in the offline queue.

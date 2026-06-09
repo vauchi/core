@@ -450,14 +450,14 @@ fn test_rekey_makes_old_key_ciphertexts_unreadable() {
     let mut storage = vauchi_core::storage::Storage::open(&db_path, old_key.clone()).unwrap();
 
     let card = vauchi_core::contact_card::ContactCard::new("ReKeyTest");
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
 
     storage.rekey(new_key.clone()).unwrap();
 
     // Drop and re-open with old key — must not be able to read data
     drop(storage);
     let old_storage = vauchi_core::storage::Storage::open(&db_path, old_key).unwrap();
-    let result = old_storage.load_own_card();
+    let result = old_storage.contacts().load_own_card();
     match result {
         Ok(None) => {} // Data indecipherable, returns None
         Ok(Some(_)) => panic!("Old key should NOT be able to decrypt after rekey"),
@@ -468,6 +468,7 @@ fn test_rekey_makes_old_key_ciphertexts_unreadable() {
     drop(old_storage);
     let new_storage = vauchi_core::storage::Storage::open(&db_path, new_key).unwrap();
     let loaded = new_storage
+        .contacts()
         .load_own_card()
         .unwrap()
         .expect("New key should decrypt after rekey");
@@ -486,7 +487,7 @@ fn test_rekey_preserves_all_encrypted_tables() {
     let mut storage = vauchi_core::storage::Storage::open(&db_path, key).unwrap();
 
     let card = vauchi_core::contact_card::ContactCard::new("RekeyAll");
-    storage.save_own_card(&card).unwrap();
+    storage.contacts().save_own_card(&card).unwrap();
 
     let device = vauchi_core::identity::RegisteredDevice {
         device_id: [0x42; 32],
@@ -499,7 +500,7 @@ fn test_rekey_preserves_all_encrypted_tables() {
     };
     let signing_key = SigningKeyPair::generate();
     let registry = vauchi_core::identity::DeviceRegistry::new(device, &signing_key);
-    storage.save_device_registry(&registry).unwrap();
+    storage.device().save_device_registry(&registry).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key.clone()).unwrap();
@@ -509,12 +510,14 @@ fn test_rekey_preserves_all_encrypted_tables() {
     let new_storage = vauchi_core::storage::Storage::open(&db_path, new_key).unwrap();
 
     let loaded_card = new_storage
+        .contacts()
         .load_own_card()
         .unwrap()
         .expect("Card should survive rekey");
     assert_eq!(loaded_card.display_name(), "RekeyAll");
 
     let loaded_registry = new_storage
+        .device()
         .load_device_registry()
         .unwrap()
         .expect("Registry should survive rekey");

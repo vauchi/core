@@ -269,7 +269,10 @@ fn test_load_nonexistent_contact_returns_none() {
 fn test_load_nonexistent_ratchet_returns_none() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
-    let result = storage.load_ratchet_state("nonexistent-contact").unwrap();
+    let result = storage
+        .ratchets()
+        .load_ratchet_state("nonexistent-contact")
+        .unwrap();
     assert!(result.is_none(), "Non-existent ratchet should return None");
 }
 
@@ -451,7 +454,7 @@ fn test_visibility_on_nonexistent_field() {
         .unwrap()
         .set_nobody("nonexistent-field-id");
 
-    let result = wb.storage().save_contact(&contact);
+    let result = wb.storage().contacts().save_contact(&contact);
     assert!(
         result.is_ok(),
         "Save should succeed with visibility on nonexistent field"

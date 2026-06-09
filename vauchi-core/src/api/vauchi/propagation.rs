@@ -27,7 +27,7 @@ impl Vauchi {
     ) -> VauchiResult<usize> {
         use crate::storage::{PendingUpdate, UpdateStatus};
 
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         let mut queued = 0;
 
         for contact in contacts {
@@ -53,7 +53,7 @@ impl Vauchi {
                 status: UpdateStatus::Pending,
                 target_relay_url: contact.relay_url().map(String::from),
             };
-            self.storage.queue_update(&update)?;
+            self.storage.pending().queue_update(&update)?;
             queued += 1;
         }
 
@@ -77,6 +77,7 @@ impl Vauchi {
 
         let our_card = self
             .storage
+            .contacts()
             .load_own_card()?
             .unwrap_or_else(|| ContactCard::new(identity.display_name()));
         let empty_card = ContactCard::new(identity.display_name());
@@ -86,6 +87,7 @@ impl Vauchi {
         // Load contact to get relay_url for per-contact relay routing
         let relay_url = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .and_then(|c| c.relay_url().map(String::from));
 
@@ -101,7 +103,7 @@ impl Vauchi {
             status: UpdateStatus::Pending,
             target_relay_url: relay_url,
         };
-        self.storage.queue_update(&update)?;
+        self.storage.pending().queue_update(&update)?;
 
         Ok(())
     }
@@ -133,6 +135,7 @@ impl Vauchi {
 
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("contact: {}", contact_id)))?;
 
@@ -163,6 +166,7 @@ impl Vauchi {
         // Version tracking for downgrade detection (#42)
         let next_version = self
             .storage
+            .contacts()
             .last_sent_delta_version(contact_id)
             .unwrap_or(0)
             + 1;
@@ -191,10 +195,11 @@ impl Vauchi {
         let payload_bytes = VersionedPayload::encode_cek(&wrapped);
 
         // Load ratchet and encrypt
-        let (mut ratchet, is_initiator) = self
-            .storage
-            .load_ratchet_state(contact_id)?
-            .ok_or_else(|| VauchiError::NotFound("ratchet state".into()))?;
+        let (mut ratchet, is_initiator) =
+            self.storage
+                .ratchets()
+                .load_ratchet_state(contact_id)?
+                .ok_or_else(|| VauchiError::NotFound("ratchet state".into()))?;
 
         let ratchet_msg = ratchet
             .encrypt(&payload_bytes)
@@ -206,10 +211,12 @@ impl Vauchi {
         self.storage.begin_transaction()?;
         let save_result = (|| -> VauchiResult<()> {
             contact.set_cek(new_cek);
-            self.storage.save_contact(&contact)?;
+            self.storage.contacts().save_contact(&contact)?;
             self.storage
+                .ratchets()
                 .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
             self.storage
+                .contacts()
                 .record_sent_delta_version(contact_id, next_version)?;
             Ok(())
         })();
@@ -248,20 +255,20 @@ impl Vauchi {
         // Resolve anonymous sender ID to real contact ID.
         // Old-format messages with real identity fingerprints pass through
         // unchanged via the fallback path in resolve_sender_id.
-        let contacts = self.storage.list_contacts().unwrap_or_default();
+        let contacts = self.storage.contacts().list_contacts().unwrap_or_default();
         let resolved = resolve_sender_id(&contacts, sender_id, self.clock.unix_seconds())
             .unwrap_or_else(|| sender_id.to_string());
         let contact_id = resolved.as_str();
 
         // Check revoked_senders tombstone
-        if self.storage.is_sender_revoked(contact_id)? {
+        if self.storage.contacts().is_sender_revoked(contact_id)? {
             return Err(VauchiError::InvalidState(
                 "update from revoked sender".to_string(),
             ));
         }
 
         // Reject updates from blocked contacts
-        if let Some(contact) = self.storage.load_contact(contact_id)?
+        if let Some(contact) = self.storage.contacts().load_contact(contact_id)?
             && contact.is_blocked()
         {
             return Err(VauchiError::ContactBlocked(contact_id.to_string()));
@@ -270,14 +277,16 @@ impl Vauchi {
         // Load contact
         let mut contact = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("contact: {}", contact_id)))?;
 
         // Load and decrypt with ratchet
-        let (mut ratchet, is_initiator) = self
-            .storage
-            .load_ratchet_state(contact_id)?
-            .ok_or_else(|| VauchiError::NotFound("ratchet state".into()))?;
+        let (mut ratchet, is_initiator) =
+            self.storage
+                .ratchets()
+                .load_ratchet_state(contact_id)?
+                .ok_or_else(|| VauchiError::NotFound("ratchet state".into()))?;
 
         let ratchet_msg: RatchetMessage = serde_json::from_slice(encrypted)
             .map_err(|e| VauchiError::Serialization(e.to_string()))?;
@@ -338,7 +347,11 @@ impl Vauchi {
         }
 
         // Reject stale/downgraded delta versions (#42)
-        let last_version = self.storage.last_delta_version(contact_id).unwrap_or(0);
+        let last_version = self
+            .storage
+            .contacts()
+            .last_delta_version(contact_id)
+            .unwrap_or(0);
         if delta.version > 0 && delta.version < last_version {
             return Err(VauchiError::InvalidState(format!(
                 "stale delta version {} (last applied: {})",
@@ -366,13 +379,16 @@ impl Vauchi {
         self.storage.begin_transaction()?;
         let result = (|| -> VauchiResult<()> {
             self.storage
+                .ratchets()
                 .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
             self.storage
+                .replay()
                 .save_replay_nonce(contact_id, &delta.nonce, delta.timestamp)?;
-            self.storage.save_contact(&contact)?;
+            self.storage.contacts().save_contact(&contact)?;
             // Track delta version for downgrade detection (#42)
             if delta.version > 0 {
                 self.storage
+                    .contacts()
                     .record_delta_version(contact_id, delta.version)?;
             }
             Ok(())
@@ -412,10 +428,11 @@ impl Vauchi {
 
         let own_card = self
             .storage
+            .contacts()
             .load_own_card()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         let mut migrated = 0;
 
         for mut contact in contacts {
@@ -425,10 +442,11 @@ impl Vauchi {
             }
 
             // Skip contacts without ratchet (can't send updates)
-            let (mut ratchet, is_initiator) = match self.storage.load_ratchet_state(contact.id())? {
-                Some(r) => r,
-                None => continue,
-            };
+            let (mut ratchet, is_initiator) =
+                match self.storage.ratchets().load_ratchet_state(contact.id())? {
+                    Some(r) => r,
+                    None => continue,
+                };
 
             // Generate a new CEK for this contact
             let cek = ContentEncryptionKey::generate();
@@ -465,11 +483,12 @@ impl Vauchi {
 
             // Save updated ratchet state
             self.storage
+                .ratchets()
                 .save_ratchet_state(contact.id(), &ratchet, is_initiator)?;
 
             // Set CEK on contact and re-save (re-encrypts card at rest with CEK)
             contact.set_cek(cek);
-            self.storage.save_contact(&contact)?;
+            self.storage.contacts().save_contact(&contact)?;
 
             // Queue for delivery
             let now = self.clock.unix_seconds();
@@ -484,7 +503,7 @@ impl Vauchi {
                 status: UpdateStatus::Pending,
                 target_relay_url: contact.relay_url().map(String::from),
             };
-            self.storage.queue_update(&update)?;
+            self.storage.pending().queue_update(&update)?;
             migrated += 1;
         }
 
@@ -502,7 +521,7 @@ impl Vauchi {
         &self,
         hex_prefix: &str,
     ) -> VauchiResult<Option<crate::identity::RegisteredDevice>> {
-        let registry = self.storage.load_device_registry()?;
+        let registry = self.storage.device().load_device_registry()?;
         match registry {
             Some(reg) => Ok(reg.find_device_by_prefix(hex_prefix).cloned()),
             None => Ok(None),
@@ -535,7 +554,11 @@ impl Vauchi {
                 SyncItem::ContactAdded { contact_data, .. } => match contact_data.to_contact() {
                     Ok(contact) => {
                         let contact_id = contact.id().to_string();
-                        let result = self.storage.save_contact(&contact).map_err(|e| e.into());
+                        let result = self
+                            .storage
+                            .contacts()
+                            .save_contact(&contact)
+                            .map_err(|e| e.into());
                         if result.is_ok() {
                             self.events.dispatch(VauchiEvent::ContactAdded {
                                 contact_id,
@@ -557,7 +580,7 @@ impl Vauchi {
                     ..
                 } => {
                     // Load own card, update the field by label, save
-                    match self.storage.load_own_card()? {
+                    match self.storage.contacts().load_own_card()? {
                         Some(mut card) => {
                             // Find field by label and update its value
                             let field_id = card
@@ -579,7 +602,10 @@ impl Vauchi {
                                 );
                                 card.add_field(field).map_err(VauchiError::from)?;
                             }
-                            self.storage.save_own_card(&card).map_err(|e| e.into())
+                            self.storage
+                                .contacts()
+                                .save_own_card(&card)
+                                .map_err(|e| e.into())
                         }
                         None => Err(VauchiError::IdentityNotInitialized),
                     }
@@ -591,6 +617,7 @@ impl Vauchi {
                     ..
                 } => self
                     .storage
+                    .labels()
                     .save_contact_override(contact_id, field_label, is_visible)
                     .map_err(|e| e.into()),
                 SyncItem::LabelChange {
@@ -602,20 +629,24 @@ impl Vauchi {
                     ..
                 } => {
                     if is_deleted {
-                        self.storage.delete_group(label_id).map_err(|e| e.into())
+                        self.storage
+                            .labels()
+                            .delete_group(label_id)
+                            .map_err(|e| e.into())
                     } else {
                         // Create or update label
-                        match self.storage.load_group(label_id) {
+                        match self.storage.labels().load_group(label_id) {
                             Ok(_existing) => {
                                 // Update existing: rename, re-assign contacts and
                                 // fields. Each call propagates so divergent state
                                 // surfaces instead of being silently dropped.
-                                self.storage.rename_group(label_id, label_name)?;
+                                self.storage.labels().rename_group(label_id, label_name)?;
                                 for cid in contacts {
-                                    self.storage.add_contact_to_group(label_id, cid)?;
+                                    self.storage.labels().add_contact_to_group(label_id, cid)?;
                                 }
                                 for fid in visible_fields {
                                     self.storage
+                                        .labels()
                                         .set_group_field_visibility(label_id, fid, true)?;
                                 }
                                 Ok(())
@@ -623,6 +654,7 @@ impl Vauchi {
                             Err(_) => {
                                 // Create new label
                                 self.storage
+                                    .labels()
                                     .create_group(label_name)
                                     .map(|_| ())
                                     .map_err(|e| e.into())
@@ -635,12 +667,15 @@ impl Vauchi {
                     recovery_trusted,
                     ..
                 } => {
-                    match self.storage.load_contact(contact_id)? {
+                    match self.storage.contacts().load_contact(contact_id)? {
                         Some(mut contact) => {
                             contact
                                 .set_recovery_trusted(recovery_trusted)
                                 .map_err(VauchiError::from)?;
-                            self.storage.save_contact(&contact).map_err(|e| e.into())
+                            self.storage
+                                .contacts()
+                                .save_contact(&contact)
+                                .map_err(|e| e.into())
                         }
                         None => Ok(()), // Contact not found, skip
                     }
@@ -655,11 +690,13 @@ impl Vauchi {
                         execute_at,
                     };
                     self.storage
+                        .consent()
                         .save_deletion_state(&state)
                         .map_err(|e| e.into())
                 }
                 SyncItem::DeletionCancelled { .. } => self
                     .storage
+                    .consent()
                     .save_deletion_state(&crate::storage::DeletionState::None)
                     .map_err(|e| e.into()),
                 SyncItem::PersonalNoteChanged {
@@ -668,6 +705,7 @@ impl Vauchi {
                     ..
                 } => self
                     .storage
+                    .contacts()
                     .save_personal_notes(contact_id, note.as_bytes())
                     .map_err(|e| e.into()),
                 SyncItem::ContactFieldNoteChanged {
@@ -677,31 +715,43 @@ impl Vauchi {
                     ..
                 } => self
                     .storage
+                    .field_notes()
                     .save_contact_field_note(contact_id, field_id, note.as_bytes())
                     .map_err(|e| e.into()),
                 SyncItem::ProposalTrustChanged {
                     ref contact_id,
                     proposal_trusted,
                     ..
-                } => match self.storage.load_contact(contact_id)? {
+                } => match self.storage.contacts().load_contact(contact_id)? {
                     Some(mut contact) => {
                         contact
                             .set_proposal_trusted(proposal_trusted)
                             .map_err(VauchiError::from)?;
-                        self.storage.save_contact(&contact).map_err(|e| e.into())
+                        self.storage
+                            .contacts()
+                            .save_contact(&contact)
+                            .map_err(|e| e.into())
                     }
                     None => Ok(()), // Contact not found, skip
                 },
                 SyncItem::ImportedContactAdded {
                     ref contact_data, ..
                 } => match contact_data.to_contact() {
-                    Ok(contact) => self.storage.save_contact(&contact).map_err(|e| e.into()),
+                    Ok(contact) => self
+                        .storage
+                        .contacts()
+                        .save_contact(&contact)
+                        .map_err(|e| e.into()),
                     Err(e) => Err(e.into()),
                 },
                 SyncItem::ImportedContactUpdated {
                     ref contact_data, ..
                 } => match contact_data.to_contact() {
-                    Ok(contact) => self.storage.save_contact(&contact).map_err(|e| e.into()),
+                    Ok(contact) => self
+                        .storage
+                        .contacts()
+                        .save_contact(&contact)
+                        .map_err(|e| e.into()),
                     Err(e) => Err(e.into()),
                 },
                 SyncItem::ImportedContactRemoved { ref contact_id, .. } => self
@@ -713,18 +763,24 @@ impl Vauchi {
                     ref contact_id,
                     timestamp,
                     ..
-                } => match self.storage.load_contact(contact_id)? {
+                } => match self.storage.contacts().load_contact(contact_id)? {
                     Some(mut contact) => {
                         contact.archive(timestamp);
-                        self.storage.save_contact(&contact).map_err(|e| e.into())
+                        self.storage
+                            .contacts()
+                            .save_contact(&contact)
+                            .map_err(|e| e.into())
                     }
                     None => Ok(()), // Contact not found, skip
                 },
                 SyncItem::ContactUnarchived { ref contact_id, .. } => {
-                    match self.storage.load_contact(contact_id)? {
+                    match self.storage.contacts().load_contact(contact_id)? {
                         Some(mut contact) => {
                             contact.unarchive();
-                            self.storage.save_contact(&contact).map_err(|e| e.into())
+                            self.storage
+                                .contacts()
+                                .save_contact(&contact)
+                                .map_err(|e| e.into())
                         }
                         None => Ok(()), // Contact not found, skip
                     }

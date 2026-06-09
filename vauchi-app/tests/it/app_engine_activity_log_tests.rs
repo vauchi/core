@@ -34,6 +34,7 @@ fn app_engine_writes_events_to_activity_log() {
     let rows = engine
         .vauchi()
         .storage()
+        .activity_log()
         .activity_log_query_recent(now, 7 * 86400)
         .unwrap();
     assert_eq!(rows.len(), 0, "Log should be empty before drain");
@@ -45,6 +46,7 @@ fn app_engine_writes_events_to_activity_log() {
     let rows = engine
         .vauchi()
         .storage()
+        .activity_log()
         .activity_log_query_recent(now, 7 * 86400)
         .unwrap();
     assert_eq!(rows.len(), 1, "Log should have 1 entry after drain");

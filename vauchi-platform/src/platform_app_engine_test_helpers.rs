@@ -118,6 +118,7 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         engine
             .vauchi()
             .storage()
+            .contacts()
             .save_contact(contact)
             .map_err(|e| MobileError::StorageError {
                 detail: e.to_string(),
@@ -134,6 +135,7 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         engine
             .vauchi()
             .storage()
+            .deliveries()
             .create_delivery_record(record)
             .map_err(|e| MobileError::StorageError {
                 detail: e.to_string(),

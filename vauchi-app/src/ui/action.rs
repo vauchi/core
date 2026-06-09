@@ -245,7 +245,7 @@ pub enum ActionResult {
     /// immediate retry attempt. Emitted by `DeliveryStatusEngine` when the
     /// user taps the "Retry Failed" footer button. AppEngine routing
     /// iterates the message ids and calls
-    /// `vauchi.storage().update_retry_next_time(id, now)` for each (mirror
+    /// `vauchi.storage().retries().update_retry_next_time(id, now)` for each (mirror
     /// of `mobile_delivery::manual_retry`), then emits a `ShowToast` with
     /// the count of rescheduled messages.
     RetryFailedDeliveries {

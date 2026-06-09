@@ -89,9 +89,13 @@ fn test_contact_with_visibility_rules_roundtrip() {
 
     let contact = Contact::from_sync_data(public_key, card, shared_key, 1000, false, rules);
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
-    let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(contact.id())
+        .unwrap()
+        .unwrap();
 
     assert_eq!(
         loaded.visibility_rules().unwrap().get("email-field"),
@@ -133,8 +137,12 @@ fn test_contact_with_empty_visibility_rules_roundtrip() {
 
     let contact = Contact::from_exchange(public_key, card, shared_key, 0);
 
-    storage.save_contact(&contact).unwrap();
-    let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(contact.id())
+        .unwrap()
+        .unwrap();
 
     // Default visibility rules — all fields visible to everyone
     assert_eq!(
@@ -168,7 +176,7 @@ fn test_visibility_rules_stored_encrypted_not_plaintext() {
 
     let contact = Contact::from_sync_data(public_key, card, shared_key, 2000, false, rules);
 
-    storage.save_contact(&contact).unwrap();
+    storage.contacts().save_contact(&contact).unwrap();
 
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -222,10 +230,10 @@ fn test_list_contacts_with_encrypted_visibility_rules() {
         rules.set_nobody(&format!("field-{}", i));
 
         let contact = Contact::from_sync_data(pk, card, shared_key, 1000, false, rules);
-        storage.save_contact(&contact).unwrap();
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
-    let contacts = storage.list_contacts().unwrap();
+    let contacts = storage.contacts().list_contacts().unwrap();
     assert_eq!(contacts.len(), 3);
 
     for (i, contact) in contacts.iter().enumerate() {

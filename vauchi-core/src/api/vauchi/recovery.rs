@@ -36,7 +36,7 @@ impl Vauchi {
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
-        let contacts = self.storage.list_contacts()?;
+        let contacts = self.storage.contacts().list_contacts()?;
         let guardians: Vec<_> = contacts
             .iter()
             .filter(|c| c.is_recovery_trusted())
@@ -120,10 +120,14 @@ impl Vauchi {
         let claim = RecoveryClaim::new(old_pk, identity.signing_public_key(), now);
 
         // Load recovery settings for threshold
-        let settings = self.storage.load_recovery_settings()?.unwrap_or_default();
+        let settings = self
+            .storage
+            .recovery()
+            .load_recovery_settings()?
+            .unwrap_or_default();
 
         let progress = RecoveryProgress::new(claim.clone(), settings.recovery_threshold(), now);
-        self.storage.save_recovery_progress(&progress)?;
+        self.storage.recovery().save_recovery_progress(&progress)?;
 
         Ok(claim)
     }
@@ -138,20 +142,21 @@ impl Vauchi {
 
         let mut progress = self
             .storage
+            .recovery()
             .load_recovery_progress()?
             .ok_or_else(|| VauchiError::InvalidState("No recovery in progress".into()))?;
 
         progress
             .add_voucher(voucher)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.storage.save_recovery_progress(&progress)?;
+        self.storage.recovery().save_recovery_progress(&progress)?;
 
         Ok(progress)
     }
 
     /// Returns current recovery progress, if any.
     pub fn get_recovery_progress(&self) -> VauchiResult<Option<RecoveryProgress>> {
-        Ok(self.storage.load_recovery_progress()?)
+        Ok(self.storage.recovery().load_recovery_progress()?)
     }
 
     /// Uploads the completed recovery proof to the relay.
@@ -162,6 +167,7 @@ impl Vauchi {
     pub fn upload_recovery_proof(&self) -> VauchiResult<()> {
         let progress = self
             .storage
+            .recovery()
             .load_recovery_progress()?
             .ok_or_else(|| VauchiError::InvalidState("No recovery in progress".into()))?;
 
@@ -186,7 +192,7 @@ impl Vauchi {
         transport.recovery_store(&key_hash, &proof_b64)?;
 
         // Clear local progress — proof is now on the relay
-        self.storage.clear_recovery_progress()?;
+        self.storage.recovery().clear_recovery_progress()?;
 
         Ok(())
     }
@@ -211,6 +217,7 @@ impl Vauchi {
         // Verify the contact exists
         let _contact = self
             .storage
+            .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
 
@@ -277,6 +284,7 @@ impl Vauchi {
         remind_at: Option<u64>,
     ) -> VauchiResult<()> {
         self.storage
+            .recovery()
             .save_recovery_response(claim_id, contact_id, response, remind_at)?;
         Ok(())
     }

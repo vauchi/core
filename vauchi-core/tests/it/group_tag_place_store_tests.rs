@@ -46,7 +46,7 @@ fn test_group_store_create_and_membership() {
     assert_eq!(loaded.name, "Work");
     assert!(loaded.contact_ids.contains("contact-1"));
     // Visible through the legacy forwarding API.
-    assert_eq!(storage.list_local_groups().unwrap().len(), 1);
+    assert_eq!(storage.groups().list_local_groups().unwrap().len(), 1);
 }
 
 // @internal
@@ -59,7 +59,7 @@ fn test_tag_store_name_roundtrip_encrypted() {
 
     let loaded = storage.tags().get_tag(&tag.id).unwrap().unwrap();
     assert_eq!(loaded.name, "VIP");
-    assert_eq!(storage.list_tags().unwrap().len(), 1);
+    assert_eq!(storage.tags().list_tags().unwrap().len(), 1);
 }
 
 // @internal
@@ -72,5 +72,5 @@ fn test_place_store_create_and_find_near() {
 
     let found = storage.places().find_place_near(47.0, 8.0).unwrap();
     assert_eq!(found.map(|p| p.id), Some(place.id));
-    assert_eq!(storage.list_places().unwrap().len(), 1);
+    assert_eq!(storage.places().list_places().unwrap().len(), 1);
 }

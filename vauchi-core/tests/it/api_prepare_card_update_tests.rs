@@ -60,7 +60,7 @@ fn test_prepare_card_update_returns_ciphertext() {
     let contact_id = exchange_as_initiator(&wb);
 
     let empty_card = ContactCard::new("Alice");
-    let current_card = wb.storage().load_own_card().unwrap().unwrap();
+    let current_card = wb.storage().contacts().load_own_card().unwrap().unwrap();
 
     let result = wb.prepare_card_update_for_contact(&contact_id, &empty_card, &current_card);
 
@@ -76,7 +76,7 @@ fn test_prepare_card_update_advances_ratchet() {
     let contact_id = exchange_as_initiator(&wb);
 
     let empty_card = ContactCard::new("Alice");
-    let current_card = wb.storage().load_own_card().unwrap().unwrap();
+    let current_card = wb.storage().contacts().load_own_card().unwrap().unwrap();
 
     // Two calls with same input must produce different ciphertext (ratchet advances)
     let ct1 = wb
@@ -134,7 +134,7 @@ fn test_prepare_card_update_empty_delta_returns_error() {
     let contact_id = exchange_as_initiator(&wb);
 
     // Same card for old and new → empty delta
-    let card = wb.storage().load_own_card().unwrap().unwrap();
+    let card = wb.storage().contacts().load_own_card().unwrap().unwrap();
     let result = wb.prepare_card_update_for_contact(&contact_id, &card, &card);
 
     assert!(
@@ -152,7 +152,7 @@ fn test_prepare_card_update_rejects_blocked_contact() {
     wb.block_contact(&contact_id).unwrap();
 
     let empty_card = ContactCard::new("Alice");
-    let current_card = wb.storage().load_own_card().unwrap().unwrap();
+    let current_card = wb.storage().contacts().load_own_card().unwrap().unwrap();
     let result = wb.prepare_card_update_for_contact(&contact_id, &empty_card, &current_card);
 
     assert!(result.is_err(), "Must reject blocked contacts");

@@ -577,6 +577,7 @@ impl VauchiPlatform {
     pub fn save_test_contact(&self, contact: &vauchi_core::Contact) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
         storage
+            .contacts()
             .save_contact(contact)
             .map_err(|e| MobileError::StorageError {
                 detail: e.to_string(),
@@ -625,6 +626,7 @@ impl VauchiPlatform {
         //    the cache so subsequent calls take the hot path.
         let storage = self.open_storage()?;
         let (backup_data, _display_name) = storage
+            .identity()
             .load_identity()
             .map_err(|e| MobileError::Other {
                 detail: format!("Identity load failed: {e}"),
@@ -1023,7 +1025,10 @@ mod tests {
         let raw_bytes = identity.to_storage_bytes();
         let display_name = identity.display_name().to_string();
         let storage = wb.open_storage().unwrap();
-        storage.save_identity(&raw_bytes, &display_name).unwrap();
+        storage
+            .identity()
+            .save_identity(&raw_bytes, &display_name)
+            .unwrap();
         drop(storage);
 
         let recovered = wb

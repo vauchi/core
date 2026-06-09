@@ -109,6 +109,32 @@ fn consent_toggle_persists_and_reflects_on_revisit() {
     );
 }
 
+// P0 (settings-toggle-not-persisting): toggling notifications/contact_added
+// must update the persisted Vauchi config — not just the cached SettingsEngine
+// view that drives in-session render. `persist_settings_toggle` matched only
+// `component_id == "privacy"`, so contact_added never reached `config_mut`,
+// leaving the restart-seed (P1) and every `config()`-reading behaviour stale.
+// @internal
+#[test]
+fn contact_added_toggle_updates_vauchi_config() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Settings);
+    assert!(
+        !engine.vauchi().config().contact_added_notifications,
+        "config default is false"
+    );
+
+    let _ = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "notifications".into(),
+        item_id: "contact_added".into(),
+    });
+
+    assert!(
+        engine.vauchi().config().contact_added_notifications,
+        "contact_added toggle must persist to vauchi config"
+    );
+}
+
 // GDPR export action returns the serialized data via GdprExportComplete
 // (core performs export_all_data; the frontend persists the payload).
 // @internal

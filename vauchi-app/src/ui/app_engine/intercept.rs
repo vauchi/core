@@ -63,7 +63,7 @@ impl AppEngine {
             component_id,
             item_id,
         } = action
-            && component_id == "privacy"
+            && matches!(component_id.as_str(), "privacy" | "notifications")
         {
             let config = self.vauchi.config_mut();
             match item_id.as_str() {
@@ -72,6 +72,9 @@ impl AppEngine {
                 }
                 "suppress_presence" => {
                     config.suppress_presence = !config.suppress_presence;
+                }
+                "contact_added" => {
+                    config.contact_added_notifications = !config.contact_added_notifications;
                 }
                 _ => {}
             }

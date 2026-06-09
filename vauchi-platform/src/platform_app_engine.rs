@@ -313,6 +313,32 @@ impl PlatformAppEngine {
             .collect())
     }
 
+    /// Returns the navigation chrome for `layout` — the mobile bottom-tab
+    /// bar (`Mobile`) or the desktop sidebar (`Desktop`) — with labels
+    /// resolved from `locale`.
+    ///
+    /// Merges the former `tab_info` / `sidebar_items` wrappers: the
+    /// frontend passes its layout (the value it already gives
+    /// `current_tab_id`) instead of picking a form-factor-named method,
+    /// so the form-factor decision stays in core (ADR-023 Amendment 1).
+    /// The engine peers `tab_info()` / `sidebar_items()` remain — cabi
+    /// serves the C-ABI desktop frontends through them.
+    pub fn nav_items(
+        &self,
+        layout: MobileTabLayout,
+        locale: MobileLocale,
+    ) -> Result<Vec<MobileTabInfo>, MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        self_heal_post_auth(&mut engine);
+        let items = match layout {
+            MobileTabLayout::Mobile => engine.tab_info(locale.into()),
+            MobileTabLayout::Desktop => engine.sidebar_items(locale.into()),
+        };
+        Ok(items.into_iter().map(MobileTabInfo::from).collect())
+    }
+
     /// Handles a user action (as JSON) and returns the result as JSON.
     ///
     /// The action JSON must match the `UserAction` enum format.

@@ -7,7 +7,8 @@
 use std::sync::{Arc, Mutex};
 
 use vauchi_platform::{
-    MobileLocale, PlatformAppEngine, PlatformAppEngineTestHelpers, PlatformEventListener,
+    MobileLocale, MobileTabLayout, PlatformAppEngine, PlatformAppEngineTestHelpers,
+    PlatformEventListener,
 };
 
 /// Helper: create a PlatformAppEngine with a temp directory.
@@ -195,6 +196,44 @@ fn tab_info_german_labels_differ_from_english_once_locales_loaded() {
     let de_contacts = de.iter().find(|t| t.id == "contacts").expect("de contacts");
     assert_eq!(en_contacts.label, "Contacts");
     assert_eq!(de_contacts.label, "Kontakte");
+}
+
+// @internal
+#[test]
+fn nav_items_dispatches_on_layout() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    let mobile = engine
+        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .expect("mobile nav");
+    let desktop = engine
+        .nav_items(MobileTabLayout::Desktop, MobileLocale::English)
+        .expect("desktop nav");
+    let tab_ids: Vec<String> = engine
+        .tab_info(MobileLocale::English)
+        .expect("tab info")
+        .iter()
+        .map(|t| t.id.clone())
+        .collect();
+    let sidebar_ids: Vec<String> = engine
+        .sidebar_items(MobileLocale::English)
+        .expect("sidebar items")
+        .iter()
+        .map(|t| t.id.clone())
+        .collect();
+    let mobile_ids: Vec<String> = mobile.iter().map(|t| t.id.clone()).collect();
+    let desktop_ids: Vec<String> = desktop.iter().map(|t| t.id.clone()).collect();
+    assert_eq!(mobile_ids, tab_ids, "nav_items(Mobile) must equal tab_info");
+    assert_eq!(
+        desktop_ids, sidebar_ids,
+        "nav_items(Desktop) must equal sidebar_items"
+    );
+    assert!(
+        desktop.len() > mobile.len(),
+        "desktop sidebar must be broader than the mobile bar (mobile={}, desktop={})",
+        mobile.len(),
+        desktop.len()
+    );
 }
 
 // @internal

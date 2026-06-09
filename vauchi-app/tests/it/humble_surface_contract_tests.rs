@@ -8,7 +8,7 @@
 //! Asserts that every `pub fn` inside an `impl PlatformAppEngine { … }`
 //! block in `core/vauchi-platform/src/**` either:
 //!
-//!   (a) appears in `HUMBLE_ALLOWLIST` — the 24-method genuine binding
+//!   (a) appears in `HUMBLE_ALLOWLIST` — the 25-method genuine binding
 //!       surface every frontend renders against, or
 //!   (b) is one of the `SURPLUS_RATCHET_CEILING` known-legacy methods
 //!       still pending retirement in Phase 3 of the program.
@@ -45,7 +45,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The 24-method Humble surface — the binding surface every frontend
+/// The 25-method Humble surface — the binding surface every frontend
 /// is allowed to depend on per ADR-021 / ADR-043. Source of truth for
 /// Phase 0 / Task 0.2 of the pure-functional-core program plan.
 ///
@@ -66,6 +66,7 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "has_identity",
     "invalidate_all",
     "invalidate_screen_json",
+    "nav_items",
     "navigate_back_json",
     "new",
     "periodic_sync_tick",
@@ -257,12 +258,19 @@ fn humble_allowlist_size_matches_plan() {
     // The engine peer `available_screens()` stays — `tab_info` maps over
     // it and the cabi export `vauchi_app_available_screens` serves
     // desktop.
+    //
+    // `nav_items` expand (2026-06-09, 24 -> 25 transient) — ADR-023
+    // Amendment 1: the `tab_info` + `sidebar_items` wrappers merge into
+    // one layout-keyed `nav_items(layout, locale)`. Phase A adds it
+    // additively (allow-list +1); Phase C removes the two wrappers once
+    // iOS/Android/macOS migrate (allow-list -> 23). Engine peers stay
+    // (cabi/desktop). See `2026-06-08-pae-allowlist-further-shrink`.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        24,
-        "Humble allow-list size drifted from the 24 expected after \
-         retiring `available_screens_json` (ADR-048 G1-G5: zero frontend \
-         callers once ios!520 + android!509 land; redundant wrapper test removed). \
+        25,
+        "Humble allow-list size drifted from the 25 expected after \
+         adding `nav_items` (ADR-023 Amendment 1, expand phase of the \
+         tab_info + sidebar_items merge; contracts to 23 once frontends migrate). \
          Edits to this list require an ADR amendment (ADR-021/043 \
          for the Humble engine framing — incl. Amendment 3 for the \
          linchpin promotions — or ADR-048's G1-G5 gates for \

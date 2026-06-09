@@ -11,8 +11,6 @@
 //! `2026-06-09-storage-per-domain-store-boundaries`). Replay-nonce defense
 //! (ADR-029) still lives here pending its own exchange/security store.
 
-use rusqlite::params;
-
 use super::{Storage, StorageError};
 use crate::identity::device::DeviceRegistry;
 use crate::sync::device_sync::{FieldStamp, InterDeviceSyncState, VersionVector};
@@ -181,29 +179,18 @@ impl Storage {
 
     // === Replay Nonce Operations (V3 replay_nonces) ===
 
-    /// Saves a replay nonce for a contact.
-    ///
-    /// Uses INSERT OR IGNORE to be idempotent if the nonce already exists.
+    /// Forwards to [`ReplayStore::save_replay_nonce`].
     pub fn save_replay_nonce(
         &self,
         contact_id: &str,
         nonce: &[u8; 32],
         timestamp: u64,
     ) -> Result<(), StorageError> {
-        self.conn.execute(
-            "INSERT OR IGNORE INTO replay_nonces (contact_id, nonce, timestamp)
-             VALUES (?1, ?2, ?3)",
-            params![contact_id, nonce.as_slice(), timestamp as i64],
-        )?;
-        Ok(())
+        self.replay()
+            .save_replay_nonce(contact_id, nonce, timestamp)
     }
 
-    /// Test-only: insert a replay-nonce row with arbitrary (possibly
-    /// malformed) BLOB length, used to exercise the
-    /// [`Storage::load_replay_nonces`] error-propagation path (site 2 of
-    /// `2026-05-21-silent-failures-in-security-paths`). Pre-2026-05-23
-    /// the loader silently filtered such rows via `.filter_map`, opening
-    /// an ADR-029 replay-defense gap under storage corruption.
+    /// Forwards to [`ReplayStore::test_insert_malformed_replay_nonce`].
     #[cfg(any(test, feature = "testing"))]
     pub fn test_insert_malformed_replay_nonce(
         &self,
@@ -211,78 +198,29 @@ impl Storage {
         bad_nonce: &[u8],
         timestamp: u64,
     ) -> Result<(), StorageError> {
-        self.conn.execute(
-            "INSERT INTO replay_nonces (contact_id, nonce, timestamp)
-             VALUES (?1, ?2, ?3)",
-            params![contact_id, bad_nonce, timestamp as i64],
-        )?;
-        Ok(())
+        self.replay()
+            .test_insert_malformed_replay_nonce(contact_id, bad_nonce, timestamp)
     }
 
-    /// Checks whether a replay nonce has already been recorded for a contact.
-    ///
-    /// Returns `true` if the nonce exists (i.e., this is a replay), `false` if fresh.
+    /// Forwards to [`ReplayStore::is_replay_nonce`].
     pub fn is_replay_nonce(
         &self,
         contact_id: &str,
         nonce: &[u8; 32],
     ) -> Result<bool, StorageError> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM replay_nonces WHERE contact_id = ?1 AND nonce = ?2",
-            params![contact_id, nonce.as_slice()],
-            |row| row.get(0),
-        )?;
-        Ok(count > 0)
+        self.replay().is_replay_nonce(contact_id, nonce)
     }
 
-    /// Loads all replay nonces for a contact.
-    ///
-    /// Returns (nonce, timestamp) pairs.
+    /// Forwards to [`ReplayStore::load_replay_nonces`].
     pub fn load_replay_nonces(
         &self,
         contact_id: &str,
     ) -> Result<Vec<([u8; 32], u64)>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT nonce, timestamp FROM replay_nonces WHERE contact_id = ?1 ORDER BY timestamp",
-        )?;
-
-        // Site 2 of `2026-05-21-silent-failures-in-security-paths`: row
-        // read errors and `nonce_vec.try_into().ok()?` both used to be
-        // silently dropped via `.filter_map`. A corrupted nonce row would
-        // produce an empty/short set, opening an ADR-029 replay-defense
-        // window without surfacing the storage fault anywhere. Propagate
-        // both classes of error instead — a single corrupted row aborts
-        // the load with a typed `Err`, and the caller decides how to
-        // recover (e.g. refuse to process inbound updates until storage
-        // is repaired). Healthy storage is unaffected.
-        let raw_rows: Vec<(Vec<u8>, i64)> = stmt
-            .query_map(params![contact_id], |row| {
-                Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, i64>(1)?))
-            })?
-            .collect::<Result<_, _>>()?;
-
-        let mut nonces = Vec::with_capacity(raw_rows.len());
-        for (nonce_vec, ts) in raw_rows {
-            let actual_len = nonce_vec.len();
-            let nonce: [u8; 32] = nonce_vec.try_into().map_err(|_| {
-                StorageError::Serialization(format!(
-                    "replay_nonces row has malformed nonce: expected 32 bytes, got {actual_len}"
-                ))
-            })?;
-            nonces.push((nonce, ts as u64));
-        }
-
-        Ok(nonces)
+        self.replay().load_replay_nonces(contact_id)
     }
 
-    /// Removes replay nonces older than the given cutoff timestamp.
-    ///
-    /// Returns the number of nonces removed.
+    /// Forwards to [`ReplayStore::cleanup_replay_nonces`].
     pub fn cleanup_replay_nonces(&self, cutoff: u64) -> Result<usize, StorageError> {
-        let removed = self.conn.execute(
-            "DELETE FROM replay_nonces WHERE timestamp < ?1",
-            params![cutoff as i64],
-        )?;
-        Ok(removed)
+        self.replay().cleanup_replay_nonces(cutoff)
     }
 }

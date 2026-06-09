@@ -142,7 +142,7 @@ pub use stores::{
     ActivityLogStore, ConsentStore, DecoyStore, DeliveryStore, DeviceDeliveryStore, DeviceStore,
     DuressStore, EmergencyStore, FieldNoteStore, GroupStore, IdentityStore, LabelStore,
     OhttpCacheStore, PendingStore, PinCacheStore, PlaceStore, RatchetStore, RecoveryStore,
-    RetryStore, SyncStore, TagStore, UxStore,
+    ReplayStore, RetryStore, SyncStore, TagStore, UxStore,
 };
 
 #[cfg(any(test, feature = "testing"))]

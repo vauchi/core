@@ -78,11 +78,11 @@ pub use identity::{Identity, IdentityBackup};
 pub mod storage;
 #[cfg(feature = "storage")]
 pub use storage::{
-    ActivityLogStore, ConsentStore, DecoyStore, DeliveryStore, DeviceDeliveryStore, DeviceStore,
-    DuressStore, EmergencyStore, FieldNoteStore, GroupStore, IdentityStore, LabelStore,
-    OhttpCacheStore, PendingStore, PendingUpdate, PinCacheStore, PlaceStore, RatchetStore,
-    RecoveryStore, ReplayStore, RetryStore, Storage, StorageError, SyncStore, TagStore,
-    UpdateStatus, UxStore,
+    ActivityLogStore, ConsentStore, ContactStore, DecoyStore, DeliveryStore, DeviceDeliveryStore,
+    DeviceStore, DuressStore, EmergencyStore, FieldNoteStore, GroupStore, IdentityStore,
+    LabelStore, OhttpCacheStore, PendingStore, PendingUpdate, PinCacheStore, PlaceStore,
+    RatchetStore, RecoveryStore, ReplayStore, RetryStore, Storage, StorageError, SyncStore,
+    TagStore, UpdateStatus, UxStore,
 };
 
 pub mod exchange;

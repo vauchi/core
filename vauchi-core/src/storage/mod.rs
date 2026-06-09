@@ -139,10 +139,10 @@ pub use error::{
 };
 pub use secure::{FileKeyStorage, SecureStorage};
 pub use stores::{
-    ActivityLogStore, ConsentStore, DecoyStore, DeliveryStore, DeviceDeliveryStore, DeviceStore,
-    DuressStore, EmergencyStore, FieldNoteStore, GroupStore, IdentityStore, LabelStore,
-    OhttpCacheStore, PendingStore, PinCacheStore, PlaceStore, RatchetStore, RecoveryStore,
-    ReplayStore, RetryStore, SyncStore, TagStore, UxStore,
+    ActivityLogStore, ConsentStore, ContactStore, DecoyStore, DeliveryStore, DeviceDeliveryStore,
+    DeviceStore, DuressStore, EmergencyStore, FieldNoteStore, GroupStore, IdentityStore,
+    LabelStore, OhttpCacheStore, PendingStore, PinCacheStore, PlaceStore, RatchetStore,
+    RecoveryStore, ReplayStore, RetryStore, SyncStore, TagStore, UxStore,
 };
 
 #[cfg(any(test, feature = "testing"))]

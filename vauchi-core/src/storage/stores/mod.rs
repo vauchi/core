@@ -14,6 +14,10 @@
 
 mod activity_log;
 mod consent;
+mod contact;
+mod contact_display;
+mod contact_ops;
+mod contact_row;
 mod decoy;
 mod delivery;
 mod device;
@@ -38,6 +42,7 @@ mod ux;
 
 pub use activity_log::ActivityLogStore;
 pub use consent::ConsentStore;
+pub use contact::ContactStore;
 pub use decoy::DecoyStore;
 pub use delivery::DeliveryStore;
 pub use device::DeviceStore;

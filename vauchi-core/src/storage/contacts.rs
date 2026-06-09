@@ -559,10 +559,7 @@ impl Storage {
             "DELETE FROM contact_ratchets WHERE contact_id = ?1",
             params![id],
         )?;
-        self.conn.execute(
-            "DELETE FROM contact_sync_timestamps WHERE contact_id = ?1",
-            params![id],
-        )?;
+        self.sync().forget_contact(id)?;
         self.delete_pending_updates_for_contact(id)?;
         self.delete_all_contact_overrides(id)?;
         self.conn.execute(

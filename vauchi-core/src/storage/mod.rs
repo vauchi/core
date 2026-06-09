@@ -138,7 +138,7 @@ pub use error::{
     UpdateStatus,
 };
 pub use secure::{FileKeyStorage, SecureStorage};
-pub use stores::RecoveryStore;
+pub use stores::{RecoveryStore, SyncStore};
 
 #[cfg(any(test, feature = "testing"))]
 pub use secure::MemoryKeyStorage;

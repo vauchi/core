@@ -180,51 +180,14 @@ impl Storage {
         contact_id: &str,
         timestamp: u64,
     ) -> Result<(), StorageError> {
-        let ts_bytes = (timestamp as i64).to_le_bytes();
-        let encrypted = crate::crypto::encrypt(&self.encryption_key, &ts_bytes)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-
-        self.conn.execute(
-            "INSERT OR REPLACE INTO contact_sync_timestamps (contact_id, last_sync_at, last_sync_at_encrypted)
-             VALUES (?1, ?2, ?3)",
-            params![contact_id, timestamp as i64, encrypted],
-        )?;
-        Ok(())
+        self.sync().set_contact_last_sync(contact_id, timestamp)
     }
 
     /// Gets the last sync timestamp for a contact (decrypted).
     ///
     /// Returns None if the contact hasn't been synced yet.
     pub fn get_contact_last_sync(&self, contact_id: &str) -> Result<Option<u64>, StorageError> {
-        let result = self.conn.query_row(
-            "SELECT last_sync_at_encrypted, last_sync_at FROM contact_sync_timestamps WHERE contact_id = ?1",
-            params![contact_id],
-            |row| {
-                let encrypted: Option<Vec<u8>> = row.get(0)?;
-                let plaintext: i64 = row.get(1)?;
-                Ok((encrypted, plaintext))
-            },
-        );
-
-        match result {
-            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                if decrypted.len() == 8 {
-                    let ts = i64::from_le_bytes(
-                        decrypted
-                            .try_into()
-                            .map_err(|_| StorageError::Encryption("Invalid timestamp".into()))?,
-                    );
-                    Ok(Some(ts as u64))
-                } else {
-                    Err(StorageError::Encryption("Invalid timestamp length".into()))
-                }
-            }
-            Ok((_, plaintext)) => Ok(Some(plaintext as u64)),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(StorageError::Database(e)),
-        }
+        self.sync().get_contact_last_sync(contact_id)
     }
 
     /// Saves a CEK for a contact, encrypted with the storage master key.

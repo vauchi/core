@@ -13,5 +13,7 @@
 //! `2026-06-09-storage-per-domain-store-boundaries`.
 
 mod recovery;
+mod sync;
 
 pub use recovery::RecoveryStore;
+pub use sync::SyncStore;

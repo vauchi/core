@@ -484,6 +484,20 @@ impl PlatformAppEngine {
                     let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                         detail: format!("Lock failed: {e}"),
                     })?;
+                    // A GATT peripheral never scans, so it emits no
+                    // `BleDeviceDiscovered` and the discovery branch above never
+                    // built its session. The peripheral that gets connected to
+                    // is always the responder — build that session now so its
+                    // KeyOffer-onward writes reach the real machine and the
+                    // contact persists (`2026-06-08-ios-ble-responder-persist`).
+                    // No-op for the central, which already holds an active
+                    // session from discovery.
+                    if matches!(&hw_event, vauchi_core::Event::BleConnected { .. })
+                        && !engine.ble_handshake_session_active()
+                        && matches!(engine.current_app_screen(), AppScreen::BleExchange { .. })
+                    {
+                        engine.start_ble_handshake_as_responder();
+                    }
                     if engine.ble_handshake_session_active() {
                         let m_event = engine.forward_ble_hardware_event(&hw_event);
                         // P3 — on Completed, persist the decrypted peer card +

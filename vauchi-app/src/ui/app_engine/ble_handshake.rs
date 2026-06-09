@@ -204,6 +204,33 @@ impl AppEngine {
         self.ensure_ble_handshake_session(role, identity_key, x3dh, card);
     }
 
+    /// Build the BLE handshake session as the **responder** for a device
+    /// acting as the GATT peripheral.
+    ///
+    /// The peripheral advertises and is connected *to* — it never scans, so
+    /// it emits no `BleDeviceDiscovered` and `start_ble_handshake_on_discovery`
+    /// is never reached. The peripheral that receives the KeyOffer is always
+    /// the responder, so the role is fixed and no peer tiebreak token is
+    /// needed (`process_key_offer` supplies the peer's keys). Idempotent: a
+    /// no-op once a session is held, so the central — which already built its
+    /// session on discovery before `BleConnected` — is unaffected.
+    ///
+    /// Without this the iOS peripheral-responder never builds the
+    /// AppEngine-owned machine, so completion runs on the hollow chrome path
+    /// and no contact is persisted
+    /// (`2026-06-08-ios-ble-responder-persist`). Android scans even as the
+    /// responder, so it built the session on discovery and was unaffected.
+    pub fn start_ble_handshake_as_responder(&mut self) {
+        if self.ble_handshake_session_active() {
+            return;
+        }
+        let Some((identity_key, x3dh, card)) = self.build_ble_session_inputs() else {
+            log::warn!("BLE: cannot start responder handshake — no identity / card");
+            return;
+        };
+        self.ensure_ble_handshake_session(BleRole::Responder, identity_key, x3dh, card);
+    }
+
     /// Tear down the BLE handshake session when leaving the BLE exchange
     /// screen. The session is built lazily on discovery (its role is
     /// unknown at screen entry), so there is no entry branch — only
@@ -509,6 +536,125 @@ mod tests {
         assert!(
             !labels.contains(&"Phone"),
             "Phone is NOT in the Work group → must NOT reach Bob; got {labels:?}"
+        );
+    }
+
+    // @scenario: ble_exchange :: Both peers persist the exchanged contact
+    #[test]
+    fn two_device_ble_exchange_persists_contact_for_both_roles() {
+        // Regression guard for the iOS responder-persist bug
+        // (2026-06-08-ios-ble-responder-persist): the responder reached
+        // "Completed" but created no contact. Persistence is core-driven and
+        // role-symmetric — BOTH the handshake initiator and responder must
+        // create the peer contact. The role is decided by the identity
+        // tiebreak, so asserting only one side (as the privacy test above
+        // does) covers the responder path only ~half the time. Assert both:
+        // whichever engine is the responder, its persist must succeed (a live
+        // session key at completion).
+        let mut va = Vauchi::in_memory().expect("vauchi alice");
+        va.create_identity("Alice").expect("alice identity");
+        let mut alice = AppEngine::new(va);
+
+        let mut vb = Vauchi::in_memory().expect("vauchi bob");
+        vb.create_identity("Bob").expect("bob identity");
+        let mut bob = AppEngine::new(vb);
+
+        let alice_token = alice
+            .vauchi
+            .identity()
+            .expect("alice identity")
+            .signing_public_key()
+            .to_vec();
+        let bob_token = bob
+            .vauchi
+            .identity()
+            .expect("bob identity")
+            .signing_public_key()
+            .to_vec();
+
+        alice.start_ble_handshake_on_discovery(&bob_token);
+        bob.start_ble_handshake_on_discovery(&alice_token);
+
+        let ea = alice.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
+            device_id: "bob".into(),
+        });
+        alice.apply_ble_machine_event(ea);
+        let eb = bob.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
+            device_id: "alice".into(),
+        });
+        bob.apply_ble_machine_event(eb);
+
+        for _ in 0..50 {
+            let a = pump(&mut alice, &mut bob);
+            let b = pump(&mut bob, &mut alice);
+            if a + b == 0 {
+                break;
+            }
+        }
+
+        assert_eq!(
+            alice.vauchi.list_contacts().expect("alice contacts").len(),
+            1,
+            "Alice must persist Bob after completion — 0 means the role she \
+             played (initiator or responder) failed to persist"
+        );
+        assert_eq!(
+            bob.vauchi.list_contacts().expect("bob contacts").len(),
+            1,
+            "Bob must persist Alice after completion — 0 means the role he \
+             played (initiator or responder) failed to persist"
+        );
+    }
+
+    // @scenario: ble_exchange :: A peripheral responder (no discovery) persists the contact
+    #[test]
+    fn responder_built_on_connect_without_discovery_persists() {
+        // Reproduces the iOS peripheral-responder path
+        // (2026-06-08-ios-ble-responder-persist): the peripheral never emits
+        // `BleDeviceDiscovered`, so it builds its session via
+        // `start_ble_handshake_as_responder` (driven from `BleConnected` in
+        // the platform layer) instead of `start_ble_handshake_on_discovery`.
+        // It must still decrypt the peer card and persist the contact.
+        let (mut initiator, _work) = engine_with_card_and_group();
+        // Force the initiator role deterministically (the central would have
+        // built this on discovery via the tiebreak).
+        let (ik, x3dh, card) = initiator
+            .build_ble_session_inputs()
+            .expect("initiator inputs");
+        initiator.ensure_ble_handshake_session(BleRole::Initiator, ik, x3dh, card);
+
+        let mut vb = Vauchi::in_memory().expect("vauchi bob");
+        vb.create_identity("Bob").expect("bob identity");
+        let mut responder = AppEngine::new(vb);
+        // The peripheral path: no discovery happened, so build as responder.
+        responder.start_ble_handshake_as_responder();
+        assert!(
+            responder.ble_handshake_session_active(),
+            "responder session must build without a prior discovery"
+        );
+
+        let ei = initiator.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
+            device_id: "bob".into(),
+        });
+        initiator.apply_ble_machine_event(ei);
+        let er = responder.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
+            device_id: "alice".into(),
+        });
+        responder.apply_ble_machine_event(er);
+
+        for _ in 0..50 {
+            let a = pump(&mut initiator, &mut responder);
+            let b = pump(&mut responder, &mut initiator);
+            if a + b == 0 {
+                break;
+            }
+        }
+
+        assert_eq!(
+            responder.vauchi.list_contacts().expect("contacts").len(),
+            1,
+            "a peripheral responder built on connect (no discovery) must \
+             persist the peer contact"
         );
     }
 }

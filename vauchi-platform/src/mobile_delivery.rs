@@ -10,8 +10,9 @@
 //!
 //! - Flag-vestigial cleanup: `is/set_delivery_receipts_enabled`,
 //!   `is/set_suppress_presence_enabled` (dead getter/setter pairs over
-//!   `Mutex<bool>` fields that were never read; real flag state is on
-//!   PAE side via `load_sync_flags_engine`).
+//!   `Mutex<bool>` fields that were never read; flag state now lives in
+//!   core `SettingsFlags` — the `.sync_flags` PAE sidecar was retired in
+//!   2026-06-08-settings-toggle-not-persisting).
 //! - Backup-cluster delete-pair: `export_backup`, `import_backup`
 //!   (redundant — covered by `full_backup_api_tests.rs` et al.).
 //! - get-failed-delivery relocate: `get_failed_delivery_records`

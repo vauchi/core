@@ -677,23 +677,6 @@ pub enum DomainCommand {
     },
     // ListArchivedContacts is already declared in batch 10.
 
-    // ── Sync flag persistence (B7 batch 18) ──
-    /// Whether delivery-receipt ACKs (`ReceivedByRecipient`) are
-    /// enabled. Persisted to a JSON sidecar file next to the storage
-    /// directory.
-    IsDeliveryReceiptsEnabled,
-    /// Set the delivery-receipts flag. Persisted across restarts.
-    SetDeliveryReceiptsEnabled {
-        enabled: bool,
-    },
-    /// Whether presence suppression is enabled (the relay never
-    /// learns whether the user is online). Persisted.
-    IsSuppressPresenceEnabled,
-    /// Set the suppress-presence flag. Persisted across restarts.
-    SetSuppressPresenceEnabled {
-        enabled: bool,
-    },
-
     // ── Contact detail view state + social registry (B7 batch 19) ──
     /// Pre-computed contact-detail view (badges, banners, actions,
     /// added-time-display) — frontends iterate the returned arrays

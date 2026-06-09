@@ -120,9 +120,11 @@ fn initial_screen_id_is_identity_check() {
 
 // @internal
 #[test]
-fn tab_info_pre_identity_returns_only_onboarding() {
+fn nav_items_mobile_pre_identity_returns_only_onboarding() {
     let (engine, _dir) = create_engine();
-    let tabs = engine.tab_info(MobileLocale::English).expect("tab info");
+    let tabs = engine
+        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .expect("nav items");
     assert_eq!(tabs.len(), 1, "pre-identity should expose just onboarding");
     let tab = &tabs[0];
     assert_eq!(tab.id, "onboarding");
@@ -133,10 +135,12 @@ fn tab_info_pre_identity_returns_only_onboarding() {
 
 // @internal
 #[test]
-fn tab_info_post_identity_returns_top_level_tabs() {
+fn nav_items_mobile_post_identity_returns_top_level_tabs() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
-    let tabs = engine.tab_info(MobileLocale::English).expect("tab info");
+    let tabs = engine
+        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .expect("nav items");
     let ids: Vec<&str> = tabs.iter().map(|t| t.id.as_str()).collect();
     assert_eq!(
         ids,
@@ -159,10 +163,12 @@ fn tab_info_post_identity_returns_top_level_tabs() {
 
 // @internal
 #[test]
-fn tab_info_english_labels_come_from_locale() {
+fn nav_items_mobile_english_labels_come_from_locale() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
-    let tabs = engine.tab_info(MobileLocale::English).expect("tab info");
+    let tabs = engine
+        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .expect("nav items");
     let by_id: std::collections::HashMap<_, _> = tabs
         .iter()
         .map(|t| (t.id.as_str(), t.label.as_str()))
@@ -176,7 +182,7 @@ fn tab_info_english_labels_come_from_locale() {
 
 // @internal
 #[test]
-fn tab_info_german_labels_differ_from_english_once_locales_loaded() {
+fn nav_items_mobile_german_labels_differ_from_english_once_locales_loaded() {
     // Non-English locales are only populated after `init_locales()` loads
     // the bundled JSON files — without that, `get_string` falls back to
     // the compile-time-bundled English map. This test exercises the
@@ -186,8 +192,12 @@ fn tab_info_german_labels_differ_from_english_once_locales_loaded() {
 
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
-    let en = engine.tab_info(MobileLocale::English).expect("en");
-    let de = engine.tab_info(MobileLocale::German).expect("de");
+    let en = engine
+        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .expect("en");
+    let de = engine
+        .nav_items(MobileTabLayout::Mobile, MobileLocale::German)
+        .expect("de");
     // Same screen IDs in the same order
     let en_ids: Vec<&str> = en.iter().map(|t| t.id.as_str()).collect();
     let de_ids: Vec<&str> = de.iter().map(|t| t.id.as_str()).collect();
@@ -209,24 +219,16 @@ fn nav_items_dispatches_on_layout() {
     let desktop = engine
         .nav_items(MobileTabLayout::Desktop, MobileLocale::English)
         .expect("desktop nav");
-    let tab_ids: Vec<String> = engine
-        .tab_info(MobileLocale::English)
-        .expect("tab info")
-        .iter()
-        .map(|t| t.id.clone())
-        .collect();
-    let sidebar_ids: Vec<String> = engine
-        .sidebar_items(MobileLocale::English)
-        .expect("sidebar items")
-        .iter()
-        .map(|t| t.id.clone())
-        .collect();
     let mobile_ids: Vec<String> = mobile.iter().map(|t| t.id.clone()).collect();
     let desktop_ids: Vec<String> = desktop.iter().map(|t| t.id.clone()).collect();
-    assert_eq!(mobile_ids, tab_ids, "nav_items(Mobile) must equal tab_info");
     assert_eq!(
-        desktop_ids, sidebar_ids,
-        "nav_items(Desktop) must equal sidebar_items"
+        mobile_ids,
+        vec!["my_info", "contacts", "exchange", "groups", "more"],
+        "nav_items(Mobile) must return the five-tab mobile bar"
+    );
+    assert!(
+        desktop_ids.contains(&"settings".to_string()),
+        "nav_items(Desktop) must expose desktop-only entries the mobile bar omits"
     );
     assert!(
         desktop.len() > mobile.len(),
@@ -238,24 +240,26 @@ fn nav_items_dispatches_on_layout() {
 
 // @internal
 #[test]
-fn sidebar_items_pre_identity_returns_only_onboarding() {
+fn nav_items_desktop_pre_identity_returns_only_onboarding() {
     let (engine, _dir) = create_engine();
     let items = engine
-        .sidebar_items(MobileLocale::English)
-        .expect("sidebar items");
+        .nav_items(MobileTabLayout::Desktop, MobileLocale::English)
+        .expect("desktop nav");
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].id, "onboarding");
 }
 
 // @internal
 #[test]
-fn sidebar_items_post_identity_is_broader_than_tab_info() {
+fn nav_items_desktop_post_identity_is_broader_than_mobile() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
-    let tabs = engine.tab_info(MobileLocale::English).expect("tab info");
+    let tabs = engine
+        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .expect("mobile nav");
     let items = engine
-        .sidebar_items(MobileLocale::English)
-        .expect("sidebar items");
+        .nav_items(MobileTabLayout::Desktop, MobileLocale::English)
+        .expect("desktop nav");
     assert!(
         items.len() > tabs.len(),
         "sidebar must be broader than the mobile tab bar (tabs={}, sidebar={})",

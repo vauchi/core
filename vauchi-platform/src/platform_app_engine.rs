@@ -278,41 +278,6 @@ impl PlatformAppEngine {
         screen_to_json(&engine.current_screen())
     }
 
-    /// Returns the mobile bottom-tab bar metadata (id, label, icon,
-    /// badge count) with labels resolved from the supplied `locale`.
-    ///
-    /// Frontends render the returned `MobileTabInfo` directly — no
-    /// local screen-to-tab map or label lookup needed (G1 of the
-    /// frontend pure-renderer remediation; ADR-021 / ADR-038).
-    pub fn tab_info(&self, locale: MobileLocale) -> Result<Vec<MobileTabInfo>, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        self_heal_post_auth(&mut engine);
-        Ok(engine
-            .tab_info(locale.into())
-            .into_iter()
-            .map(MobileTabInfo::from)
-            .collect())
-    }
-
-    /// Returns desktop-sidebar metadata — all top-level navigable
-    /// screens with locale-resolved labels. Wider than `tab_info()`
-    /// because desktop frames accommodate more entries than a phone
-    /// bottom-tab bar. Use this from macOS / Windows / linux-gtk /
-    /// linux-qt sidebars so they stop maintaining their own screen →
-    /// label match tables (§6 pure-renderer remediation).
-    pub fn sidebar_items(&self, locale: MobileLocale) -> Result<Vec<MobileTabInfo>, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        Ok(engine
-            .sidebar_items(locale.into())
-            .into_iter()
-            .map(MobileTabInfo::from)
-            .collect())
-    }
-
     /// Returns the navigation chrome for `layout` — the mobile bottom-tab
     /// bar (`Mobile`) or the desktop sidebar (`Desktop`) — with labels
     /// resolved from `locale`.

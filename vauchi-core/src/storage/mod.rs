@@ -80,7 +80,7 @@ use rusqlite::Connection;
 pub struct Storage {
     conn: Connection,
     /// Encryption key derived from user's master key
-    pub(super) encryption_key: SymmetricKey,
+    encryption_key: SymmetricKey,
     /// Database file path (None for in-memory databases).
     db_path: Option<std::path::PathBuf>,
     /// Explicit-time seam for the storage subsystem (Phase 1 /
@@ -89,7 +89,7 @@ pub struct Storage {
     /// instead of reading ambient `SystemTime::now`. Defaults
     /// to `SystemClock::shared()`; tests inject a `FakeClock`
     /// via `with_clock(...)`.
-    pub(super) clock: std::sync::Arc<dyn crate::clock::Clock>,
+    clock: std::sync::Arc<dyn crate::clock::Clock>,
 }
 impl Storage {
     /// Borrow the storage subsystem's [`Clock`](crate::clock::Clock).

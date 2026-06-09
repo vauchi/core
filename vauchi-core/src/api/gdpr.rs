@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-use crate::storage::Storage;
+use crate::storage::{DeviceStore, Storage};
 
 /// Complete GDPR data export.
 #[derive(Debug, Serialize, Deserialize)]
@@ -137,7 +137,7 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
         .collect();
 
     // Export devices (best effort — device info may not be configured)
-    let devices = export_devices(storage);
+    let devices = export_devices(&storage.device());
 
     // Export recovery config (count of trusted contacts)
     let trusted_count = contacts.iter().filter(|c| c.is_recovery_trusted()).count();
@@ -245,10 +245,10 @@ fn redact_hex_strings(text: &str) -> String {
 }
 
 /// Exports device information (best effort).
-fn export_devices(storage: &Storage) -> Option<Vec<GdprDevice>> {
+fn export_devices(devices: &DeviceStore<'_>) -> Option<Vec<GdprDevice>> {
     // Try to load device registry from storage
     // Returns empty list if no devices registered
-    match storage.device().load_device_registry_json() {
+    match devices.load_device_registry_json() {
         Ok(Some(json)) => {
             // Parse device registry JSON
             if let Ok(registry) = serde_json::from_str::<serde_json::Value>(&json)

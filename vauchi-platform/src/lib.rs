@@ -14,10 +14,9 @@
 //! Note: Storage connections are created on-demand for thread safety,
 //! as rusqlite's Connection is not Sync.
 
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use vauchi_core::{Storage, SymmetricKey};
+use vauchi_core::SymmetricKey;
 
 // === Modules ===
 
@@ -30,7 +29,6 @@ mod exchange_view;
 mod json_helpers;
 mod mobile_contact_detail;
 mod mobile_contacts;
-mod mobile_gdpr;
 mod mobile_import;
 mod mobile_visibility;
 mod multipart_qr;
@@ -69,7 +67,6 @@ pub use diagnostic::{
     diagnostic_rank_configs, diagnostic_scan_qr_with_config, diagnostic_score_config,
 };
 pub use domain_command::{DomainCommand, DomainCommandResult};
-use error::lock_or;
 pub use error::{KeychainError, MobileError};
 pub use exchange::{MobileCommand, MobileEvent, MobileExchangeState};
 pub use exchange_view::{MobileExchangeViewState, exchange_view_state};
@@ -459,172 +456,6 @@ impl vauchi_core::api::PurgeSender for MobileRelaySender {
             .connect()
             .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Connect: {e}")))?;
         self.client.send_purge(purge, now)
-    }
-}
-
-// === Main Interface ===
-
-/// Main Vauchi interface for mobile platforms.
-///
-/// Uses on-demand storage connections for thread safety.
-#[derive(uniffi::Object)]
-pub struct VauchiPlatform {
-    pub(crate) storage_path: PathBuf,
-    pub(crate) storage_key: SymmetricKey,
-    /// Optional PEM-encoded certificate for TLS pinning.
-    pinned_cert_pem: Mutex<Option<String>>,
-    /// Platform keychain for crypto-shredding operations.
-    platform_keychain: Mutex<Option<Arc<dyn MobilePlatformKeychain>>>,
-}
-
-impl VauchiPlatform {
-    /// Opens a storage connection.
-    ///
-    /// `pub` (not `pub(crate)`) so
-    /// `tests/it/multistage_persistence_regression.rs` can verify
-    /// post-exchange contact persistence after the contact-CRUD
-    /// `impl VauchiPlatform` block retires (slice 32g-B Tier 2).
-    /// Not `#[uniffi::export]`-marked, so it stays out of the FFI
-    /// surface.
-    pub fn open_storage(&self) -> Result<Storage, MobileError> {
-        Storage::open(&self.storage_path, self.storage_key.clone()).map_err(|e| {
-            MobileError::StorageError {
-                detail: e.to_string(),
-            }
-        })
-    }
-
-    /// Save a contact directly to storage.
-    ///
-    /// Used by integration tests that need exchanged or imported contacts
-    /// without running a full exchange flow or VCF import.
-    /// Not exported via UniFFI (outside `#[uniffi::export]` block).
-    #[doc(hidden)]
-    pub fn save_test_contact(&self, contact: &vauchi_core::Contact) -> Result<(), MobileError> {
-        let storage = self.open_storage()?;
-        storage
-            .contacts()
-            .save_contact(contact)
-            .map_err(|e| MobileError::StorageError {
-                detail: e.to_string(),
-            })
-    }
-}
-
-#[uniffi::export]
-impl VauchiPlatform {
-    /// Create a new VauchiPlatform instance with a platform-provided secure key.
-    ///
-    /// This is the recommended constructor. The platform (iOS/Android) should:
-    /// 1. Generate a 32-byte key if one doesn't exist in secure storage
-    /// 2. Store it in platform-specific secure storage (Keychain/KeyStore)
-    /// 3. Pass the key bytes to this constructor
-    #[uniffi::constructor]
-    pub fn new_with_secure_key(
-        data_dir: String,
-        _relay_url: String,
-        storage_key_bytes: Vec<u8>,
-    ) -> Result<Arc<Self>, MobileError> {
-        let data_path = PathBuf::from(&data_dir);
-
-        std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
-            detail: e.to_string(),
-        })?;
-
-        let storage_path = data_path.join("vauchi.db");
-
-        let key_array: [u8; 32] =
-            storage_key_bytes
-                .try_into()
-                .map_err(|_| MobileError::StorageError {
-                    detail: "Storage key must be exactly 32 bytes".to_string(),
-                })?;
-        let storage_key =
-            SymmetricKey::try_from_bytes(key_array).map_err(|_| MobileError::StorageError {
-                detail: "Degenerate storage key rejected".to_string(),
-            })?;
-
-        // Storage handle is opened lazily on first use; the constructor does not
-        // pre-open it. Pre-opening would run schema migrations and startup
-        // maintenance during cold start (audit finding F4, 2026-04-17) for a
-        // handle that is immediately dropped — Storage is not retained on
-        // VauchiPlatform; every operation re-opens via storage_path + storage_key.
-
-        Ok(Arc::new(VauchiPlatform {
-            storage_path,
-            storage_key,
-            pinned_cert_pem: Mutex::new(None),
-            platform_keychain: Mutex::new(None),
-        }))
-    }
-
-    /// Create a new VauchiPlatform instance (legacy constructor).
-    ///
-    /// WARNING: This constructor stores the encryption key in a plaintext file.
-    /// Use `new_with_secure_key` instead for production.
-    #[uniffi::constructor]
-    pub fn new(data_dir: String, _relay_url: String) -> Result<Arc<Self>, MobileError> {
-        let data_path = PathBuf::from(&data_dir);
-
-        std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
-            detail: e.to_string(),
-        })?;
-
-        let storage_path = data_path.join("vauchi.db");
-        let key_path = data_path.join("storage.key");
-
-        let storage_key = if key_path.exists() {
-            let key_bytes = std::fs::read(&key_path).map_err(|e| MobileError::StorageError {
-                detail: format!("Failed to read key: {}", e),
-            })?;
-            let key_array: [u8; 32] =
-                key_bytes
-                    .try_into()
-                    .map_err(|_| MobileError::StorageError {
-                        detail: "Invalid key length".to_string(),
-                    })?;
-            SymmetricKey::try_from_bytes(key_array).map_err(|_| MobileError::StorageError {
-                detail: "Degenerate storage key rejected".to_string(),
-            })?
-        } else {
-            let key = SymmetricKey::generate();
-            std::fs::write(&key_path, key.as_bytes()).map_err(|e| MobileError::StorageError {
-                detail: format!("Failed to save key: {}", e),
-            })?;
-            key
-        };
-
-        // Storage handle opened lazily — see new_with_secure_key for rationale.
-
-        Ok(Arc::new(VauchiPlatform {
-            storage_path,
-            storage_key,
-            pinned_cert_pem: Mutex::new(None),
-            platform_keychain: Mutex::new(None),
-        }))
-    }
-
-    /// Set the pinned certificate for relay TLS connections.
-    ///
-    /// The certificate should be in PEM format. Once set, only connections
-    /// to relay servers presenting this exact certificate will be allowed.
-    pub fn set_pinned_certificate(&self, cert_pem: String) {
-        let Ok(mut pinned) = lock_or(&self.pinned_cert_pem) else {
-            return;
-        };
-        if cert_pem.is_empty() {
-            *pinned = None;
-        } else {
-            *pinned = Some(cert_pem);
-        }
-    }
-
-    /// Check if certificate pinning is enabled.
-    pub fn is_certificate_pinning_enabled(&self) -> bool {
-        let Ok(guard) = lock_or(&self.pinned_cert_pem) else {
-            return false;
-        };
-        guard.is_some()
     }
 }
 

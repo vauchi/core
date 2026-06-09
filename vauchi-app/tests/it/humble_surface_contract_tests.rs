@@ -382,13 +382,10 @@ fn platform_app_engine_surface_matches_allowlist_strict() {
 const PERMITTED_UNIFFI_OBJECTS: &[&str] = &[
     // ── Screen-driving (ADR-043 Am.2 clarification 1) ──
     "PlatformAppEngine",
-    // ── Legacy ──
-    // `VauchiPlatform` is the Phase-B legacy facade; the
-    // `2026-05-11-pure-functional-core-program-plan.md` Phase 6 /
-    // Task 6.3 retires it after the `SURPLUS_RATCHET_CEILING` hits
-    // zero. Allowlisted here until then; remove this entry when
-    // Phase 6 lands.
-    "VauchiPlatform",
+    // `VauchiPlatform` (the Phase-B legacy facade) was retired by the
+    // Phase 6 / G4 collapse (2026-06-09): the struct and all its impls
+    // were deleted from vauchi-platform/src/, so it no longer appears in
+    // the observed set. Only the single screen-driving object remains.
 ];
 
 /// Walk `core/vauchi-platform/src/**.rs` and collect every

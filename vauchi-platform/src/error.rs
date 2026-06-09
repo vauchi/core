@@ -113,18 +113,6 @@ impl MobileError {
     }
 }
 
-/// Acquire a mutex lock, converting poison errors to `MobileError::Other`.
-pub(crate) fn lock_or<T>(
-    mutex: &std::sync::Mutex<T>,
-) -> Result<std::sync::MutexGuard<'_, T>, MobileError> {
-    mutex
-        .lock()
-        .map_err(|_| MobileError::other(LOCK_POISON_MSG))
-}
-
-/// Consistent message for lock-poison errors.
-pub(crate) const LOCK_POISON_MSG: &str = "lock poisoned";
-
 impl From<vauchi_core::network::NetworkError> for MobileError {
     fn from(err: vauchi_core::network::NetworkError) -> Self {
         match err {

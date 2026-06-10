@@ -370,7 +370,7 @@ fn form_dialog_add_field_cancel_clean_completes() {
 
 // @internal
 #[test]
-fn form_dialog_add_field_collected_input_format() {
+fn form_dialog_add_field_engine_output_typed() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField {
         available_groups: vec![],
     });
@@ -392,20 +392,16 @@ fn form_dialog_add_field_collected_input_format() {
         value: "main account".into(),
     });
 
-    let input = engine
-        .collected_input()
-        .expect("collected_input should return Some");
-    let parts: Vec<&str> = input.split('\n').collect();
     assert_eq!(
-        parts.len(),
-        5,
-        "Format should be type\\nlabel\\nvalue\\nnote\\ngroups"
+        engine.engine_output(),
+        Some(EngineOutput::Form(FormInput::AddField {
+            entry_type: "email".into(),
+            label: "Work".into(),
+            value: "test@example.com".into(),
+            note: "main account".into(),
+            groups: vec![],
+        }))
     );
-    assert_eq!(parts[0], "email");
-    assert_eq!(parts[1], "Work");
-    assert_eq!(parts[2], "test@example.com");
-    assert_eq!(parts[3], "main account");
-    assert_eq!(parts[4], "", "No groups selected");
 }
 
 // @internal
@@ -444,11 +440,15 @@ fn form_dialog_add_field_group_toggle() {
         component_id: "field_value".into(),
         value: "+1 555".into(),
     });
-    let input = engine
-        .collected_input()
-        .expect("collected_input should return Some");
-    let parts: Vec<&str> = input.split('\n').collect();
-    assert_eq!(parts[4], "g1", "Should include toggled group");
+    let Some(EngineOutput::Form(FormInput::AddField { groups, .. })) = engine.engine_output()
+    else {
+        panic!("add-field dialog must expose FormInput::AddField");
+    };
+    assert_eq!(
+        groups,
+        vec!["g1".to_string()],
+        "Should include toggled group"
+    );
 }
 
 // --- EditField tests ---
@@ -510,7 +510,7 @@ fn form_dialog_edit_field_submit_completes() {
 
 // @internal
 #[test]
-fn form_dialog_edit_field_collected_input() {
+fn form_dialog_edit_field_engine_output() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditField {
         field_id: "f1".into(),
         field_label: "Email".into(),
@@ -521,12 +521,13 @@ fn form_dialog_edit_field_collected_input() {
         component_id: "field_value".into(),
         value: "updated@example.com".into(),
     });
-    let input = engine
-        .collected_input()
-        .expect("collected_input should return Some");
-    // Format: "value\nnote" — note is empty so input starts with value
-    let value_part = input.split('\n').next().unwrap_or("");
-    assert_eq!(value_part, "updated@example.com");
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::Form(FormInput::EditField {
+            value: "updated@example.com".into(),
+            note: String::new(),
+        }))
+    );
 }
 
 // --- EditName tests ---
@@ -563,7 +564,7 @@ fn form_dialog_edit_name_prefills_current_name() {
 
 // @internal
 #[test]
-fn form_dialog_edit_name_collected_input() {
+fn form_dialog_edit_name_engine_output() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {
         current_name: "Alice".into(),
     });
@@ -571,10 +572,12 @@ fn form_dialog_edit_name_collected_input() {
         component_id: "display_name".into(),
         value: "Bob".into(),
     });
-    let input = engine
-        .collected_input()
-        .expect("collected_input should return Some");
-    assert_eq!(input, "Bob");
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::Form(FormInput::EditName {
+            name: "Bob".into()
+        }))
+    );
 }
 
 // --- EditRelayUrl tests ---
@@ -591,7 +594,7 @@ fn form_dialog_edit_relay_url_screen_id() {
 
 // @internal
 #[test]
-fn form_dialog_edit_relay_url_collected_input() {
+fn form_dialog_edit_relay_url_engine_output() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditRelayUrl {
         current_url: "https://relay.vauchi.app".into(),
     });
@@ -599,10 +602,12 @@ fn form_dialog_edit_relay_url_collected_input() {
         component_id: "relay_url".into(),
         value: "https://custom.relay.example".into(),
     });
-    let input = engine
-        .collected_input()
-        .expect("collected_input should return Some");
-    assert_eq!(input, "https://custom.relay.example");
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::Form(FormInput::EditRelayUrl {
+            url: "https://custom.relay.example".into()
+        }))
+    );
 }
 
 // --- TextChanged test ---

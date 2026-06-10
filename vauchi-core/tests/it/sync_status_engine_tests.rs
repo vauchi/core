@@ -149,7 +149,10 @@ fn sync_now_returns_complete() {
         matches!(result, ActionResult::Complete),
         "sync_now should return Complete for AppEngine to handle"
     );
-    assert_eq!(engine.collected_input().as_deref(), Some("sync_now"));
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::Sync(SyncChoice::SyncNow))
+    );
 }
 
 // @internal
@@ -163,7 +166,10 @@ fn test_connection_returns_complete() {
         matches!(result, ActionResult::Complete),
         "test_connection should return Complete for AppEngine to handle"
     );
-    assert_eq!(engine.collected_input().as_deref(), Some("test_connection"));
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::Sync(SyncChoice::TestConnection))
+    );
 }
 
 // @internal

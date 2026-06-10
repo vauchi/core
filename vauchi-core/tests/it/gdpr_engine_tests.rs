@@ -52,12 +52,15 @@ fn gdpr_export_completes() {
 
 // @internal
 #[test]
-fn gdpr_export_collected_input() {
+fn gdpr_export_engine_output() {
     let mut engine = GdprEngine::new(None, "All consents granted".into());
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "export".into(),
     });
-    assert_eq!(engine.collected_input(), Some("export".into()));
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::Gdpr(GdprChoice::Export))
+    );
 }
 
 // @internal
@@ -89,14 +92,17 @@ fn gdpr_confirm_delete_completes() {
         action_id: "confirm_delete".into(),
     });
     assert_eq!(result, ActionResult::Complete);
-    assert_eq!(engine.collected_input(), Some("delete".into()));
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::Gdpr(GdprChoice::Delete))
+    );
 }
 
 // @internal
 #[test]
-fn gdpr_collected_input_initially_none() {
+fn gdpr_engine_output_initially_none() {
     let engine = GdprEngine::new(None, "All consents granted".into());
-    assert_eq!(engine.collected_input(), None);
+    assert_eq!(engine.engine_output(), None);
 }
 
 // @internal

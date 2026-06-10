@@ -88,27 +88,31 @@ fn contact_visibility_save_completes() {
 
 // @internal
 #[test]
-fn contact_visibility_collected_input_format() {
+fn contact_visibility_engine_output_toggles() {
     let engine = make_engine();
-    let input = engine
-        .collected_input()
-        .expect("should return collected input");
-    assert_eq!(input, "email:visible,phone:hidden");
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::ContactVisibility {
+            toggles: vec![("email".into(), true), ("phone".into(), false)],
+        })
+    );
 }
 
 // @internal
 #[test]
-fn contact_visibility_toggle_then_collected_input_reflects_change() {
+fn contact_visibility_toggle_then_output_reflects_change() {
     let mut engine = make_engine();
     let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "field_toggles".into(),
         item_id: "phone".into(),
     });
 
-    let input = engine
-        .collected_input()
-        .expect("should return collected input");
-    assert_eq!(input, "email:visible,phone:visible");
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::ContactVisibility {
+            toggles: vec![("email".into(), true), ("phone".into(), true)],
+        })
+    );
 }
 
 // @internal

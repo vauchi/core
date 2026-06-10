@@ -302,7 +302,12 @@ vauchi-core/src/storage/mod.rs 1079
 #  `#[cfg(test)] mod factory_filter_tests;` declaration with its
 #  INLINE_TEST_REQUIRED marker —
 #  2026-06-08-exchange-card-not-group-filtered G2 Slice 3.)
-vauchi-app/src/ui/app_engine/mod.rs 1485
+# (2026-06-10: residual split — AppScreen -> app_screen.rs (~305),
+#  multi-stage bridges -> multi_stage_exchange.rs (~190), chrome
+#  overlays + SyncChromeStatus + ACTION_* -> overlays.rs (~330).
+#  1485 -> 676; baseline lowered so the ratchet bites. See
+#  2026-06-10-app-engine-residual-splits.)
+vauchi-app/src/ui/app_engine/mod.rs 676
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -387,7 +392,13 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 #  wiring — 2026-06-08-exchange-card-not-group-filtered G2 Slice 3. The
 #  68-line factory wiring test lives in factory_filter_tests.rs, not inline,
 #  to keep this grandfathered factory from growing.)
-vauchi-app/src/ui/app_engine/screens.rs 1607
+# (2026-06-10: residual split — help/mailto catalog -> help_catalog.rs
+#  (~150), contacts-family arms -> screens_contacts.rs (~370),
+#  exchange-family arms + reconstruct_identity_via_storage_bytes ->
+#  screens_exchange.rs (~230); local English-only format_relative_time
+#  replaced by crate::relative_time. 1607 -> 906; baseline lowered so
+#  the ratchet bites. See 2026-06-10-app-engine-residual-splits.)
+vauchi-app/src/ui/app_engine/screens.rs 906
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

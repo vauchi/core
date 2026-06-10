@@ -271,12 +271,8 @@ impl AppEngine {
     /// Fingerprint verification complete: apply the verify/unverify decision.
     pub(super) fn complete_verify_fingerprint(&mut self, contact_id: &str) -> ActionResult {
         use crate::ui::fingerprint_verify::VerifyAction;
-        let fp_engine = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::FingerprintVerifyEngine>());
-        if let Some(fp_engine) = fp_engine {
-            match fp_engine.completion_action() {
+        match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::FingerprintVerify(action)) => match action {
                 VerifyAction::Verified => {
                     if let Err(e) = self.vauchi.verify_contact_fingerprint(contact_id) {
                         return ActionResult::ShowAlert {
@@ -294,6 +290,12 @@ impl AppEngine {
                     }
                 }
                 VerifyAction::None => {}
+            },
+            other => {
+                tracing::warn!(
+                    ?other,
+                    "verify-fingerprint completion without FingerprintVerify output"
+                );
             }
         }
         let screen = self.navigate_back();

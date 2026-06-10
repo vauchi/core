@@ -8,7 +8,7 @@
 //! the confirm action correctly.
 
 use vauchi_app::ui::{
-    ActionResult, FingerprintVerifyEngine, UserAction, VerifyAction, WorkflowEngine,
+    ActionResult, EngineOutput, FingerprintVerifyEngine, UserAction, VerifyAction, WorkflowEngine,
 };
 
 // @scenario: fingerprint.feature - Fingerprint screen shows both fingerprints
@@ -155,5 +155,43 @@ fn test_confirm_ignored_when_already_verified() {
     assert!(
         matches!(result, ActionResult::UpdateScreen(_)),
         "confirm_match when already verified should be a no-op"
+    );
+}
+
+// @scenario: fingerprint.feature - Confirming match marks contact verified
+#[test]
+fn engine_output_is_none_action_before_any_press() {
+    let engine = FingerprintVerifyEngine::new("c1", "AAAA BBBB", "CCCC DDDD", false);
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::FingerprintVerify(VerifyAction::None))
+    );
+}
+
+// @scenario: fingerprint.feature - Confirming match marks contact verified
+#[test]
+fn engine_output_carries_verified_after_confirm_match() {
+    let mut engine = FingerprintVerifyEngine::new("c1", "AAAA BBBB", "CCCC DDDD", false);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_match".into(),
+    });
+    assert_eq!(result, ActionResult::Complete);
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::FingerprintVerify(VerifyAction::Verified))
+    );
+}
+
+// @scenario: fingerprint.feature - Removing verification
+#[test]
+fn engine_output_carries_unverified_after_unverify() {
+    let mut engine = FingerprintVerifyEngine::new("c1", "AAAA", "BBBB", true);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "unverify".into(),
+    });
+    assert_eq!(result, ActionResult::Complete);
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::FingerprintVerify(VerifyAction::Unverified))
     );
 }

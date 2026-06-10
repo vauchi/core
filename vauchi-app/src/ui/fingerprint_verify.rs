@@ -167,4 +167,8 @@ impl WorkflowEngine for FingerprintVerifyEngine {
     fn was_cancelled(&self) -> bool {
         self.action == VerifyAction::None
     }
+
+    fn engine_output(&self) -> Option<EngineOutput> {
+        Some(EngineOutput::FingerprintVerify(self.action.clone()))
+    }
 }

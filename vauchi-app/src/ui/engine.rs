@@ -4,7 +4,7 @@
 
 use std::any::Any;
 
-use super::{ActionResult, ScreenModel, UserAction};
+use super::{ActionResult, EngineOutput, ScreenModel, UserAction};
 use crate::notification_types::PendingNotification;
 use vauchi_core::{Command, Event};
 
@@ -30,6 +30,18 @@ pub trait WorkflowEngine: Send {
     /// Used by `AppEngine` to extract credentials before processing
     /// `ActionResult::Complete`. Default returns `None`.
     fn collected_input(&self) -> Option<String> {
+        None
+    }
+
+    /// Salient typed state this engine exposes to `AppEngine` at
+    /// completion/interception time (see [`EngineOutput`]).
+    ///
+    /// The typed replacement for downcasting via [`Self::as_any`]:
+    /// hub sites match the expected variant and `tracing::warn!` +
+    /// degrade on a mismatch (foreign engine active when a stale
+    /// async result lands). Default `None` — engine has nothing the
+    /// hub reads.
+    fn engine_output(&self) -> Option<EngineOutput> {
         None
     }
 

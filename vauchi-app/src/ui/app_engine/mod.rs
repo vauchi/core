@@ -10,6 +10,7 @@
 
 mod ble_handshake;
 mod completion;
+mod completion_contact;
 mod device_link;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_initiator;

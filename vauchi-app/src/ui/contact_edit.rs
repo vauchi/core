@@ -320,6 +320,10 @@ impl ContactEditEngine {
 }
 
 impl WorkflowEngine for ContactEditEngine {
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     fn current_screen(&self) -> ScreenModel {
         match self.step {
             ContactEditStep::EditFields => self.build_edit_fields_screen(),

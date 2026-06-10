@@ -132,6 +132,44 @@ fn contact_detail_edit_navigates_to_edit_screen() {
     );
 }
 
+// @scenario: contacts_management.feature :: Edit contact display name
+#[test]
+fn editing_contact_display_name_persists_through_completion() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let card = ContactCard::new("Bob");
+    let contact = Contact::from_exchange([3u8; 32], card, SymmetricKey::generate(), 0);
+    let bob_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactEdit {
+        contact_id: bob_id.clone(),
+    });
+
+    // Edit the display name, advance through the wizard, and save.
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Bobby".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    }); // EditFields -> EditVisibility
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    }); // EditVisibility -> Preview
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "save".into(),
+    });
+
+    // Re-open the detail fresh: the edited name must be the resolved title.
+    let screen = engine.navigate_to(AppScreen::ContactDetail { contact_id: bob_id });
+    assert_eq!(
+        screen.title, "Bobby",
+        "edited display name must persist and render on the contact detail"
+    );
+}
+
 // ── contact visibility tests ─────────────────────────────────────────
 
 // @internal

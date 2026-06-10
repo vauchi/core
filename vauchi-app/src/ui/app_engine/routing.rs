@@ -329,6 +329,7 @@ impl AppEngine {
             AppScreen::DuressPin => self.complete_duress_pin(),
             AppScreen::DeviceManagement => self.complete_device_management(),
             AppScreen::ContactDetail { contact_id } => self.complete_contact_detail(contact_id),
+            AppScreen::ContactEdit { contact_id } => self.complete_contact_edit(contact_id),
             AppScreen::GroupDetail { group_id } => self.complete_group_detail(group_id),
             AppScreen::Groups => self.complete_groups(),
             AppScreen::ContactMerge { .. } => self.complete_contact_merge(),

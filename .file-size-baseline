@@ -302,7 +302,7 @@ vauchi-core/src/storage/mod.rs 1079
 #  `#[cfg(test)] mod factory_filter_tests;` declaration with its
 #  INLINE_TEST_REQUIRED marker —
 #  2026-06-08-exchange-card-not-group-filtered G2 Slice 3.)
-vauchi-app/src/ui/app_engine/mod.rs 1484
+vauchi-app/src/ui/app_engine/mod.rs 1485
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -356,7 +356,7 @@ vauchi-app/src/ui/app_engine/mod.rs 1484
 # (-259 2026-06-06: moved route_result + its arm helpers to
 #  app_engine/result_routing.rs (Tier 2 of the complexity sweep); the
 #  Start* arms now share one start_exchange_to helper.)
-vauchi-app/src/ui/app_engine/routing.rs 595
+vauchi-app/src/ui/app_engine/routing.rs 596
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)

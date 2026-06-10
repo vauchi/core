@@ -11,6 +11,34 @@ use crate::domain_command::{DomainCommand, DomainCommandResult};
 use crate::error::MobileError;
 use crate::platform_app_engine::PlatformAppEngine;
 
+/// Maps `Vauchi` visibility errors onto the exact `MobileError`
+/// shapes the inline arm bodies produced pre-G3, so frontend-visible
+/// error text is unchanged.
+fn map_visibility_error(e: vauchi_core::VauchiError) -> MobileError {
+    use vauchi_core::VauchiError;
+    match e {
+        VauchiError::NotFound(detail) if detail.starts_with("contact: ") => MobileError::Other {
+            detail: format!("Contact not found: {}", &detail["contact: ".len()..]),
+        },
+        VauchiError::NotFound(detail) if detail.starts_with("field: ") => {
+            MobileError::InvalidInput {
+                field: String::new(),
+                detail: format!("Field not found: {}", &detail["field: ".len()..]),
+            }
+        }
+        VauchiError::IdentityNotInitialized => MobileError::Other {
+            detail: "Identity not found".into(),
+        },
+        VauchiError::InvalidState(detail) => MobileError::InvalidInput {
+            field: String::new(),
+            detail,
+        },
+        other => MobileError::StorageError {
+            detail: other.to_string(),
+        },
+    }
+}
+
 impl PlatformAppEngine {
     pub(crate) fn dispatch_groups_visibility(
         &self,
@@ -268,47 +296,10 @@ impl PlatformAppEngine {
                 contact_id,
                 field_label,
             } => {
-                let storage = engine.vauchi().storage();
-                let mut contact = storage
-                    .contacts()
-                    .load_contact(&contact_id)
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?
-                    .ok_or_else(|| MobileError::Other {
-                        detail: format!("Contact not found: {contact_id}"),
-                    })?;
-                let card = storage
-                    .contacts()
-                    .load_own_card()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?
-                    .ok_or(MobileError::Other {
-                        detail: "Identity not found".into(),
-                    })?;
-                let field_id = card
-                    .fields()
-                    .iter()
-                    .find(|f| f.label() == field_label)
-                    .ok_or_else(|| MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: format!("Field not found: {field_label}"),
-                    })?
-                    .id()
-                    .to_string();
-                contact
-                    .visibility_rules_mut()
-                    .ok_or(MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: "Visibility rules require an exchanged contact".into(),
-                    })?
-                    .set_nobody(&field_id);
-                storage.contacts().save_contact(&contact).map_err(|e| {
-                    MobileError::StorageError {
-                        detail: e.to_string(),
-                    }
-                })?;
+                engine
+                    .vauchi()
+                    .set_field_visibility_by_label(&contact_id, &field_label, false)
+                    .map_err(map_visibility_error)?;
                 engine.invalidate_screen(&AppScreen::ContactVisibility {
                     contact_id: contact_id.clone(),
                 });
@@ -321,47 +312,10 @@ impl PlatformAppEngine {
                 contact_id,
                 field_label,
             } => {
-                let storage = engine.vauchi().storage();
-                let mut contact = storage
-                    .contacts()
-                    .load_contact(&contact_id)
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?
-                    .ok_or_else(|| MobileError::Other {
-                        detail: format!("Contact not found: {contact_id}"),
-                    })?;
-                let card = storage
-                    .contacts()
-                    .load_own_card()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?
-                    .ok_or(MobileError::Other {
-                        detail: "Identity not found".into(),
-                    })?;
-                let field_id = card
-                    .fields()
-                    .iter()
-                    .find(|f| f.label() == field_label)
-                    .ok_or_else(|| MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: format!("Field not found: {field_label}"),
-                    })?
-                    .id()
-                    .to_string();
-                contact
-                    .visibility_rules_mut()
-                    .ok_or(MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: "Visibility rules require an exchanged contact".into(),
-                    })?
-                    .set_everyone(&field_id);
-                storage.contacts().save_contact(&contact).map_err(|e| {
-                    MobileError::StorageError {
-                        detail: e.to_string(),
-                    }
-                })?;
+                engine
+                    .vauchi()
+                    .set_field_visibility_by_label(&contact_id, &field_label, true)
+                    .map_err(map_visibility_error)?;
                 engine.invalidate_screen(&AppScreen::ContactVisibility {
                     contact_id: contact_id.clone(),
                 });
@@ -374,38 +328,10 @@ impl PlatformAppEngine {
                 contact_id,
                 field_label,
             } => {
-                let storage = engine.vauchi().storage();
-                let contact = storage
-                    .contacts()
-                    .load_contact(&contact_id)
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?
-                    .ok_or_else(|| MobileError::Other {
-                        detail: format!("Contact not found: {contact_id}"),
-                    })?;
-                let card = storage
-                    .contacts()
-                    .load_own_card()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?
-                    .ok_or(MobileError::Other {
-                        detail: "Identity not found".into(),
-                    })?;
-                let field_id = card
-                    .fields()
-                    .iter()
-                    .find(|f| f.label() == field_label)
-                    .ok_or_else(|| MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: format!("Field not found: {field_label}"),
-                    })?
-                    .id()
-                    .to_string();
-                let visible = contact
-                    .visibility_rules()
-                    .is_some_and(|r| r.can_see(&field_id, &contact_id));
+                let visible = engine
+                    .vauchi()
+                    .is_field_visible_by_label(&contact_id, &field_label)
+                    .map_err(map_visibility_error)?;
                 Ok(DomainCommandResult::Bool { value: visible })
             }
             DomainCommand::GetSuggestedLabels => {

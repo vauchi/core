@@ -573,6 +573,14 @@ pub fn serialize_card_payload_v2(
     relay_url: &str,
     card: &ContactCard,
 ) -> Vec<u8> {
+    // The embedded `identity_pubkey` is the verification key the parser
+    // checks the signature against; signing with a different keypair would
+    // silently emit a payload that fails its own signature on parse.
+    debug_assert_eq!(
+        signing_keypair.public_key().as_bytes(),
+        identity_pubkey,
+        "serialize_card_payload_v2: identity_pubkey must match the signing keypair"
+    );
     let message = bootstrap_signing_message(x3dh_pubkey, relay_url);
     let signature = signing_keypair.sign(&message);
     let body = CardPayloadV2Body {

@@ -132,8 +132,8 @@ fn settings_reflects_config_values() {
     let name_value = find_value(&screen, "profile", "display_name");
     assert_eq!(name_value, "Alice");
 
-    let relay_value = find_value(&screen, "network", "relay_url");
-    assert_eq!(relay_value, "https://relay.vauchi.app");
+    let relay_detail = find_link_detail(&screen, "network", "relay_url");
+    assert_eq!(relay_detail.as_deref(), Some("https://relay.vauchi.app"));
 }
 
 // ADR-022: irrevocable actions use InlineConfirm, not ShowAlert

@@ -37,11 +37,8 @@ fn test_new_with_relay_session_audio_proximity_starts_pending() {
     // too so a future refactor that drops the second initialiser
     // doesn't silently regress to a stale Default.
     let card = b"Alice's contact card".to_vec();
-    let session = MultiStageSession::new_with_relay(
-        card,
-        Some("https://relay.example/route".to_string()),
-        Some([0u8; 32]),
-    );
+    let session =
+        MultiStageSession::new_with_relay(card, Some("https://relay.example/route".to_string()));
     assert_eq!(session.audio_proximity(), AudioProximityState::Pending);
 }
 
@@ -119,12 +116,10 @@ fn test_full_exchange_with_relay_metadata() {
     let mut alice = MultiStageSession::new_with_relay(
         alice_card.clone(),
         Some("https://alice-relay.example.com".to_string()),
-        Some([0xAA; 32]),
     );
     let mut bob = MultiStageSession::new_with_relay(
         bob_card.clone(),
         Some("https://bob-relay.example.com".to_string()),
-        Some([0xBB; 32]),
     );
 
     // Stage 1: Both display INIT QRs
@@ -157,13 +152,11 @@ fn test_full_exchange_with_relay_metadata() {
         alice.peer_relay_url(),
         Some("https://bob-relay.example.com")
     );
-    assert_eq!(alice.peer_relay_noise_pubkey(), Some([0xBB; 32]));
 
     assert_eq!(
         bob.peer_relay_url(),
         Some("https://alice-relay.example.com")
     );
-    assert_eq!(bob.peer_relay_noise_pubkey(), Some([0xAA; 32]));
 
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
@@ -201,9 +194,7 @@ fn test_exchange_without_relay_metadata() {
 
     assert!(matches!(alice.get_state(), ProtocolState::Finalized));
     assert!(alice.peer_relay_url().is_none());
-    assert!(alice.peer_relay_noise_pubkey().is_none());
     assert!(bob.peer_relay_url().is_none());
-    assert!(bob.peer_relay_noise_pubkey().is_none());
 }
 
 // @internal
@@ -514,11 +505,8 @@ fn test_new_with_relay_session_accel_proximity_starts_pending() {
     // so a future refactor that drops the second initialiser doesn't
     // silently regress to a stale Default.
     let card = b"Alice's contact card".to_vec();
-    let session = MultiStageSession::new_with_relay(
-        card,
-        Some("https://relay.example/route".to_string()),
-        Some([0u8; 32]),
-    );
+    let session =
+        MultiStageSession::new_with_relay(card, Some("https://relay.example/route".to_string()));
     assert_eq!(
         session.accel_proximity(),
         AccelerometerProximityState::Pending

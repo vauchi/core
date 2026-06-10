@@ -157,11 +157,6 @@ pub struct RelayConfig {
     /// Proxy configuration (SOCKS5 proxy support).
     pub proxy: ProxyConfig,
 
-    /// Relay's Noise NK public key for inner transport encryption.
-    /// When set, the transport performs a Noise NK handshake after connect
-    /// and wraps all subsequent messages with Noise encryption.
-    pub relay_noise_pubkey: Option<[u8; 32]>,
-
     /// Pinned relay certificates for TLS certificate pinning.
     /// When non-empty, verifies the server's leaf certificate matches a pin.
     pub pinned_certs: Vec<PinnedCertificate>,
@@ -260,7 +255,6 @@ impl Default for RelayConfig {
             ack_timeout_ms: 30_000,
             max_retries: 5,
             proxy: ProxyConfig::None,
-            relay_noise_pubkey: None,
             pinned_certs: vec![PinnedCertificate::new(RELAY_PROD_SPKI_PIN)],
             ohttp_pinned_certs: vec![PinnedCertificate::new(OHTTP_PROD_SPKI_PIN)],
             pin_ttl_secs: 86_400,        // 24 hours
@@ -342,7 +336,6 @@ impl RelayConfig {
             max_reconnect_attempts: self.max_reconnect_attempts,
             reconnect_base_delay_ms: self.reconnect_base_delay_ms,
             proxy: self.proxy.clone(),
-            relay_noise_pubkey: self.relay_noise_pubkey,
             pinned_certs: self.pinned_certs.clone(),
         }
     }

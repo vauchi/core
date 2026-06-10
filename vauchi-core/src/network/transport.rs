@@ -112,10 +112,6 @@ pub struct TransportConfig {
     pub reconnect_base_delay_ms: u64,
     /// Proxy configuration (optional SOCKS5 or HTTP CONNECT proxy).
     pub proxy: ProxyConfig,
-    /// Relay's Noise NK public key for inner transport encryption.
-    /// When set, the transport performs a Noise NK handshake after WebSocket
-    /// connect and wraps all subsequent messages with Noise encryption.
-    pub relay_noise_pubkey: Option<[u8; 32]>,
     /// Pinned relay certificates for TLS certificate pinning.
     /// When non-empty, the TLS handshake verifies the server's leaf certificate
     /// matches at least one pinned SHA-256 fingerprint. Empty means no pinning.
@@ -131,7 +127,6 @@ impl Default for TransportConfig {
             max_reconnect_attempts: 5,
             reconnect_base_delay_ms: 1_000,
             proxy: ProxyConfig::None,
-            relay_noise_pubkey: None,
             pinned_certs: Vec::new(),
         }
     }
@@ -148,7 +143,6 @@ impl TransportConfig {
             max_reconnect_attempts: 3,
             reconnect_base_delay_ms: 5_000,
             proxy,
-            relay_noise_pubkey: None,
             pinned_certs: Vec::new(),
         }
     }

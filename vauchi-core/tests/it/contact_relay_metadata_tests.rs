@@ -28,10 +28,6 @@ fn new_contact_has_no_relay_metadata() {
         contact.relay_url().is_none(),
         "New contacts should have no relay URL"
     );
-    assert!(
-        contact.relay_noise_pubkey().is_none(),
-        "New contacts should have no relay Noise pubkey"
-    );
 }
 
 // ── Setting relay metadata ─────────────────────────────────────────
@@ -49,25 +45,13 @@ fn set_relay_url() {
 
 // @internal
 #[test]
-fn set_relay_noise_pubkey() {
-    let mut contact = make_test_contact();
-    let pubkey = [42u8; 32];
-    contact.set_relay_noise_pubkey(Some(pubkey));
-    assert_eq!(contact.relay_noise_pubkey().unwrap(), &pubkey);
-}
-
-// @internal
-#[test]
 fn clear_relay_metadata() {
     let mut contact = make_test_contact();
     contact.set_relay_url(Some("https://relay.example.com".to_string()));
-    contact.set_relay_noise_pubkey(Some([99u8; 32]));
 
     contact.set_relay_url(None);
-    contact.set_relay_noise_pubkey(None);
 
     assert!(contact.relay_url().is_none());
-    assert!(contact.relay_noise_pubkey().is_none());
 }
 
 // ── Constructors preserve relay fields ─────────────────────────────
@@ -82,7 +66,6 @@ fn from_exchange_has_no_relay_fields() {
         0,
     );
     assert!(contact.relay_url().is_none());
-    assert!(contact.relay_noise_pubkey().is_none());
 }
 
 // @internal
@@ -97,7 +80,6 @@ fn from_sync_data_has_no_relay_fields() {
         vauchi_core::contact::VisibilityRules::new(),
     );
     assert!(contact.relay_url().is_none());
-    assert!(contact.relay_noise_pubkey().is_none());
 }
 
 // ── Relay metadata survives card update ────────────────────────────
@@ -107,13 +89,11 @@ fn from_sync_data_has_no_relay_fields() {
 fn relay_metadata_preserved_after_card_update() {
     let mut contact = make_test_contact();
     contact.set_relay_url(Some("https://relay.example.com".to_string()));
-    contact.set_relay_noise_pubkey(Some([77u8; 32]));
 
     let new_card = ContactCard::new("Bob Updated");
     contact.update_card(new_card, 0);
 
     assert_eq!(contact.relay_url().unwrap(), "https://relay.example.com");
-    assert_eq!(contact.relay_noise_pubkey().unwrap(), &[77u8; 32]);
 }
 
 // ── Relay metadata survives recovery ───────────────────────────────
@@ -123,7 +103,6 @@ fn relay_metadata_preserved_after_card_update() {
 fn relay_metadata_preserved_after_recovery() {
     let mut contact = make_test_contact();
     contact.set_relay_url(Some("https://relay.example.com".to_string()));
-    contact.set_relay_noise_pubkey(Some([88u8; 32]));
 
     contact
         .accept_recovery([5u8; 32], SymmetricKey::generate(), 0)
@@ -132,5 +111,4 @@ fn relay_metadata_preserved_after_recovery() {
     // Relay metadata should persist through recovery — the contact
     // is still reachable at the same relay.
     assert_eq!(contact.relay_url().unwrap(), "https://relay.example.com");
-    assert_eq!(contact.relay_noise_pubkey().unwrap(), &[88u8; 32]);
 }

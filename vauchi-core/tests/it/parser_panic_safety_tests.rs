@@ -40,7 +40,6 @@ fn valid_qr_data_string() -> String {
         &identity,
         &ephemeral,
         Some("https://relay.example.com".to_string()),
-        Some([7u8; 32]),
         0u64,
     )
     .to_data_string()

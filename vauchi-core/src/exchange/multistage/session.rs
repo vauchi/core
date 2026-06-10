@@ -263,11 +263,9 @@ pub struct MultiStageSession {
 
     // Our relay metadata (included in our INIT QR)
     our_relay_url: Option<String>,
-    our_relay_noise_pubkey: Option<[u8; 32]>,
 
     // Peer's relay metadata (extracted from their INIT QR)
     peer_relay_url: Option<String>,
-    peer_relay_noise_pubkey: Option<[u8; 32]>,
 
     // Audio-proximity verification state (Hover-only).
     //
@@ -346,18 +344,14 @@ pub enum RatchetSetupError {
 impl MultiStageSession {
     /// Create a new session for exchanging the given contact card data.
     pub fn new(local_card: Vec<u8>) -> Self {
-        Self::new_with_relay(local_card, None, None)
+        Self::new_with_relay(local_card, None)
     }
 
     /// Create a new session with optional relay metadata.
     ///
-    /// The relay URL and Noise NK pubkey will be included in our INIT QR
-    /// so the peer can route future messages to our relay.
-    pub fn new_with_relay(
-        local_card: Vec<u8>,
-        relay_url: Option<String>,
-        relay_noise_pubkey: Option<[u8; 32]>,
-    ) -> Self {
+    /// The relay URL will be included in our INIT QR so the peer can
+    /// route future messages to our relay.
+    pub fn new_with_relay(local_card: Vec<u8>, relay_url: Option<String>) -> Self {
         let session_id: [u8; 16] = crate::crypto::random_bytes();
 
         let ephemeral_secret = X25519Secret::random_from_rng(OsRng);
@@ -374,7 +368,7 @@ impl MultiStageSession {
         // `MultiStageSession::new` is a separate refactor tracked as a
         // follow-up to `2026-05-21-adr-019-commitment-xchacha-consistency`.
         let commitment_context =
-            Self::build_commitment_context(relay_url.as_deref(), relay_noise_pubkey.as_ref());
+            Self::build_commitment_context(relay_url.as_deref());
         let commitment = Commitment::create_with_context(&local_card, &commitment_context)
             .expect("XChaCha20Poly1305 encryption of fresh plaintext cannot fail");
 
@@ -408,9 +402,7 @@ impl MultiStageSession {
             retry_used: false,
             fail_broadcast_until: None,
             our_relay_url: relay_url,
-            our_relay_noise_pubkey: relay_noise_pubkey,
             peer_relay_url: None,
-            peer_relay_noise_pubkey: None,
             audio_proximity: AudioProximityState::Pending,
             audio_listening_started_at: None,
             accel_proximity: AccelerometerProximityState::Pending,
@@ -556,11 +548,6 @@ impl MultiStageSession {
     /// Returns the peer's relay URL (available after INIT exchange).
     pub fn peer_relay_url(&self) -> Option<&str> {
         self.peer_relay_url.as_deref()
-    }
-
-    /// Returns the peer's relay Noise NK public key (available after INIT exchange).
-    pub fn peer_relay_noise_pubkey(&self) -> Option<[u8; 32]> {
-        self.peer_relay_noise_pubkey
     }
 
     /// Returns the current audio-proximity state. Hover-only — Glance
@@ -1075,14 +1062,7 @@ impl MultiStageSession {
                 commitment_hash,
                 display_name: _,
                 relay_url,
-                relay_noise_pubkey,
-            } => self.handle_init(
-                session_id,
-                ephemeral,
-                commitment_hash,
-                relay_url,
-                relay_noise_pubkey,
-            ),
+            } => self.handle_init(session_id, ephemeral, commitment_hash, relay_url),
             StageQr::Data {
                 session_id: _,
                 chunk_idx,
@@ -1115,16 +1095,8 @@ impl MultiStageSession {
                 commitment_hash,
                 display_name: _,
                 relay_url,
-                relay_noise_pubkey,
                 ciphertext,
-            } => self.handle_inid(
-                session_id,
-                ephemeral,
-                commitment_hash,
-                relay_url,
-                relay_noise_pubkey,
-                ciphertext,
-            ),
+            } => self.handle_inid(session_id, ephemeral, commitment_hash, relay_url, ciphertext),
             StageQr::Fail { session_id: _ } => self.handle_fail(),
             StageQr::Shake {
                 session_id: _,
@@ -1149,7 +1121,6 @@ impl MultiStageSession {
             self.commitment.hash(),
             &self.display_name,
             self.our_relay_url.as_deref(),
-            self.our_relay_noise_pubkey.as_ref(),
         )
     }
 
@@ -1159,7 +1130,6 @@ impl MultiStageSession {
         ephemeral: [u8; 32],
         commitment_hash: [u8; 32],
         relay_url: Option<String>,
-        relay_noise_pubkey: Option<[u8; 32]>,
     ) -> ProtocolState {
         // Only accept INIT while Advertising
         if !matches!(self.state, ProtocolState::Advertising) {
@@ -1170,7 +1140,6 @@ impl MultiStageSession {
         self.peer_ephemeral = Some(ephemeral);
         self.peer_commitment_hash = Some(commitment_hash);
         self.peer_relay_url = relay_url;
-        self.peer_relay_noise_pubkey = relay_noise_pubkey;
 
         match self.ephemeral_secret.take() {
             Some(secret) => {
@@ -1202,23 +1171,15 @@ impl MultiStageSession {
 
     /// Handle INID (INIT+Data) — processes INIT fields and stores embedded ciphertext.
     /// Eliminates the DATA phase for small payloads (1 chunk).
-    #[allow(clippy::too_many_arguments)]
     fn handle_inid(
         &mut self,
         session_id: [u8; 16],
         ephemeral: [u8; 32],
         commitment_hash: [u8; 32],
         relay_url: Option<String>,
-        relay_noise_pubkey: Option<[u8; 32]>,
         ciphertext: Vec<u8>,
     ) -> ProtocolState {
-        let state = self.handle_init(
-            session_id,
-            ephemeral,
-            commitment_hash,
-            relay_url,
-            relay_noise_pubkey,
-        );
+        let state = self.handle_init(session_id, ephemeral, commitment_hash, relay_url);
 
         if matches!(state, ProtocolState::Failed(_)) {
             return state;
@@ -1345,10 +1306,7 @@ impl MultiStageSession {
         };
 
         // Build peer's commitment context from their relay metadata (T1.7)
-        let peer_context = Self::build_commitment_context(
-            self.peer_relay_url.as_deref(),
-            self.peer_relay_noise_pubkey.as_ref(),
-        );
+        let peer_context = Self::build_commitment_context(self.peer_relay_url.as_deref());
 
         if !Commitment::verify_hash_with_context(
             &reveal_key,
@@ -1610,10 +1568,7 @@ impl MultiStageSession {
     /// Both sides must use the same context construction when creating and
     /// verifying the commitment hash. The context binds relay fields into
     /// the commitment so a MitM cannot swap relay URLs in the INIT QR.
-    fn build_commitment_context(
-        relay_url: Option<&str>,
-        relay_noise_pubkey: Option<&[u8; 32]>,
-    ) -> Vec<u8> {
+    fn build_commitment_context(relay_url: Option<&str>) -> Vec<u8> {
         // Length-delimited encoding prevents ambiguity between
         // (url_A || pubkey_A) and (url_B || pubkey_B) where url_A is a
         // prefix of url_B. Without delimiters, SHA-256 pre-images could collide.
@@ -1622,9 +1577,6 @@ impl MultiStageSession {
             let len = (url.len() as u32).to_be_bytes();
             context.extend_from_slice(&len);
             context.extend_from_slice(url.as_bytes());
-        }
-        if let Some(pk) = relay_noise_pubkey {
-            context.extend_from_slice(pk);
         }
         context
     }
@@ -1769,12 +1721,6 @@ impl MultiStageSession {
             key.zeroize();
         }
         if let Some(ref mut key) = self.peer_reveal_key {
-            key.zeroize();
-        }
-        if let Some(ref mut key) = self.our_relay_noise_pubkey {
-            key.zeroize();
-        }
-        if let Some(ref mut key) = self.peer_relay_noise_pubkey {
             key.zeroize();
         }
         self.transport_key = None;

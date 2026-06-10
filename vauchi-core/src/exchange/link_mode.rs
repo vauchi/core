@@ -38,9 +38,10 @@ const CARD_PAYLOAD_VERSION: u8 = 1;
 const CARD_PAYLOAD_VERSION_V2: u8 = 2;
 
 /// Domain-separation prefix for the link-mode bootstrap signature
-/// (ADR-002/007). Signed over `[domain][x3dh_pubkey][relay_noise(32, zeros
-/// if none)][relay_url]` — fixed-length fields first so the variable
-/// `relay_url` tail is unambiguous.
+/// (ADR-002/007). Signed over `[domain][x3dh_pubkey][relay_url]` — the
+/// fixed-length `x3dh_pubkey` precedes the variable `relay_url` tail, and
+/// `relay_url` is the only variable field, so the layout is unambiguous
+/// without length prefixes.
 const LINK_BOOTSTRAP_DOMAIN: &[u8] = b"vauchi-link-bootstrap-v2";
 
 /// HKDF info string for the persistent link-mode shared communication key
@@ -537,7 +538,6 @@ pub enum LinkCardPayload {
         identity_pubkey: [u8; 32],
         x3dh_pubkey: [u8; 32],
         relay_url: String,
-        relay_noise_pubkey: Option<[u8; 32]>,
         card: ContactCard,
     },
 }
@@ -548,22 +548,15 @@ struct CardPayloadV2Body {
     identity_pubkey: [u8; 32],
     x3dh_pubkey: [u8; 32],
     relay_url: String,
-    #[serde(default)]
-    relay_noise_pubkey: Option<[u8; 32]>,
     signature: Vec<u8>,
     card: ContactCard,
 }
 
 /// Build the domain-separated message the v2 bootstrap signature covers.
-fn bootstrap_signing_message(
-    x3dh_pubkey: &[u8; 32],
-    relay_url: &str,
-    relay_noise_pubkey: &Option<[u8; 32]>,
-) -> Vec<u8> {
-    let mut message = Vec::with_capacity(LINK_BOOTSTRAP_DOMAIN.len() + 32 + 32 + relay_url.len());
+fn bootstrap_signing_message(x3dh_pubkey: &[u8; 32], relay_url: &str) -> Vec<u8> {
+    let mut message = Vec::with_capacity(LINK_BOOTSTRAP_DOMAIN.len() + 32 + relay_url.len());
     message.extend_from_slice(LINK_BOOTSTRAP_DOMAIN);
     message.extend_from_slice(x3dh_pubkey);
-    message.extend_from_slice(&relay_noise_pubkey.unwrap_or([0u8; 32]));
     message.extend_from_slice(relay_url.as_bytes());
     message
 }
@@ -578,16 +571,14 @@ pub fn serialize_card_payload_v2(
     signing_keypair: &SigningKeyPair,
     x3dh_pubkey: &[u8; 32],
     relay_url: &str,
-    relay_noise_pubkey: Option<[u8; 32]>,
     card: &ContactCard,
 ) -> Vec<u8> {
-    let message = bootstrap_signing_message(x3dh_pubkey, relay_url, &relay_noise_pubkey);
+    let message = bootstrap_signing_message(x3dh_pubkey, relay_url);
     let signature = signing_keypair.sign(&message);
     let body = CardPayloadV2Body {
         identity_pubkey: *identity_pubkey,
         x3dh_pubkey: *x3dh_pubkey,
         relay_url: relay_url.to_string(),
-        relay_noise_pubkey,
         signature: signature.as_bytes().to_vec(),
         card: card.clone(),
     };
@@ -619,11 +610,7 @@ pub fn parse_card_payload_versioned(data: &[u8]) -> Result<LinkCardPayload, Link
                     body.signature.len()
                 ))
             })?;
-            let message = bootstrap_signing_message(
-                &body.x3dh_pubkey,
-                &body.relay_url,
-                &body.relay_noise_pubkey,
-            );
+            let message = bootstrap_signing_message(&body.x3dh_pubkey, &body.relay_url);
             if !verify_signature(
                 &body.identity_pubkey,
                 &message,
@@ -637,7 +624,6 @@ pub fn parse_card_payload_versioned(data: &[u8]) -> Result<LinkCardPayload, Link
                 identity_pubkey: body.identity_pubkey,
                 x3dh_pubkey: body.x3dh_pubkey,
                 relay_url: body.relay_url,
-                relay_noise_pubkey: body.relay_noise_pubkey,
                 card: body.card,
             })
         }

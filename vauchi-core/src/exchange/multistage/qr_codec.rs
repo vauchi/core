@@ -38,8 +38,6 @@ pub enum QrCodecError {
     CrcMismatch { expected: u16, got: u16 },
     #[error("QR string too short")]
     TooShort,
-    #[error("relay URL present but Noise NK pubkey missing — TOFU not allowed")]
-    MissingRelayNoisePubkey,
 }
 
 /// Parsed stage QR payload.
@@ -52,7 +50,6 @@ pub enum StageQr {
         commitment_hash: [u8; 32],
         display_name: String,
         relay_url: Option<String>,
-        relay_noise_pubkey: Option<[u8; 32]>,
     },
     Data {
         session_id: [u8; 16],
@@ -90,7 +87,6 @@ pub enum StageQr {
         commitment_hash: [u8; 32],
         display_name: String,
         relay_url: Option<String>,
-        relay_noise_pubkey: Option<[u8; 32]>,
         /// Raw commitment ciphertext (not transport-encrypted).
         ciphertext: Vec<u8>,
     },
@@ -134,7 +130,6 @@ const FLAGS_LEN: usize = 2;
 
 /// Relay metadata flags for INIT QR.
 const FLAG_HAS_RELAY_URL: u8 = 0x01;
-const FLAG_HAS_RELAY_NOISE_PUBKEY: u8 = 0x02;
 
 /// Stage prefixes (4 chars each).
 const PREFIX_LEN: usize = 4;
@@ -190,7 +185,6 @@ pub fn format_ini2_qr_with_relay(
     commitment_hash: &[u8; 32],
     display_name: &str,
     relay_url: Option<&str>,
-    relay_noise_pubkey: Option<&[u8; 32]>,
 ) -> String {
     assert!(
         display_name.len() <= 99,
@@ -207,9 +201,6 @@ pub fn format_ini2_qr_with_relay(
     if relay_url.is_some() {
         flags |= FLAG_HAS_RELAY_URL;
     }
-    if relay_noise_pubkey.is_some() {
-        flags |= FLAG_HAS_RELAY_NOISE_PUBKEY;
-    }
 
     let mut result = format!(
         "INI2{sid}{eph}{ch}{name_len:02}{name}{flags}",
@@ -223,9 +214,6 @@ pub fn format_ini2_qr_with_relay(
 
     if let Some(url) = relay_url {
         result.push_str(&format!("{:03}{}", url.len(), url));
-    }
-    if let Some(npk) = relay_noise_pubkey {
-        result.push_str(&base45::encode(npk));
     }
 
     result
@@ -253,7 +241,6 @@ pub fn format_in2d_qr(
     commitment_hash: &[u8; 32],
     display_name: &str,
     relay_url: Option<&str>,
-    relay_noise_pubkey: Option<&[u8; 32]>,
     ciphertext: &[u8],
 ) -> String {
     assert!(
@@ -264,9 +251,6 @@ pub fn format_in2d_qr(
     let mut flags: u8 = 0;
     if relay_url.is_some() {
         flags |= FLAG_HAS_RELAY_URL;
-    }
-    if relay_noise_pubkey.is_some() {
-        flags |= FLAG_HAS_RELAY_NOISE_PUBKEY;
     }
 
     let ct_encoded = base45::encode(ciphertext);
@@ -285,9 +269,6 @@ pub fn format_in2d_qr(
     // Relay fields (same position as INIT)
     if let Some(url) = relay_url {
         result.push_str(&format!("{:03}{}", url.len(), url));
-    }
-    if let Some(npk) = relay_noise_pubkey {
-        result.push_str(&base45::encode(npk));
     }
 
     // Ciphertext appended at the very end with length prefix
@@ -458,23 +439,12 @@ fn parse_ini2(body: &str) -> Result<StageQr, QrCodecError> {
     };
 
     // Optional relay Noise NK pubkey
-    let relay_noise_pubkey = if flags & FLAG_HAS_RELAY_NOISE_PUBKEY != 0 {
-        let npk = take(body, &mut pos, F32_LEN)?;
-        Some(decode_fixed(npk)?)
-    } else if relay_url.is_some() {
-        // Fail-closed: relay URL without Noise pubkey allows TOFU MITM
-        return Err(QrCodecError::MissingRelayNoisePubkey);
-    } else {
-        None
-    };
-
     Ok(StageQr::Init {
         session_id: decode_fixed(sid)?,
         ephemeral: decode_fixed(eph)?,
         commitment_hash: decode_fixed(ch)?,
         display_name: name.to_string(),
         relay_url,
-        relay_noise_pubkey,
     })
 }
 
@@ -503,15 +473,6 @@ fn parse_in2d(body: &str) -> Result<StageQr, QrCodecError> {
         None
     };
 
-    let relay_noise_pubkey = if flags & FLAG_HAS_RELAY_NOISE_PUBKEY != 0 {
-        let npk = take(body, &mut pos, F32_LEN)?;
-        Some(decode_fixed(npk)?)
-    } else if relay_url.is_some() {
-        return Err(QrCodecError::MissingRelayNoisePubkey);
-    } else {
-        None
-    };
-
     // Ciphertext with length prefix (at the end)
     let ct_len_str = take(body, &mut pos, 3)?;
     let ct_len: usize = ct_len_str
@@ -526,7 +487,6 @@ fn parse_in2d(body: &str) -> Result<StageQr, QrCodecError> {
         commitment_hash: decode_fixed(ch)?,
         display_name: name.to_string(),
         relay_url,
-        relay_noise_pubkey,
         ciphertext,
     })
 }

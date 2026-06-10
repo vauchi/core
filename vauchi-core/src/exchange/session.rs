@@ -173,12 +173,8 @@ pub struct ExchangeSession {
     ble_pending_card: Option<Vec<u8>>,
     /// Our relay URL to include in QR code (for per-contact routing).
     our_relay_url: Option<String>,
-    /// Our relay's Noise NK public key to include in QR code.
-    our_relay_noise_pubkey: Option<[u8; 32]>,
     /// Their relay URL extracted from their QR code.
     their_relay_url: Option<String>,
-    /// Their relay's Noise NK public key extracted from their QR code.
-    their_relay_noise_pubkey: Option<[u8; 32]>,
     /// Optional exchange debug log. When enabled, captures timestamped
     /// events at each state transition for diagnostic analysis.
     debug_log: Option<ExchangeDebugLog>,
@@ -261,9 +257,7 @@ impl ExchangeSession {
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
-            our_relay_noise_pubkey: None,
             their_relay_url: None,
-            their_relay_noise_pubkey: None,
             debug_log: None,
             pending_commands: Vec::new(),
             our_confirmation_token: None,
@@ -308,9 +302,7 @@ impl ExchangeSession {
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
-            our_relay_noise_pubkey: None,
             their_relay_url: None,
-            their_relay_noise_pubkey: None,
             debug_log: None,
             pending_commands: Vec::new(),
             our_confirmation_token: None,
@@ -360,9 +352,7 @@ impl ExchangeSession {
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
-            our_relay_noise_pubkey: None,
             their_relay_url: None,
-            their_relay_noise_pubkey: None,
             debug_log: None,
             pending_commands: Vec::new(),
             our_confirmation_token: None,
@@ -423,9 +413,7 @@ impl ExchangeSession {
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
-            our_relay_noise_pubkey: None,
             their_relay_url: None,
-            their_relay_noise_pubkey: None,
             debug_log: None,
             pending_commands: Vec::new(),
             our_confirmation_token: None,
@@ -481,9 +469,7 @@ impl ExchangeSession {
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
-            our_relay_noise_pubkey: None,
             their_relay_url: None,
-            their_relay_noise_pubkey: None,
             debug_log: None,
             pending_commands: Vec::new(),
             our_confirmation_token: None,
@@ -648,12 +634,6 @@ impl ExchangeSession {
     /// BLE → QR if `has_camera` is true).
     pub fn set_device_capabilities(&mut self, caps: super::capability::types::DeviceCapabilities) {
         self.device_capabilities = Some(caps);
-    }
-
-    /// Sets our relay's Noise NK public key to include in the QR code.
-    /// Must be called before `process(StartQR)`.
-    pub fn set_our_relay_noise_pubkey(&mut self, pubkey: Option<[u8; 32]>) {
-        self.our_relay_noise_pubkey = pubkey;
     }
 
     /// Returns the QR code if in DisplayingQr or PeerScanned state.
@@ -1369,7 +1349,6 @@ impl ExchangeSession {
             0,
         );
         contact.set_relay_url(self.their_relay_url.take());
-        contact.set_relay_noise_pubkey(self.their_relay_noise_pubkey.take());
 
         contact.set_trust_metrics(Some(self.build_trust_metrics()));
 
@@ -1555,7 +1534,6 @@ impl ExchangeSession {
 
         // Set relay metadata learned from their QR code
         contact.set_relay_url(self.their_relay_url.take());
-        contact.set_relay_noise_pubkey(self.their_relay_noise_pubkey.take());
 
         contact.set_trust_metrics(Some(self.build_trust_metrics()));
 
@@ -1583,7 +1561,6 @@ impl ExchangeSession {
             &self.identity,
             &self.our_x3dh,
             self.our_relay_url.clone(),
-            self.our_relay_noise_pubkey,
             self.clock.unix_seconds(),
         );
         self.our_audio_challenge = Some(*our_qr.audio_challenge());
@@ -1628,7 +1605,6 @@ impl ExchangeSession {
         self.their_display_name = Some(qr.display_name().to_string());
         // Store their relay metadata for per-contact routing
         self.their_relay_url = qr.relay_url().map(String::from);
-        self.their_relay_noise_pubkey = qr.relay_noise_pubkey().copied();
 
         self.state = ExchangeState::PeerScanned {
             our_qr,
@@ -1716,7 +1692,6 @@ impl ExchangeSession {
         self.their_audio_challenge = Some(*qr.audio_challenge());
         self.their_display_name = Some(qr.display_name().to_string());
         self.their_relay_url = qr.relay_url().map(String::from);
-        self.their_relay_noise_pubkey = qr.relay_noise_pubkey().copied();
 
         // USB provides physical proximity — skip straight to key agreement
         self.state = ExchangeState::AwaitingKeyAgreement {

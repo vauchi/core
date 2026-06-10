@@ -4,8 +4,8 @@
 
 //! Tests for contact relay field persistence (Phase 1F / T2.5).
 //!
-//! Validates that relay_url and relay_noise_pubkey survive save/load
-//! roundtrips through encrypted storage.
+//! Validates that relay_url survives save/load roundtrips through
+//! encrypted storage.
 
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
@@ -48,34 +48,11 @@ fn contact_relay_url_survives_storage_roundtrip() {
 
 // @internal
 #[test]
-fn contact_relay_noise_pubkey_survives_storage_roundtrip() {
-    let storage = open_storage();
-
-    let pubkey = [42u8; 32];
-    let mut contact = make_contact("Bob");
-    contact.set_relay_noise_pubkey(Some(pubkey));
-    storage.contacts().save_contact(&contact).unwrap();
-
-    let loaded = storage
-        .contacts()
-        .load_contact(contact.id())
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        loaded.relay_noise_pubkey().unwrap(),
-        &pubkey,
-        "Relay Noise pubkey must survive save/load roundtrip"
-    );
-}
-
-// @internal
-#[test]
 fn contact_with_both_relay_fields_roundtrips() {
     let storage = open_storage();
 
     let mut contact = make_contact("Carol");
     contact.set_relay_url(Some("https://carol-relay.example.com".to_string()));
-    contact.set_relay_noise_pubkey(Some([99u8; 32]));
     storage.contacts().save_contact(&contact).unwrap();
 
     let loaded = storage
@@ -87,7 +64,6 @@ fn contact_with_both_relay_fields_roundtrips() {
         loaded.relay_url().unwrap(),
         "https://carol-relay.example.com"
     );
-    assert_eq!(loaded.relay_noise_pubkey().unwrap(), &[99u8; 32]);
 }
 
 // @internal
@@ -104,7 +80,6 @@ fn contact_without_relay_fields_loads_as_none() {
         .unwrap()
         .unwrap();
     assert!(loaded.relay_url().is_none());
-    assert!(loaded.relay_noise_pubkey().is_none());
 }
 
 // ── Existing contacts preserved after migration ──────────────────
@@ -126,7 +101,6 @@ fn existing_contact_without_relay_loads_after_migration() {
         .unwrap()
         .unwrap();
     assert!(loaded.relay_url().is_none());
-    assert!(loaded.relay_noise_pubkey().is_none());
     assert_eq!(loaded.display_name(), "Legacy");
 }
 
@@ -143,7 +117,6 @@ fn list_contacts_includes_relay_metadata() {
 
     let mut bob = make_contact("Bob");
     bob.set_relay_url(Some("https://bob.relay".to_string()));
-    bob.set_relay_noise_pubkey(Some([11u8; 32]));
     storage.contacts().save_contact(&bob).unwrap();
 
     let contacts = storage.contacts().list_contacts().unwrap();
@@ -154,11 +127,9 @@ fn list_contacts_includes_relay_metadata() {
         .find(|c| c.display_name() == "Alice")
         .unwrap();
     assert_eq!(alice_loaded.relay_url().unwrap(), "https://alice.relay");
-    assert!(alice_loaded.relay_noise_pubkey().is_none());
 
     let bob_loaded = contacts.iter().find(|c| c.display_name() == "Bob").unwrap();
     assert_eq!(bob_loaded.relay_url().unwrap(), "https://bob.relay");
-    assert_eq!(bob_loaded.relay_noise_pubkey().unwrap(), &[11u8; 32]);
 }
 
 // ── Update relay fields ──────────────────────────────────────────

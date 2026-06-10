@@ -12,13 +12,12 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::{MultiRelayConfig, MultiRelayManager};
 
-fn make_contact(name: &str, relay_url: Option<&str>, noise_pubkey: Option<[u8; 32]>) -> Contact {
+fn make_contact(name: &str, relay_url: Option<&str>) -> Contact {
     let public_key = [name.as_bytes()[0]; 32];
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
     let mut contact = Contact::from_exchange(public_key, card, shared_key, 0);
     contact.set_relay_url(relay_url.map(String::from));
-    contact.set_relay_noise_pubkey(noise_pubkey);
     contact
 }
 
@@ -33,7 +32,7 @@ fn relay_for_contact_returns_contact_relay_when_set() {
         .unwrap();
     let manager = MultiRelayManager::new(config);
 
-    let contact = make_contact("Alice", Some("https://alice.relay"), None);
+    let contact = make_contact("Alice", Some("https://alice.relay"));
     let relay = manager.relay_for_contact(&contact, &vauchi_core::rng::OsSecureRng::new());
 
     assert_eq!(relay, "https://alice.relay");
@@ -48,7 +47,7 @@ fn relay_for_contact_returns_home_relay_when_no_contact_relay() {
         .unwrap();
     let manager = MultiRelayManager::new(config);
 
-    let contact = make_contact("Bob", None, None);
+    let contact = make_contact("Bob", None);
     let relay = manager.relay_for_contact(&contact, &vauchi_core::rng::OsSecureRng::new());
 
     assert_eq!(relay, "https://home.relay");
@@ -65,7 +64,7 @@ fn relay_for_contact_falls_back_when_contact_relay_unhealthy() {
 
     manager.mark_unhealthy("https://alice.relay");
 
-    let contact = make_contact("Alice", Some("https://alice.relay"), None);
+    let contact = make_contact("Alice", Some("https://alice.relay"));
     let relay = manager.relay_for_contact(&contact, &vauchi_core::rng::OsSecureRng::new());
 
     assert_eq!(
@@ -146,7 +145,7 @@ fn unhealthy_contact_relay_falls_back_then_recovers() {
     let mut manager = MultiRelayManager::new(config);
     manager.add_contact_relay("https://alice.relay");
 
-    let alice = make_contact("Alice", Some("https://alice.relay"), None);
+    let alice = make_contact("Alice", Some("https://alice.relay"));
 
     // Initially healthy → uses contact relay
     assert_eq!(
@@ -181,7 +180,7 @@ fn contacts_without_relay_always_use_home_regardless_of_health() {
         .unwrap();
     let manager = MultiRelayManager::new(config);
 
-    let bob = make_contact("Bob", None, None);
+    let bob = make_contact("Bob", None);
 
     // No relay set → home relay
     let relay = manager.relay_for_contact(&bob, &vauchi_core::rng::OsSecureRng::new());
@@ -197,7 +196,7 @@ fn empty_relay_url_treated_as_no_relay() {
         .unwrap();
     let manager = MultiRelayManager::new(config);
 
-    let contact = make_contact("Eve", Some(""), None);
+    let contact = make_contact("Eve", Some(""));
     assert_eq!(
         manager.relay_for_contact(&contact, &vauchi_core::rng::OsSecureRng::new()),
         "https://home.relay",
@@ -216,9 +215,9 @@ fn mixed_relay_contacts_route_independently() {
     manager.add_contact_relay("https://alice.relay");
     manager.add_contact_relay("https://carol.relay");
 
-    let alice = make_contact("Alice", Some("https://alice.relay"), None);
-    let bob = make_contact("Bob", None, None);
-    let carol = make_contact("Carol", Some("https://carol.relay"), None);
+    let alice = make_contact("Alice", Some("https://alice.relay"));
+    let bob = make_contact("Bob", None);
+    let carol = make_contact("Carol", Some("https://carol.relay"));
 
     assert_eq!(
         manager.relay_for_contact(&alice, &vauchi_core::rng::OsSecureRng::new()),
@@ -257,10 +256,10 @@ fn group_contacts_by_relay() {
     let manager = MultiRelayManager::new(config);
 
     let contacts = vec![
-        make_contact("Alice", Some("https://alice.relay"), None),
-        make_contact("Bob", None, None),
-        make_contact("Carol", Some("https://alice.relay"), None),
-        make_contact("Dave", Some("https://dave.relay"), None),
+        make_contact("Alice", Some("https://alice.relay")),
+        make_contact("Bob", None),
+        make_contact("Carol", Some("https://alice.relay")),
+        make_contact("Dave", Some("https://dave.relay")),
     ];
 
     let groups = manager.group_contacts_by_relay(&contacts);

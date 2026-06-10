@@ -5,7 +5,7 @@
 //! Tests for QR exchange v3 with relay metadata (Phase 1A).
 //!
 //! Validates the extended QR binary format that includes relay URL
-//! and Noise NK public key for per-contact relay routing.
+//! for per-contact relay routing.
 
 use vauchi_core::exchange::{ExchangeQR, X3DHKeyPair};
 use vauchi_core::identity::Identity;
@@ -30,7 +30,6 @@ fn v3_roundtrip_no_relay_metadata() {
     assert_eq!(parsed.public_key(), identity.signing_public_key());
     assert_eq!(parsed.exchange_key(), ephemeral.public_key());
     assert!(parsed.relay_url().is_none());
-    assert!(parsed.relay_noise_pubkey().is_none());
     assert!(parsed.verify_signature());
 }
 
@@ -42,29 +41,25 @@ fn v3_roundtrip_with_relay_url_and_noise_pubkey() {
     let identity = Identity::create("Bob", 0);
     let ephemeral = X3DHKeyPair::generate();
     let relay_url = "https://relay.bobs-server.com";
-    let noise_pubkey = [42u8; 32];
 
-    let qr = ExchangeQR::generate_with_relay(
-        &identity,
-        &ephemeral,
-        Some(relay_url.to_string()),
-        Some(noise_pubkey),
-        0u64,
-    );
+    let qr =
+        ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(relay_url.to_string()), 0u64);
 
     let data = qr.to_data_string();
     let parsed = ExchangeQR::from_data_string(&data).unwrap();
 
     assert_eq!(parsed.display_name(), "Bob");
     assert_eq!(parsed.relay_url().unwrap(), relay_url);
-    assert_eq!(parsed.relay_noise_pubkey().unwrap(), &noise_pubkey);
     assert!(parsed.verify_signature());
 }
 
 // @internal
 #[test]
-fn v3_relay_url_without_noise_pubkey_rejected() {
-    // TOFU fail-closed: relay URL without Noise pubkey allows MITM
+fn v3_relay_url_without_noise_pubkey_now_accepted() {
+    // Decision A (ADR-037): the client no longer pins a relay Noise
+    // pubkey, so a relay URL with no pubkey is the normal case and must
+    // parse. The gateway pins relay TLS (SPKI); operator separation
+    // provides the privacy property the TOFU pin used to.
     let identity = Identity::create("Carol", 0);
     let ephemeral = X3DHKeyPair::generate();
 
@@ -72,16 +67,13 @@ fn v3_relay_url_without_noise_pubkey_rejected() {
         &identity,
         &ephemeral,
         Some("https://relay.example.com".to_string()),
-        None,
         0u64,
     );
 
     let data = qr.to_data_string();
-    let result = ExchangeQR::from_data_string(&data);
-    assert!(
-        result.is_err(),
-        "relay URL without Noise pubkey must be rejected"
-    );
+    let parsed = ExchangeQR::from_data_string(&data).expect("relay-url-only QR must parse");
+    assert_eq!(parsed.relay_url().unwrap(), "https://relay.example.com");
+    assert!(parsed.verify_signature());
 }
 
 // @internal
@@ -94,7 +86,6 @@ fn v3_roundtrip_unicode_name_with_relay() {
         &identity,
         &ephemeral,
         Some("https://relay.example.com".to_string()),
-        Some([99u8; 32]),
         0u64,
     );
 
@@ -118,7 +109,6 @@ fn v3_signature_covers_relay_fields() {
         &identity,
         &ephemeral,
         Some("https://relay.example.com".to_string()),
-        Some([55u8; 32]),
         0u64,
     );
 
@@ -134,8 +124,7 @@ fn v3_empty_relay_url_rejected_on_parse() {
     let identity = Identity::create("Eve", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    let qr =
-        ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(String::new()), None, 0u64);
+    let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(String::new()), 0u64);
 
     let data = qr.to_data_string();
     let result = ExchangeQR::from_data_string(&data);
@@ -157,7 +146,6 @@ fn v3_private_host_relay_url_rejected_on_parse() {
         &identity,
         &ephemeral,
         Some("https://127.0.0.1/evil".to_string()),
-        None,
         0u64,
     );
 
@@ -181,7 +169,6 @@ fn v3_insecure_scheme_relay_url_rejected_on_parse() {
         &identity,
         &ephemeral,
         Some("http://relay.evil.com".to_string()),
-        None,
         0u64,
     );
 
@@ -202,20 +189,12 @@ fn v3_roundtrip_long_relay_url() {
     let ephemeral = X3DHKeyPair::generate();
     let long_url = format!("https://{}.example.com", "a".repeat(200));
 
-    // Must include Noise pubkey with relay URL (TOFU fail-closed)
-    let qr = ExchangeQR::generate_with_relay(
-        &identity,
-        &ephemeral,
-        Some(long_url.clone()),
-        Some([0xBBu8; 32]),
-        0u64,
-    );
+    let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(long_url.clone()), 0u64);
 
     let data = qr.to_data_string();
     let parsed = ExchangeQR::from_data_string(&data).unwrap();
 
     assert_eq!(parsed.relay_url().unwrap(), long_url);
-    assert_eq!(*parsed.relay_noise_pubkey().unwrap(), [0xBBu8; 32]);
     assert!(parsed.verify_signature());
 }
 
@@ -231,7 +210,6 @@ fn v3_qr_image_generation_with_relay() {
         &identity,
         &ephemeral,
         Some("https://relay.vauchi.app".to_string()),
-        Some([1u8; 32]),
         0u64,
     );
 

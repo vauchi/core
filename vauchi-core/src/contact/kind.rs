@@ -115,8 +115,6 @@ pub struct ExchangedData {
     pub(crate) has_recovered: bool,
     /// Relay URL learned during exchange (for per-contact relay routing).
     pub(crate) relay_url: Option<String>,
-    /// Relay's Noise NK public key, pinned during in-person exchange.
-    pub(crate) relay_noise_pubkey: Option<[u8; 32]>,
     /// Full trust metrics from the exchange. None for legacy contacts.
     pub(crate) trust_metrics: Option<TrustMetrics>,
     /// Our visibility rules for this contact (what they can see of our card).
@@ -142,7 +140,6 @@ impl ExchangedData {
         proximity_confidence: ProximityConfidence,
         has_recovered: bool,
         relay_url: Option<String>,
-        relay_noise_pubkey: Option<[u8; 32]>,
         trust_metrics: Option<TrustMetrics>,
         visibility_rules: VisibilityRules,
     ) -> Self {
@@ -157,7 +154,6 @@ impl ExchangedData {
             proximity_confidence,
             has_recovered,
             relay_url,
-            relay_noise_pubkey,
             trust_metrics,
             visibility_rules,
             reciprocity: None,

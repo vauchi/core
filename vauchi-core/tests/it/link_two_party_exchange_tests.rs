@@ -36,7 +36,6 @@ fn deposit_v2(v: &Vauchi, relay_url: &str) -> (Vec<u8>, X3DHKeyPair, [u8; 32]) {
         identity.signing_keypair(),
         x3dh.public_key(),
         relay_url,
-        None,
         &card,
     );
     (payload, x3dh, identity_pubkey)

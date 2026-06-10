@@ -38,7 +38,6 @@ pub(super) struct ContactRow {
     pub has_recovered: i32,
     pub card_updated_at: Option<i64>,
     pub relay_url: Option<String>,
-    pub relay_noise_pubkey: Option<Vec<u8>>,
     pub trust_metrics: Option<String>,
     pub contact_kind: String,
     pub import_source: Option<String>,
@@ -220,12 +219,6 @@ impl ContactStore<'_> {
         contact.set_card_updated_at(row.card_updated_at.map(|t| t as u64));
 
         contact.set_relay_url(row.relay_url);
-        if let Some(pubkey_bytes) = row.relay_noise_pubkey {
-            let pubkey: [u8; 32] = pubkey_bytes.try_into().map_err(|_| {
-                StorageError::Encryption("Invalid relay Noise pubkey length".into())
-            })?;
-            contact.set_relay_noise_pubkey(Some(pubkey));
-        }
 
         // Restore trust metrics from storage (JSON column, NULL for legacy contacts).
         //

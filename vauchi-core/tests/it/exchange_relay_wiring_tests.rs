@@ -14,9 +14,7 @@ use vauchi_core::identity::Identity;
 /// Runs a full QR exchange between two identities and returns the resulting contacts.
 fn run_qr_exchange(
     alice_relay_url: Option<String>,
-    alice_relay_noise_pubkey: Option<[u8; 32]>,
     bob_relay_url: Option<String>,
-    bob_relay_noise_pubkey: Option<[u8; 32]>,
 ) -> (vauchi_core::contact::Contact, vauchi_core::contact::Contact) {
     let alice_id = Identity::create("Alice", 0);
     let bob_id = Identity::create("Bob", 0);
@@ -38,9 +36,7 @@ fn run_qr_exchange(
     );
 
     alice_session.set_our_relay_url(alice_relay_url);
-    alice_session.set_our_relay_noise_pubkey(alice_relay_noise_pubkey);
     bob_session.set_our_relay_url(bob_relay_url);
-    bob_session.set_our_relay_noise_pubkey(bob_relay_noise_pubkey);
 
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
@@ -93,9 +89,7 @@ fn run_qr_exchange(
 fn exchange_with_relay_metadata_populates_contact() {
     let (alice_contact, bob_contact) = run_qr_exchange(
         Some("https://alice-relay.com".to_string()),
-        Some([11u8; 32]),
         Some("https://bob-relay.com".to_string()),
-        Some([22u8; 32]),
     );
 
     // Alice's contact (Bob) should have Bob's relay
@@ -104,11 +98,6 @@ fn exchange_with_relay_metadata_populates_contact() {
         "https://bob-relay.com",
         "Alice should learn Bob's relay from exchange"
     );
-    assert_eq!(
-        alice_contact.relay_noise_pubkey().unwrap(),
-        &[22u8; 32],
-        "Alice should learn Bob's relay Noise pubkey"
-    );
 
     // Bob's contact (Alice) should have Alice's relay
     assert_eq!(
@@ -116,39 +105,26 @@ fn exchange_with_relay_metadata_populates_contact() {
         "https://alice-relay.com",
         "Bob should learn Alice's relay from exchange"
     );
-    assert_eq!(
-        bob_contact.relay_noise_pubkey().unwrap(),
-        &[11u8; 32],
-        "Bob should learn Alice's relay Noise pubkey"
-    );
 }
 
 // @internal
 #[test]
 fn exchange_without_relay_metadata_leaves_contact_fields_empty() {
-    let (alice_contact, bob_contact) = run_qr_exchange(None, None, None, None);
+    let (alice_contact, bob_contact) = run_qr_exchange(None, None);
 
     assert!(alice_contact.relay_url().is_none());
-    assert!(alice_contact.relay_noise_pubkey().is_none());
     assert!(bob_contact.relay_url().is_none());
-    assert!(bob_contact.relay_noise_pubkey().is_none());
 }
 
 // @internal
 #[test]
 fn exchange_with_partial_relay_metadata() {
-    let (alice_contact, bob_contact) = run_qr_exchange(
-        Some("https://alice-relay.com".to_string()),
-        Some([11u8; 32]),
-        None,
-        None,
-    );
+    let (alice_contact, bob_contact) =
+        run_qr_exchange(Some("https://alice-relay.com".to_string()), None);
 
     // Alice's contact (Bob) has no relay
     assert!(alice_contact.relay_url().is_none());
-    assert!(alice_contact.relay_noise_pubkey().is_none());
 
     // Bob's contact (Alice) has Alice's relay
     assert_eq!(bob_contact.relay_url().unwrap(), "https://alice-relay.com");
-    assert_eq!(bob_contact.relay_noise_pubkey().unwrap(), &[11u8; 32]);
 }

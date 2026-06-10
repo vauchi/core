@@ -23,7 +23,6 @@ fn test_exchanged_data() -> ExchangedData {
         false,
         None,
         None,
-        None,
         VisibilityRules::new(),
     )
 }

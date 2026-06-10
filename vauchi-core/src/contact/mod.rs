@@ -124,7 +124,6 @@ impl Contact {
                 proximity_confidence: ProximityConfidence::Unknown,
                 has_recovered: false,
                 relay_url: None,
-                relay_noise_pubkey: None,
                 trust_metrics: None,
                 visibility_rules: VisibilityRules::new(),
                 reciprocity: None,
@@ -244,7 +243,6 @@ impl Contact {
                 proximity_confidence: ProximityConfidence::Unknown,
                 has_recovered: false,
                 relay_url: None,
-                relay_noise_pubkey: None,
                 trust_metrics: None,
                 visibility_rules,
                 reciprocity: None,
@@ -449,13 +447,6 @@ impl Contact {
             .and_then(|d| d.relay_url.as_deref())
     }
 
-    /// Returns the contact's relay Noise NK public key, if known.
-    pub fn relay_noise_pubkey(&self) -> Option<&[u8; 32]> {
-        self.kind
-            .exchanged_data()
-            .and_then(|d| d.relay_noise_pubkey.as_ref())
-    }
-
     /// Sets the proximity confidence level (no-op for imported contacts).
     pub fn set_proximity_confidence(&mut self, confidence: ProximityConfidence) {
         if let Some(data) = self.kind.exchanged_data_mut() {
@@ -534,13 +525,6 @@ impl Contact {
     pub fn set_relay_url(&mut self, url: Option<String>) {
         if let Some(data) = self.kind.exchanged_data_mut() {
             data.relay_url = url;
-        }
-    }
-
-    /// Sets the contact's relay Noise NK public key (no-op for imported contacts).
-    pub fn set_relay_noise_pubkey(&mut self, pubkey: Option<[u8; 32]>) {
-        if let Some(data) = self.kind.exchanged_data_mut() {
-            data.relay_noise_pubkey = pubkey;
         }
     }
 

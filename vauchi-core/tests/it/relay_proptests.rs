@@ -5,7 +5,7 @@
 //! Property-based tests for relay discovery (T1.5, T2.3).
 //!
 //! Tests:
-//! - QR v3 roundtrip with arbitrary relay URLs and Noise pubkeys
+//! - QR v3 roundtrip with arbitrary relay URLs
 //! - Contact relay field roundtrip through storage
 //! - Relay URL validation properties
 
@@ -26,67 +26,13 @@ fn valid_relay_url_strategy() -> impl Strategy<Value = String> {
     "[a-z0-9]{1,50}".prop_map(|sub| format!("https://{sub}.relay.example.com"))
 }
 
-/// Strategy: generate random 32-byte Noise pubkeys.
-fn noise_pubkey_strategy() -> impl Strategy<Value = [u8; 32]> {
-    prop::array::uniform32(any::<u8>())
-}
-
 // ── QR v3 roundtrip properties ───────────────────────────────────
 
 proptest! {
 // @internal
     #[test]
     fn qr_v3_roundtrip_preserves_relay_url(
-        relay_url in valid_relay_url_strategy(),
-        noise_pk in noise_pubkey_strategy()
-    ) {
-        let identity = Identity::create("PropTest", 0);
-        let ephemeral = X3DHKeyPair::generate();
-
-        // Parser enforces fail-closed: relay URL requires noise pubkey
-        let qr = ExchangeQR::generate_with_relay(
-            &identity,
-            &ephemeral,
-            Some(relay_url.clone()),
-            Some(noise_pk),
-            0u64,
-        );
-
-        let data = qr.to_data_string();
-        let parsed = ExchangeQR::from_data_string(&data).unwrap();
-
-        prop_assert_eq!(parsed.relay_url().unwrap(), &relay_url);
-        prop_assert_eq!(*parsed.relay_noise_pubkey().unwrap(), noise_pk);
-        prop_assert!(parsed.verify_signature());
-    }
-
-// @internal
-    #[test]
-    fn qr_v3_roundtrip_preserves_noise_pubkey(
-        pubkey in noise_pubkey_strategy()
-    ) {
-        let identity = Identity::create("PropTest", 0);
-        let ephemeral = X3DHKeyPair::generate();
-
-        let qr = ExchangeQR::generate_with_relay(
-            &identity,
-            &ephemeral,
-            Some("https://relay.example.com".to_string()),
-            Some(pubkey),
-            0u64,
-        );
-
-        let data = qr.to_data_string();
-        let parsed = ExchangeQR::from_data_string(&data).unwrap();
-
-        prop_assert_eq!(parsed.relay_noise_pubkey().unwrap(), &pubkey);
-    }
-
-// @internal
-    #[test]
-    fn qr_v3_roundtrip_both_relay_fields(
-        relay_url in valid_relay_url_strategy(),
-        pubkey in noise_pubkey_strategy()
+        relay_url in valid_relay_url_strategy()
     ) {
         let identity = Identity::create("PropTest", 0);
         let ephemeral = X3DHKeyPair::generate();
@@ -95,7 +41,6 @@ proptest! {
             &identity,
             &ephemeral,
             Some(relay_url.clone()),
-            Some(pubkey),
             0u64,
         );
 
@@ -103,7 +48,6 @@ proptest! {
         let parsed = ExchangeQR::from_data_string(&data).unwrap();
 
         prop_assert_eq!(parsed.relay_url().unwrap(), &relay_url);
-        prop_assert_eq!(parsed.relay_noise_pubkey().unwrap(), &pubkey);
         prop_assert!(parsed.verify_signature());
     }
 }
@@ -131,25 +75,6 @@ proptest! {
 
         prop_assert_eq!(loaded.relay_url().unwrap(), &relay_url);
     }
-
-// @internal
-    #[test]
-    fn contact_relay_pubkey_roundtrips_through_storage(
-        pubkey in noise_pubkey_strategy()
-    ) {
-        let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-
-        let public_key = [42u8; 32];
-        let card = ContactCard::new("PropTest");
-        let shared_key = SymmetricKey::generate();
-        let mut contact = Contact::from_exchange(public_key, card, shared_key, 0);
-        contact.set_relay_noise_pubkey(Some(pubkey));
-
-        storage.contacts().save_contact(&contact).unwrap();
-        let loaded = storage.contacts().load_contact(contact.id()).unwrap().unwrap();
-
-        prop_assert_eq!(loaded.relay_noise_pubkey().unwrap(), &pubkey);
-    }
 }
 
 // ── Multi-stage INIT QR roundtrip properties ────────────────────
@@ -159,7 +84,6 @@ proptest! {
     #[test]
     fn multistage_init_qr_roundtrip_with_relay(
         relay_url in valid_relay_url_strategy(),
-        pubkey in noise_pubkey_strategy(),
         display_name in "[A-Za-z0-9 ]{1,20}"
     ) {
         let session_id = [42u8; 16];
@@ -171,7 +95,6 @@ proptest! {
             &session_id, &eph, &ch,
             &display_name,
             Some(&relay_url),
-            Some(&pubkey),
         );
 
         let parsed = parse_qr(&qr).unwrap();
@@ -182,14 +105,12 @@ proptest! {
                 commitment_hash: c,
                 display_name: name,
                 relay_url: url,
-                relay_noise_pubkey: npk,
             } => {
                 prop_assert_eq!(sid, session_id);
                 prop_assert_eq!(e, eph);
                 prop_assert_eq!(c, ch);
                 prop_assert_eq!(name, display_name);
                 prop_assert_eq!(url.as_deref(), Some(relay_url.as_str()));
-                prop_assert_eq!(npk, Some(pubkey));
             }
             _ => prop_assert!(false, "expected Init variant"),
         }
@@ -208,15 +129,14 @@ proptest! {
         let qr = format_ini2_qr_with_relay(
             &session_id, &eph, &ch,
             &display_name,
-            None, None,
+            None,
         );
 
         let parsed = parse_qr(&qr).unwrap();
         match parsed {
-            StageQr::Init { relay_url, relay_noise_pubkey, display_name: name, .. } => {
+            StageQr::Init { relay_url, display_name: name, .. } => {
                 prop_assert_eq!(name, display_name);
                 prop_assert!(relay_url.is_none());
-                prop_assert!(relay_noise_pubkey.is_none());
             }
             _ => prop_assert!(false, "expected Init variant"),
         }

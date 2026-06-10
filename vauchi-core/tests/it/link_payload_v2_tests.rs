@@ -32,49 +32,21 @@ fn repack_v2(body: &serde_json::Value) -> Vec<u8> {
 #[test]
 fn v2_round_trips_with_all_bootstrap_fields() {
     let (keypair, identity, x3dh, card) = sample();
-    let payload = serialize_card_payload_v2(
-        &identity,
-        &keypair,
-        &x3dh,
-        "https://relay.example",
-        Some([7u8; 32]),
-        &card,
-    );
+    let payload =
+        serialize_card_payload_v2(&identity, &keypair, &x3dh, "https://relay.example", &card);
 
     match parse_card_payload_versioned(&payload).expect("v2 parse") {
         LinkCardPayload::V2 {
             identity_pubkey,
             x3dh_pubkey,
             relay_url,
-            relay_noise_pubkey,
             card,
         } => {
             assert_eq!(identity_pubkey, identity);
             assert_eq!(x3dh_pubkey, x3dh);
             assert_eq!(relay_url, "https://relay.example");
-            assert_eq!(relay_noise_pubkey, Some([7u8; 32]));
             assert_eq!(card.display_name(), "Alice");
         }
-        other => panic!("expected V2, got {other:?}"),
-    }
-}
-
-// @internal
-#[test]
-fn v2_round_trips_without_relay_noise() {
-    let (keypair, identity, x3dh, card) = sample();
-    let payload = serialize_card_payload_v2(
-        &identity,
-        &keypair,
-        &x3dh,
-        "https://relay.example",
-        None,
-        &card,
-    );
-    match parse_card_payload_versioned(&payload).expect("v2 parse") {
-        LinkCardPayload::V2 {
-            relay_noise_pubkey, ..
-        } => assert_eq!(relay_noise_pubkey, None),
         other => panic!("expected V2, got {other:?}"),
     }
 }
@@ -100,14 +72,8 @@ fn v1_payload_parses_as_v1_via_versioned() {
 #[test]
 fn tampered_relay_url_fails_signature() {
     let (keypair, identity, x3dh, card) = sample();
-    let payload = serialize_card_payload_v2(
-        &identity,
-        &keypair,
-        &x3dh,
-        "https://relay.example",
-        None,
-        &card,
-    );
+    let payload =
+        serialize_card_payload_v2(&identity, &keypair, &x3dh, "https://relay.example", &card);
     let mut body: serde_json::Value = serde_json::from_slice(&payload[1..]).unwrap();
     body["relay_url"] = serde_json::json!("https://evil.example");
 
@@ -123,14 +89,8 @@ fn tampered_relay_url_fails_signature() {
 #[test]
 fn tampered_x3dh_key_fails_signature() {
     let (keypair, identity, x3dh, card) = sample();
-    let payload = serialize_card_payload_v2(
-        &identity,
-        &keypair,
-        &x3dh,
-        "https://relay.example",
-        None,
-        &card,
-    );
+    let payload =
+        serialize_card_payload_v2(&identity, &keypair, &x3dh, "https://relay.example", &card);
     let mut body: serde_json::Value = serde_json::from_slice(&payload[1..]).unwrap();
     // Flip the exchange key — a MITM swapping in its own would be caught.
     body["x3dh_pubkey"] = serde_json::to_value([9u8; 32]).unwrap();
@@ -144,14 +104,8 @@ fn tampered_x3dh_key_fails_signature() {
 #[test]
 fn substituted_identity_key_fails_signature() {
     let (keypair, identity, x3dh, card) = sample();
-    let payload = serialize_card_payload_v2(
-        &identity,
-        &keypair,
-        &x3dh,
-        "https://relay.example",
-        None,
-        &card,
-    );
+    let payload =
+        serialize_card_payload_v2(&identity, &keypair, &x3dh, "https://relay.example", &card);
     let other_identity = *SigningKeyPair::generate().public_key().as_bytes();
     let mut body: serde_json::Value = serde_json::from_slice(&payload[1..]).unwrap();
     body["identity_pubkey"] = serde_json::to_value(other_identity).unwrap();
@@ -165,14 +119,8 @@ fn substituted_identity_key_fails_signature() {
 #[test]
 fn wrong_length_signature_rejected() {
     let (keypair, identity, x3dh, card) = sample();
-    let payload = serialize_card_payload_v2(
-        &identity,
-        &keypair,
-        &x3dh,
-        "https://relay.example",
-        None,
-        &card,
-    );
+    let payload =
+        serialize_card_payload_v2(&identity, &keypair, &x3dh, "https://relay.example", &card);
     let mut body: serde_json::Value = serde_json::from_slice(&payload[1..]).unwrap();
     body["signature"] = serde_json::json!([1, 2, 3]);
 

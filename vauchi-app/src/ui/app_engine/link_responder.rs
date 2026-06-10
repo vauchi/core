@@ -132,7 +132,6 @@ impl AppEngine {
     /// the peer can verify it and establish a live update channel. Shared by
     /// both link builders. `None` if no identity / card read fails (rare,
     /// non-fatal — the caller leaves the screen on its waiting state).
-    /// `relay_noise_pubkey` is `None` until relay-noise pinning lands.
     pub(super) fn build_link_card_bytes_v2(&self, x3dh_pubkey: &[u8; 32]) -> Option<Vec<u8>> {
         let identity = self.vauchi.identity()?;
         let identity_pubkey = *identity.signing_public_key();
@@ -147,7 +146,6 @@ impl AppEngine {
             identity.signing_keypair(),
             x3dh_pubkey,
             self.vauchi.relay_server_url(),
-            None,
             &card,
         ))
     }

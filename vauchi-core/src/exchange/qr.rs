@@ -12,14 +12,12 @@
 //! MAGIC(4) || version(1) || pubkey(32) || exchange_key(32) || token(32)
 //! || challenge(16) || timestamp(8) || name_len(2) || name(N)
 //! || flags(1) || [relay_url_len(2) || relay_url(M)]
-//! || [relay_noise_pubkey(32)]
 //! || signature(64)
 //! ```
 //!
 //! Flags byte (bitfield):
 //! - Bit 0: has_relay_url — if set, relay_url_len + relay_url follow
-//! - Bit 1: has_relay_noise_pubkey — if set, 32-byte pubkey follows relay_url (or flags if no URL)
-//! - Bits 2-7: reserved (must be zero)
+//! - Bits 1-7: reserved (must be zero)
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
@@ -34,7 +32,7 @@ use crate::text::normalize_text;
 /// Protocol version for QR codes.
 /// v1: Original format (signing key only)
 /// v2: Added X25519 exchange key for X3DH
-/// v3: Added relay URL + Noise NK pubkey for per-contact routing
+/// v3: Added relay URL for per-contact routing (Noise pubkey removed pre-launch, ADR-037)
 const PROTOCOL_VERSION: u8 = 3;
 
 /// QR code expiration time in seconds.
@@ -54,8 +52,6 @@ const MAX_DISPLAY_NAME_LEN: usize = 255;
 
 /// Flag: relay URL is present after display name
 const FLAG_HAS_RELAY_URL: u8 = 0x01;
-/// Flag: relay Noise NK pubkey is present
-const FLAG_HAS_RELAY_NOISE_PUBKEY: u8 = 0x02;
 
 /// Exchange QR code data structure.
 ///
@@ -80,8 +76,6 @@ pub struct ExchangeQR {
     display_name: String,
     /// Relay URL for per-contact routing (learned during exchange)
     relay_url: Option<String>,
-    /// Relay's Noise NK public key (pinned during exchange, eliminates TOFU)
-    relay_noise_pubkey: Option<[u8; 32]>,
     /// Signature over the above fields (including relay metadata)
     signature: [u8; 64],
 }
@@ -92,30 +86,23 @@ impl ExchangeQR {
     /// The exchange key in the QR is the provided ephemeral key, not the
     /// identity's static X3DH key. This gives full forward secrecy.
     pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair, now: u64) -> Self {
-        Self::generate_with_relay(identity, ephemeral, None, None, now)
+        Self::generate_with_relay(identity, ephemeral, None, now)
     }
 
     /// Generates a QR code with optional relay metadata.
     ///
-    /// When relay_url and/or relay_noise_pubkey are provided, they are
-    /// included in the QR code and signed. The recipient learns the
-    /// sender's relay during in-person exchange.
+    /// When relay_url is provided, it is included in the QR code and
+    /// signed. The recipient learns the sender's relay during in-person
+    /// exchange.
     pub fn generate_with_relay(
         identity: &Identity,
         ephemeral: &X3DHKeyPair,
         relay_url: Option<String>,
-        relay_noise_pubkey: Option<[u8; 32]>,
         now: u64,
     ) -> Self {
         let timestamp = now;
 
-        Self::generate_with_relay_and_timestamp(
-            identity,
-            ephemeral,
-            timestamp,
-            relay_url,
-            relay_noise_pubkey,
-        )
+        Self::generate_with_relay_and_timestamp(identity, ephemeral, timestamp, relay_url)
     }
 
     /// Generates a QR code with a specific timestamp (for testing).
@@ -124,7 +111,7 @@ impl ExchangeQR {
         ephemeral: &X3DHKeyPair,
         timestamp: u64,
     ) -> Self {
-        Self::generate_with_relay_and_timestamp(identity, ephemeral, timestamp, None, None)
+        Self::generate_with_relay_and_timestamp(identity, ephemeral, timestamp, None)
     }
 
     /// Full constructor with all parameters.
@@ -133,7 +120,6 @@ impl ExchangeQR {
         ephemeral: &X3DHKeyPair,
         timestamp: u64,
         relay_url: Option<String>,
-        relay_noise_pubkey: Option<[u8; 32]>,
     ) -> Self {
         use crate::crypto::random_bytes;
 
@@ -154,7 +140,6 @@ impl ExchangeQR {
             timestamp,
             &display_name,
             relay_url.as_deref(),
-            relay_noise_pubkey.as_ref(),
         );
 
         let signature = identity.sign(&message);
@@ -168,7 +153,6 @@ impl ExchangeQR {
             timestamp,
             display_name,
             relay_url,
-            relay_noise_pubkey,
             signature: *signature.as_bytes(),
         }
     }
@@ -208,11 +192,6 @@ impl ExchangeQR {
         self.relay_url.as_deref()
     }
 
-    /// Returns the relay Noise NK public key, if present.
-    pub fn relay_noise_pubkey(&self) -> Option<&[u8; 32]> {
-        self.relay_noise_pubkey.as_ref()
-    }
-
     /// Checks if the QR code has expired.
     pub fn is_expired(&self, now: u64) -> bool {
         now > self.timestamp + QR_EXPIRY_SECONDS
@@ -229,7 +208,6 @@ impl ExchangeQR {
             self.timestamp,
             &self.display_name,
             self.relay_url.as_deref(),
-            self.relay_noise_pubkey.as_ref(),
         );
 
         let public_key = PublicKey::from_bytes(self.public_key);
@@ -243,7 +221,7 @@ impl ExchangeQR {
         let name_bytes = self.display_name.as_bytes();
         let name_len = name_bytes.len() as u16;
 
-        let flags = build_flags(self.relay_url.as_deref(), self.relay_noise_pubkey.as_ref());
+        let flags = build_flags(self.relay_url.as_deref());
 
         let mut data = Vec::new();
         data.extend_from_slice(MAGIC);
@@ -262,9 +240,6 @@ impl ExchangeQR {
             let url_len = url_bytes.len() as u16;
             data.extend_from_slice(&url_len.to_be_bytes());
             data.extend_from_slice(url_bytes);
-        }
-        if let Some(ref pubkey) = self.relay_noise_pubkey {
-            data.extend_from_slice(pubkey);
         }
         data.extend_from_slice(&self.signature);
 
@@ -360,22 +335,6 @@ impl ExchangeQR {
             None
         };
 
-        let relay_noise_pubkey = if flags & FLAG_HAS_RELAY_NOISE_PUBKEY != 0 {
-            if bytes.len() < cursor + 32 {
-                return Err(ExchangeError::InvalidQRFormat);
-            }
-            let pubkey: [u8; 32] = bytes[cursor..cursor + 32]
-                .try_into()
-                .map_err(|_| ExchangeError::InvalidQRFormat)?;
-            cursor += 32;
-            Some(pubkey)
-        } else if relay_url.is_some() {
-            // Fail-closed: relay URL without Noise pubkey allows TOFU MITM
-            return Err(ExchangeError::InvalidQRFormat);
-        } else {
-            None
-        };
-
         // Remaining bytes must be the signature (64 bytes)
         if bytes.len() != cursor + 64 {
             return Err(ExchangeError::InvalidQRFormat);
@@ -394,7 +353,6 @@ impl ExchangeQR {
             timestamp,
             display_name,
             relay_url,
-            relay_noise_pubkey,
             signature,
         };
 
@@ -438,11 +396,10 @@ fn build_signed_message(
     timestamp: u64,
     display_name: &str,
     relay_url: Option<&str>,
-    relay_noise_pubkey: Option<&[u8; 32]>,
 ) -> Vec<u8> {
     let name_bytes = display_name.as_bytes();
     let name_len = name_bytes.len() as u16;
-    let flags = build_flags(relay_url, relay_noise_pubkey);
+    let flags = build_flags(relay_url);
 
     let mut message = Vec::new();
     message.push(version);
@@ -461,20 +418,14 @@ fn build_signed_message(
         message.extend_from_slice(&url_len.to_be_bytes());
         message.extend_from_slice(url_bytes);
     }
-    if let Some(pubkey) = relay_noise_pubkey {
-        message.extend_from_slice(pubkey);
-    }
     message
 }
 
 /// Builds the flags byte from optional relay fields.
-fn build_flags(relay_url: Option<&str>, relay_noise_pubkey: Option<&[u8; 32]>) -> u8 {
+fn build_flags(relay_url: Option<&str>) -> u8 {
     let mut flags = 0u8;
     if relay_url.is_some() {
         flags |= FLAG_HAS_RELAY_URL;
-    }
-    if relay_noise_pubkey.is_some() {
-        flags |= FLAG_HAS_RELAY_NOISE_PUBKEY;
     }
     flags
 }
@@ -519,7 +470,6 @@ mod tests {
         assert_eq!(qr.exchange_key(), ephemeral.public_key());
         assert_eq!(qr.display_name(), "Alice");
         assert!(qr.relay_url().is_none());
-        assert!(qr.relay_noise_pubkey().is_none());
     }
 
     #[test]
@@ -584,25 +534,12 @@ mod tests {
 
     #[test]
     fn test_flags_none() {
-        assert_eq!(build_flags(None, None), 0x00);
+        assert_eq!(build_flags(None), 0x00);
     }
 
     #[test]
     fn test_flags_url_only() {
-        assert_eq!(build_flags(Some("https://relay.example.com"), None), 0x01);
-    }
-
-    #[test]
-    fn test_flags_pubkey_only() {
-        assert_eq!(build_flags(None, Some(&[0u8; 32])), 0x02);
-    }
-
-    #[test]
-    fn test_flags_both() {
-        assert_eq!(
-            build_flags(Some("https://relay.example.com"), Some(&[0u8; 32])),
-            0x03
-        );
+        assert_eq!(build_flags(Some("https://relay.example.com")), 0x01);
     }
 
     #[test]
@@ -615,7 +552,6 @@ mod tests {
             &identity,
             &ephemeral,
             Some("https://relay.example.com".to_string()),
-            Some([1u8; 32]),
             0u64,
         );
 
@@ -625,14 +561,6 @@ mod tests {
         assert!(
             !tampered.verify_signature(),
             "Tampered relay URL must invalidate signature"
-        );
-
-        // Manually tamper with noise pubkey
-        let mut tampered2 = qr_with_relay.clone();
-        tampered2.relay_noise_pubkey = Some([2u8; 32]);
-        assert!(
-            !tampered2.verify_signature(),
-            "Tampered Noise pubkey must invalidate signature"
         );
     }
 }

@@ -14,8 +14,13 @@
 
 use vauchi_core::Vauchi;
 use vauchi_core::VauchiError;
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
+use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::identity::Identity;
-use vauchi_core::recovery::{RecoveryClaim, RecoverySettings, RecoveryVoucher};
+use vauchi_core::recovery::{
+    RecoveryClaim, RecoveryProof, RecoverySettings, RecoveryVoucher, VerificationResult,
+};
 
 fn vauchi_with_identity(name: &str) -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
@@ -276,4 +281,132 @@ fn vouch_for_claim_requires_identity() {
     let claim = RecoveryClaim::new(&[1u8; 32], &[2u8; 32], 0);
     let result = wb.vouch_for_claim(&claim, "any-contact");
     assert!(matches!(result, Err(VauchiError::IdentityNotInitialized)));
+}
+
+// ============================================================
+// verify_recovery_proof (PAE G3 push-down — was inline in
+// vauchi-platform's VerifyRecoveryProof dispatch arm)
+// ============================================================
+
+/// Proof for recovering `old_pk` into `new_pk`, vouched by `helpers`.
+fn build_proof(old_pk: [u8; 32], new_pk: &[u8; 32], helpers: &[&Identity]) -> RecoveryProof {
+    let claim = RecoveryClaim::new(&old_pk, new_pk, 0);
+    let mut proof = RecoveryProof::new(old_pk, *new_pk, helpers.len() as u32, 0);
+    for helper in helpers {
+        proof.add_voucher(build_voucher(&claim, helper)).unwrap();
+    }
+    proof
+}
+
+fn add_exchanged_contact(wb: &Vauchi, identity: &Identity, name: &str) {
+    let contact = Contact::from_exchange(
+        *identity.signing_public_key(),
+        ContactCard::new(name),
+        SymmetricKey::generate(),
+        0,
+    );
+    wb.add_contact(contact).unwrap();
+}
+
+// @internal
+#[test]
+fn verify_recovery_proof_high_confidence_when_known_vouchers_meet_threshold() {
+    let wb = vauchi_with_identity("Recoverer");
+    let new_pk = *wb.identity().unwrap().signing_public_key();
+    let bob = Identity::create("Bob", 0);
+    let carol = Identity::create("Carol", 0);
+    add_exchanged_contact(&wb, &bob, "Bob");
+    add_exchanged_contact(&wb, &carol, "Carol");
+
+    let proof = build_proof([7u8; 32], &new_pk, &[&bob, &carol]);
+    let (parsed, result) = wb
+        .verify_recovery_proof(&proof.to_bytes().unwrap())
+        .unwrap();
+
+    assert_eq!(parsed.old_pk().as_bytes(), &[7u8; 32]);
+    assert_eq!(parsed.new_pk().as_bytes(), &new_pk);
+    assert_eq!(parsed.voucher_count(), 2);
+    match result {
+        VerificationResult::HighConfidence {
+            mutual_vouchers,
+            total_vouchers,
+        } => {
+            assert_eq!(total_vouchers, 2);
+            let mut names = mutual_vouchers.clone();
+            names.sort();
+            assert_eq!(names, vec!["Bob".to_string(), "Carol".to_string()]);
+        }
+        other => panic!("expected HighConfidence, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn verify_recovery_proof_medium_confidence_with_one_known_voucher() {
+    let wb = vauchi_with_identity("Recoverer");
+    let new_pk = *wb.identity().unwrap().signing_public_key();
+    let bob = Identity::create("Bob", 0);
+    let stranger = Identity::create("Mallory", 0);
+    add_exchanged_contact(&wb, &bob, "Bob");
+
+    let proof = build_proof([7u8; 32], &new_pk, &[&bob, &stranger]);
+    let (_, result) = wb
+        .verify_recovery_proof(&proof.to_bytes().unwrap())
+        .unwrap();
+
+    match result {
+        VerificationResult::MediumConfidence {
+            mutual_vouchers,
+            required,
+            total_vouchers,
+        } => {
+            assert_eq!(mutual_vouchers, vec!["Bob".to_string()]);
+            assert_eq!(required, 2, "default verification threshold");
+            assert_eq!(total_vouchers, 2);
+        }
+        other => panic!("expected MediumConfidence, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn verify_recovery_proof_low_confidence_with_no_known_vouchers() {
+    let wb = vauchi_with_identity("Recoverer");
+    let new_pk = *wb.identity().unwrap().signing_public_key();
+    let stranger = Identity::create("Mallory", 0);
+
+    let proof = build_proof([7u8; 32], &new_pk, &[&stranger]);
+    let (_, result) = wb
+        .verify_recovery_proof(&proof.to_bytes().unwrap())
+        .unwrap();
+
+    match result {
+        VerificationResult::LowConfidence { total_vouchers } => {
+            assert_eq!(total_vouchers, 1);
+        }
+        other => panic!("expected LowConfidence, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn verify_recovery_proof_rejects_garbage_bytes() {
+    let wb = vauchi_with_identity("Recoverer");
+    let result = wb.verify_recovery_proof(&[0xFF, 0x00, 0x13, 0x37]);
+    assert!(matches!(result, Err(VauchiError::Serialization(_))));
+}
+
+// @internal
+#[test]
+fn verify_recovery_proof_rejects_proof_below_its_own_threshold() {
+    let wb = vauchi_with_identity("Recoverer");
+    let new_pk = *wb.identity().unwrap().signing_public_key();
+    let bob = Identity::create("Bob", 0);
+
+    let claim = RecoveryClaim::new(&[7u8; 32], &new_pk, 0);
+    let mut proof = RecoveryProof::new([7u8; 32], new_pk, 3, 0);
+    proof.add_voucher(build_voucher(&claim, &bob)).unwrap();
+
+    let result = wb.verify_recovery_proof(&proof.to_bytes().unwrap());
+    assert!(matches!(result, Err(VauchiError::InvalidState(_))));
 }

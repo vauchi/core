@@ -15,7 +15,9 @@ use crate::crypto::{HKDF, X3DHKeyPair};
 use crate::network::HttpTransport;
 use crate::recovery::guardian::GuardianToken;
 use crate::recovery::sealed_box;
-use crate::recovery::{RecoveryClaim, RecoveryProgress, RecoveryVoucher};
+use crate::recovery::{
+    RecoveryClaim, RecoveryProgress, RecoveryProof, RecoveryVoucher, VerificationResult,
+};
 use vauchi_protocol::v2::V2GuardianEntry;
 
 use super::Vauchi;
@@ -157,6 +159,36 @@ impl Vauchi {
     /// Returns current recovery progress, if any.
     pub fn get_recovery_progress(&self) -> VauchiResult<Option<RecoveryProgress>> {
         Ok(self.storage.recovery().load_recovery_progress()?)
+    }
+
+    /// Parses, validates, and scores an incoming recovery proof
+    /// against local contacts.
+    ///
+    /// Confidence is the mutual-voucher rule from
+    /// [`RecoveryProof::verify_for_contact`], driven by the stored
+    /// [`crate::recovery::RecoverySettings::verification_threshold`]
+    /// (default 2) — the decision of "how many known vouchers is
+    /// enough" is the user's setting, not a caller-side constant.
+    /// Returns the parsed proof alongside the verdict so callers can
+    /// surface key fingerprints and counts without re-parsing.
+    pub fn verify_recovery_proof(
+        &self,
+        proof_bytes: &[u8],
+    ) -> VauchiResult<(RecoveryProof, VerificationResult)> {
+        let proof = RecoveryProof::from_bytes(proof_bytes)
+            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+        proof
+            .validate()
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+
+        let contacts = self.storage.contacts().list_contacts()?;
+        let settings = self
+            .storage
+            .recovery()
+            .load_recovery_settings()?
+            .unwrap_or_default();
+        let verdict = proof.verify_for_contact(&contacts, &settings);
+        Ok((proof, verdict))
     }
 
     /// Uploads the completed recovery proof to the relay.

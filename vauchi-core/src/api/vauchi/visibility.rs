@@ -226,6 +226,79 @@ impl Vauchi {
             .is_some_and(|rules| rules.can_see(field_id, contact_id)))
     }
 
+    /// Resolves an own-card field label to its field id.
+    ///
+    /// Layer-A visibility rules are keyed by field *id*; UniFFI
+    /// surfaces address fields by *label* — this is the one
+    /// resolution point (was duplicated inline per dispatch arm in
+    /// vauchi-platform).
+    fn own_field_id_by_label(&self, field_label: &str) -> VauchiResult<String> {
+        let card = self
+            .storage
+            .contacts()
+            .load_own_card()?
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        Ok(card
+            .fields()
+            .iter()
+            .find(|f| f.label() == field_label)
+            .ok_or_else(|| VauchiError::NotFound(format!("field: {field_label}")))?
+            .id()
+            .to_string())
+    }
+
+    /// Sets a field's Layer-A visibility for one contact, addressed
+    /// by the field's own-card label.
+    ///
+    /// `visible == false` sets the rule to nobody; `true` to
+    /// everyone. Requires an exchanged contact (imported contacts
+    /// carry no visibility rules).
+    pub fn set_field_visibility_by_label(
+        &self,
+        contact_id: &str,
+        field_label: &str,
+        visible: bool,
+    ) -> VauchiResult<()> {
+        let mut contact = self
+            .storage
+            .contacts()
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::NotFound(format!("contact: {contact_id}")))?;
+        let field_id = self.own_field_id_by_label(field_label)?;
+        let rules = contact
+            .visibility_rules_mut()
+            .ok_or(VauchiError::InvalidState(
+                "Visibility rules require an exchanged contact".into(),
+            ))?;
+        if visible {
+            rules.set_everyone(&field_id);
+        } else {
+            rules.set_nobody(&field_id);
+        }
+        self.storage.contacts().save_contact(&contact)?;
+        Ok(())
+    }
+
+    /// Reads a field's Layer-A visibility for one contact, addressed
+    /// by the field's own-card label.
+    ///
+    /// Imported contacts (no visibility rules) read as not visible.
+    pub fn is_field_visible_by_label(
+        &self,
+        contact_id: &str,
+        field_label: &str,
+    ) -> VauchiResult<bool> {
+        let contact = self
+            .storage
+            .contacts()
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::NotFound(format!("contact: {contact_id}")))?;
+        let field_id = self.own_field_id_by_label(field_label)?;
+        Ok(contact
+            .visibility_rules()
+            .is_some_and(|r| r.can_see(&field_id, contact_id)))
+    }
+
     /// Toggles field visibility for a contact.
     ///
     /// If the field is currently visible to this contact, hides it.

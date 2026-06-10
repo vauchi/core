@@ -97,3 +97,88 @@ fn test_toggle_twice_restores_visibility() {
         .unwrap();
     assert!(visible, "Double toggle should restore visibility");
 }
+
+// ============================================================
+// Label-keyed Layer-A visibility (PAE G3 push-down — was inline
+// in vauchi-platform's Hide/Show/IsFieldVisibleToContact arms)
+// ============================================================
+
+// @internal
+#[test]
+fn set_field_visibility_by_label_hides_and_shows_exact_field() {
+    let (wb, contact_id) = setup_with_fields();
+
+    assert!(
+        wb.is_field_visible_by_label(&contact_id, "Work Email")
+            .unwrap()
+    );
+
+    wb.set_field_visibility_by_label(&contact_id, "Work Email", false)
+        .unwrap();
+    assert!(
+        !wb.is_field_visible_by_label(&contact_id, "Work Email")
+            .unwrap()
+    );
+    assert!(
+        wb.is_field_visible_by_label(&contact_id, "Mobile").unwrap(),
+        "hiding one field must not affect siblings"
+    );
+
+    wb.set_field_visibility_by_label(&contact_id, "Work Email", true)
+        .unwrap();
+    assert!(
+        wb.is_field_visible_by_label(&contact_id, "Work Email")
+            .unwrap()
+    );
+}
+
+// @internal
+#[test]
+fn set_field_visibility_by_label_rejects_unknown_field() {
+    let (wb, contact_id) = setup_with_fields();
+    let err = wb
+        .set_field_visibility_by_label(&contact_id, "No Such Label", false)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("field"),
+        "error must name the missing field: {err}"
+    );
+}
+
+// @internal
+#[test]
+fn set_field_visibility_by_label_rejects_unknown_contact() {
+    let (wb, _) = setup_with_fields();
+    let err = wb
+        .set_field_visibility_by_label("no-such-contact", "Work Email", false)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("contact"),
+        "error must name the missing contact: {err}"
+    );
+}
+
+// @internal
+#[test]
+fn is_field_visible_by_label_persists_across_reload() {
+    let (wb, contact_id) = setup_with_fields();
+    wb.set_field_visibility_by_label(&contact_id, "Mobile", false)
+        .unwrap();
+
+    let reloaded = wb.get_contact(&contact_id).unwrap().unwrap();
+    let card = wb.own_card().unwrap().unwrap();
+    let mobile_id = card
+        .fields()
+        .iter()
+        .find(|f| f.label() == "Mobile")
+        .unwrap()
+        .id()
+        .to_string();
+    assert!(
+        !reloaded
+            .visibility_rules()
+            .unwrap()
+            .can_see(&mobile_id, &contact_id),
+        "rule must be keyed by field id, not label"
+    );
+}

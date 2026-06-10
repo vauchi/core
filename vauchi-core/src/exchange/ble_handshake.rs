@@ -181,6 +181,11 @@ pub struct BleHandshakeSession {
     their_commitment: Option<[u8; 32]>,
     their_encrypted_card: Option<Vec<u8>>,
     completed_cache: HashMap<[u8; 32], BleExchangeResult>,
+    /// OOB-bootstrap binding (v4): identity pin + nonce echo. See
+    /// `2026-06-10-oob-bootstrap-exchange-rituals-design.md` Tier 0.
+    expected_peer: Option<[u8; 32]>,
+    oob_nonce: Option<[u8; NONCE_SIZE]>,
+    required_oob_nonce: Option<[u8; NONCE_SIZE]>,
 }
 
 impl BleHandshakeSession {
@@ -241,6 +246,30 @@ impl BleHandshakeSession {
         )
     }
 
+    /// Pin the expected peer identity (Ed25519 signing key) received
+    /// over an OOB channel (scanned QR / NFC tap). Once set, a wire
+    /// identity that differs aborts the handshake with
+    /// [`ExchangeError::IdentityMismatch`] — the radio cannot
+    /// substitute a peer the human didn't point at.
+    pub fn expect_peer(&mut self, identity_key: [u8; 32]) {
+        self.expected_peer = Some(identity_key);
+    }
+
+    /// Carry the OOB session nonce (from the scanned/tapped payload)
+    /// in our KeyOffer so the displayer can verify we actually saw it.
+    /// Initiator-side counterpart of [`Self::require_oob_nonce`].
+    pub fn set_oob_nonce(&mut self, nonce: [u8; NONCE_SIZE]) {
+        self.oob_nonce = Some(nonce);
+    }
+
+    /// Require the KeyOffer to echo the OOB nonce this device
+    /// displayed/transmitted; absence or mismatch aborts with
+    /// [`ExchangeError::OobNonceMismatch`] — winning the radio race is
+    /// not enough, the connector must have seen the QR/tap.
+    pub fn require_oob_nonce(&mut self, nonce: [u8; NONCE_SIZE]) {
+        self.required_oob_nonce = Some(nonce);
+    }
+
     /// Internal constructor from raw key material.
     fn new_from_keys(
         identity_key: [u8; 32],
@@ -271,6 +300,9 @@ impl BleHandshakeSession {
             their_commitment: None,
             their_encrypted_card: None,
             completed_cache: HashMap::new(),
+            expected_peer: None,
+            oob_nonce: None,
+            required_oob_nonce: None,
         }
     }
 

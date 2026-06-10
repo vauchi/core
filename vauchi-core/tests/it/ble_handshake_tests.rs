@@ -972,3 +972,189 @@ fn test_v1_offer_rejected() {
         "v1 offer must be rejected by v2 responder"
     );
 }
+
+// ============================================================
+// OOB bootstrap binding — expected-peer pin + nonce echo (v4)
+// Design: _private/docs/designs/2026-06-10-oob-bootstrap-exchange-rituals-design.md
+// Record: _private/docs/problems/2026-06-10-ble-unauthenticated-peer-identity
+// ============================================================
+
+fn now() -> u64 {
+    vauchi_core::clock::SystemClock::shared().unix_seconds()
+}
+
+// @scenario: ble_exchange :: Pinned initiator rejects a KeyAck from an unexpected identity
+#[test]
+fn test_pinned_initiator_rejects_key_ack_from_unexpected_identity() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+    let carol_id = make_test_identity();
+
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    alice.expect_peer(*carol_id.signing_public_key());
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let (ack, bob_card) = bob.process_key_offer(&offer, now()).expect("process offer");
+
+    let err = alice
+        .process_key_ack(&ack, &bob_card, now())
+        .expect_err("ack from bob must be rejected when carol is pinned");
+    assert!(
+        matches!(err, ExchangeError::IdentityMismatch),
+        "expected IdentityMismatch, got {err:?}"
+    );
+}
+
+// @scenario: ble_exchange :: Pinned initiator accepts the expected identity
+#[test]
+fn test_pinned_initiator_accepts_expected_identity() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    alice.expect_peer(*bob_id.signing_public_key());
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let (ack, bob_card) = bob.process_key_offer(&offer, now()).expect("process offer");
+    let (commitment, alice_card) = alice
+        .process_key_ack(&ack, &bob_card, now())
+        .expect("pinned ack from the expected identity must succeed");
+
+    assert_eq!(commitment.len(), 32, "commitment must be SHA-256 sized");
+    assert!(!alice_card.is_empty(), "encrypted card must be produced");
+}
+
+// @scenario: ble_exchange :: Pinned responder rejects a KeyOffer from an unexpected identity
+#[test]
+fn test_pinned_responder_rejects_offer_from_unexpected_identity() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+    let carol_id = make_test_identity();
+
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+    bob.expect_peer(*carol_id.signing_public_key());
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let err = bob
+        .process_key_offer(&offer, now())
+        .expect_err("offer from alice must be rejected when carol is pinned");
+    assert!(
+        matches!(err, ExchangeError::IdentityMismatch),
+        "expected IdentityMismatch, got {err:?}"
+    );
+}
+
+// @scenario: ble_exchange :: Responder requiring an OOB nonce rejects an offer without the echo
+#[test]
+fn test_responder_requiring_oob_nonce_rejects_missing_echo() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+    bob.require_oob_nonce([7u8; 16]);
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let err = bob
+        .process_key_offer(&offer, now())
+        .expect_err("offer without the displayed nonce echo must be rejected");
+    assert!(
+        matches!(err, ExchangeError::OobNonceMismatch),
+        "expected OobNonceMismatch, got {err:?}"
+    );
+}
+
+// @scenario: ble_exchange :: OOB nonce echo roundtrip succeeds
+#[test]
+fn test_oob_nonce_echo_roundtrip() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+    let displayed_nonce = [9u8; 16];
+
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    alice.set_oob_nonce(displayed_nonce);
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+    bob.require_oob_nonce(displayed_nonce);
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let (ack, bob_card) = bob
+        .process_key_offer(&offer, now())
+        .expect("offer echoing the displayed nonce must succeed");
+    let (commitment, _) = alice
+        .process_key_ack(&ack, &bob_card, now())
+        .expect("roundtrip completes");
+    assert_eq!(commitment.len(), 32, "commitment must be SHA-256 sized");
+}
+
+// @scenario: ble_exchange :: Wrong echoed nonce is rejected (adversarial, CC-14)
+#[test]
+fn test_responder_rejects_wrong_oob_nonce_echo() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    alice.set_oob_nonce([1u8; 16]);
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+    bob.require_oob_nonce([2u8; 16]);
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let err = bob
+        .process_key_offer(&offer, now())
+        .expect_err("wrong nonce echo must be rejected");
+    assert!(
+        matches!(err, ExchangeError::OobNonceMismatch),
+        "expected OobNonceMismatch, got {err:?}"
+    );
+}
+
+// @scenario: ble_exchange :: v4 KeyOffer carries the OOB nonce slot
+#[test]
+fn test_v4_key_offer_is_137_bytes() {
+    let alice_id = make_test_identity();
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+
+    let offer = alice.create_key_offer().expect("key offer");
+    assert_eq!(
+        offer.len(),
+        137,
+        "v4 KeyOffer = v3 121 bytes + oob_nonce(16) appended"
+    );
+    assert_eq!(offer[0], BLE_HANDSHAKE_VERSION, "version byte leads");
+}
+
+// @scenario: ble_exchange :: Truncated v4 offer rejected (adversarial, CC-14)
+#[test]
+fn test_truncated_v4_offer_rejected() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let err = bob
+        .process_key_offer(&offer[..offer.len() - 1], now())
+        .expect_err("truncated offer must be rejected");
+    assert!(
+        matches!(err, ExchangeError::InvalidBleFormat),
+        "expected InvalidBleFormat, got {err:?}"
+    );
+}

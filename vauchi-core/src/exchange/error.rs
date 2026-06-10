@@ -68,6 +68,9 @@ pub enum ExchangeError {
     #[error("Identity mismatch: signing key does not match QR public key")]
     IdentityMismatch,
 
+    #[error("OOB nonce echo missing or mismatched")]
+    OobNonceMismatch,
+
     #[error("Stale prekey, retrying")]
     StalePrekey,
 
@@ -240,6 +243,7 @@ impl ExchangeError {
 
             Self::InvalidSignature
             | Self::IdentityMismatch
+            | Self::OobNonceMismatch
             | Self::KeyAgreementFailed(_)
             | Self::InvalidProtocolVersion
             | Self::InvalidState(_)

@@ -12,6 +12,7 @@ mod app_screen;
 mod ble_handshake;
 mod completion;
 mod completion_contact;
+mod completion_forms;
 mod device_link;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_initiator;
@@ -36,11 +37,10 @@ mod screens_contacts;
 mod screens_exchange;
 
 pub use app_screen::AppScreen;
-pub use navigation::TabLayout;
-pub use overlays::SyncChromeStatus;
 use overlays::{
     ACTION_DISMISS_DEMO_CONTACT, ACTION_OPEN_SETTINGS, ACTION_OPEN_UPDATE_LINK, ACTION_SYNC_NOW,
 };
+pub use {navigation::TabLayout, overlays::SyncChromeStatus};
 
 use std::collections::HashMap;
 use std::sync::mpsc;

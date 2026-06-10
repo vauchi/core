@@ -9,6 +9,7 @@
 use std::sync::Arc;
 
 use crate::contact::Contact;
+use crate::contact::display::{DisplayNamePreference, resolve_display_name};
 use crate::contact_card::{ContactCard, ContactField};
 use crate::storage::Storage;
 
@@ -126,15 +127,74 @@ impl<'a> ContactManager<'a> {
 
     /// Gets a contact by ID.
     pub fn get_contact(&self, id: &str) -> VauchiResult<Option<Contact>> {
-        Ok(self.storage.contacts().load_contact(id)?)
+        let mut contact = self.storage.contacts().load_contact(id)?;
+        if let Some(c) = contact.as_mut() {
+            self.apply_name_override(c)?;
+        }
+        Ok(contact)
     }
 
     /// Gets a contact by ID, returning error if not found.
     pub fn get_contact_required(&self, id: &str) -> VauchiResult<Contact> {
-        self.storage
+        let mut contact = self
+            .storage
             .contacts()
             .load_contact(id)?
-            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))
+            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
+        self.apply_name_override(&mut contact)?;
+        Ok(contact)
+    }
+
+    /// Resolves a contact's displayed name from its local display
+    /// preference (nickname / chosen shared name), overriding the
+    /// card-derived `display_name` in place. A `Primary` preference is the
+    /// common case and short-circuits after a single preference lookup.
+    fn apply_name_override(&self, contact: &mut Contact) -> VauchiResult<()> {
+        let id = contact.id().to_string();
+        let (name_pref, _) = self.storage.contacts().load_display_preferences(&id)?;
+        self.resolve_name_with(contact, &id, &name_pref)
+    }
+
+    /// Bulk variant of [`apply_name_override`] for list paths: loads every
+    /// contact's preference in one query, then resolves only the non-Primary
+    /// ones (which alone need a nickname / shared-name lookup).
+    fn apply_name_overrides(&self, contacts: &mut [Contact]) -> VauchiResult<()> {
+        let ids: Vec<String> = contacts.iter().map(|c| c.id().to_string()).collect();
+        let id_refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+        let prefs = self
+            .storage
+            .contacts()
+            .batch_display_preferences(&id_refs)?;
+        for contact in contacts.iter_mut() {
+            let id = contact.id().to_string();
+            let name_pref = prefs
+                .get(&id)
+                .map(|(name, _)| name.clone())
+                .unwrap_or(DisplayNamePreference::Primary);
+            self.resolve_name_with(contact, &id, &name_pref)?;
+        }
+        Ok(())
+    }
+
+    fn resolve_name_with(
+        &self,
+        contact: &mut Contact,
+        id: &str,
+        name_pref: &DisplayNamePreference,
+    ) -> VauchiResult<()> {
+        if matches!(name_pref, DisplayNamePreference::Primary) {
+            return Ok(());
+        }
+        let nickname = self.storage.contacts().load_contact_nickname(id)?;
+        let shared_names = self.storage.contacts().list_shared_names(id)?;
+        let resolved = resolve_display_name(
+            contact.display_name(),
+            name_pref,
+            &shared_names,
+            nickname.as_deref(),
+        );
+        contact.override_display_name(&resolved);
+        Ok(())
     }
 
     /// Lists all visible (non-hidden) contacts.
@@ -143,7 +203,9 @@ impl<'a> ContactManager<'a> {
     /// accessible via `Vauchi::list_hidden_contacts()`.
     pub fn list_contacts(&self) -> VauchiResult<Vec<Contact>> {
         let contacts = self.storage.contacts().list_contacts()?;
-        Ok(contacts.into_iter().filter(|c| !c.is_hidden()).collect())
+        let mut visible: Vec<Contact> = contacts.into_iter().filter(|c| !c.is_hidden()).collect();
+        self.apply_name_overrides(&mut visible)?;
+        Ok(visible)
     }
 
     /// Lists visible (non-hidden) contacts with pagination.
@@ -160,14 +222,20 @@ impl<'a> ContactManager<'a> {
     }
 
     /// Searches visible (non-hidden) contacts by display name (case-insensitive).
+    ///
+    /// Matching is on the stored (primary) name; the returned contacts then
+    /// carry their resolved display name so results render consistently with
+    /// the list/detail. Nickname-aware *matching* is a deliberate follow-up.
     pub fn search_contacts(&self, query: &str) -> VauchiResult<Vec<Contact>> {
         let query_lower = query.to_lowercase();
         let contacts = self.storage.contacts().list_contacts()?;
 
-        Ok(contacts
+        let mut matches: Vec<Contact> = contacts
             .into_iter()
             .filter(|c| !c.is_hidden() && c.display_name().to_lowercase().contains(&query_lower))
-            .collect())
+            .collect();
+        self.apply_name_overrides(&mut matches)?;
+        Ok(matches)
     }
 
     /// Finds contacts by fuzzy matching on display name or ID prefix.
@@ -195,6 +263,7 @@ impl<'a> ContactManager<'a> {
             }
         }
 
+        self.apply_name_overrides(&mut results)?;
         Ok(results)
     }
 

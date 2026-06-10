@@ -614,6 +614,14 @@ impl Contact {
         Ok(())
     }
 
+    /// Overrides only the in-memory display name, leaving the signed card
+    /// untouched. Used by read paths that resolve a local display
+    /// preference (e.g. a nickname) for rendering — never persisted back to
+    /// the card, whose `display_name` is signed and immutable.
+    pub(crate) fn override_display_name(&mut self, name: &str) {
+        self.display_name = name.to_string();
+    }
+
     /// Returns a human-readable fingerprint for verification.
     ///
     /// Returns an empty string for imported contacts (no public key).

@@ -607,6 +607,33 @@ impl Vauchi {
         Ok(())
     }
 
+    /// Sets the locally displayed name for a contact.
+    ///
+    /// A contact's card is signed and immutable, and for CEK-protected
+    /// contacts the plaintext name is not stored at rest (ADR-015) — so an
+    /// edited name is persisted as a local encrypted nickname with a
+    /// `Custom` display preference, which the read paths resolve into the
+    /// shown name. Setting the name back to the card's primary name clears
+    /// the override.
+    pub fn set_contact_display_name(&self, contact_id: &str, name: &str) -> VauchiResult<()> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err(VauchiError::InvalidState(
+                "Display name cannot be empty".into(),
+            ));
+        }
+        let contact = self
+            .get_contact(contact_id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
+        if trimmed == contact.card().display_name() {
+            self.clear_contact_nickname(contact_id)?;
+        } else {
+            self.set_contact_nickname(contact_id, trimmed)?;
+            self.set_display_name_preference(contact_id, DisplayNamePreference::Custom)?;
+        }
+        Ok(())
+    }
+
     /// Returns the local nickname for a contact, or None if unset.
     pub fn get_contact_nickname(&self, contact_id: &str) -> VauchiResult<Option<String>> {
         Ok(self.storage.contacts().load_contact_nickname(contact_id)?)

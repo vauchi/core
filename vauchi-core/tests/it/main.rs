@@ -28,6 +28,7 @@ mod aha_moments_integration_tests;
 mod animated_qr_transport_tests;
 mod anonymous_sender_tests;
 mod api_config_tests;
+mod api_contact_display_name_edit_tests;
 mod api_custom_avatar_tests;
 mod api_display_preference_tests;
 mod api_error_tests;

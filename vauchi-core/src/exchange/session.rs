@@ -571,17 +571,21 @@ impl ExchangeSession {
             )
         })?;
 
-        let our_identity = self.identity.signing_public_key();
-        let is_initiator = our_identity < their_identity;
-
-        let ratchet = if is_initiator {
-            crate::crypto::DoubleRatchetState::initialize_initiator(shared_key, their_exchange_key)
-                .map_err(|e| ExchangeError::KeyAgreementFailed(e.to_string()))?
-        } else {
-            let our_dh = X3DHKeyPair::from_bytes(*self.our_x3dh.secret_bytes());
-            crate::crypto::DoubleRatchetState::initialize_responder(shared_key, our_dh)
-        };
-        Ok((ratchet, is_initiator))
+        let our_dh = X3DHKeyPair::from_bytes(*self.our_x3dh.secret_bytes());
+        super::ratchet_bootstrap::bootstrap_exchange_ratchet(
+            shared_key,
+            self.identity.signing_public_key(),
+            their_identity,
+            Some(their_exchange_key),
+            Some(our_dh),
+        )
+        .map_err(|e| match e {
+            super::ratchet_bootstrap::RatchetBootstrapError::Init(msg) => {
+                ExchangeError::KeyAgreementFailed(msg)
+            }
+            // Both ephemerals are resolved above, so Missing* cannot occur.
+            other => ExchangeError::InvalidState(format!("ratchet bootstrap: {other:?}")),
+        })
     }
 
     /// Returns the shared key from the `AwaitingCardExchange` state.
@@ -1324,11 +1328,8 @@ impl ExchangeSession {
         // relay message encryption, NOT for BLE session encryption (that's
         // handled by BleHandshakeSession's ephemeral DH).
         let our_id = self.identity.signing_public_key();
-        let (id_lo, id_hi) = if our_id < &remote.identity_key {
-            (our_id.as_slice(), remote.identity_key.as_slice())
-        } else {
-            (remote.identity_key.as_slice(), our_id.as_slice())
-        };
+        let (id_lo, id_hi) =
+            super::key_order::sorted_pair(our_id.as_slice(), remote.identity_key.as_slice());
         let mut relay_info = b"vauchi-ble-relay-key-v1".to_vec();
         relay_info.extend_from_slice(id_lo);
         relay_info.extend_from_slice(id_hi);
@@ -1416,16 +1417,10 @@ impl ExchangeSession {
         let shared_bytes = self.our_x3dh.diffie_hellman(&their_exchange_key)?;
         let our_id = self.identity.signing_public_key();
         let our_eph = self.our_x3dh.public_key();
-        let (id_lo, id_hi) = if our_id < &their_public_key {
-            (our_id.as_slice(), their_public_key.as_slice())
-        } else {
-            (their_public_key.as_slice(), our_id.as_slice())
-        };
-        let (eph_lo, eph_hi) = if our_eph < &their_exchange_key {
-            (our_eph.as_slice(), their_exchange_key.as_slice())
-        } else {
-            (their_exchange_key.as_slice(), our_eph.as_slice())
-        };
+        let (id_lo, id_hi) =
+            super::key_order::sorted_pair(our_id.as_slice(), their_public_key.as_slice());
+        let (eph_lo, eph_hi) =
+            super::key_order::sorted_pair(our_eph.as_slice(), their_exchange_key.as_slice());
         let mut info = b"vauchi-x3dh-symmetric-v2".to_vec();
         info.extend_from_slice(id_lo);
         info.extend_from_slice(id_hi);
@@ -1448,8 +1443,7 @@ impl ExchangeSession {
         self.expected_their_token = Some(their_confirm);
 
         // Derive confirmation escrow keys (design spec §3.5).
-        // Role: smaller identity key = Initiator.
-        let escrow_role = if our_id.as_slice() < their_public_key.as_slice() {
+        let escrow_role = if super::key_order::is_initiator(our_id, &their_public_key) {
             super::escrow::EscrowRole::Initiator
         } else {
             super::escrow::EscrowRole::Responder

@@ -32,8 +32,8 @@ use subtle::ConstantTimeEq;
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret as X25519Secret};
 use zeroize::Zeroize;
 
-use super::chunker::{Chunker, ReassemblyBuffer};
 use super::accel_envelope;
+use super::chunker::{Chunker, ReassemblyBuffer};
 use super::commitment::Commitment;
 use super::qr_codec::{self, StageQr};
 use super::types::{
@@ -42,6 +42,7 @@ use super::types::{
 
 use crate::crypto::x3dh::X3DHKeyPair;
 use crate::crypto::{DoubleRatchetState, SymmetricKey};
+use crate::exchange::{key_order, ratchet_bootstrap};
 
 /// Maximum raw payload bytes per chunk (before transport encryption overhead).
 /// Transport encryption adds 12 (nonce) + 16 (Poly1305 tag) = 28 bytes overhead.
@@ -367,8 +368,7 @@ impl MultiStageSession {
         // panic here asserts that invariant. Propagating up through
         // `MultiStageSession::new` is a separate refactor tracked as a
         // follow-up to `2026-05-21-adr-019-commitment-xchacha-consistency`.
-        let commitment_context =
-            Self::build_commitment_context(relay_url.as_deref());
+        let commitment_context = Self::build_commitment_context(relay_url.as_deref());
         let commitment = Commitment::create_with_context(&local_card, &commitment_context)
             .expect("XChaCha20Poly1305 encryption of fresh plaintext cannot fail");
 
@@ -506,13 +506,12 @@ impl MultiStageSession {
 
     /// Builds the role-correct Double Ratchet for a finalized multi-stage exchange.
     ///
-    /// Mirrors [`crate::exchange::ExchangeSession::build_exchange_ratchet`]: the
-    /// role is derived deterministically from the identity keys (smaller =
-    /// initiator). The initiator keys the ratchet off the peer's transport
-    /// ephemeral (`peer_ephemeral`); the responder keys off our own retained
-    /// transport ephemeral (`ratchet_ephemeral`) -- the keypair whose public the
-    /// initiator received. `transport_key` is the root seed; both sides reconcile
-    /// on the first message (`DoubleRatchetState::dh_ratchet`).
+    /// Role decision and role-correct keying are delegated to
+    /// [`crate::exchange::ratchet_bootstrap::bootstrap_exchange_ratchet`]
+    /// (shared with `ExchangeSession`). Here the initiator's peer key is
+    /// the peer's transport ephemeral (`peer_ephemeral`) and the
+    /// responder's own key is the retained transport ephemeral
+    /// (`ratchet_ephemeral`). `transport_key` is the root seed.
     ///
     /// Keeping the root dependent on a fresh ephemeral DH (not `transport_key`
     /// alone) preserves the property that `transport_key` compromise -- it is
@@ -527,22 +526,28 @@ impl MultiStageSession {
             .transport_key
             .ok_or(RatchetSetupError::NoTransportKey)?;
         let shared = SymmetricKey::from_bytes(transport_key);
-        let is_initiator = our_identity < their_identity;
-        let ratchet = if is_initiator {
-            let peer_ephemeral = self
-                .peer_ephemeral
-                .ok_or(RatchetSetupError::NoPeerEphemeral)?;
-            DoubleRatchetState::initialize_initiator(&shared, peer_ephemeral)
-                .map_err(|e| RatchetSetupError::RatchetInit(e.to_string()))?
-        } else {
-            let secret = self
-                .ratchet_ephemeral
-                .as_ref()
-                .ok_or(RatchetSetupError::NoEphemeral)?;
-            let our_dh = X3DHKeyPair::from_bytes(secret.to_bytes());
-            DoubleRatchetState::initialize_responder(&shared, our_dh)
-        };
-        Ok((ratchet, is_initiator))
+        let our_ephemeral = self
+            .ratchet_ephemeral
+            .as_ref()
+            .map(|secret| X3DHKeyPair::from_bytes(secret.to_bytes()));
+        ratchet_bootstrap::bootstrap_exchange_ratchet(
+            &shared,
+            our_identity,
+            their_identity,
+            self.peer_ephemeral,
+            our_ephemeral,
+        )
+        .map_err(|e| match e {
+            ratchet_bootstrap::RatchetBootstrapError::MissingPeerEphemeral => {
+                RatchetSetupError::NoPeerEphemeral
+            }
+            ratchet_bootstrap::RatchetBootstrapError::MissingOurEphemeral => {
+                RatchetSetupError::NoEphemeral
+            }
+            ratchet_bootstrap::RatchetBootstrapError::Init(msg) => {
+                RatchetSetupError::RatchetInit(msg)
+            }
+        })
     }
 
     /// Returns the peer's relay URL (available after INIT exchange).
@@ -1096,7 +1101,13 @@ impl MultiStageSession {
                 display_name: _,
                 relay_url,
                 ciphertext,
-            } => self.handle_inid(session_id, ephemeral, commitment_hash, relay_url, ciphertext),
+            } => self.handle_inid(
+                session_id,
+                ephemeral,
+                commitment_hash,
+                relay_url,
+                ciphertext,
+            ),
             StageQr::Fail { session_id: _ } => self.handle_fail(),
             StageQr::Shake {
                 session_id: _,
@@ -1701,15 +1712,11 @@ impl MultiStageSession {
     /// regardless of who initiated the exchange.
     fn compute_ready_hash(&self) -> [u8; 32] {
         let peer_sid = self.peer_session_id.unwrap_or([0u8; 16]);
-        let (first, second) = if self.session_id <= peer_sid {
-            (self.session_id, peer_sid)
-        } else {
-            (peer_sid, self.session_id)
-        };
+        let (first, second) = key_order::sorted_pair(&self.session_id, &peer_sid);
 
         let mut input = Vec::with_capacity(32);
-        input.extend_from_slice(&first);
-        input.extend_from_slice(&second);
+        input.extend_from_slice(first);
+        input.extend_from_slice(second);
         let d = Sha256::digest(&input);
         let mut hash = [0u8; 32];
         hash.copy_from_slice(d.as_ref());

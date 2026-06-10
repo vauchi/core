@@ -32,6 +32,7 @@ mod mobile_contacts;
 mod mobile_import;
 mod mobile_visibility;
 mod multipart_qr;
+mod pae_dispatch;
 mod platform_app_engine;
 mod platform_app_engine_test_helpers;
 mod policies;

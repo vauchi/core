@@ -8,8 +8,6 @@
 //! Frontends render the screen natively and handle image hardware
 //! commands via the command/event protocol (ADR-031).
 
-use std::any::Any;
-
 use vauchi_core::avatar::{generate_initials_avatar, generate_mandelbrot_avatar, normalize_avatar};
 use vauchi_core::{Command, Event};
 
@@ -530,13 +528,5 @@ impl WorkflowEngine for AvatarEditorEngine {
 
     fn was_cancelled(&self) -> bool {
         self.cancelled
-    }
-
-    fn as_any(&self) -> Option<&dyn Any> {
-        Some(self)
-    }
-
-    fn as_any_mut(&mut self) -> Option<&mut dyn Any> {
-        Some(self)
     }
 }

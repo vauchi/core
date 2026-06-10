@@ -662,8 +662,4 @@ impl WorkflowEngine for BackupRecoveryEngine {
             self.step = BackupStep::Failed;
         }
     }
-
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
 }

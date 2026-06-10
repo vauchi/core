@@ -273,14 +273,6 @@ impl WorkflowEngine for LinkResponderEngine {
     fn was_cancelled(&self) -> bool {
         self.cancelled
     }
-
-    /// Expose the concrete type so `AppEngine::link_responder_completed`
-    /// / `link_responder_failed` can drive the terminal transition after
-    /// the engine-owned `LinkResponderSession` reaches `Finalized` /
-    /// `Failed`.
-    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
-        Some(self)
-    }
 }
 
 // INLINE_TEST_REQUIRED: exercises the completed-screen rich/minimal branch

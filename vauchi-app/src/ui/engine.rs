@@ -144,16 +144,19 @@ pub trait WorkflowEngine: Send {
         Vec::new()
     }
 
-    /// Downcast to concrete type for AppEngine-level interception.
+    /// Downcast to concrete type — **allowlisted legacy escape hatch**.
     ///
-    /// Used by `MyInfoEntryDetailEngine` for group visibility persistence.
-    /// Prefer adding trait methods over new downcast sites.
+    /// Typed data crosses the hub↔engine seam via
+    /// [`Self::engine_output`] / [`Self::apply_update`]; do NOT add new
+    /// implementations or call sites. The only implementors are the
+    /// legacy `ExchangeEngine` (`complete_exchange` must hand the live
+    /// `DoubleRatchetState` off the session — not cloneable through a
+    /// snapshot channel) and `DirectTransportEngine`
+    /// (`factory_filter_tests` inspects the outgoing card). Both engines
+    /// are Phase-4b graduation targets of
+    /// `2026-05-11-pure-functional-core-program`; this method dies with
+    /// them. Record: `2026-06-10-appengine-typed-engine-channel`.
     fn as_any(&self) -> Option<&dyn Any> {
-        None
-    }
-
-    /// Downcast to concrete mutable type for AppEngine-level interception.
-    fn as_any_mut(&mut self) -> Option<&mut dyn Any> {
         None
     }
 }

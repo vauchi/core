@@ -464,8 +464,4 @@ impl WorkflowEngine for DuressPinEngine {
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
     }
-
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
 }

@@ -162,14 +162,6 @@ impl WorkflowEngine for TagPromotionEngine {
         self.build_screen()
     }
 
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
-
-    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
-        Some(self)
-    }
-
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ItemToggled {

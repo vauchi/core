@@ -211,10 +211,6 @@ impl WorkflowEngine for DeviceManagementEngine {
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
     }
-
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
 }
 
 // INLINE_TEST_REQUIRED: Tests access private pending_revoke_index field and build_screen()

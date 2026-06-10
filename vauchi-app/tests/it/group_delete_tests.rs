@@ -9,8 +9,7 @@
 //! Complete to vauchi.delete_group().
 
 use vauchi_app::ui::{
-    ActionResult, Component, GroupDetailEngine, GroupInfo, GroupsEngine, GroupsMode, Item,
-    UserAction, WorkflowEngine,
+    ActionResult, Component, GroupDetailEngine, Item, UserAction, WorkflowEngine,
 };
 
 fn sample_members() -> Vec<Item> {
@@ -23,23 +22,6 @@ fn sample_members() -> Vec<Item> {
         actions: vec![],
         a11y: None,
     }]
-}
-
-fn sample_groups() -> Vec<GroupInfo> {
-    vec![
-        GroupInfo {
-            id: "g1".into(),
-            name: "Family".into(),
-            member_count: 3,
-            visible_field_count: 2,
-        },
-        GroupInfo {
-            id: "g2".into(),
-            name: "Work".into(),
-            member_count: 5,
-            visible_field_count: 4,
-        },
-    ]
 }
 
 // --- GroupDetailEngine tests ---
@@ -106,11 +88,3 @@ fn group_detail_cancel_delete_removes_confirm() {
 // The former list-level GroupsEngine delete (pending_delete_group_id +
 // confirm/cancel) was removed — it deleted `groups.first()`, the wrong
 // group — in 2026-06-05-screen-ux-declutter.
-
-// @internal
-#[test]
-fn groups_engine_as_any_downcasts() {
-    let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-    let any = engine.as_any().expect("GroupsEngine must implement as_any");
-    assert!(any.downcast_ref::<GroupsEngine>().is_some());
-}

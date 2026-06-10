@@ -875,20 +875,6 @@ impl WorkflowEngine for MultiStageExchangeEngine {
         }
     }
 
-    /// Downcast for the platform-side bridge.
-    ///
-    /// `core/vauchi-platform/src/platform_app_engine.rs::apply_multi_stage_*`
-    /// uses this to mutate the active multi-stage engine via the bridge
-    /// setters when `MultiStageSessionListener` callbacks fire from the
-    /// cycle thread. No other downcast site is supported.
-    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
-        Some(self)
-    }
-
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
-
     /// 65% brightness keeps the front camera from over-exposing while
     /// scanning the peer's QR (mirror of the prior frontend-side
     /// `UIScreen.main.brightness = 0.65` / Android

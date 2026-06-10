@@ -317,10 +317,6 @@ impl WorkflowEngine for SocialGraphEngine {
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
     }
-
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
 }
 
 // INLINE_TEST_REQUIRED: tests assert the engine's screen-shape across

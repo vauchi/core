@@ -447,17 +447,6 @@ impl WorkflowEngine for LinkExchangeEngine {
     fn handle_hardware_event(&mut self, _event: Event) -> Option<ActionResult> {
         None
     }
-
-    /// Expose the concrete type so the AppEngine link-initiator lifecycle
-    /// can drive `set_share_url` / `transition_to_*` after the
-    /// engine-owned `LinkInitiatorSession` advances.
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
-
-    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
-        Some(self)
-    }
 }
 
 // INLINE_TEST_REQUIRED: exercises the success-screen rich/minimal branch

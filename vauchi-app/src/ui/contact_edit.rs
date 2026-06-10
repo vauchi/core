@@ -320,10 +320,6 @@ impl ContactEditEngine {
 }
 
 impl WorkflowEngine for ContactEditEngine {
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
-
     fn engine_output(&self) -> Option<EngineOutput> {
         Some(EngineOutput::ContactEdit {
             display_name: self.edited_contact().display_name.clone(),

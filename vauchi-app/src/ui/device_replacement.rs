@@ -528,14 +528,6 @@ impl WorkflowEngine for DeviceReplacementEngine {
         ))
     }
 
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
-
-    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
-        Some(self)
-    }
-
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

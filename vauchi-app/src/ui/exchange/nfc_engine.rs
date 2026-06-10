@@ -387,14 +387,6 @@ impl WorkflowEngine for NfcExchangeEngine {
     fn was_cancelled(&self) -> bool {
         self.cancelled
     }
-
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
-
-    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
-        Some(self)
-    }
 }
 
 /// Core-driven NFC role chooser (Send/Receive), the engine's opening screen.

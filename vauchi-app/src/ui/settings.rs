@@ -428,8 +428,12 @@ impl SettingsEngine {
             items: vec![SettingsItem {
                 id: "relay_url".into(),
                 label: "Relay URL".into(),
-                kind: SettingsItemKind::Value {
-                    value: self.config.relay_url.clone(),
+                // Link, not Value: renderers wire taps (→ ListItemSelected
+                // → EditRelayUrl dialog) only on Link rows; as a Value row
+                // the editor was unreachable on mobile (device regression
+                // 2026-06-10, `2026-06-10-mobile-relay-url-editor-noop`).
+                kind: SettingsItemKind::Link {
+                    detail: Some(self.config.relay_url.clone()),
                 },
                 a11y: Some(A11y {
                     label: Some("Relay URL".into()),

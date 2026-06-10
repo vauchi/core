@@ -358,8 +358,8 @@
             "id": "relay_url",
             "label": "Relay URL",
             "kind": {
-              "Value": {
-                "value": "https://relay.vauchi.app"
+              "Link": {
+                "detail": "https://relay.vauchi.app"
               }
             },
             "a11y": {

@@ -21,7 +21,7 @@
 
 use vauchi_app::ui::{
     AppEngine, AppScreen, Component, DropdownOption, MoreEngine, SettingsConfig, SettingsEngine,
-    WorkflowEngine,
+    SettingsItemKind, WorkflowEngine,
 };
 use vauchi_core::api::Vauchi;
 
@@ -137,6 +137,41 @@ fn settings_screen_emits_full_group_set_in_stable_order() {
         "SettingsEngine emitted SettingsGroup ids do not match the cross-platform contract. \
          Editing the canonical list is intentional only when paired with iOS + Android \
          renderer updates in the same MR."
+    );
+}
+
+// @internal
+#[test]
+fn relay_url_renders_as_link_so_renderers_emit_list_item_selected() {
+    // Device regression 2026-06-10: `Value` rows are display-only in
+    // every Humble UI renderer, so the relay-URL editor was unreachable
+    // on mobile even after the persistence fix. The row must be a
+    // `Link` (tappable → `ListItemSelected("relay_url")` → intercept
+    // opens `FormDialogType::EditRelayUrl`), carrying the current URL
+    // as its detail text.
+    let engine = SettingsEngine::new(sample_settings_config());
+    let screen = engine.current_screen();
+
+    let network_items = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::SettingsGroup { id, items, .. } if id == "network" => Some(items),
+            _ => None,
+        })
+        .expect("settings screen must emit a network group");
+
+    let relay_item = network_items
+        .iter()
+        .find(|i| i.id == "relay_url")
+        .expect("network group must contain the relay_url item");
+
+    assert_eq!(
+        relay_item.kind,
+        SettingsItemKind::Link {
+            detail: Some("https://relay.test".into())
+        },
+        "relay_url must render as a tappable Link with the current URL as detail"
     );
 }
 

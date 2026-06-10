@@ -90,11 +90,13 @@ impl WorkflowEngine for LockScreenEngine {
         }
     }
 
-    fn collected_input(&self) -> Option<String> {
+    fn engine_output(&self) -> Option<EngineOutput> {
         if self.entered_pin.is_empty() {
             None
         } else {
-            Some(self.entered_pin.clone())
+            Some(EngineOutput::Lock {
+                pin: self.entered_pin.clone(),
+            })
         }
     }
 

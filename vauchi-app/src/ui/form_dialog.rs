@@ -675,30 +675,37 @@ impl WorkflowEngine for FormDialogEngine {
         }
     }
 
-    fn collected_input(&self) -> Option<String> {
-        // Return the primary input value for the form
-        match &self.dialog_type {
-            FormDialogType::AddField { .. } => {
-                let entry_type = self.selected_entry_type.as_deref().unwrap_or("custom");
-                let label = self.get_value("field_label");
-                let value = self.get_value("field_value");
-                let note = self.get_value("field_note");
-                let groups = self.selected_groups.join(",");
-                // Format: type\nlabel\nvalue\nnote\ngroups
-                Some(format!("{entry_type}\n{label}\n{value}\n{note}\n{groups}"))
-            }
-            FormDialogType::EditField { .. } => {
-                let value = self.get_value("field_value");
-                let note = self.get_value("field_note");
-                // Format: value\nnote
-                Some(format!("{value}\n{note}"))
-            }
-            FormDialogType::EditName { .. } => Some(self.get_value("display_name").to_string()),
-            FormDialogType::EditRelayUrl { .. } => Some(self.get_value("relay_url").to_string()),
-            FormDialogType::CreateGroup | FormDialogType::RenameGroup { .. } => {
-                Some(self.get_value("group_name").to_string())
-            }
-        }
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        use crate::ui::FormInput;
+        let input = match &self.dialog_type {
+            FormDialogType::AddField { .. } => FormInput::AddField {
+                entry_type: self
+                    .selected_entry_type
+                    .clone()
+                    .unwrap_or_else(|| "custom".into()),
+                label: self.get_value("field_label").to_string(),
+                value: self.get_value("field_value").to_string(),
+                note: self.get_value("field_note").to_string(),
+                groups: self.selected_groups.clone(),
+            },
+            FormDialogType::EditField { .. } => FormInput::EditField {
+                value: self.get_value("field_value").to_string(),
+                note: self.get_value("field_note").to_string(),
+            },
+            FormDialogType::EditName { .. } => FormInput::EditName {
+                name: self.get_value("display_name").to_string(),
+            },
+            FormDialogType::EditRelayUrl { .. } => FormInput::EditRelayUrl {
+                url: self.get_value("relay_url").to_string(),
+            },
+            FormDialogType::CreateGroup => FormInput::CreateGroup {
+                name: self.get_value("group_name").to_string(),
+            },
+            FormDialogType::RenameGroup { .. } => FormInput::RenameGroup {
+                name: self.get_value("group_name").to_string(),
+            },
+        };
+        Some(crate::ui::EngineOutput::Form(input))
     }
 
     fn was_cancelled(&self) -> bool {

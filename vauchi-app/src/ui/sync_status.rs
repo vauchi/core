@@ -155,7 +155,12 @@ impl WorkflowEngine for SyncStatusEngine {
         }
     }
 
-    fn collected_input(&self) -> Option<String> {
-        self.last_action.clone()
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        use crate::ui::{EngineOutput, SyncChoice};
+        match self.last_action.as_deref() {
+            Some("sync_now") => Some(EngineOutput::Sync(SyncChoice::SyncNow)),
+            Some("test_connection") => Some(EngineOutput::Sync(SyncChoice::TestConnection)),
+            _ => None,
+        }
     }
 }

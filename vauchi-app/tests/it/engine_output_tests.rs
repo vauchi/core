@@ -83,3 +83,71 @@ fn backup_output_redacts_password_in_debug() {
         "Debug must print restore_data length only: {debug}"
     );
 }
+
+// @scenario: lock.feature - Unlocking with the app password
+#[test]
+fn lock_output_carries_pin_and_redacts_debug() {
+    use vauchi_app::ui::LockScreenEngine;
+    let mut engine = LockScreenEngine::new(4);
+    assert_eq!(
+        engine.engine_output(),
+        None,
+        "empty entry must expose no output"
+    );
+    for digit in ["1", "2", "3", "4"] {
+        engine.handle_action(UserAction::TextChanged {
+            component_id: "pin".into(),
+            value: digit.into(),
+        });
+    }
+    let output = engine.engine_output().expect("pin output");
+    assert_eq!(output, EngineOutput::Lock { pin: "1234".into() });
+    let debug = format!("{output:?}");
+    assert!(
+        !debug.contains("1234") && debug.contains("<redacted>"),
+        "Debug must redact the PIN: {debug}"
+    );
+}
+
+// @scenario: visibility.feature - Toggling per-contact field visibility
+#[test]
+fn contact_visibility_output_carries_typed_toggles() {
+    use vauchi_app::ui::{ContactVisibilityEngine, ToggleItem};
+    let toggle = |id: &str, label: &str, selected: bool| ToggleItem {
+        id: id.into(),
+        label: label.into(),
+        selected,
+        subtitle: None,
+        a11y: None,
+        info_key: None,
+    };
+    let engine = ContactVisibilityEngine::new(
+        "Ada".into(),
+        vec![toggle("f1", "Phone", true), toggle("f2", "Email", false)],
+    );
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::ContactVisibility {
+            toggles: vec![("f1".into(), true), ("f2".into(), false)],
+        })
+    );
+}
+
+// @scenario: my_info.feature - Editing the display name
+#[test]
+fn form_dialog_output_is_typed_per_dialog_kind() {
+    use vauchi_app::ui::{FormDialogEngine, FormDialogType, FormInput};
+    let mut engine = FormDialogEngine::new(FormDialogType::EditName {
+        current_name: "Ada".into(),
+    });
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Grace".into(),
+    });
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::Form(FormInput::EditName {
+            name: "Grace".into()
+        }))
+    );
+}

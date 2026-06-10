@@ -119,9 +119,9 @@ impl AppEngine {
 
     /// Lock screen complete: authenticate with the entered password.
     pub(super) fn complete_lock(&mut self) -> ActionResult {
-        let pin = match self.engine.collected_input() {
-            Some(p) => p,
-            None => {
+        let pin = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Lock { pin }) => pin,
+            _ => {
                 return ActionResult::ValidationError {
                     component_id: "pin".into(),
                     message: "Please enter your password".into(),
@@ -241,24 +241,27 @@ impl AppEngine {
 
     /// Contact visibility complete: persist per-field show/hide toggles.
     pub(super) fn complete_contact_visibility(&mut self, contact_id: &str) -> ActionResult {
-        if let Some(input) = self.engine.collected_input() {
-            // Parse "field_id:visible,field_id:hidden,..." and persist
-            for pair in input.split(',') {
-                let mut parts = pair.splitn(2, ':');
-                if let (Some(field_id), Some(state)) = (parts.next(), parts.next()) {
-                    let should_show = state == "visible";
+        match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::ContactVisibility { toggles }) => {
+                for (field_id, should_show) in toggles {
                     let is_visible = self
                         .vauchi
-                        .get_effective_field_visibility(contact_id, field_id)
+                        .get_effective_field_visibility(contact_id, &field_id)
                         .unwrap_or(true);
                     if should_show != is_visible {
                         // best-effort: visibility toggle is idempotent;
                         // a failure leaves the row in its prior state
                         // and the user can retry from the same screen
                         #[allow(clippy::let_underscore_must_use)]
-                        let _ = self.vauchi.toggle_field_visibility(contact_id, field_id);
+                        let _ = self.vauchi.toggle_field_visibility(contact_id, &field_id);
                     }
                 }
+            }
+            other => {
+                tracing::warn!(
+                    ?other,
+                    "contact-visibility completion without ContactVisibility output"
+                );
             }
         }
         let screen = self.navigate_back();
@@ -377,44 +380,55 @@ impl AppEngine {
 
     /// Privacy / GDPR complete: export, delete, cancel, execute, or shred.
     pub(super) fn complete_privacy(&mut self) -> ActionResult {
-        // GdprEngine returns "export" or "delete" via collected_input().
-        // The actual API calls happen in the platform layer (UniFFI/CABI);
-        // here we just navigate back and show feedback.
-        let action = self.engine.collected_input().unwrap_or_default();
-        match action.as_str() {
-            "export" => match vauchi_core::api::export_all_data(self.vauchi.storage()) {
-                Ok(export) => match serde_json::to_string_pretty(&export) {
-                    Ok(json) => ActionResult::GdprExportComplete { json },
+        // GdprEngine exposes the confirmed operation via EngineOutput::Gdpr.
+        use crate::ui::GdprChoice;
+        let choice = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Gdpr(choice)) => Some(choice),
+            None => None,
+            other => {
+                tracing::warn!(?other, "privacy completion without Gdpr output");
+                None
+            }
+        };
+        match choice {
+            Some(GdprChoice::Export) => {
+                match vauchi_core::api::export_all_data(self.vauchi.storage()) {
+                    Ok(export) => match serde_json::to_string_pretty(&export) {
+                        Ok(json) => ActionResult::GdprExportComplete { json },
+                        Err(_) => ActionResult::ShowToast {
+                            message: "Export failed: could not serialize data.".into(),
+                            undo_action_id: None,
+                        },
+                    },
                     Err(_) => ActionResult::ShowToast {
-                        message: "Export failed: could not serialize data.".into(),
+                        message: "Export failed: could not read data.".into(),
                         undo_action_id: None,
                     },
-                },
-                Err(_) => ActionResult::ShowToast {
-                    message: "Export failed: could not read data.".into(),
-                    undo_action_id: None,
-                },
-            },
-            "delete" => match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
-                .schedule_deletion()
-            {
-                Ok(_) => {
-                    let _ = self.navigate_back();
-                    // Rebuild Privacy fresh on revisit so it shows the
-                    // now-scheduled state (cancel action) instead of the
-                    // cached ConfirmDelete sub-step.
-                    self.engine_cache.remove(&AppScreen::Privacy);
-                    ActionResult::ShowToast {
-                        message: "Identity deletion scheduled. You have 7 days to cancel.".into(),
-                        undo_action_id: None,
-                    }
                 }
-                Err(_) => ActionResult::ShowToast {
-                    message: "Could not schedule deletion.".into(),
-                    undo_action_id: None,
-                },
-            },
-            "cancel_deletion" => {
+            }
+            Some(GdprChoice::Delete) => {
+                match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
+                    .schedule_deletion()
+                {
+                    Ok(_) => {
+                        let _ = self.navigate_back();
+                        // Rebuild Privacy fresh on revisit so it shows the
+                        // now-scheduled state (cancel action) instead of the
+                        // cached ConfirmDelete sub-step.
+                        self.engine_cache.remove(&AppScreen::Privacy);
+                        ActionResult::ShowToast {
+                            message: "Identity deletion scheduled. You have 7 days to cancel."
+                                .into(),
+                            undo_action_id: None,
+                        }
+                    }
+                    Err(_) => ActionResult::ShowToast {
+                        message: "Could not schedule deletion.".into(),
+                        undo_action_id: None,
+                    },
+                }
+            }
+            Some(GdprChoice::CancelDeletion) => {
                 match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
                     .cancel_deletion()
                 {
@@ -432,7 +446,7 @@ impl AppEngine {
                     },
                 }
             }
-            "execute" => {
+            Some(GdprChoice::Execute) => {
                 // Borrow `identity` only long enough to run the delete and
                 // capture the relay deliveries (signed pre-shred); then the
                 // cache can be cleared (all data is gone).
@@ -463,7 +477,7 @@ impl AppEngine {
                     },
                 }
             }
-            "shred" => match self.vauchi.perform_emergency_wipe(true) {
+            Some(GdprChoice::Shred) => match self.vauchi.perform_emergency_wipe(true) {
                 Ok(_) => {
                     self.engine_cache.clear();
                     ActionResult::WipeComplete
@@ -473,7 +487,7 @@ impl AppEngine {
                     undo_action_id: None,
                 },
             },
-            _ => {
+            None => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }
@@ -488,21 +502,52 @@ impl AppEngine {
             let screen = self.navigate_back();
             return ActionResult::NavigateTo(screen);
         }
-        let input = self.engine.collected_input();
+        use crate::ui::FormInput;
+        let input = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Form(input)) => Some(input),
+            other => {
+                tracing::warn!(?other, "form-dialog completion without Form output");
+                None
+            }
+        };
         match dialog_type {
-            FormDialogType::EditName { .. } => self.form_edit_name(input),
-            FormDialogType::EditField { field_id, .. } => self.form_edit_field(field_id, input),
+            FormDialogType::EditName { .. } => {
+                let name = match input {
+                    Some(FormInput::EditName { name }) => Some(name),
+                    _ => None,
+                };
+                self.form_edit_name(name)
+            }
+            FormDialogType::EditField { field_id, .. } => {
+                let (value, note) = match input {
+                    Some(FormInput::EditField { value, note }) => (value, note),
+                    _ => (String::new(), String::new()),
+                };
+                self.form_edit_field(field_id, value, note)
+            }
             FormDialogType::AddField { .. } => self.form_add_field(input),
-            FormDialogType::CreateGroup => self.form_create_group(input),
-            FormDialogType::RenameGroup { group_id, .. } => self.form_rename_group(group_id, input),
+            FormDialogType::CreateGroup => {
+                let name = match input {
+                    Some(FormInput::CreateGroup { name }) => Some(name),
+                    _ => None,
+                };
+                self.form_create_group(name)
+            }
+            FormDialogType::RenameGroup { group_id, .. } => {
+                let name = match input {
+                    Some(FormInput::RenameGroup { name }) => Some(name),
+                    _ => None,
+                };
+                self.form_rename_group(group_id, name)
+            }
             FormDialogType::EditRelayUrl { .. } => match input {
                 // Persist durably via core so the change survives a restart on
                 // every frontend (mobile had no Backend, so this was a no-op).
-                Some(url) => {
+                Some(FormInput::EditRelayUrl { url }) => {
                     let result = self.vauchi.set_relay_url(&url);
                     self.form_saved(result)
                 }
-                None => self.form_saved(Ok::<(), std::convert::Infallible>(())),
+                _ => self.form_saved(Ok::<(), std::convert::Infallible>(())),
             },
         }
     }
@@ -546,12 +591,8 @@ impl AppEngine {
     }
 
     /// `FormDialogType::EditField` — update a field's value + note.
-    fn form_edit_field(&mut self, field_id: &str, input: Option<String>) -> ActionResult {
-        let raw = input.unwrap_or_default();
-        // Format: value\nnote
-        let mut parts = raw.splitn(2, '\n');
-        let value = parts.next().unwrap_or("").to_string();
-        let note = parts.next().unwrap_or("").trim().to_string();
+    fn form_edit_field(&mut self, field_id: &str, value: String, note: String) -> ActionResult {
+        let note = note.trim().to_string();
         let now = self.vauchi.clock().unix_seconds();
         let result = match self.vauchi.own_card() {
             Ok(Some(mut card)) => {
@@ -583,15 +624,27 @@ impl AppEngine {
 
     /// `FormDialogType::AddField` — parse + add a new own-card field, then
     /// apply group visibility and buffer it into a cached onboarding engine.
-    fn form_add_field(&mut self, input: Option<String>) -> ActionResult {
-        let raw = input.unwrap_or_default();
-        // Format: type\nlabel\nvalue\nnote\ngroups
-        let mut lines = raw.splitn(5, '\n');
-        let entry_type = lines.next().unwrap_or("custom").trim();
-        let label_input = lines.next().unwrap_or("").trim();
-        let value = lines.next().unwrap_or("").trim();
-        let note = lines.next().unwrap_or("").trim();
-        let _groups = lines.next().unwrap_or("").trim();
+    fn form_add_field(&mut self, input: Option<crate::ui::FormInput>) -> ActionResult {
+        let (entry_type, label_input, value, note, groups) = match input {
+            Some(crate::ui::FormInput::AddField {
+                entry_type,
+                label,
+                value,
+                note,
+                groups,
+            }) => (entry_type, label, value, note, groups),
+            _ => (
+                "custom".to_string(),
+                String::new(),
+                String::new(),
+                String::new(),
+                Vec::new(),
+            ),
+        };
+        let entry_type = entry_type.trim();
+        let label_input = label_input.trim();
+        let value = value.trim();
+        let note = note.trim();
         if value.is_empty() {
             return ActionResult::ValidationError {
                 component_id: "field_value".into(),
@@ -630,8 +683,8 @@ impl AppEngine {
             field = field.with_note(note.to_string());
         }
         let field_id = field.id().to_string();
-        let group_list: Vec<String> = _groups
-            .split(',')
+        let group_list: Vec<String> = groups
+            .into_iter()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();
@@ -697,9 +750,17 @@ impl AppEngine {
 
     /// Sync screen complete: surface pending-update / connection feedback.
     pub(super) fn complete_sync(&mut self) -> ActionResult {
-        let action = self.engine.collected_input().unwrap_or_default();
-        match action.as_str() {
-            "sync_now" => {
+        use crate::ui::SyncChoice;
+        let choice = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Sync(choice)) => Some(choice),
+            None => None,
+            other => {
+                tracing::warn!(?other, "sync completion without Sync output");
+                None
+            }
+        };
+        match choice {
+            Some(SyncChoice::SyncNow) => {
                 let pending = self.vauchi.pending_update_count().unwrap_or(0);
                 if pending == 0 {
                     ActionResult::ShowToast {
@@ -713,11 +774,11 @@ impl AppEngine {
                     }
                 }
             }
-            "test_connection" => ActionResult::ShowToast {
+            Some(SyncChoice::TestConnection) => ActionResult::ShowToast {
                 message: "Connection check initiated".into(),
                 undo_action_id: None,
             },
-            _ => {
+            None => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }

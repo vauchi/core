@@ -25,14 +25,6 @@ pub trait WorkflowEngine: Send {
         Vec::new()
     }
 
-    /// Returns sensitive input collected by this engine (e.g. a PIN).
-    ///
-    /// Used by `AppEngine` to extract credentials before processing
-    /// `ActionResult::Complete`. Default returns `None`.
-    fn collected_input(&self) -> Option<String> {
-        None
-    }
-
     /// Salient typed state this engine exposes to `AppEngine` at
     /// completion/interception time (see [`EngineOutput`]).
     ///

@@ -552,8 +552,17 @@ impl WorkflowEngine for GdprEngine {
         }
     }
 
-    fn collected_input(&self) -> Option<String> {
-        self.last_action.clone()
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        use crate::ui::GdprChoice;
+        let choice = match self.last_action.as_deref() {
+            Some("export") => GdprChoice::Export,
+            Some("delete") => GdprChoice::Delete,
+            Some("cancel_deletion") => GdprChoice::CancelDeletion,
+            Some("execute") => GdprChoice::Execute,
+            Some("shred") => GdprChoice::Shred,
+            _ => return None,
+        };
+        Some(crate::ui::EngineOutput::Gdpr(choice))
     }
 }
 
@@ -647,7 +656,10 @@ mod tests {
             action_id: "confirm_delete".into(),
         });
         assert!(matches!(result, ActionResult::Complete));
-        assert_eq!(e.collected_input().as_deref(), Some("delete"));
+        assert_eq!(
+            e.engine_output(),
+            Some(crate::ui::EngineOutput::Gdpr(crate::ui::GdprChoice::Delete))
+        );
     }
 
     #[test]
@@ -672,7 +684,10 @@ mod tests {
             action_id: "export".into(),
         });
         assert!(matches!(result, ActionResult::Complete));
-        assert_eq!(e.collected_input().as_deref(), Some("export"));
+        assert_eq!(
+            e.engine_output(),
+            Some(crate::ui::EngineOutput::Gdpr(crate::ui::GdprChoice::Export))
+        );
     }
 
     #[test]
@@ -813,7 +828,12 @@ mod tests {
             action_id: "confirm_execute".into(),
         });
         assert!(matches!(r, ActionResult::Complete));
-        assert_eq!(e.collected_input().as_deref(), Some("execute"));
+        assert_eq!(
+            e.engine_output(),
+            Some(crate::ui::EngineOutput::Gdpr(
+                crate::ui::GdprChoice::Execute
+            ))
+        );
     }
 
     // @internal
@@ -825,7 +845,10 @@ mod tests {
             action_id: "confirm_shred".into(),
         });
         assert!(matches!(r, ActionResult::Complete));
-        assert_eq!(e.collected_input().as_deref(), Some("shred"));
+        assert_eq!(
+            e.engine_output(),
+            Some(crate::ui::EngineOutput::Gdpr(crate::ui::GdprChoice::Shred))
+        );
     }
 
     // @internal

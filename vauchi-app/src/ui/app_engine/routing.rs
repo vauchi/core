@@ -21,37 +21,34 @@ impl AppEngine {
             AppScreen::FormDialog { dialog_type } => dialog_type,
             _ => return false,
         };
-        let input = match self.engine.collected_input() {
-            Some(v) => v,
-            None => return false,
+        use crate::ui::FormInput;
+        let input = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Form(input)) => input,
+            _ => return false,
         };
-        match dialog_type {
-            FormDialogType::AddField { .. } => {
-                // Format: "type\nlabel\nvalue\nnote\ngroups"
-                let parts: Vec<&str> = input.splitn(5, '\n').collect();
-                if parts.len() >= 3 {
-                    let label = parts.get(1).unwrap_or(&"").trim();
-                    let value = parts.get(2).unwrap_or(&"").trim();
-                    !label.is_empty() || !value.is_empty()
-                } else {
-                    false
-                }
+        match (dialog_type, input) {
+            (FormDialogType::AddField { .. }, FormInput::AddField { label, value, .. }) => {
+                !label.trim().is_empty() || !value.trim().is_empty()
             }
-            FormDialogType::EditField {
-                current_value,
-                current_note,
-                ..
-            } => {
-                // Format: "value\nnote"
-                let mut parts = input.splitn(2, '\n');
-                let value = parts.next().unwrap_or("");
-                let note = parts.next().unwrap_or("");
-                value != current_value.as_str() || note != current_note.as_deref().unwrap_or("")
+            (
+                FormDialogType::EditField {
+                    current_value,
+                    current_note,
+                    ..
+                },
+                FormInput::EditField { value, note },
+            ) => value != *current_value || note != current_note.as_deref().unwrap_or(""),
+            (FormDialogType::EditName { current_name }, FormInput::EditName { name }) => {
+                name != *current_name
             }
-            FormDialogType::EditName { current_name } => input != *current_name,
-            FormDialogType::EditRelayUrl { current_url } => input != *current_url,
-            FormDialogType::CreateGroup => !input.is_empty(),
-            FormDialogType::RenameGroup { current_name, .. } => input != *current_name,
+            (FormDialogType::EditRelayUrl { current_url }, FormInput::EditRelayUrl { url }) => {
+                url != *current_url
+            }
+            (FormDialogType::CreateGroup, FormInput::CreateGroup { name }) => !name.is_empty(),
+            (FormDialogType::RenameGroup { current_name, .. }, FormInput::RenameGroup { name }) => {
+                name != *current_name
+            }
+            _ => false,
         }
     }
 

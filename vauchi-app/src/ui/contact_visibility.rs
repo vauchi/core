@@ -79,16 +79,13 @@ impl WorkflowEngine for ContactVisibilityEngine {
         }
     }
 
-    fn collected_input(&self) -> Option<String> {
-        // Return visibility state as "field_id:visible,field_id:hidden,..."
-        let parts: Vec<String> = self
-            .fields
-            .iter()
-            .map(|f| {
-                let state = if f.selected { "visible" } else { "hidden" };
-                format!("{}:{}", f.id, state)
-            })
-            .collect();
-        Some(parts.join(","))
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::ContactVisibility {
+            toggles: self
+                .fields
+                .iter()
+                .map(|f| (f.id.clone(), f.selected))
+                .collect(),
+        })
     }
 }

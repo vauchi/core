@@ -41,6 +41,66 @@ pub enum EngineOutput {
     ContactEdit { display_name: String },
     /// The backup/restore form state (password redacted in `Debug`).
     Backup(BackupFormSnapshot),
+    /// PIN/password typed on the lock screen (redacted in `Debug`).
+    /// Absent (engine returns `None`) while the entry is empty.
+    Lock { pin: String },
+    /// Per-field show/hide toggles on the contact-visibility screen,
+    /// as `(field_id, visible)` pairs.
+    ContactVisibility { toggles: Vec<(String, bool)> },
+    /// The sync screen's pressed action.
+    Sync(SyncChoice),
+    /// The privacy/GDPR operation the user confirmed.
+    Gdpr(GdprChoice),
+    /// A form-dialog submission, typed per dialog kind — replaces the
+    /// retired newline-packed `collected_input` strings.
+    Form(FormInput),
+}
+
+/// Action pressed on the sync-status screen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SyncChoice {
+    SyncNow,
+    TestConnection,
+}
+
+/// Operation confirmed on the privacy/GDPR screen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GdprChoice {
+    Export,
+    Delete,
+    CancelDeletion,
+    Execute,
+    Shred,
+}
+
+/// Typed form-dialog submission, one variant per [`FormDialogType`].
+///
+/// [`FormDialogType`]: super::form_dialog::FormDialogType
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FormInput {
+    EditName {
+        name: String,
+    },
+    EditField {
+        value: String,
+        note: String,
+    },
+    AddField {
+        entry_type: String,
+        label: String,
+        value: String,
+        note: String,
+        groups: Vec<String>,
+    },
+    CreateGroup {
+        name: String,
+    },
+    RenameGroup {
+        name: String,
+    },
+    EditRelayUrl {
+        url: String,
+    },
 }
 
 /// Snapshot of the emergency-broadcast engine at completion time.
@@ -87,6 +147,14 @@ impl std::fmt::Debug for EngineOutput {
                 .field("display_name", display_name)
                 .finish(),
             Self::Backup(s) => f.debug_tuple("Backup").field(s).finish(),
+            Self::Lock { .. } => f.debug_struct("Lock").field("pin", &"<redacted>").finish(),
+            Self::ContactVisibility { toggles } => f
+                .debug_struct("ContactVisibility")
+                .field("toggles", toggles)
+                .finish(),
+            Self::Sync(c) => f.debug_tuple("Sync").field(c).finish(),
+            Self::Gdpr(c) => f.debug_tuple("Gdpr").field(c).finish(),
+            Self::Form(i) => f.debug_tuple("Form").field(i).finish(),
         }
     }
 }

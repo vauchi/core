@@ -7,7 +7,9 @@
 //! Verifies that sync_now and test_connection actions return the correct
 //! results and that connection state is displayed accurately.
 
-use vauchi_app::ui::{ActionResult, SyncStatusEngine, UserAction, WorkflowEngine};
+use vauchi_app::ui::{
+    ActionResult, EngineOutput, SyncChoice, SyncStatusEngine, UserAction, WorkflowEngine,
+};
 use vauchi_core::network::ConnectionState;
 
 // @scenario: sync.feature - Sync screen shows relay info and actions
@@ -48,9 +50,9 @@ fn test_sync_now_returns_complete_with_input() {
         "sync_now should return Complete for routing"
     );
     assert_eq!(
-        engine.collected_input(),
-        Some("sync_now".into()),
-        "collected_input must signal sync_now to the router"
+        engine.engine_output(),
+        Some(EngineOutput::Sync(SyncChoice::SyncNow)),
+        "engine_output must signal sync_now to the router"
     );
 }
 
@@ -68,9 +70,9 @@ fn test_connection_returns_complete_with_input() {
         "test_connection should return Complete for routing"
     );
     assert_eq!(
-        engine.collected_input(),
-        Some("test_connection".into()),
-        "collected_input must signal test_connection to the router"
+        engine.engine_output(),
+        Some(EngineOutput::Sync(SyncChoice::TestConnection)),
+        "engine_output must signal test_connection to the router"
     );
 }
 

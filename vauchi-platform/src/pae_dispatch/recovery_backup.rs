@@ -20,9 +20,8 @@ impl PlatformAppEngine {
         match command {
             DomainCommand::VerifyRecoveryProof { proof_b64 } => {
                 use base64::Engine as _;
-                use vauchi_core::recovery::RecoveryProof;
-
-                let storage = engine.vauchi().storage();
+                use vauchi_app::i18n::{Locale, get_string};
+                use vauchi_core::recovery::VerificationResult;
 
                 let proof_bytes = base64::engine::general_purpose::STANDARD
                     .decode(&proof_b64)
@@ -30,51 +29,49 @@ impl PlatformAppEngine {
                         field: String::new(),
                         detail: format!("Invalid base64: {e}"),
                     })?;
-                let proof = RecoveryProof::from_bytes(&proof_bytes).map_err(|e| {
-                    MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: format!("Invalid proof: {e}"),
-                    }
-                })?;
-                proof.validate().map_err(|e| MobileError::InvalidInput {
-                    field: String::new(),
-                    detail: format!("Proof validation failed: {e}"),
-                })?;
+                let (proof, verdict) = engine
+                    .vauchi()
+                    .verify_recovery_proof(&proof_bytes)
+                    .map_err(|e| match e {
+                        vauchi_core::VauchiError::Serialization(detail) => {
+                            MobileError::InvalidInput {
+                                field: String::new(),
+                                detail: format!("Invalid proof: {detail}"),
+                            }
+                        }
+                        vauchi_core::VauchiError::InvalidState(detail) => {
+                            MobileError::InvalidInput {
+                                field: String::new(),
+                                detail: format!("Proof validation failed: {detail}"),
+                            }
+                        }
+                        other => MobileError::StorageError {
+                            detail: other.to_string(),
+                        },
+                    })?;
 
-                let contacts =
-                    storage
-                        .contacts()
-                        .list_contacts()
-                        .map_err(|e| MobileError::StorageError {
-                            detail: e.to_string(),
-                        })?;
-                let contact_pks: std::collections::HashSet<[u8; 32]> = contacts
-                    .iter()
-                    .filter_map(|c| c.public_key().copied())
-                    .collect();
-                let known_voucher_count = proof
-                    .vouchers()
-                    .iter()
-                    .filter(|v| contact_pks.contains(v.voucher_pk().as_bytes()))
-                    .count();
-
-                let (confidence, recommendation) = if known_voucher_count >= 2 {
-                    (
-                        "high".to_string(),
-                        "Multiple contacts you know have vouched. Safe to accept.".to_string(),
-                    )
-                } else if known_voucher_count == 1 {
-                    (
-                        "medium".to_string(),
-                        "One contact you know has vouched. Consider verifying in person."
-                            .to_string(),
-                    )
-                } else {
-                    (
-                        "low".to_string(),
-                        "No known contacts have vouched. Verify identity carefully before accepting."
-                            .to_string(),
-                    )
+                let locale = engine
+                    .render_context()
+                    .locale
+                    .as_deref()
+                    .and_then(Locale::from_code)
+                    .unwrap_or_default();
+                let (confidence, known_vouchers, recommendation_key) = match &verdict {
+                    VerificationResult::HighConfidence {
+                        mutual_vouchers, ..
+                    } => (
+                        "high",
+                        mutual_vouchers.len(),
+                        "recovery.verify_recommendation_high",
+                    ),
+                    VerificationResult::MediumConfidence {
+                        mutual_vouchers, ..
+                    } => (
+                        "medium",
+                        mutual_vouchers.len(),
+                        "recovery.verify_recommendation_medium",
+                    ),
+                    _ => ("low", 0, "recovery.verify_recommendation_low"),
                 };
 
                 Ok(DomainCommandResult::RecoveryVerification {
@@ -82,9 +79,9 @@ impl PlatformAppEngine {
                         old_public_key: hex::encode(proof.old_pk()),
                         new_public_key: hex::encode(proof.new_pk()),
                         voucher_count: proof.voucher_count() as u32,
-                        known_vouchers: known_voucher_count as u32,
-                        confidence,
-                        recommendation,
+                        known_vouchers: known_vouchers as u32,
+                        confidence: confidence.to_string(),
+                        recommendation: get_string(locale, recommendation_key),
                     },
                 })
             }

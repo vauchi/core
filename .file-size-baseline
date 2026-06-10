@@ -504,173 +504,21 @@ vauchi-app/src/ui/exchange/ble.rs 1202
 #  Option B per the design pass.)
 vauchi-app/src/ui/multi_stage_exchange.rs 2118
 
-# EXEMPT — UniFFI facade growth: PlatformAppEngine wraps the full
-# AppEngine surface JSON-side and now also owns the Pair 4
-# auto-managed multi-stage session lifecycle (creates / cancels
-# MobileMultiStageSession on screen transitions in/out of
-# MultiStageExchange, routes QrScanned hardware events to
-# session.process_scanned_qr, restarts on retry). Splitting would
-# fragment the lifecycle hooks across multiple files.
-# Pair 4 of `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens` (2026-04-28).
-# (+140 for Round 2 audit core surface: boot(), biometric_unlock_check(),
-# set_network_online() / is_network_online(), periodic_sync_tick() +
-# periodic_sync_interval_seconds() + periodic_sync_max_retries() —
-# `2026-04-28-lifecycle-session-residue-umbrella` items P1 / P2-B / P2-C
-# / P2-D 2026-04-28 feature/round2-core-lifecycle-surface)
-# Bumped 2026-04-28 to 1723 by Phases B2 + B3 of
-# `2026-04-28-collapse-vauchi-platform-into-app-engine`. B2 added the
-# 9 recovery-domain wrappers (+412); B3 adds the 4 emergency-broadcast
-# wrappers (configure / send / get_config / disable, +95).
-# Bumped 2026-04-28 to 1984 by Phase B4 — post-orchestrator
-# device-linking wrappers (get_devices, device_count, is_primary_device,
-# unlink_device, generate/parse_device_link_qr,
-# create_device_link_session_initiator, +261). The 5 pre-orchestrator
-# legacy methods are intentionally NOT migrated (superseded by the
-# orchestrator session in
-# `done/2026-04-27-device-link-orchestrator-phase2d-windows`).
-# Bumped 2026-04-28 to 2073 by Phase B7 skeleton — adds
-# `dispatch_domain_command(DomainCommand) -> DomainCommandResult` plus
-# the first batch of variants (Consent: 5 commands).
-# Bumped 2026-04-28 to 2235 by Phase B7 batch 2 — Content Updates (4
-# commands: IsContentUpdatesSupported, CheckContentUpdates,
-# ApplyContentUpdates, ReloadSocialNetworks; +162 incl. duplicated
-# feature-gated impl that mirrors mobile_content.rs and will become
-# the only copy after D3).
-# Splitting is not an option (UniFFI facade — see
-# `.claude/rules/file-size.md` Structural Exemptions).
-# (+29 for Pair 4 peer_scan TextChanged auto-route mirroring the
-#  existing QrScanned hardware-event auto-route — feeds the
-#  cycle-thread session when the QR-scanner Component fires from
-#  the multi-stage screen 2026-04-28)
-# Bumped 2026-04-29 to 2485 by Phase B7 batch 5 — Aha Moments +
-# Demo Contact (14 commands; backed by `.aha_moments` +
-# `.demo_contact` JSON files mirroring the legacy VauchiPlatform
-# layout; +221 lines split between dispatch arms and 6
-# file-helper methods).
-# Bumped 2026-04-29 to 2826 by Phase B7 batch 10 — Contact Card +
-# CRUD (19 commands: GetOwnCard, AddField, UpdateField, RemoveField,
-# SetDisplayName, SetOwnAvatar, ClearOwnAvatar, ListContacts,
-# GetContact, SearchContacts, ContactCount, RemoveContact,
-# Soft/Undo/Hard delete imported, Archive/Unarchive/ListArchived,
-# Hide/Unhide; +341 lines).
-# Bumped 2026-04-29 to 2931 by Phase B7 batch 3 — GDPR / Deletion
-# (5 commands: ExportGdprData, ScheduleIdentityDeletion,
-# CancelIdentityDeletion, ExecuteIdentityDeletion, GetDeletionState)
-# + read-only ShredStatus. The 5 keychain-bound shred methods
-# (panic_shred / soft_shred / hard_shred / cancel_shred /
-# verify_shred) are deferred to a separate batch that adds
-# MobilePlatformKeychain plumbing to PlatformAppEngine.
-# Bumped 2026-04-29 to 3029 by Phase B7 batch 4 — Recovery leftovers
-# (3 commands: VerifyRecoveryProof, UploadGuardianEntries,
-# SaveRecoveryResponse). Completes the recovery domain (B2 covered
-# the 9 main typed methods).
-# Bumped 2026-04-29 to 3409 by Phase B7 batch 6 — Visibility Labels
-# + Field Visibility (15 commands; +381 lines of dispatch).
-# Bumped 2026-04-29 to 3575 by Phase B7 batch 7 — Passcode + Duress
-# + Decoy (11 commands: SetupAppPassword, SetupDuressPassword,
-# Authenticate, IsPasswordEnabled, IsDuressEnabled, DisableDuress,
-# ConfigureDuressAlerts, GetDuressSettings, AddDecoyContact,
-# ListDecoyContacts, DeleteDecoyContact; +166 lines).
-# Bumped 2026-04-29 to 3890 by Phase B7 batch 8 — Delivery records,
-# retry queue, offline queue counts (21 storage-only commands;
-# +315 lines of dispatch arms). State-heavy methods (sync,
-# get_sync_status, delivery-receipts / suppress-presence flags,
-# backup export/import) deferred to a separate orchestration batch.
-# Bumped 2026-04-29 to 3966 by Phase B7 batch 9 — Identity reads
-# (CreateIdentity, GetPublicId, GetDisplayName, GetOwnFingerprint)
-# + Onboarding helpers (DisplayNameSuggestions, ResetOnboarding).
-# 6 commands; +76 lines of dispatch arms.
-# Bumped 2026-04-29 to 4253 by Phase B7 batch 11 — Contact
-# Verification + Duplicates + Notes + Field Notes + Nicknames +
-# Custom Avatars + Social Search + Hidden Contacts + Footer Action
-# Id (19 commands; +287 lines of dispatch arms; reuses pub(crate)
-# enrich_contact / enrich_contacts_batch helpers promoted in the
-# same MR).
-# Bumped 2026-04-29 to 4346 by Phase B7 batch 12 — Backup + Import
-# (5 commands: ExportBackup, ImportBackup, ExportFullBackup,
-# ImportFullBackup, ImportContactsFromVcf; +93 lines of dispatch
-# arms with hex⇄base64 transport encoding mirroring legacy
-# mobile_delivery + mobile_import).
-# Bumped 2026-04-29 to 4347 by Phase B7 batch 13 — Offline queue +
-# decoy CRUD + counts (note: variants are duplicates of batch 7/8 —
-# kept here only for the test additions; dispatch arms removed in
-# combine merge).
-# Bumped 2026-04-29 to 4410 by Phase B7 batch 14 — Search + display
-# prefs + merge (4 commands: SetDisplayNamePreference,
-# SetAvatarPreference, MergeContacts; SearchContacts variant
-# de-duplicated against batch 10).
-# Bumped 2026-04-29 to 4410 by Phase B7 batch 15 — Field visibility
-# (variants and dispatch arms duplicate batch 6; only the test
-# additions are kept in the combine merge).
-# Bumped 2026-04-29 to 4482 by Phase B7 batch 16 — Onboarding state
-# ops (5 commands: GetOnboardingProgress, CurrentOnboardingStep,
-# IsOnboardingComplete, AdvanceOnboarding, SkipOnboardingStep; +72
-# lines).
-# Bumped 2026-04-29 to 4551 by Phase B7 batch 17 — Display options
-# + paginated contact lists (2 commands: GetContactDisplayOptions,
-# ListContactsPaginated; ListArchivedContacts already migrated by
-# batch 10; +69 lines).
-# Bumped 2026-04-29 to 4646 by Phase B7 batch 18 — Sync flag
-# persistence (4 commands: IsDeliveryReceiptsEnabled,
-# SetDeliveryReceiptsEnabled, IsSuppressPresenceEnabled,
-# SetSuppressPresenceEnabled). Adds a `SyncFlags` JSON sidecar at
-# `.sync_flags` so the legacy mutex-only flags now survive
-# restarts; +95 lines incl. the sidecar helpers + struct.
-# Bumped 2026-04-29 to 4753 by Phase B7 batch 19 — Contact detail
-# view state + list social networks (2 commands:
-# ContactDetailViewState, ListSocialNetworks; +107 lines incl. the
-# badges/banners/actions builder mirroring mobile_contact_detail).
-# Bumped 2026-04-29 to 4760 by Phase B7 batch 20 — Multipart QR
-# encoding (1 command: EncodeMultipartQr; stateless wrapper around
-# multipart_qr::encode_multipart; +7 lines).
-# Bumped 2026-04-29 to 4797 by Phase B7 batch 21 — Certificate
-# pinning persistence (2 commands: SetPinnedCertificate,
-# IsCertificatePinningEnabled). Persists the PEM to a `.cert_pin`
-# sidecar file so the choice survives restarts; +37 lines incl.
-# the file-existence-as-state pattern + path helper.
-# Bumped 2026-04-29 to 4836 by Pair 5 device-link session lifecycle
-# (Pair 5 of 2026-04-28-pure-humble-ui-retire-native-screens).
-# Adds the `device_link_session` field, three pub(crate) accessors,
-# and the `after_screen_transition` + `dispatch_device_link_side_effects`
-# wiring. The bulk (bridge listener + ensure/cancel/dispatch + test
-# helpers, +328 lines) lives in the new sibling
-# `platform_app_engine_device_link.rs` to keep this file lean.
-# Bumped 2026-05-01 to 4945 by Phase 1.6 link-mode responder session
-# lifecycle (`2026-04-27-deep-link-responder-flow`). Adds the
-# `link_responder_session` field, the lazy `ensure_link_responder_session`
-# private helper + idempotent `cancel_link_responder_session`, the
-# `after_screen_transition` cancel-on-leave wiring, and the public
-# UniFFI `current_link_responder_session()` getter (+109 lines). No
-# bridge listener lives here — frontends own `on_commands`,
-# `on_finalized`, `on_failed` dispatch, attached to the session
-# returned by the getter.
-# (+20 lines for cancel-session-first guard in `apply_multi_stage_*_for_test`
-#  bridges — fixes flaky `apply_multi_stage_state_finalized_with_session_ended`
-#  caused by cycle-thread racing the test's manual state pushes.)
-# (+4 on top of main's 5099 baseline for the unlink_device cascade
-#   from slice 4: revoke_device call now needs `now`.)
-# (+31 from cascading now: u64 through Recovery cluster + SystemTime inlines in slice 29 2026-05-13)
-# (+6 from threading now: u64 into DeviceLinkQR::generate / DeviceLinkQR::is_expired / Identity::create_device_link_initiator FFI wrappers in slice 30 2026-05-15)
-# (+28 for S2 of 2026-05-16-settings-storage-by-sensitivity:
-#   `set_render_context_json` PAE method — humble JSON shim that
-#   deserialises into `vauchi_app::ui::RenderContext` and calls
-#   `engine.set_render_context(ctx)`. Allowlist member 26 of 26 per
-#   ADR-047. UniFFI facade pattern; splitting breaks binding generation.)
-# (+36 for slice 32b of 2026-05-11-pure-functional-core-program:
-#   `PlatformAppEngineTestHelpers` trait + impl carrying
-#   `save_test_contact`. Trait dispatch keeps the helper off the
-#   humble-surface ratchet — `impl … for PlatformAppEngine` blocks
-#   fall outside the contract test's `impl PlatformAppEngine {`
-#   regex. UniFFI facade pattern; splitting breaks binding generation.)
-# (-142 for 2026-05-20 follow-up tidy after PAE test-helper
-#   containment: the +126 note above (now superseded) anticipated
-#   this — the trait + impl moved to a sibling module
-#   `platform_app_engine_test_helpers.rs`, dropping
-#   platform_app_engine.rs below its prior baseline. Trait + impl
-#   live in their own file so the binding-facing PAE file stays the
-#   canonical home for production surface, and so future test-helper
-#   additions don't pressure this baseline.)
-vauchi-platform/src/platform_app_engine.rs 5098
+# EXEMPT — UniFFI export surface only: the uniffi::Object struct, the
+# PlatformEventListener callback trait, and the exported typed-method
+# signatures must stay in one file per type for readable binding diffs.
+# The old "splitting breaks binding generation" claim was wrong for
+# this crate's proc-macro UniFFI setup — export blocks already span
+# multiple files (lib.rs, validation.rs, diagnostic.rs, ...), and the
+# 2026-06-10 split proved it: dispatch arm bodies moved to
+# pae_dispatch/{engagement,own_card_identity,contacts,groups_visibility,
+# security,recovery_backup,delivery,devices}.rs and non-exported
+# internals to platform_app_engine_internals.rs with zero binding
+# change (4522 -> 1125). Remaining: thick typed-method bodies (session
+# routing) and the G3 push-down of domain logic into core/app — see
+# 2026-06-10-pae-monolith-false-exemption. Do NOT grow this entry for
+# new dispatch arms; they belong in pae_dispatch/.
+vauchi-platform/src/platform_app_engine.rs 1125
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

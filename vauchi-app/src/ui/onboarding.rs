@@ -23,7 +23,7 @@ fn backup_mime_types() -> Vec<String> {
 
 /// Data collected during onboarding.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OnboardingData {
     pub display_name: String,
     pub selected_groups: Vec<GroupSetup>,
@@ -32,7 +32,7 @@ pub struct OnboardingData {
 
 /// A group the user can toggle during onboarding.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GroupSetup {
     pub name: String,
     pub selected: bool,
@@ -41,7 +41,7 @@ pub struct GroupSetup {
 
 /// A contact field configured during onboarding.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldSetup {
     pub field_type: String,
     pub label: String,
@@ -909,6 +909,10 @@ impl WorkflowEngine for OnboardingEngine {
 
     fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
         Some(self)
+    }
+
+    fn engine_output(&self) -> Option<EngineOutput> {
+        Some(EngineOutput::Onboarding(Box::new(self.data.clone())))
     }
 
     fn current_screen(&self) -> ScreenModel {

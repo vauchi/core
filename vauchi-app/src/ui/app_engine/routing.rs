@@ -413,25 +413,20 @@ impl AppEngine {
     /// picker + password entry through core. This helper handles the
     /// export side only.
     pub(super) fn execute_backup(&mut self) -> ActionResult {
-        use crate::ui::backup_recovery::{BackupLevel, BackupMode, BackupRecoveryEngine};
-
         // The backup password, level toggle, and restore blob all live on the
         // engine (it captures them as the user advances and zeroizes the
-        // password on drop). Read everything in one borrow, then release it
-        // before the mutable engine/vauchi calls
-        // (#2026-06-07-app-engine-dispatch-tier-consolidation, Phase 1).
-        let (is_restore, backup_hex, password, is_full) = {
-            let e = self
-                .engine
-                .as_any()
-                .and_then(|a| a.downcast_ref::<BackupRecoveryEngine>());
-            (
-                e.is_some_and(|e| *e.mode() == BackupMode::Restore),
-                e.map(|e| e.restore_data().trim().to_string())
-                    .unwrap_or_default(),
-                e.map(|e| e.password().to_string()).unwrap_or_default(),
-                e.map(|e| *e.level() == BackupLevel::Full).unwrap_or(true),
-            )
+        // password on drop; the snapshot redacts the password in Debug).
+        let (is_restore, backup_hex, password, is_full) = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Backup(snap)) => (
+                snap.restore_mode,
+                snap.restore_data,
+                snap.password,
+                snap.full_level,
+            ),
+            other => {
+                tracing::warn!(?other, "execute_backup without Backup output");
+                (false, String::new(), String::new(), true)
+            }
         };
 
         if is_restore {

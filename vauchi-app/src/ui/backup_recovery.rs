@@ -469,6 +469,15 @@ impl BackupRecoveryEngine {
 }
 
 impl WorkflowEngine for BackupRecoveryEngine {
+    fn engine_output(&self) -> Option<EngineOutput> {
+        Some(EngineOutput::Backup(BackupFormSnapshot {
+            restore_mode: *self.mode() == BackupMode::Restore,
+            restore_data: self.restore_data().trim().to_string(),
+            password: self.password().to_string(),
+            full_level: *self.level() == BackupLevel::Full,
+        }))
+    }
+
     fn current_screen(&self) -> ScreenModel {
         match self.step {
             BackupStep::ChooseMode => self.choose_screen(),

@@ -23,12 +23,16 @@ impl AppEngine {
         // (and is still alive at completion time). Read everything from it
         // here rather than from a duplicated AppEngine-level `pending_*` field
         // (#2026-06-07-app-engine-dispatch-tier-consolidation, Phase 1).
-        let onboarding_engine = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::onboarding::OnboardingEngine>());
-        let name = onboarding_engine
-            .map(|ob| ob.onboarding_data().display_name.clone())
+        let onboarding_data = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Onboarding(data)) => Some(data),
+            other => {
+                tracing::warn!(?other, "onboarding completion without Onboarding output");
+                None
+            }
+        };
+        let name = onboarding_data
+            .as_ref()
+            .map(|ob| ob.display_name.clone())
             .unwrap_or_default();
         if name.trim().is_empty() {
             return ActionResult::ValidationError {
@@ -36,10 +40,10 @@ impl AppEngine {
                 message: "Please enter a display name".into(),
             };
         }
-        let onboarding_groups: Vec<String> = onboarding_engine
+        let onboarding_groups: Vec<String> = onboarding_data
+            .as_ref()
             .map(|ob| {
-                ob.onboarding_data()
-                    .selected_groups
+                ob.selected_groups
                     .iter()
                     .filter(|g| g.selected)
                     .map(|g| g.name.clone())
@@ -53,15 +57,8 @@ impl AppEngine {
         // these were silently dropped before this slice. Only
         // `shown == true` entries persist — `shown == false`
         // marks user-skipped inputs.
-        let onboarding_fields: Vec<crate::ui::onboarding::FieldSetup> = onboarding_engine
-            .map(|ob| {
-                ob.onboarding_data()
-                    .fields
-                    .iter()
-                    .filter(|f| f.shown)
-                    .cloned()
-                    .collect()
-            })
+        let onboarding_fields: Vec<crate::ui::onboarding::FieldSetup> = onboarding_data
+            .map(|ob| ob.fields.into_iter().filter(|f| f.shown).collect())
             .unwrap_or_default();
         // Use the atomic helper so identity creation +
         // onboarding-complete flag land in one call. Closes
@@ -310,26 +307,27 @@ impl AppEngine {
 
     /// Emergency broadcast complete: save / send / disable per engine outcome.
     pub(super) fn complete_emergency_broadcast(&mut self) -> ActionResult {
-        use crate::ui::{EmergencyBroadcastEngine, EmergencyOutcome};
-        // Read everything off the engine into owned values first so the
-        // immutable engine borrow is released before the mutating
-        // `vauchi` calls below.
-        let eng = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<EmergencyBroadcastEngine>());
-        let plan = eng.map(|e| {
-            (
-                e.outcome().cloned(),
-                e.contact_ids(),
-                e.message().to_string(),
-                e.include_location(),
-            )
-        });
-        let Some((outcome, ids, message, include_location)) = plan else {
+        use crate::ui::EmergencyOutcome;
+        let plan = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::EmergencyBroadcast(plan)) => Some(plan),
+            other => {
+                tracing::warn!(
+                    ?other,
+                    "emergency-broadcast completion without EmergencyBroadcast output"
+                );
+                None
+            }
+        };
+        let Some(plan) = plan else {
             let screen = self.navigate_back();
             return ActionResult::NavigateTo(screen);
         };
+        let (outcome, ids, message, include_location) = (
+            plan.outcome,
+            plan.contact_ids,
+            plan.message,
+            plan.include_location,
+        );
         match outcome {
             Some(EmergencyOutcome::Save) => {
                 if let Err(e) =

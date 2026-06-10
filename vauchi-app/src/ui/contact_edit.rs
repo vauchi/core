@@ -324,6 +324,12 @@ impl WorkflowEngine for ContactEditEngine {
         Some(self)
     }
 
+    fn engine_output(&self) -> Option<EngineOutput> {
+        Some(EngineOutput::ContactEdit {
+            display_name: self.edited_contact().display_name.clone(),
+        })
+    }
+
     fn current_screen(&self) -> ScreenModel {
         match self.step {
             ContactEditStep::EditFields => self.build_edit_fields_screen(),

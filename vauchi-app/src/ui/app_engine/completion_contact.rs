@@ -36,11 +36,13 @@ impl AppEngine {
     /// `navigate_back` replaces it (same ordering constraint as
     /// `complete_exchange`).
     pub(super) fn complete_contact_edit(&mut self, contact_id: &str) -> ActionResult {
-        let edited_name = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::contact_edit::ContactEditEngine>())
-            .map(|e| e.edited_contact().display_name.clone());
+        let edited_name = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::ContactEdit { display_name }) => Some(display_name),
+            other => {
+                tracing::warn!(?other, "contact-edit completion without ContactEdit output");
+                None
+            }
+        };
 
         if let Some(name) = edited_name
             && let Err(e) = self.vauchi.set_contact_display_name(contact_id, &name)

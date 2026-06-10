@@ -317,6 +317,15 @@ impl EmergencyBroadcastEngine {
 }
 
 impl WorkflowEngine for EmergencyBroadcastEngine {
+    fn engine_output(&self) -> Option<EngineOutput> {
+        Some(EngineOutput::EmergencyBroadcast(EmergencyBroadcastPlan {
+            outcome: self.outcome().cloned(),
+            contact_ids: self.contact_ids(),
+            message: self.message().to_string(),
+            include_location: self.include_location(),
+        }))
+    }
+
     fn current_screen(&self) -> ScreenModel {
         match self.step {
             EmergencyStep::Overview => self.overview_screen(),

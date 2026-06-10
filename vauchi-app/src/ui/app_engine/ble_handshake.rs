@@ -259,10 +259,11 @@ impl AppEngine {
                 // hollow `BleExchangeFlow` no longer self-completes from
                 // BLE data bytes (P4), so the real machine's completion is
                 // what flips the UI to success.
-                if let Some(any) = self.engine.as_any_mut()
-                    && let Some(active) = any.downcast_mut::<crate::ui::BleExchangeEngine>()
+                if !self
+                    .engine
+                    .apply_update(crate::ui::EngineUpdate::BleForceSuccess)
                 {
-                    active.force_success();
+                    tracing::warn!("BleForceSuccess not consumed by active engine");
                 }
                 persisted
             }

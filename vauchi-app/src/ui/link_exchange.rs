@@ -362,6 +362,24 @@ fn failure_detail(reason: &str) -> &'static str {
 }
 
 impl WorkflowEngine for LinkExchangeEngine {
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        use crate::ui::LinkExchangeUpdate as U;
+        let crate::ui::EngineUpdate::LinkExchange(update) = update else {
+            return false;
+        };
+        match update {
+            U::ShareUrl(url) => self.set_share_url(url),
+            U::Waiting => self.transition_to_waiting(),
+            U::Retrieving => self.transition_to_retrieving(),
+            U::Succeeded(summary) => {
+                self.set_success_summary(summary);
+                self.transition_to_success();
+            }
+            U::Failed(id) => self.transition_to_failed(id),
+        }
+        true
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

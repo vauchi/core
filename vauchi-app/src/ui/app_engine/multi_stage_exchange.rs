@@ -444,13 +444,10 @@ impl AppEngine {
     ///
     /// Pair 4 of `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens`.
     pub fn apply_multi_stage_state(&mut self, state: vauchi_core::exchange::ProtocolState) -> bool {
-        if let Some(any) = self.engine.as_any_mut()
-            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
-        {
-            active.set_state(state);
-            return true;
-        }
-        false
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::MultiStage(
+                crate::ui::MultiStageUpdate::State(state),
+            ))
     }
 
     /// Bridge from the multi-stage cycle thread — push the latest QR
@@ -459,25 +456,19 @@ impl AppEngine {
         &mut self,
         payload: &vauchi_core::exchange::QrPayload,
     ) -> bool {
-        if let Some(any) = self.engine.as_any_mut()
-            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
-        {
-            active.set_qr_payload(payload);
-            return true;
-        }
-        false
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::MultiStage(
+                crate::ui::MultiStageUpdate::QrPayload(payload.clone()),
+            ))
     }
 
     /// Bridge from the multi-stage cycle thread — record the peer
     /// display name on the `Finalized` transition.
     pub fn apply_multi_stage_finalized(&mut self, contact_name: String) -> bool {
-        if let Some(any) = self.engine.as_any_mut()
-            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
-        {
-            active.set_finalized(contact_name);
-            return true;
-        }
-        false
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::MultiStage(
+                crate::ui::MultiStageUpdate::Finalized(contact_name),
+            ))
     }
 
     /// Build the shared exchange-success summary from a just-persisted
@@ -538,26 +529,20 @@ impl AppEngine {
         &mut self,
         summary: crate::ui::exchange::success::ExchangeSuccessSummary,
     ) -> bool {
-        if let Some(any) = self.engine.as_any_mut()
-            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
-        {
-            active.set_success_summary(summary);
-            return true;
-        }
-        false
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::MultiStage(
+                crate::ui::MultiStageUpdate::SuccessSummary(summary),
+            ))
     }
 
     /// Bridge from the multi-stage cycle thread — flag the cycle as
     /// ended so the engine flips to the success / failure terminal
     /// chrome.
     pub fn apply_multi_stage_session_ended(&mut self) -> bool {
-        if let Some(any) = self.engine.as_any_mut()
-            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
-        {
-            active.set_session_ended();
-            return true;
-        }
-        false
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::MultiStage(
+                crate::ui::MultiStageUpdate::SessionEnded,
+            ))
     }
 
     /// Bridge from the multi-stage cycle thread — push an
@@ -577,13 +562,10 @@ impl AppEngine {
         &mut self,
         state: vauchi_core::exchange::AudioProximityState,
     ) -> bool {
-        if let Some(any) = self.engine.as_any_mut()
-            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
-        {
-            active.set_audio_proximity(state);
-            return true;
-        }
-        false
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::MultiStage(
+                crate::ui::MultiStageUpdate::AudioProximity(state),
+            ))
     }
 
     /// TapHoverShake mirror of [`Self::apply_multi_stage_audio_proximity`]:
@@ -594,13 +576,10 @@ impl AppEngine {
         &mut self,
         state: vauchi_core::exchange::AccelerometerProximityState,
     ) -> bool {
-        if let Some(any) = self.engine.as_any_mut()
-            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
-        {
-            active.set_accel_proximity(state);
-            return true;
-        }
-        false
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::MultiStage(
+                crate::ui::MultiStageUpdate::AccelProximity(state),
+            ))
     }
 
     /// `true` when the active engine is a `MultiStageExchangeEngine`
@@ -614,11 +593,9 @@ impl AppEngine {
     /// `screens.rs` flips to per-mode constructors, this always
     /// returns `false`.
     pub fn is_active_engine_multi_stage_hover(&self) -> bool {
-        if let Some(any) = self.engine.as_any()
-            && let Some(active) = any.downcast_ref::<crate::ui::MultiStageExchangeEngine>()
-        {
-            return active.is_hover_mode();
-        }
-        false
+        matches!(
+            self.engine.engine_output(),
+            Some(crate::ui::EngineOutput::MultiStageExchange { hover_mode: true })
+        )
     }
 }

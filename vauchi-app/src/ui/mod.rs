@@ -78,8 +78,10 @@ pub use avatar_editor::AvatarEditorEngine;
 pub use backup_recovery::{BackupLevel, BackupMode, BackupRecoveryEngine};
 pub use change_password::ChangePasswordEngine;
 pub use channel::{
-    BackupFormSnapshot, DuressPinSetup, EmergencyBroadcastPlan, EngineOutput, FormInput,
-    GdprChoice, SyncChoice,
+    BackupFormSnapshot, ContactDetailUpdate, ContactListUpdate, DeviceLinkUpdate, DuressPinSetup,
+    EmergencyBroadcastPlan, EngineOutput, EngineUpdate, FormInput, GdprChoice, LinkExchangeUpdate,
+    LinkResponderUpdate, MultiStageUpdate, MyInfoEntryDetailUpdate, OnboardingUpdate,
+    RecoveryHelpUpdate, RecoveryUpdate, SyncChoice,
 };
 pub use component::{
     A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, IndicatorKind,

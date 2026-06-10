@@ -738,6 +738,31 @@ impl DeviceLinkingEngine {
 }
 
 impl WorkflowEngine for DeviceLinkingEngine {
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        use crate::ui::DeviceLinkUpdate as U;
+        let crate::ui::EngineUpdate::DeviceLink(update) = update else {
+            return false;
+        };
+        match update {
+            U::QrPending => self.transition_to_qr_pending(),
+            U::QrReady {
+                qr_data,
+                expires_at,
+            } => self.transition_to_waiting_for_request(qr_data, expires_at),
+            U::QrExpired => self.transition_to_qr_expired(),
+            U::RequestReceived {
+                device_name,
+                confirmation_code,
+                challenge_hex,
+            } => {
+                self.transition_to_confirming_device(device_name, confirmation_code, challenge_hex)
+            }
+            U::Completed => self.transition_to_link_success(),
+            U::Failed(reason) => self.transition_to_link_failed(reason),
+        }
+        true
+    }
+
     fn as_any(&self) -> Option<&dyn std::any::Any> {
         Some(self)
     }

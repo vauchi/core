@@ -29,7 +29,6 @@
 
 use super::{AppEngine, AppScreen};
 use crate::ui::ActionResult;
-use crate::ui::LinkExchangeEngine;
 
 #[cfg(all(feature = "network-http", feature = "storage"))]
 use vauchi_core::Command;
@@ -46,15 +45,6 @@ use vauchi_core::exchange::link_mode;
 const INITIATOR_POLL_DEADLINE_SECS: u64 = 300;
 
 impl AppEngine {
-    fn link_exchange_engine_mut(&mut self) -> Option<&mut LinkExchangeEngine> {
-        if !matches!(self.screen, AppScreen::LinkExchange) {
-            return None;
-        }
-        self.engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<LinkExchangeEngine>())
-    }
-
     /// Build / drop the engine-owned initiator machine as navigation
     /// enters or leaves `AppScreen::LinkExchange`. Called from
     /// `navigate_to_internal` after the screen-presentation lifecycle
@@ -100,9 +90,11 @@ impl AppEngine {
             deadline,
         ));
         self.link_initiator_x3dh = Some(x3dh);
-        if let Some(engine) = self.link_exchange_engine_mut() {
-            engine.set_share_url(share_url);
-        }
+        let _ = self
+            .engine
+            .apply_update(crate::ui::EngineUpdate::LinkExchange(
+                crate::ui::LinkExchangeUpdate::ShareUrl(share_url),
+            ));
     }
 
     /// Feed a `LinkShared` / `LinkOpened` / `RelayEscrow*` hardware event
@@ -149,15 +141,18 @@ impl AppEngine {
                     Ok(contact_id) => {
                         // Link mode assigns no group, so group_names is empty.
                         let summary = self.build_exchange_summary(&contact_id, Vec::new());
-                        if let Some(engine) = self.link_exchange_engine_mut() {
-                            engine.set_success_summary(summary);
-                            engine.transition_to_success();
-                        }
+                        let _ = self
+                            .engine
+                            .apply_update(crate::ui::EngineUpdate::LinkExchange(
+                                crate::ui::LinkExchangeUpdate::Succeeded(summary),
+                            ));
                     }
                     Err(_) => {
-                        if let Some(engine) = self.link_exchange_engine_mut() {
-                            engine.transition_to_failed("decrypt_error".to_string());
-                        }
+                        let _ = self
+                            .engine
+                            .apply_update(crate::ui::EngineUpdate::LinkExchange(
+                                crate::ui::LinkExchangeUpdate::Failed("decrypt_error".to_string()),
+                            ));
                     }
                 }
                 self.link_initiator = None;
@@ -166,16 +161,20 @@ impl AppEngine {
             }
             LinkInitiatorState::Failed(reason) => {
                 let id = link_initiator_failure_id(&reason);
-                if let Some(engine) = self.link_exchange_engine_mut() {
-                    engine.transition_to_failed(id);
-                }
+                let _ = self
+                    .engine
+                    .apply_update(crate::ui::EngineUpdate::LinkExchange(
+                        crate::ui::LinkExchangeUpdate::Failed(id),
+                    ));
                 self.link_initiator = None;
                 None
             }
             LinkInitiatorState::Polling => {
-                if let Some(engine) = self.link_exchange_engine_mut() {
-                    engine.transition_to_waiting();
-                }
+                let _ = self
+                    .engine
+                    .apply_update(crate::ui::EngineUpdate::LinkExchange(
+                        crate::ui::LinkExchangeUpdate::Waiting,
+                    ));
                 if new_commands.is_empty() {
                     None
                 } else {
@@ -185,9 +184,11 @@ impl AppEngine {
                 }
             }
             LinkInitiatorState::Retrieving => {
-                if let Some(engine) = self.link_exchange_engine_mut() {
-                    engine.transition_to_retrieving();
-                }
+                let _ = self
+                    .engine
+                    .apply_update(crate::ui::EngineUpdate::LinkExchange(
+                        crate::ui::LinkExchangeUpdate::Retrieving,
+                    ));
                 if new_commands.is_empty() {
                     None
                 } else {

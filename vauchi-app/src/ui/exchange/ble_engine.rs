@@ -344,6 +344,16 @@ impl WorkflowEngine for BleExchangeEngine {
         Some(self.apply_outcome(outcome))
     }
 
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        match update {
+            crate::ui::EngineUpdate::BleForceSuccess => {
+                self.force_success();
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn was_cancelled(&self) -> bool {
         self.cancelled
     }

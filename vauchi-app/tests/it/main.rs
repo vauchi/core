@@ -35,6 +35,7 @@ mod direct_transport_app_engine_tests;
 mod display_hint_tests;
 mod drain_notifications_tests;
 mod engine_output_tests;
+mod engine_update_tests;
 mod exchange_ble_invariants_proptest;
 mod exchange_cancel_navigation_tests;
 mod exchange_group_filter_preview_tests;

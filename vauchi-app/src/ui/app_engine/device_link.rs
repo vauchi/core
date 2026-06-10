@@ -15,18 +15,17 @@
 //! Pair 5 of
 //! `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens/`.
 
-use super::{AppEngine, AppScreen};
+use super::AppEngine;
 use crate::ui::ScreenModel;
-use crate::ui::WorkflowEngine;
-use crate::ui::device_linking::DeviceLinkingEngine;
+use crate::ui::{DeviceLinkUpdate, EngineUpdate};
 
 impl AppEngine {
     /// Cycle-thread bridge: signal that a fresh device-link session
     /// has been spawned and is preparing the QR.
     pub fn device_link_qr_pending(&mut self) -> Option<ScreenModel> {
-        let dl = self.device_linking_engine_mut()?;
-        dl.transition_to_qr_pending();
-        Some(dl.current_screen())
+        self.engine
+            .apply_update(EngineUpdate::DeviceLink(DeviceLinkUpdate::QrPending))
+            .then(|| self.engine.current_screen())
     }
 
     /// Cycle-thread bridge for `DeviceLinkSessionListener::on_qr_ready`
@@ -37,18 +36,21 @@ impl AppEngine {
         qr_data: String,
         expires_at: u64,
     ) -> Option<ScreenModel> {
-        let dl = self.device_linking_engine_mut()?;
-        dl.transition_to_waiting_for_request(qr_data, expires_at);
-        Some(dl.current_screen())
+        self.engine
+            .apply_update(EngineUpdate::DeviceLink(DeviceLinkUpdate::QrReady {
+                qr_data,
+                expires_at,
+            }))
+            .then(|| self.engine.current_screen())
     }
 
     /// Cycle-thread bridge for the `"qr_expired"` failure branch of
     /// `DeviceLinkSessionListener::on_failed` — the QR window
     /// elapsed before any peer connected.
     pub fn device_link_qr_expired(&mut self) -> Option<ScreenModel> {
-        let dl = self.device_linking_engine_mut()?;
-        dl.transition_to_qr_expired();
-        Some(dl.current_screen())
+        self.engine
+            .apply_update(EngineUpdate::DeviceLink(DeviceLinkUpdate::QrExpired))
+            .then(|| self.engine.current_screen())
     }
 
     /// Cycle-thread bridge for
@@ -61,9 +63,15 @@ impl AppEngine {
         confirmation_code: String,
         challenge_hex: String,
     ) -> Option<ScreenModel> {
-        let dl = self.device_linking_engine_mut()?;
-        dl.transition_to_confirming_device(device_name, confirmation_code, challenge_hex);
-        Some(dl.current_screen())
+        self.engine
+            .apply_update(EngineUpdate::DeviceLink(
+                DeviceLinkUpdate::RequestReceived {
+                    device_name,
+                    confirmation_code,
+                    challenge_hex,
+                },
+            ))
+            .then(|| self.engine.current_screen())
     }
 
     /// Cycle-thread bridge for
@@ -72,9 +80,9 @@ impl AppEngine {
     /// from any non-terminal step (the cycle thread does not always
     /// pass through the legacy `Syncing` state).
     pub fn device_link_completed(&mut self) -> Option<ScreenModel> {
-        let dl = self.device_linking_engine_mut()?;
-        dl.transition_to_link_success();
-        Some(dl.current_screen())
+        self.engine
+            .apply_update(EngineUpdate::DeviceLink(DeviceLinkUpdate::Completed))
+            .then(|| self.engine.current_screen())
     }
 
     /// Cycle-thread bridge for
@@ -83,17 +91,8 @@ impl AppEngine {
     /// (`"user_denied"`, `"user_confirm_timeout"`, `"cancelled"`,
     /// relay/decode errors).
     pub fn device_link_failed(&mut self, reason: String) -> Option<ScreenModel> {
-        let dl = self.device_linking_engine_mut()?;
-        dl.transition_to_link_failed(reason);
-        Some(dl.current_screen())
-    }
-
-    fn device_linking_engine_mut(&mut self) -> Option<&mut DeviceLinkingEngine> {
-        if self.screen != AppScreen::DeviceLinking {
-            return None;
-        }
         self.engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<DeviceLinkingEngine>())
+            .apply_update(EngineUpdate::DeviceLink(DeviceLinkUpdate::Failed(reason)))
+            .then(|| self.engine.current_screen())
     }
 }

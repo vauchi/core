@@ -4,7 +4,7 @@
 
 use std::any::Any;
 
-use super::{ActionResult, EngineOutput, ScreenModel, UserAction};
+use super::{ActionResult, EngineOutput, EngineUpdate, ScreenModel, UserAction};
 use crate::notification_types::PendingNotification;
 use vauchi_core::{Command, Event};
 
@@ -35,6 +35,17 @@ pub trait WorkflowEngine: Send {
     /// hub reads.
     fn engine_output(&self) -> Option<EngineOutput> {
         None
+    }
+
+    /// Apply a typed hub→engine state update (see [`EngineUpdate`]).
+    ///
+    /// The typed replacement for `as_any_mut` downcast pokes. Returns
+    /// `true` when this engine consumed the update; `false` (the
+    /// default) when the update addresses a different engine — the
+    /// caller warns + degrades, matching failed-downcast semantics.
+    fn apply_update(&mut self, update: EngineUpdate) -> bool {
+        let _ = update;
+        false
     }
 
     /// Returns `true` if the last `Complete` was triggered by a cancel action

@@ -22,9 +22,7 @@
 
 use super::{AppEngine, AppScreen};
 use crate::ui::ActionResult;
-use crate::ui::LinkResponderEngine;
 use crate::ui::ScreenModel;
-use crate::ui::WorkflowEngine;
 
 #[cfg(all(feature = "network-http", feature = "storage"))]
 use vauchi_core::Command;
@@ -53,27 +51,21 @@ impl AppEngine {
         // Build the summary first so the immutable `self.vauchi` borrow ends
         // before the `&mut self` engine borrow. Link mode assigns no group.
         let summary = self.build_exchange_summary(contact_id, Vec::new());
-        let engine = self.link_responder_engine_mut()?;
-        engine.set_success_summary(summary);
-        engine.transition_to_completed();
-        Some(engine.current_screen())
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::LinkResponder(
+                crate::ui::LinkResponderUpdate::Completed(summary),
+            ))
+            .then(|| self.engine.current_screen())
     }
 
     /// Terminal failure. `reason` is the stable `LinkResponder` failure
     /// id. Transitions the responder engine to `link_responder_failed`.
     pub fn link_responder_failed(&mut self, reason: String) -> Option<ScreenModel> {
-        let engine = self.link_responder_engine_mut()?;
-        engine.transition_to_failed(reason);
-        Some(engine.current_screen())
-    }
-
-    fn link_responder_engine_mut(&mut self) -> Option<&mut LinkResponderEngine> {
-        if !matches!(self.screen, AppScreen::DeepLinkResponder { .. }) {
-            return None;
-        }
         self.engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<LinkResponderEngine>())
+            .apply_update(crate::ui::EngineUpdate::LinkResponder(
+                crate::ui::LinkResponderUpdate::Failed(reason),
+            ))
+            .then(|| self.engine.current_screen())
     }
 
     /// Build / drop the engine-owned responder machine as navigation

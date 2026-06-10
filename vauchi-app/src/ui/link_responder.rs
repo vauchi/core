@@ -225,6 +225,20 @@ fn failure_detail(reason: &str) -> &'static str {
 }
 
 impl WorkflowEngine for LinkResponderEngine {
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        let crate::ui::EngineUpdate::LinkResponder(update) = update else {
+            return false;
+        };
+        match update {
+            crate::ui::LinkResponderUpdate::Completed(summary) => {
+                self.set_success_summary(summary);
+                self.transition_to_completed();
+            }
+            crate::ui::LinkResponderUpdate::Failed(reason) => self.transition_to_failed(reason),
+        }
+        true
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

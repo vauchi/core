@@ -768,6 +768,28 @@ impl WorkflowEngine for MultiStageExchangeEngine {
         self.build_screen()
     }
 
+    fn engine_output(&self) -> Option<EngineOutput> {
+        Some(EngineOutput::MultiStageExchange {
+            hover_mode: self.is_hover_mode(),
+        })
+    }
+
+    fn apply_update(&mut self, update: EngineUpdate) -> bool {
+        let EngineUpdate::MultiStage(update) = update else {
+            return false;
+        };
+        match update {
+            MultiStageUpdate::State(state) => self.set_state(state),
+            MultiStageUpdate::QrPayload(payload) => self.set_qr_payload(&payload),
+            MultiStageUpdate::Finalized(peer_name) => self.set_finalized(peer_name),
+            MultiStageUpdate::SuccessSummary(summary) => self.set_success_summary(summary),
+            MultiStageUpdate::SessionEnded => self.set_session_ended(),
+            MultiStageUpdate::AudioProximity(state) => self.set_audio_proximity(state),
+            MultiStageUpdate::AccelProximity(state) => self.set_accel_proximity(state),
+        }
+        true
+    }
+
     /// Cancel pressed rather than Done after success.
     /// `AppEngine::handle_completion` routes Cancel back to the mode
     /// picker vs Done to Contacts (Fix A of

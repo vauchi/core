@@ -767,6 +767,31 @@ impl ContactDetailEngine {
 }
 
 impl WorkflowEngine for ContactDetailEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::ContactDetail {
+            is_hidden: self.is_hidden(),
+        })
+    }
+
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        use crate::ui::ContactDetailUpdate as U;
+        let crate::ui::EngineUpdate::ContactDetail(update) = update else {
+            return false;
+        };
+        match update {
+            U::ToggleProposalTrusted => self.toggle_proposal_trusted(),
+            U::ToggleRecoveryTrusted => self.toggle_recovery_trusted(),
+            U::ToggleHidden => self.toggle_hidden(),
+            U::TagQuery { query, suggestions } => self.set_tag_query(query, suggestions),
+            U::TagAdded(tag) => self.add_tag_row(tag),
+            U::TagRemoved(tag_id) => self.remove_tag_row(&tag_id),
+            U::PlaceQuery { query, suggestions } => self.set_place_query(query, suggestions),
+            U::PlaceNamed(name) => self.set_place_named(name),
+            U::ClearExchangePlace => self.clear_exchange_place(),
+        }
+        true
+    }
+
     fn as_any(&self) -> Option<&dyn std::any::Any> {
         Some(self)
     }

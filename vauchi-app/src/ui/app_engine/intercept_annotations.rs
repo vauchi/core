@@ -114,28 +114,30 @@ impl AppEngine {
             } if component_id == "add_tag" => {
                 let suggestions = self.vauchi.tag_name_suggestions(value).unwrap_or_default();
                 self.engine
-                    .as_any_mut()
-                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
-                    .map(|engine| {
-                        engine.set_tag_query(value.clone(), suggestions);
-                        ActionResult::UpdateScreen(engine.current_screen())
-                    })
+                    .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                        crate::ui::ContactDetailUpdate::TagQuery {
+                            query: value.clone(),
+                            suggestions,
+                        },
+                    ))
+                    .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
             }
             UserAction::ActionPressed { action_id } if action_id.starts_with("add_tag:") => {
                 let name = action_id.strip_prefix("add_tag:").unwrap_or_default();
                 let added = self.vauchi.add_tag_to_contact(contact_id, name).ok();
-                self.engine
-                    .as_any_mut()
-                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
-                    .map(|engine| {
-                        if let Some(tag) = added {
-                            engine.add_tag_row(ContactTag {
+                if let Some(tag) = added
+                    && !self
+                        .engine
+                        .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                            crate::ui::ContactDetailUpdate::TagAdded(ContactTag {
                                 id: tag.id,
                                 name: tag.name,
-                            });
-                        }
-                        ActionResult::UpdateScreen(engine.current_screen())
-                    })
+                            }),
+                        ))
+                {
+                    return None;
+                }
+                Some(ActionResult::UpdateScreen(self.engine.current_screen()))
             }
             UserAction::ActionPressed { action_id } if action_id.starts_with("remove_tag:") => {
                 let tag_id = action_id.strip_prefix("remove_tag:").unwrap_or_default();
@@ -143,15 +145,16 @@ impl AppEngine {
                     .vauchi
                     .remove_tag_from_contact(tag_id, contact_id)
                     .is_ok();
-                self.engine
-                    .as_any_mut()
-                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
-                    .map(|engine| {
-                        if removed {
-                            engine.remove_tag_row(tag_id);
-                        }
-                        ActionResult::UpdateScreen(engine.current_screen())
-                    })
+                if removed
+                    && !self
+                        .engine
+                        .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                            crate::ui::ContactDetailUpdate::TagRemoved(tag_id.to_string()),
+                        ))
+                {
+                    return None;
+                }
+                Some(ActionResult::UpdateScreen(self.engine.current_screen()))
             }
             _ => None,
         }
@@ -291,33 +294,37 @@ impl AppEngine {
                 component_id,
                 item_id,
             } if component_id == "search_facets" => {
-                let query = {
-                    let engine = self
-                        .engine
-                        .as_any_mut()
-                        .and_then(|a| a.downcast_mut::<ContactListEngine>())?;
-                    engine.toggle_facet(item_id);
-                    engine.search_query().to_string()
+                if !self
+                    .engine
+                    .apply_update(crate::ui::EngineUpdate::ContactList(
+                        crate::ui::ContactListUpdate::ToggleFacet(item_id.clone()),
+                    ))
+                {
+                    return None;
+                }
+                let query = match self.engine.engine_output() {
+                    Some(crate::ui::EngineOutput::ContactList { query, .. }) => query,
+                    _ => String::new(),
                 };
                 self.apply_contact_facets(query);
                 Some(ActionResult::UpdateScreen(self.engine.current_screen()))
             }
             UserAction::SearchChanged { query, .. } => {
-                let faceting = self
-                    .engine
-                    .as_any()
-                    .and_then(|a| a.downcast_ref::<ContactListEngine>())
-                    .is_some_and(ContactListEngine::any_facet);
+                let faceting = matches!(
+                    self.engine.engine_output(),
+                    Some(crate::ui::EngineOutput::ContactList {
+                        any_facet: true,
+                        ..
+                    })
+                );
                 if !faceting {
                     return None;
                 }
-                if let Some(engine) = self
+                let _ = self
                     .engine
-                    .as_any_mut()
-                    .and_then(|a| a.downcast_mut::<ContactListEngine>())
-                {
-                    engine.set_search_query(query.clone());
-                }
+                    .apply_update(crate::ui::EngineUpdate::ContactList(
+                        crate::ui::ContactListUpdate::SearchQuery(query.clone()),
+                    ));
                 self.apply_contact_facets(query.clone());
                 Some(ActionResult::UpdateScreen(self.engine.current_screen()))
             }
@@ -329,11 +336,10 @@ impl AppEngine {
     /// flags + `query`, and push it onto the engine. No facet enabled clears
     /// faceted mode (the engine reverts to in-memory name search).
     fn apply_contact_facets(&mut self, query: String) {
-        let Some((tags, comment, place)) = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<ContactListEngine>())
-            .map(ContactListEngine::facet_flags)
+        let Some(crate::ui::EngineOutput::ContactList {
+            facets: (tags, comment, place),
+            ..
+        }) = self.engine.engine_output()
         else {
             return;
         };
@@ -351,13 +357,11 @@ impl AppEngine {
         } else {
             None
         };
-        if let Some(engine) = self
+        let _ = self
             .engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<ContactListEngine>())
-        {
-            engine.set_faceted_ids(ids);
-        }
+            .apply_update(crate::ui::EngineUpdate::ContactList(
+                crate::ui::ContactListUpdate::FacetedIds(ids),
+            ));
     }
 
     /// Intercept exchange-place naming/clearing on the ContactDetail screen
@@ -379,37 +383,40 @@ impl AppEngine {
             } if component_id == "name_place" => {
                 let suggestions = self.place_name_suggestions(value);
                 self.engine
-                    .as_any_mut()
-                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
-                    .map(|engine| {
-                        engine.set_place_query(value.clone(), suggestions);
-                        ActionResult::UpdateScreen(engine.current_screen())
-                    })
+                    .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                        crate::ui::ContactDetailUpdate::PlaceQuery {
+                            query: value.clone(),
+                            suggestions,
+                        },
+                    ))
+                    .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
             }
             UserAction::ActionPressed { action_id } if action_id.starts_with("name_place:") => {
                 let name = action_id.strip_prefix("name_place:").unwrap_or_default();
                 let named = self.vauchi.name_exchange_place(contact_id, name).is_ok();
-                self.engine
-                    .as_any_mut()
-                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
-                    .map(|engine| {
-                        if named {
-                            engine.set_place_named(name.to_string());
-                        }
-                        ActionResult::UpdateScreen(engine.current_screen())
-                    })
+                if named
+                    && !self
+                        .engine
+                        .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                            crate::ui::ContactDetailUpdate::PlaceNamed(name.to_string()),
+                        ))
+                {
+                    return None;
+                }
+                Some(ActionResult::UpdateScreen(self.engine.current_screen()))
             }
             UserAction::ActionPressed { action_id } if action_id == "clear_exchange_place" => {
                 let cleared = self.vauchi.clear_exchange_location(contact_id).is_ok();
-                self.engine
-                    .as_any_mut()
-                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
-                    .map(|engine| {
-                        if cleared {
-                            engine.clear_exchange_place();
-                        }
-                        ActionResult::UpdateScreen(engine.current_screen())
-                    })
+                if cleared
+                    && !self
+                        .engine
+                        .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                            crate::ui::ContactDetailUpdate::ClearExchangePlace,
+                        ))
+                {
+                    return None;
+                }
+                Some(ActionResult::UpdateScreen(self.engine.current_screen()))
             }
             _ => None,
         }

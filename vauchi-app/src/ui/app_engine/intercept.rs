@@ -459,12 +459,10 @@ impl AppEngine {
 
         // Let the engine update its in-memory state and return the new screen.
         self.engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
-            .map(|engine| {
-                engine.toggle_proposal_trusted();
-                ActionResult::UpdateScreen(engine.current_screen())
-            })
+            .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                crate::ui::ContactDetailUpdate::ToggleProposalTrusted,
+            ))
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
     /// Intercept the recovery-trust SettingsToggled on ContactDetail and
@@ -495,12 +493,10 @@ impl AppEngine {
         let _ = self.vauchi.toggle_recovery_trust(contact_id);
 
         self.engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
-            .map(|engine| {
-                engine.toggle_recovery_trusted();
-                ActionResult::UpdateScreen(engine.current_screen())
-            })
+            .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                crate::ui::ContactDetailUpdate::ToggleRecoveryTrusted,
+            ))
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
     /// Intercept hide/unhide toggle on ContactDetail and persist to storage.
@@ -516,12 +512,13 @@ impl AppEngine {
             return None;
         }
 
-        let is_hidden = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<ContactDetailEngine>())
-            .map(|e| e.is_hidden())
-            .unwrap_or(false);
+        let is_hidden = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::ContactDetail { is_hidden }) => is_hidden,
+            other => {
+                tracing::warn!(?other, "hide toggle without ContactDetail output");
+                false
+            }
+        };
 
         // best-effort: screen rebuild below reflects actual storage
         // state; an optimistic flip that diverges is recovered on next read
@@ -534,12 +531,10 @@ impl AppEngine {
         }
 
         self.engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
-            .map(|engine| {
-                engine.toggle_hidden();
-                ActionResult::UpdateScreen(engine.current_screen())
-            })
+            .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                crate::ui::ContactDetailUpdate::ToggleHidden,
+            ))
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
     /// Intercept delete/archive actions on ContactDetail, perform the side effect,

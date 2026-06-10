@@ -207,6 +207,26 @@ impl ContactListEngine {
 }
 
 impl WorkflowEngine for ContactListEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::ContactList {
+            query: self.search_query().to_string(),
+            any_facet: self.any_facet(),
+            facets: self.facet_flags(),
+        })
+    }
+
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        let crate::ui::EngineUpdate::ContactList(update) = update else {
+            return false;
+        };
+        match update {
+            crate::ui::ContactListUpdate::ToggleFacet(id) => self.toggle_facet(&id),
+            crate::ui::ContactListUpdate::SearchQuery(query) => self.set_search_query(query),
+            crate::ui::ContactListUpdate::FacetedIds(ids) => self.set_faceted_ids(ids),
+        }
+        true
+    }
+
     fn current_screen(&self) -> ScreenModel {
         let mut actions = vec![ScreenAction {
             id: "add_contact".into(),

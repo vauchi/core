@@ -9,11 +9,9 @@ use super::AppEngine;
 use super::AppScreen;
 use crate::i18n::Locale;
 use crate::ui::action::{ActionResult, UserAction};
-use crate::ui::contact_detail::ContactDetailEngine;
-use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogType;
 use crate::ui::info_content;
-use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
+use crate::ui::my_info_entry_detail::EntryContactInfo;
 
 impl AppEngine {
     /// Persist a consent toggle on the Privacy screen by flipping the
@@ -275,73 +273,71 @@ impl AppEngine {
             } if component_id == "group_visibility" => {
                 // Persist group visibility change
                 let group_id = item_id.clone();
-                let engine = self
-                    .engine
-                    .as_any_mut()
-                    .and_then(|a| a.downcast_mut::<MyInfoEntryDetailEngine>());
-                if let Some(engine) = engine {
-                    let is_visible = engine
-                        .groups
-                        .iter()
-                        .find(|(gid, _, _)| gid == &group_id)
-                        .map(|(_, _, v)| *v)
-                        .unwrap_or(false);
-                    let new_visible = !is_visible;
-                    // best-effort: per-group visibility toggle; failure
-                    // leaves the storage state unchanged and the screen
-                    // rebuild below will reflect actual state
-                    #[allow(clippy::let_underscore_must_use)]
-                    let _ =
-                        self.vauchi
-                            .set_group_field_visibility(&group_id, field_id, new_visible);
-                    // Update engine state
-                    if let Some(entry) = engine
-                        .groups
-                        .iter_mut()
-                        .find(|(gid, _, _)| gid == &group_id)
-                    {
-                        entry.2 = new_visible;
+                let groups = match self.engine.engine_output() {
+                    Some(crate::ui::EngineOutput::MyInfoEntryDetail { groups, .. }) => groups,
+                    other => {
+                        tracing::warn!(?other, "group toggle without MyInfoEntryDetail output");
+                        return None;
                     }
-                    // Rebuild visible contacts
-                    let all_groups = self.vauchi.list_groups().unwrap_or_default();
-                    let mut visible_contacts = Vec::new();
-                    let mut seen = std::collections::HashSet::new();
-                    for g in &all_groups {
-                        if g.is_field_visible(field_id) {
-                            for cid in g.contacts() {
-                                if seen.insert(cid.to_string()) {
-                                    let name = self
-                                        .vauchi
-                                        .get_contact(cid)
-                                        .ok()
-                                        .flatten()
-                                        .map(|c| c.display_name().to_string())
-                                        .unwrap_or_else(|| "Unknown".into());
-                                    visible_contacts.push(EntryContactInfo {
-                                        contact_id: cid.to_string(),
-                                        name,
-                                        via_group: g.name().to_string(),
-                                    });
-                                }
+                };
+                let is_visible = groups
+                    .iter()
+                    .find(|(gid, _, _)| gid == &group_id)
+                    .map(|(_, _, v)| *v)
+                    .unwrap_or(false);
+                let new_visible = !is_visible;
+                // best-effort: per-group visibility toggle; failure
+                // leaves the storage state unchanged and the screen
+                // rebuild below will reflect actual state
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = self
+                    .vauchi
+                    .set_group_field_visibility(&group_id, field_id, new_visible);
+                // Rebuild visible contacts
+                let all_groups = self.vauchi.list_groups().unwrap_or_default();
+                let mut visible_contacts = Vec::new();
+                let mut seen = std::collections::HashSet::new();
+                for g in &all_groups {
+                    if g.is_field_visible(field_id) {
+                        for cid in g.contacts() {
+                            if seen.insert(cid.to_string()) {
+                                let name = self
+                                    .vauchi
+                                    .get_contact(cid)
+                                    .ok()
+                                    .flatten()
+                                    .map(|c| c.display_name().to_string())
+                                    .unwrap_or_else(|| "Unknown".into());
+                                visible_contacts.push(EntryContactInfo {
+                                    contact_id: cid.to_string(),
+                                    name,
+                                    via_group: g.name().to_string(),
+                                });
                             }
                         }
                     }
-                    engine.visible_contacts = visible_contacts;
+                }
+                if self
+                    .engine
+                    .apply_update(crate::ui::EngineUpdate::MyInfoEntryDetail(
+                        crate::ui::MyInfoEntryDetailUpdate::GroupVisibility {
+                            group_id,
+                            visible: new_visible,
+                            visible_contacts,
+                        },
+                    ))
+                {
                     // Invalidate MyInfo cache so it refreshes
                     self.engine_cache.remove(&AppScreen::MyInfo);
-                    return Some(ActionResult::UpdateScreen(engine.current_screen()));
+                    return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
                 }
             }
             UserAction::ActionPressed { action_id } if action_id == "edit" => {
                 // Navigate to EditField form for this field
-                if let Some(engine) = self
-                    .engine
-                    .as_any()
-                    .and_then(|a| a.downcast_ref::<MyInfoEntryDetailEngine>())
+                if let Some(crate::ui::EngineOutput::MyInfoEntryDetail {
+                    label, value, note, ..
+                }) = self.engine.engine_output()
                 {
-                    let label = engine.label.clone();
-                    let value = engine.value.clone();
-                    let note = engine.note.clone();
                     let screen = self.navigate_to(AppScreen::FormDialog {
                         dialog_type: FormDialogType::EditField {
                             field_id: field_id.to_string(),
@@ -589,14 +585,15 @@ impl AppEngine {
             return None;
         }
 
-        let selected_idx = self
-            .engine
-            .as_any()
-            .and_then(|a| {
-                a.downcast_ref::<crate::ui::duplicate_detection::DuplicateDetectionEngine>()
-            })
-            .and_then(|e| e.selected_pair_index())
-            .unwrap_or(0);
+        let selected_idx = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::DuplicateDetection {
+                selected_pair_index,
+            }) => selected_pair_index.unwrap_or(0),
+            other => {
+                tracing::warn!(?other, "merge without DuplicateDetection output");
+                0
+            }
+        };
 
         let pair = pairs.get(selected_idx).cloned()?;
 
@@ -651,25 +648,22 @@ impl AppEngine {
     /// a validation error to the input (failure). Returns `UpdateScreen`
     /// so the rendered screen reflects the new engine state.
     pub(super) fn intercept_create_claim_action(&mut self) -> Option<ActionResult> {
-        let old_key = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::RecoveryEngine>())?
-            .old_key_input()
-            .trim()
-            .to_string();
+        let old_key = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Recovery { old_key_input }) => {
+                old_key_input.trim().to_string()
+            }
+            _ => return None,
+        };
 
         let result = self.vauchi.create_recovery_claim_hex_b64(&old_key);
 
-        let engine = self
-            .engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<crate::ui::RecoveryEngine>())?;
-        match result {
-            Ok(claim_b64) => engine.set_generated_claim(claim_b64),
-            Err(e) => engine.set_create_claim_error(format!("{e}")),
-        }
-        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+        let update = match result {
+            Ok(claim_b64) => crate::ui::RecoveryUpdate::ClaimGenerated(claim_b64),
+            Err(e) => crate::ui::RecoveryUpdate::ClaimCreateError(format!("{e}")),
+        };
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::Recovery(update))
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
     /// Intercept the "verify_claim" action on the RecoveryHelp screen.
@@ -680,29 +674,28 @@ impl AppEngine {
     /// validation error to the input (failure). Returns `UpdateScreen` so
     /// the rendered screen reflects the new engine state.
     pub(super) fn intercept_verify_claim_action(&mut self) -> Option<ActionResult> {
-        let claim_input = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::recovery_help::RecoveryHelpEngine>())?
-            .claim_input()
-            .trim()
-            .to_string();
+        let claim_input = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::RecoveryHelp { claim_input }) => {
+                claim_input.trim().to_string()
+            }
+            _ => return None,
+        };
 
         let parse_result = self.vauchi.parse_recovery_claim_b64(&claim_input);
 
-        let engine = self
-            .engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<crate::ui::recovery_help::RecoveryHelpEngine>())?;
-        match parse_result {
-            Ok(claim) => engine.set_parsed_claim(crate::ui::recovery_help::ParsedClaimSummary {
-                old_pk_hex: hex::encode::<&[u8]>(claim.old_pk().as_ref()),
-                new_pk_hex: hex::encode::<&[u8]>(claim.new_pk().as_ref()),
-                is_expired: claim.is_expired(self.vauchi.clock().unix_seconds()),
-            }),
-            Err(e) => engine.set_claim_parse_error(format!("Invalid claim: {e}")),
-        }
-        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+        let update = match parse_result {
+            Ok(claim) => crate::ui::RecoveryHelpUpdate::ParsedClaim(
+                crate::ui::recovery_help::ParsedClaimSummary {
+                    old_pk_hex: hex::encode::<&[u8]>(claim.old_pk().as_ref()),
+                    new_pk_hex: hex::encode::<&[u8]>(claim.new_pk().as_ref()),
+                    is_expired: claim.is_expired(self.vauchi.clock().unix_seconds()),
+                },
+            ),
+            Err(e) => crate::ui::RecoveryHelpUpdate::ClaimParseError(format!("Invalid claim: {e}")),
+        };
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::RecoveryHelp(update))
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
     /// Intercept the "create_voucher" action on the RecoveryHelp screen.
@@ -715,22 +708,20 @@ impl AppEngine {
     /// the engine so the ShowVoucher screen can render it for the user
     /// to share.
     pub(super) fn intercept_create_voucher_action(&mut self) -> Option<ActionResult> {
-        let claim_input = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::recovery_help::RecoveryHelpEngine>())?
-            .claim_input()
-            .trim()
-            .to_string();
+        let claim_input = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::RecoveryHelp { claim_input }) => {
+                claim_input.trim().to_string()
+            }
+            _ => return None,
+        };
 
         match self.vauchi.create_voucher_from_claim_b64(&claim_input) {
-            Ok(voucher_b64) => {
-                let engine = self.engine.as_any_mut().and_then(|a| {
-                    a.downcast_mut::<crate::ui::recovery_help::RecoveryHelpEngine>()
-                })?;
-                engine.set_voucher_data(voucher_b64);
-                Some(ActionResult::UpdateScreen(self.engine.current_screen()))
-            }
+            Ok(voucher_b64) => self
+                .engine
+                .apply_update(crate::ui::EngineUpdate::RecoveryHelp(
+                    crate::ui::RecoveryHelpUpdate::VoucherData(voucher_b64),
+                ))
+                .then(|| ActionResult::UpdateScreen(self.engine.current_screen())),
             Err(e) => Some(ActionResult::ShowAlert {
                 title: "Voucher Creation Failed".into(),
                 message: format!("{e}"),
@@ -752,13 +743,12 @@ impl AppEngine {
             return None;
         }
 
-        let selected_idx = self
-            .engine
-            .as_any()
-            .and_then(|a| {
-                a.downcast_ref::<crate::ui::duplicate_detection::DuplicateDetectionEngine>()
-            })
-            .and_then(|e| e.selected_pair_index())?;
+        let selected_idx = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::DuplicateDetection {
+                selected_pair_index,
+            }) => selected_pair_index?,
+            _ => return None,
+        };
 
         let pair = pairs.get(selected_idx).cloned()?;
         // best-effort: duplicate dismissal is idempotent; if the row was
@@ -881,12 +871,15 @@ impl AppEngine {
 
         match action_id.as_str() {
             "add_decoy" => {
-                let name = self
-                    .engine
-                    .as_any()
-                    .and_then(|a| a.downcast_ref::<crate::ui::DecoyContactsEngine>())
-                    .map(|e| e.new_decoy_name().trim().to_string())
-                    .unwrap_or_default();
+                let name = match self.engine.engine_output() {
+                    Some(crate::ui::EngineOutput::DecoyContacts { new_name, .. }) => {
+                        new_name.trim().to_string()
+                    }
+                    other => {
+                        tracing::warn!(?other, "add_decoy without DecoyContacts output");
+                        String::new()
+                    }
+                };
                 if name.is_empty() {
                     return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
                 }
@@ -911,11 +904,12 @@ impl AppEngine {
                 Some(ActionResult::UpdateScreen(self.engine.current_screen()))
             }
             "confirm_delete_decoy" => {
-                let pending = self
-                    .engine
-                    .as_any()
-                    .and_then(|a| a.downcast_ref::<crate::ui::DecoyContactsEngine>())
-                    .and_then(|e| e.pending_delete_id().map(|s| s.to_string()));
+                let pending = match self.engine.engine_output() {
+                    Some(crate::ui::EngineOutput::DecoyContacts {
+                        pending_delete_id, ..
+                    }) => pending_delete_id,
+                    _ => None,
+                };
                 if let Some(id) = pending {
                     // best-effort: refresh_decoy_engine below re-reads
                     // storage; a failed delete shows up as the row staying

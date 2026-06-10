@@ -116,6 +116,22 @@ impl PlacesEngine {
 }
 
 impl WorkflowEngine for PlacesEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::Places {
+            pending_delete_id: self.pending_delete_id().map(str::to_string),
+        })
+    }
+
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        match update {
+            crate::ui::EngineUpdate::ConfirmPendingDelete => {
+                self.confirm_delete();
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

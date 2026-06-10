@@ -152,6 +152,12 @@ impl TagPromotionEngine {
 }
 
 impl WorkflowEngine for TagPromotionEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::TagPromotion {
+            selected_field_ids: self.selected_field_ids(),
+        })
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

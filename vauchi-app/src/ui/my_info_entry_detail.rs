@@ -59,6 +59,34 @@ impl MyInfoEntryDetailEngine {
 }
 
 impl WorkflowEngine for MyInfoEntryDetailEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::MyInfoEntryDetail {
+            label: self.label.clone(),
+            value: self.value.clone(),
+            note: self.note.clone(),
+            groups: self.groups.clone(),
+        })
+    }
+
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        let crate::ui::EngineUpdate::MyInfoEntryDetail(update) = update else {
+            return false;
+        };
+        match update {
+            crate::ui::MyInfoEntryDetailUpdate::GroupVisibility {
+                group_id,
+                visible,
+                visible_contacts,
+            } => {
+                if let Some(entry) = self.groups.iter_mut().find(|(gid, _, _)| gid == &group_id) {
+                    entry.2 = visible;
+                }
+                self.visible_contacts = visible_contacts;
+            }
+        }
+        true
+    }
+
     fn as_any(&self) -> Option<&dyn std::any::Any> {
         Some(self)
     }

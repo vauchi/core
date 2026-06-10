@@ -155,6 +155,12 @@ impl DuplicateDetectionEngine {
 }
 
 impl WorkflowEngine for DuplicateDetectionEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::DuplicateDetection {
+            selected_pair_index: self.selected_pair_index(),
+        })
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

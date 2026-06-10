@@ -621,6 +621,25 @@ impl RecoveryEngine {
 }
 
 impl WorkflowEngine for RecoveryEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::Recovery {
+            old_key_input: self.old_key_input().to_string(),
+        })
+    }
+
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        let crate::ui::EngineUpdate::Recovery(update) = update else {
+            return false;
+        };
+        match update {
+            crate::ui::RecoveryUpdate::ClaimGenerated(claim) => self.set_generated_claim(claim),
+            crate::ui::RecoveryUpdate::ClaimCreateError(message) => {
+                self.set_create_claim_error(message)
+            }
+        }
+        true
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

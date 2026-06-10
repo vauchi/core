@@ -149,6 +149,13 @@ impl DecoyContactsEngine {
 }
 
 impl WorkflowEngine for DecoyContactsEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::DecoyContacts {
+            new_name: self.new_decoy_name().to_string(),
+            pending_delete_id: self.pending_delete_id().map(str::to_string),
+        })
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

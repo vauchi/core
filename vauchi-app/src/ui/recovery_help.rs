@@ -397,6 +397,26 @@ impl RecoveryHelpEngine {
 }
 
 impl WorkflowEngine for RecoveryHelpEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::RecoveryHelp {
+            claim_input: self.claim_input().to_string(),
+        })
+    }
+
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        let crate::ui::EngineUpdate::RecoveryHelp(update) = update else {
+            return false;
+        };
+        match update {
+            crate::ui::RecoveryHelpUpdate::ParsedClaim(claim) => self.set_parsed_claim(claim),
+            crate::ui::RecoveryHelpUpdate::ClaimParseError(message) => {
+                self.set_claim_parse_error(message)
+            }
+            crate::ui::RecoveryHelpUpdate::VoucherData(data) => self.set_voucher_data(data),
+        }
+        true
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

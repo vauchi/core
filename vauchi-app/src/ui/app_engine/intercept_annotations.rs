@@ -11,13 +11,7 @@
 use super::AppEngine;
 use super::AppScreen;
 use crate::ui::action::{ActionResult, UserAction};
-use crate::ui::contact_detail::ContactDetailEngine;
 use crate::ui::contact_detail_rules::ContactTag;
-use crate::ui::contact_list::ContactListEngine;
-use crate::ui::engine::WorkflowEngine;
-use crate::ui::places_list::PlacesEngine;
-use crate::ui::tag_promotion::TagPromotionEngine;
-use crate::ui::tags_list::TagsEngine;
 use vauchi_core::SearchFacets;
 
 impl AppEngine {
@@ -175,21 +169,15 @@ impl AppEngine {
         if action_id != "confirm_delete_tag" {
             return None;
         }
-        let tag_id = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<TagsEngine>())
-            .and_then(|e| e.pending_delete_id())
-            .map(str::to_string)?;
+        let tag_id = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Tags { pending_delete_id }) => pending_delete_id?,
+            _ => return None,
+        };
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.vauchi.delete_tag(&tag_id);
         self.engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<TagsEngine>())
-            .map(|engine| {
-                engine.confirm_delete();
-                ActionResult::UpdateScreen(engine.current_screen())
-            })
+            .apply_update(crate::ui::EngineUpdate::ConfirmPendingDelete)
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
     /// Intercept the place-delete confirmation on the Places management
@@ -205,21 +193,15 @@ impl AppEngine {
         if action_id != "confirm_delete_place" {
             return None;
         }
-        let place_id = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<PlacesEngine>())
-            .and_then(|e| e.pending_delete_id())
-            .map(str::to_string)?;
+        let place_id = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Places { pending_delete_id }) => pending_delete_id?,
+            _ => return None,
+        };
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.vauchi.delete_place(&place_id);
         self.engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<PlacesEngine>())
-            .map(|engine| {
-                engine.confirm_delete();
-                ActionResult::UpdateScreen(engine.current_screen())
-            })
+            .apply_update(crate::ui::EngineUpdate::ConfirmPendingDelete)
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
     /// Intercept the tag→group promotion flow (ADR-051):
@@ -255,12 +237,15 @@ impl AppEngine {
             if action_id != "confirm_promotion" {
                 return None;
             }
-            let fields = self
-                .engine
-                .as_any()
-                .and_then(|a| a.downcast_ref::<TagPromotionEngine>())
-                .map(|e| e.selected_field_ids())
-                .unwrap_or_default();
+            let fields = match self.engine.engine_output() {
+                Some(crate::ui::EngineOutput::TagPromotion { selected_field_ids }) => {
+                    selected_field_ids
+                }
+                other => {
+                    tracing::warn!(?other, "promotion without TagPromotion output");
+                    Vec::new()
+                }
+            };
             return Some(match self.vauchi.confirm_tag_promotion(&tag_id, fields) {
                 Ok(_group_id) => {
                     // The tag is consumed (replace semantics); drop the cached

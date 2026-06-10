@@ -8,38 +8,28 @@ use std::collections::HashMap;
 
 use super::AppEngine;
 use super::AppScreen;
+use super::help_catalog;
 use crate::ui::activity_log::{ActivityLogEngine, ActivityLogItem};
-use crate::ui::archived_contacts::ArchivedContactsEngine;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
 use crate::ui::change_password::ChangePasswordEngine;
 use crate::ui::component::{
     A11y, Field, Item, ListItemAction, ListItemActionKind, Status, UiFieldVisibility, initials,
 };
-use crate::ui::contact_detail::{
-    ContactDetailEngine, ContactNotFoundEngine, DeliverySummary, SharedInfoView,
-};
-use crate::ui::contact_detail_rules::{ContactPlace, ContactTag};
-use crate::ui::contact_edit::{ContactEditEngine, EditableContact, EditableField};
-use crate::ui::contact_limit::ContactLimitEngine;
-use crate::ui::contact_list::{ContactListEngine, IndexedItem};
-use crate::ui::contact_merge::{ContactMergeEngine, MergePreview};
-use crate::ui::contact_visibility::ContactVisibilityEngine;
+use crate::ui::contact_detail::{ContactNotFoundEngine, SharedInfoView};
+use crate::ui::contact_list::IndexedItem;
 use crate::ui::decoy_contacts::{DecoyContactItem, DecoyContactsEngine};
 use crate::ui::delivery::{DeliveryItem, DeliveryStatusEngine, RetryEntry};
 use crate::ui::device_linking::DeviceLinkingEngine;
 use crate::ui::device_management::{DeviceListItem, DeviceManagementEngine};
-use crate::ui::duplicate_detection::{DuplicateDetectionEngine, DuplicatePair};
 use crate::ui::duress_pin::{DuressConfig, DuressPinEngine};
 use crate::ui::emergency_broadcast::EmergencyBroadcastEngine;
 use crate::ui::emergency_shred::EmergencyShredEngine;
 use crate::ui::engine::WorkflowEngine;
-use crate::ui::exchange::{ExchangeConfig, ExchangeEngine};
-use crate::ui::fingerprint_verify::FingerprintVerifyEngine;
 use crate::ui::form_dialog::FormDialogEngine;
 use crate::ui::gdpr::GdprEngine;
 use crate::ui::group_detail::GroupDetailEngine;
 use crate::ui::groups_list::{GroupInfo, GroupsEngine, GroupsMode};
-use crate::ui::help::{HelpEngine, HelpItem};
+use crate::ui::help::HelpEngine;
 use crate::ui::lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
 use crate::ui::more::MoreEngine;
 use crate::ui::my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, OwnFieldInfo};
@@ -165,32 +155,15 @@ impl AppEngine {
             AppScreen::MyInfoEntryDetail { field_id } => {
                 Self::create_entry_detail_engine(vauchi, field_id)
             }
-            AppScreen::Contacts => {
-                let contacts = Self::load_contact_items(vauchi);
-                let all_groups = vauchi.list_groups().unwrap_or_default();
-                if all_groups.is_empty() {
-                    Box::new(ContactListEngine::new(contacts))
-                } else {
-                    let groups: Vec<(String, String)> = all_groups
-                        .iter()
-                        .map(|g| (g.id().to_string(), g.name().to_string()))
-                        .collect();
-                    let mut memberships = HashMap::new();
-                    for g in &all_groups {
-                        let member_ids: Vec<String> = contacts
-                            .iter()
-                            .filter(|c| g.contains_contact(&c.item.id))
-                            .map(|c| c.item.id.clone())
-                            .collect();
-                        memberships.insert(g.id().to_string(), member_ids);
-                    }
-                    Box::new(ContactListEngine::with_groups(
-                        contacts,
-                        groups,
-                        memberships,
-                    ))
-                }
-            }
+            AppScreen::Contacts
+            | AppScreen::ContactDetail { .. }
+            | AppScreen::ContactVisibility { .. }
+            | AppScreen::ContactEdit { .. }
+            | AppScreen::ContactDuplicates
+            | AppScreen::ArchivedContacts
+            | AppScreen::ContactMerge { .. }
+            | AppScreen::ContactLimit
+            | AppScreen::VerifyFingerprint { .. } => Self::create_contacts_engine(vauchi, screen),
             AppScreen::Settings => {
                 let card = vauchi.own_card().ok().flatten();
                 let display_name = card
@@ -271,75 +244,17 @@ impl AppEngine {
                 };
                 Box::new(SettingsEngine::new(config))
             }
-            AppScreen::Exchange => {
-                let card = vauchi.own_card().ok().flatten();
-                let all_groups = vauchi.list_groups().unwrap_or_default();
-                let available_groups = all_groups
-                    .iter()
-                    .map(|g| (g.id().to_string(), g.name().to_string()))
-                    .collect();
-                let snapshot_now = vauchi.clock().unix_seconds();
-                let card_snapshot = card.as_ref().cloned().map(|c| {
-                    vauchi_core::exchange::card_snapshot::CardSnapshot::freeze(c, snapshot_now)
-                });
-                let config = ExchangeConfig {
-                    own_name: card
-                        .as_ref()
-                        .map(|c| c.display_name().to_string())
-                        .unwrap_or_default(),
-                    own_qr_data: vauchi.public_id().unwrap_or_default(),
-                    available_groups,
-                    device_capabilities: device_capabilities.clone(),
-                    mode: None, // triggers mode selection screen
-                    card_snapshot,
-                    available_group_data: all_groups,
-                };
-
-                // ADR-031: Create a protocol session if identity + card are available.
-                // Identity is cloned via storage serialization (it intentionally
-                // doesn't impl Clone because it contains private key material).
-                // The intermediate buffer is zeroized to avoid leaking key material.
-                //
-                // Site 3 of `2026-05-21-silent-failures-in-security-paths`: the
-                // `from_storage_bytes` round-trip is a contract invariant pinned
-                // by `identity_storage_bytes_roundtrip_preserves_all_fields` in
-                // `core/vauchi-core/tests/it/identity_tests.rs`. A failure here
-                // means either a bug in the serializer/parser pair or genuine
-                // memory corruption — not a recoverable runtime condition. Pre-
-                // 2026-05-23 both sites used `.ok()` and silently dropped the
-                // error, so the user tapping "start exchange" got no feedback.
-                // We now surface the violation via tracing and keep the
-                // graceful-degradation fallback (engine without pre-built
-                // session / NFC identity) so the user retains an entry point.
-                let session = vauchi
-                    .identity()
-                    .and_then(reconstruct_identity_via_storage_bytes)
-                    .and_then(|identity| {
-                        card.map(|c| {
-                            let proximity =
-                                vauchi_core::exchange::ManualConfirmationVerifier::new();
-                            vauchi_core::exchange::ExchangeSession::new_qr(
-                                identity,
-                                c,
-                                proximity,
-                                vauchi_core::clock::SystemClock::shared(),
-                            )
-                        })
-                    });
-
-                // NFC graduation: TapTap now routes to the dedicated
-                // `NfcExchangeEngine` (reached via `StartNfcExchange`), which
-                // reconstructs its own signing identity in the
-                // `AppScreen::NfcExchange` factory arm. The legacy
-                // `ExchangeEngine` no longer holds an NFC identity.
-                let clock = vauchi.clock().clone();
-                let engine = match session {
-                    Some(s) => ExchangeEngine::with_session(config, s, clock),
-                    None => ExchangeEngine::new(config, clock),
-                };
-                Box::new(engine)
+            AppScreen::Exchange
+            | AppScreen::DeepLinkConsent { .. }
+            | AppScreen::DeepLinkResponder { .. }
+            | AppScreen::LinkExchange
+            | AppScreen::BleExchange { .. }
+            | AppScreen::NfcExchange
+            | AppScreen::DirectTransport
+            | AppScreen::MultiStageExchange { .. } => {
+                Self::create_exchange_engine(vauchi, screen, device_capabilities, pending_groups)
             }
-            AppScreen::Help => Box::new(HelpEngine::new(Self::default_help_items())),
+            AppScreen::Help => Box::new(HelpEngine::new(help_catalog::default_help_items())),
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None, vauchi.has_identity())),
             AppScreen::Lock => Box::new(LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)),
             AppScreen::DeviceLinking => {
@@ -664,298 +579,6 @@ impl AppEngine {
                     .collect();
                 Box::new(ActivityLogEngine::new(items))
             }
-            AppScreen::ContactDetail { contact_id } => match vauchi.get_contact(contact_id) {
-                Ok(Some(contact)) => {
-                    let fields: Vec<Field> = contact
-                        .card()
-                        .fields()
-                        .iter()
-                        .map(|f| {
-                            let field_type_str = format!("{:?}", f.field_type());
-                            Field {
-                                id: f.id().to_string(),
-                                icon: crate::ui::component::icon_for_field_type(&field_type_str)
-                                    .into(),
-                                field_type: field_type_str,
-                                label: f.label().to_string(),
-                                value: f.value().to_string(),
-                                visibility: UiFieldVisibility::Shown,
-                                a11y: None,
-                            }
-                        })
-                        .collect();
-                    let status = if vauchi.is_contact_revoked(contact.id()) {
-                        Some("Deleted their identity".into())
-                    } else if contact.has_recovered() && !contact.is_fingerprint_verified() {
-                        Some("Recovered — re-verify recommended".into())
-                    } else {
-                        None
-                    };
-                    let item = Item {
-                        id: contact.id().to_string(),
-                        name: contact.display_name().to_string(),
-                        subtitle: None,
-                        avatar_initials: initials(contact.display_name()),
-                        status,
-                        actions: vec![],
-                        a11y: Some(A11y {
-                            label: Some(format!("Contact: {}", contact.display_name())),
-                            hint: Some("Double tap to view contact details".into()),
-                            role: None,
-                        }),
-                    };
-
-                    // Load personal note (stored as raw UTF-8 bytes by the app layer)
-                    let personal_note = vauchi
-                        .load_personal_notes(contact_id)
-                        .ok()
-                        .flatten()
-                        .and_then(|bytes| String::from_utf8(bytes).ok())
-                        .unwrap_or_default();
-
-                    // Load per-field notes — convert raw bytes to UTF-8 strings
-                    let field_notes: HashMap<String, String> = vauchi
-                        .load_contact_field_notes(contact_id)
-                        .unwrap_or_default()
-                        .into_iter()
-                        .filter_map(|(field_id, bytes)| {
-                            String::from_utf8(bytes).ok().map(|s| (field_id, s))
-                        })
-                        .collect();
-
-                    // Build shared info (my card as seen by this contact)
-                    let shared_info = Self::build_shared_info(vauchi, contact_id);
-
-                    let trust_level = contact.trust_level().to_string();
-                    let trust_level_enum = contact.trust_level();
-                    let proposal_trusted = contact.is_proposal_trusted();
-                    let is_hidden = contact.is_hidden();
-                    let is_imported = contact.is_imported();
-                    let is_verified = contact.is_fingerprint_verified();
-                    let fingerprint = contact.fingerprint();
-                    let is_recovery_trusted = contact.is_recovery_trusted();
-
-                    // Reciprocity status (design spec §6.3)
-                    use vauchi_core::exchange::reciprocity::Reciprocity;
-                    let reciprocity_status = match contact.reciprocity(0) {
-                        Reciprocity::Pending => "Awaiting confirmation".to_string(),
-                        Reciprocity::Unreciprocated => "May not have your card".to_string(),
-                        _ => String::new(),
-                    };
-
-                    // Delivery status summary (J1: update propagation)
-                    let delivery_summary = vauchi
-                        .get_delivery_status_for_contact(contact_id)
-                        .ok()
-                        .map(|records| {
-                            use vauchi_core::storage::DeliveryStatus;
-                            let total = records.len();
-                            let delivered = records
-                                .iter()
-                                .filter(|r| matches!(r.status, DeliveryStatus::Delivered))
-                                .count();
-                            let failed = records
-                                .iter()
-                                .filter(|r| {
-                                    matches!(
-                                        r.status,
-                                        DeliveryStatus::Failed { .. } | DeliveryStatus::Expired
-                                    )
-                                })
-                                .count();
-                            let pending = total - delivered - failed;
-                            DeliverySummary {
-                                total,
-                                delivered,
-                                pending,
-                                failed,
-                            }
-                        });
-
-                    let avatar_data = contact.card().avatar().map(|a| a.to_vec());
-
-                    // Owner-private tags for this contact (ADR-051). Reduced to
-                    // the UI-shaped {id, name} the renderer needs.
-                    let tags: Vec<ContactTag> = vauchi
-                        .tags_for_contact(contact_id)
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|t| ContactTag {
-                            id: t.id,
-                            name: t.name,
-                        })
-                        .collect();
-
-                    // Recorded exchange place (ADR-051): resolve the linked
-                    // named place to its name for display, if any.
-                    let exchange_place =
-                        vauchi
-                            .exchange_location(contact_id)
-                            .ok()
-                            .flatten()
-                            .map(|loc| {
-                                let name = loc.place_id.as_ref().and_then(|pid| {
-                                    vauchi
-                                        .list_places()
-                                        .unwrap_or_default()
-                                        .into_iter()
-                                        .find(|p| &p.id == pid)
-                                        .map(|p| p.name)
-                                });
-                                ContactPlace { name }
-                            });
-
-                    let build_engine = |engine: ContactDetailEngine| {
-                        let mut e = engine
-                            .with_avatar_data(avatar_data)
-                            .with_tags(tags)
-                            .with_exchange_place(exchange_place)
-                            .with_field_notes(field_notes)
-                            .with_trust(trust_level, proposal_trusted)
-                            .with_reciprocity(reciprocity_status)
-                            .with_hidden(is_hidden)
-                            .with_imported(is_imported)
-                            .with_verification(is_verified, trust_level_enum)
-                            .with_fingerprint(fingerprint)
-                            .with_recovery_trusted(is_recovery_trusted);
-                        if let Some(summary) = delivery_summary
-                            && summary.total > 0
-                        {
-                            e = e.with_delivery_summary(summary);
-                        }
-                        e
-                    };
-
-                    match shared_info {
-                        Some(info) => {
-                            Box::new(build_engine(ContactDetailEngine::with_shared_info(
-                                item,
-                                fields,
-                                info,
-                                personal_note,
-                            )))
-                        }
-                        None => Box::new(build_engine(ContactDetailEngine::new(
-                            item,
-                            fields,
-                            personal_note,
-                        ))),
-                    }
-                }
-                _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
-            },
-            AppScreen::ContactVisibility { contact_id } => {
-                let (name, fields) = match vauchi.get_contact(contact_id) {
-                    Ok(Some(contact)) => {
-                        let name = contact.display_name().to_string();
-                        let items = contact
-                            .card()
-                            .fields()
-                            .iter()
-                            .map(|f| crate::ui::component::ToggleItem {
-                                id: f.id().to_string(),
-                                label: f.label().to_string(),
-                                selected: true,
-                                subtitle: None,
-                                a11y: None,
-                                info_key: None,
-                            })
-                            .collect();
-                        (name, items)
-                    }
-                    _ => (
-                        format!("Contact {}", &contact_id[..8.min(contact_id.len())]),
-                        vec![],
-                    ),
-                };
-                Box::new(ContactVisibilityEngine::new(name, fields))
-            }
-            AppScreen::ContactEdit { contact_id } => match vauchi.get_contact(contact_id) {
-                Ok(Some(contact)) => {
-                    let fields = contact
-                        .card()
-                        .fields()
-                        .iter()
-                        .map(|f| EditableField {
-                            id: f.id().to_string(),
-                            field_type: format!("{:?}", f.field_type()),
-                            label: f.label().to_string(),
-                            value: f.value().to_string(),
-                            visible_to_groups: vec![],
-                            shown: true,
-                        })
-                        .collect();
-                    let editable = EditableContact {
-                        display_name: contact.display_name().to_string(),
-                        fields,
-                    };
-                    let avatar_data = vauchi
-                        .own_card()
-                        .ok()
-                        .flatten()
-                        .and_then(|c| c.avatar().map(|a| a.to_vec()));
-                    Box::new(ContactEditEngine::new(editable, vec![]).with_avatar_data(avatar_data))
-                }
-                _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
-            },
-            AppScreen::ContactDuplicates => {
-                let pairs = vauchi.find_duplicates().unwrap_or_default();
-                let ui_pairs: Vec<_> = pairs
-                    .iter()
-                    .map(|p| {
-                        let c1 = vauchi.get_contact(&p.id1).ok().flatten();
-                        let c2 = vauchi.get_contact(&p.id2).ok().flatten();
-                        let name1 = c1
-                            .as_ref()
-                            .map(|c| c.display_name().to_string())
-                            .unwrap_or_else(|| p.id1.clone());
-                        let name2 = c2
-                            .as_ref()
-                            .map(|c| c.display_name().to_string())
-                            .unwrap_or_else(|| p.id2.clone());
-                        // Cross-kind detection drives the merge-vs-delete-imported
-                        // routing in intercept; populate even when one side is
-                        // missing (treat missing as not-imported, mirrors get_contact
-                        // failure path elsewhere).
-                        let is_imported_1 = c1.as_ref().map(|c| c.is_imported()).unwrap_or(false);
-                        let is_imported_2 = c2.as_ref().map(|c| c.is_imported()).unwrap_or(false);
-                        DuplicatePair {
-                            id1: p.id1.clone(),
-                            name1,
-                            is_imported_1,
-                            id2: p.id2.clone(),
-                            name2,
-                            is_imported_2,
-                            similarity: p.similarity,
-                        }
-                    })
-                    .collect();
-                Box::new(DuplicateDetectionEngine::new(ui_pairs))
-            }
-            AppScreen::ArchivedContacts => {
-                let archived = vauchi
-                    .list_archived_contacts()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|c| (c.id().to_string(), c.display_name().to_string()))
-                    .collect();
-                Box::new(ArchivedContactsEngine::new(archived))
-            }
-            AppScreen::ContactMerge {
-                primary_name,
-                primary_fields,
-                secondary_name,
-                secondary_fields,
-            } => Box::new(ContactMergeEngine::new(MergePreview {
-                primary_name: primary_name.clone(),
-                primary_fields: primary_fields.clone(),
-                secondary_name: secondary_name.clone(),
-                secondary_fields: secondary_fields.clone(),
-            })),
-            AppScreen::ContactLimit => {
-                let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
-                Box::new(ContactLimitEngine::new(contact_count, 0))
-            }
             AppScreen::DeviceReplacement => {
                 Box::new(crate::ui::device_replacement::DeviceReplacementEngine::new_source())
                 // Note: Settings "Set Up New Device" opens as Source (old device side).
@@ -990,122 +613,11 @@ impl AppEngine {
                     },
                 ))
             }
-            AppScreen::DeepLinkConsent { payload } => {
-                Box::new(crate::ui::DeepLinkConsentEngine::new(payload.clone()))
-            }
-            AppScreen::DeepLinkResponder { payload } => {
-                Box::new(crate::ui::LinkResponderEngine::new(payload.clone()))
-            }
-            AppScreen::LinkExchange => Box::new(crate::ui::LinkExchangeEngine::new()),
-            AppScreen::BleExchange { mode } => {
-                // Role-tiebreak token: this device's stable signing public
-                // key. The engine advertises it; on discovery each peer
-                // compares its own token against the other's and exactly one
-                // initiates the connection (ADR-043 — core owns the tiebreak,
-                // retiring the Android `compareTokens` frontend logic).
-                let own_token = vauchi
-                    .identity()
-                    .map(|id| id.signing_public_key().to_vec())
-                    .unwrap_or_default();
-                Box::new(crate::ui::BleExchangeEngine::new(
-                    *mode,
-                    device_capabilities.has_camera,
-                    own_token,
-                ))
-            }
-            AppScreen::NfcExchange => {
-                // The NFC engine signs its key offer with the full identity, so
-                // reconstruct it via the storage-bytes round-trip (Identity has
-                // no Clone — same path the legacy `set_nfc_identity` used).
-                let display_name = vauchi
-                    .own_card()
-                    .ok()
-                    .flatten()
-                    .map(|c| c.display_name().to_string())
-                    .unwrap_or_default();
-                let identity = vauchi
-                    .identity()
-                    .and_then(reconstruct_identity_via_storage_bytes);
-                Box::new(crate::ui::NfcExchangeEngine::new(
-                    identity,
-                    display_name,
-                    device_capabilities.has_camera,
-                ))
-            }
-            AppScreen::DirectTransport => {
-                // The Cable engine signs its key offer with the full identity
-                // and sends its own card, so reconstruct both via the
-                // storage-bytes round-trip (Identity has no Clone). A missing
-                // identity/own-card degrades to the engine's Failed screen
-                // (the legacy factory's graceful-degradation contract). The
-                // desktop is always the USB initiator.
-                let identity = vauchi
-                    .identity()
-                    .and_then(reconstruct_identity_via_storage_bytes);
-                // G2 privacy filter (shared chokepoint with the BLE path):
-                // share only the fields the selected exchange group(s) may see.
-                let card =
-                    crate::ui::exchange::group_filter::filtered_own_card(vauchi, pending_groups);
-                let clock = vauchi.clock().clone();
-                Box::new(crate::ui::DirectTransportEngine::new(
-                    identity,
-                    card,
-                    vauchi_core::exchange::UsbRole::Initiator,
-                    clock,
-                ))
-            }
-            AppScreen::VerifyFingerprint { contact_id } => {
-                let contact = vauchi.get_contact(contact_id).ok().flatten();
-                let their_fp = contact
-                    .as_ref()
-                    .map(|c| c.fingerprint())
-                    .unwrap_or_default();
-                let our_fp = vauchi.own_fingerprint().unwrap_or_default();
-                let is_verified = contact
-                    .as_ref()
-                    .map(|c| c.is_fingerprint_verified())
-                    .unwrap_or(false);
-                Box::new(FingerprintVerifyEngine::new(
-                    contact_id,
-                    &their_fp,
-                    &our_fp,
-                    is_verified,
-                ))
-            }
-            AppScreen::MultiStageExchange { mode } => {
-                // The cycle-thread session lives in vauchi-platform —
-                // the bridge from MultiStageSessionListener callbacks
-                // into this engine's `set_state` / `set_qr_payload` /
-                // `set_finalized` / `set_session_ended` setters is
-                // wired at the platform-binding layer.
-                //
-                // Phase 1.E of `2026-05-11-hover-graduation-plan.md`
-                // made the constructor mode-aware. Hover gets
-                // `new_hover()` (front camera + audio-handshake
-                // trigger registered); other supported modes (Glance
-                // today; Broadcast / TapHoverShake on future
-                // graduations) get `new_glance()` (back camera +
-                // audio-quiet). The autonomous audio-handshake
-                // trigger in `MobileMultiStageSession` is gated on
-                // `is_active_engine_multi_stage_hover()` per the
-                // 1.C polish commit, so Glance flows never fire
-                // spurious audio chrome.
-                let engine = match mode {
-                    vauchi_core::exchange::mode::ExchangeMode::Hover => {
-                        crate::ui::MultiStageExchangeEngine::new_hover()
-                    }
-                    vauchi_core::exchange::mode::ExchangeMode::TapHoverShake => {
-                        crate::ui::MultiStageExchangeEngine::new_tap_hover_shake()
-                    }
-                    _ => crate::ui::MultiStageExchangeEngine::new_glance(),
-                };
-                Box::new(engine)
-            }
         }
     }
 
     /// Builds a SharedInfoView for a contact — my fields as visible to them.
-    fn build_shared_info(vauchi: &Vauchi, contact_id: &str) -> Option<SharedInfoView> {
+    pub(super) fn build_shared_info(vauchi: &Vauchi, contact_id: &str) -> Option<SharedInfoView> {
         let own_card = vauchi.own_card().ok()??;
 
         // Determine the display name this contact sees
@@ -1348,156 +860,6 @@ impl AppEngine {
             })
             .collect()
     }
-
-    fn default_help_items() -> Vec<HelpItem> {
-        vec![
-            HelpItem {
-                id: "add-contact".into(),
-                question: "How do I add a contact?".into(),
-                answer: Some(
-                    "Meet in person and go to Exchange. \
-                     Show your QR code or use Bluetooth to share your contact card. \
-                     Both parties must be present — Vauchi never exchanges contacts remotely."
-                        .into(),
-                ),
-                answer_url: Some("https://docs.vauchi.app/users/faq#contacts--exchange".into()),
-                category: "Getting Started".into(),
-            },
-            HelpItem {
-                id: "e2e-encryption".into(),
-                question: "What is end-to-end encryption?".into(),
-                answer: Some(
-                    "End-to-end encryption means only you and your contact can read \
-                     your shared data. The relay server sees only encrypted blobs — \
-                     it cannot read names, fields, or any content. Keys are exchanged \
-                     in person and never leave your device."
-                        .into(),
-                ),
-                answer_url: Some("https://docs.vauchi.app/users/faq#privacy--security".into()),
-                category: "Security".into(),
-            },
-            HelpItem {
-                id: "create-backup".into(),
-                question: "How do I create a backup?".into(),
-                answer: Some(
-                    "Go to Settings > Backup & Restore. Choose Export to create an \
-                     encrypted backup file. Store it safely — you will need your \
-                     password to restore it. Backups include your identity, contacts, \
-                     and all field data."
-                        .into(),
-                ),
-                answer_url: Some("https://docs.vauchi.app/users/faq#backup--restore".into()),
-                category: "Getting Started".into(),
-            },
-            HelpItem {
-                id: "recovery".into(),
-                question: "How does social recovery work?".into(),
-                answer: Some(
-                    "Social recovery lets trusted contacts help you regain access \
-                     if you lose your device. You choose recovery trustees from your \
-                     contacts. To recover, a threshold of trustees must confirm your \
-                     identity in person."
-                        .into(),
-                ),
-                answer_url: Some("https://docs.vauchi.app/users/faq#identity--account".into()),
-                category: "Security".into(),
-            },
-            HelpItem {
-                id: "exchange-qr".into(),
-                question: "How do I exchange contact cards?".into(),
-                answer: Some(
-                    "Go to Exchange to show your QR code. Your contact scans it \
-                     with their Vauchi app (or vice versa). This establishes an \
-                     encrypted channel so future updates sync automatically. \
-                     Both parties must be physically present."
-                        .into(),
-                ),
-                answer_url: Some("https://docs.vauchi.app/users/faq#contacts--exchange".into()),
-                category: "Getting Started".into(),
-            },
-            HelpItem {
-                id: "ip-privacy".into(),
-                question: "How is my IP address protected?".into(),
-                answer: Some(
-                    "Vauchi uses a self-hosted OHTTP relay that strips your IP \
-                     address before requests reach the relay server. For additional \
-                     protection you can configure a SOCKS5 proxy in Settings. \
-                     Timing obfuscation further prevents traffic correlation."
-                        .into(),
-                ),
-                answer_url: Some("https://docs.vauchi.app/users/faq#privacy--security".into()),
-                category: "Privacy".into(),
-            },
-            HelpItem {
-                id: "report-issue".into(),
-                question: "Report a Bug".into(),
-                answer: None,
-                answer_url: Some(Self::bug_report_mailto()),
-                category: "Support".into(),
-            },
-            HelpItem {
-                id: "feature-idea".into(),
-                question: "Suggest an Idea".into(),
-                answer: None,
-                answer_url: Some(Self::idea_mailto()),
-                category: "Support".into(),
-            },
-            HelpItem {
-                id: "known-issues".into(),
-                question: "Known Issues".into(),
-                answer: None,
-                answer_url: Some("https://docs.vauchi.app/users/known-issues".into()),
-                category: "Support".into(),
-            },
-        ]
-    }
-
-    fn bug_report_mailto() -> String {
-        let version = env!("CARGO_PKG_VERSION");
-        let os = std::env::consts::OS;
-        let arch = std::env::consts::ARCH;
-        let subject = Self::percent_encode(&format!("Bug Report — Vauchi v{version}"));
-        let body = Self::percent_encode(&format!(
-            "--- Device Info (auto-filled) ---\n\
-             App: Vauchi v{version}\n\
-             Platform: {os} ({arch})\n\
-             ---\n\n\
-             What happened:\n\n\n\
-             Steps to reproduce:\n\
-             1. \n\
-             2. \n\
-             3. \n\n\
-             What I expected:\n\n"
-        ));
-        format!("mailto:support@vauchi.app?subject={subject}&body={body}")
-    }
-
-    fn idea_mailto() -> String {
-        let version = env!("CARGO_PKG_VERSION");
-        let subject = Self::percent_encode(&format!("Idea — Vauchi v{version}"));
-        let body = Self::percent_encode(
-            "What would you like to see in Vauchi?\n\n\n\
-             Why would this be useful?\n\n",
-        );
-        format!("mailto:support@vauchi.app?subject={subject}&body={body}")
-    }
-
-    fn percent_encode(s: &str) -> String {
-        let mut out = String::with_capacity(s.len() * 2);
-        for b in s.bytes() {
-            match b {
-                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                    out.push(b as char);
-                }
-                _ => {
-                    out.push('%');
-                    out.push(char::from(b"0123456789ABCDEF"[(b >> 4) as usize]));
-                    out.push(char::from(b"0123456789ABCDEF"[(b & 0x0F) as usize]));
-                }
-            }
-        }
-        out
-    }
 }
 
 /// Per-row swipe actions offered on the contact list. Imported contacts
@@ -1561,47 +923,6 @@ fn format_relative_time(now: u64, timestamp: u64) -> String {
             "1 month ago".to_string()
         } else {
             format!("{months} months ago")
-        }
-    }
-}
-
-/// Round-trips an `Identity` reference via `to_storage_bytes` /
-/// `from_storage_bytes` to obtain an owned copy. `Identity` deliberately
-/// does not implement `Clone` because it contains private key material;
-/// the serialization round-trip is the documented clone path.
-///
-/// The intermediate buffer is wrapped in `zeroize::Zeroizing` to scrub
-/// the serialized form when this fn returns.
-///
-/// Returns `None` only on contract violation: `from_storage_bytes` is
-/// guaranteed to accept the output of `to_storage_bytes`
-/// (`identity_storage_bytes_roundtrip_preserves_all_fields` in
-/// `core/vauchi-core/tests/it/identity_tests.rs` pins this). A failure
-/// here therefore means a bug in the serializer/parser pair or memory
-/// corruption — surfaced via `tracing::error!` instead of silently
-/// dropped (site 3 of
-/// `2026-05-21-silent-failures-in-security-paths`). The caller falls
-/// through to the existing graceful-degradation path so the user keeps
-/// an entry point into the exchange flow rather than getting a hung
-/// "tap does nothing" no-op.
-fn reconstruct_identity_via_storage_bytes(
-    id_ref: &vauchi_core::identity::Identity,
-) -> Option<vauchi_core::identity::Identity> {
-    let bytes = zeroize::Zeroizing::new(id_ref.to_storage_bytes());
-    match vauchi_core::identity::Identity::from_storage_bytes(
-        &bytes,
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    ) {
-        Ok(identity) => Some(identity),
-        Err(e) => {
-            tracing::error!(
-                target: "vauchi.ui.app_engine.screens",
-                error = %e,
-                "Identity round-trip via to_storage_bytes -> from_storage_bytes failed; \
-                 falling back to engine without pre-built session. This is a contract \
-                 violation — see identity_storage_bytes_roundtrip_preserves_all_fields."
-            );
-            None
         }
     }
 }

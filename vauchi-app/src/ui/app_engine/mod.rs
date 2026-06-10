@@ -16,6 +16,7 @@ mod device_link;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_initiator;
 mod dispatch;
+mod help_catalog;
 // INLINE_TEST_REQUIRED: factory_filter_tests drives the `pub(super)`
 // create_engine factory + the `pub(crate)` DirectTransportEngine::outgoing_card
 // seam — both crate-internal, so the test cannot live in a `tests/` directory.
@@ -31,6 +32,8 @@ mod overlays;
 mod result_routing;
 mod routing;
 mod screens;
+mod screens_contacts;
+mod screens_exchange;
 
 pub use app_screen::AppScreen;
 pub use navigation::TabLayout;

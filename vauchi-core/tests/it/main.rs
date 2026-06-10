@@ -203,6 +203,7 @@ mod exchange_mode_proptests;
 mod exchange_nfc_command_event_tests;
 mod exchange_proximity_enforcement_tests;
 mod exchange_proximity_tests;
+mod exchange_ratchet_bootstrap_tests;
 mod exchange_reciprocity_integration_tests;
 mod exchange_relay_wiring_tests;
 mod exchange_session_debug_tests;

@@ -939,6 +939,7 @@ impl WorkflowEngine for OnboardingEngine {
             U::ResetToLinkChoice => {
                 // Re-emitting "back" from BackupPasswordEntry clears
                 // pending bytes + password and routes to LinkChoice.
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = self.handle_action(UserAction::ActionPressed {
                     action_id: "back".into(),
                 });

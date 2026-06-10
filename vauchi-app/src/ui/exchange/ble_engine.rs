@@ -350,6 +350,10 @@ impl WorkflowEngine for BleExchangeEngine {
                 self.force_success();
                 true
             }
+            crate::ui::EngineUpdate::BleForceFailure { reason } => {
+                self.force_failure(reason);
+                true
+            }
             _ => false,
         }
     }

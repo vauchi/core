@@ -272,10 +272,13 @@ impl AppEngine {
                 // hardware event for the hollow flow to observe — flip the
                 // chrome to Failed here or the UI shows "Exchanging..."
                 // forever (P5b re-test, 2026-06-10).
-                if let Some(any) = self.engine.as_any_mut()
-                    && let Some(active) = any.downcast_mut::<crate::ui::BleExchangeEngine>()
+                if !self
+                    .engine
+                    .apply_update(crate::ui::EngineUpdate::BleForceFailure {
+                        reason: Some(reason),
+                    })
                 {
-                    active.force_failure(Some(reason));
+                    tracing::warn!("BleForceFailure not consumed by active engine");
                 }
                 false
             }

@@ -129,6 +129,10 @@ pub enum EngineUpdate {
     LinkExchange(LinkExchangeUpdate),
     /// Flip the BLE exchange chrome to its terminal Success screen.
     BleForceSuccess,
+    /// Flip the BLE exchange chrome to its terminal Failed screen.
+    BleForceFailure {
+        reason: Option<String>,
+    },
     ContactDetail(ContactDetailUpdate),
     ContactList(ContactListUpdate),
     Recovery(RecoveryUpdate),
@@ -277,6 +281,7 @@ impl EngineUpdate {
                 LinkExchangeUpdate::Failed(_) => "LinkExchange::Failed",
             },
             Self::BleForceSuccess => "BleForceSuccess",
+            Self::BleForceFailure { .. } => "BleForceFailure",
             Self::ContactDetail(u) => match u {
                 ContactDetailUpdate::ToggleProposalTrusted => {
                     "ContactDetail::ToggleProposalTrusted"

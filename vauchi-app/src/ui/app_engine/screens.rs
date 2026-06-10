@@ -234,11 +234,16 @@ impl AppEngine {
                         .unwrap_or_else(|_| "Weekly".to_string()),
                     last_backup_display: {
                         let now = vauchi.clock().unix_seconds();
+                        let locale = render_context
+                            .locale
+                            .as_deref()
+                            .and_then(crate::i18n::Locale::from_code)
+                            .unwrap_or_default();
                         vauchi
                             .load_backup_reminder_state()
                             .ok()
                             .and_then(|s| s.last_backup_timestamp)
-                            .map(|t| format_relative_time(now, t))
+                            .map(|t| crate::relative_time::format_relative_time(now, t, locale))
                             .unwrap_or_else(|| "Never".to_string())
                     },
                 };
@@ -898,31 +903,4 @@ fn contact_row_actions(is_imported: bool, is_hidden: bool) -> Vec<ListItemAction
         });
     }
     actions
-}
-
-/// Format a Unix timestamp as a human-readable relative time string.
-fn format_relative_time(now: u64, timestamp: u64) -> String {
-    let delta = now.saturating_sub(timestamp);
-    let days = delta / (24 * 60 * 60);
-    if days == 0 {
-        "Today".to_string()
-    } else if days == 1 {
-        "Yesterday".to_string()
-    } else if days < 7 {
-        format!("{days} days ago")
-    } else if days < 30 {
-        let weeks = days / 7;
-        if weeks == 1 {
-            "1 week ago".to_string()
-        } else {
-            format!("{weeks} weeks ago")
-        }
-    } else {
-        let months = days / 30;
-        if months == 1 {
-            "1 month ago".to_string()
-        } else {
-            format!("{months} months ago")
-        }
-    }
 }

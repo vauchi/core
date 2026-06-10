@@ -502,11 +502,15 @@ impl AppEngine {
             FormDialogType::AddField { .. } => self.form_add_field(input),
             FormDialogType::CreateGroup => self.form_create_group(input),
             FormDialogType::RenameGroup { group_id, .. } => self.form_rename_group(group_id, input),
-            FormDialogType::EditRelayUrl { .. } => {
-                // Relay URL is TUI-specific config (Backend), not in Vauchi.
-                // Navigate back; TUI handles save via Backend::set_relay_url.
-                self.form_saved(Ok::<(), std::convert::Infallible>(()))
-            }
+            FormDialogType::EditRelayUrl { .. } => match input {
+                // Persist durably via core so the change survives a restart on
+                // every frontend (mobile had no Backend, so this was a no-op).
+                Some(url) => {
+                    let result = self.vauchi.set_relay_url(&url);
+                    self.form_saved(result)
+                }
+                None => self.form_saved(Ok::<(), std::convert::Infallible>(())),
+            },
         }
     }
 

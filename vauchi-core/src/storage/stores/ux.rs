@@ -298,6 +298,45 @@ impl UxStore<'_> {
 
         Ok(())
     }
+    /// Saves the persisted relay URL (encrypted).
+    pub fn save_relay_url(&self, url: &str) -> Result<(), StorageError> {
+        let encrypted = crate::crypto::encrypt(self.key, url.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let now = self.now_secs();
+        self.conn.execute(
+            "INSERT OR REPLACE INTO ux_state (id, relay_url_encrypted, updated_at)
+             VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET relay_url_encrypted = ?1, updated_at = ?2",
+            params![encrypted, now as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Loads the persisted relay URL (decrypted), if any.
+    pub fn load_relay_url(&self) -> Result<Option<String>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT relay_url_encrypted FROM ux_state WHERE id = 1",
+            [],
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                Ok(encrypted)
+            },
+        );
+
+        match result {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
+                let decrypted = crate::crypto::decrypt(self.key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let url = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(url))
+            }
+            Ok(_) => Ok(None),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
     /// Loads the settings flags (decrypted).
     pub fn load_settings_flags(&self) -> Result<Option<SettingsFlags>, StorageError> {
         let result = self.conn.query_row(

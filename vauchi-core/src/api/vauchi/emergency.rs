@@ -316,6 +316,22 @@ impl Vauchi {
         &mut self.config
     }
 
+    /// Sets the relay server URL, updating the live config and persisting it
+    /// durably so it survives a restart (seeded back into config on the next
+    /// launch). The relay transport is built at startup, so a change takes
+    /// effect on the next launch — matching the existing desktop behaviour.
+    pub fn set_relay_url(&mut self, url: &str) -> VauchiResult<()> {
+        let trimmed = url.trim();
+        if trimmed.is_empty() {
+            return Err(VauchiError::InvalidState(
+                "Relay URL cannot be empty".into(),
+            ));
+        }
+        self.storage.ux().save_relay_url(trimmed)?;
+        self.config.relay.server_url = trimmed.to_string();
+        Ok(())
+    }
+
     /// Returns a reference to the storage.
     pub fn storage(&self) -> &Storage {
         &self.storage

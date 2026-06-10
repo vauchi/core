@@ -374,6 +374,15 @@ impl Vauchi {
             config.suppress_presence = flags.suppress_presence;
             config.contact_added_notifications = flags.contact_added_notifications;
         }
+        // Seed the persisted relay URL, but only when the caller left the
+        // built-in default — an explicit `with_relay_url` (desktop
+        // `--relay-url` / resolved file) must win over the stored value
+        // (mobile-relay-url-editor-noop).
+        if config.relay.server_url == crate::api::config::DEFAULT_RELAY_URL
+            && let Ok(Some(url)) = storage.ux().load_relay_url()
+        {
+            config.relay.server_url = url;
+        }
 
         let events = Arc::new(EventDispatcher::new());
 

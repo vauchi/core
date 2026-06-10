@@ -97,6 +97,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("ux_state", "backup_reminder_encrypted"),
     // V53 settings flags
     ("ux_state", "settings_flags_encrypted"),
+    // V54 persisted relay URL
+    ("ux_state", "relay_url_encrypted"),
     // V30 label display name override
     ("visibility_labels", "display_name_override_encrypted"),
     // V38 exchange state crash recovery
@@ -1195,7 +1197,7 @@ impl Storage {
         new_key: &SymmetricKey,
     ) -> Result<(), StorageError> {
         let result = self.conn.query_row(
-            "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted, onboarding_progress_encrypted, backup_reminder_encrypted, settings_flags_encrypted FROM ux_state WHERE id = 1",
+            "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted, onboarding_progress_encrypted, backup_reminder_encrypted, settings_flags_encrypted, relay_url_encrypted FROM ux_state WHERE id = 1",
             [],
             |row| {
                 let id: i64 = row.get(0)?;
@@ -1204,7 +1206,16 @@ impl Storage {
                 let onboarding: Option<Vec<u8>> = row.get(3)?;
                 let backup_reminder: Option<Vec<u8>> = row.get(4)?;
                 let settings_flags: Option<Vec<u8>> = row.get(5)?;
-                Ok((id, aha, demo, onboarding, backup_reminder, settings_flags))
+                let relay_url: Option<Vec<u8>> = row.get(6)?;
+                Ok((
+                    id,
+                    aha,
+                    demo,
+                    onboarding,
+                    backup_reminder,
+                    settings_flags,
+                    relay_url,
+                ))
             },
         );
 
@@ -1215,6 +1226,7 @@ impl Storage {
             onboarding_enc,
             backup_reminder_enc,
             settings_flags_enc,
+            relay_url_enc,
         )) = result
         {
             if let Some(enc) = aha_enc
@@ -1294,6 +1306,20 @@ impl Storage {
                     .map_err(|e| {
                         StorageError::Migration(format!("Update settings_flags: {}", e))
                     })?;
+            }
+            if let Some(enc) = relay_url_enc
+                && !enc.is_empty()
+            {
+                let plain = decrypt(old_key, &enc)
+                    .map_err(|e| StorageError::Migration(format!("Decrypt relay_url: {}", e)))?;
+                let new_enc = encrypt(new_key, &plain)
+                    .map_err(|e| StorageError::Migration(format!("Encrypt relay_url: {}", e)))?;
+                self.conn
+                    .execute(
+                        "UPDATE ux_state SET relay_url_encrypted = ?1 WHERE id = ?2",
+                        params![new_enc, id],
+                    )
+                    .map_err(|e| StorageError::Migration(format!("Update relay_url: {}", e)))?;
             }
         }
         Ok(())

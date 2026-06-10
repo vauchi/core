@@ -38,6 +38,7 @@ mod api_personal_notes_tests;
 mod api_places_tests;
 mod api_prepare_card_update_tests;
 mod api_relay_exchange_tests;
+mod api_relay_url_persist_tests;
 mod api_search_tests;
 mod api_shared_avatars_tests;
 mod api_shared_names_tests;

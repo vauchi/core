@@ -531,6 +531,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "settings_flags",
             action: MigrationAction::Sql(MIGRATION_V53_SETTINGS_FLAGS),
         },
+        Migration {
+            version: 54,
+            name: "relay_url",
+            action: MigrationAction::Sql(MIGRATION_V54_RELAY_URL),
+        },
     ]
 }
 
@@ -845,6 +850,10 @@ const MIGRATION_V44_BACKUP_REMINDER: &str =
 /// (settings-toggle-not-persisting P1).
 const MIGRATION_V53_SETTINGS_FLAGS: &str =
     "ALTER TABLE ux_state ADD COLUMN settings_flags_encrypted BLOB;";
+
+/// Migration v54: persisted relay URL singleton column on ux_state
+/// (mobile-relay-url-editor-noop).
+const MIGRATION_V54_RELAY_URL: &str = "ALTER TABLE ux_state ADD COLUMN relay_url_encrypted BLOB;";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "
     CREATE TABLE IF NOT EXISTS local_groups (

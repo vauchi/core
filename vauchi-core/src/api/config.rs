@@ -246,7 +246,7 @@ impl Default for RelayConfig {
     /// `server_url` and optionally `pinned_certs`.
     fn default() -> Self {
         RelayConfig {
-            server_url: "https://relay.vauchi.app".to_string(),
+            server_url: DEFAULT_RELAY_URL.to_string(),
             connect_timeout_ms: 10_000,
             io_timeout_ms: 30_000,
             max_reconnect_attempts: 5,
@@ -266,6 +266,10 @@ impl Default for RelayConfig {
 
 /// Production data relay host.
 pub(crate) const PROD_RELAY_HOST: &str = "relay.vauchi.app";
+/// Default data relay URL. Used both by [`RelayConfig::default`] and by the
+/// startup seed guard (a persisted relay URL is applied only when config
+/// still holds this default, so an explicit `with_relay_url` override wins).
+pub(crate) const DEFAULT_RELAY_URL: &str = "https://relay.vauchi.app";
 /// Production OHTTP relay (IP-stripping hop, ADR-037) the client sends
 /// OHTTP traffic to when the data relay is `relay.vauchi.app`.
 pub(crate) const PROD_OHTTP_RELAY_URL: &str = "https://ohttp.vauchi.app";

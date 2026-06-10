@@ -344,6 +344,36 @@ fn test_rekey_preserves_onboarding_progress() {
     assert_eq!(plain, b"{\"step\":\"backup\"}");
 }
 
+// @scenario: security :: Rekey preserves ux_state.relay_url_encrypted
+#[test]
+fn test_rekey_preserves_relay_url() {
+    let (_dir, mut storage) = open_storage();
+    let key1 = storage.key().clone();
+
+    let url_enc = vauchi_core::crypto::encrypt(&key1, b"https://my.relay.example").unwrap();
+    storage
+        .connection()
+        .execute(
+            "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json, demo_contact_json, relay_url_encrypted, updated_at) VALUES (1, '', '', ?1, 1000)",
+            [&url_enc],
+        )
+        .unwrap();
+
+    let key2 = SymmetricKey::generate();
+    storage.rekey(key2.clone()).unwrap();
+
+    let loaded: Option<Vec<u8>> = storage
+        .connection()
+        .query_row(
+            "SELECT relay_url_encrypted FROM ux_state WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let plain = vauchi_core::crypto::decrypt(&key2, &loaded.unwrap()).unwrap();
+    assert_eq!(plain, b"https://my.relay.example");
+}
+
 // @scenario: security :: Rekey preserves visibility_labels.display_name_override_encrypted
 #[test]
 fn test_rekey_preserves_label_display_name_override() {

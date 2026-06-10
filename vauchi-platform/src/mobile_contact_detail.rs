@@ -119,3 +119,75 @@ pub(crate) fn compute_added_time_display(
     }
     Some(format_relative_time(now, then, locale))
 }
+
+/// Assemble the full contact-detail view state for one contact.
+///
+/// All decisions delegate to the `vauchi_app::ui` predicates; this
+/// function only orders the lists and resolves banner labels from the
+/// locale table (was inline in the `ContactDetailViewState` dispatch
+/// arm with hardcoded English labels, `Locale::English`, and a
+/// `reciprocity(0)` call that disabled the 7-day unreciprocated
+/// timeout — `now` is used for both timestamps here).
+pub(crate) fn build_view_state(
+    contact: &vauchi_core::Contact,
+    contact_id: &str,
+    now: u64,
+    locale: Locale,
+) -> MobileContactDetailViewState {
+    use vauchi_app::i18n::get_string;
+    use vauchi_app::ui::{
+        ReciprocityBannerKind, reciprocity_banner, show_recovery_trusted_indicator,
+        show_verified_badge, verify_button_visible,
+    };
+
+    let mut badges = Vec::new();
+    if show_verified_badge(contact.is_fingerprint_verified()) {
+        badges.push(MobileContactDetailBadge::Verified);
+    }
+    if show_recovery_trusted_indicator(contact.is_recovery_trusted()) {
+        badges.push(MobileContactDetailBadge::RecoveryTrusted);
+    }
+
+    let mut banners = Vec::new();
+    if let Some(kind) = reciprocity_banner(contact.reciprocity(now)) {
+        banners.push(match kind {
+            ReciprocityBannerKind::Pending => MobileContactDetailBanner::ReciprocityPending {
+                label: get_string(locale, "contact_detail.reciprocity_pending"),
+            },
+            ReciprocityBannerKind::Unreciprocated => {
+                MobileContactDetailBanner::ReciprocityUnreciprocated {
+                    label: get_string(locale, "contact_detail.reciprocity_unreciprocated"),
+                }
+            }
+        });
+    }
+
+    let mut actions = Vec::new();
+    if verify_button_visible(contact.is_fingerprint_verified(), contact.trust_level()) {
+        actions.push(MobileContactDetailAction::Verify);
+    }
+    actions.push(MobileContactDetailAction::ToggleRecoveryTrust {
+        currently_trusted: contact.is_recovery_trusted(),
+    });
+    actions.push(MobileContactDetailAction::ToggleHidden {
+        currently_hidden: contact.is_hidden(),
+    });
+    actions.push(MobileContactDetailAction::Edit);
+    actions.push(MobileContactDetailAction::VerifyFingerprint);
+    actions.push(MobileContactDetailAction::PreviewAs {
+        contact_id: contact_id.to_string(),
+    });
+    if contact.is_imported() {
+        actions.push(MobileContactDetailAction::Delete);
+    } else {
+        actions.push(MobileContactDetailAction::Archive);
+    }
+    actions.push(MobileContactDetailAction::Back);
+
+    MobileContactDetailViewState {
+        badges,
+        banners,
+        actions,
+        added_time_display: compute_added_time_display(contact, now, locale),
+    }
+}

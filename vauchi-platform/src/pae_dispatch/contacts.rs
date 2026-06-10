@@ -618,12 +618,9 @@ impl PlatformAppEngine {
             // ── Contact detail view state + social registry (B7 batch 19) ──
             DomainCommand::ContactDetailViewState { contact_id } => {
                 use vauchi_app::i18n::Locale;
-                use vauchi_app::ui::{
-                    ReciprocityBannerKind, reciprocity_banner, show_recovery_trusted_indicator,
-                    show_verified_badge, verify_button_visible,
-                };
-                let storage = engine.vauchi().storage();
-                let contact = storage
+                let contact = engine
+                    .vauchi()
+                    .storage()
                     .contacts()
                     .load_contact(&contact_id)
                     .map_err(|e| MobileError::StorageError {
@@ -633,80 +630,20 @@ impl PlatformAppEngine {
                         field: "contact_id".to_string(),
                         detail: format!("contact not found: {contact_id}"),
                     })?;
-
-                let mut badges = Vec::new();
-                if show_verified_badge(contact.is_fingerprint_verified()) {
-                    badges.push(crate::mobile_contact_detail::MobileContactDetailBadge::Verified);
-                }
-                if show_recovery_trusted_indicator(contact.is_recovery_trusted()) {
-                    badges.push(
-                        crate::mobile_contact_detail::MobileContactDetailBadge::RecoveryTrusted,
-                    );
-                }
-
-                let mut banners = Vec::new();
-                if let Some(kind) = reciprocity_banner(contact.reciprocity(0)) {
-                    banners.push(match kind {
-                        ReciprocityBannerKind::Pending => {
-                            crate::mobile_contact_detail::MobileContactDetailBanner::ReciprocityPending {
-                                label: "Waiting for them to share their info".to_string(),
-                            }
-                        }
-                        ReciprocityBannerKind::Unreciprocated => {
-                            crate::mobile_contact_detail::MobileContactDetailBanner::ReciprocityUnreciprocated {
-                                label: "They haven't shared their info".to_string(),
-                            }
-                        }
-                    });
-                }
-
-                let mut actions = Vec::new();
-                if verify_button_visible(contact.is_fingerprint_verified(), contact.trust_level()) {
-                    actions.push(crate::mobile_contact_detail::MobileContactDetailAction::Verify);
-                }
-                actions.push(
-                    crate::mobile_contact_detail::MobileContactDetailAction::ToggleRecoveryTrust {
-                        currently_trusted: contact.is_recovery_trusted(),
-                    },
-                );
-                actions.push(
-                    crate::mobile_contact_detail::MobileContactDetailAction::ToggleHidden {
-                        currently_hidden: contact.is_hidden(),
-                    },
-                );
-                actions.push(crate::mobile_contact_detail::MobileContactDetailAction::Edit);
-                actions.push(
-                    crate::mobile_contact_detail::MobileContactDetailAction::VerifyFingerprint,
-                );
-                actions.push(
-                    crate::mobile_contact_detail::MobileContactDetailAction::PreviewAs {
-                        contact_id: contact_id.clone(),
-                    },
-                );
-                if contact.is_imported() {
-                    actions.push(crate::mobile_contact_detail::MobileContactDetailAction::Delete);
-                } else {
-                    actions.push(crate::mobile_contact_detail::MobileContactDetailAction::Archive);
-                }
-                actions.push(crate::mobile_contact_detail::MobileContactDetailAction::Back);
-
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                let added_time_display = crate::mobile_contact_detail::compute_added_time_display(
-                    &contact,
-                    now,
-                    Locale::English,
-                );
-
+                let now = engine.vauchi().clock().unix_seconds();
+                let locale = engine
+                    .render_context()
+                    .locale
+                    .as_deref()
+                    .and_then(Locale::from_code)
+                    .unwrap_or_default();
                 Ok(DomainCommandResult::ContactDetailView {
-                    state: crate::mobile_contact_detail::MobileContactDetailViewState {
-                        badges,
-                        banners,
-                        actions,
-                        added_time_display,
-                    },
+                    state: crate::mobile_contact_detail::build_view_state(
+                        &contact,
+                        &contact_id,
+                        now,
+                        locale,
+                    ),
                 })
             }
             DomainCommand::ListSocialNetworks => {

@@ -312,3 +312,66 @@ fn exchanged_contact_surfaces_added_time_display_string() {
         "added_time_display must not be an empty string",
     );
 }
+
+// ── G3 push-down: banner labels from the locale table + real-clock
+//    reciprocity (the arm previously passed now=0, which disabled the
+//    7-day unreciprocated timeout) ──
+
+fn add_exchanged_with_reciprocity(
+    engine: &PlatformAppEngine,
+    name: &str,
+    pk_seed: u8,
+    exchange_ts: u64,
+) -> String {
+    let card = vauchi_core::contact_card::ContactCard::new(name);
+    let mut contact = vauchi_core::Contact::from_exchange(
+        [pk_seed; 32],
+        card,
+        vauchi_core::crypto::SymmetricKey::generate(),
+        exchange_ts,
+    );
+    contact.set_reciprocity(vauchi_core::exchange::Reciprocity::Pending);
+    let id = contact.id().to_string();
+    engine.save_test_contact(&contact).unwrap();
+    id
+}
+
+fn wall_clock_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+// @internal
+#[test]
+fn fresh_pending_contact_shows_localized_pending_banner() {
+    let (engine, _dir) = setup();
+    let id = add_exchanged_with_reciprocity(&engine, "Bob", 0x21, wall_clock_now() - 60);
+
+    let state = view_state(&engine, id).unwrap();
+
+    match state.banners.as_slice() {
+        [MobileContactDetailBanner::ReciprocityPending { label }] => {
+            assert_eq!(label, "Waiting for them to share their info");
+        }
+        other => panic!("expected one pending banner, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn week_old_pending_contact_shows_localized_unreciprocated_banner() {
+    let (engine, _dir) = setup();
+    let eight_days = 8 * 24 * 60 * 60;
+    let id = add_exchanged_with_reciprocity(&engine, "Bob", 0x22, wall_clock_now() - eight_days);
+
+    let state = view_state(&engine, id).unwrap();
+
+    match state.banners.as_slice() {
+        [MobileContactDetailBanner::ReciprocityUnreciprocated { label }] => {
+            assert_eq!(label, "They haven't shared their info");
+        }
+        other => panic!("expected one unreciprocated banner, got {other:?}"),
+    }
+}

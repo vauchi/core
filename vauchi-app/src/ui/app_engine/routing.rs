@@ -8,8 +8,7 @@
 use super::AppEngine;
 use super::AppScreen;
 use crate::ui::ScreenModel;
-use crate::ui::action::{ActionResult, ContactActionKind, UserAction};
-use crate::ui::engine::WorkflowEngine;
+use crate::ui::action::{ActionResult, ContactActionKind};
 use crate::ui::form_dialog::FormDialogType;
 use vauchi_core::Event;
 
@@ -247,13 +246,13 @@ impl AppEngine {
                 // on the OnboardingEngine and transition to its new
                 // `BackupPasswordEntry` step so the user can enter
                 // the password core-side.
-                if let Some(eng) = self
+                if self
                     .engine
-                    .as_any_mut()
-                    .and_then(|a| a.downcast_mut::<crate::ui::onboarding::OnboardingEngine>())
+                    .apply_update(crate::ui::EngineUpdate::Onboarding(
+                        crate::ui::OnboardingUpdate::PendingBackupBytes(bytes),
+                    ))
                 {
-                    eng.set_pending_backup_bytes(bytes);
-                    return Some(ActionResult::NavigateTo(eng.current_screen()));
+                    return Some(ActionResult::NavigateTo(self.engine.current_screen()));
                 }
                 None
             }
@@ -267,13 +266,13 @@ impl AppEngine {
                 // entered DeviceReplacement). Result: smooth password
                 // → import flow shared with the onboarding entry point.
                 let _ = self.navigate_to_internal(AppScreen::Onboarding);
-                if let Some(eng) = self
+                if self
                     .engine
-                    .as_any_mut()
-                    .and_then(|a| a.downcast_mut::<crate::ui::onboarding::OnboardingEngine>())
+                    .apply_update(crate::ui::EngineUpdate::Onboarding(
+                        crate::ui::OnboardingUpdate::PendingBackupBytes(bytes),
+                    ))
                 {
-                    eng.set_pending_backup_bytes(bytes);
-                    return Some(ActionResult::NavigateTo(eng.current_screen()));
+                    return Some(ActionResult::NavigateTo(self.engine.current_screen()));
                 }
                 None
             }
@@ -292,14 +291,18 @@ impl AppEngine {
         // `Vauchi::import_full_backup`. Bytes are the file content
         // verbatim — hex-encoded ASCII matching `export_full_backup`.
         if matches!(self.screen, AppScreen::Onboarding)
-            && let Some(eng) = self
-                .engine
-                .as_any_mut()
-                .and_then(|a| a.downcast_mut::<crate::ui::onboarding::OnboardingEngine>())
-            && eng.current_step() == vauchi_core::types::OnboardingStep::BackupPasswordEntry
-            && let Some((bytes, password)) = eng.take_pending_backup()
+            && let Some(crate::ui::EngineOutput::Onboarding(snap)) = self.engine.engine_output()
+            && snap.step == vauchi_core::types::OnboardingStep::BackupPasswordEntry
+            && let Some(pending) = snap.pending_backup
         {
-            return self.execute_backup_restore(bytes, password);
+            // Consume the staged backup so re-submitting without
+            // re-picking the file stays impossible (take semantics).
+            let _ = self
+                .engine
+                .apply_update(crate::ui::EngineUpdate::Onboarding(
+                    crate::ui::OnboardingUpdate::ClearPendingBackup,
+                ));
+            return self.execute_backup_restore(pending.bytes, pending.password);
         }
 
         // Dispatch on a cloned screen so the per-handler `&mut self` calls
@@ -388,20 +391,13 @@ impl AppEngine {
     /// can retry restore after a failure. Called only from
     /// `execute_backup_restore`'s error paths.
     fn reset_onboarding_to_link_choice(&mut self) {
-        if let Some(eng) = self
+        // best-effort: navigation reset is advisory; if the engine
+        // can't transition the screen will rebuild fresh
+        let _ = self
             .engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<crate::ui::onboarding::OnboardingEngine>())
-        {
-            // Re-emitting "back" from BackupPasswordEntry clears
-            // pending bytes + password and routes to LinkChoice.
-            // best-effort: navigation reset is advisory; if the
-            // engine can't transition the screen will rebuild fresh
-            #[allow(clippy::let_underscore_must_use)]
-            let _ = eng.handle_action(UserAction::ActionPressed {
-                action_id: "back".into(),
-            });
-        }
+            .apply_update(crate::ui::EngineUpdate::Onboarding(
+                crate::ui::OnboardingUpdate::ResetToLinkChoice,
+            ));
     }
 
     ///

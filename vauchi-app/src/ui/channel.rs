@@ -37,8 +37,9 @@ pub enum EngineOutput {
     /// Outcome of the fingerprint-verification screen.
     FingerprintVerify(VerifyAction),
     /// Everything captured during onboarding (display name, group
-    /// selection, ContactInfo fields), read at completion time.
-    Onboarding(Box<OnboardingData>),
+    /// selection, ContactInfo fields), plus the wizard step and any
+    /// pending backup-restore file, read at completion time.
+    Onboarding(Box<OnboardingSnapshot>),
     /// The configured emergency broadcast and the user's chosen outcome.
     EmergencyBroadcast(EmergencyBroadcastPlan),
     /// The display name as edited on the contact-edit screen.
@@ -324,6 +325,33 @@ impl EngineUpdate {
 impl std::fmt::Debug for EngineUpdate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.name())
+    }
+}
+
+/// Snapshot of the onboarding engine at completion time.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OnboardingSnapshot {
+    pub data: OnboardingData,
+    pub step: vauchi_core::types::OnboardingStep,
+    pub pending_backup: Option<PendingBackup>,
+}
+
+/// Backup file + password staged on the onboarding engine during a
+/// restore. The hub consumes it at completion and sends
+/// [`OnboardingUpdate::ClearPendingBackup`] so re-submitting without
+/// re-picking the file stays impossible.
+#[derive(Clone, PartialEq)]
+pub struct PendingBackup {
+    pub bytes: Vec<u8>,
+    pub password: String,
+}
+
+impl std::fmt::Debug for PendingBackup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PendingBackup")
+            .field("bytes_len", &self.bytes.len())
+            .field("password", &"<redacted>")
+            .finish()
     }
 }
 

@@ -226,17 +226,17 @@ impl AppEngine {
             && let Some(parent) = self.nav_history.last()
             && matches!(parent, AppScreen::Onboarding)
             && let Some(engine) = self.engine_cache.get_mut(parent)
-            && let Some(ob) = engine
-                .as_any_mut()
-                .and_then(|a| a.downcast_mut::<crate::ui::onboarding::OnboardingEngine>())
+            && !engine.apply_update(crate::ui::EngineUpdate::Onboarding(
+                crate::ui::OnboardingUpdate::PushField(crate::ui::onboarding::FieldSetup {
+                    field_type: entry_type.to_string(),
+                    label: label.clone(),
+                    value: value.to_string(),
+                    visible_to_groups: group_list,
+                    shown: true,
+                }),
+            ))
         {
-            ob.push_field(crate::ui::onboarding::FieldSetup {
-                field_type: entry_type.to_string(),
-                label: label.clone(),
-                value: value.to_string(),
-                visible_to_groups: group_list,
-                shown: true,
-            });
+            tracing::warn!("onboarding PushField not consumed by cached engine");
         }
         self.form_saved(result)
     }

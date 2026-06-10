@@ -26,15 +26,16 @@ fn onboarding_output_carries_typed_display_name() {
         value: "Ada".into(),
     });
 
-    let Some(EngineOutput::Onboarding(data)) = engine.engine_output() else {
+    let Some(EngineOutput::Onboarding(snap)) = engine.engine_output() else {
         panic!("onboarding engine must expose Onboarding output");
     };
-    assert_eq!(data.display_name, "Ada");
+    assert_eq!(snap.data.display_name, "Ada");
     assert!(
-        data.selected_groups.iter().all(|g| !g.selected),
+        snap.data.selected_groups.iter().all(|g| !g.selected),
         "no group is selected before the user toggles one"
     );
-    assert_eq!(data.fields, vec![]);
+    assert_eq!(snap.data.fields, vec![]);
+    assert_eq!(snap.pending_backup, None);
 }
 
 // @scenario: emergency_broadcast.feature - Configuring an emergency broadcast

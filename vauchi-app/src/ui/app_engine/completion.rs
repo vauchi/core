@@ -23,7 +23,7 @@ impl AppEngine {
         // here rather than from a duplicated AppEngine-level `pending_*` field
         // (#2026-06-07-app-engine-dispatch-tier-consolidation, Phase 1).
         let onboarding_data = match self.engine.engine_output() {
-            Some(crate::ui::EngineOutput::Onboarding(data)) => Some(data),
+            Some(crate::ui::EngineOutput::Onboarding(snap)) => Some(snap.data),
             other => {
                 tracing::warn!(?other, "onboarding completion without Onboarding output");
                 None

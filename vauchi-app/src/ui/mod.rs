@@ -80,8 +80,8 @@ pub use change_password::ChangePasswordEngine;
 pub use channel::{
     BackupFormSnapshot, ContactDetailUpdate, ContactListUpdate, DeviceLinkUpdate, DuressPinSetup,
     EmergencyBroadcastPlan, EngineOutput, EngineUpdate, FormInput, GdprChoice, LinkExchangeUpdate,
-    LinkResponderUpdate, MultiStageUpdate, MyInfoEntryDetailUpdate, OnboardingUpdate,
-    RecoveryHelpUpdate, RecoveryUpdate, SyncChoice,
+    LinkResponderUpdate, MultiStageUpdate, MyInfoEntryDetailUpdate, OnboardingSnapshot,
+    OnboardingUpdate, PendingBackup, RecoveryHelpUpdate, RecoveryUpdate, SyncChoice,
 };
 pub use component::{
     A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, IndicatorKind,

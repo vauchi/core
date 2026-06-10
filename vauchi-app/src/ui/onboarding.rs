@@ -912,7 +912,40 @@ impl WorkflowEngine for OnboardingEngine {
     }
 
     fn engine_output(&self) -> Option<EngineOutput> {
-        Some(EngineOutput::Onboarding(Box::new(self.data.clone())))
+        Some(EngineOutput::Onboarding(Box::new(
+            crate::ui::OnboardingSnapshot {
+                data: self.data.clone(),
+                step: self.step,
+                pending_backup: self.pending_backup_bytes.as_ref().map(|bytes| {
+                    crate::ui::PendingBackup {
+                        bytes: bytes.clone(),
+                        password: self.pending_backup_password.clone(),
+                    }
+                }),
+            },
+        )))
+    }
+
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        use crate::ui::OnboardingUpdate as U;
+        let crate::ui::EngineUpdate::Onboarding(update) = update else {
+            return false;
+        };
+        match update {
+            U::PendingBackupBytes(bytes) => self.set_pending_backup_bytes(bytes),
+            U::ClearPendingBackup => {
+                let _ = self.take_pending_backup();
+            }
+            U::ResetToLinkChoice => {
+                // Re-emitting "back" from BackupPasswordEntry clears
+                // pending bytes + password and routes to LinkChoice.
+                let _ = self.handle_action(UserAction::ActionPressed {
+                    action_id: "back".into(),
+                });
+            }
+            U::PushField(field) => self.push_field(field),
+        }
+        true
     }
 
     fn current_screen(&self) -> ScreenModel {

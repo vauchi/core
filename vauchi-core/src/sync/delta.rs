@@ -539,12 +539,12 @@ impl VersionedPayload {
     }
 }
 
-const RECIPROCITY_DOMAIN: &[u8] = b"vauchi-reciprocity-confirm-v1";
+const RECIPROCITY_DOMAIN: &[u8] = b"vauchi-sync-reciprocity-confirm-v1";
 
 /// Reciprocity confirmation payload (version byte 0x03).
 ///
 /// Wire format: `0x03 || token(32) || signature(64)` = 97 bytes.
-/// Signature covers: `domain(29) || sender_pk(32) || recipient_pk(32) || token(32)` = 125 bytes.
+/// Signature covers: `domain(34) || sender_pk(32) || recipient_pk(32) || token(32)` = 130 bytes.
 #[derive(Debug)]
 pub struct ReciprocityConfirmPayload {
     token: [u8; 32],
@@ -610,7 +610,7 @@ impl ReciprocityConfirmPayload {
         sender_pk: &[u8; 32],
         recipient_pk: &[u8; 32],
     ) -> Vec<u8> {
-        let mut msg = Vec::with_capacity(125);
+        let mut msg = Vec::with_capacity(130);
         msg.extend_from_slice(RECIPROCITY_DOMAIN);
         msg.extend_from_slice(sender_pk);
         msg.extend_from_slice(recipient_pk);

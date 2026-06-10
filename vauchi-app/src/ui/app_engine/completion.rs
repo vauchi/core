@@ -232,14 +232,7 @@ impl AppEngine {
     /// app_engine/multi_stage_exchange.rs) lands on Contacts; Cancel returns
     /// to the mode picker.
     pub(super) fn complete_multi_stage_exchange(&mut self) -> ActionResult {
-        let cancelled = self
-            .engine
-            .as_any()
-            .and_then(|a| {
-                a.downcast_ref::<crate::ui::multi_stage_exchange::MultiStageExchangeEngine>()
-            })
-            .map(|ms| ms.was_cancelled())
-            .unwrap_or(false);
+        let cancelled = self.engine.was_cancelled();
         let target = if cancelled {
             AppScreen::Exchange
         } else {

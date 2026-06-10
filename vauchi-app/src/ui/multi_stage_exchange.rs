@@ -369,14 +369,6 @@ impl MultiStageExchangeEngine {
         self.is_hover_mode
     }
 
-    /// Whether the user cancelled the exchange (Cancel pressed) rather
-    /// than completing it (Done after success). `AppEngine::handle_completion`
-    /// reads this to route Cancel back to the mode picker vs Done to
-    /// Contacts (Fix A of `2026-06-02-exchange-back-cancel-broken`).
-    pub fn was_cancelled(&self) -> bool {
-        self.cancelled
-    }
-
     /// Current audio-proximity state — `Pending` for Glance throughout
     /// the exchange (the mode never transitions the field). For Hover,
     /// transitions through `Listening → Confirmed` on success or
@@ -774,6 +766,14 @@ pub(crate) fn own_qr_label(state: &ProtocolState) -> String {
 impl WorkflowEngine for MultiStageExchangeEngine {
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
+    }
+
+    /// Cancel pressed rather than Done after success.
+    /// `AppEngine::handle_completion` routes Cancel back to the mode
+    /// picker vs Done to Contacts (Fix A of
+    /// `2026-06-02-exchange-back-cancel-broken`).
+    fn was_cancelled(&self) -> bool {
+        self.cancelled
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {

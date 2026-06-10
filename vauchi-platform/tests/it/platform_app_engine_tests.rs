@@ -7,7 +7,7 @@
 use std::sync::{Arc, Mutex};
 
 use vauchi_platform::{
-    MobileLocale, MobileTabLayout, PlatformAppEngine, PlatformAppEngineTestHelpers,
+    MobileEvent, MobileLocale, MobileTabLayout, PlatformAppEngine, PlatformAppEngineTestHelpers,
     PlatformEventListener,
 };
 
@@ -1012,5 +1012,60 @@ fn cancel_action_on_multi_stage_screen_stops_session_after_navigate() {
     assert_eq!(
         pre_count, post_count,
         "session must be cancelled after handle_action(cancel); pre={pre_count} post={post_count}",
+    );
+}
+
+// @scenario: exchange-ble.feature - Terminal BLE machine events surface to the frontend
+// @internal
+#[test]
+fn ble_machine_terminal_event_fires_invalidation_and_flips_chrome() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+
+    let calls: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
+    engine
+        .set_event_listener(Box::new(RecordingListener {
+            calls: Arc::clone(&calls),
+        }))
+        .expect("register listener");
+
+    engine
+        .navigate_to_json_for_test(r#"{"BleExchange":{"mode":"magic"}}"#.into())
+        .expect("navigate to BLE exchange");
+
+    // Peer token 0xff… sorts above our identity-derived token, so this
+    // device is the initiator and the discovery builds the
+    // AppEngine-owned handshake session.
+    engine
+        .handle_hardware_event(MobileEvent::BleDeviceDiscovered {
+            id: "AA:BB:CC:DD:EE:FF".into(),
+            rssi: -40,
+            adv_data: vec![0xff, 0xff, 0xff, 0xff],
+        })
+        .expect("discovery");
+
+    // A malformed data chunk drives the machine to a terminal Failed
+    // event. Without the chrome flip + invalidation, a terminal machine
+    // event was invisible: the frontend kept rendering "Exchanging..."
+    // forever (P5b re-test, `2026-06-06-android-ble-execution`).
+    engine
+        .handle_hardware_event(MobileEvent::BleCharacteristicNotified {
+            uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567897".into(),
+            data: vec![0u8; 8],
+        })
+        .expect("malformed chunk");
+
+    assert_eq!(
+        current_screen_id(&engine),
+        "exchange_failed",
+        "terminal machine failure must flip the chrome to the failed screen"
+    );
+    assert!(
+        calls
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|ids| ids.iter().any(|id| id == "ble_exchange")),
+        "terminal BLE machine event must fire on_screens_invalidated"
     );
 }

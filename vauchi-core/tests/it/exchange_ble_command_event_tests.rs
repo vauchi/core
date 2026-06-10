@@ -158,7 +158,7 @@ fn ble_full_initiator_flow_via_command_event() {
         })
         .expect("initiator should emit KeyOffer write");
 
-    assert_eq!(key_offer.len(), 121, "v2 KeyOffer should be 121 bytes");
+    assert_eq!(key_offer.len(), 137, "v4 KeyOffer should be 137 bytes");
 
     // --- Step 2: Responder processes KeyOffer (simulated) ---
     // Use Bob's BleHandshakeSession directly to produce the response

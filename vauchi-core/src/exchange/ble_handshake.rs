@@ -67,18 +67,16 @@ use crate::crypto::encryption::{self, SymmetricKey};
 use crate::crypto::kdf::HKDF;
 use crate::identity::Identity;
 
-/// HKDF info prefix for BLE handshake key derivation (v3: identity
-/// binding + sender_timestamp in KeyAck wire format). Bumping the info
-/// string from v2 → v3 prevents v2 and v3 session keys from colliding
-/// across protocol versions even when DH inputs are identical (same
-/// pattern as the v1 → v2 bump shipped in `core@a388d78e`).
-pub const BLE_HANDSHAKE_INFO: &[u8] = b"vauchi-ble-handshake-v3";
+/// HKDF info prefix for BLE handshake key derivation. Bumped in
+/// lockstep with the wire version (ADR-007): v4 keys must not collide
+/// with v3 keys even when DH inputs are identical (same pattern as the
+/// v1 → v2 bump shipped in `core@a388d78e`).
+pub const BLE_HANDSHAKE_INFO: &[u8] = b"vauchi-ble-handshake-v4";
 
-/// Protocol version byte (v3: KeyAck carries `sender_timestamp` so the
-/// receiver can reconstruct AAD with the SENDER's timestamp instead of
-/// its own clock, fixing the asymmetry that broke AEAD authentication
-/// under clock drift between peers).
-pub const BLE_HANDSHAKE_VERSION: u8 = 0x03;
+/// Protocol version byte (v4: KeyOffer carries a 16-byte OOB nonce
+/// echo for bootstrap binding, ADR-053; v3 added `sender_timestamp`
+/// to the KeyAck for AAD reconstruction under clock drift).
+pub const BLE_HANDSHAKE_VERSION: u8 = 0x04;
 
 /// Maximum age of a KeyOffer before it is considered expired (seconds).
 const BLE_HANDSHAKE_EXPIRY_SECS: u64 = 60;
@@ -87,7 +85,11 @@ const BLE_HANDSHAKE_EXPIRY_SECS: u64 = 60;
 const NONCE_SIZE: usize = 16;
 
 /// KeyOffer wire size: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16) + timestamp(8).
-const KEY_OFFER_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 8;
+// v4 appends a 16-byte OOB nonce echo after the timestamp — zeroes
+// when the session was not OOB-bootstrapped (no QR scan / NFC tap).
+// This is the EXACT minimum: the `< KEY_OFFER_SIZE` ingress guard makes
+// the fixed `[121..137]` echo slice safe — keep guard and slice in sync.
+const KEY_OFFER_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 8 + NONCE_SIZE;
 
 /// KeyAck wire size (v3): version(1) + identity(32) + exchange(32) +
 /// ephemeral(32) + nonce(16) + commitment(32) + sender_timestamp(8).
@@ -322,9 +324,11 @@ impl BleHandshakeSession {
 
     /// Phase 1 (Initiator): Create and serialize a KeyOffer message.
     ///
-    /// Produces a 121-byte message (KeyOffer wire format is shared
-    /// across v2 and v3 — the wire change in v3 is on KeyAck only):
-    /// `[version(1)][identity_pub(32)][exchange_pub(32)][ephemeral_pub(32)][nonce(16)][timestamp(8)]`
+    /// Produces a 137-byte v4 message:
+    /// `[version(1)][identity_pub(32)][exchange_pub(32)][ephemeral_pub(32)][nonce(16)][timestamp(8)][oob_nonce(16)]`
+    /// The trailing `oob_nonce` echoes the OOB bootstrap payload's
+    /// session nonce ([`Self::set_oob_nonce`]); all-zero when the
+    /// session was not OOB-bootstrapped.
     ///
     /// Transitions: `Idle → KeyOfferSent`
     pub fn create_key_offer(&mut self) -> Result<Vec<u8>, ExchangeError> {
@@ -341,6 +345,7 @@ impl BleHandshakeSession {
         offer.extend_from_slice(self.our_x3dh.public_key());
         offer.extend_from_slice(&self.our_nonce);
         offer.extend_from_slice(&self.our_timestamp.to_be_bytes());
+        offer.extend_from_slice(&self.oob_nonce.unwrap_or([0u8; NONCE_SIZE]));
 
         let exchange_id = compute_exchange_id(&self.our_identity_key, self.our_x3dh.public_key());
         self.state = BleHandshakeState::KeyOfferSent { exchange_id };
@@ -402,6 +407,22 @@ impl BleHandshakeSession {
             return Err(ExchangeError::SelfExchange);
         }
 
+        // OOB bootstrap binding (v4) — both checks run before any key
+        // derivation so a rejected peer never advances session state.
+        if let Some(expected) = self.expected_peer
+            && !bool::from(their_identity.ct_eq(&expected))
+        {
+            return Err(ExchangeError::IdentityMismatch);
+        }
+        let their_oob_echo: [u8; NONCE_SIZE] = their_offer[121..137]
+            .try_into()
+            .map_err(|_| ExchangeError::InvalidBleFormat)?;
+        if let Some(required) = self.required_oob_nonce
+            && !bool::from(their_oob_echo.ct_eq(&required))
+        {
+            return Err(ExchangeError::OobNonceMismatch);
+        }
+
         if now.saturating_sub(their_timestamp) > BLE_HANDSHAKE_EXPIRY_SECS {
             return Err(ExchangeError::BleExpired);
         }
@@ -438,7 +459,8 @@ impl BleHandshakeSession {
         // Compute commitment: SHA-256(encrypted_card)
         let commitment = compute_commitment(&encrypted_card);
 
-        // Build v3 KeyAck: version(1) + identity(32) + exchange(32) + ephemeral(32)
+        // Build v4 KeyAck (structure unchanged from v3; the OOB slot is
+        // KeyOffer-only in Tier 0): version(1) + identity(32) + exchange(32) + ephemeral(32)
         //                   + nonce(16) + commitment(32) + sender_timestamp(8) = 153
         let mut ack = Vec::with_capacity(KEY_ACK_SIZE);
         ack.push(BLE_HANDSHAKE_VERSION);
@@ -529,6 +551,14 @@ impl BleHandshakeSession {
         // identity layer the way the responder side already does.
         if their_identity == self.our_identity_key {
             return Err(ExchangeError::SelfExchange);
+        }
+
+        // OOB bootstrap binding (v4): the scanner pinned the identity
+        // it scanned; a different wire identity is a radio interloper.
+        if let Some(expected) = self.expected_peer
+            && !bool::from(their_identity.ct_eq(&expected))
+        {
+            return Err(ExchangeError::IdentityMismatch);
         }
 
         let their_exchange: [u8; 32] = their_ack[33..65]
@@ -765,6 +795,9 @@ impl Drop for BleHandshakeSession {
         self.session_key = None;
         // Zeroize nonces
         self.our_nonce.zeroize();
+        // WHY: oob_nonce / required_oob_nonce are intentionally NOT
+        // zeroized — they are public OOB-channel values (printed in the
+        // QR / NFC payload), not secret material (ADR-053).
     }
 }
 

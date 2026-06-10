@@ -194,8 +194,9 @@ fn test_create_key_offer_format() {
         .create_key_offer()
         .expect("key offer should succeed");
 
-    // version(1) + identity_pub(32) + ephemeral_pub(32) + nonce(16) + timestamp(8) = 89
-    assert_eq!(offer.len(), 121, "v2 KeyOffer must be exactly 121 bytes");
+    // version(1) + identity_pub(32) + exchange_pub(32) + ephemeral_pub(32)
+    //   + nonce(16) + timestamp(8) + oob_nonce(16) = 137
+    assert_eq!(offer.len(), 137, "v4 KeyOffer must be exactly 137 bytes");
     assert_eq!(
         offer[0], BLE_HANDSHAKE_VERSION,
         "First byte must be version tag"
@@ -293,7 +294,7 @@ fn test_responder_rejects_invalid_version() {
     );
 
     let mut bad_offer = vec![0x99u8]; // Wrong version
-    bad_offer.extend_from_slice(&[0u8; 120]); // Pad to 121 bytes (v2 size)
+    bad_offer.extend_from_slice(&[0u8; 136]); // Pad to 137 bytes (v4 size)
 
     let result = bob.process_key_offer(
         &bad_offer,
@@ -669,6 +670,7 @@ fn test_expired_key_offer_rejected() {
     offer.extend_from_slice(&[3u8; 16]); // nonce
     // Timestamp: 0 (epoch); observed from `now=1200` (20 min later)
     offer.extend_from_slice(&0u64.to_be_bytes());
+    offer.extend_from_slice(&[0u8; 16]); // oob_nonce echo (v4, none)
 
     let result = bob.process_key_offer(&offer, 1200);
     assert!(
@@ -857,10 +859,10 @@ fn test_process_committed_payload_in_wrong_state() {
 
 // @scenario: ble_exchange :: Protocol version is 0x03
 #[test]
-fn test_protocol_version_is_v3() {
+fn test_protocol_version_is_v4() {
     assert_eq!(
-        BLE_HANDSHAKE_VERSION, 0x03,
-        "BLE handshake must use protocol version 3"
+        BLE_HANDSHAKE_VERSION, 0x04,
+        "BLE handshake must use protocol version 4 (OOB binding slot)"
     );
 }
 
@@ -877,12 +879,13 @@ fn test_key_offer_includes_exchange_key() {
 
     let offer = session.create_key_offer().expect("key offer");
 
-    // v2 KeyOffer: version(1) + identity_pub(32) + exchange_pub(32)
-    //   + ephemeral_pub(32) + nonce(16) + timestamp(8) = 121 bytes
+    // v4 KeyOffer: version(1) + identity_pub(32) + exchange_pub(32)
+    //   + ephemeral_pub(32) + nonce(16) + timestamp(8) + oob_nonce(16)
+    //   = 137 bytes
     assert_eq!(
         offer.len(),
-        121,
-        "v2 KeyOffer must be 121 bytes (was 89 in v1)"
+        137,
+        "v4 KeyOffer must be 137 bytes (121 in v2/v3, 89 in v1)"
     );
 
     // identity_pub is Ed25519 signing key
@@ -958,10 +961,10 @@ fn test_v1_offer_rejected() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Construct a v1-format offer padded to v2 length so it passes
+    // Construct a v1-format offer padded to v4 length so it passes
     // the size check and reaches the version check
     let mut v1_offer = vec![0x01u8]; // v1 version
-    v1_offer.extend_from_slice(&[0u8; 120]); // pad to 121 bytes
+    v1_offer.extend_from_slice(&[0u8; 136]); // pad to 137 bytes
 
     let result = bob.process_key_offer(
         &v1_offer,

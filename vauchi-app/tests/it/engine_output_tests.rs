@@ -18,10 +18,10 @@ use vauchi_app::ui::{
 #[test]
 fn onboarding_output_carries_typed_display_name() {
     let mut engine = OnboardingEngine::new();
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Ada".into(),
     });
@@ -95,7 +95,7 @@ fn lock_output_carries_pin_and_redacts_debug() {
         "empty entry must expose no output"
     );
     for digit in ["1", "2", "3", "4"] {
-        engine.handle_action(UserAction::TextChanged {
+        let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),
             value: digit.into(),
         });
@@ -140,7 +140,7 @@ fn form_dialog_output_is_typed_per_dialog_kind() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {
         current_name: "Ada".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Grace".into(),
     });
@@ -157,11 +157,11 @@ fn form_dialog_output_is_typed_per_dialog_kind() {
 fn change_password_output_redacts_both_credentials() {
     use vauchi_app::ui::ChangePasswordEngine;
     let mut engine = ChangePasswordEngine::new();
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "current_password".into(),
         value: "old-secret".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "new_password".into(),
         value: "new-secret".into(),
     });

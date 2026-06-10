@@ -432,4 +432,193 @@ impl AppEngine {
         };
         self.apply_multi_stage_success_summary(summary);
     }
+
+    /// Bridge from the multi-stage cycle thread — push a state
+    /// transition into the active `MultiStageExchangeEngine`.
+    ///
+    /// No-op when the active engine is not the multi-stage one
+    /// (frontend left the screen between callback dispatch and lock
+    /// acquisition). Returns `true` when the bridge applied the
+    /// state, `false` otherwise — useful for the platform layer to
+    /// decide whether to fire screen-invalidation notifications.
+    ///
+    /// Pair 4 of `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens`.
+    pub fn apply_multi_stage_state(&mut self, state: vauchi_core::exchange::ProtocolState) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_state(state);
+            return true;
+        }
+        false
+    }
+
+    /// Bridge from the multi-stage cycle thread — push the latest QR
+    /// payload (own card) into the active `MultiStageExchangeEngine`.
+    pub fn apply_multi_stage_qr_payload(
+        &mut self,
+        payload: &vauchi_core::exchange::QrPayload,
+    ) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_qr_payload(payload);
+            return true;
+        }
+        false
+    }
+
+    /// Bridge from the multi-stage cycle thread — record the peer
+    /// display name on the `Finalized` transition.
+    pub fn apply_multi_stage_finalized(&mut self, contact_name: String) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_finalized(contact_name);
+            return true;
+        }
+        false
+    }
+
+    /// Build the shared exchange-success summary from a just-persisted
+    /// contact: who you exchanged with, what they shared, which of *your*
+    /// fields they can now see, and the groups they joined. Mode-agnostic
+    /// so every exchange engine can render the same terminal screen
+    /// (2026-06-04-exchange-terminal-screens). Returns the default
+    /// (status-only) summary if the contact can't be read back.
+    pub(crate) fn build_exchange_summary(
+        &self,
+        contact_id: &str,
+        group_names: Vec<String>,
+    ) -> crate::ui::exchange::success::ExchangeSuccessSummary {
+        let Some(contact) = self.vauchi.get_contact(contact_id).ok().flatten() else {
+            return Default::default();
+        };
+        let card = contact.card();
+        let received_fields: Vec<(String, String, String)> = card
+            .fields()
+            .iter()
+            .map(|f| {
+                (
+                    format!("{:?}", f.field_type()),
+                    f.label().to_string(),
+                    f.value().to_string(),
+                )
+            })
+            .collect();
+        let my_visible_fields: Vec<String> = self
+            .vauchi
+            .own_card()
+            .ok()
+            .flatten()
+            .map(|own| {
+                own.fields()
+                    .iter()
+                    .filter(|f| {
+                        self.vauchi
+                            .get_effective_field_visibility(contact_id, f.id())
+                            .unwrap_or(false)
+                    })
+                    .map(|f| f.label().to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        crate::ui::exchange::success::ExchangeSuccessSummary {
+            peer_name: card.display_name().to_string(),
+            received_fields,
+            my_visible_fields,
+            group_names,
+        }
+    }
+
+    /// Bridge: attach the rich exchange-success summary (received card +
+    /// group + visibility) to the active multi-stage engine so its
+    /// success screen renders it (2026-06-04-exchange-terminal-screens).
+    pub fn apply_multi_stage_success_summary(
+        &mut self,
+        summary: crate::ui::exchange::success::ExchangeSuccessSummary,
+    ) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_success_summary(summary);
+            return true;
+        }
+        false
+    }
+
+    /// Bridge from the multi-stage cycle thread — flag the cycle as
+    /// ended so the engine flips to the success / failure terminal
+    /// chrome.
+    pub fn apply_multi_stage_session_ended(&mut self) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_session_ended();
+            return true;
+        }
+        false
+    }
+
+    /// Bridge from the multi-stage cycle thread — push an
+    /// audio-proximity state transition from the platform-side
+    /// orchestrator into the active `MultiStageExchangeEngine`'s
+    /// view-state. Phase 1.C.3d of
+    /// `_private/docs/planning/todo/2026-05-11-hover-graduation-plan.md`
+    /// — sibling of `apply_multi_stage_state` mirroring the existing
+    /// bridge pattern.
+    ///
+    /// Returns `true` if the active engine is the multi-stage one
+    /// and the state was applied; `false` otherwise (caller is the
+    /// audio-listener bridge in vauchi-platform; a `false` return
+    /// indicates the user navigated away mid-handshake, which the
+    /// bridge handles by dropping the callback).
+    pub fn apply_multi_stage_audio_proximity(
+        &mut self,
+        state: vauchi_core::exchange::AudioProximityState,
+    ) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_audio_proximity(state);
+            return true;
+        }
+        false
+    }
+
+    /// TapHoverShake mirror of [`Self::apply_multi_stage_audio_proximity`]:
+    /// routes a `MultiStageEvent::AccelProximityChanged` onto the active
+    /// engine's `set_accel_proximity`. Returns `false` if the active engine
+    /// is not the multi-stage one (navigated away).
+    pub fn apply_multi_stage_accel_proximity(
+        &mut self,
+        state: vauchi_core::exchange::AccelerometerProximityState,
+    ) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_accel_proximity(state);
+            return true;
+        }
+        false
+    }
+
+    /// `true` when the active engine is a `MultiStageExchangeEngine`
+    /// constructed via [`MultiStageExchangeEngine::new_hover`].
+    /// Phase 1.C polish — the platform-binding wire-up
+    /// (`PlatformAppEngine::ensure_multi_stage_session`) reads this
+    /// to decide whether to register the cycle-thread audio listener
+    /// (see `try_autonomous_audio_trigger` mode gate). Returns
+    /// `false` for Glance engines and for every non-multi-stage
+    /// active engine. Until the Phase 1.E mode-dispatcher in
+    /// `screens.rs` flips to per-mode constructors, this always
+    /// returns `false`.
+    pub fn is_active_engine_multi_stage_hover(&self) -> bool {
+        if let Some(any) = self.engine.as_any()
+            && let Some(active) = any.downcast_ref::<crate::ui::MultiStageExchangeEngine>()
+        {
+            return active.is_hover_mode();
+        }
+        false
+    }
 }

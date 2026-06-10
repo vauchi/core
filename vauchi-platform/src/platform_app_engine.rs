@@ -24,6 +24,7 @@ use crate::types::{
     MobileTabLayout,
 };
 use vauchi_app::notification_types::NotificationCategory as CoreNotificationCategory;
+use vauchi_app::orchestrator::ble_handshake_machine::BleMachineEvent;
 use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
 use vauchi_core::api::{HandlerId, Vauchi, VauchiConfig, VauchiEvent};
 use vauchi_core::crypto::SymmetricKey;
@@ -106,7 +107,7 @@ pub struct PlatformAppEngine {
     /// emit `VauchiEvent`s, so this slot lets the bridge call
     /// `on_screens_invalidated` directly when the engine state changes
     /// from a listener callback (Pair 4 of pure-humble-ui-retire-native-screens).
-    direct_listener: DirectListenerSlot,
+    pub(crate) direct_listener: DirectListenerSlot,
     /// Storage path retained for in-place session creation. Mirrors
     /// `VauchiPlatform::storage_path` so content-update internals can
     /// resolve the data directory without a sibling `VauchiPlatform`.
@@ -371,6 +372,10 @@ impl PlatformAppEngine {
             AppScreen::MultiStageExchange { .. }
         );
 
+        // Set when the BLE handshake machine reaches a terminal event below;
+        // the invalidation fires after the engine lock is released.
+        let mut ble_terminal = false;
+
         // Resolve the optional `ActionResult` from whichever routing path the
         // event takes. The `Command`s it emits accumulate in `pending_commands`
         // regardless of path, and are drained into the envelope at the end — the
@@ -435,8 +440,15 @@ impl PlatformAppEngine {
                     if engine.ble_handshake_session_active() {
                         let m_event = engine.forward_ble_hardware_event(&hw_event);
                         // P3 — on Completed, persist the decrypted peer card +
-                        // Double Ratchet as an exchanged contact. Inert for
-                        // every other machine event.
+                        // Double Ratchet as an exchanged contact; terminal
+                        // events also flip the engine chrome.
+                        // No BLE poll loop + terminal envelopes carry no
+                        // ActionResult → push an invalidation or the UI
+                        // freezes on "Exchanging..." (P5b, 2026-06-10).
+                        ble_terminal = matches!(
+                            m_event,
+                            BleMachineEvent::Completed(_) | BleMachineEvent::Failed { .. }
+                        );
                         engine.apply_ble_machine_event(m_event);
                     }
                 }
@@ -475,6 +487,9 @@ impl PlatformAppEngine {
                 detail: format!("Lock failed: {e}"),
             })?
             .drain_pending_commands();
+        if ble_terminal {
+            self.fire_screens_invalidated(vec!["ble_exchange".into()]);
+        }
         hardware_event_envelope_to_json(action_result.as_ref(), &commands)
     }
 
@@ -769,14 +784,7 @@ impl PlatformAppEngine {
             );
         drop(engine);
         if multi_stage_active {
-            let listener = self
-                .direct_listener
-                .lock()
-                .ok()
-                .and_then(|guard| guard.clone());
-            if let Some(listener) = listener {
-                listener.on_screens_invalidated(vec!["multi_stage_exchange".into()]);
-            }
+            self.fire_screens_invalidated(vec!["multi_stage_exchange".into()]);
         }
         let mapped = items
             .into_iter()

@@ -86,6 +86,16 @@ impl BleExchangeEngine {
         self.screen = BleScreen::Success;
     }
 
+    /// Drive the chrome to the terminal Failed screen. Called by the
+    /// AppEngine when the real `BleHandshakeMachine` reports `Failed`:
+    /// a machine-level (crypto / protocol) failure has no hardware
+    /// event for the hollow flow to observe, so without this the
+    /// chrome rendered "Exchanging..." forever (P5b re-test,
+    /// `2026-06-06-android-ble-execution`, 2026-06-10).
+    pub fn force_failure(&mut self, reason: Option<String>) {
+        self.screen = BleScreen::Failed { reason };
+    }
+
     fn progress(&self) -> Progress {
         Progress {
             current_step: self.flow.step().step_number(0),

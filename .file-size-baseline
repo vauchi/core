@@ -518,7 +518,10 @@ vauchi-app/src/ui/multi_stage_exchange.rs 2118
 # routing) and the G3 push-down of domain logic into core/app — see
 # 2026-06-10-pae-monolith-false-exemption. Do NOT grow this entry for
 # new dispatch arms; they belong in pae_dispatch/.
-vauchi-platform/src/platform_app_engine.rs 1125
+# (+8 for BLE terminal-event invalidation in handle_hardware_event
+# 2026-06-10 — routing logic, not a dispatch arm; the listener-fire
+# helper itself lives in platform_app_engine_internals.rs)
+vauchi-platform/src/platform_app_engine.rs 1133
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

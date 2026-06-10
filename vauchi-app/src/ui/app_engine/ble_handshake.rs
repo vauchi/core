@@ -248,8 +248,9 @@ impl AppEngine {
     /// decrypted peer card as an exchanged contact (with its Double
     /// Ratchet) so it appears in the contact list and future encrypted
     /// card updates from this peer decrypt. Returns `true` when a
-    /// contact was created. Other events are inert here — engine chrome
-    /// is driven separately.
+    /// contact was created. Terminal events also flip the engine chrome
+    /// (the hollow flow observes no machine state); intermediate events
+    /// are inert here.
     pub fn apply_ble_machine_event(&mut self, event: BleMachineEvent) -> bool {
         match event {
             BleMachineEvent::Completed(result) => {
@@ -264,6 +265,18 @@ impl AppEngine {
                     active.force_success();
                 }
                 persisted
+            }
+            BleMachineEvent::Failed { reason } => {
+                // Machine-level failure (crypto / protocol error) has no
+                // hardware event for the hollow flow to observe — flip the
+                // chrome to Failed here or the UI shows "Exchanging..."
+                // forever (P5b re-test, 2026-06-10).
+                if let Some(any) = self.engine.as_any_mut()
+                    && let Some(active) = any.downcast_mut::<crate::ui::BleExchangeEngine>()
+                {
+                    active.force_failure(Some(reason));
+                }
+                false
             }
             _ => false,
         }

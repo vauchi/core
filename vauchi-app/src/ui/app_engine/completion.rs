@@ -787,13 +787,17 @@ impl AppEngine {
 
     /// Change-password complete: apply if both fields populated (else cancel).
     pub(super) fn complete_change_password(&mut self) -> ActionResult {
-        let cp_engine = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::ChangePasswordEngine>());
-        if let Some(engine) = cp_engine {
-            let current = engine.current_password().to_string();
-            let new = engine.new_password().to_string();
+        let creds = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::ChangePassword { current, new }) => Some((current, new)),
+            other => {
+                tracing::warn!(
+                    ?other,
+                    "change-password completion without ChangePassword output"
+                );
+                None
+            }
+        };
+        if let Some((current, new)) = creds {
             // An empty current_password reaches here only on Cancel
             // (the Save button stays disabled until both fields are
             // populated and matching).  Treat empty current as a
@@ -814,24 +818,25 @@ impl AppEngine {
 
     /// Duress-PIN complete: set up or disable the duress password/settings.
     pub(super) fn complete_duress_pin(&mut self) -> ActionResult {
-        let dp_engine = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::DuressPinEngine>());
-        if let Some(dp_engine) = dp_engine {
-            let config = dp_engine.config();
-            if config.enabled {
-                let pin = dp_engine.pin();
-                if let Err(e) = self.vauchi.setup_duress_password(pin) {
+        let setup = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::DuressPin(setup)) => Some(setup),
+            other => {
+                tracing::warn!(?other, "duress-pin completion without DuressPin output");
+                None
+            }
+        };
+        if let Some(setup) = setup {
+            if setup.enabled {
+                if let Err(e) = self.vauchi.setup_duress_password(&setup.pin) {
                     return ActionResult::ShowAlert {
                         title: "Error".into(),
                         message: format!("Failed to set duress PIN: {e}"),
                     };
                 }
                 let settings = vauchi_core::types::DuressSettings {
-                    alert_contact_ids: config.alert_contacts.iter().map(|c| c.id.clone()).collect(),
-                    alert_message: config.alert_message.clone(),
-                    include_location: config.include_location,
+                    alert_contact_ids: setup.alert_contact_ids,
+                    alert_message: setup.alert_message,
+                    include_location: setup.include_location,
                 };
                 if let Err(e) = self.vauchi.save_duress_settings(&settings) {
                     return ActionResult::ShowAlert {
@@ -853,11 +858,18 @@ impl AppEngine {
     /// Device-management complete: revoke the confirmed device if any.
     pub(super) fn complete_device_management(&mut self) -> ActionResult {
         // Read the confirmed index from the engine before navigating away
-        let revoke_index = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::device_management::DeviceManagementEngine>())
-            .and_then(|e| e.confirmed_revoke_index());
+        let revoke_index = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::DeviceManagement {
+                confirmed_revoke_index,
+            }) => confirmed_revoke_index,
+            other => {
+                tracing::warn!(
+                    ?other,
+                    "device-management completion without DeviceManagement output"
+                );
+                None
+            }
+        };
 
         if let Some(idx) = revoke_index {
             match self.vauchi.revoke_device(idx as usize) {
@@ -884,12 +896,20 @@ impl AppEngine {
             let screen = self.navigate_back();
             return ActionResult::NavigateTo(screen);
         }
-        let editor = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::avatar_editor::AvatarEditorEngine>());
-        if let Some(editor) = editor {
-            if editor.avatar_removed() {
+        let editor = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::AvatarEditor { removed, avatar }) => {
+                Some((removed, avatar))
+            }
+            other => {
+                tracing::warn!(
+                    ?other,
+                    "avatar-editor completion without AvatarEditor output"
+                );
+                None
+            }
+        };
+        if let Some((removed, avatar)) = editor {
+            if removed {
                 if let Ok(Some(mut card)) = self.vauchi.own_card() {
                     card.clear_avatar();
                     if let Err(e) = self.vauchi.update_own_card(&card) {
@@ -899,10 +919,10 @@ impl AppEngine {
                         };
                     }
                 }
-            } else if let Some(avatar) = editor.result_avatar() {
+            } else if let Some(avatar) = avatar {
                 // Persist the new avatar
                 if let Ok(Some(mut card)) = self.vauchi.own_card() {
-                    if let Err(e) = card.set_avatar(avatar.to_vec()) {
+                    if let Err(e) = card.set_avatar(avatar) {
                         return ActionResult::ShowAlert {
                             title: "Avatar Update Failed".into(),
                             message: format!("{e}"),
@@ -929,13 +949,16 @@ impl AppEngine {
             return ActionResult::NavigateTo(screen);
         }
         // Check if user chose to decommission old device
-        let outcome = self
-            .engine
-            .as_any()
-            .and_then(|a| {
-                a.downcast_ref::<crate::ui::device_replacement::DeviceReplacementEngine>()
-            })
-            .map(|e| e.completion_outcome().clone());
+        let outcome = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::DeviceReplacement(outcome)) => Some(outcome),
+            other => {
+                tracing::warn!(
+                    ?other,
+                    "device-replacement completion without DeviceReplacement output"
+                );
+                None
+            }
+        };
         if let Some(crate::ui::device_replacement::CompletionOutcome::RemoveOldDevice) = outcome {
             // Delegate to existing device management unlink
             // (current device index = 0, handled by the platform layer)
@@ -958,12 +981,16 @@ impl AppEngine {
         // grant → DeepLinkResponder, deny / cancel → back. Read
         // the consent decision off the engine before
         // navigate_back / navigate_to_internal replaces it.
-        let granted = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<crate::ui::DeepLinkConsentEngine>())
-            .map(|e| matches!(e.decision(), crate::ui::ConsentDecision::Granted))
-            .unwrap_or(false);
+        let granted = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::DeepLinkConsent { granted }) => granted,
+            other => {
+                tracing::warn!(
+                    ?other,
+                    "deep-link-consent completion without DeepLinkConsent output"
+                );
+                false
+            }
+        };
 
         if granted {
             let payload = payload.clone();

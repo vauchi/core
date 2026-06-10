@@ -295,6 +295,19 @@ impl DuressPinEngine {
 }
 
 impl WorkflowEngine for DuressPinEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        let config = self.config();
+        Some(crate::ui::EngineOutput::DuressPin(
+            crate::ui::DuressPinSetup {
+                enabled: config.enabled,
+                pin: self.pin().to_string(),
+                alert_contact_ids: config.alert_contacts.iter().map(|c| c.id.clone()).collect(),
+                alert_message: config.alert_message.clone(),
+                include_location: config.include_location,
+            },
+        ))
+    }
+
     fn current_screen(&self) -> ScreenModel {
         match self.step {
             DuressPinStep::Overview => self.overview_screen(),

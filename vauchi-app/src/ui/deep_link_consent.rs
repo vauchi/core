@@ -124,6 +124,12 @@ impl DeepLinkConsentEngine {
 }
 
 impl WorkflowEngine for DeepLinkConsentEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::DeepLinkConsent {
+            granted: matches!(self.decision(), ConsentDecision::Granted),
+        })
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

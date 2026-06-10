@@ -158,6 +158,13 @@ impl ChangePasswordEngine {
 }
 
 impl WorkflowEngine for ChangePasswordEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::ChangePassword {
+            current: self.current_password().to_string(),
+            new: self.new_password().to_string(),
+        })
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

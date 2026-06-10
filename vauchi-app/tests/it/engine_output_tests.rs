@@ -151,3 +151,58 @@ fn form_dialog_output_is_typed_per_dialog_kind() {
         }))
     );
 }
+
+// @scenario: settings.feature - Changing the app password
+#[test]
+fn change_password_output_redacts_both_credentials() {
+    use vauchi_app::ui::ChangePasswordEngine;
+    let mut engine = ChangePasswordEngine::new();
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "current_password".into(),
+        value: "old-secret".into(),
+    });
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "new_password".into(),
+        value: "new-secret".into(),
+    });
+
+    let output = engine.engine_output().expect("change-password output");
+    assert_eq!(
+        output,
+        EngineOutput::ChangePassword {
+            current: "old-secret".into(),
+            new: "new-secret".into(),
+        }
+    );
+    let debug = format!("{output:?}");
+    assert!(
+        !debug.contains("secret") && debug.contains("<redacted>"),
+        "Debug must redact both credentials: {debug}"
+    );
+}
+
+// @scenario: duress.feature - Setting up a duress PIN
+#[test]
+fn duress_pin_output_redacts_pin_in_debug() {
+    use vauchi_app::ui::{DuressConfig, DuressPinEngine};
+    let engine = DuressPinEngine::new(DuressConfig {
+        enabled: true,
+        alert_contacts: vec![],
+        alert_message: "help".into(),
+        include_location: true,
+    });
+
+    let output = engine.engine_output().expect("duress output");
+    let EngineOutput::DuressPin(ref setup) = output else {
+        panic!("duress engine must expose DuressPin output");
+    };
+    assert!(setup.enabled);
+    assert_eq!(setup.alert_message, "help");
+    assert!(setup.include_location);
+    assert_eq!(setup.alert_contact_ids, Vec::<String>::new());
+    let debug = format!("{output:?}");
+    assert!(
+        debug.contains("<redacted>"),
+        "Debug must redact the PIN: {debug}"
+    );
+}

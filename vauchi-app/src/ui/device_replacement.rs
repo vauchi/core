@@ -522,6 +522,12 @@ impl DeviceReplacementEngine {
 }
 
 impl WorkflowEngine for DeviceReplacementEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::DeviceReplacement(
+            self.completion_outcome().clone(),
+        ))
+    }
+
     fn as_any(&self) -> Option<&dyn std::any::Any> {
         Some(self)
     }

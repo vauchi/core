@@ -54,6 +54,44 @@ pub enum EngineOutput {
     /// A form-dialog submission, typed per dialog kind — replaces the
     /// retired newline-packed `collected_input` strings.
     Form(FormInput),
+    /// Change-password form (both credentials redacted in `Debug`).
+    ChangePassword { current: String, new: String },
+    /// Duress-PIN setup (PIN redacted in `Debug`).
+    DuressPin(DuressPinSetup),
+    /// Device-management screen: index confirmed for revocation, if any.
+    DeviceManagement { confirmed_revoke_index: Option<u32> },
+    /// Avatar-editor result (`Debug` prints the byte length only).
+    AvatarEditor {
+        removed: bool,
+        avatar: Option<Vec<u8>>,
+    },
+    /// Outcome of the device-replacement decommission screen.
+    DeviceReplacement(super::device_replacement::CompletionOutcome),
+    /// Whether the user granted the deep-link consent gate.
+    DeepLinkConsent { granted: bool },
+}
+
+/// Snapshot of the duress-PIN setup form.
+///
+/// `pin` is a live credential — `Debug` is hand-written to redact it.
+#[derive(Clone, PartialEq)]
+pub struct DuressPinSetup {
+    pub enabled: bool,
+    pub pin: String,
+    pub alert_contact_ids: Vec<String>,
+    pub alert_message: String,
+    pub include_location: bool,
+}
+
+impl std::fmt::Debug for DuressPinSetup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DuressPinSetup")
+            .field("enabled", &self.enabled)
+            .field("pin", &"<redacted>")
+            .field("alert_contact_ids", &self.alert_contact_ids)
+            .field("include_location", &self.include_location)
+            .finish()
+    }
 }
 
 /// Action pressed on the sync-status screen.
@@ -155,6 +193,28 @@ impl std::fmt::Debug for EngineOutput {
             Self::Sync(c) => f.debug_tuple("Sync").field(c).finish(),
             Self::Gdpr(c) => f.debug_tuple("Gdpr").field(c).finish(),
             Self::Form(i) => f.debug_tuple("Form").field(i).finish(),
+            Self::ChangePassword { .. } => f
+                .debug_struct("ChangePassword")
+                .field("current", &"<redacted>")
+                .field("new", &"<redacted>")
+                .finish(),
+            Self::DuressPin(s) => f.debug_tuple("DuressPin").field(s).finish(),
+            Self::DeviceManagement {
+                confirmed_revoke_index,
+            } => f
+                .debug_struct("DeviceManagement")
+                .field("confirmed_revoke_index", confirmed_revoke_index)
+                .finish(),
+            Self::AvatarEditor { removed, avatar } => f
+                .debug_struct("AvatarEditor")
+                .field("removed", removed)
+                .field("avatar_len", &avatar.as_ref().map(|a| a.len()))
+                .finish(),
+            Self::DeviceReplacement(o) => f.debug_tuple("DeviceReplacement").field(o).finish(),
+            Self::DeepLinkConsent { granted } => f
+                .debug_struct("DeepLinkConsent")
+                .field("granted", granted)
+                .finish(),
         }
     }
 }

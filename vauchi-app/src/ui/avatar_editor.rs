@@ -344,6 +344,13 @@ impl AvatarEditorEngine {
 }
 
 impl WorkflowEngine for AvatarEditorEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::AvatarEditor {
+            removed: self.avatar_removed(),
+            avatar: self.result_avatar().map(|a| a.to_vec()),
+        })
+    }
+
     fn current_screen(&self) -> ScreenModel {
         match &self.state {
             State::SourcePicker => self.build_source_picker(),

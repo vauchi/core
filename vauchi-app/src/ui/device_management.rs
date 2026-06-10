@@ -143,6 +143,12 @@ impl DeviceManagementEngine {
 }
 
 impl WorkflowEngine for DeviceManagementEngine {
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        Some(crate::ui::EngineOutput::DeviceManagement {
+            confirmed_revoke_index: self.confirmed_revoke_index(),
+        })
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }

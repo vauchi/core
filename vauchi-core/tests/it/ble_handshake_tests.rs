@@ -1056,9 +1056,9 @@ fn test_pinned_responder_rejects_offer_from_unexpected_identity() {
     );
 }
 
-// @scenario: ble_exchange :: Responder requiring an OOB nonce rejects an offer without the echo
+// @scenario: ble_exchange :: Responder rejects a zeroed OOB echo when a nonce is required
 #[test]
-fn test_responder_requiring_oob_nonce_rejects_missing_echo() {
+fn test_responder_rejects_zero_oob_nonce_when_nonzero_required() {
     let alice_id = make_test_identity();
     let bob_id = make_test_identity();
 
@@ -1122,6 +1122,34 @@ fn test_responder_rejects_wrong_oob_nonce_echo() {
     assert!(
         matches!(err, ExchangeError::OobNonceMismatch),
         "expected OobNonceMismatch, got {err:?}"
+    );
+}
+
+// @scenario: ble_exchange :: Correct nonce echo cannot smuggle a wrong identity (CC-14)
+#[test]
+fn test_correct_echo_with_wrong_identity_still_rejected() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+    let carol_id = make_test_identity();
+    let displayed_nonce = [5u8; 16];
+
+    // Alice echoes the right nonce, but Bob pinned Carol — the pin
+    // must win even when the echo is correct (combined constraints).
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    alice.set_oob_nonce(displayed_nonce);
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+    bob.require_oob_nonce(displayed_nonce);
+    bob.expect_peer(*carol_id.signing_public_key());
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let err = bob
+        .process_key_offer(&offer, now())
+        .expect_err("correct echo must not bypass the identity pin");
+    assert!(
+        matches!(err, ExchangeError::IdentityMismatch),
+        "expected IdentityMismatch, got {err:?}"
     );
 }
 

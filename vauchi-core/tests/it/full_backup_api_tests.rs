@@ -11,7 +11,7 @@
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::{ContactField, FieldType, ImportSource, Vauchi};
+use vauchi_core::{ContactField, FieldType, ImportSource, Vauchi, VauchiConfig};
 
 const BACKUP_PASSWORD: &str = "correct-horse-battery-staple";
 
@@ -87,6 +87,71 @@ fn full_backup_api_roundtrip() {
     let imported_count = contacts.iter().filter(|c| c.is_imported()).count();
     assert_eq!(exchanged_count, 2);
     assert_eq!(imported_count, 1);
+}
+
+/// The identity persisted by a v3 full-backup import must be loadable
+/// by a fresh instance over the same storage — i.e. survive a process
+/// restart without the backup password. Regression:
+/// `import_full_backup` saved the identity in the user-password-
+/// encrypted backup format, which no startup loader can decrypt; the
+/// restored user was locked out on relaunch (device-verified, Pixel
+/// 3a — `2026-06-11-restore-identity-unloadable-after-restart`).
+// @scenario: backup_format_versioning :: Restored identity survives restart
+#[test]
+fn full_backup_import_survives_restart() {
+    let v = setup_vauchi_with_data();
+    let backup_hex = v.export_full_backup(BACKUP_PASSWORD).unwrap();
+
+    let dir = tempfile::tempdir().unwrap();
+    let storage_key = SymmetricKey::generate();
+    let db_path = dir.path().join("vauchi.db");
+
+    {
+        let config =
+            VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key.clone());
+        let mut v2 = Vauchi::new(config).unwrap();
+        v2.import_full_backup(&backup_hex, BACKUP_PASSWORD).unwrap();
+        assert!(v2.identity().is_some());
+    }
+
+    let config = VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key);
+    let mut v3 = Vauchi::new(config).unwrap();
+    v3.refresh_identity_from_storage();
+    assert!(
+        v3.identity().is_some(),
+        "restored identity must load after restart"
+    );
+    assert_eq!(v3.public_id().unwrap(), v.public_id().unwrap());
+    assert_eq!(v3.list_contacts().unwrap().len(), 3);
+}
+
+/// Same restart-survival contract for the v2 identity-only import.
+// @scenario: backup_format_versioning :: Restored identity survives restart
+#[test]
+fn identity_backup_import_survives_restart() {
+    let v = setup_vauchi_with_data();
+    let backup_hex = v.export_backup(BACKUP_PASSWORD).unwrap();
+
+    let dir = tempfile::tempdir().unwrap();
+    let storage_key = SymmetricKey::generate();
+    let db_path = dir.path().join("vauchi.db");
+
+    {
+        let config =
+            VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key.clone());
+        let mut v2 = Vauchi::new(config).unwrap();
+        v2.import_backup(&backup_hex, BACKUP_PASSWORD).unwrap();
+        assert!(v2.identity().is_some());
+    }
+
+    let config = VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key);
+    let mut v3 = Vauchi::new(config).unwrap();
+    v3.refresh_identity_from_storage();
+    assert!(
+        v3.identity().is_some(),
+        "imported identity must load after restart"
+    );
+    assert_eq!(v3.public_id().unwrap(), v.public_id().unwrap());
 }
 
 /// Full backup with wrong password must fail.

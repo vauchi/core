@@ -97,6 +97,30 @@ fn fixed_layout_screen_has_no_sync_indicator() {
     );
 }
 
+// @internal
+#[test]
+fn pinned_layout_screen_keeps_sync_indicator() {
+    // Unlike Fixed (QR no-reflow contract), Pinned screens delegate
+    // scrolling to their list component but may still reflow — the sync
+    // chrome must render (`2026-06-11-contacts-list-windowing-design`).
+    use vauchi_app::ui::{AppScreen, ScreenLayout};
+
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Contacts);
+    let screen = engine.current_screen();
+    assert_eq!(
+        screen.layout,
+        ScreenLayout::Pinned,
+        "the contacts screen must be Pinned layout"
+    );
+    assert!(
+        find_sync_indicator(&screen.components).is_some(),
+        "a Pinned-layout screen must keep the sync indicator"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Offline → overlay skipped (apply_offline_overlay Banner handles it)
 // ---------------------------------------------------------------------------

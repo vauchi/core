@@ -198,8 +198,14 @@ impl Vauchi {
 
         let name = identity.display_name().to_string();
 
-        // Persist to storage
-        self.storage.identity().save_identity(&bytes, &name)?;
+        // Persist in the same plaintext storage format as
+        // `create_identity` — the DB encrypts at rest (ADR-015).
+        // Persisting the password-encrypted backup bytes locked the
+        // user out on restart: no startup loader has the backup
+        // password (2026-06-11-restore-identity-unloadable-after-restart).
+        self.storage
+            .identity()
+            .save_identity(&identity.to_storage_bytes(), &name)?;
 
         // Create contact card if none exists
         if self.storage.contacts().load_own_card()?.is_none() {
@@ -284,13 +290,15 @@ impl Vauchi {
             self.clock.unix_seconds(),
         );
 
-        // Persist identity (v2 format for storage compatibility)
-        let id_backup = identity
-            .export_backup(password)
-            .map_err(|e| VauchiError::Configuration(format!("Identity re-export failed: {e:?}")))?;
+        // Persist in the same plaintext storage format as
+        // `create_identity` — the DB encrypts at rest (ADR-015).
+        // Re-exporting with the backup password both locked the user
+        // out on restart (no startup loader has that password) and
+        // re-ran password-strength validation at restore time
+        // (2026-06-11-restore-identity-unloadable-after-restart).
         self.storage
             .identity()
-            .save_identity(id_backup.as_bytes(), identity.display_name())?;
+            .save_identity(&identity.to_storage_bytes(), identity.display_name())?;
 
         // Restore own card
         if let Some(card) = &envelope.sections.own_card {

@@ -327,6 +327,10 @@ impl WorkflowEngine for ContactListEngine {
             components,
             actions,
             progress: None,
+            // The list owns scrolling lazily; eager rendering of 10k
+            // rows crashed the mobile renderers
+            // (2026-06-11-contacts-list-eager-render-anr).
+            layout: crate::ui::screen::ScreenLayout::Pinned,
             ..Default::default()
         }
     }
@@ -429,6 +433,30 @@ mod tests {
             kind: ListItemActionKind::Archive,
             destructive: false,
         }
+    }
+
+    // @internal
+    #[test]
+    fn contacts_screen_uses_pinned_layout() {
+        // The list component owns scrolling (lazy) so 10k contacts never
+        // render eagerly (2026-06-11-contacts-list-eager-render-anr).
+        let engine = ContactListEngine::new(vec![item("c1", vec![])]);
+        assert_eq!(
+            engine.current_screen().layout,
+            crate::ui::screen::ScreenLayout::Pinned
+        );
+    }
+
+    // @internal
+    #[test]
+    fn empty_contacts_screen_keeps_pinned_layout() {
+        // One stable layout per screen — the empty InfoPanel state must
+        // not flip the renderer between scroll hosts.
+        let engine = ContactListEngine::new(vec![]);
+        assert_eq!(
+            engine.current_screen().layout,
+            crate::ui::screen::ScreenLayout::Pinned
+        );
     }
 
     // @internal

@@ -1699,7 +1699,7 @@
       }
     },
     "ScreenLayout": {
-      "description": "Whether the renderer wraps content in a scroll container or renders a fixed, non-scrolling layout sized to the viewport. Frontends honour this instead of always wrapping content in a scroll view. `Fixed` is used by screens that must not reflow while a live element updates — e.g. the QR exchange screen, where a moving QR breaks the peer camera lock (`2026-06-03-exchange-qr-scan-stability`).",
+      "description": "Whether the renderer wraps content in a scroll container or renders a fixed, non-scrolling layout sized to the viewport. Frontends honour this instead of always wrapping content in a scroll view. `Fixed` is used by screens that must not reflow while a live element updates — e.g. the QR exchange screen, where a moving QR breaks the peer camera lock (`2026-06-03-exchange-qr-scan-stability`). `Pinned` is used by list-dominant screens: chrome stays pinned while the list component owns scrolling lazily — eager rendering of 10k rows froze and crashed the mobile renderers (`2026-06-11-contacts-list-windowing-design`).",
       "oneOf": [
         {
           "description": "Content may exceed the viewport; renderer wraps it in a scroll container (the default for list / detail screens).",
@@ -1713,6 +1713,13 @@
           "type": "string",
           "enum": [
             "Fixed"
+          ]
+        },
+        {
+          "description": "Chrome is sized to the viewport and does not scroll; the screen's list component is the scroll host (and, unlike `Fixed`, overlays such as sync chrome may still reflow it).",
+          "type": "string",
+          "enum": [
+            "Pinned"
           ]
         }
       ]

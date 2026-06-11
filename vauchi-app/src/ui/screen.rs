@@ -38,7 +38,11 @@ pub enum ScreenPresentationKind {
 /// this instead of always wrapping content in a scroll view. `Fixed` is
 /// used by screens that must not reflow while a live element updates —
 /// e.g. the QR exchange screen, where a moving QR breaks the peer
-/// camera lock (`2026-06-03-exchange-qr-scan-stability`).
+/// camera lock (`2026-06-03-exchange-qr-scan-stability`). `Pinned` is
+/// used by list-dominant screens: chrome stays pinned while the list
+/// component owns scrolling lazily — eager rendering of 10k rows froze
+/// and crashed the mobile renderers
+/// (`2026-06-11-contacts-list-windowing-design`).
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -49,11 +53,16 @@ pub enum ScreenLayout {
     Scroll,
     /// Content is sized to the viewport and must not scroll or reflow.
     Fixed,
+    /// Chrome is sized to the viewport and does not scroll; the
+    /// screen's list component is the scroll host (and, unlike
+    /// `Fixed`, overlays such as sync chrome may still reflow it).
+    Pinned,
 }
 
 impl ScreenLayout {
     /// `true` when this is the default scrolling layout. Used by serde
-    /// `skip_serializing_if` so the field is omitted unless `Fixed`.
+    /// `skip_serializing_if` so the field is omitted unless `Fixed` or
+    /// `Pinned`.
     pub fn is_scroll(&self) -> bool {
         matches!(self, ScreenLayout::Scroll)
     }
@@ -231,6 +240,17 @@ mod tests {
         let m = ScreenModel::new("test", "Title", vec![], vec![]);
         let json = serde_json::to_string(&m).unwrap();
         assert!(json.contains(&format!("\"schema_version\":{CURRENT_SCHEMA_VERSION}")));
+    }
+
+    // @internal
+    #[test]
+    fn pinned_layout_round_trips_on_the_wire() {
+        let mut m = ScreenModel::new("contacts", "Contacts", vec![], vec![]);
+        m.layout = ScreenLayout::Pinned;
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"layout\":\"Pinned\""));
+        let back: ScreenModel = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.layout, ScreenLayout::Pinned);
     }
 
     #[test]

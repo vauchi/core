@@ -406,7 +406,7 @@ mod tests {
         let _lock = lock_and_init();
         let faqs = get_faqs_localized(Locale::French);
         let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
-        assert!(phone_lost.question.contains("telephone"));
+        assert!(phone_lost.question.contains("téléphone"));
     }
 
     #[test]
@@ -414,14 +414,14 @@ mod tests {
         let _lock = lock_and_init();
         let faqs = get_faqs_localized(Locale::Spanish);
         let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
-        assert!(phone_lost.question.contains("telefono"));
+        assert!(phone_lost.question.contains("teléfono"));
     }
 
     #[test]
     fn test_localized_search() {
         let _lock = lock_and_init();
         // Search in German
-        let results = search_faqs_localized("Verschluesselung", Locale::German);
+        let results = search_faqs_localized("Verschlüsselung", Locale::German);
         assert!(!results.is_empty());
     }
 

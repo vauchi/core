@@ -241,7 +241,7 @@ impl OnboardingEngine {
                     InfoItem {
                         icon: Some("backup".into()),
                         title: "Restore from backup".into(),
-                        detail: "Import identity only. Contacts will need to be re-established."
+                        detail: "Restore your identity, contacts, and card from an encrypted backup file."
                             .into(),
                     },
                 ],

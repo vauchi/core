@@ -23,7 +23,7 @@
           {
             "icon": "backup",
             "title": "Restore from backup",
-            "detail": "Import identity only. Contacts will need to be re-established."
+            "detail": "Restore your identity, contacts, and card from an encrypted backup file."
           }
         ],
         "a11y": {

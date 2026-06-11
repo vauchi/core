@@ -458,8 +458,8 @@ impl WorkflowEngine for AppEngine {
 
     #[tracing::instrument(level = "debug", skip_all, name = "app.handle_action")]
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        let action = dispatch::normalize_inline_confirm_action(action);
         self.drain_events_to_log();
-
         // Global-chrome + top-level navigation guards (sync, backup
         // reminder, update link, tab nav, system back, settings gear,
         // demo-contact dismiss). See `dispatch::intercept_global_chrome`.

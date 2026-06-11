@@ -276,3 +276,27 @@ impl AppEngine {
         None
     }
 }
+
+/// Translate renderer-convention InlineConfirm presses into the
+/// canonical engine form.
+///
+/// iOS (`InlineConfirmView.swift`) and Android
+/// (`InlineConfirmComponent.kt`) emit `<component_id>:confirm` /
+/// `<component_id>:cancel`; engines match `confirm_<id>` /
+/// `cancel_<id>`. Without this chokepoint normalization every inline
+/// confirmation was a silent no-op — a dirty form became a screen the
+/// user could not leave (device-verified Samsung S7,
+/// `2026-06-11-add-entry-form-cannot-be-exited`). Colons appear in no
+/// other action-id vocabulary, so the rewrite cannot collide.
+pub(super) fn normalize_inline_confirm_action(action: UserAction) -> UserAction {
+    if let UserAction::ActionPressed { action_id } = &action
+        && let Some((id, verb)) = action_id.rsplit_once(':')
+        && matches!(verb, "confirm" | "cancel")
+        && !id.is_empty()
+    {
+        return UserAction::ActionPressed {
+            action_id: format!("{verb}_{id}"),
+        };
+    }
+    action
+}

@@ -1,0 +1,97 @@
+{
+  "schema_version": 3,
+  "screen_id": "sync_status",
+  "title": "Sync",
+  "subtitle": null,
+  "components": [
+    {
+      "StatusIndicator": {
+        "id": "connection_status",
+        "icon": null,
+        "title": "Relay: Offline",
+        "detail": "Changes will sync automatically when connected. Check your internet connection.",
+        "status": "Failed",
+        "a11y": null
+      }
+    },
+    {
+      "InfoPanel": {
+        "id": "sync_info",
+        "icon": "sync",
+        "title": "Details",
+        "items": [
+          {
+            "icon": "relay",
+            "title": "Relay",
+            "detail": "https://relay.vauchi.app"
+          },
+          {
+            "icon": "contacts",
+            "title": "Contacts",
+            "detail": "12"
+          },
+          {
+            "icon": "pending",
+            "title": "Pending Updates",
+            "detail": "2 update(s) waiting to sync"
+          }
+        ],
+        "a11y": null
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "sync_now",
+      "label": "Sync Now",
+      "style": "Primary",
+      "enabled": false
+    },
+    {
+      "id": "test_connection",
+      "label": "Retry Connection",
+      "style": "Secondary",
+      "enabled": true
+    }
+  ],
+  "progress": null,
+  "tokens": {
+    "spacing": {
+      "xs": 4,
+      "sm": 8,
+      "sm_md": 12,
+      "md": 16,
+      "lg": 24,
+      "xl": 32
+    },
+    "spacing_direction": {
+      "content_start": 16,
+      "content_end": 16,
+      "list_item_start": 8,
+      "list_item_end": 8,
+      "list_item_inline_start": 12,
+      "list_item_inline_end": 12
+    },
+    "typography": {
+      "title_size": 24,
+      "subtitle_size": 18,
+      "body_size": 16,
+      "caption_size": 14
+    },
+    "border_radius": {
+      "sm": 4,
+      "md": 8,
+      "md_lg": 12,
+      "lg": 16
+    },
+    "touch_target": {
+      "minimum": 44
+    },
+    "motion": {
+      "enter_duration_ms": 200,
+      "exit_duration_ms": 150,
+      "emphasis_duration_ms": 300
+    }
+  },
+  "presentation_kind": "Page"
+}

@@ -329,6 +329,68 @@ fn emergency_broadcast_overview_fixture_is_fresh() {
     );
 }
 
+// ── Phase 4: single-screen nav/setup engines (screenshot catalog,
+//    problem 2026-06-12-device-screenshot-catalog) ──────────────────
+
+// @internal
+#[test]
+fn more_fixture_is_fresh() {
+    let engine = MoreEngine::new();
+    assert_fixture_fresh(&engine.current_screen(), "more.json");
+}
+
+// @internal
+#[test]
+fn support_fixture_is_fresh() {
+    let engine = SupportEngine::new();
+    assert_fixture_fresh(&engine.current_screen(), "support.json");
+}
+
+// @internal
+#[test]
+fn recovery_help_fixture_is_fresh() {
+    let engine = RecoveryHelpEngine::new();
+    assert_fixture_fresh(&engine.current_screen(), "recovery_help.json");
+}
+
+// @internal
+#[test]
+fn change_password_fixture_is_fresh() {
+    let engine = ChangePasswordEngine::new();
+    assert_fixture_fresh(&engine.current_screen(), "change_password.json");
+}
+
+// @internal
+#[test]
+fn contact_limit_fixture_is_fresh() {
+    let engine = ContactLimitEngine::new(150, 150);
+    assert_fixture_fresh(&engine.current_screen(), "contact_limit.json");
+}
+
+// @internal
+#[test]
+fn sync_status_fixture_is_fresh() {
+    let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 12, 2);
+    assert_fixture_fresh(&engine.current_screen(), "sync_status.json");
+}
+
+// @internal
+#[test]
+fn archived_contacts_fixture_is_fresh() {
+    let engine = ArchivedContactsEngine::new(vec![
+        ("c1".into(), "Alice".into()),
+        ("c2".into(), "Bob".into()),
+    ]);
+    assert_fixture_fresh(&engine.current_screen(), "archived_contacts.json");
+}
+
+// @internal
+#[test]
+fn privacy_settings_fixture_is_fresh() {
+    let engine = GdprEngine::new(None, "2 contacts, 1 group".into());
+    assert_fixture_fresh(&engine.current_screen(), "privacy_settings.json");
+}
+
 // ── Regenerate all fixtures (run with --ignored) ─────────────────
 
 // @internal
@@ -433,9 +495,40 @@ fn regenerate_all_engine_fixtures() {
             "emergency_broadcast_overview.json",
             EmergencyBroadcastEngine::new(None).current_screen(),
         ),
+        // Phase 4: single-screen nav/setup engines
+        ("more.json", MoreEngine::new().current_screen()),
+        ("support.json", SupportEngine::new().current_screen()),
+        (
+            "recovery_help.json",
+            RecoveryHelpEngine::new().current_screen(),
+        ),
+        (
+            "change_password.json",
+            ChangePasswordEngine::new().current_screen(),
+        ),
+        (
+            "contact_limit.json",
+            ContactLimitEngine::new(150, 150).current_screen(),
+        ),
+        (
+            "sync_status.json",
+            SyncStatusEngine::new("https://relay.vauchi.app".into(), 12, 2).current_screen(),
+        ),
+        (
+            "archived_contacts.json",
+            ArchivedContactsEngine::new(vec![
+                ("c1".into(), "Alice".into()),
+                ("c2".into(), "Bob".into()),
+            ])
+            .current_screen(),
+        ),
+        (
+            "privacy_settings.json",
+            GdprEngine::new(None, "2 contacts, 1 group".into()).current_screen(),
+        ),
     ];
 
-    assert_eq!(fixtures.len(), 16, "expected 16 engine fixtures");
+    assert_eq!(fixtures.len(), 24, "expected 24 engine fixtures");
 
     for (filename, screen) in &fixtures {
         let json = screen_to_json(screen);

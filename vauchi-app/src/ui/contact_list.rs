@@ -36,6 +36,13 @@ impl From<Item> for IndexedItem {
     }
 }
 
+/// Window length for windowed `Component::List` emissions. Filtered
+/// sets at or under this size are emitted whole (the exact unwindowed
+/// wire shape); larger sets are sliced so a 10k-contact list never puts
+/// a multi-MB emission on the wire
+/// (`2026-06-11-contacts-list-eager-render-anr` Track B).
+const DEFAULT_LIST_WINDOW: usize = 200;
+
 /// Contact list engine — full contact list with search and group filtering.
 #[derive(Clone, Debug)]
 pub struct ContactListEngine {
@@ -57,6 +64,11 @@ pub struct ContactListEngine {
     /// these contact ids (computed by the AppEngine intercept via
     /// `Vauchi::search_contacts_faceted`). `None` → plain in-memory search.
     faceted_ids: Option<Vec<String>>,
+    /// Requested window start within the filtered set. Clamped at render
+    /// time so a filter change that shrinks the set can never emit past
+    /// its end; reset to the top whenever the filtered set itself changes
+    /// (search, facets, group filter).
+    window_offset: usize,
 }
 
 impl ContactListEngine {
@@ -71,6 +83,7 @@ impl ContactListEngine {
             facet_comment: false,
             facet_place: false,
             faceted_ids: None,
+            window_offset: 0,
         }
     }
 
@@ -90,6 +103,7 @@ impl ContactListEngine {
             facet_comment: false,
             facet_place: false,
             faceted_ids: None,
+            window_offset: 0,
         }
     }
 
@@ -116,11 +130,13 @@ impl ContactListEngine {
             "place" => self.facet_place = !self.facet_place,
             _ => {}
         }
+        self.window_offset = 0;
     }
 
     /// Set the search query (used by the intercept when faceting).
     pub fn set_search_query(&mut self, query: String) {
         self.search_query = query;
+        self.window_offset = 0;
     }
 
     /// Set (or clear) the faceted result restriction. `Some` activates
@@ -128,6 +144,7 @@ impl ContactListEngine {
     /// group filter); `None` reverts to plain in-memory name search.
     pub fn set_faceted_ids(&mut self, ids: Option<Vec<String>>) {
         self.faceted_ids = ids;
+        self.window_offset = 0;
     }
 
     fn search_facets_toggle(&self) -> Component {
@@ -162,11 +179,7 @@ impl ContactListEngine {
         }
     }
 
-    fn filtered_contacts(&self) -> Vec<Item> {
-        // Clone is required: ScreenModel owns its components, so the
-        // emitted Vec<Item> needs to be owned. Caching would add
-        // complexity for a list that is small in practice (< 1000
-        // contacts).
+    fn filtered_contacts(&self) -> Vec<&Item> {
         let faceted: Option<std::collections::HashSet<&str>> = self
             .faceted_ids
             .as_ref()
@@ -201,7 +214,7 @@ impl ContactListEngine {
                 }
                 true
             })
-            .map(|c| c.item.clone())
+            .map(|c| &c.item)
             .collect()
     }
 }
@@ -278,15 +291,27 @@ impl WorkflowEngine for ContactListEngine {
                 a11y: None,
             }]
         } else {
+            let total = filtered.len();
+            let (window_items, total_count, offset, window) = if total > DEFAULT_LIST_WINDOW {
+                let offset = self.window_offset.min(total - DEFAULT_LIST_WINDOW);
+                (
+                    &filtered[offset..offset + DEFAULT_LIST_WINDOW],
+                    total,
+                    offset,
+                    DEFAULT_LIST_WINDOW,
+                )
+            } else {
+                (&filtered[..], 0, 0, 0)
+            };
             vec![
                 self.search_facets_toggle(),
                 Component::List {
                     id: "contacts".into(),
-                    items: filtered,
+                    items: window_items.iter().map(|&i| i.clone()).collect(),
                     searchable: true,
-                    total_count: 0,
-                    offset: 0,
-                    window: 0,
+                    total_count,
+                    offset,
+                    window,
                 },
             ]
         };
@@ -341,7 +366,7 @@ impl WorkflowEngine for ContactListEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::SearchChanged { query, .. } => {
-                self.search_query = query;
+                self.set_search_query(query);
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ItemToggled {
@@ -364,10 +389,19 @@ impl WorkflowEngine for ContactListEngine {
             {
                 let group_id = action_id.strip_prefix("filter_group:").unwrap().to_string();
                 self.group_filter = Some(group_id);
+                self.window_offset = 0;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ActionPressed { ref action_id } if action_id == "filter_group_clear" => {
                 self.group_filter = None;
+                self.window_offset = 0;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ListWindowRequested {
+                component_id,
+                offset,
+            } if component_id == "contacts" => {
+                self.window_offset = offset;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemAction {

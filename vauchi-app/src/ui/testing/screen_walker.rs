@@ -79,7 +79,14 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                 });
             }
         }
-        Component::List { id, items, .. } => {
+        Component::List {
+            id,
+            items,
+            total_count,
+            offset,
+            window,
+            ..
+        } => {
             for item in items {
                 out.push(UserAction::ListItemSelected {
                     component_id: id.clone(),
@@ -99,6 +106,14 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                         action_id: action.id.clone(),
                     });
                 }
+            }
+            // Windowed emissions add the renderer's prefetch dispatch —
+            // same P-11 rationale as per-row actions.
+            if *total_count > 0 {
+                out.push(UserAction::ListWindowRequested {
+                    component_id: id.clone(),
+                    offset: offset + window,
+                });
             }
         }
         Component::ActionList { id, items } => {

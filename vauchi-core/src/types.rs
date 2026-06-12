@@ -469,3 +469,90 @@ impl AhaMomentType {
         ]
     }
 }
+
+/// Maximum number of trusted contacts for emergency broadcast.
+pub const MAX_TRUSTED_CONTACTS: usize = 10;
+
+/// Outcome of [`crate::api::Vauchi::biometric_unlock_check`].
+///
+/// Returned after a successful platform biometric authentication
+/// (LAContext on iOS, BiometricPrompt on Android). The variant tells
+/// the frontend which screen to render next:
+///
+/// - `Unlocked`: biometric proves the real user; transition to the
+///   post-auth screen.
+/// - `PromptForDuressPin`: a duress PIN is configured, so the user
+///   must enter the PIN — that PIN check determines `Normal` vs
+///   `Duress` mode via [`crate::api::Vauchi::authenticate`].
+///
+/// The dispatcher is constant-time: the wall-clock duration of the
+/// containing call is at least
+/// [`crate::api::BIOMETRIC_UNLOCK_MIN_DURATION`] regardless of which
+/// outcome is returned, so an observer cannot infer whether duress is
+/// configured by timing the unlock animation.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub enum BiometricUnlockOutcome {
+    /// Biometric authentication succeeded and no duress PIN is
+    /// configured — the user is fully unlocked. `auth_mode` is set to
+    /// [`crate::api::AuthMode::Normal`].
+    Unlocked,
+    /// Biometric authentication succeeded but a duress PIN is
+    /// configured — the frontend must present the PIN entry screen so
+    /// the user enters either the real PIN or the duress PIN. The
+    /// subsequent [`crate::api::Vauchi::authenticate`] call sets the
+    /// final [`crate::api::AuthMode`].
+    PromptForDuressPin,
+}
+
+/// Types of consent that can be granted or revoked.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub enum ConsentType {
+    /// Consent for local data processing (required for operation).
+    DataProcessing,
+    /// Consent for sharing contact information with exchanged contacts.
+    ContactSharing,
+    /// Consent to participate in recovery vouching.
+    RecoveryVouching,
+}
+
+impl ConsentType {
+    // Only called by the api-gated ConsentManager; compiled in all
+    // configs so a future ungated caller needs no feature surgery.
+    #[cfg_attr(not(feature = "network-rustls"), allow(dead_code))]
+    pub(crate) fn as_str(&self) -> &'static str {
+        match self {
+            ConsentType::DataProcessing => "data_processing",
+            ConsentType::ContactSharing => "contact_sharing",
+            ConsentType::RecoveryVouching => "recovery_vouching",
+        }
+    }
+
+    /// Parses a consent type from its string representation.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "data_processing" => Some(ConsentType::DataProcessing),
+            "contact_sharing" => Some(ConsentType::ContactSharing),
+            "recovery_vouching" => Some(ConsentType::RecoveryVouching),
+            _ => None,
+        }
+    }
+}
+
+/// A recorded consent decision.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ConsentRecord {
+    /// Unique record ID.
+    pub id: String,
+    /// Type of consent.
+    pub consent_type: ConsentType,
+    /// Whether consent was granted (true) or revoked (false).
+    pub granted: bool,
+    /// Unix timestamp of the decision.
+    pub timestamp: u64,
+    /// Privacy policy version at time of consent.
+    #[serde(default)]
+    pub policy_version: Option<String>,
+}

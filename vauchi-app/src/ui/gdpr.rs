@@ -26,8 +26,8 @@ pub struct ConsentStatus {
 
 impl ConsentStatus {
     /// Build from a consent log, taking the latest decision per type.
-    pub fn from_consent_records(records: &[vauchi_core::api::ConsentRecord]) -> Self {
-        let granted = |t: vauchi_core::api::ConsentType| {
+    pub fn from_consent_records(records: &[vauchi_core::ConsentRecord]) -> Self {
+        let granted = |t: vauchi_core::ConsentType| {
             records
                 .iter()
                 .rfind(|r| r.consent_type == t)
@@ -35,9 +35,9 @@ impl ConsentStatus {
                 .unwrap_or(false)
         };
         Self {
-            data_processing: granted(vauchi_core::api::ConsentType::DataProcessing),
-            contact_sharing: granted(vauchi_core::api::ConsentType::ContactSharing),
-            recovery_vouching: granted(vauchi_core::api::ConsentType::RecoveryVouching),
+            data_processing: granted(vauchi_core::ConsentType::DataProcessing),
+            contact_sharing: granted(vauchi_core::ConsentType::ContactSharing),
+            recovery_vouching: granted(vauchi_core::ConsentType::RecoveryVouching),
         }
     }
 }

@@ -169,6 +169,18 @@ lint:clippy:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
 
+# vauchi-app with default features off is the wasm/web-demo configuration —
+# no other build exercises it, so feature-gate drift only surfaces at the
+# next downstream lock bump (web-demo froze 773 commits on exactly this,
+# 2026-06-12-web-demo-core-lock-freeze). Deny warnings so cross-feature
+# dead code is caught here too.
+lint:no-default-features:
+  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  stage: lint
+  needs: []
+  script:
+    - RUSTFLAGS="-D warnings" cargo check -p vauchi-app --no-default-features
+
 # SemVer compatibility check — catch breaking API changes before they cascade
 # to 10+ downstream consumers (cli, tui, e2e, relay, linux-gtk, mobile bindings).
 # Advisory while pre-1.0 (no deployed clients, SP-33 allows intentional breaks).

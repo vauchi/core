@@ -160,7 +160,8 @@ pub use app_password::{AppPasswordConfig, AuthResult};
 pub use duress::{DuressAlert, DuressAlertType};
 
 // Emergency Broadcast System
-pub use emergency::{BroadcastResult, EmergencyWipeStatus, MAX_TRUSTED_CONTACTS};
+pub use crate::types::MAX_TRUSTED_CONTACTS;
+pub use emergency::{BroadcastResult, EmergencyWipeStatus};
 
 // Vauchi
 pub use vauchi::{

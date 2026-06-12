@@ -618,6 +618,8 @@ impl Contact {
     /// untouched. Used by read paths that resolve a local display
     /// preference (e.g. a nickname) for rendering — never persisted back to
     /// the card, whose `display_name` is signed and immutable.
+    // Only called by the api-gated ContactManager read path.
+    #[cfg_attr(not(feature = "network-rustls"), allow(dead_code))]
     pub(crate) fn override_display_name(&mut self, name: &str) {
         self.display_name = name.to_string();
     }

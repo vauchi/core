@@ -64,6 +64,7 @@ pub(crate) fn resolve_exchange_allow(
 /// `DirectTransportEngine`) share so the privacy filter lives in one place.
 /// `None` only when there is no own card. See
 /// `2026-06-08-exchange-card-not-group-filtered`.
+#[cfg(feature = "network-rustls")]
 pub(crate) fn filtered_own_card(
     vauchi: &vauchi_core::api::Vauchi,
     selected_group_ids: &[String],

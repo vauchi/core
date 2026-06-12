@@ -12,12 +12,11 @@
 //! - Max 10 trusted contacts
 //! - Default message: "I may be in danger. Please check on me."
 //! - Alerts are E2E encrypted with each contact's shared key
-
-/// Maximum number of trusted contacts for emergency broadcast.
-pub const MAX_TRUSTED_CONTACTS: usize = 10;
-
-/// Default emergency message.
-pub const DEFAULT_EMERGENCY_MESSAGE: &str = "I may be in danger. Please check on me.";
+//!
+//! `MAX_TRUSTED_CONTACTS` and `DEFAULT_EMERGENCY_MESSAGE` live in
+//! `crate::types` (ungated, so the no-default-features build can reach
+//! them). The module-boundary lint forbids re-exporting them from this
+//! leaf feature module, so callers import from `crate::types` directly.
 
 /// Minimum seconds between emergency broadcasts (UX guard).
 ///

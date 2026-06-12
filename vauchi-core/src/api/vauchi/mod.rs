@@ -102,38 +102,7 @@ pub enum AuthMode {
     Unauthenticated,
 }
 
-/// Outcome of [`Vauchi::biometric_unlock_check`].
-///
-/// Returned after a successful platform biometric authentication
-/// (LAContext on iOS, BiometricPrompt on Android). The variant tells
-/// the frontend which screen to render next:
-///
-/// - `Unlocked`: biometric proves the real user; transition to the
-///   post-auth screen.
-/// - `PromptForDuressPin`: a duress PIN is configured, so the user
-///   must enter the PIN — that PIN check determines `Normal` vs
-///   `Duress` mode via [`Vauchi::authenticate`].
-///
-/// The dispatcher is constant-time: the wall-clock duration of the
-/// containing call is at least
-/// [`security::BIOMETRIC_UNLOCK_MIN_DURATION`] regardless of which
-/// outcome is returned, so an observer cannot infer whether duress is
-/// configured by timing the unlock animation.
-#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[non_exhaustive]
-pub enum BiometricUnlockOutcome {
-    /// Biometric authentication succeeded and no duress PIN is
-    /// configured — the user is fully unlocked. `auth_mode` is set to
-    /// [`AuthMode::Normal`].
-    Unlocked,
-    /// Biometric authentication succeeded but a duress PIN is
-    /// configured — the frontend must present the PIN entry screen so
-    /// the user enters either the real PIN or the duress PIN. The
-    /// subsequent [`Vauchi::authenticate`] call sets the final
-    /// [`AuthMode`].
-    PromptForDuressPin,
-}
+pub use crate::types::BiometricUnlockOutcome;
 
 /// Outcome of a `Vauchi::sync()` call.
 #[derive(Debug)]

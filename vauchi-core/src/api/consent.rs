@@ -6,55 +6,7 @@
 //!
 //! Tracks user consent for data processing activities (GDPR Article 7).
 
-use serde::{Deserialize, Serialize};
-
-/// Types of consent that can be granted or revoked.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum ConsentType {
-    /// Consent for local data processing (required for operation).
-    DataProcessing,
-    /// Consent for sharing contact information with exchanged contacts.
-    ContactSharing,
-    /// Consent to participate in recovery vouching.
-    RecoveryVouching,
-}
-
-impl ConsentType {
-    fn as_str(&self) -> &'static str {
-        match self {
-            ConsentType::DataProcessing => "data_processing",
-            ConsentType::ContactSharing => "contact_sharing",
-            ConsentType::RecoveryVouching => "recovery_vouching",
-        }
-    }
-
-    /// Parses a consent type from its string representation.
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "data_processing" => Some(ConsentType::DataProcessing),
-            "contact_sharing" => Some(ConsentType::ContactSharing),
-            "recovery_vouching" => Some(ConsentType::RecoveryVouching),
-            _ => None,
-        }
-    }
-}
-
-/// A recorded consent decision.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsentRecord {
-    /// Unique record ID.
-    pub id: String,
-    /// Type of consent.
-    pub consent_type: ConsentType,
-    /// Whether consent was granted (true) or revoked (false).
-    pub granted: bool,
-    /// Unix timestamp of the decision.
-    pub timestamp: u64,
-    /// Privacy policy version at time of consent.
-    #[serde(default)]
-    pub policy_version: Option<String>,
-}
+pub use crate::types::{ConsentRecord, ConsentType};
 
 /// Aggregated consent status for a specific consent type.
 ///

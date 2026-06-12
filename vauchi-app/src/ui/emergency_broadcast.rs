@@ -12,9 +12,8 @@
 //! `Vauchi` call (configure / send / delete).
 
 use crate::ui::*;
-use vauchi_core::api::MAX_TRUSTED_CONTACTS;
-use vauchi_core::api::emergency::DEFAULT_EMERGENCY_MESSAGE;
 use vauchi_core::types::EmergencyBroadcastConfig;
+use vauchi_core::{DEFAULT_EMERGENCY_MESSAGE, MAX_TRUSTED_CONTACTS};
 
 /// What the AppEngine should do when the engine returns `Complete`.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -49,10 +49,10 @@ pub mod text;
 #[cfg(feature = "storage")]
 pub mod install_id;
 pub use types::{
-    AhaMomentTracker, AhaMomentType, AudioCapability, BackupReminderState,
-    DEFAULT_EMERGENCY_MESSAGE, DemoContactState, DuressSettings, EmergencyBroadcastConfig,
-    EventOrigin, ExchangeTransport, OnboardingProgress, OnboardingStep, ProximityConfidence,
-    ReminderFrequency,
+    AhaMomentTracker, AhaMomentType, AudioCapability, BackupReminderState, BiometricUnlockOutcome,
+    ConsentRecord, ConsentType, DEFAULT_EMERGENCY_MESSAGE, DemoContactState, DuressSettings,
+    EmergencyBroadcastConfig, EventOrigin, ExchangeTransport, MAX_TRUSTED_CONTACTS,
+    OnboardingProgress, OnboardingStep, ProximityConfidence, ReminderFrequency,
 };
 pub mod contact;
 pub mod contact_card;
@@ -120,11 +120,10 @@ pub use sync::{CardDelta, DeltaError, FieldChange, SyncState};
 pub mod api;
 #[cfg(feature = "network-rustls")]
 pub use api::{
-    AppPasswordConfig, AuthMode, AuthResult, BIOMETRIC_UNLOCK_MIN_DURATION, BiometricUnlockOutcome,
-    BroadcastResult, ConsentStatus, DeviceSyncOrchestrator, DuressAlert, DuressAlertType,
-    EmergencyWipeStatus, GroupDraft, HandlerId, RecoveryReadiness, SearchFacets, SetupProgress,
-    SyncError, SyncManager, Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent,
-    VauchiResult, VauchiSyncOutcome,
+    AppPasswordConfig, AuthMode, AuthResult, BIOMETRIC_UNLOCK_MIN_DURATION, BroadcastResult,
+    ConsentStatus, DeviceSyncOrchestrator, DuressAlert, DuressAlertType, EmergencyWipeStatus,
+    GroupDraft, HandlerId, RecoveryReadiness, SearchFacets, SetupProgress, SyncError, SyncManager,
+    Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome,
 };
 #[cfg(all(feature = "network-rustls", feature = "network-http"))]
 pub use api::{PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES};

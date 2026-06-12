@@ -147,6 +147,11 @@ fn all_components() -> Vec<Component> {
             id: "l".to_string(),
             items: vec![sample_item()],
             searchable: true,
+            // Windowed sample so the new wire keys are walked by the
+            // deny-list scan (zeros are skip-serialized).
+            total_count: 3,
+            offset: 1,
+            window: 1,
         },
         Component::Preview {
             name: "Alice".to_string(),

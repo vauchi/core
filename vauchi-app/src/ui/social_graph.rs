@@ -213,6 +213,9 @@ impl SocialGraphEngine {
                 id: format!("contacts_{}", level.id()),
                 items: level_contacts,
                 searchable: false,
+                total_count: 0,
+                offset: 0,
+                window: 0,
             });
         }
 

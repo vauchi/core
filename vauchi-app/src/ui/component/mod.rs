@@ -13,6 +13,12 @@ pub use preview::{
     Field, PreviewVariant, UiFieldVisibility, build_visible_fields, icon_for_field_type,
 };
 
+/// Serde skip-helper: windowing fields are omitted from the wire when
+/// zero so unwindowed lists keep the exact pre-windowing JSON shape.
+fn is_zero(n: &usize) -> bool {
+    *n == 0
+}
+
 /// An option in a [`Component::Dropdown`].
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -108,6 +114,21 @@ pub enum Component {
         id: String,
         items: Vec<Item>,
         searchable: bool,
+        /// Size of the full filtered set when the emission is windowed;
+        /// zero/absent = unwindowed (`items` is the complete set, the
+        /// exact pre-windowing wire shape). Windowing keeps multi-MB
+        /// emissions off the wire at 10k items
+        /// (`2026-06-11-contacts-list-eager-render-anr` Track B).
+        #[serde(default, skip_serializing_if = "is_zero")]
+        total_count: usize,
+        /// Window start within the filtered set (windowed emissions only).
+        #[serde(default, skip_serializing_if = "is_zero")]
+        offset: usize,
+        /// Emitted window length. The renderer dispatches
+        /// [`crate::ui::UserAction::ListWindowRequested`] as scrolling
+        /// approaches the loaded window's edge.
+        #[serde(default, skip_serializing_if = "is_zero")]
+        window: usize,
     },
     SettingsGroup {
         id: String,

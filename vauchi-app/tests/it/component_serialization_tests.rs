@@ -274,3 +274,65 @@ fn sectioned_action_list_roundtrip_empty_sections() {
     let roundtrip: Component = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(component, roundtrip);
 }
+
+// --- List windowing (`2026-06-11-contacts-list-eager-render-anr` Track B) ---
+
+// @internal
+#[test]
+fn list_unwindowed_keeps_pre_windowing_json_shape() {
+    // Zero windowing fields must be skip-serialized so every unwindowed
+    // emitter (group members, tags, places, …) keeps its exact current
+    // wire bytes — hand-mirrored frontend decoders see no change.
+    let component = Component::List {
+        id: "members".to_string(),
+        items: vec![],
+        searchable: true,
+        total_count: 0,
+        offset: 0,
+        window: 0,
+    };
+    let json = serde_json::to_value(&component).expect("serialize unwindowed List");
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "List": { "id": "members", "items": [], "searchable": true }
+        })
+    );
+}
+
+// @internal
+#[test]
+fn list_without_window_fields_decodes_unwindowed() {
+    let json = r#"{"List":{"id":"members","items":[],"searchable":true}}"#;
+    let component: Component = serde_json::from_str(json).expect("decode pre-windowing List");
+    let Component::List {
+        total_count,
+        offset,
+        window,
+        ..
+    } = component
+    else {
+        panic!("expected List, got {component:?}");
+    };
+    assert_eq!((total_count, offset, window), (0, 0, 0));
+}
+
+// @internal
+#[test]
+fn list_windowed_roundtrip() {
+    let component = Component::List {
+        id: "contacts".to_string(),
+        items: vec![],
+        searchable: true,
+        total_count: 500,
+        offset: 200,
+        window: 200,
+    };
+    let json = serde_json::to_string(&component).expect("serialize windowed List");
+    assert!(
+        json.contains("\"total_count\":500"),
+        "windowed fields on wire: {json}"
+    );
+    let roundtrip: Component = serde_json::from_str(&json).expect("deserialize windowed List");
+    assert_eq!(component, roundtrip);
+}

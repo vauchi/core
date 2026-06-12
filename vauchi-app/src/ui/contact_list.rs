@@ -284,6 +284,9 @@ impl WorkflowEngine for ContactListEngine {
                     id: "contacts".into(),
                     items: filtered,
                     searchable: true,
+                    total_count: 0,
+                    offset: 0,
+                    window: 0,
                 },
             ]
         };
@@ -432,6 +435,186 @@ mod tests {
             label: "Archive".into(),
             kind: ListItemActionKind::Archive,
             destructive: false,
+        }
+    }
+
+    /// Wire-contract window length (Track B,
+    /// `2026-06-11-contacts-list-eager-render-anr`): asserted as a
+    /// literal so the tests pin the spec, not the implementation.
+    const WINDOW: usize = 200;
+
+    fn contacts(n: usize) -> Vec<IndexedItem> {
+        (0..n).map(|i| item(&format!("c{i}"), vec![])).collect()
+    }
+
+    fn list_window(screen: &ScreenModel) -> (Vec<String>, usize, usize, usize) {
+        match screen
+            .components
+            .iter()
+            .find(|c| matches!(c, Component::List { .. }))
+        {
+            Some(Component::List {
+                items,
+                total_count,
+                offset,
+                window,
+                ..
+            }) => (
+                items.iter().map(|i| i.id.clone()).collect(),
+                *total_count,
+                *offset,
+                *window,
+            ),
+            other => panic!("expected a List component, got {other:?}"),
+        }
+    }
+
+    fn updated_screen(result: ActionResult) -> ScreenModel {
+        match result {
+            ActionResult::UpdateScreen(screen) => screen,
+            other => panic!("expected UpdateScreen, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn large_list_emits_first_window_with_total_count() {
+        let engine = ContactListEngine::new(contacts(250));
+        let (ids, total, offset, window) = list_window(&engine.current_screen());
+        assert_eq!(total, 250);
+        assert_eq!(offset, 0);
+        assert_eq!(window, WINDOW);
+        assert_eq!(ids.len(), WINDOW);
+        assert_eq!(ids[0], "c0");
+        assert_eq!(ids[WINDOW - 1], "c199");
+    }
+
+    // @internal
+    #[test]
+    fn small_list_stays_unwindowed() {
+        // At or under one window the emission keeps the exact
+        // pre-windowing wire shape (zeros are skip-serialized).
+        let engine = ContactListEngine::new(contacts(WINDOW));
+        let (ids, total, offset, window) = list_window(&engine.current_screen());
+        assert_eq!((total, offset, window), (0, 0, 0));
+        assert_eq!(ids.len(), WINDOW);
+    }
+
+    // @internal
+    #[test]
+    fn window_request_moves_window() {
+        let mut engine = ContactListEngine::new(contacts(500));
+        let screen = updated_screen(engine.handle_action(UserAction::ListWindowRequested {
+            component_id: "contacts".into(),
+            offset: 150,
+        }));
+        let (ids, total, offset, window) = list_window(&screen);
+        assert_eq!(total, 500);
+        assert_eq!(offset, 150);
+        assert_eq!(window, WINDOW);
+        assert_eq!(ids[0], "c150");
+        assert_eq!(ids[WINDOW - 1], "c349");
+    }
+
+    // @internal
+    #[test]
+    fn window_request_clamps_to_last_full_window() {
+        let mut engine = ContactListEngine::new(contacts(500));
+        let screen = updated_screen(engine.handle_action(UserAction::ListWindowRequested {
+            component_id: "contacts".into(),
+            offset: 9999,
+        }));
+        let (ids, total, offset, window) = list_window(&screen);
+        assert_eq!(total, 500);
+        assert_eq!(offset, 300);
+        assert_eq!(window, WINDOW);
+        assert_eq!(ids[0], "c300");
+        assert_eq!(ids[WINDOW - 1], "c499");
+    }
+
+    // @internal
+    #[test]
+    fn window_request_for_other_component_keeps_window() {
+        let mut engine = ContactListEngine::new(contacts(500));
+        let screen = updated_screen(engine.handle_action(UserAction::ListWindowRequested {
+            component_id: "search_facets".into(),
+            offset: 300,
+        }));
+        let (ids, _, offset, _) = list_window(&screen);
+        assert_eq!(offset, 0);
+        assert_eq!(ids[0], "c0");
+    }
+
+    // @internal
+    #[test]
+    fn search_change_resets_window_offset() {
+        let mut engine = ContactListEngine::new(contacts(500));
+        let _ = engine.handle_action(UserAction::ListWindowRequested {
+            component_id: "contacts".into(),
+            offset: 300,
+        });
+        // Every fixture contact matches "contact" — the filtered set is
+        // unchanged but the result window must restart at the top.
+        let screen = updated_screen(engine.handle_action(UserAction::SearchChanged {
+            component_id: "contacts".into(),
+            query: "contact".into(),
+        }));
+        let (ids, total, offset, _) = list_window(&screen);
+        assert_eq!(total, 500);
+        assert_eq!(offset, 0);
+        assert_eq!(ids[0], "c0");
+    }
+
+    // @internal
+    #[test]
+    fn group_filter_change_resets_window_offset() {
+        let groups = vec![("work".to_string(), "Work".to_string())];
+        let mut memberships: HashMap<String, Vec<String>> = HashMap::new();
+        memberships.insert("work".into(), (0..300).map(|i| format!("c{i}")).collect());
+        let mut engine = ContactListEngine::with_groups(contacts(500), groups, memberships);
+        let _ = engine.handle_action(UserAction::ListWindowRequested {
+            component_id: "contacts".into(),
+            offset: 300,
+        });
+        let screen = updated_screen(engine.handle_action(UserAction::ActionPressed {
+            action_id: "filter_group:work".into(),
+        }));
+        let (ids, total, offset, _) = list_window(&screen);
+        assert_eq!(total, 300);
+        assert_eq!(offset, 0);
+        assert_eq!(ids[0], "c0");
+    }
+
+    mod windowing_properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            // @internal
+            #[test]
+            fn windowed_emission_is_a_contiguous_slice_of_the_filtered_set(
+                n in 1usize..450,
+                requested in 0usize..1000,
+            ) {
+                let mut engine = ContactListEngine::new(contacts(n));
+                let _ = engine.handle_action(UserAction::ListWindowRequested {
+                    component_id: "contacts".into(),
+                    offset: requested,
+                });
+                let (ids, total, offset, window) = list_window(&engine.current_screen());
+                if n > WINDOW {
+                    prop_assert_eq!(total, n);
+                    prop_assert_eq!(window, WINDOW);
+                    prop_assert_eq!(window, ids.len());
+                    prop_assert!(offset + window <= n);
+                    for (k, id) in ids.iter().enumerate() {
+                        prop_assert_eq!(id, &format!("c{}", offset + k));
+                    }
+                } else {
+                    prop_assert_eq!((total, offset, window), (0, 0, 0));
+                    prop_assert_eq!(ids.len(), n);
+                }
+            }
         }
     }
 

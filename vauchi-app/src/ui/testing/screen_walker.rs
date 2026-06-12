@@ -617,6 +617,9 @@ mod tests {
                 a11y: None,
             }],
             searchable: false,
+            total_count: 0,
+            offset: 0,
+            window: 0,
         };
         let screen = screen_with(vec![component], vec![]);
         let actions = walk_actions(&screen);
@@ -657,6 +660,9 @@ mod tests {
                 a11y: None,
             }],
             searchable: false,
+            total_count: 0,
+            offset: 0,
+            window: 0,
         };
         let screen = screen_with(vec![component], vec![]);
         let actions = walk_actions(&screen);
@@ -678,6 +684,40 @@ mod tests {
                     action_id: "delete".into(),
                 },
             ]
+        );
+    }
+
+    // @internal
+    #[test]
+    fn windowed_list_emits_window_request_affordance() {
+        // Mirrors the P-11 per-row-action lesson: without enumerating
+        // the window-request affordance the reachability harness would
+        // pass green even if an engine's `ListWindowRequested` arm and
+        // the renderer's prefetch dispatch diverge.
+        let component = Component::List {
+            id: "contacts".into(),
+            items: vec![Item {
+                id: "c-200".into(),
+                name: "Alice".into(),
+                subtitle: None,
+                avatar_initials: "A".into(),
+                status: None,
+                actions: vec![],
+                a11y: None,
+            }],
+            searchable: false,
+            total_count: 500,
+            offset: 200,
+            window: 1,
+        };
+        let screen = screen_with(vec![component], vec![]);
+        let actions = walk_actions(&screen);
+        assert!(
+            actions.contains(&UserAction::ListWindowRequested {
+                component_id: "contacts".into(),
+                offset: 201,
+            }),
+            "windowed List must surface the window-request affordance, got {actions:?}"
         );
     }
 

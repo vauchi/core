@@ -120,6 +120,9 @@ impl GroupDetailEngine {
             id: "members".into(),
             items: self.members.clone(),
             searchable: false,
+            total_count: 0,
+            offset: 0,
+            window: 0,
         });
 
         if self.pending_delete {

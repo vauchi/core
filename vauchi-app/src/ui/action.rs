@@ -74,6 +74,16 @@ pub enum UserAction {
         component_id: String,
         item_id: String,
     },
+    /// The lazy list is approaching the edge of the emitted window — the
+    /// renderer asks the engine to re-slice the windowed
+    /// [`crate::ui::Component::List`] from `offset`. Only meaningful for
+    /// windowed emissions (`total_count > 0`); the engine clamps the
+    /// offset, re-slices, and answers with the usual `UpdateScreen`
+    /// (`2026-06-11-contacts-list-eager-render-anr` Track B).
+    ListWindowRequested {
+        component_id: String,
+        offset: usize,
+    },
     /// User pressed Undo on a toast with an undo action.
     UndoPressed {
         action_id: String,

@@ -87,6 +87,9 @@ impl PlacesEngine {
             id: "places".into(),
             items,
             searchable: false,
+            total_count: 0,
+            offset: 0,
+            window: 0,
         });
 
         if let Some(name) = self.pending_name() {

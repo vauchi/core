@@ -427,6 +427,9 @@ impl RecoveryEngine {
             id: "trusted_contacts".into(),
             items: self.trusted_contacts.clone(),
             searchable: false,
+            total_count: 0,
+            offset: 0,
+            window: 0,
         });
 
         ScreenModel {

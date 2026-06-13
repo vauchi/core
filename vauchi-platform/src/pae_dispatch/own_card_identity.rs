@@ -40,7 +40,7 @@ impl PlatformAppEngine {
                 value,
             } => {
                 let storage = engine.vauchi().storage();
-                let mut card = storage
+                let old_card = storage
                     .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
@@ -49,6 +49,7 @@ impl PlatformAppEngine {
                     .ok_or(MobileError::Other {
                         detail: "Identity not found".into(),
                     })?;
+                let mut card = old_card.clone();
                 let field = vauchi_core::ContactField::new(
                     field_type.into(),
                     &label,
@@ -66,12 +67,20 @@ impl PlatformAppEngine {
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;
+                // Option B: own-card edits propagate via the explicit
+                // group-aware batch, not auto-driven by the mutator (ADR-054 G4).
+                engine
+                    .vauchi()
+                    .propagate_card_update(&old_card, &card)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
                 engine.invalidate_screen(&AppScreen::MyInfo);
                 Ok(DomainCommandResult::Unit)
             }
             DomainCommand::UpdateField { label, new_value } => {
                 let storage = engine.vauchi().storage();
-                let mut card = storage
+                let old_card = storage
                     .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
@@ -80,6 +89,7 @@ impl PlatformAppEngine {
                     .ok_or(MobileError::Other {
                         detail: "Identity not found".into(),
                     })?;
+                let mut card = old_card.clone();
                 let field_id = card
                     .fields()
                     .iter()
@@ -101,12 +111,20 @@ impl PlatformAppEngine {
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;
+                // Option B: own-card edits propagate via the explicit
+                // group-aware batch, not auto-driven by the mutator (ADR-054 G4).
+                engine
+                    .vauchi()
+                    .propagate_card_update(&old_card, &card)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
                 engine.invalidate_screen(&AppScreen::MyInfo);
                 Ok(DomainCommandResult::Unit)
             }
             DomainCommand::RemoveField { label } => {
                 let storage = engine.vauchi().storage();
-                let mut card = storage
+                let old_card = storage
                     .contacts()
                     .load_own_card()
                     .map_err(|e| MobileError::StorageError {
@@ -115,6 +133,7 @@ impl PlatformAppEngine {
                     .ok_or(MobileError::Other {
                         detail: "Identity not found".into(),
                     })?;
+                let mut card = old_card.clone();
                 let field_id = match card.fields().iter().find(|f| f.label() == label) {
                     Some(f) => f.id().to_string(),
                     None => return Ok(DomainCommandResult::Bool { value: false }),
@@ -127,6 +146,14 @@ impl PlatformAppEngine {
                 storage
                     .contacts()
                     .save_own_card(&card)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                // Option B: own-card edits propagate via the explicit
+                // group-aware batch, not auto-driven by the mutator (ADR-054 G4).
+                engine
+                    .vauchi()
+                    .propagate_card_update(&old_card, &card)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;

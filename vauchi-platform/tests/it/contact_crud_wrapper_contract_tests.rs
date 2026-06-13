@@ -260,6 +260,52 @@ fn test_remove_field() {
     assert!(card.fields.is_empty());
 }
 
+// A mobile own-card edit must propagate to exchanged contacts (Option B:
+// the handler calls propagate_card_update explicitly). Before the wiring the
+// handlers only persisted + refreshed MyInfo, so the edit reached no contact.
+// @scenario: contact_card_management:Editing the own card propagates to exchanged contacts
+#[test]
+fn add_field_propagates_to_a_ratcheted_contact() {
+    let (engine, _dir) = setup();
+
+    // An exchanged + ratcheted contact, so propagation has a real target.
+    let shared = vauchi_core::crypto::SymmetricKey::generate();
+    let contact = vauchi_core::Contact::from_exchange(
+        [0xCD; 32],
+        vauchi_core::contact_card::ContactCard::new("Bob"),
+        shared.clone(),
+        0,
+    );
+    let contact_id = contact.id().to_string();
+    engine.save_test_contact(&contact).unwrap();
+    let their_dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    engine
+        .create_test_ratchet_as_initiator(contact_id.clone(), &shared, *their_dh.public_key())
+        .unwrap();
+
+    assert_eq!(
+        engine
+            .test_pending_update_count(contact_id.clone())
+            .unwrap(),
+        0,
+        "no pending update before the edit"
+    );
+
+    add_field(
+        &engine,
+        MobileFieldType::Email,
+        "work".to_string(),
+        "alice@company.com".to_string(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        engine.test_pending_update_count(contact_id).unwrap(),
+        1,
+        "editing the own card queues a propagation update for the ratcheted contact"
+    );
+}
+
 // === Social networks ===
 
 // @scenario: contact_card_management:Social network profile links

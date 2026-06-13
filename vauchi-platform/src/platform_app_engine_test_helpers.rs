@@ -108,6 +108,20 @@ pub trait PlatformAppEngineTestHelpers {
     /// listener tests still need a forward-nav seam to land on
     /// `DeviceLinking` and assert the session spawn/cancel lifecycle.
     fn navigate_to_json_for_test(&self, screen_json: String) -> Result<String, MobileError>;
+
+    /// Test-only: establish an initiator ratchet for an already-saved
+    /// exchanged contact, so own-card propagation has a real delivery target
+    /// without running a full exchange.
+    fn create_test_ratchet_as_initiator(
+        &self,
+        contact_id: String,
+        shared_secret: &vauchi_core::crypto::SymmetricKey,
+        their_dh_public: [u8; 32],
+    ) -> Result<(), MobileError>;
+
+    /// Test-only: number of queued pending card-update payloads for a contact.
+    /// Lets a test assert that an own-card edit was propagated.
+    fn test_pending_update_count(&self, contact_id: String) -> Result<usize, MobileError>;
 }
 
 impl PlatformAppEngineTestHelpers for PlatformAppEngine {
@@ -197,5 +211,37 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         };
         self.after_screen_transition(pre_screen)?;
         screen_envelope_to_json(&model, &pending_commands)
+    }
+
+    fn create_test_ratchet_as_initiator(
+        &self,
+        contact_id: String,
+        shared_secret: &vauchi_core::crypto::SymmetricKey,
+        their_dh_public: [u8; 32],
+    ) -> Result<(), MobileError> {
+        let engine = self.engine().lock().map_err(|e| MobileError::Other {
+            detail: format!("engine lock poisoned: {e}"),
+        })?;
+        engine
+            .vauchi()
+            .create_ratchet_as_initiator(&contact_id, shared_secret, their_dh_public)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })
+    }
+
+    fn test_pending_update_count(&self, contact_id: String) -> Result<usize, MobileError> {
+        let engine = self.engine().lock().map_err(|e| MobileError::Other {
+            detail: format!("engine lock poisoned: {e}"),
+        })?;
+        let pending = engine
+            .vauchi()
+            .storage()
+            .pending()
+            .get_pending_updates(&contact_id)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })?;
+        Ok(pending.len())
     }
 }

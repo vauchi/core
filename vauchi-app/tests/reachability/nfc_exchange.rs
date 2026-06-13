@@ -48,13 +48,23 @@ fn identity() -> Identity {
 
 /// Role-chooser root — a fresh engine with an identity renders the chooser.
 fn role_factory() -> NfcExchangeEngine {
-    NfcExchangeEngine::new(Some(identity()), "Alice".into(), true)
+    NfcExchangeEngine::new(
+        Some(identity()),
+        "Alice".into(),
+        true,
+        vauchi_core::clock::SystemClock::shared(),
+    )
 }
 
 /// Failed root — Send with no identity fails gracefully to the failed screen
 /// (camera present → the QR fallback is offered).
 fn failed_factory() -> NfcExchangeEngine {
-    let mut e = NfcExchangeEngine::new(None, "Alice".into(), true);
+    let mut e = NfcExchangeEngine::new(
+        None,
+        "Alice".into(),
+        true,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     let _ = e.handle_action(vauchi_app::ui::UserAction::ListItemSelected {
         component_id: "nfc_role".into(),
         item_id: NFC_ROLE_SEND.into(),

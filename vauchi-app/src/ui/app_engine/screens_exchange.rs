@@ -129,6 +129,7 @@ impl AppEngine {
                     identity,
                     display_name,
                     device_capabilities.has_camera,
+                    vauchi.clock().clone(),
                 ))
             }
             AppScreen::DirectTransport => {

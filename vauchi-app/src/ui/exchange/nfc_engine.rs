@@ -26,6 +26,8 @@
 //!   mirroring `LinkExchangeEngine` rather than BLE's in-place reset.
 
 use crate::ui::*;
+use std::sync::Arc;
+use vauchi_core::clock::Clock;
 use vauchi_core::identity::Identity;
 use vauchi_core::{Command, Event};
 
@@ -45,6 +47,16 @@ pub const ROLE_RECEIVE: &str = "nfc_role:receive";
 /// Relay-escrow TTL when an NFC tap drops after the shared key is established.
 /// Mirrors Link-mode's 7-day default (`link_mode.rs` `DEFAULT_TTL_SECONDS`).
 const NFC_RELAY_TTL_SECONDS: u32 = 604_800;
+
+/// How long a non-terminal NFC step (`AwaitingTap`/`PayloadSent`/`AckSent`)
+/// may persist with no inbound progress before the engine fails to the
+/// retry/cancel screen. Measured from `Active` entry (role pick) and
+/// re-stamped on every step advance / consumed in-step event. This is the
+/// human tap-window backstop — NOT the OS ~125 ms HCE APDU budget, which the
+/// platform enforces. RoleSelection (a user choice) never times out
+/// (`2026-06-11-exchange-waits-forever-without-capabilities`, T1.3; ADR-021:
+/// core owns the timer). Unix-seconds.
+pub const NFC_STEP_TIMEOUT_SECS: u64 = 60;
 
 /// Presentation state of the NFC engine. The active sub-flow screen is derived
 /// from the wrapped flow's `NfcStep`; `Success`/`Failed` are terminal.
@@ -75,6 +87,11 @@ pub struct NfcExchangeEngine {
     flow: Option<NfcExchangeFlow>,
     screen: NfcScreen,
     cancelled: bool,
+    clock: Arc<dyn Clock>,
+    /// Unix-seconds when the current step was entered — stamped on `Active`
+    /// entry (role pick) and re-stamped on step progress. The `tick` stall
+    /// deadline ([`NFC_STEP_TIMEOUT_SECS`]) is measured from it.
+    step_entered_unix: u64,
 }
 
 impl NfcExchangeEngine {
@@ -82,7 +99,13 @@ impl NfcExchangeEngine {
     /// identity (None if the host could not provide one — the role pick then
     /// fails gracefully); `has_camera` gates the QR fallback on the failed
     /// screen.
-    pub fn new(identity: Option<Identity>, display_name: String, has_camera: bool) -> Self {
+    pub fn new(
+        identity: Option<Identity>,
+        display_name: String,
+        has_camera: bool,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
+        let step_entered_unix = clock.unix_seconds();
         Self {
             identity,
             display_name,
@@ -90,6 +113,8 @@ impl NfcExchangeEngine {
             flow: None,
             screen: NfcScreen::RoleSelection,
             cancelled: false,
+            clock,
+            step_entered_unix,
         }
     }
 
@@ -122,6 +147,7 @@ impl NfcExchangeEngine {
             Ok(commands) => {
                 self.flow = Some(flow);
                 self.screen = NfcScreen::Active;
+                self.step_entered_unix = self.clock.unix_seconds();
                 ActionResult::Commands { commands }
             }
             Err(e) => self.fail(format!("NFC activation failed: {e:?}")),
@@ -136,6 +162,7 @@ impl NfcExchangeEngine {
             return self.fail("no active identity for NFC exchange".into());
         }
         self.screen = NfcScreen::Active;
+        self.step_entered_unix = self.clock.unix_seconds();
         ActionResult::Commands {
             commands: vec![Command::NfcActivate {
                 payload: Vec::new(),
@@ -376,12 +403,41 @@ impl WorkflowEngine for NfcExchangeEngine {
             // discard it — the tap already happened and is processed below.
             if flow.activate().is_ok() {
                 self.flow = Some(flow);
+                // First peer contact restarts the stall budget, so the
+                // handshake gets a full window regardless of how long the
+                // responder waited on the empty Active screen for the
+                // initiator to approach (T1.3-NFC; adversarial-review W1).
+                self.step_entered_unix = self.clock.unix_seconds();
             }
         }
 
         let flow = self.flow.as_mut()?;
         let outcome = flow.handle_event(&event);
+        // Forward progress refreshes the stall deadline (T1.2): a step advance
+        // or a consumed in-step event (e.g. a mid-handshake APDU). Only a
+        // genuinely silent step trips it; `Ignored`/terminal do not re-stamp.
+        if matches!(
+            outcome,
+            NfcHardwareOutcome::StepAdvanced { .. } | NfcHardwareOutcome::Consumed { .. }
+        ) {
+            self.step_entered_unix = self.clock.unix_seconds();
+        }
         Some(self.apply_outcome(outcome))
+    }
+
+    /// Fail a stalled non-terminal NFC step past [`NFC_STEP_TIMEOUT_SECS`]
+    /// (T1.3, ADR-021). Driven by the `poll_notifications` pump. Only the
+    /// `Active` step states wait on hardware; `RoleSelection` is a user choice
+    /// and `Success`/`Failed` are terminal — none of those time out.
+    fn tick(&mut self, now: u64) {
+        if self.cancelled || !matches!(self.screen, NfcScreen::Active) {
+            return;
+        }
+        if now.saturating_sub(self.step_entered_unix) >= NFC_STEP_TIMEOUT_SECS {
+            self.screen = NfcScreen::Failed {
+                reason: Some("NFC tap timed out — no response from the other device.".into()),
+            };
+        }
     }
 
     fn was_cancelled(&self) -> bool {
@@ -443,7 +499,12 @@ mod tests {
     }
 
     fn engine() -> NfcExchangeEngine {
-        NfcExchangeEngine::new(Some(identity()), "Alice".into(), true)
+        NfcExchangeEngine::new(
+            Some(identity()),
+            "Alice".into(),
+            true,
+            SystemClock::shared(),
+        )
     }
 
     fn select(item: &str) -> UserAction {
@@ -457,6 +518,62 @@ mod tests {
         UserAction::ActionPressed {
             action_id: id.into(),
         }
+    }
+
+    // @internal
+    #[test]
+    fn active_step_past_timeout_ticks_to_failed() {
+        let mut e = engine();
+        let _ = e.handle_action(select(ROLE_SEND));
+        // `entered` read just after entering Active is >= the stamped
+        // step-entry second (CC-06 — explicit now, no FakeClock, no sleep).
+        let entered = SystemClock::shared().unix_seconds();
+        assert_ne!(e.current_screen().screen_id, "exchange_failed");
+
+        e.tick(entered + NFC_STEP_TIMEOUT_SECS + 1);
+
+        assert_eq!(
+            e.current_screen().screen_id,
+            "exchange_failed",
+            "a stalled NFC step past its budget must fail to retry/cancel"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn role_selection_does_not_time_out() {
+        // RoleSelection is a user choice — it must never time out, even far
+        // past the step budget.
+        let mut e = engine();
+        assert_eq!(e.current_screen().screen_id, "exchange_nfc_role");
+
+        e.tick(u64::MAX);
+
+        assert_eq!(
+            e.current_screen().screen_id,
+            "exchange_nfc_role",
+            "the role chooser must not be timed out"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn tick_on_terminal_screen_is_inert() {
+        // No identity → role pick fails straight to the terminal Failed
+        // screen; a tick far past any budget must not mutate it (CC-14).
+        let mut e = NfcExchangeEngine::new(None, "A".into(), true, SystemClock::shared());
+        let _ = e.handle_action(select(ROLE_SEND));
+        assert_eq!(e.current_screen().screen_id, "exchange_failed");
+        let before = e.current_screen();
+
+        e.tick(u64::MAX);
+
+        assert_eq!(e.current_screen().screen_id, before.screen_id);
+        assert_eq!(
+            e.current_screen().components,
+            before.components,
+            "tick must not mutate a terminal NFC screen"
+        );
     }
 
     // @internal
@@ -515,7 +632,7 @@ mod tests {
     // @internal
     #[test]
     fn send_without_identity_fails_gracefully() {
-        let mut e = NfcExchangeEngine::new(None, "Alice".into(), true);
+        let mut e = NfcExchangeEngine::new(None, "Alice".into(), true, SystemClock::shared());
         let _ = e.handle_action(select(ROLE_SEND));
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
     }
@@ -542,7 +659,7 @@ mod tests {
     // @internal
     #[test]
     fn retry_from_failed_requests_a_fresh_engine() {
-        let mut e = NfcExchangeEngine::new(None, "Alice".into(), true);
+        let mut e = NfcExchangeEngine::new(None, "Alice".into(), true, SystemClock::shared());
         let _ = e.handle_action(select(ROLE_SEND)); // -> Failed (no identity)
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
         let result = e.handle_action(press(ACTION_RETRY));
@@ -555,7 +672,7 @@ mod tests {
     // @internal
     #[test]
     fn failed_screen_offers_qr_fallback_only_with_camera() {
-        let mut with = NfcExchangeEngine::new(None, "A".into(), true);
+        let mut with = NfcExchangeEngine::new(None, "A".into(), true, SystemClock::shared());
         let _ = with.handle_action(select(ROLE_SEND));
         let with_ids: Vec<String> = with
             .current_screen()
@@ -565,7 +682,7 @@ mod tests {
             .collect();
         assert!(with_ids.iter().any(|i| i == "fallback_qr"));
 
-        let mut without = NfcExchangeEngine::new(None, "A".into(), false);
+        let mut without = NfcExchangeEngine::new(None, "A".into(), false, SystemClock::shared());
         let _ = without.handle_action(select(ROLE_SEND));
         let without_ids: Vec<String> = without
             .current_screen()

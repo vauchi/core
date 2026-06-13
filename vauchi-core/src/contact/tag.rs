@@ -8,14 +8,11 @@
 //! contacts ("climbing-gym", "berlin-trip"). One tag name is shared across
 //! many contacts; one contact carries many tags.
 //!
-//! `Tag` is distinct from both sibling concepts:
-//! - `Group` (`labels/group.rs`) is a *visibility* construct — it resolves to
-//!   the card fields a contact receives. A tag has no `visible_fields` and
-//!   never affects what a contact receives.
-//! - `LocalGroup` (`local_group.rs`) is organisational with no vocabulary
-//!   reuse semantics.
+//! `Tag` is distinct from `Group` (`labels/group.rs`), a *visibility*
+//! construct that resolves to the card fields a contact receives. A tag has
+//! no `visible_fields` and never affects what a contact receives.
 //!
-//! Key invariant: like `LocalGroup`, `Tag` has no `visible_fields` field, so
+//! Key invariant: `Tag` has no `visible_fields` field, so
 //! it is structurally impossible to leak tag membership over the wire. Tags
 //! are never serialised into a `CardSnapshot`. See `ADR-051`.
 

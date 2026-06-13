@@ -64,8 +64,8 @@ pub use contact::display::{
 pub use contact::merge::DuplicatePair;
 pub use contact::{
     Contact, ContactError, ContactKind, ExchangedData, FieldVisibility, Group, GroupError,
-    GroupManager, ImportSource, ImportedData, LocalGroup, MAX_LABELS, SUGGESTED_LABELS,
-    VisibilityRules, resolve_visible_fields,
+    GroupManager, ImportSource, ImportedData, MAX_LABELS, SUGGESTED_LABELS, VisibilityRules,
+    resolve_visible_fields,
 };
 pub use contact_card::vcard_import::{VCardImportError, import_vcf};
 pub use contact_card::{
@@ -79,10 +79,10 @@ pub mod storage;
 #[cfg(feature = "storage")]
 pub use storage::{
     ActivityLogStore, ConsentStore, ContactStore, DecoyStore, DeliveryStore, DeviceDeliveryStore,
-    DeviceStore, DuressStore, EmergencyStore, FieldNoteStore, GroupStore, IdentityStore,
-    LabelStore, OhttpCacheStore, PendingStore, PendingUpdate, PinCacheStore, PlaceStore,
-    RatchetStore, RecoveryStore, ReplayStore, RetryStore, Storage, StorageError, SyncStore,
-    TagStore, UpdateStatus, UxStore,
+    DeviceStore, DuressStore, EmergencyStore, FieldNoteStore, IdentityStore, LabelStore,
+    OhttpCacheStore, PendingStore, PendingUpdate, PinCacheStore, PlaceStore, RatchetStore,
+    RecoveryStore, ReplayStore, RetryStore, Storage, StorageError, SyncStore, TagStore,
+    UpdateStatus, UxStore,
 };
 
 pub mod exchange;

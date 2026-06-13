@@ -2,13 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tests for the group/tag/place persistence views.
+//! Tests for the tag/place persistence store-boundary views.
+//! (GroupStore retired in `ADR-054`; this file keeps its historical name.)
 //!
 //! Part of problem `2026-06-09-storage-per-domain-store-boundaries` (Phase 1).
 //! Each store owns a single self-contained table; per-contact exchange
 //! locations stay on `Storage` (they live on the `contacts` row).
 
-use vauchi_core::{GroupStore, PlaceStore, Storage, SymmetricKey, TagStore};
+use vauchi_core::{PlaceStore, Storage, SymmetricKey, TagStore};
 
 fn test_storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
@@ -16,37 +17,11 @@ fn test_storage() -> Storage {
 
 // Consumers scoped to one domain receive only that store — statically unable to
 // reach any other table.
-fn group_count_via_scoped_view(store: &GroupStore<'_>) -> usize {
-    store.list_local_groups().unwrap().len()
-}
 fn tag_count_via_scoped_view(store: &TagStore<'_>) -> usize {
     store.list_tags().unwrap().len()
 }
 fn place_count_via_scoped_view(store: &PlaceStore<'_>) -> usize {
     store.list_places().unwrap().len()
-}
-
-// @internal
-#[test]
-fn test_group_store_create_and_membership() {
-    let storage = test_storage();
-    assert_eq!(group_count_via_scoped_view(&storage.groups()), 0);
-
-    let group = storage.groups().create_local_group("Work").unwrap();
-    storage
-        .groups()
-        .add_to_local_group(&group.id, "contact-1")
-        .unwrap();
-
-    let loaded = storage
-        .groups()
-        .get_local_group(&group.id)
-        .unwrap()
-        .unwrap();
-    assert_eq!(loaded.name, "Work");
-    assert!(loaded.contact_ids.contains("contact-1"));
-    // Visible through the legacy forwarding API.
-    assert_eq!(storage.groups().list_local_groups().unwrap().len(), 1);
 }
 
 // @internal

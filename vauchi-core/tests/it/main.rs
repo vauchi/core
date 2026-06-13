@@ -264,7 +264,6 @@ mod link_payload_v2_tests;
 mod link_responder_poll_tests;
 mod link_responder_tests;
 mod link_two_party_exchange_tests;
-mod local_group_tests;
 mod local_keys_tests;
 mod lock_screen_engine_tests;
 mod mailbox_token_shape_tests;

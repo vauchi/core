@@ -46,9 +46,14 @@ fn stalled_phase_past_step_budget_emits_failed() {
 
     let event = machine.advance(NOW + MULTI_STAGE_STEP_TIMEOUT_MS + 1);
 
+    let MultiStageEvent::Failed { reason } = event else {
+        panic!("a stalled phase past the step budget must emit Failed, got {event:?}");
+    };
+    // T1.5: the reason renders directly on the failed screen, so it must be
+    // a user-readable message, not the old stable id.
     assert!(
-        matches!(event, MultiStageEvent::Failed { .. }),
-        "a stalled phase past the step budget must emit Failed, got {event:?}"
+        reason.to_lowercase().contains("timed out") && reason != "exchange_timeout",
+        "timeout reason must be human-readable, got {reason:?}"
     );
     assert!(
         matches!(machine.phase(), MultiStagePhase::Failed { .. }),

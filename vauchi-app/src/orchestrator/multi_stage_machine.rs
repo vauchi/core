@@ -340,10 +340,12 @@ impl MultiStageMachine {
             && now.saturating_sub(self.phase_entered_ms) >= MULTI_STAGE_STEP_TIMEOUT_MS
     }
 
-    /// Transition to the stall-timeout terminal failure. The reason id
-    /// is stable so the engine + i18n table can recognise it.
+    /// Transition to the stall-timeout terminal failure with a
+    /// plain-language reason. The failed screen renders it directly as the
+    /// `StatusIndicator` detail, so it must be user-readable, not a stable
+    /// id — matching the Direct/BLE/NFC engines' timeout messages (T1.5).
     fn fail_step_timed_out(&mut self) -> MultiStageEvent {
-        let reason = "exchange_timeout".to_string();
+        let reason = "Exchange timed out — no response from the other device.".to_string();
         self.phase = MultiStagePhase::Failed {
             reason: reason.clone(),
         };

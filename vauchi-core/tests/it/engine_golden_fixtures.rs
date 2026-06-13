@@ -362,6 +362,15 @@ fn change_password_fixture_is_fresh() {
 
 // @internal
 #[test]
+fn set_password_fixture_is_fresh() {
+    // Setup mode (no password yet): 2-field "Set Password" form. Distinct
+    // wire shape from change_password.json — desktop/TUI renderers need it.
+    let engine = ChangePasswordEngine::new(false);
+    assert_fixture_fresh(&engine.current_screen(), "set_password.json");
+}
+
+// @internal
+#[test]
 fn contact_limit_fixture_is_fresh() {
     let engine = ContactLimitEngine::new(150, 150);
     assert_fixture_fresh(&engine.current_screen(), "contact_limit.json");
@@ -507,6 +516,10 @@ fn regenerate_all_engine_fixtures() {
             ChangePasswordEngine::new(true).current_screen(),
         ),
         (
+            "set_password.json",
+            ChangePasswordEngine::new(false).current_screen(),
+        ),
+        (
             "contact_limit.json",
             ContactLimitEngine::new(150, 150).current_screen(),
         ),
@@ -528,7 +541,7 @@ fn regenerate_all_engine_fixtures() {
         ),
     ];
 
-    assert_eq!(fixtures.len(), 24, "expected 24 engine fixtures");
+    assert_eq!(fixtures.len(), 25, "expected 25 engine fixtures");
 
     for (filename, screen) in &fixtures {
         let json = screen_to_json(screen);

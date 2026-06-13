@@ -171,6 +171,18 @@ impl Vauchi {
             return Err(VauchiError::IdentityNotInitialized);
         }
 
+        // Refuse to silently overwrite an existing credential: `setup_*`
+        // creates the FIRST password; rotation must go through
+        // `change_app_password` (which verifies the current one). Without
+        // this guard a wrong-mode caller could replace the stored hash+salt
+        // with no current-password check — a clobber/lockout risk
+        // (2026-06-13-ios-app-password-setup-missing review).
+        if self.storage.identity().load_password_config()?.is_some() {
+            return Err(VauchiError::InvalidState(
+                "app password already configured; use change_app_password to rotate".into(),
+            ));
+        }
+
         // Ensure the identity row exists in DB (may not yet if create_identity
         // only stored the own_card). Insert a placeholder row if missing.
         if !self.storage.identity().has_identity()? {

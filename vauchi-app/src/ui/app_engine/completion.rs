@@ -13,6 +13,7 @@
 use super::{AppEngine, AppScreen};
 use crate::ui::action::{ActionResult, UserAction};
 use vauchi_core::contact_card::FieldType;
+use zeroize::Zeroize;
 
 impl AppEngine {
     /// Onboarding complete: create identity + persist onboarding groups/fields.
@@ -543,35 +544,60 @@ impl AppEngine {
                 None
             }
         };
-        if let Some((current, new)) = creds {
+        let mut password_was_set = false;
+        if let Some((mut current, mut new)) = creds {
             // An empty `new` reaches here only on Cancel (Save stays disabled
             // until new is populated and matches confirm; Cancel zeroizes the
             // fields). Treat it as a cancel — navigate back, touch nothing.
-            if !new.is_empty() {
-                // setup_app_password sets the first password; change_app_password
-                // rotates an existing one and errors if none is configured —
-                // pick by current state so the first-password path works
-                // (problem 2026-06-13-ios-app-password-setup-missing).
-                let had_password = self.vauchi.is_password_enabled().unwrap_or(false);
-                let result = if had_password {
-                    self.vauchi.change_app_password(&current, &new)
-                } else {
-                    self.vauchi.setup_app_password(&new)
-                };
-                if let Err(e) = result {
-                    let verb = if had_password {
-                        "change password"
-                    } else {
-                        "set password"
-                    };
-                    return ActionResult::ShowAlert {
-                        title: "Error".into(),
-                        message: format!("Could not {verb}: {e}"),
-                    };
+            let alert = if new.is_empty() {
+                None
+            } else {
+                // setup_app_password sets the FIRST password; change_app_password
+                // rotates an existing one. Pick by current state so the
+                // first-password path works on every Humble frontend
+                // (problem 2026-06-13-ios-app-password-setup-missing). A storage
+                // read error must NOT default to setup — that would route an
+                // existing password to setup_app_password and clobber it.
+                match self.vauchi.is_password_enabled() {
+                    Err(e) => Some(format!("Could not read password state: {e}")),
+                    Ok(had_password) => {
+                        let result = if had_password {
+                            self.vauchi.change_app_password(&current, &new)
+                        } else {
+                            self.vauchi.setup_app_password(&new)
+                        };
+                        password_was_set = result.is_ok();
+                        result.err().map(|e| {
+                            let verb = if had_password {
+                                "change password"
+                            } else {
+                                "set password"
+                            };
+                            format!("Could not {verb}: {e}")
+                        })
+                    }
                 }
+            };
+            // Zeroize the credential copies moved out of the engine output
+            // before they drop (EngineOutput itself can't impl Drop — handlers
+            // move fields out of it).
+            current.zeroize();
+            new.zeroize();
+            if let Some(message) = alert {
+                return ActionResult::ShowAlert {
+                    title: "Error".into(),
+                    message,
+                };
             }
         }
         let screen = self.navigate_back();
+        if password_was_set {
+            // Setting the first password flips this screen setup→change mode;
+            // `navigate_back` just re-cached the now-stale engine, so evict it
+            // so the next open rebuilds from is_password_enabled() (same
+            // pattern as completion_contact.rs after a contact mutation).
+            self.engine_cache.remove(&AppScreen::ChangePassword);
+        }
         ActionResult::NavigateTo(screen)
     }
 

@@ -28,6 +28,12 @@ fn factory() -> ChangePasswordEngine {
     ChangePasswordEngine::new(true)
 }
 
+/// Setup mode (no password configured) — same `submit`/`cancel` action ids,
+/// but a different 2-field component tree the BFS walker must also cover.
+fn factory_setup() -> ChangePasswordEngine {
+    ChangePasswordEngine::new(false)
+}
+
 // @internal
 #[test]
 fn change_password_screen_is_reachable() {
@@ -40,5 +46,16 @@ fn change_password_screen_is_reachable() {
 #[test]
 fn change_password_has_no_orphans() {
     let report = check_reachability(factory, HANDLED);
+    assert!(report.is_reachable(), "unexpected orphans: {report:?}");
+}
+
+// @internal
+#[test]
+fn set_password_setup_mode_is_reachable_and_orphan_free() {
+    let engine = factory_setup();
+    assert_eq!(engine.current_screen().screen_id, "change_password");
+    assert_eq!(engine.current_screen().title, "Set Password");
+    assert_reachability_across_screens(factory_setup, HANDLED);
+    let report = check_reachability(factory_setup, HANDLED);
     assert!(report.is_reachable(), "unexpected orphans: {report:?}");
 }

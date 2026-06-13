@@ -319,9 +319,12 @@ fn change_password_wrong_current_shows_alert_storage_unchanged() {
         action_id: "submit".into(),
     });
 
+    let ActionResult::ShowAlert { message, .. } = &result else {
+        panic!("wrong current password should ShowAlert, got {result:?}");
+    };
     assert!(
-        matches!(result, ActionResult::ShowAlert { .. }),
-        "wrong current password should ShowAlert, got {result:?}"
+        message.contains("change password"),
+        "change-mode error must use the 'change password' verb, got {message:?}"
     );
 
     // Storage unchanged — old still authenticates.
@@ -395,6 +398,103 @@ fn set_password_submit_persists_via_setup_app_password() {
     );
     assert!(vauchi.authenticate("first-pin-1234").is_ok());
     assert!(vauchi.authenticate("wrong-pin").is_err());
+}
+
+// @internal
+#[test]
+fn set_password_mismatch_disables_submit() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::ChangePassword);
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "new_password".into(),
+        value: "first-pin-1234".into(),
+    });
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "different".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("expected UpdateScreen, got {result:?}");
+    };
+    let submit = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "submit")
+        .expect("submit action");
+    assert!(
+        !submit.enabled,
+        "setup-mode submit must stay disabled while new != confirm"
+    );
+}
+
+// @internal
+#[test]
+fn set_password_cancel_leaves_no_password_configured() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::ChangePassword);
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "new_password".into(),
+        value: "first-pin-1234".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "first-pin-1234".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+    assert!(matches!(result, ActionResult::NavigateTo(_)));
+    assert!(
+        !engine.vauchi_mut().is_password_enabled().unwrap(),
+        "cancel must not configure a password"
+    );
+}
+
+// @internal
+#[test]
+fn change_password_screen_shows_change_mode_after_setup() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // First visit: setup mode, set the first password.
+    engine.navigate_to(AppScreen::ChangePassword);
+    for (id, v) in [
+        ("new_password", "first-pin-1234"),
+        ("confirm_password", "first-pin-1234"),
+    ] {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: id.into(),
+            value: v.into(),
+        });
+    }
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    // Re-open: now a password exists → the screen must render in change mode
+    // (the engine cache must not pin the stale setup-mode engine).
+    let screen = engine.navigate_to(AppScreen::ChangePassword);
+    assert_eq!(screen.title, "Change Password");
+    let ids: Vec<&str> = screen
+        .components
+        .iter()
+        .filter_map(|c| match c {
+            vauchi_app::ui::Component::TextInput { id, .. } => Some(id.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        ids.contains(&"current_password"),
+        "change mode must re-show the current-password field, got {ids:?}"
+    );
 }
 
 // @internal

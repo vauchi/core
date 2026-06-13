@@ -34,12 +34,6 @@ pub struct ChangePasswordEngine {
     confirm: String,
 }
 
-impl Default for ChangePasswordEngine {
-    fn default() -> Self {
-        Self::new(true)
-    }
-}
-
 impl Drop for ChangePasswordEngine {
     fn drop(&mut self) {
         self.current.zeroize();

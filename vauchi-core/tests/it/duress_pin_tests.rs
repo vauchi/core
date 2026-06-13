@@ -15,7 +15,7 @@ use crate::common;
 
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::storage::Storage;
-use vauchi_core::{AppPasswordConfig, AuthMode, AuthResult, BiometricUnlockOutcome};
+use vauchi_core::{AppPasswordConfig, AuthMode, AuthResult, BiometricUnlockOutcome, VauchiError};
 
 use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange};
 
@@ -514,6 +514,29 @@ fn test_setup_app_password() {
         wb.is_password_enabled().expect("check should succeed"),
         "password should be enabled after setup"
     );
+}
+
+// @internal
+#[test]
+fn test_setup_app_password_refuses_to_clobber_existing() {
+    let mut wb = create_vauchi_with_identity("Alice");
+    wb.setup_app_password("first-pin-1234")
+        .expect("first setup should succeed");
+
+    // A second setup must NOT silently overwrite — rotation goes through
+    // change_app_password (which verifies the current password).
+    let err = wb
+        .setup_app_password("second-pin-9876")
+        .expect_err("second setup must be rejected, not clobber");
+    assert!(
+        matches!(err, VauchiError::InvalidState(_)),
+        "expected InvalidState, got {err:?}"
+    );
+
+    // Storage is untouched — the original password still authenticates,
+    // the attempted overwrite does not.
+    assert!(wb.authenticate("first-pin-1234").is_ok());
+    assert!(wb.authenticate("second-pin-9876").is_err());
 }
 
 // @scenario: duress_mode :: Normal credential shows real contacts

@@ -266,10 +266,15 @@ impl CardDelta {
             .collect()
     }
 
-    /// Filters this delta based on visibility rules for a specific contact.
+    /// Filters this delta by Layer-A visibility rules only — NOT group-aware.
     ///
-    /// Returns a new delta containing only the changes that the contact
-    /// is allowed to see according to the visibility rules.
+    /// Returns a new delta with only the changes the contact may see per the
+    /// per-contact [`VisibilityRules`]. This ignores group (Layer-B) membership
+    /// and is default-open (an empty rule set passes every field), so it must
+    /// NOT drive outbound propagation — doing so leaks ungranted fields to
+    /// grouped contacts (ADR-054 G4). Outbound filtering goes through
+    /// `get_effective_field_visibility` + [`CardDelta::filter_with`]; this is
+    /// retained as the Layer-A primitive exercised by the delta-filter tests.
     pub fn filter_for_contact(
         &self,
         contact_id: &str,

@@ -17,6 +17,8 @@ use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::sync::delta::{CardDelta, FieldChange};
 use vauchi_core::{Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi};
 
+use crate::common::two_recipient::{add_recipient, deliver, stored_card_has};
+
 // -- Helpers -----------------------------------------------------------
 
 fn create_test_vauchi() -> Vauchi {
@@ -353,4 +355,118 @@ fn test_mixed_visibility_propagation() {
         .get_pending_updates(&dave_id)
         .unwrap();
     assert_eq!(dave_pending.len(), 1);
+}
+
+// -- Tests: Group-aware content-edit propagation (ADR-054 G4) -----------
+
+// ADR-054 G4 (2026-06-08-sync-card-update-not-group-filtered): an ordinary
+// own-card edit must propagate through the group-aware resolver, not the
+// Layer-A-only filter. A grouped recipient whose group does not grant the new
+// field must not receive it (both recipients grouped → the default-closed gate
+// excludes B; no Layer-A rule needed).
+// @scenario: visibility_control :: A content edit reaches only the granting group
+#[test]
+fn content_edit_reaches_only_the_granting_group() {
+    let wb = create_test_vauchi();
+    let wb_pk = *wb.identity().unwrap().signing_public_key();
+
+    let work = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
+    let work_id = work.id().to_string();
+
+    let granting = wb.create_group("Work").unwrap();
+    wb.set_group_field_visibility(granting.id(), &work_id, true)
+        .unwrap();
+    let other = wb.create_group("Friends").unwrap();
+
+    let mut a = add_recipient(&wb, &wb_pk, "A");
+    let mut b = add_recipient(&wb, &wb_pk, "B");
+    wb.add_contact_to_group(granting.id(), &a.id_at_sharer)
+        .unwrap();
+    wb.add_contact_to_group(other.id(), &b.id_at_sharer)
+        .unwrap();
+
+    let old_card = wb.own_card().unwrap().unwrap();
+    let mut new_card = old_card.clone();
+    let _ = new_card.add_field(work);
+
+    let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
+    assert_eq!(
+        queued, 1,
+        "Only A (in the granting group) is queued; B's delta is empty (skipped)"
+    );
+    assert!(
+        wb.storage()
+            .pending()
+            .get_pending_updates(&b.id_at_sharer)
+            .unwrap()
+            .is_empty(),
+        "B (group does not grant `work`) has no queued update"
+    );
+
+    deliver(&wb, &mut a);
+    deliver(&wb, &mut b);
+    assert!(
+        stored_card_has(&a, "work"),
+        "A's group grants `work` → A receives it"
+    );
+    assert!(
+        !stored_card_has(&b, "work"),
+        "B's group does not grant `work` → B does not receive it"
+    );
+}
+
+// ADR-054 D3: a content edit must reach an *ungrouped* recipient via the
+// Layer-A public base card (not hidden), while a *grouped* recipient receives
+// only their group's union. Brackets the over-restrict direction so the G4 fix
+// cannot hide public fields from ungrouped contacts.
+// @scenario: visibility_control :: A content edit reaches ungrouped contacts via the public base card
+#[test]
+fn content_edit_ungrouped_recipient_gets_public_base() {
+    let wb = create_test_vauchi();
+    let wb_pk = *wb.identity().unwrap().signing_public_key();
+
+    let work = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
+    let work_id = work.id().to_string();
+    let personal = ContactField::new(FieldType::Phone, "personal", "+15550000", 0);
+
+    // `work` is granted to the Work group; `personal` is granted by no group,
+    // so it stays Layer-A `Everyone` (public base).
+    let group = wb.create_group("Work").unwrap();
+    wb.set_group_field_visibility(group.id(), &work_id, true)
+        .unwrap();
+
+    let mut grouped = add_recipient(&wb, &wb_pk, "Grouped");
+    let mut ungrouped = add_recipient(&wb, &wb_pk, "Ungrouped");
+    wb.add_contact_to_group(group.id(), &grouped.id_at_sharer)
+        .unwrap();
+
+    let old_card = wb.own_card().unwrap().unwrap();
+    let mut new_card = old_card.clone();
+    let _ = new_card.add_field(work);
+    let _ = new_card.add_field(personal);
+
+    wb.propagate_card_update(&old_card, &new_card).unwrap();
+    deliver(&wb, &mut grouped);
+    deliver(&wb, &mut ungrouped);
+
+    // Grouped recipient: only the group's union (`work`), not the ungranted
+    // `personal`.
+    assert!(
+        stored_card_has(&grouped, "work"),
+        "Grouped recipient's group grants `work`"
+    );
+    assert!(
+        !stored_card_has(&grouped, "personal"),
+        "Grouped recipient is default-closed: `personal` (no group) is hidden"
+    );
+
+    // Ungrouped recipient: the Layer-A public base card — both `Everyone` fields.
+    assert!(
+        stored_card_has(&ungrouped, "work"),
+        "D3: ungrouped recipient falls back to Layer-A; `work` is Everyone"
+    );
+    assert!(
+        stored_card_has(&ungrouped, "personal"),
+        "D3: ungrouped recipient receives the public base `personal`"
+    );
 }

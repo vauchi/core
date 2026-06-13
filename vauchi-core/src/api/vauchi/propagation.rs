@@ -155,8 +155,17 @@ impl Vauchi {
             .exchanged_data()
             .ok_or_else(|| VauchiError::InvalidState("contact not exchanged".into()))?;
 
-        // Filter delta based on visibility rules
-        let mut delta = delta.filter_for_contact(contact_id, &ex.visibility_rules);
+        // Filter to the fields this contact may currently see, via the
+        // group-aware resolver (ADR-054 D3) — the same chokepoint
+        // repropagate_to_contact uses. Replaces the Layer-A-only
+        // filter_for_contact, which ignored group membership and leaked
+        // ungranted fields to grouped contacts
+        // (2026-06-08-sync-card-update-not-group-filtered, G4). unwrap_or(false)
+        // fails closed on storage error (privacy > completeness).
+        let mut delta = delta.filter_with(|fid| {
+            self.get_effective_field_visibility(contact_id, fid)
+                .unwrap_or(false)
+        });
         if delta.is_empty() {
             return Err(VauchiError::InvalidState(
                 "empty delta after visibility filter".into(),

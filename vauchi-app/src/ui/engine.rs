@@ -116,6 +116,17 @@ pub trait WorkflowEngine: Send {
         None
     }
 
+    /// Advance time-based engine state by one poll tick (ADR-021: core
+    /// owns timeouts, never the frontend). `now` is unix-seconds from
+    /// the `poll_notifications` pump, which runs every loop regardless of
+    /// screen. Engines with a bounded wait state (e.g. cable/USB
+    /// `Waiting`) override this to fail to a retry/cancel screen once the
+    /// wait exceeds its budget; the default is a no-op. The engine
+    /// mutates its own screen state — the frontend re-renders via
+    /// `current_screen()` after the poll (same path the session
+    /// advancers already use).
+    fn tick(&mut self, _now: u64) {}
+
     /// Screen-presentation [`Command`]s emitted when this engine becomes
     /// the active one (ADR-031 §Hardware, Phase 2b of
     /// `2026-05-04-exchange-command-screen-presentation`).

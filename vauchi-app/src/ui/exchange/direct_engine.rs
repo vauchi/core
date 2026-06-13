@@ -53,6 +53,15 @@ pub const ACTION_RETRY: &str = "retry";
 /// Action id for the Done button on the success screen.
 pub const ACTION_DONE: &str = "done";
 
+/// How long the cable `Waiting` screen may wait for the peer device to
+/// connect over USB and report a payload before failing to the
+/// retry/cancel screen (unix-seconds; the engine's clock domain). Driven
+/// by the `poll_notifications` pump via `WorkflowEngine::tick`
+/// (`2026-06-11-exchange-waits-forever-without-capabilities`, T1.3 —
+/// ADR-021: core owns the timer). A connected cable handshakes in
+/// seconds; this is the no-response backstop, not a tight bound.
+pub const DIRECT_WAITING_TIMEOUT_SECS: u64 = 60;
+
 /// Three coarse progress steps: connect → exchange → verify.
 const TOTAL_STEPS: u8 = 3;
 
@@ -572,6 +581,42 @@ mod tests {
         let e = DirectTransportEngine::new(None, None, UsbRole::Initiator, SystemClock::shared());
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
         assert!(!e.was_cancelled());
+    }
+
+    // @internal
+    #[test]
+    fn waiting_past_timeout_ticks_to_failed() {
+        let mut e = engine("Alice");
+        // Read the clock just after construction: `entered` is >= the
+        // engine's stamped waiting-entry second, so `+ budget + 1` is
+        // unambiguously past the deadline (CC-06 — explicit `now`, no wait).
+        let entered = SystemClock::shared().unix_seconds();
+        assert_eq!(e.current_screen().screen_id, "exchange_direct_waiting");
+
+        e.tick(entered + DIRECT_WAITING_TIMEOUT_SECS + 1);
+
+        assert_eq!(
+            e.current_screen().screen_id,
+            "exchange_failed",
+            "a peerless cable Waiting past its budget must fail to retry/cancel"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn waiting_within_timeout_stays_waiting() {
+        let mut e = engine("Alice");
+        let entered = SystemClock::shared().unix_seconds();
+
+        // `entered` is at most one second past the stamped waiting-entry,
+        // so ticking at `entered` is well within the budget.
+        e.tick(entered);
+
+        assert_eq!(
+            e.current_screen().screen_id,
+            "exchange_direct_waiting",
+            "must not fail before the Waiting budget elapses"
+        );
     }
 
     // @internal

@@ -104,6 +104,11 @@ pub struct DirectTransportEngine {
     /// `screen_entered` is idempotent across re-renders.
     started: bool,
     cancelled: bool,
+    /// Unix-seconds when the engine entered `Waiting` (construction). The
+    /// `tick`-driven stall deadline ([`DIRECT_WAITING_TIMEOUT_SECS`]) is
+    /// measured from it. `Waiting` is only entered at construction (retry
+    /// re-provisions a fresh engine), so this is never re-stamped.
+    waiting_entered_unix: u64,
 }
 
 impl DirectTransportEngine {
@@ -135,6 +140,13 @@ impl DirectTransportEngine {
                 reason: Some("Identity unavailable — cannot start a USB exchange".into()),
             }
         };
+        // Only meaningful while `Waiting`; the degraded Failed-at-construction
+        // path leaves it 0 (tick guards on `screen == Waiting` regardless).
+        let waiting_entered_unix = if session.is_some() {
+            clock.unix_seconds()
+        } else {
+            0
+        };
         Self {
             session,
             reciprocity_confirmer: None,
@@ -143,6 +155,7 @@ impl DirectTransportEngine {
             screen,
             started: false,
             cancelled: false,
+            waiting_entered_unix,
         }
     }
 
@@ -377,6 +390,22 @@ impl DirectTransportEngine {
 impl WorkflowEngine for DirectTransportEngine {
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
+    }
+
+    /// Fail a peerless cable `Waiting` once it exceeds
+    /// [`DIRECT_WAITING_TIMEOUT_SECS`] (T1.3, ADR-021). Driven by the
+    /// `poll_notifications` pump. Only `Waiting` has a wall-clock bound —
+    /// `Exchanging`/`Verifying` are peer-progress states and the rest are
+    /// terminal.
+    fn tick(&mut self, now: u64) {
+        if self.cancelled || self.screen != DirectScreen::Waiting {
+            return;
+        }
+        if now.saturating_sub(self.waiting_entered_unix) >= DIRECT_WAITING_TIMEOUT_SECS {
+            self.screen = DirectScreen::Failed {
+                reason: Some("No response over USB — the other device didn't connect.".into()),
+            };
+        }
     }
 
     /// Emit the initial `DirectSend` command once, on first screen entry.
@@ -616,6 +645,27 @@ mod tests {
             e.current_screen().screen_id,
             "exchange_direct_waiting",
             "must not fail before the Waiting budget elapses"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn tick_on_degraded_failed_engine_is_inert() {
+        // No identity → the engine constructs straight into Failed. A tick
+        // far past any budget must not re-fail it or change the reason
+        // (the `screen != Waiting` guard, CC-14 adversarial case).
+        let mut e =
+            DirectTransportEngine::new(None, None, UsbRole::Initiator, SystemClock::shared());
+        assert_eq!(e.current_screen().screen_id, "exchange_failed");
+        let before = e.current_screen().components;
+
+        e.tick(u64::MAX);
+
+        assert_eq!(e.current_screen().screen_id, "exchange_failed");
+        assert_eq!(
+            e.current_screen().components,
+            before,
+            "tick must not mutate a degraded-Failed engine"
         );
     }
 

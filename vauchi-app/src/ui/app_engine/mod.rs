@@ -558,6 +558,9 @@ impl AppEngine {
         self.advance_multi_stage_session();
 
         let now = self.vauchi.clock().unix_seconds();
+        // Active-engine wall-clock tick — no-op unless bounded-wait (cable
+        // DirectTransport `Waiting` fails a peerless stall; ADR-021, T1.3).
+        self.engine.tick(now);
 
         // Fetch raw rows from the activity log since the last poll.
         let rows = match self.vauchi.activity_log_poll(self.last_poll_time, now) {

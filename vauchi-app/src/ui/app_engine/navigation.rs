@@ -281,6 +281,14 @@ impl AppEngine {
     /// Screens that should never be cached — always start fresh.
     /// Onboarding IS cacheable: user navigates to FormDialog (add field)
     /// and back, must return to their current step with accumulated data.
+    ///
+    /// `DirectTransport` is excluded: it owns a live USB `ExchangeSession`
+    /// and a `tick`-driven `Waiting` deadline stamped at construction.
+    /// Caching it across a navigate-away would carry a stale
+    /// `waiting_entered_unix`, firing a spurious timeout on return; a fresh
+    /// engine restarts the cable handshake cleanly (hardware can't be
+    /// paused). Mirrors how multi-stage/BLE tear down their session on
+    /// screen exit (2026-06-11-exchange-waits-forever-without-capabilities).
     fn is_cacheable(screen: &AppScreen) -> bool {
         !matches!(
             screen,
@@ -288,6 +296,7 @@ impl AppEngine {
                 | AppScreen::FormDialog { .. }
                 | AppScreen::DeepLinkConsent { .. }
                 | AppScreen::DeepLinkResponder { .. }
+                | AppScreen::DirectTransport
         )
     }
 

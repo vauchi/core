@@ -220,13 +220,19 @@ pub struct MultiStageMachine {
     /// `handle_hardware_event` calls return [`MultiStageEvent::None`]
     /// and leave the phase at [`MultiStagePhase::Cancelled`].
     cancelled: bool,
+    /// `now` (ms) when the current phase was entered. Set on
+    /// construction, re-stamped on every phase transition; the per-step
+    /// stall deadline ([`MULTI_STAGE_STEP_TIMEOUT_MS`]) is measured from
+    /// it so steady progress refreshes the budget and only a stalled
+    /// wait state trips it.
+    phase_entered_ms: u64,
 }
 
 impl MultiStageMachine {
     /// Construct a Glance-mode machine — bilateral QR scan, no
     /// ultrasonic proximity handshake. **No I/O.** The first
     /// [`advance`](Self::advance) emits the first QR frame.
-    pub fn new_glance(local_card: Vec<u8>, _now: u64) -> Self {
+    pub fn new_glance(local_card: Vec<u8>, now: u64) -> Self {
         Self {
             inner: MultiStageSession::new(local_card),
             mode: MultiStageMode::Glance,
@@ -234,6 +240,7 @@ impl MultiStageMachine {
             current_frame_started_at: None,
             current_frame_duration: 0,
             cancelled: false,
+            phase_entered_ms: now,
         }
     }
 
@@ -242,7 +249,7 @@ impl MultiStageMachine {
     /// commands fire on the `Confirming` transition (per T0.2
     /// design); the listening window restarts on retry. T1.2b
     /// wires the audio command emission via `event_to_commands`.
-    pub fn new_hover(local_card: Vec<u8>, _now: u64) -> Self {
+    pub fn new_hover(local_card: Vec<u8>, now: u64) -> Self {
         Self {
             inner: MultiStageSession::new(local_card),
             mode: MultiStageMode::Hover,
@@ -250,6 +257,7 @@ impl MultiStageMachine {
             current_frame_started_at: None,
             current_frame_duration: 0,
             cancelled: false,
+            phase_entered_ms: now,
         }
     }
 
@@ -260,7 +268,7 @@ impl MultiStageMachine {
     /// the accel capture + envelope cross-correlation is a follow-up
     /// (needs the envelope-over-transport protocol — see the TapHoverShake
     /// graduation plan P2.C / the accel-envelope ADR).
-    pub fn new_tap_hover_shake(local_card: Vec<u8>, _now: u64) -> Self {
+    pub fn new_tap_hover_shake(local_card: Vec<u8>, now: u64) -> Self {
         Self {
             inner: MultiStageSession::new(local_card),
             mode: MultiStageMode::TapHoverShake,
@@ -268,6 +276,7 @@ impl MultiStageMachine {
             current_frame_started_at: None,
             current_frame_duration: 0,
             cancelled: false,
+            phase_entered_ms: now,
         }
     }
 
@@ -313,6 +322,47 @@ impl MultiStageMachine {
         if self.cancelled || self.is_terminal() {
             return MultiStageEvent::None;
         }
+        if self.step_timed_out(now) {
+            return self.fail_step_timed_out();
+        }
+        let prior_phase = self.phase.clone();
+        let event = self.advance_frame(now);
+        self.note_phase_progress(&prior_phase, now);
+        event
+    }
+
+    /// Whether the current phase has stalled past
+    /// [`MULTI_STAGE_STEP_TIMEOUT_MS`]. `Finalized` is success-pending
+    /// (no peer wait — it never times out); `Completed`/`Failed`/
+    /// `Cancelled` are excluded by the caller's `is_terminal` guard.
+    fn step_timed_out(&self, now: u64) -> bool {
+        !matches!(self.phase, MultiStagePhase::Finalized { .. })
+            && now.saturating_sub(self.phase_entered_ms) >= MULTI_STAGE_STEP_TIMEOUT_MS
+    }
+
+    /// Transition to the stall-timeout terminal failure. The reason id
+    /// is stable so the engine + i18n table can recognise it.
+    fn fail_step_timed_out(&mut self) -> MultiStageEvent {
+        let reason = "exchange_timeout".to_string();
+        self.phase = MultiStagePhase::Failed {
+            reason: reason.clone(),
+        };
+        MultiStageEvent::Failed { reason }
+    }
+
+    /// Re-stamp the per-step deadline whenever the phase advanced, so a
+    /// healthy exchange (steady progress) keeps refreshing its budget
+    /// and only a stalled wait state trips it.
+    fn note_phase_progress(&mut self, prior: &MultiStagePhase, now: u64) {
+        if self.phase != *prior {
+            self.phase_entered_ms = now;
+        }
+    }
+
+    /// One display-frame step. No deadline/progress bookkeeping — the
+    /// public [`advance`](Self::advance) wraps this with the per-step
+    /// stall deadline and phase-progress stamping.
+    fn advance_frame(&mut self, now: u64) -> MultiStageEvent {
         // Per-frame gating: if the previous frame's window has not
         // elapsed yet, hold. The first frame (Preparing entry) has
         // no prior window so it emits immediately.
@@ -378,11 +428,12 @@ impl MultiStageMachine {
     ///   downstream of the machine — see the engine integration in
     ///   T1.2b).
     /// - Every other variant is explicitly ignored.
-    pub fn handle_hardware_event(&mut self, event: &Event, _now: u64) -> MultiStageEvent {
+    pub fn handle_hardware_event(&mut self, event: &Event, now: u64) -> MultiStageEvent {
         if self.cancelled || self.is_terminal() {
             return MultiStageEvent::None;
         }
-        match event {
+        let prior_phase = self.phase.clone();
+        let result = match event {
             Event::HardwareError { transport, error } => {
                 let reason = format!("{transport}: {error}");
                 self.phase = MultiStagePhase::Failed {
@@ -416,7 +467,7 @@ impl MultiStageMachine {
                 // re-derive our phase from the new inner state.
                 let accel_before = self.inner.accel_proximity();
                 let _ = self.inner.process_scanned_qr(data);
-                let prior_phase = self.phase.clone();
+                let qr_prior_phase = self.phase.clone();
                 self.sync_phase_from_inner_state();
                 // A scanned SHAK stage may have driven accel-proximity
                 // (open + cross-correlate) without any phase change; surface it
@@ -424,9 +475,13 @@ impl MultiStageMachine {
                 // stage, so this never coincides with a phase transition.
                 let accel_after = self.inner.accel_proximity();
                 if accel_after != accel_before {
+                    // Re-stamp the stall deadline on the outer pre-match phase
+                    // before this early return, so it does not depend on the
+                    // "never coincides with a transition" invariant above.
+                    self.note_phase_progress(&prior_phase, now);
                     return MultiStageEvent::AccelProximityChanged(accel_after);
                 }
-                phase_transition_event(&prior_phase, &self.phase)
+                phase_transition_event(&qr_prior_phase, &self.phase)
             }
             Event::QrScanProgress { .. } => {
                 // Per-frame viewfinder telemetry — the engine-side
@@ -449,7 +504,9 @@ impl MultiStageMachine {
             // arriving on the multi-stage screen are ignored to
             // keep the machine's surface narrow.
             _ => MultiStageEvent::None,
-        }
+        };
+        self.note_phase_progress(&prior_phase, now);
+        result
     }
 
     /// User-initiated cancel. Idempotent — calling on an already-

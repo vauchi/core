@@ -617,7 +617,7 @@ fn impulse_event(i: u64, amp: i32) -> Event {
 
 /// Drive two TapHoverShake machines via advance/QrScanned until both reach
 /// `Confirming` (transport_key derived on both inner sessions).
-fn drive_two_to_confirming() -> (MultiStageMachine, MultiStageMachine) {
+fn drive_two_to_confirming() -> (MultiStageMachine, MultiStageMachine, u64) {
     let mut a = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
     let mut b = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
     for i in 0..4000u64 {
@@ -631,19 +631,22 @@ fn drive_two_to_confirming() -> (MultiStageMachine, MultiStageMachine) {
             let _ = a.handle_hardware_event(&Event::QrScanned { data: p.data }, t);
         }
         if a.phase() == MultiStagePhase::Confirming && b.phase() == MultiStagePhase::Confirming {
-            return (a, b);
+            return (a, b, t);
         }
     }
     panic!("machines never both reached Confirming");
 }
 
 /// Poll `advance` until the machine emits a SHAK QR frame, returning its data.
-fn capture_shake_frame(m: &mut MultiStageMachine) -> String {
+fn capture_shake_frame(m: &mut MultiStageMachine, start_now: u64) -> String {
     // Each advance must clear the per-frame display-duration gate, so step
     // `now` well past it. Phase 6 of the mod-7 Confirming cycle carries SHAK,
-    // so 20 fresh frames cover several full cycles.
+    // so 20 fresh frames cover several full cycles. `now` continues from when
+    // Confirming was entered (`start_now`) — a continuous poll cadence — so the
+    // per-step stall deadline (MULTI_STAGE_STEP_TIMEOUT_MS, measured from phase
+    // entry) is not tripped by an artificial far-future jump.
     for i in 0..20u64 {
-        let now = 10_000_000 + i * 2_000;
+        let now = start_now + (i + 1) * 2_000;
         if let MultiStageEvent::QrFrameReady(p) = m.advance(now)
             && p.data.starts_with("SHAK")
         {
@@ -656,7 +659,7 @@ fn capture_shake_frame(m: &mut MultiStageMachine) -> String {
 // @internal
 #[test]
 fn scanned_shake_confirms_accel_proximity_on_matching_envelopes() {
-    let (mut a, mut b) = drive_two_to_confirming();
+    let (mut a, mut b, confirmed_at) = drive_two_to_confirming();
     let _ = a.try_accel_capture_start();
     let _ = b.try_accel_capture_start();
     // Identical co-located impulse on both devices.
@@ -664,7 +667,7 @@ fn scanned_shake_confirms_accel_proximity_on_matching_envelopes() {
         let _ = a.handle_hardware_event(&impulse_event(t, 20), t);
         let _ = b.handle_hardware_event(&impulse_event(t, 20), t);
     }
-    let shak = capture_shake_frame(&mut b);
+    let shak = capture_shake_frame(&mut b, confirmed_at);
     let ev = a.handle_hardware_event(&Event::QrScanned { data: shak }, 6000);
     assert!(
         matches!(
@@ -678,7 +681,7 @@ fn scanned_shake_confirms_accel_proximity_on_matching_envelopes() {
 // @internal
 #[test]
 fn scanned_shake_fails_accel_proximity_on_divergent_envelopes() {
-    let (mut a, mut b) = drive_two_to_confirming();
+    let (mut a, mut b, confirmed_at) = drive_two_to_confirming();
     let _ = a.try_accel_capture_start();
     let _ = b.try_accel_capture_start();
     // A records a strongly varying impulse; B a near-constant one → low corr.
@@ -686,7 +689,7 @@ fn scanned_shake_fails_accel_proximity_on_divergent_envelopes() {
         let _ = a.handle_hardware_event(&impulse_event(t, 40), t);
         let _ = b.handle_hardware_event(&impulse_event(t, 0), t);
     }
-    let shak = capture_shake_frame(&mut b);
+    let shak = capture_shake_frame(&mut b, confirmed_at);
     let ev = a.handle_hardware_event(&Event::QrScanned { data: shak }, 6000);
     assert!(
         matches!(

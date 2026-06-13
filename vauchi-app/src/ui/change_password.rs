@@ -2,13 +2,22 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Change-password engine — rotates the app password from Settings.
+//! App-password engine — sets or rotates the app password from Settings.
 //!
-//! Single screen with three masked inputs (current / new / confirm).
-//! `submit` only enables when all three are non-empty, `new == confirm`,
-//! and `new != current`. The actual rotation happens in
-//! `handle_completion` for `AppScreen::ChangePassword`, which calls
-//! [`vauchi_core::api::Vauchi::change_app_password`].
+//! One engine, two modes (chosen at construction from
+//! [`vauchi_core::api::Vauchi::is_password_enabled`]):
+//!
+//! - **setup** (no password yet): two masked inputs (new / confirm); `submit`
+//!   enables when both are non-empty and equal. Completion calls
+//!   [`vauchi_core::api::Vauchi::setup_app_password`].
+//! - **change** (password exists): three masked inputs (current / new /
+//!   confirm); `submit` additionally requires a non-empty current that differs
+//!   from new. Completion calls
+//!   [`vauchi_core::api::Vauchi::change_app_password`].
+//!
+//! The mode lives in core so every Humble frontend inherits the setup path —
+//! without it, frontends that only render the change form can never configure
+//! a first password (see problem `2026-06-13-ios-app-password-setup-missing`).
 //!
 //! Pure-renderer rule (ADR-021/043): the engine never branches on form
 //! factor and exposes only UI-shaped wire types.
@@ -16,8 +25,10 @@
 use crate::ui::*;
 use zeroize::Zeroize;
 
-/// Engine that drives the change-app-password form.
+/// Engine that drives the set/change-app-password form.
 pub struct ChangePasswordEngine {
+    /// True when a password already exists → change mode; false → setup mode.
+    password_enabled: bool,
     current: String,
     new_pw: String,
     confirm: String,
@@ -25,7 +36,7 @@ pub struct ChangePasswordEngine {
 
 impl Default for ChangePasswordEngine {
     fn default() -> Self {
-        Self::new()
+        Self::new(true)
     }
 }
 
@@ -38,16 +49,19 @@ impl Drop for ChangePasswordEngine {
 }
 
 impl ChangePasswordEngine {
-    pub fn new() -> Self {
+    /// `password_enabled` is whether an app password already exists, i.e.
+    /// `Vauchi::is_password_enabled()` at the time the screen opens.
+    pub fn new(password_enabled: bool) -> Self {
         Self {
+            password_enabled,
             current: String::new(),
             new_pw: String::new(),
             confirm: String::new(),
         }
     }
 
-    /// Returns the current password the user entered. Used by
-    /// `handle_completion` after the engine signals `Complete`.
+    /// Returns the current password the user entered. Empty in setup mode.
+    /// Used by `handle_completion` after the engine signals `Complete`.
     pub fn current_password(&self) -> &str {
         &self.current
     }
@@ -59,10 +73,14 @@ impl ChangePasswordEngine {
     }
 
     fn submit_enabled(&self) -> bool {
-        !self.current.is_empty()
-            && !self.new_pw.is_empty()
-            && self.new_pw == self.confirm
-            && self.new_pw != self.current
+        if self.new_pw.is_empty() || self.new_pw != self.confirm {
+            return false;
+        }
+        if self.password_enabled {
+            !self.current.is_empty() && self.new_pw != self.current
+        } else {
+            true
+        }
     }
 
     fn confirm_validation_error(&self) -> Option<String> {
@@ -74,67 +92,123 @@ impl ChangePasswordEngine {
     }
 
     fn new_validation_error(&self) -> Option<String> {
-        if !self.new_pw.is_empty() && !self.current.is_empty() && self.new_pw == self.current {
+        if self.password_enabled
+            && !self.new_pw.is_empty()
+            && !self.current.is_empty()
+            && self.new_pw == self.current
+        {
             Some("New password must differ from current password".into())
         } else {
             None
         }
     }
 
+    fn current_password_input(&self) -> Component {
+        Component::TextInput {
+            id: "current_password".into(),
+            label: "Current Password".into(),
+            value: String::new(),
+            placeholder: Some("Enter your current password".into()),
+            max_length: Some(128),
+            validation_error: None,
+            input_type: InputType::Password,
+            a11y: Some(A11y {
+                label: Some("Current password".into()),
+                hint: Some("Enter your current app password.".into()),
+                role: Some(AccessibilityRole::TextField),
+            }),
+            info_key: None,
+        }
+    }
+
+    fn new_password_input(&self) -> Component {
+        let (label, placeholder, a11y_label, hint) = if self.password_enabled {
+            (
+                "New Password",
+                "Choose a new password",
+                "New password",
+                "Choose a new password — must differ from your current one.",
+            )
+        } else {
+            (
+                "Password",
+                "Choose a password",
+                "Password",
+                "Choose a password to lock the app.",
+            )
+        };
+        Component::TextInput {
+            id: "new_password".into(),
+            label: label.into(),
+            value: String::new(),
+            placeholder: Some(placeholder.into()),
+            max_length: Some(128),
+            validation_error: self.new_validation_error(),
+            input_type: InputType::Password,
+            a11y: Some(A11y {
+                label: Some(a11y_label.into()),
+                hint: Some(hint.into()),
+                role: Some(AccessibilityRole::TextField),
+            }),
+            info_key: None,
+        }
+    }
+
+    fn confirm_password_input(&self) -> Component {
+        let (label, placeholder, a11y_label, hint) = if self.password_enabled {
+            (
+                "Confirm New Password",
+                "Re-enter the new password",
+                "Confirm new password",
+                "Re-enter the new password to confirm.",
+            )
+        } else {
+            (
+                "Confirm Password",
+                "Re-enter the password",
+                "Confirm password",
+                "Re-enter the password to confirm.",
+            )
+        };
+        Component::TextInput {
+            id: "confirm_password".into(),
+            label: label.into(),
+            value: String::new(),
+            placeholder: Some(placeholder.into()),
+            max_length: Some(128),
+            validation_error: self.confirm_validation_error(),
+            input_type: InputType::Password,
+            a11y: Some(A11y {
+                label: Some(a11y_label.into()),
+                hint: Some(hint.into()),
+                role: Some(AccessibilityRole::TextField),
+            }),
+            info_key: None,
+        }
+    }
+
     fn build_screen(&self) -> ScreenModel {
+        let mut components = Vec::with_capacity(3);
+        if self.password_enabled {
+            components.push(self.current_password_input());
+        }
+        components.push(self.new_password_input());
+        components.push(self.confirm_password_input());
+
+        let (title, subtitle) = if self.password_enabled {
+            ("Change Password".to_string(), None)
+        } else {
+            (
+                "Set Password".to_string(),
+                Some("Protect the app with a password.".to_string()),
+            )
+        };
+
         ScreenModel {
             screen_id: "change_password".into(),
-            title: "Change Password".into(),
-            subtitle: None,
-            components: vec![
-                Component::TextInput {
-                    id: "current_password".into(),
-                    label: "Current Password".into(),
-                    value: String::new(),
-                    placeholder: Some("Enter your current password".into()),
-                    max_length: Some(128),
-                    validation_error: None,
-                    input_type: InputType::Password,
-                    a11y: Some(A11y {
-                        label: Some("Current password".into()),
-                        hint: Some("Enter your current app password.".into()),
-                        role: Some(AccessibilityRole::TextField),
-                    }),
-                    info_key: None,
-                },
-                Component::TextInput {
-                    id: "new_password".into(),
-                    label: "New Password".into(),
-                    value: String::new(),
-                    placeholder: Some("Choose a new password".into()),
-                    max_length: Some(128),
-                    validation_error: self.new_validation_error(),
-                    input_type: InputType::Password,
-                    a11y: Some(A11y {
-                        label: Some("New password".into()),
-                        hint: Some(
-                            "Choose a new password — must differ from your current one.".into(),
-                        ),
-                        role: Some(AccessibilityRole::TextField),
-                    }),
-                    info_key: None,
-                },
-                Component::TextInput {
-                    id: "confirm_password".into(),
-                    label: "Confirm New Password".into(),
-                    value: String::new(),
-                    placeholder: Some("Re-enter the new password".into()),
-                    max_length: Some(128),
-                    validation_error: self.confirm_validation_error(),
-                    input_type: InputType::Password,
-                    a11y: Some(A11y {
-                        label: Some("Confirm new password".into()),
-                        hint: Some("Re-enter the new password to confirm.".into()),
-                        role: Some(AccessibilityRole::TextField),
-                    }),
-                    info_key: None,
-                },
-            ],
+            title,
+            subtitle,
+            components,
             actions: vec![
                 ScreenAction {
                     id: "submit".into(),

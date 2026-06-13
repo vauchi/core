@@ -398,7 +398,10 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 #  screens_exchange.rs (~230); local English-only format_relative_time
 #  replaced by crate::relative_time. 1607 -> 906; baseline lowered so
 #  the ratchet bites. See 2026-06-10-app-engine-residual-splits.)
-vauchi-app/src/ui/app_engine/screens.rs 906
+# (+2 for AppScreen::ChangePassword arm passing is_password_enabled() into
+#  ChangePasswordEngine::new — first-password setup mode,
+#  2026-06-13-ios-app-password-setup-missing.)
+vauchi-app/src/ui/app_engine/screens.rs 908
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

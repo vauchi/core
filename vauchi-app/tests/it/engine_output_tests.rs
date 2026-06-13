@@ -157,7 +157,7 @@ fn form_dialog_output_is_typed_per_dialog_kind() {
 #[test]
 fn change_password_output_redacts_both_credentials() {
     use vauchi_app::ui::ChangePasswordEngine;
-    let mut engine = ChangePasswordEngine::new();
+    let mut engine = ChangePasswordEngine::new(true);
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "current_password".into(),
         value: "old-secret".into(),

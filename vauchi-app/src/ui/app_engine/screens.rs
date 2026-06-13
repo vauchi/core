@@ -328,7 +328,9 @@ impl AppEngine {
                     .collect();
                 Box::new(DecoyContactsEngine::new(decoys))
             }
-            AppScreen::ChangePassword => Box::new(ChangePasswordEngine::new()),
+            AppScreen::ChangePassword => Box::new(ChangePasswordEngine::new(
+                vauchi.is_password_enabled().unwrap_or(false),
+            )),
             AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),
             AppScreen::EmergencyBroadcast => {
                 let config = vauchi.load_emergency_config().ok().flatten();

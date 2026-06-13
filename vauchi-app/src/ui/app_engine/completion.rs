@@ -530,7 +530,8 @@ impl AppEngine {
         }
     }
 
-    /// Change-password complete: apply if both fields populated (else cancel).
+    /// Set/change-password complete: set the first password (setup mode) or
+    /// rotate an existing one (change mode), else cancel.
     pub(super) fn complete_change_password(&mut self) -> ActionResult {
         let creds = match self.engine.engine_output() {
             Some(crate::ui::EngineOutput::ChangePassword { current, new }) => Some((current, new)),
@@ -543,18 +544,31 @@ impl AppEngine {
             }
         };
         if let Some((current, new)) = creds {
-            // An empty current_password reaches here only on Cancel
-            // (the Save button stays disabled until both fields are
-            // populated and matching).  Treat empty current as a
-            // cancel — navigate back without touching storage.
-            if !current.is_empty()
-                && !new.is_empty()
-                && let Err(e) = self.vauchi.change_app_password(&current, &new)
-            {
-                return ActionResult::ShowAlert {
-                    title: "Error".into(),
-                    message: format!("Could not change password: {e}"),
+            // An empty `new` reaches here only on Cancel (Save stays disabled
+            // until new is populated and matches confirm; Cancel zeroizes the
+            // fields). Treat it as a cancel — navigate back, touch nothing.
+            if !new.is_empty() {
+                // setup_app_password sets the first password; change_app_password
+                // rotates an existing one and errors if none is configured —
+                // pick by current state so the first-password path works
+                // (problem 2026-06-13-ios-app-password-setup-missing).
+                let had_password = self.vauchi.is_password_enabled().unwrap_or(false);
+                let result = if had_password {
+                    self.vauchi.change_app_password(&current, &new)
+                } else {
+                    self.vauchi.setup_app_password(&new)
                 };
+                if let Err(e) = result {
+                    let verb = if had_password {
+                        "change password"
+                    } else {
+                        "set password"
+                    };
+                    return ActionResult::ShowAlert {
+                        title: "Error".into(),
+                        message: format!("Could not {verb}: {e}"),
+                    };
+                }
             }
         }
         let screen = self.navigate_back();

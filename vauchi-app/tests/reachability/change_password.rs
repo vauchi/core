@@ -25,7 +25,7 @@ use vauchi_app::ui::{ChangePasswordEngine, WorkflowEngine};
 const HANDLED: &[&str] = &["submit", "cancel"];
 
 fn factory() -> ChangePasswordEngine {
-    ChangePasswordEngine::new()
+    ChangePasswordEngine::new(true)
 }
 
 // @internal

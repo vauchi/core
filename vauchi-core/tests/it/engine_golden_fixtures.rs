@@ -356,7 +356,7 @@ fn recovery_help_fixture_is_fresh() {
 // @internal
 #[test]
 fn change_password_fixture_is_fresh() {
-    let engine = ChangePasswordEngine::new();
+    let engine = ChangePasswordEngine::new(true);
     assert_fixture_fresh(&engine.current_screen(), "change_password.json");
 }
 
@@ -504,7 +504,7 @@ fn regenerate_all_engine_fixtures() {
         ),
         (
             "change_password.json",
-            ChangePasswordEngine::new().current_screen(),
+            ChangePasswordEngine::new(true).current_screen(),
         ),
         (
             "contact_limit.json",

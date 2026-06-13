@@ -252,16 +252,25 @@ fn test_remove_contact_from_label_triggers_repropagate() {
     // While in Work (which grants `work`), Bob can see it.
     assert!(wb.get_effective_field_visibility(&bob_id, &work).unwrap());
 
+    // Make `work` group-only: private at Layer-A so the Work group is its sole
+    // grant. ADR-054 D3 — an ungrouped contact falls back to the Layer-A public
+    // base card, so only a group-only field is revoked by leaving the group.
+    // Group membership overrides Layer-A, so Bob still sees `work` right now.
+    wb.set_field_private_and_repropagate(&bob_id, &work)
+        .unwrap();
+    assert!(
+        wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
+        "In the Work group, Bob sees `work` despite the Layer-A `private` rule"
+    );
+
     wb.remove_contact_from_group_and_repropagate(label.id(), &bob_id)
         .unwrap();
 
-    // Removed from his only group -> default-closed -> Bob sees no fields.
-    // (repropagate computes add-only deltas, so a visibility *shrink* queues
-    // no update; removal-delta propagation is a separate pre-existing gap,
-    // tracked in 2026-06-08-sync-card-update-not-group-filtered.)
+    // Removed from his only group → falls back to Layer-A, where `work` is
+    // private → revoked. (A Layer-A-public field would survive removal.)
     assert!(
         !wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
-        "After removal from his only group, Bob sees no fields (default-closed)"
+        "Group-only `work` is revoked when Bob leaves his only granting group"
     );
 }
 
@@ -428,19 +437,30 @@ fn groups_mode_field_in_no_group_is_hidden() {
 
 // @internal
 #[test]
-fn ungrouped_contact_in_groups_mode_sees_no_fields() {
-    // Groups exist, but Carol is in none → default-closed → sees nothing.
+fn ungrouped_contact_in_groups_mode_falls_back_to_layer_a() {
+    // ADR-054 D3: a contact in zero groups (while groups exist for others) is
+    // NOT default-closed. Unlike a *grouped* contact
+    // (`groups_mode_field_in_no_group_is_hidden`), they fall back to the
+    // Layer-A `can_see` rules — the public base card.
     let (wb, _bob_id) = vauchi_with_work_group_and_bob();
     let carol_id = add_contact_with_ratchet(&wb, "Carol");
+
+    // `personal` has no group grant and no Layer-A rule → default `Everyone`,
+    // so the ungrouped contact sees it (public base card).
+    assert!(
+        wb.get_effective_field_visibility(&carol_id, "personal")
+            .unwrap(),
+        "D3: ungrouped contact falls back to Layer-A; `personal` is Everyone → visible"
+    );
+
+    // A field explicitly restricted at Layer-A stays hidden even via the
+    // fallback — the public base card excludes private fields.
+    wb.set_field_private_and_repropagate(&carol_id, "work")
+        .unwrap();
     assert!(
         !wb.get_effective_field_visibility(&carol_id, "work")
             .unwrap(),
-        "Ungrouped contact in groups mode sees no fields, even `work`"
-    );
-    assert!(
-        !wb.get_effective_field_visibility(&carol_id, "personal")
-            .unwrap(),
-        "Ungrouped contact in groups mode sees no fields"
+        "D3: Layer-A `private` (Nobody) hides `work` from the ungrouped contact"
     );
 }
 

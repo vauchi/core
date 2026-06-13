@@ -167,7 +167,16 @@ fn revoking_for_one_recipient_does_not_affect_another_recipient() {
     let mut bob = add_recipient(&alice, &alice_pk, "Bob");
     let mut carol = add_recipient(&alice, &alice_pk, "Carol");
 
-    // Grant `work` to both, deliver each grant.
+    // Make `work` group-only for Bob: private at Layer-A so the Work group is
+    // its sole grant and leaving it revokes `work` (ADR-054 D3 — an ungrouped
+    // contact otherwise keeps Layer-A-public fields). Set it while Bob is
+    // ungrouped, so it adds no `work` delta; drain any baseline send.
+    alice
+        .set_field_private_and_repropagate(&bob.id_at_sharer, &work)
+        .unwrap();
+    deliver(&alice, &mut bob);
+
+    // Grant `work` to both via the group, deliver each grant.
     alice
         .add_contact_to_group_and_repropagate(group.id(), &bob.id_at_sharer)
         .unwrap();

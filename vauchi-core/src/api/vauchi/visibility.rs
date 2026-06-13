@@ -208,18 +208,19 @@ impl Vauchi {
             return Ok(true);
         }
 
-        // Groups mode (any labels exist) is **default-closed**: a field that no
-        // group grants is hidden — matching exchange-time filtering so the
-        // initial share and later propagation agree
-        // (2026-06-08-sync-card-update-not-group-filtered, decision A). Before
-        // this, the Layer-A `can_see` fallback below ran unconditionally and
-        // leaked ungranted fields (default `Everyone`) to grouped contacts.
-        if !self.storage.labels().load_all_groups()?.is_empty() {
+        // ADR-054 D3: a *grouped* contact is default-closed — a field none of
+        // their groups grants is hidden, matching exchange-time filtering so
+        // initial share and propagation agree
+        // (2026-06-08-sync-card-update-not-group-filtered, decision A). The gate
+        // keys on `labels` (THIS contact's groups), not on groups existing
+        // globally: an ungrouped contact is not default-closed but falls through
+        // to the Layer-A public base card below, even while others are grouped.
+        if !labels.is_empty() {
             return Ok(false);
         }
 
-        // No-groups mode: no audience to restrict to — fall back to the
-        // contact's per-contact Layer-A rules (default `Everyone`). Imported
+        // No group membership for this contact: fall back to its per-contact
+        // Layer-A rules (default `Everyone`) — the public base card. Imported
         // contacts have no visibility rules; default to not visible.
         Ok(contact
             .visibility_rules()

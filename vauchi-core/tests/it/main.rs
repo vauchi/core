@@ -424,6 +424,7 @@ mod verifier_harness_tests;
 mod version_tests;
 mod visibility_control_tests;
 mod visibility_e2e_tests;
+mod visibility_effective_proptest;
 mod visibility_enforcement_tests;
 mod visibility_integration_tests;
 mod visibility_label_sync_tests;

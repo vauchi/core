@@ -19,6 +19,10 @@
 //! land in slices 2–3.
 
 use crate::ui::*;
+use std::sync::Arc;
+use vauchi_core::clock::Clock;
+#[cfg(test)]
+use vauchi_core::clock::SystemClock;
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::{Command, Event};
 
@@ -33,6 +37,19 @@ pub const ACTION_CANCEL: &str = "cancel";
 pub const ACTION_RETRY: &str = "retry";
 /// Action id for the Done button on the success screen.
 pub const ACTION_DONE: &str = "done";
+
+/// How long a non-terminal BLE step (`Discovering`/`Handshaking`/
+/// `Exchanging`/`Verifying`) may persist with no progress before the
+/// engine fails to the retry/cancel screen. Re-stamped on every forward
+/// `BleStep` transition AND every consumed in-step event (e.g. a transfer
+/// chunk while `Exchanging`), so a healthy exchange never trips it; only a
+/// step with no inbound progress for the budget does — no peer discovered,
+/// or a peer that connects then goes silent
+/// (`2026-06-11-exchange-waits-forever-without-capabilities`,
+/// T1.2; ADR-021: core owns the timer). Unix-seconds (the engine's
+/// clock domain). Phase 0 (android!523) already handles permission-denied
+/// fast; this is the no-event-ever backstop.
+pub const BLE_STEP_TIMEOUT_SECS: u64 = 60;
 
 /// Presentation state of the BLE engine. The active sub-flow screen is derived
 /// from the wrapped flow's `BleStep`; `Success`/`Failed` are terminal.
@@ -58,6 +75,11 @@ pub struct BleExchangeEngine {
     /// `BleStartAdvertising.payload` so the peer can compare and exactly
     /// one side initiates the connection (see [`BleExchangeFlow`]).
     own_token: Vec<u8>,
+    clock: Arc<dyn Clock>,
+    /// Unix-seconds when the current `BleStep` was entered; re-stamped on
+    /// every step transition (and on retry). The `tick` stall deadline
+    /// ([`BLE_STEP_TIMEOUT_SECS`]) is measured from it.
+    step_entered_unix: u64,
 }
 
 impl BleExchangeEngine {
@@ -66,7 +88,13 @@ impl BleExchangeEngine {
     /// device's role-tiebreak token (a stable per-identity value); the engine
     /// advertises it and [`BleExchangeFlow`] compares it against the peer's to
     /// pick exactly one initiator.
-    pub fn new(mode: ExchangeMode, has_camera: bool, own_token: Vec<u8>) -> Self {
+    pub fn new(
+        mode: ExchangeMode,
+        has_camera: bool,
+        own_token: Vec<u8>,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
+        let step_entered_unix = clock.unix_seconds();
         Self {
             mode,
             flow: BleExchangeFlow::new(mode, own_token.clone()),
@@ -75,6 +103,8 @@ impl BleExchangeEngine {
             started: false,
             cancelled: false,
             own_token,
+            clock,
+            step_entered_unix,
         }
     }
 
@@ -301,6 +331,7 @@ impl WorkflowEngine for BleExchangeEngine {
                         self.flow = BleExchangeFlow::new(self.mode, self.own_token.clone());
                         self.screen = BleScreen::Active;
                         self.started = false;
+                        self.step_entered_unix = self.clock.unix_seconds();
                         ActionResult::UpdateScreen(self.build_screen())
                     }
                     UserAction::ActionPressed { action_id } if action_id == ACTION_CANCEL => {
@@ -341,7 +372,34 @@ impl WorkflowEngine for BleExchangeEngine {
             return None;
         }
         let outcome = self.flow.handle_event(&event);
+        // Any forward progress refreshes the stall deadline (T1.2): a step
+        // advance OR a consumed in-step event — notably a transfer chunk
+        // while `Exchanging` (a unit step that otherwise never re-stamps).
+        // So the deadline only trips on a genuinely silent step, not a slow
+        // transfer. `Ignored` (irrelevant event) and the terminal outcomes
+        // do not re-stamp.
+        if matches!(
+            outcome,
+            BleHardwareOutcome::StepAdvanced { .. } | BleHardwareOutcome::Consumed { .. }
+        ) {
+            self.step_entered_unix = self.clock.unix_seconds();
+        }
         Some(self.apply_outcome(outcome))
+    }
+
+    /// Fail a stalled non-terminal BLE step past [`BLE_STEP_TIMEOUT_SECS`]
+    /// (T1.2, ADR-021). Driven by the `poll_notifications` pump. `Active`
+    /// implies a waiting step (`Complete` flips to `Success` via
+    /// `apply_outcome`); `Success`/`Failed` are terminal.
+    fn tick(&mut self, now: u64) {
+        if self.cancelled || !matches!(self.screen, BleScreen::Active) {
+            return;
+        }
+        if now.saturating_sub(self.step_entered_unix) >= BLE_STEP_TIMEOUT_SECS {
+            self.force_failure(Some(
+                "No nearby device responded — Bluetooth exchange timed out.".into(),
+            ));
+        }
     }
 
     fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
@@ -383,7 +441,8 @@ mod tests {
     // @internal
     #[test]
     fn new_engine_renders_discovering_and_not_cancelled() {
-        let engine = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
+        let engine =
+            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
         assert_eq!(
             engine.current_screen().screen_id,
             "exchange_ble_discovering"
@@ -393,8 +452,68 @@ mod tests {
 
     // @internal
     #[test]
+    fn stalled_step_past_timeout_ticks_to_failed() {
+        let mut engine =
+            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
+        // `entered` read just after construction is >= the engine's stamped
+        // step-entry second, so `+ budget + 1` is unambiguously past the
+        // deadline (CC-06 — explicit now, no FakeClock, no sleep).
+        let entered = SystemClock::shared().unix_seconds();
+        assert_eq!(
+            engine.current_screen().screen_id,
+            "exchange_ble_discovering"
+        );
+
+        engine.tick(entered + BLE_STEP_TIMEOUT_SECS + 1);
+
+        assert_eq!(
+            engine.current_screen().screen_id,
+            "exchange_failed",
+            "a stalled BLE step past its budget must fail to retry/cancel"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn step_within_timeout_stays_active() {
+        let mut engine =
+            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
+        let entered = SystemClock::shared().unix_seconds();
+
+        engine.tick(entered);
+
+        assert_eq!(
+            engine.current_screen().screen_id,
+            "exchange_ble_discovering",
+            "must not fail before the step budget elapses"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn tick_on_terminal_screen_is_inert() {
+        // A tick far past any budget must not mutate a terminal screen
+        // (the `screen != Active` guard, CC-14 adversarial case).
+        let mut engine =
+            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
+        engine.force_failure(Some("crypto failure".into()));
+        let before = engine.current_screen();
+
+        engine.tick(u64::MAX);
+
+        assert_eq!(engine.current_screen().screen_id, before.screen_id);
+        assert_eq!(
+            engine.current_screen().components,
+            before.components,
+            "tick must not mutate a terminal BLE screen"
+        );
+    }
+
+    // @internal
+    #[test]
     fn screen_entered_emits_advertise_then_scan_once() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Bump, true, vec![]);
+        let mut engine =
+            BleExchangeEngine::new(ExchangeMode::Bump, true, vec![], SystemClock::shared());
         let cmds = engine.screen_entered();
         assert_eq!(cmds.len(), 2);
         assert!(matches!(cmds[0], Command::BleStartAdvertising { .. }));
@@ -406,7 +525,8 @@ mod tests {
     // @internal
     #[test]
     fn discovery_event_emits_connect_command_and_advances() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
+        let mut engine =
+            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
         let result = discover(&mut engine).expect("an active engine handles BLE events");
         match result {
             ActionResult::Commands { commands } => assert!(matches!(
@@ -421,7 +541,8 @@ mod tests {
     // @internal
     #[test]
     fn disconnect_transitions_to_failed_with_all_fallbacks() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Shake, true, vec![]);
+        let mut engine =
+            BleExchangeEngine::new(ExchangeMode::Shake, true, vec![], SystemClock::shared());
         let _ = engine.handle_hardware_event(Event::BleDisconnected {
             reason: "lost".into(),
         });
@@ -437,7 +558,8 @@ mod tests {
     // @internal
     #[test]
     fn no_qr_fallback_offered_without_camera() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, false, vec![]);
+        let mut engine =
+            BleExchangeEngine::new(ExchangeMode::Magic, false, vec![], SystemClock::shared());
         let _ = engine.handle_hardware_event(Event::BleDisconnected { reason: "x".into() });
         let ids: Vec<String> = engine
             .current_screen()
@@ -454,7 +576,8 @@ mod tests {
     fn force_success_flips_chrome_to_success_screen() {
         // P4: the real `BleHandshakeMachine` completion drives the chrome
         // to Success (the hollow flow no longer self-completes).
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
+        let mut engine =
+            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
         assert_eq!(
             engine.current_screen().screen_id,
             "exchange_ble_discovering"
@@ -466,7 +589,8 @@ mod tests {
     // @internal
     #[test]
     fn cancel_completes_and_marks_cancelled() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
+        let mut engine =
+            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "cancel".into(),
         });
@@ -477,7 +601,8 @@ mod tests {
     // @internal
     #[test]
     fn retry_from_failed_resets_to_active_and_re_emits_start() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Bump, true, vec![]);
+        let mut engine =
+            BleExchangeEngine::new(ExchangeMode::Bump, true, vec![], SystemClock::shared());
         let _ = engine.handle_hardware_event(Event::BleDisconnected { reason: "x".into() });
         assert_eq!(engine.current_screen().screen_id, "exchange_failed");
         let _ = engine.handle_action(UserAction::ActionPressed {

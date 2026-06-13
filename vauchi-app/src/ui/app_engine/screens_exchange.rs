@@ -109,6 +109,7 @@ impl AppEngine {
                     *mode,
                     device_capabilities.has_camera,
                     own_token,
+                    vauchi.clock().clone(),
                 ))
             }
             AppScreen::NfcExchange => {

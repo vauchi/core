@@ -81,6 +81,17 @@ const AUDIO_LISTEN_TIMEOUT_MS: u64 = 5000;
 /// Format: `[version: 1][public_key: 32][card_json: rest]`.
 const EXCHANGE_PAYLOAD_VERSION: u8 = 1;
 
+/// Maximum a single non-terminal exchange phase may persist with no
+/// forward progress before the machine fails to a retry/cancel screen.
+/// The deadline resets on every phase transition, so a healthy exchange
+/// (steady QR/chunk progress) never trips it; only a wait state with no
+/// peer and no progress does — the device-verified infinite "Searching…"
+/// (problem `2026-06-11-exchange-waits-forever-without-capabilities`,
+/// ADR-021: core owns the timer, never the frontend). Milliseconds — the
+/// machine's time domain is `unix_millis` (per the 2026-06-03 per-frame
+/// gating fix; seconds froze the QR ~1000× its window).
+pub const MULTI_STAGE_STEP_TIMEOUT_MS: u64 = 120_000;
+
 /// Observable phase of the multi-stage machine. 1:1 with
 /// [`ProtocolState`] (renamed for engine-side ergonomics — the
 /// underlying protocol model is unchanged).

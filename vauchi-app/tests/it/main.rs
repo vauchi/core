@@ -49,6 +49,7 @@ mod help_engine_wiring_tests;
 mod humble_surface_contract_tests;
 mod inline_confirm_action_id_tests;
 mod link_exchange_tests;
+mod multi_stage_deadline_tests;
 mod multi_stage_machine_proptest;
 mod nfc_exchange_app_engine_tests;
 mod places_tests;

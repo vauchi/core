@@ -330,6 +330,73 @@ fn change_password_wrong_current_shows_alert_storage_unchanged() {
     assert!(vauchi.authenticate("new-pin-9876").is_err());
 }
 
+// ── set-password (setup mode: no password configured yet) ───────────
+
+// @internal
+#[test]
+fn set_password_screen_omits_current_field_when_no_password() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    // No setup_app_password — identity has no password yet.
+    let mut engine = AppEngine::new(vauchi);
+
+    let screen = engine.navigate_to(AppScreen::ChangePassword);
+    assert_eq!(
+        screen.title, "Set Password",
+        "setup mode should title the screen 'Set Password', not 'Change Password'"
+    );
+    let input_ids: Vec<&str> = screen
+        .components
+        .iter()
+        .filter_map(|c| match c {
+            vauchi_app::ui::Component::TextInput { id, .. } => Some(id.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        !input_ids.contains(&"current_password"),
+        "setup mode must not ask for a current password (there is none), got {input_ids:?}"
+    );
+    assert!(input_ids.contains(&"new_password"));
+    assert!(input_ids.contains(&"confirm_password"));
+}
+
+// @internal
+#[test]
+fn set_password_submit_persists_via_setup_app_password() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    assert!(!vauchi.is_password_enabled().unwrap());
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::ChangePassword);
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "new_password".into(),
+        value: "first-pin-1234".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "first-pin-1234".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "setup submit should navigate back on success, got {result:?}"
+    );
+
+    let vauchi = engine.vauchi_mut();
+    assert!(
+        vauchi.is_password_enabled().unwrap(),
+        "an app password should now be configured"
+    );
+    assert!(vauchi.authenticate("first-pin-1234").is_ok());
+    assert!(vauchi.authenticate("wrong-pin").is_err());
+}
+
 // @internal
 #[test]
 fn change_password_mismatch_disables_submit() {

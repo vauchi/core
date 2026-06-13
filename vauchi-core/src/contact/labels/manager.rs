@@ -327,27 +327,6 @@ impl GroupManager {
     }
 }
 
-/// Resolves which fields a given contact can see.
-///
-/// Two modes:
-/// - No-group mode (no labels exist): returns fields where `field_visibility`
-///   is `Everyone` on the card.
-/// - Groups mode (labels exist): returns union of `visible_fields` across
-///   all labels the contact belongs to. Per-contact overrides still apply.
-///
-/// Ungrouped contacts in groups mode see no fields (default-closed).
-pub fn resolve_visible_fields(
-    card: &crate::contact_card::ContactCard,
-    label_manager: &GroupManager,
-    contact_id: &str,
-) -> HashSet<String> {
-    if label_manager.is_empty() {
-        card.field_visibility().everyone_field_ids()
-    } else {
-        label_manager.visible_fields_via_labels(contact_id)
-    }
-}
-
 // INLINE_TEST_REQUIRED: tests access private GroupManager internals
 #[cfg(test)]
 mod tests {

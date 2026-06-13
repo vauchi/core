@@ -65,7 +65,6 @@ pub use contact::merge::DuplicatePair;
 pub use contact::{
     Contact, ContactError, ContactKind, ExchangedData, FieldVisibility, Group, GroupError,
     GroupManager, ImportSource, ImportedData, MAX_LABELS, SUGGESTED_LABELS, VisibilityRules,
-    resolve_visible_fields,
 };
 pub use contact_card::vcard_import::{VCardImportError, import_vcf};
 pub use contact_card::{

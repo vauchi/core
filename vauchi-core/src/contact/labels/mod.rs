@@ -12,7 +12,7 @@ mod group;
 mod manager;
 
 pub use group::Group;
-pub use manager::{GroupManager, resolve_visible_fields};
+pub use manager::GroupManager;
 
 /// Maximum number of labels allowed per user.
 pub const MAX_LABELS: usize = 50;

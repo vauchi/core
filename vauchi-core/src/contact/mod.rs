@@ -23,9 +23,7 @@ pub mod visibility;
 mod visibility;
 
 pub use kind::{ContactKind, ExchangedData, ImportSource, ImportedData};
-pub use labels::{
-    Group, GroupError, GroupManager, MAX_LABELS, SUGGESTED_LABELS, resolve_visible_fields,
-};
+pub use labels::{Group, GroupError, GroupManager, MAX_LABELS, SUGGESTED_LABELS};
 pub use tag::Tag;
 pub use trust::TrustLevel;
 pub use visibility::{FieldVisibility, VisibilityRules};

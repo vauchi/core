@@ -183,7 +183,7 @@ vauchi-core/src/network/http_transport.rs 1253
 # 2026-06-10: +27 for set_contact_display_name (contact-edit persistence
 # fix). The nickname/display-preference cluster (~490 lines) is the
 # natural carve-out target when the split lands.
-vauchi-core/src/api/vauchi/sync_http.rs 1154
+vauchi-core/src/api/vauchi/sync_http.rs 1160
 vauchi-core/src/api/vauchi/contacts.rs 1063
 
 # EXEMPT — security-critical: crypto + verification belong together
@@ -210,7 +210,7 @@ vauchi-core/src/recovery/mod.rs 1253
 #  2026-06-08-card-revocation-not-propagated; migration ledger exemption)
 # (+10 2026-06-09: migration v53 ux_state.settings_flags_encrypted —
 #  2026-06-08-settings-toggle-not-persisting P1; migration ledger exemption)
-vauchi-core/src/storage/migration.rs 1961
+vauchi-core/src/storage/migration.rs 1971
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
 # (+4 for #[allow(clippy::let_underscore_must_use)] attr + comment on
@@ -232,7 +232,7 @@ vauchi-core/src/storage/migration.rs 1961
 # (+30 2026-06-09: settings_flags re-encrypt block in rekey_ux_state +
 #  ENCRYPTED_COLUMNS entry — 2026-06-08-settings-toggle-not-persisting P1;
 #  co-located EXEMPT, all encrypted columns rekeyed together)
-vauchi-core/src/storage/rekey.rs 1776
+vauchi-core/src/storage/rekey.rs 1799
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

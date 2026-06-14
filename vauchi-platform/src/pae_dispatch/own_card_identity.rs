@@ -67,14 +67,17 @@ impl PlatformAppEngine {
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;
-                // Option B: own-card edits propagate via the explicit
-                // group-aware batch (ADR-054 G4). Best-effort: the edit is
-                // already saved, so a propagation error (e.g. a transient
-                // storage/crypto failure on one contact) must NOT fail the
-                // user's edit — it re-propagates on the next own-card edit. A
-                // retry queue is a follow-up (review 2026-06-14).
+                // Repropagation retry queue: arm the durable marker, then
+                // attempt an immediate flush. The edit never fails on a
+                // propagation error; the next sync tick retries
+                // (2026-06-14-own-card-propagation-retry-queue).
+                engine.vauchi().mark_own_card_repropagate().map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
                 #[allow(clippy::let_underscore_must_use)]
-                let _ = engine.vauchi().propagate_card_update(&old_card, &card);
+                let _ = engine.vauchi().run_owed_repropagation();
                 engine.invalidate_screen(&AppScreen::MyInfo);
                 Ok(DomainCommandResult::Unit)
             }
@@ -111,14 +114,17 @@ impl PlatformAppEngine {
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;
-                // Option B: own-card edits propagate via the explicit
-                // group-aware batch (ADR-054 G4). Best-effort: the edit is
-                // already saved, so a propagation error (e.g. a transient
-                // storage/crypto failure on one contact) must NOT fail the
-                // user's edit — it re-propagates on the next own-card edit. A
-                // retry queue is a follow-up (review 2026-06-14).
+                // Repropagation retry queue: arm the durable marker, then
+                // attempt an immediate flush. The edit never fails on a
+                // propagation error; the next sync tick retries
+                // (2026-06-14-own-card-propagation-retry-queue).
+                engine.vauchi().mark_own_card_repropagate().map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
                 #[allow(clippy::let_underscore_must_use)]
-                let _ = engine.vauchi().propagate_card_update(&old_card, &card);
+                let _ = engine.vauchi().run_owed_repropagation();
                 engine.invalidate_screen(&AppScreen::MyInfo);
                 Ok(DomainCommandResult::Unit)
             }
@@ -149,14 +155,17 @@ impl PlatformAppEngine {
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;
-                // Option B: own-card edits propagate via the explicit
-                // group-aware batch (ADR-054 G4). Best-effort: the edit is
-                // already saved, so a propagation error (e.g. a transient
-                // storage/crypto failure on one contact) must NOT fail the
-                // user's edit — it re-propagates on the next own-card edit. A
-                // retry queue is a follow-up (review 2026-06-14).
+                // Repropagation retry queue: arm the durable marker, then
+                // attempt an immediate flush. The edit never fails on a
+                // propagation error; the next sync tick retries
+                // (2026-06-14-own-card-propagation-retry-queue).
+                engine.vauchi().mark_own_card_repropagate().map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
                 #[allow(clippy::let_underscore_must_use)]
-                let _ = engine.vauchi().propagate_card_update(&old_card, &card);
+                let _ = engine.vauchi().run_owed_repropagation();
                 engine.invalidate_screen(&AppScreen::MyInfo);
                 Ok(DomainCommandResult::Bool { value: true })
             }

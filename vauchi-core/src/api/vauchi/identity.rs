@@ -543,7 +543,10 @@ impl Vauchi {
     /// Marks the own card dirty so the next sync tick repropagates it to
     /// contacts (group-aware, via `run_owed_repropagation`). A fresh edit
     /// resets the retry budget so a previously backed-off marker resumes.
-    fn mark_own_card_repropagate(&self) -> VauchiResult<()> {
+    ///
+    /// Public so a frontend that edits the own card directly (rather than via
+    /// the `*_own_field` API) can arm the same retry path.
+    pub fn mark_own_card_repropagate(&self) -> VauchiResult<()> {
         self.storage
             .ux()
             .save_own_card_repropagate(&crate::types::OwnCardRepropagateState {

@@ -203,10 +203,18 @@ pub struct MotionTokens {
     pub emphasis_duration_ms: u16,
 }
 
-// Generated from themes/tokens.json by themes/scripts/generate.py.
-// To update: edit tokens.json, run `generate.py`, copy tokens_defaults.rs here.
-// Contract check (check-core-contract.py) validates values match tokens.json.
-include!("tokens_defaults.rs");
+// DesignTokens defaults are parsed at runtime from the bundled tokens.json
+// (themes/tokens.json, embedded into OUT_DIR by build.rs) — no generated
+// Rust. Source of truth: themes/tokens.json; values validated by
+// check-core-contract.py and the default-value tests below (ADR-038
+// Amendment 2).
+impl Default for DesignTokens {
+    fn default() -> Self {
+        const TOKENS_JSON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/tokens.json"));
+        serde_json::from_slice(TOKENS_JSON)
+            .expect("bundled tokens.json must parse into DesignTokens")
+    }
+}
 
 /// A complete theme definition
 #[derive(Debug, Clone, Serialize, Deserialize)]

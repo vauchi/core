@@ -68,13 +68,13 @@ impl PlatformAppEngine {
                         detail: e.to_string(),
                     })?;
                 // Option B: own-card edits propagate via the explicit
-                // group-aware batch, not auto-driven by the mutator (ADR-054 G4).
-                engine
-                    .vauchi()
-                    .propagate_card_update(&old_card, &card)
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?;
+                // group-aware batch (ADR-054 G4). Best-effort: the edit is
+                // already saved, so a propagation error (e.g. a transient
+                // storage/crypto failure on one contact) must NOT fail the
+                // user's edit — it re-propagates on the next own-card edit. A
+                // retry queue is a follow-up (review 2026-06-14).
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = engine.vauchi().propagate_card_update(&old_card, &card);
                 engine.invalidate_screen(&AppScreen::MyInfo);
                 Ok(DomainCommandResult::Unit)
             }
@@ -112,13 +112,13 @@ impl PlatformAppEngine {
                         detail: e.to_string(),
                     })?;
                 // Option B: own-card edits propagate via the explicit
-                // group-aware batch, not auto-driven by the mutator (ADR-054 G4).
-                engine
-                    .vauchi()
-                    .propagate_card_update(&old_card, &card)
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?;
+                // group-aware batch (ADR-054 G4). Best-effort: the edit is
+                // already saved, so a propagation error (e.g. a transient
+                // storage/crypto failure on one contact) must NOT fail the
+                // user's edit — it re-propagates on the next own-card edit. A
+                // retry queue is a follow-up (review 2026-06-14).
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = engine.vauchi().propagate_card_update(&old_card, &card);
                 engine.invalidate_screen(&AppScreen::MyInfo);
                 Ok(DomainCommandResult::Unit)
             }
@@ -150,13 +150,13 @@ impl PlatformAppEngine {
                         detail: e.to_string(),
                     })?;
                 // Option B: own-card edits propagate via the explicit
-                // group-aware batch, not auto-driven by the mutator (ADR-054 G4).
-                engine
-                    .vauchi()
-                    .propagate_card_update(&old_card, &card)
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?;
+                // group-aware batch (ADR-054 G4). Best-effort: the edit is
+                // already saved, so a propagation error (e.g. a transient
+                // storage/crypto failure on one contact) must NOT fail the
+                // user's edit — it re-propagates on the next own-card edit. A
+                // retry queue is a follow-up (review 2026-06-14).
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = engine.vauchi().propagate_card_update(&old_card, &card);
                 engine.invalidate_screen(&AppScreen::MyInfo);
                 Ok(DomainCommandResult::Bool { value: true })
             }

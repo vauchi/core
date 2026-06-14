@@ -536,6 +536,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "relay_url",
             action: MigrationAction::Sql(MIGRATION_V54_RELAY_URL),
         },
+        Migration {
+            version: 55,
+            name: "own_card_repropagate",
+            action: MigrationAction::Sql(MIGRATION_V55_OWN_CARD_REPROPAGATE),
+        },
     ]
 }
 
@@ -854,6 +859,11 @@ const MIGRATION_V53_SETTINGS_FLAGS: &str =
 /// Migration v54: persisted relay URL singleton column on ux_state
 /// (mobile-relay-url-editor-noop).
 const MIGRATION_V54_RELAY_URL: &str = "ALTER TABLE ux_state ADD COLUMN relay_url_encrypted BLOB;";
+
+// Durable "own card changed → repropagate to contacts" marker (+ failed-attempt
+// counter for backoff). Decoupled from device-sync `SyncItem::CardUpdated`.
+const MIGRATION_V55_OWN_CARD_REPROPAGATE: &str =
+    "ALTER TABLE ux_state ADD COLUMN own_card_repropagate_encrypted BLOB;";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "
     CREATE TABLE IF NOT EXISTS local_groups (

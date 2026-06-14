@@ -301,6 +301,43 @@ impl SettingsFlags {
     }
 }
 
+/// Durable marker: the own card changed and contacts owe a (re)propagation.
+///
+/// Set on an own-card edit; the sync loop runs a group-aware repropagation
+/// pass and clears it only once every contact's update has been queued.
+/// Decoupled from device-sync `SyncItem::CardUpdated` (contact propagation is
+/// not device sync). `failed_attempts` caps consecutive failed passes so a
+/// permanent error backs off instead of hot-looping; a fresh edit resets it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct OwnCardRepropagateState {
+    /// A repropagation pass is owed.
+    #[serde(default)]
+    pub needs_repropagate: bool,
+    /// Consecutive sync passes that could not queue repropagation for every
+    /// contact. Reset to 0 on a fully successful pass or on a fresh edit.
+    #[serde(default)]
+    pub failed_attempts: u32,
+}
+
+impl OwnCardRepropagateState {
+    /// Maximum consecutive failed passes before the marker backs off (stops
+    /// auto-retrying until the next edit). Bounds work on a permanent error.
+    pub const MAX_FAILED_ATTEMPTS: u32 = 5;
+
+    /// The marker owes a pass and has not exhausted its retry budget.
+    pub fn should_run(&self) -> bool {
+        self.needs_repropagate && self.failed_attempts < Self::MAX_FAILED_ATTEMPTS
+    }
+
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
 impl Default for BackupReminderState {
     fn default() -> Self {
         Self::new()

@@ -311,6 +311,7 @@ mod onboarding_engine_proptest;
 mod onboarding_engine_tests;
 mod onboarding_scenario_tests;
 mod onboarding_tests;
+mod own_card_repropagate_tests;
 mod panic_widget_tests;
 mod parent_tab_tests;
 mod parser_panic_safety_tests;

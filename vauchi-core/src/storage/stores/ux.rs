@@ -298,6 +298,61 @@ impl UxStore<'_> {
 
         Ok(())
     }
+    /// Saves the own-card repropagation marker (encrypted).
+    pub fn save_own_card_repropagate(
+        &self,
+        state: &crate::types::OwnCardRepropagateState,
+    ) -> Result<(), StorageError> {
+        let json = state
+            .to_json()
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let encrypted = crate::crypto::encrypt(self.key, json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        let now = self.now_secs();
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO ux_state (id, own_card_repropagate_encrypted, updated_at)
+             VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET own_card_repropagate_encrypted = ?1, updated_at = ?2",
+            params![encrypted, now as i64],
+        )?;
+
+        Ok(())
+    }
+
+    /// Loads the own-card repropagation marker, defaulting to "not owed".
+    pub fn load_own_card_repropagate(
+        &self,
+    ) -> Result<crate::types::OwnCardRepropagateState, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT own_card_repropagate_encrypted FROM ux_state WHERE id = 1",
+            [],
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                Ok(encrypted)
+            },
+        );
+
+        match result {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
+                let decrypted = crate::crypto::decrypt(self.key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let state = crate::types::OwnCardRepropagateState::from_json(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(state)
+            }
+            Ok(_) => Ok(crate::types::OwnCardRepropagateState::default()),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                Ok(crate::types::OwnCardRepropagateState::default())
+            }
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
     /// Saves the persisted relay URL (encrypted).
     pub fn save_relay_url(&self, url: &str) -> Result<(), StorageError> {
         let encrypted = crate::crypto::encrypt(self.key, url.as_bytes())

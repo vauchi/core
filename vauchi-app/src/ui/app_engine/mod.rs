@@ -230,6 +230,37 @@ impl AppEngine {
         }
     }
 
+    /// Hot-reload design assets (themes and/or tokens) from raw JSON, then
+    /// rebuild every screen. Tokens/themes affect ALL screens (not just
+    /// Settings), so the whole engine cache is cleared and the active
+    /// engine rebuilt — the next `current_screen()` reflects the new
+    /// values. UI-shaped name; a method on the engine, no new generic
+    /// (ADR-030). Errors if either JSON fails to parse (store untouched).
+    pub fn reload_design_assets(
+        &mut self,
+        themes_json: Option<&[u8]>,
+        tokens_json: Option<&[u8]>,
+    ) -> Result<(), crate::theme::ThemeError> {
+        if let Some(data) = themes_json {
+            crate::theme::load_themes_from_bytes(data)?;
+        }
+        if let Some(data) = tokens_json {
+            crate::theme::load_design_tokens_from_bytes(data)?;
+        }
+        self.engine_cache.clear();
+        let screen = self.screen.clone();
+        self.engine = Self::create_engine(
+            &self.vauchi,
+            &screen,
+            self.preview_as_contact.as_deref(),
+            &self.device_capabilities,
+            &self.transport_readiness,
+            &self.render_context,
+            &self.pending_exchange_groups,
+        );
+        Ok(())
+    }
+
     pub fn new(vauchi: Vauchi) -> Self {
         // Boot decision (audit
         // `2026-04-28-app-launch-and-identity-orchestration-in-core`

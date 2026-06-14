@@ -760,6 +760,7 @@ mod tests {
         *super::THEME_STORE.write().unwrap() = None;
     }
 
+    // @internal
     #[test]
     fn active_design_tokens_falls_back_to_default_when_unloaded() {
         let _g = STORE_TEST_LOCK.lock().unwrap();
@@ -768,6 +769,7 @@ mod tests {
         assert!(!design_tokens_loaded());
     }
 
+    // @internal
     #[test]
     fn load_design_tokens_then_active_returns_loaded() {
         let _g = STORE_TEST_LOCK.lock().unwrap();
@@ -781,6 +783,7 @@ mod tests {
         reset_design_stores();
     }
 
+    // @internal
     #[test]
     fn malformed_tokens_json_errors_without_poisoning() {
         let _g = STORE_TEST_LOCK.lock().unwrap();
@@ -791,6 +794,7 @@ mod tests {
         reset_design_stores();
     }
 
+    // @internal
     #[test]
     fn active_themes_falls_back_to_bundled_when_unloaded() {
         let _g = STORE_TEST_LOCK.lock().unwrap();
@@ -800,6 +804,7 @@ mod tests {
         assert!(themes.iter().any(|t| t.id == default_theme().id));
     }
 
+    // @internal
     #[test]
     fn load_themes_then_active_returns_loaded() {
         let _g = STORE_TEST_LOCK.lock().unwrap();
@@ -820,6 +825,7 @@ mod tests {
         reset_design_stores();
     }
 
+    // @internal
     #[test]
     fn reloaded_tokens_flow_into_new_screenmodels() {
         let _g = STORE_TEST_LOCK.lock().unwrap();

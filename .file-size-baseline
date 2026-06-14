@@ -314,7 +314,11 @@ vauchi-core/src/storage/mod.rs 1079
 # (+15 for T2.2-wiring: readiness threaded into create_engine at the new()
 #  + handle_action grant-affordance intercept wiring — exchange-waits-forever
 #  Phase 2 permission-aware mode picker.)
-vauchi-app/src/ui/app_engine/mod.rs 705
+# (+31 for reload_design_assets: theme/token hot-reload trigger — clears the
+#  engine cache + rebuilds the active engine (incl. the transport_readiness
+#  arg threaded by the origin/main T2.2-wiring rebase), sibling of
+#  set_render_context; ADR-038 Amendment 2 / token-theme hot-reload 2026-06-14.)
+vauchi-app/src/ui/app_engine/mod.rs 736
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts

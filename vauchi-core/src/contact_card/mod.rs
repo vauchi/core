@@ -254,11 +254,24 @@ impl ContactCard {
 
     /// Adds a field to the card.
     pub fn add_field(&mut self, field: ContactField) -> Result<(), ContactCardError> {
+        field.validate()?;
+
+        // Upsert by id: replace an existing field with the same id rather than
+        // appending a duplicate. Delta apply re-sends `Added` for every visible
+        // field (repropagation diffs empty -> own), so appending would
+        // accumulate duplicates on the receiver and a single `Removed` would
+        // under-revoke (2026-06-14-delta-apply-duplicate-fields).
+        if let Some(existing) = self.fields.iter_mut().find(|f| f.id() == field.id()) {
+            *existing = field;
+            return Ok(());
+        }
+
         if self.fields.len() >= MAX_FIELDS {
             return Err(ContactCardError::MaxFieldsReached);
         }
 
-        // Enforce single birthday constraint (Phase 3)
+        // Enforce single birthday constraint (Phase 3) — only on a genuinely
+        // new field; the same-id replace above never changes the birthday count.
         if field.field_type() == FieldType::Birthday
             && self
                 .fields
@@ -267,8 +280,6 @@ impl ContactCard {
         {
             return Err(ContactCardError::MaxFieldsReached);
         }
-
-        field.validate()?;
 
         self.fields.push(field);
         Ok(())

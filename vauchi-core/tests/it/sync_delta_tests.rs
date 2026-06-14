@@ -19,6 +19,54 @@ fn test_delta_compute_no_changes() {
     assert!(delta.is_empty());
 }
 
+// @scenario: sync_updates :: Re-adding a field with the same id replaces it
+#[test]
+fn add_field_replaces_same_id_field_instead_of_duplicating() {
+    let field = ContactField::new(FieldType::Email, "work", "old@co.com", 0);
+    let mut updated = field.clone();
+    updated.set_value("new@co.com", 0); // same id, new value
+
+    let mut card = ContactCard::new("Alice");
+    card.add_field(field).unwrap();
+    card.add_field(updated).unwrap(); // same id → upsert, not append
+
+    assert_eq!(card.fields().len(), 1, "same-id field must not duplicate");
+    assert_eq!(
+        card.fields()[0].value(),
+        "new@co.com",
+        "upsert keeps the latest value"
+    );
+}
+
+// @scenario: sync_updates :: Duplicate Added then Removed leaves no stale field
+// Guards against incomplete revocation: repropagation re-sends compute(empty ->
+// own) = all-Added, so a field can be Added twice before a Removed; without
+// upsert the duplicate survived removal (problem record
+// 2026-06-14-delta-apply-duplicate-fields).
+#[test]
+fn duplicate_added_then_removed_leaves_no_stale_field() {
+    let empty = ContactCard::new("Alice");
+    let mut with_work = empty.clone();
+    with_work
+        .add_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+
+    let add = CardDelta::compute(&empty, &with_work, 0); // Added(work)
+    let remove = CardDelta::compute(&with_work, &empty, 0); // Removed(work)
+
+    let mut received = ContactCard::new("Alice");
+    add.apply(&mut received, 0).unwrap(); // first repropagate
+    add.apply(&mut received, 0).unwrap(); // second repropagate (same id again)
+    remove.apply(&mut received, 0).unwrap(); // revocation
+
+    let copies = received
+        .fields()
+        .iter()
+        .filter(|f| f.label() == "work")
+        .count();
+    assert_eq!(copies, 0, "revocation left {copies} stale work field(s)");
+}
+
 // @scenario: sync_updates :: Only changed fields transmitted
 // @internal
 #[test]

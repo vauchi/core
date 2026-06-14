@@ -373,6 +373,9 @@ impl Vauchi {
 
         // Apply delta to contact's card
         let mut new_card = contact.card().clone();
+        // Heal any pre-upsert duplicate fields before applying, so a single
+        // `Removed` fully revokes (2026-06-14-delta-apply-duplicate-fields).
+        new_card.deduplicate_fields();
         delta
             .apply(&mut new_card, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;

@@ -348,6 +348,20 @@ impl ContactCard {
         Ok(())
     }
 
+    /// Removes duplicate fields that share a field id, keeping the first.
+    ///
+    /// Heals cards corrupted before `add_field` became an upsert: applying a
+    /// delta's `Added` used the append-only `add_field`, so repeated
+    /// repropagation (which re-sends every visible field as `Added`)
+    /// accumulated duplicates, and a single `Removed` under-revoked
+    /// (2026-06-14-delta-apply-duplicate-fields). New cards no longer
+    /// duplicate; this cleans already-stored ones. The `field_visibility` map
+    /// is keyed by id, so duplicates collapse to one entry with no orphan.
+    pub fn deduplicate_fields(&mut self) {
+        let mut seen = std::collections::HashSet::new();
+        self.fields.retain(|f| seen.insert(f.id().to_string()));
+    }
+
     /// Validates that the serialized card size is within the maximum limit.
     pub fn validate_size(&self) -> Result<(), ContactCardError> {
         let json =

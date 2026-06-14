@@ -67,6 +67,30 @@ fn duplicate_added_then_removed_leaves_no_stale_field() {
     assert_eq!(copies, 0, "revocation left {copies} stale work field(s)");
 }
 
+// Heals already-corrupted cards: a stored card with duplicate same-id fields
+// (constructed via serde here, since add_field now upserts) collapses to one
+// copy. (2026-06-14-delta-apply-duplicate-fields)
+// @scenario: sync_updates :: A card with duplicate fields is deduplicated
+#[test]
+fn deduplicate_fields_collapses_same_id_duplicates() {
+    let mut card = ContactCard::new("Alice");
+    card.add_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+
+    // Inject a duplicate field entry (post-upsert, add_field cannot create one).
+    let mut value = serde_json::to_value(&card).unwrap();
+    let fields = value.get_mut("fields").unwrap().as_array_mut().unwrap();
+    let dup = fields[0].clone();
+    fields.push(dup);
+    let mut corrupted: ContactCard = serde_json::from_value(value).unwrap();
+    assert_eq!(corrupted.fields().len(), 2, "constructed a duplicated card");
+
+    corrupted.deduplicate_fields();
+
+    assert_eq!(corrupted.fields().len(), 1, "dedup keeps one copy per id");
+    assert_eq!(corrupted.fields()[0].label(), "work");
+}
+
 // @scenario: sync_updates :: Only changed fields transmitted
 // @internal
 #[test]

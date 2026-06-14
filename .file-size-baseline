@@ -479,7 +479,9 @@ vauchi-app/src/ui/contact_detail.rs 1429
 #  machinery remains pending a follow-up tidy that will shrink this.)
 # (+13 for G3: proximity_method_for_mode -> Option (Glance has no proximity
 #  runner) + the Glance-None test, 2026-06-07)
-vauchi-app/src/ui/exchange/ble.rs 1202
+# (+17 for the BLE mid-session PermissionDenied regression pin —
+#  exchange-waits-forever T2.3, the device-observed forever-scan transport.)
+vauchi-app/src/ui/exchange/ble.rs 1219
 
 # EXEMPT — state machine: 9 ProtocolState variants + camera-gate transitions need cohesion;
 # inline tests access private state (state, peer_name, session_ended, camera_gate, scan_quality_tracker).

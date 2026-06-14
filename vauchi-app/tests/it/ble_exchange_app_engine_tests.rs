@@ -132,6 +132,25 @@ fn ble_disconnect_forwarded_through_app_engine_renders_failed() {
 
 // @internal
 #[test]
+fn ble_permission_denied_mid_wait_renders_failed_screen() {
+    // T2.3 mid-session: a BLE permission revoked WHILE the engine is in the
+    // live wait must surface the SAME `exchange_failed` retry/cancel screen the
+    // pre-entry guard produces — not a toast over a still-"Searching…" screen
+    // (the device-observed forever-scan). Pins the engine-level outcome so a
+    // refactor of the BLE fail path to ShowToast would fail here.
+    let mut engine = enter_ble_mode("mode:magic");
+    let _ = engine.handle_hardware_event(Event::PermissionDenied {
+        transport: "ble".into(),
+    });
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_failed",
+        "a mid-session BLE permission denial must flip the live wait to the failed screen"
+    );
+}
+
+// @internal
+#[test]
 fn cancel_on_ble_exchange_lands_on_mode_picker() {
     let mut engine = enter_ble_mode("mode:magic");
     assert!(matches!(

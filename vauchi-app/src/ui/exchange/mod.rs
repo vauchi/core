@@ -32,7 +32,10 @@ use vauchi_core::Command;
 use vauchi_core::clock::Clock;
 use vauchi_core::exchange::capability::TransportReadiness;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
-use vauchi_core::exchange::mode::ExchangeMode;
+use vauchi_core::exchange::mode::{DeviceRequirement, ExchangeMode};
+use vauchi_core::exchange::mode_availability::{
+    ModeAvailability, check_mode_availability_with_readiness,
+};
 use vauchi_core::exchange::{ExchangeEvent, ExchangeSession};
 
 use crate::ui::reciprocity_confirmer::ReciprocityConfirmer;
@@ -303,6 +306,33 @@ impl ExchangeEngine {
         self.step = ExchangeStep::Failed;
     }
 
+    /// Plain-language grant prompt for a denied required transport, shown on the
+    /// T2.3 fail-fast retry/cancel screen. Only the permission-bearing
+    /// requirements (camera/ble/nfc/microphone — the ones a `PermissionDenied`
+    /// event maps to) can reach here; presence-only requirements never yield
+    /// `PermissionRequired`, so the catch-all arm is unreachable in practice.
+    fn permission_denied_detail(req: DeviceRequirement) -> String {
+        let what = match req {
+            DeviceRequirement::Camera => "Camera access",
+            DeviceRequirement::Ble => "Bluetooth access",
+            DeviceRequirement::Nfc => "NFC access",
+            DeviceRequirement::Microphone => "Microphone access",
+            // `DeviceRequirement` is `#[non_exhaustive]`, so this arm is
+            // required. It is unreachable today (only the four
+            // permission-bearing requirements can be `PermissionRequired`); the
+            // assert fails loudly in tests if a new permission-bearing
+            // requirement is added without a grant prompt here.
+            other => {
+                debug_assert!(
+                    false,
+                    "permission_denied_detail: no grant prompt for {other:?}"
+                );
+                "A required permission"
+            }
+        };
+        format!("{what} was denied. Grant it in Settings, then retry.")
+    }
+
     pub fn scanned_data(&self) -> Option<&str> {
         self.scanned_data.as_deref()
     }
@@ -329,6 +359,34 @@ impl ExchangeEngine {
     /// `self.config.mode`, set when the mode is picked (before any group
     /// detour).
     fn enter_mode_sub_flow(&mut self) -> ActionResult {
+        // T2.3: fail fast before entering a wait a denied OS permission makes
+        // unwinnable. A present-but-denied required transport routes to the
+        // existing retry/cancel failure screen instead of the silent wait that
+        // the device-stress run observed. Reuses the T2.2 picker helper;
+        // Internet/UsbPort (presence-only, never `PermissionDenied`) never match,
+        // so Link/Cable fall through unchanged. The mid-session case (denial
+        // *during* a live wait) is already handled by each wait engine's own
+        // `PermissionDenied` branch.
+        //
+        // Scope: this guards the *denied-permission* case only
+        // (`PermissionRequired`). A `ModeAvailability::Unavailable`
+        // (hardware-absent) mode is NOT caught here — it has no grant path, the
+        // picker already filters it, and if one still reaches entry (a caps
+        // hot-plug race) the wait engine's own deadline (Phase 1) backstops the
+        // forever-wait. Extending fail-fast to absent hardware is out of scope.
+        // See `2026-06-11-exchange-waits-forever-without-capabilities` (T2.3).
+        if let Some(mode) = self.config.mode
+            && let ModeAvailability::PermissionRequired { requirement } =
+                check_mode_availability_with_readiness(
+                    mode,
+                    &self.config.device_capabilities,
+                    &self.config.transport_readiness,
+                )
+        {
+            self.failure_detail = Some(Self::permission_denied_detail(requirement));
+            self.step = ExchangeStep::Failed;
+            return ActionResult::NavigateTo(self.build_screen());
+        }
         match self.config.mode {
             Some(ExchangeMode::Link) => self.start_link_mode(),
             Some(
@@ -983,6 +1041,11 @@ impl WorkflowEngine for ExchangeEngine {
                 self.ble_fallback_available = false;
                 self.qr_fallback_available = false;
                 self.failure_detail = None;
+                // INVARIANT: relay fallback bypasses the T2.3 enter_mode_sub_flow
+                // guard, but that is safe — Link requires only Internet, which is
+                // presence-only and has no OS permission concept
+                // (`requirement_for_transport` maps no "internet" label, so it can
+                // never be `PermissionRequired`). No denial can gate the relay.
                 self.start_link_mode()
             }
             (ExchangeStep::Failed, UserAction::ActionPressed { action_id })
@@ -1587,6 +1650,216 @@ mod tests {
             "Expected StartBleExchange handoff (G3), got {:?}",
             result
         );
+    }
+
+    // ── T2.3: fail fast before entering a wait a denied permission can't win ──
+
+    /// All hardware present, so a denial yields PermissionRequired (present but
+    /// denied) — the exact case the T2.3 guard targets (absent hardware would be
+    /// Unavailable, with no grant path).
+    fn all_present_caps() -> DeviceCapabilities {
+        DeviceCapabilities {
+            has_camera: true,
+            has_ble: true,
+            has_nfc: true,
+            audio: vauchi_core::types::AudioCapability::Full,
+            has_accelerometer: true,
+            has_internet: true,
+            has_usb_port: true,
+            ..Default::default()
+        }
+    }
+
+    /// Mode-picker config (mode: None) with all hardware present and a
+    /// caller-supplied permission ledger.
+    fn failfast_config(ledger: TransportReadiness) -> ExchangeConfig {
+        ExchangeConfig {
+            own_name: "Alice".into(),
+            own_qr_data: "qr".into(),
+            available_groups: vec![],
+            device_capabilities: all_present_caps(),
+            transport_readiness: ledger,
+            mode: None,
+            card_snapshot: None,
+            available_group_data: Vec::new(),
+        }
+    }
+
+    /// Pick `item_id` on the picker; returns the engine + routing result.
+    fn pick_mode(ledger: TransportReadiness, item_id: &str) -> (ExchangeEngine, ActionResult) {
+        let mut engine = ExchangeEngine::new(
+            failfast_config(ledger),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "recommended".into(),
+            item_id: item_id.into(),
+        });
+        (engine, result)
+    }
+
+    /// Assert a routing result is the fail-fast screen naming `needle`.
+    fn assert_failed_naming(result: ActionResult, engine: &ExchangeEngine, needle: &str) {
+        let screen = match result {
+            ActionResult::NavigateTo(s) => s,
+            other => panic!("expected NavigateTo(exchange_failed), got {other:?}"),
+        };
+        assert_eq!(screen.screen_id, "exchange_failed");
+        assert_eq!(engine.step, ExchangeStep::Failed);
+        let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+        assert!(
+            action_ids.contains(&"retry") && action_ids.contains(&"cancel"),
+            "fail-fast screen must offer retry + cancel, got {action_ids:?}"
+        );
+        let detail = engine.failure_detail.as_deref().unwrap_or_default();
+        assert!(
+            detail.contains(needle),
+            "failure detail should name {needle:?}, got {detail:?}"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn denied_ble_routes_magic_to_failed_not_ble_wait() {
+        let mut led = TransportReadiness::new();
+        led.note_denied(DeviceRequirement::Ble);
+        let (engine, result) = pick_mode(led, "mode:magic");
+        assert_eq!(engine.config.mode, Some(ExchangeMode::Magic));
+        assert!(
+            !matches!(result, ActionResult::StartBleExchange { .. }),
+            "denied BLE must NOT enter the BLE wait"
+        );
+        assert_failed_naming(result, &engine, "Bluetooth");
+    }
+
+    // @internal
+    #[test]
+    fn denied_nfc_routes_taptap_to_failed_not_nfc_wait() {
+        let mut led = TransportReadiness::new();
+        led.note_denied(DeviceRequirement::Nfc);
+        let (engine, result) = pick_mode(led, "mode:tap_tap");
+        assert!(
+            !matches!(result, ActionResult::StartNfcExchange),
+            "denied NFC must NOT enter the NFC wait"
+        );
+        assert_failed_naming(result, &engine, "NFC");
+    }
+
+    // @internal
+    #[test]
+    fn denied_microphone_routes_hover_to_failed_not_multistage() {
+        // Hover requires Camera + Microphone + Speaker; deny only Microphone
+        // (Camera/Speaker present-Unknown). PermissionRequired reports the FIRST
+        // denied requirement, so the detail names the microphone, not camera.
+        let mut led = TransportReadiness::new();
+        led.note_denied(DeviceRequirement::Microphone);
+        let (engine, result) = pick_mode(led, "mode:hover");
+        assert!(
+            !matches!(result, ActionResult::StartMultiStageExchange { .. }),
+            "denied microphone must NOT enter the multi-stage wait"
+        );
+        assert_failed_naming(result, &engine, "Microphone");
+    }
+
+    // @internal
+    #[test]
+    fn unknown_ledger_lets_magic_enter_ble_wait() {
+        // Optimistic-Unknown contract: an empty ledger never blocks entry.
+        let (engine, result) = pick_mode(TransportReadiness::new(), "mode:magic");
+        assert!(
+            matches!(result, ActionResult::StartBleExchange { .. }),
+            "unknown permission must still enter the wait, got {result:?}"
+        );
+        assert_ne!(engine.step, ExchangeStep::Failed);
+    }
+
+    // @internal
+    #[test]
+    fn granted_nfc_lets_taptap_enter_nfc_wait() {
+        let mut led = TransportReadiness::new();
+        led.note_granted(DeviceRequirement::Nfc);
+        let (_engine, result) = pick_mode(led, "mode:tap_tap");
+        assert!(
+            matches!(result, ActionResult::StartNfcExchange),
+            "granted NFC must enter the wait, got {result:?}"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn cable_never_blocks_even_with_a_poisoned_ledger() {
+        // CC-14: Cable needs only UsbPort (presence-only, no permission). Even a
+        // ledger denying every permission-bearing transport must not block it.
+        let mut led = TransportReadiness::new();
+        led.note_denied(DeviceRequirement::Ble);
+        led.note_denied(DeviceRequirement::Camera);
+        led.note_denied(DeviceRequirement::Nfc);
+        led.note_denied(DeviceRequirement::Microphone);
+        let (engine, result) = pick_mode(led, "mode:cable");
+        assert!(
+            matches!(result, ActionResult::StartDirectTransport),
+            "Cable (UsbPort presence-only) must never fail-fast, got {result:?}"
+        );
+        assert_ne!(engine.step, ExchangeStep::Failed);
+    }
+
+    // @internal
+    #[test]
+    fn unrecognized_location_label_does_not_deny_magic() {
+        // CC-14: "location" is the capture-geolocation permission, not a
+        // transport; note_permission_denied ignores it, so Magic still enters
+        // the BLE wait.
+        let mut led = TransportReadiness::new();
+        led.note_permission_denied("location");
+        let (engine, result) = pick_mode(led, "mode:magic");
+        assert!(
+            matches!(result, ActionResult::StartBleExchange { .. }),
+            "a location denial must not gate a BLE mode, got {result:?}"
+        );
+        assert_ne!(engine.step, ExchangeStep::Failed);
+    }
+
+    // @internal
+    #[test]
+    fn preset_mode_deep_link_path_fails_fast_on_denied_ble() {
+        // The deep-link / preset-mode path reaches enter_mode_sub_flow via
+        // group-skip, not the picker. The guard must still fire there.
+        let mut led = TransportReadiness::new();
+        led.note_denied(DeviceRequirement::Ble);
+        let mut config = failfast_config(led);
+        config.mode = Some(ExchangeMode::Magic);
+        config.available_groups = vec![("g1".into(), "Work".into())];
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
+        // Skip groups → routes straight to the preset mode's sub-flow.
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "skip".into(),
+        });
+        assert!(
+            !matches!(result, ActionResult::StartBleExchange { .. }),
+            "preset-mode deep-link path must also fail fast on denied BLE"
+        );
+        assert_failed_naming(result, &engine, "Bluetooth");
+    }
+
+    // @internal
+    #[test]
+    fn retry_with_still_denied_permission_refails_not_enter_wait() {
+        // Retry clears failure_detail then re-enters; with the ledger still
+        // denied the guard must re-fail, not fall through to the BLE wait.
+        let mut led = TransportReadiness::new();
+        led.note_denied(DeviceRequirement::Ble);
+        let (mut engine, _first) = pick_mode(led, "mode:magic");
+        assert_eq!(engine.step, ExchangeStep::Failed);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "retry".into(),
+        });
+        assert!(
+            !matches!(result, ActionResult::StartBleExchange { .. }),
+            "retry with a still-denied permission must re-fail, not enter the wait"
+        );
+        assert_failed_naming(result, &engine, "Bluetooth");
     }
 
     #[test]

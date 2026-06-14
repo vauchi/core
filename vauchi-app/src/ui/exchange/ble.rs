@@ -929,6 +929,23 @@ mod tests {
 
     // @internal
     #[test]
+    fn ble_permission_denied_mid_wait_fails() {
+        // T2.3 mid-session race: a BLE permission revoked WHILE the engine is
+        // waiting (Discovering) must fail to the same retry/cancel outcome as
+        // HardwareUnavailable, not hang. Pins the existing PermissionDenied
+        // branch so a refactor cannot silently re-open the forever-scan.
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
+        let outcome = flow.handle_event(&Event::PermissionDenied {
+            transport: "ble".into(),
+        });
+        assert!(matches!(
+            outcome,
+            BleHardwareOutcome::FailedWithFallback { .. }
+        ));
+    }
+
+    // @internal
+    #[test]
     fn non_ble_hardware_error_is_ignored() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         let outcome = flow.handle_event(&Event::HardwareError {

@@ -255,6 +255,14 @@ pub(crate) fn requirement_token(req: DeviceRequirement) -> &'static str {
 }
 
 /// Inverse of [`requirement_token`]; `None` for an unknown token.
+///
+/// Live via `screens_exchange::intercept_grant_permission` (the grant-affordance
+/// tap handler) + the round-trip test. The `--no-default-features` lib check
+/// (`-D warnings`, no `cfg(test)`) doesn't trace the `AppEngine` trait-impl path
+/// that reaches it, so it is falsely flagged dead there; `requirement_token`
+/// survives because its caller (`mode_item`) sits on the `ExchangeEngine`
+/// `dyn WorkflowEngine` path rustc does trace. Annotate to keep that build green.
+#[allow(dead_code)]
 pub(crate) fn parse_requirement(token: &str) -> Option<DeviceRequirement> {
     Some(match token {
         "camera" => DeviceRequirement::Camera,

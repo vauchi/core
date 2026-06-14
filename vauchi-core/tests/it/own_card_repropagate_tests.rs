@@ -240,6 +240,88 @@ fn pass_backed_off_at_cap_does_not_run() {
     );
 }
 
+/// Hex id of the own-card field with the given label.
+fn own_field_id(wb: &Vauchi, label: &str) -> String {
+    wb.own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .find(|f| f.label() == label)
+        .unwrap()
+        .id()
+        .to_string()
+}
+
+// @scenario: visibility_control :: A public-base change is repropagated to contacts
+#[test]
+fn set_own_field_private_and_public_arm_the_repropagation_marker() {
+    let (wb, _bob) = alice_with_ratcheted_bob();
+    wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+    let work = own_field_id(&wb, "work");
+    // add_own_field armed the marker; drain it so we isolate set_own_field_*.
+    wb.run_owed_repropagation().unwrap();
+    assert!(
+        !wb.storage()
+            .ux()
+            .load_own_card_repropagate()
+            .unwrap()
+            .needs_repropagate,
+        "precondition: marker cleared after a successful pass"
+    );
+
+    wb.set_own_field_private(&work).unwrap();
+    assert!(
+        wb.storage()
+            .ux()
+            .load_own_card_repropagate()
+            .unwrap()
+            .needs_repropagate,
+        "set_own_field_private must arm the repropagation marker so the public-base change reaches contacts"
+    );
+
+    wb.run_owed_repropagation().unwrap();
+    wb.set_own_field_public(&work).unwrap();
+    assert!(
+        wb.storage()
+            .ux()
+            .load_own_card_repropagate()
+            .unwrap()
+            .needs_repropagate,
+        "set_own_field_public must arm the repropagation marker"
+    );
+}
+
+// @internal
+#[test]
+fn remove_own_field_by_id_arms_marker_like_by_label() {
+    let (wb, _bob) = alice_with_ratcheted_bob();
+    wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+    let work = own_field_id(&wb, "work");
+    wb.run_owed_repropagation().unwrap();
+    assert!(
+        !wb.storage()
+            .ux()
+            .load_own_card_repropagate()
+            .unwrap()
+            .needs_repropagate,
+        "precondition: marker cleared"
+    );
+
+    let removed = wb.remove_own_field_by_id(&work).unwrap();
+    assert!(removed, "the field existed and was removed");
+    assert!(
+        wb.storage()
+            .ux()
+            .load_own_card_repropagate()
+            .unwrap()
+            .needs_repropagate,
+        "remove_own_field_by_id must arm the marker like the by-label remove_own_field"
+    );
+}
+
 // --- CC-13 stateful property test for the marker state machine ---
 
 #[derive(Debug, Clone)]

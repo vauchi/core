@@ -250,3 +250,44 @@ fn removing_from_one_group_keeps_a_field_granted_by_another() {
         "Bob must keep `work` — still granted by the Team group"
     );
 }
+
+// @scenario: visibility_control :: Removing a field from the public base revokes it from an ungrouped contact
+#[test]
+fn set_own_field_private_revokes_a_public_field_from_an_ungrouped_contact() {
+    let alice = create_test_vauchi();
+    alice
+        .add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+    let work = own_field_id(&alice, "work");
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+
+    // Bob exchanges and stays UNGROUPED → he sees the public base (`work` is
+    // public by default). Deliver the initial public-base share (add_own_field
+    // armed the marker).
+    let mut bob = add_recipient(&alice, &alice_pk, "Bob");
+    alice.run_owed_repropagation().unwrap();
+    assert_eq!(
+        deliver(&alice, &mut bob),
+        1,
+        "Bob receives the initial public field"
+    );
+    assert!(
+        stored_card_has(&bob, "work"),
+        "Bob holds `work` from the public base"
+    );
+
+    // Remove `work` from the public base. Before the marker wiring this armed
+    // nothing and Bob kept the field forever; now it triggers a Removed delta.
+    alice.set_own_field_private(&work).unwrap();
+    alice.run_owed_repropagation().unwrap();
+    assert_eq!(
+        deliver(&alice, &mut bob),
+        1,
+        "Bob receives the public-base revocation"
+    );
+
+    assert!(
+        !stored_card_has(&bob, "work"),
+        "set_own_field_private revokes `work` from the ungrouped contact's stored card"
+    );
+}

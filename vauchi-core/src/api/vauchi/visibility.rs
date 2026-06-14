@@ -182,6 +182,9 @@ impl Vauchi {
             .ok_or(VauchiError::IdentityNotInitialized)?;
         card.field_visibility_mut().set_everyone(field_id);
         self.storage.contacts().save_own_card(&card)?;
+        // A public-base change is what ungrouped contacts may see — arm the
+        // repropagation marker so the next sync pass sends the grant/revoke.
+        self.mark_own_card_repropagate()?;
         Ok(())
     }
 
@@ -196,6 +199,8 @@ impl Vauchi {
             .ok_or(VauchiError::IdentityNotInitialized)?;
         card.field_visibility_mut().set_nobody(field_id);
         self.storage.contacts().save_own_card(&card)?;
+        // See set_own_field_public: arm the marker so the revoke propagates.
+        self.mark_own_card_repropagate()?;
         Ok(())
     }
 

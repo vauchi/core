@@ -536,8 +536,10 @@ impl Vauchi {
         let Some(label) = label else {
             return Ok(false);
         };
-        let manager = ContactManager::new(&self.storage, self.events.clone());
-        manager.remove_field_from_own_card(&label)
+        // Route through the by-label path so the removal also arms the
+        // repropagation marker and records the device-sync item (the manager
+        // call alone does neither).
+        self.remove_own_field(&label)
     }
 
     /// Marks the own card dirty so the next sync tick repropagates it to

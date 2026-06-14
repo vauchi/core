@@ -188,3 +188,50 @@ fn tapping_grant_affordance_relearns_permission_and_restores_the_mode() {
         "a granted Glance must no longer be a grant affordance; got {ids:?}"
     );
 }
+
+// @internal
+#[test]
+fn record_symptom_camera_and_ble_denied_offers_grant_and_other_mode() {
+    // T2.4 — automated proxy for the device-observed symptom (2026-06-11, Pixel
+    // 3a): fresh install, Exchange → Glance, deny camera, BLE never granted →
+    // "Searching…" forever. With both transports present-but-denied, the picker
+    // must instead show a recoverable state: Glance (camera + BLE) becomes a
+    // grant affordance, and a transport-independent mode (Link, internet-only)
+    // stays selectable as an alternative — never a silent wait. The manual
+    // device re-probe of this exact flow remains the acceptance test.
+    let mut engine = engine();
+    // Camera + BLE + internet present, so the denials are present-but-denied
+    // (grant affordance), not hardware-absent (which has no grant path).
+    engine.set_device_capabilities(DeviceCapabilities {
+        has_camera: true,
+        has_ble: true,
+        has_internet: true,
+        ..Default::default()
+    });
+    // The record's two simultaneous denials.
+    let _ = engine.handle_hardware_event(Event::PermissionDenied {
+        transport: "camera".into(),
+    });
+    let _ = engine.handle_hardware_event(Event::PermissionDenied {
+        transport: "ble".into(),
+    });
+    let entry = engine.navigate_to(AppScreen::Exchange);
+    assert_eq!(entry.screen_id, "exchange");
+
+    let ids = item_ids(&engine.current_screen());
+    // Glance (camera + BLE, both denied) → grant affordance, not a silent mode row.
+    assert!(
+        ids.iter().any(|id| id.starts_with("grant:glance:")),
+        "denied camera+BLE must turn Glance into a grant affordance; got {ids:?}"
+    );
+    assert!(
+        !ids.iter().any(|id| id == "mode:glance"),
+        "Glance must not stay a silently-selectable wait; got {ids:?}"
+    );
+    // A transport-independent fallback (Link, internet-only) stays selectable —
+    // the "other-mode affordance" the record requires alongside grant.
+    assert!(
+        ids.iter().any(|id| id == "mode:link"),
+        "an internet-only mode must remain selectable as an alternative; got {ids:?}"
+    );
+}

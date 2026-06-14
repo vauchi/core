@@ -10,6 +10,7 @@
 
 use crate::exchange::capability::readiness::requirement_present;
 use crate::exchange::capability::types::DeviceCapabilities;
+use crate::exchange::capability::{RequirementReadiness, TransportReadiness};
 use crate::exchange::mode::{DeviceRequirement, ExchangeMode};
 
 /// Availability status of an [`ExchangeMode`] on a specific device.
@@ -20,6 +21,10 @@ pub enum ModeAvailability {
     Available,
     /// Usable but with reduced functionality (reserved for future degraded-mode logic).
     Degraded { reason: String },
+    /// All required hardware is present, but the OS permission for `requirement`
+    /// was denied. Recoverable — a grant affordance can re-prompt. Distinct from
+    /// `Unavailable` (hardware absent), which has no grant path.
+    PermissionRequired { requirement: DeviceRequirement },
     /// One or more required hardware capabilities are absent.
     Unavailable { reason: String },
 }
@@ -47,6 +52,43 @@ pub fn check_mode_availability(mode: ExchangeMode, caps: &DeviceCapabilities) ->
         ModeAvailability::Unavailable {
             reason: format!("Requires {}", missing.join(", ")),
         }
+    }
+}
+
+/// Like [`check_mode_availability`] but factoring in runtime OS permission (the
+/// [`TransportReadiness`] ledger), not just hardware presence.
+///
+/// Hardware absence is the hard blocker (`Unavailable`) and dominates a denial —
+/// granting cannot conjure absent hardware. With all hardware present, a denied
+/// required transport yields `PermissionRequired { requirement }` (grantable;
+/// the first denied requirement, so the picker can offer one grant affordance).
+/// Otherwise `Available`.
+pub fn check_mode_availability_with_readiness(
+    mode: ExchangeMode,
+    caps: &DeviceCapabilities,
+    readiness: &TransportReadiness,
+) -> ModeAvailability {
+    let mut missing: Vec<&'static str> = Vec::new();
+    let mut denied: Option<DeviceRequirement> = None;
+
+    for req in mode.config().requires {
+        match readiness.requirement_readiness(*req, caps) {
+            RequirementReadiness::HardwareAbsent => missing.push(requirement_name(req)),
+            RequirementReadiness::PermissionDenied => {
+                denied.get_or_insert(*req);
+            }
+            RequirementReadiness::Ready => {}
+        }
+    }
+
+    if !missing.is_empty() {
+        return ModeAvailability::Unavailable {
+            reason: format!("Requires {}", missing.join(", ")),
+        };
+    }
+    match denied {
+        Some(requirement) => ModeAvailability::PermissionRequired { requirement },
+        None => ModeAvailability::Available,
     }
 }
 
@@ -127,6 +169,53 @@ mod tests {
                 mode
             );
         }
+    }
+
+    // @internal
+    #[test]
+    fn readiness_all_granted_is_available() {
+        // Empty ledger = all Unknown = optimistically usable.
+        let caps = full_caps();
+        let led = TransportReadiness::new();
+        assert_eq!(
+            check_mode_availability_with_readiness(ExchangeMode::Glance, &caps, &led),
+            ModeAvailability::Available
+        );
+    }
+
+    // @internal
+    #[test]
+    fn readiness_denied_present_transport_is_permission_required() {
+        // Glance requires Ble + Camera. Camera present but denied →
+        // PermissionRequired{Camera} (grantable), not Unavailable.
+        let caps = full_caps();
+        let mut led = TransportReadiness::new();
+        led.note_denied(DeviceRequirement::Camera);
+        assert_eq!(
+            check_mode_availability_with_readiness(ExchangeMode::Glance, &caps, &led),
+            ModeAvailability::PermissionRequired {
+                requirement: DeviceRequirement::Camera
+            }
+        );
+    }
+
+    // @internal
+    #[test]
+    fn readiness_absent_hardware_dominates_a_denial() {
+        // Camera absent AND BLE denied → Unavailable (hardware absence wins;
+        // granting BLE cannot conjure a camera).
+        let caps = DeviceCapabilities {
+            has_camera: false,
+            ..full_caps()
+        };
+        let mut led = TransportReadiness::new();
+        led.note_denied(DeviceRequirement::Ble);
+        assert_eq!(
+            check_mode_availability_with_readiness(ExchangeMode::Glance, &caps, &led),
+            ModeAvailability::Unavailable {
+                reason: "Requires camera".to_string()
+            }
+        );
     }
 
     #[test]

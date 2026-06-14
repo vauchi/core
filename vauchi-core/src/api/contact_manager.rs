@@ -388,6 +388,9 @@ impl<'a> ContactManager<'a> {
 
     /// Sets a field as visible to everyone for a contact.
     pub fn set_field_public(&self, contact_id: &str, field: &str) -> VauchiResult<()> {
+        if self.contact_is_grouped(contact_id)? {
+            return self.save_override(contact_id, field, true);
+        }
         let mut contact = self.get_contact_required(contact_id)?;
         contact
             .visibility_rules_mut()
@@ -401,6 +404,9 @@ impl<'a> ContactManager<'a> {
 
     /// Sets a field as visible to nobody for a contact.
     pub fn set_field_private(&self, contact_id: &str, field: &str) -> VauchiResult<()> {
+        if self.contact_is_grouped(contact_id)? {
+            return self.save_override(contact_id, field, false);
+        }
         let mut contact = self.get_contact_required(contact_id)?;
         contact
             .visibility_rules_mut()
@@ -420,6 +426,10 @@ impl<'a> ContactManager<'a> {
         allowed_contacts: Vec<String>,
     ) -> VauchiResult<()> {
         use std::collections::HashSet;
+        if self.contact_is_grouped(contact_id)? {
+            let allowed = allowed_contacts.iter().any(|c| c == contact_id);
+            return self.save_override(contact_id, field, allowed);
+        }
         let mut contact = self.get_contact_required(contact_id)?;
         let allowed_set: HashSet<String> = allowed_contacts.into_iter().collect();
         contact
@@ -429,6 +439,28 @@ impl<'a> ContactManager<'a> {
             ))?
             .set_contacts(field, allowed_set);
         self.storage.contacts().save_contact(&contact)?;
+        Ok(())
+    }
+
+    /// True when the contact belongs to >=1 group. ADR-054: the resolver
+    /// checks group membership (Layer B) before the Layer-A `can_see` fallback,
+    /// so a `set_field_*` Layer-A write is silently ignored for a grouped
+    /// contact. Per-contact visibility for a grouped contact must go through an
+    /// override (Layer C), which wins over the group grant (review 2026-06-14).
+    fn contact_is_grouped(&self, contact_id: &str) -> VauchiResult<bool> {
+        Ok(!self
+            .storage
+            .labels()
+            .get_groups_for_contact(contact_id)?
+            .is_empty())
+    }
+
+    /// Writes a per-contact visibility override (Layer C) — the highest-priority
+    /// layer, beating both group membership and Layer-A.
+    fn save_override(&self, contact_id: &str, field: &str, is_visible: bool) -> VauchiResult<()> {
+        self.storage
+            .labels()
+            .save_contact_override(contact_id, field, is_visible)?;
         Ok(())
     }
 

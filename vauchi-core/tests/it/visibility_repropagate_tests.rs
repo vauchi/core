@@ -248,19 +248,19 @@ fn test_remove_contact_from_label_triggers_repropagate() {
     wb.set_group_field_visibility(label.id(), &work, true)
         .unwrap();
 
-    wb.add_contact_to_group(label.id(), &bob_id).unwrap();
-    // While in Work (which grants `work`), Bob can see it.
-    assert!(wb.get_effective_field_visibility(&bob_id, &work).unwrap());
-
-    // Make `work` group-only: private at Layer-A so the Work group is its sole
-    // grant. ADR-054 D3 — an ungrouped contact falls back to the Layer-A public
-    // base card, so only a group-only field is revoked by leaving the group.
-    // Group membership overrides Layer-A, so Bob still sees `work` right now.
+    // Make `work` group-only: set it private at Layer-A while Bob is *ungrouped*
+    // so it writes Layer-A (ADR-054 routes set_field_private for a *grouped*
+    // contact to a per-contact override instead). The Work group is then its
+    // sole grant.
     wb.set_field_private_and_repropagate(&bob_id, &work)
         .unwrap();
+
+    wb.add_contact_to_group(label.id(), &bob_id).unwrap();
+    // In the Work group (which grants `work`), Bob sees it — the group grant
+    // wins over the Layer-A `private` fallback.
     assert!(
         wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
-        "In the Work group, Bob sees `work` despite the Layer-A `private` rule"
+        "Bob sees `work` via the Work group despite the Layer-A `private` rule"
     );
 
     wb.remove_contact_from_group_and_repropagate(label.id(), &bob_id)
@@ -477,6 +477,28 @@ fn per_contact_override_grants_even_in_groups_mode() {
         wb.get_effective_field_visibility(&dave_id, "personal")
             .unwrap(),
         "Per-contact override grants `personal` despite no group granting it"
+    );
+}
+
+// @internal
+#[test]
+fn set_field_private_for_a_grouped_contact_hides_via_override() {
+    // ADR-054 review (2026-06-14): for a *grouped* contact, set_field_private
+    // routes to a per-contact override (Layer C), which beats the group grant —
+    // so the field is hidden even though the group grants it. (A Layer-A write
+    // would be silently ignored for a grouped contact.)
+    let (wb, bob_id) = vauchi_with_work_group_and_bob();
+    assert!(
+        wb.get_effective_field_visibility(&bob_id, "work").unwrap(),
+        "precondition: the Work group grants `work` to grouped Bob"
+    );
+
+    wb.set_field_private_and_repropagate(&bob_id, "work")
+        .unwrap();
+
+    assert!(
+        !wb.get_effective_field_visibility(&bob_id, "work").unwrap(),
+        "set_field_private on a grouped contact hides `work` via an override, beating the group grant"
     );
 }
 

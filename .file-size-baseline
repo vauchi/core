@@ -309,7 +309,9 @@ vauchi-core/src/storage/mod.rs 1079
 #  2026-06-10-app-engine-residual-splits.)
 # (+3 for the active-engine pump tick in poll_notifications — the
 #  silent-stall deadline foundation, ADR-021 / exchange-waits-forever T1.3.)
-vauchi-app/src/ui/app_engine/mod.rs 679
+# (+11 for the TransportReadiness ledger field + init + accessor + import —
+#  exchange-waits-forever Phase 2 T2.1b capability/permission split.)
+vauchi-app/src/ui/app_engine/mod.rs 690
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts

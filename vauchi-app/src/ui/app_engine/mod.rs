@@ -46,6 +46,7 @@ use std::collections::HashMap;
 use std::sync::mpsc;
 
 use vauchi_core::api::{HandlerId, Vauchi, VauchiEvent};
+use vauchi_core::exchange::capability::TransportReadiness;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::version::{APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy};
 
@@ -87,6 +88,9 @@ pub struct AppEngine {
     /// Device hardware capabilities reported by the frontend at startup.
     /// Used to determine exchange mode availability.
     pub(super) device_capabilities: DeviceCapabilities,
+    /// Transient transport-permission ledger (T2.1b): updated from
+    /// `Event::PermissionDenied`, joined with `device_capabilities` by T2.2.
+    pub(super) transport_readiness: TransportReadiness,
     /// Frontend-pushed render context — Category-1 settings per ADR-047
     /// (locale + theme_id). Owned by the frontend's OS-native sandbox;
     /// pushed via `set_render_context_json` at boot and on Settings
@@ -185,6 +189,12 @@ impl AppEngine {
     pub fn set_device_capabilities(&mut self, caps: DeviceCapabilities) {
         self.device_capabilities = caps;
         self.engine_cache.remove(&AppScreen::Exchange);
+    }
+
+    /// The transport-readiness ledger (presence × permission) — consult
+    /// seam for the mode picker (T2.2) + tests.
+    pub fn transport_readiness(&self) -> &TransportReadiness {
+        &self.transport_readiness
     }
 
     /// Returns the active render context (locale + theme_id) pushed
@@ -290,6 +300,7 @@ impl AppEngine {
             field_catalog,
             preview_as_contact: None,
             device_capabilities: DeviceCapabilities::default(),
+            transport_readiness: TransportReadiness::default(),
             render_context: crate::ui::RenderContext::default(),
             update_status: AppUpdateStatus::UpToDate,
             update_dismissed: false,

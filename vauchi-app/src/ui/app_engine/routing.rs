@@ -85,6 +85,18 @@ impl AppEngine {
     }
 
     pub fn handle_hardware_event(&mut self, event: Event) -> Option<ActionResult> {
+        // Phase 2 (T2.1b): record a transport permission denial in the
+        // device-wide readiness ledger up front, regardless of screen, so the
+        // mode picker reflects it on next visit (T2.2 consult). The ledger
+        // ignores non-transport labels — notably "location" (the ADR-051
+        // capture-geolocation permission, handled separately below).
+        if let Event::PermissionDenied { transport } = &event {
+            self.transport_readiness.note_permission_denied(transport);
+            // Rebuild the picker on next visit. TODO(T2.2): a cache remove does
+            // not rebuild the LIVE engine — the consult slice must re-render it.
+            self.engine_cache.remove(&AppScreen::Exchange);
+        }
+
         // ADR-031 file-picker: dispatched by current screen, not by the
         // narrow screen guard below. The picker is reachable from More
         // (contacts import) and — once Phase 2B lands — Onboarding

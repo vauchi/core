@@ -102,10 +102,11 @@ impl TransportReadiness {
     }
 
     /// Ingest a platform event's free-string `transport` label as a denial,
-    /// mapping it to the requirement(s) it gates. Unrecognised /
-    /// non-permission-bearing labels are ignored. Case-insensitive; tolerates
-    /// platform aliases (e.g. Android BLE scanning requires the *location*
-    /// permission, so `"location"` denies [`DeviceRequirement::Ble`]).
+    /// mapping it to the requirement it gates (see `requirement_for_transport`
+    /// for the exact set: camera, ble/BLE/bluetooth, nfc, microphone/mic).
+    /// Case-insensitive; unrecognised or non-permission-bearing labels — e.g.
+    /// `"location"` (the ADR-051 capture-geolocation permission, not a
+    /// transport) — are ignored.
     pub fn note_permission_denied(&mut self, transport: &str) {
         if let Some(req) = requirement_for_transport(transport) {
             self.note_denied(req);
@@ -167,10 +168,13 @@ pub(crate) fn requirement_present(req: DeviceRequirement, caps: &DeviceCapabilit
 fn requirement_for_transport(transport: &str) -> Option<DeviceRequirement> {
     match transport.to_ascii_lowercase().as_str() {
         "camera" => Some(DeviceRequirement::Camera),
-        // Android BLE scanning requires the location permission, so a location
-        // denial gates BLE; "bluetooth" is an iOS-side alias. (iOS emits "BLE"
-        // — case is folded above.)
-        "ble" | "bluetooth" | "location" => Some(DeviceRequirement::Ble),
+        // Android emits "ble" (BleFailure), iOS "BLE" (case folded above);
+        // "bluetooth" is a defensive alias. NOTE: "location" is deliberately
+        // NOT here — it is the ADR-051 capture-geolocation permission, not a
+        // transport. Android BLE scanning uses BLUETOOTH_SCAN with
+        // `neverForLocation` (AndroidManifest), so a location denial must not
+        // gate BLE.
+        "ble" | "bluetooth" => Some(DeviceRequirement::Ble),
         // NFC needs an OS permission on Android 12+ (Nearby Devices); the NFC
         // engine emits "nfc" on denial.
         "nfc" => Some(DeviceRequirement::Nfc),
@@ -264,7 +268,7 @@ mod tests {
     fn permission_denied_event_label_maps_to_requirement() {
         let mut led = TransportReadiness::new();
         led.note_permission_denied("Camera"); // case-insensitive
-        led.note_permission_denied("location"); // Android BLE-scan proxy
+        led.note_permission_denied("ble");
         led.note_permission_denied("MICROPHONE");
         led.note_permission_denied("nfc");
         assert_eq!(
@@ -304,6 +308,9 @@ mod tests {
         led.note_permission_denied("usb");
         led.note_permission_denied("internet");
         led.note_permission_denied("gibberish");
+        // "location" is the ADR-051 capture-geolocation permission, not a
+        // transport — it must not gate BLE (or anything).
+        led.note_permission_denied("location");
         assert_eq!(
             led.permission(DeviceRequirement::UsbPort),
             PermissionState::Unknown
@@ -311,6 +318,11 @@ mod tests {
         assert_eq!(
             led.permission(DeviceRequirement::Internet),
             PermissionState::Unknown
+        );
+        assert_eq!(
+            led.permission(DeviceRequirement::Ble),
+            PermissionState::Unknown,
+            "location denial must not deny BLE"
         );
     }
 }

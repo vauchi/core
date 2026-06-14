@@ -20,9 +20,11 @@
 //! At least one exchange method is always available.
 
 pub mod gate;
+pub mod readiness;
 pub mod runtime;
 pub mod types;
 
 pub use gate::{Action, ActionStatus, Feature, FeatureGate, FeatureStatus};
+pub use readiness::{PermissionState, RequirementReadiness, TransportReadiness};
 pub use runtime::{ConnectionType, RuntimeStateProvider};
 pub use types::{BiometricType, DeviceCapabilities, Platform};

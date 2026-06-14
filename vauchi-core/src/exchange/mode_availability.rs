@@ -8,9 +8,9 @@
 //! each [`DeviceRequirement`] to a field of [`DeviceCapabilities`], then
 //! recommends the most capable available mode.
 
+use crate::exchange::capability::readiness::requirement_present;
 use crate::exchange::capability::types::DeviceCapabilities;
 use crate::exchange::mode::{DeviceRequirement, ExchangeMode};
-use crate::types::AudioCapability;
 
 /// Availability status of an [`ExchangeMode`] on a specific device.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,24 +34,9 @@ pub fn check_mode_availability(mode: ExchangeMode, caps: &DeviceCapabilities) ->
     let mut missing: Vec<&'static str> = Vec::new();
 
     for req in mode.config().requires {
-        let satisfied = match req {
-            DeviceRequirement::Camera => caps.has_camera,
-            DeviceRequirement::Ble => caps.has_ble,
-            DeviceRequirement::Nfc => caps.has_nfc,
-            DeviceRequirement::Microphone => matches!(
-                caps.audio,
-                AudioCapability::Full | AudioCapability::ReceiveOnly
-            ),
-            DeviceRequirement::Speaker => matches!(
-                caps.audio,
-                AudioCapability::Full | AudioCapability::EmitOnly
-            ),
-            DeviceRequirement::Accelerometer => caps.has_accelerometer,
-            DeviceRequirement::Internet => caps.has_internet,
-            DeviceRequirement::UsbPort => caps.has_usb_port,
-        };
-
-        if !satisfied {
+        // Presence join is the single source of truth in `readiness`
+        // (shared with the TransportReadiness ledger — no duplicate map).
+        if !requirement_present(*req, caps) {
             missing.push(requirement_name(req));
         }
     }

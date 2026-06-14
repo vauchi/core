@@ -404,6 +404,7 @@ mod transport_negotiation_tests;
 mod transport_proptest;
 mod transport_protocol_tests;
 mod transport_proximity_tests;
+mod transport_readiness_proptest;
 mod transport_trace_tests;
 mod trust_level_tests;
 mod trust_metrics_proptest;

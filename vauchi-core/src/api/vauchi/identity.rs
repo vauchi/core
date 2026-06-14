@@ -470,6 +470,9 @@ impl Vauchi {
     pub fn update_own_card(&self, card: &ContactCard) -> VauchiResult<Vec<String>> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
         let changed_labels = manager.update_own_card(card)?;
+        if !changed_labels.is_empty() {
+            self.mark_own_card_repropagate()?;
+        }
         let ts = self.now_timestamp();
         for label in &changed_labels {
             // Look up the current value for the changed field
@@ -494,6 +497,7 @@ impl Vauchi {
         let value = field.value().to_string();
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.add_field_to_own_card(field)?;
+        self.mark_own_card_repropagate()?;
         self.record_sync_item(crate::sync::SyncItem::CardUpdated {
             field_label: label,
             new_value: value,
@@ -507,6 +511,7 @@ impl Vauchi {
         let manager = ContactManager::new(&self.storage, self.events.clone());
         let removed = manager.remove_field_from_own_card(label)?;
         if removed {
+            self.mark_own_card_repropagate()?;
             self.record_sync_item(crate::sync::SyncItem::CardUpdated {
                 field_label: label.to_string(),
                 new_value: String::new(), // empty = removal
@@ -533,6 +538,19 @@ impl Vauchi {
         };
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.remove_field_from_own_card(&label)
+    }
+
+    /// Marks the own card dirty so the next sync tick repropagates it to
+    /// contacts (group-aware, via `run_owed_repropagation`). A fresh edit
+    /// resets the retry budget so a previously backed-off marker resumes.
+    fn mark_own_card_repropagate(&self) -> VauchiResult<()> {
+        self.storage
+            .ux()
+            .save_own_card_repropagate(&crate::types::OwnCardRepropagateState {
+                needs_repropagate: true,
+                failed_attempts: 0,
+            })?;
+        Ok(())
     }
 
     /// Sets whether a field is shown in no-group visibility mode.

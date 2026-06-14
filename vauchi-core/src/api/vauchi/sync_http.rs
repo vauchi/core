@@ -128,6 +128,12 @@ impl Vauchi {
         // Capture version policy from relay response headers before adapter is moved.
         let version_policy = adapter.last_version_policy();
 
+        // Queue any owed own-card repropagation (group-aware, idempotent against
+        // each contact's baseline) so the send phase below delivers it in the
+        // same tick. Best-effort — the durable marker retries on failure.
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.run_owed_repropagation();
+
         // Send phase — adapter moves into RelayClient → SyncController
         let send_result = self.run_send_phase(identity, &contacts, adapter)?;
 

@@ -614,4 +614,42 @@ impl Vauchi {
 
         Ok(())
     }
+
+    /// Runs the owed own-card repropagation pass.
+    ///
+    /// When an own-card edit set the durable marker (and the retry budget is not
+    /// exhausted), repropagate the current card to every contact via
+    /// `repropagate_to_contact` — group-aware, the full visible card sent from
+    /// an empty baseline so the receiver re-applies it idempotently by field id.
+    /// The marker clears only on a fully successful pass; a partial failure bumps
+    /// `failed_attempts` and is retried next tick, so a contact that already
+    /// applied the edit may be re-sent it — staying duplicate-free relies on the
+    /// receiver's upsert-by-id (see the `add_field` upsert / `deduplicate_fields`
+    /// work; this pass must land after it).
+    ///
+    /// The sync loop calls this each tick; also exposed so a frontend can force a
+    /// flush after an edit without waiting for the next tick.
+    pub fn run_owed_repropagation(&self) -> VauchiResult<()> {
+        let mut state = self.storage.ux().load_own_card_repropagate()?;
+        if !state.should_run() {
+            return Ok(());
+        }
+
+        let mut all_ok = true;
+        for contact in self.storage.contacts().list_contacts()? {
+            if self.repropagate_to_contact(contact.id()).is_err() {
+                all_ok = false;
+            }
+        }
+
+        if all_ok {
+            self.storage
+                .ux()
+                .save_own_card_repropagate(&crate::types::OwnCardRepropagateState::default())?;
+        } else {
+            state.failed_attempts = state.failed_attempts.saturating_add(1);
+            self.storage.ux().save_own_card_repropagate(&state)?;
+        }
+        Ok(())
+    }
 }

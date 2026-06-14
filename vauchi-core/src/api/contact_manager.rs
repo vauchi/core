@@ -386,81 +386,43 @@ impl<'a> ContactManager<'a> {
 
     // === Visibility Operations ===
 
-    /// Sets a field as visible to everyone for a contact.
+    /// Sets a field as visible to everyone for a contact (Layer C override).
     pub fn set_field_public(&self, contact_id: &str, field: &str) -> VauchiResult<()> {
-        if self.contact_is_grouped(contact_id)? {
-            return self.save_override(contact_id, field, true);
-        }
-        let mut contact = self.get_contact_required(contact_id)?;
-        contact
-            .visibility_rules_mut()
-            .ok_or(VauchiError::InvalidState(
-                "Visibility rules require an exchanged contact".into(),
-            ))?
-            .set_everyone(field);
-        self.storage.contacts().save_contact(&contact)?;
-        Ok(())
+        self.set_field_override(contact_id, field, true)
     }
 
-    /// Sets a field as visible to nobody for a contact.
+    /// Sets a field as hidden from a contact (Layer C override).
     pub fn set_field_private(&self, contact_id: &str, field: &str) -> VauchiResult<()> {
-        if self.contact_is_grouped(contact_id)? {
-            return self.save_override(contact_id, field, false);
-        }
-        let mut contact = self.get_contact_required(contact_id)?;
-        contact
-            .visibility_rules_mut()
-            .ok_or(VauchiError::InvalidState(
-                "Visibility rules require an exchanged contact".into(),
-            ))?
-            .set_nobody(field);
-        self.storage.contacts().save_contact(&contact)?;
-        Ok(())
+        self.set_field_override(contact_id, field, false)
     }
 
-    /// Sets a field as visible to specific contacts.
+    /// Sets a field as visible only to specific contacts. For *this* contact
+    /// the per-contact override is set visible iff they are in the allowed set.
     pub fn set_field_restricted(
         &self,
         contact_id: &str,
         field: &str,
         allowed_contacts: Vec<String>,
     ) -> VauchiResult<()> {
-        use std::collections::HashSet;
-        if self.contact_is_grouped(contact_id)? {
-            let allowed = allowed_contacts.iter().any(|c| c == contact_id);
-            return self.save_override(contact_id, field, allowed);
-        }
-        let mut contact = self.get_contact_required(contact_id)?;
-        let allowed_set: HashSet<String> = allowed_contacts.into_iter().collect();
-        contact
-            .visibility_rules_mut()
-            .ok_or(VauchiError::InvalidState(
+        let visible = allowed_contacts.iter().any(|c| c == contact_id);
+        self.set_field_override(contact_id, field, visible)
+    }
+
+    /// Writes a per-contact visibility override (Layer C) — the durable
+    /// per-contact exception that the resolver checks first, so it wins over
+    /// group grants and persists through group-membership changes
+    /// (2026-06-14 visibility layering, G2). Group-removal revocation is a
+    /// separate concern handled by the public base (`set_own_field_*`).
+    fn set_field_override(&self, contact_id: &str, field: &str, visible: bool) -> VauchiResult<()> {
+        let contact = self.get_contact_required(contact_id)?;
+        if !contact.is_exchanged() {
+            return Err(VauchiError::InvalidState(
                 "Visibility rules require an exchanged contact".into(),
-            ))?
-            .set_contacts(field, allowed_set);
-        self.storage.contacts().save_contact(&contact)?;
-        Ok(())
-    }
-
-    /// True when the contact belongs to >=1 group. ADR-054: the resolver
-    /// checks group membership (Layer B) before the Layer-A `can_see` fallback,
-    /// so a `set_field_*` Layer-A write is silently ignored for a grouped
-    /// contact. Per-contact visibility for a grouped contact must go through an
-    /// override (Layer C), which wins over the group grant (review 2026-06-14).
-    fn contact_is_grouped(&self, contact_id: &str) -> VauchiResult<bool> {
-        Ok(!self
-            .storage
-            .labels()
-            .get_groups_for_contact(contact_id)?
-            .is_empty())
-    }
-
-    /// Writes a per-contact visibility override (Layer C) — the highest-priority
-    /// layer, beating both group membership and Layer-A.
-    fn save_override(&self, contact_id: &str, field: &str, is_visible: bool) -> VauchiResult<()> {
+            ));
+        }
         self.storage
             .labels()
-            .save_contact_override(contact_id, field, is_visible)?;
+            .save_contact_override(contact_id, field, visible)?;
         Ok(())
     }
 
@@ -788,26 +750,29 @@ mod tests {
         let contact_id = contact.id().to_string();
         manager.add_contact(contact).unwrap();
 
-        // Set field private
+        // set_field_private writes a per-contact override (Layer C), not the
+        // contact's Layer-A visibility_rules (2026-06-14 visibility layering).
         manager.set_field_private(&contact_id, "email").unwrap();
-
-        let loaded = manager.get_contact(&contact_id).unwrap().unwrap();
-        assert!(
-            !loaded
-                .visibility_rules()
-                .unwrap()
-                .can_see("email", "anyone")
+        let overrides = storage
+            .labels()
+            .load_contact_overrides(&contact_id)
+            .unwrap();
+        assert_eq!(
+            overrides.get("email"),
+            Some(&false),
+            "set_field_private writes a hidden override"
         );
 
-        // Set field public
+        // set_field_public flips the same override to visible.
         manager.set_field_public(&contact_id, "email").unwrap();
-
-        let loaded = manager.get_contact(&contact_id).unwrap().unwrap();
-        assert!(
-            loaded
-                .visibility_rules()
-                .unwrap()
-                .can_see("email", "anyone")
+        let overrides = storage
+            .labels()
+            .load_contact_overrides(&contact_id)
+            .unwrap();
+        assert_eq!(
+            overrides.get("email"),
+            Some(&true),
+            "set_field_public writes a visible override"
         );
     }
 

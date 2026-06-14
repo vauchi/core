@@ -248,26 +248,26 @@ fn test_remove_contact_from_label_triggers_repropagate() {
     wb.set_group_field_visibility(label.id(), &work, true)
         .unwrap();
 
-    // Make `work` group-only: set it private at Layer-A while Bob is *ungrouped*
-    // so it writes Layer-A (ADR-054 routes set_field_private for a *grouped*
-    // contact to a per-contact override instead). The Work group is then its
-    // sole grant.
-    wb.set_field_private_and_repropagate(&bob_id, &work)
-        .unwrap();
-
     wb.add_contact_to_group(label.id(), &bob_id).unwrap();
-    // In the Work group (which grants `work`), Bob sees it — the group grant
-    // wins over the Layer-A `private` fallback.
+    // While in Work (which grants `work`), Bob can see it.
+    assert!(wb.get_effective_field_visibility(&bob_id, &work).unwrap());
+
+    // Make `work` group-only: remove it from the public base so the Work group
+    // is its sole grant. ADR-054 D3 — an ungrouped contact falls back to the
+    // public base card, so only a group-only field is revoked by leaving the
+    // group. A group grant (Layer B) outranks the public base, so Bob still
+    // sees `work` right now.
+    wb.set_own_field_private(&work).unwrap();
     assert!(
         wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
-        "Bob sees `work` via the Work group despite the Layer-A `private` rule"
+        "In the Work group, Bob sees `work` despite it not being in the public base"
     );
 
     wb.remove_contact_from_group_and_repropagate(label.id(), &bob_id)
         .unwrap();
 
-    // Removed from his only group → falls back to Layer-A, where `work` is
-    // private → revoked. (A Layer-A-public field would survive removal.)
+    // Removed from his only group → falls back to the public base, where `work`
+    // is private → revoked. (A public-base field would survive removal.)
     assert!(
         !wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
         "Group-only `work` is revoked when Bob leaves his only granting group"

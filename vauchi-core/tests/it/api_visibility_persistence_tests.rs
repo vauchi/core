@@ -240,6 +240,53 @@ fn set_own_field_private_persists_across_reload() {
 
 // @internal
 #[test]
+fn set_field_private_hides_grouped_contact_via_override_and_persists() {
+    let (wb, contact_id) = setup_with_fields();
+    let email_id = wb
+        .own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .find(|f| f.label() == "Work Email")
+        .unwrap()
+        .id()
+        .to_string();
+
+    // Grant the field via a group the contact is in.
+    let group = wb.create_group("Team").unwrap();
+    wb.set_group_field_visibility(group.id(), &email_id, true)
+        .unwrap();
+    wb.add_contact_to_group(group.id(), &contact_id).unwrap();
+    assert!(
+        wb.get_effective_field_visibility(&contact_id, &email_id)
+            .unwrap(),
+        "the group grant makes the field visible"
+    );
+
+    // A per-contact private must hide the field even for a *grouped* contact:
+    // the Layer C override wins over the Layer B group grant (always-override
+    // model — fixes the grouped-contact footgun).
+    wb.set_field_private_and_repropagate(&contact_id, &email_id)
+        .unwrap();
+    assert!(
+        !wb.get_effective_field_visibility(&contact_id, &email_id)
+            .unwrap(),
+        "set_field_private hides the field via a per-contact override even when a group grants it"
+    );
+
+    // The override is robust: it persists through group-membership changes.
+    wb.remove_contact_from_group(group.id(), &contact_id)
+        .unwrap();
+    assert!(
+        !wb.get_effective_field_visibility(&contact_id, &email_id)
+            .unwrap(),
+        "the per-contact override persists when the contact leaves the group"
+    );
+}
+
+// @internal
+#[test]
 fn is_field_visible_by_label_persists_across_reload() {
     let (wb, contact_id) = setup_with_fields();
     wb.set_field_visibility_by_label(&contact_id, "Mobile", false)

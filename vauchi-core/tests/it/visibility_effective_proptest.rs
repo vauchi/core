@@ -6,14 +6,13 @@
 //! `Vauchi::get_effective_field_visibility` (ADR-054 D3).
 //!
 //! A declarative model of the resolver's priority order
-//! (override → group-union → grouped-default-closed → ungrouped-Layer-A) is
-//! kept alongside a real `Vauchi`. Random sequences of group / override /
-//! set-field-private operations are applied to both, then the resolver's
-//! verdict is asserted equal to the model for every (contact, field). Because
-//! both propagation paths filter the wire delta through this exact resolver (G4
-//! fix, `propagation.rs` + `features.rs`), the resolver invariant is the
-//! wire-delta invariant: a contact never receives a field the model does not
-//! grant.
+//! (override → group-union → grouped-default-closed → ungrouped public base)
+//! is kept alongside a real `Vauchi`. Random sequences of group / override /
+//! public-base operations are applied to both, then the resolver's verdict is
+//! asserted equal to the model for every (contact, field). Because both
+//! propagation paths filter the wire delta through this exact resolver (G4 fix,
+//! `propagation.rs` + `features.rs`), the resolver invariant is the wire-delta
+//! invariant: a contact never receives a field the model does not grant.
 
 use std::collections::HashSet;
 
@@ -31,15 +30,16 @@ enum Op {
     Grant(usize, usize),           // group, field
     Revoke(usize, usize),          // group, field
     Override(usize, usize, bool),  // contact, field, visible
-    SetPrivate(usize, usize),      // contact, field — set_field_private
+    SetOwnPrivate(usize),          // field — remove from the public base
+    SetOwnPublic(usize),           // field — restore to the public base
 }
 
 /// Declarative mirror of the resolver's documented priority order.
 struct Model {
     groups: Vec<HashSet<usize>>,       // per contact → group indices
     grants: Vec<HashSet<usize>>,       // per group → field indices
-    overrides: Vec<Vec<Option<bool>>>, // [contact][field] — Layer C
-    layer_a: Vec<Vec<Option<bool>>>,   // [contact][field] — Layer A (None = default `Everyone`)
+    overrides: Vec<Vec<Option<bool>>>, // [contact][field]
+    own_private: HashSet<usize>,       // fields removed from the public base
 }
 
 impl Model {
@@ -48,7 +48,7 @@ impl Model {
             groups: vec![HashSet::new(); N_CONTACTS],
             grants: vec![HashSet::new(); N_GROUPS],
             overrides: vec![vec![None; N_FIELDS]; N_CONTACTS],
-            layer_a: vec![vec![None; N_FIELDS]; N_CONTACTS],
+            own_private: HashSet::new(),
         }
     }
 
@@ -63,8 +63,11 @@ impl Model {
         if !self.groups[c].is_empty() {
             return false; // grouped contact: default-closed (ADR-054 D3)
         }
-        // ungrouped: Layer-A fallback — default `Everyone` unless set private.
-        self.layer_a[c][f].unwrap_or(true)
+        // ungrouped: Layer-A public base. `set_own_field_private` removes a
+        // field from it; otherwise it defaults to `Everyone`. (The contacts are
+        // exchanged, so the legacy per-contact rules default to visible and only
+        // the public base shapes the ungrouped verdict here.)
+        !self.own_private.contains(&f)
     }
 }
 
@@ -75,7 +78,8 @@ fn op_strategy() -> impl Strategy<Value = Op> {
         (0..N_GROUPS, 0..N_FIELDS).prop_map(|(g, f)| Op::Grant(g, f)),
         (0..N_GROUPS, 0..N_FIELDS).prop_map(|(g, f)| Op::Revoke(g, f)),
         (0..N_CONTACTS, 0..N_FIELDS, any::<bool>()).prop_map(|(c, f, b)| Op::Override(c, f, b)),
-        (0..N_CONTACTS, 0..N_FIELDS).prop_map(|(c, f)| Op::SetPrivate(c, f)),
+        (0..N_FIELDS).prop_map(Op::SetOwnPrivate),
+        (0..N_FIELDS).prop_map(Op::SetOwnPublic),
     ]
 }
 
@@ -134,16 +138,13 @@ proptest! {
                     model.overrides[c][f] = Some(b);
                     wb.set_contact_visibility_override(&contact_ids[c], &field_ids[f], b).unwrap();
                 }
-                Op::SetPrivate(c, f) => {
-                    // ADR-054: set_field_private routes to a per-contact override
-                    // for a grouped contact (a Layer-A write would be ignored),
-                    // else to Layer-A. Mirror that split in the model.
-                    if model.groups[c].is_empty() {
-                        model.layer_a[c][f] = Some(false);
-                    } else {
-                        model.overrides[c][f] = Some(false);
-                    }
-                    wb.set_field_private_and_repropagate(&contact_ids[c], &field_ids[f]).unwrap();
+                Op::SetOwnPrivate(f) => {
+                    model.own_private.insert(f);
+                    wb.set_own_field_private(&field_ids[f]).unwrap();
+                }
+                Op::SetOwnPublic(f) => {
+                    model.own_private.remove(&f);
+                    wb.set_own_field_public(&field_ids[f]).unwrap();
                 }
             }
         }

@@ -41,6 +41,9 @@ pub const MAX_FIELDS: usize = 200;
 /// Maximum display name length.
 pub const MAX_DISPLAY_NAME_LENGTH: usize = 100;
 
+/// Maximum length of a card `bio` (ADR-054 D2), in Unicode scalar values.
+pub const MAX_BIO_LENGTH: usize = 160;
+
 /// Maximum serialized card size in bytes (64 KB).
 pub const MAX_CARD_SIZE_BYTES: usize = 65536;
 
@@ -105,6 +108,8 @@ pub enum ContactCardError {
     EmptyDisplayName,
     #[error("Display name too long (max 100 characters)")]
     DisplayNameTooLong,
+    #[error("Bio too long (max {MAX_BIO_LENGTH} characters)")]
+    BioTooLong,
     #[error("Maximum number of fields reached ({MAX_FIELDS})")]
     MaxFieldsReached,
     #[error("Field not found")]
@@ -142,6 +147,11 @@ pub struct ContactCard {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     nickname: Option<String>,
+    /// Optional short self-description (ADR-054 D2, max 160 chars). Unlike the
+    /// local `nickname`, the bio is part of the shared card.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bio: Option<String>,
     /// Per-field visibility rules for the own card.
     /// In no-group mode: `Everyone` = visible, `Nobody` = hidden.
     /// In groups mode: group membership determines visibility (this is ignored).
@@ -163,6 +173,7 @@ impl ContactCard {
             fields: Vec::new(),
             avatar: None,
             nickname: None,
+            bio: None,
             field_visibility: VisibilityRules::new(),
         }
     }
@@ -220,6 +231,26 @@ impl ContactCard {
                 .collect::<String>();
             self.nickname = Some(truncated);
         }
+    }
+
+    /// Returns the optional shared bio (ADR-054 D2).
+    pub fn bio(&self) -> Option<&str> {
+        self.bio.as_deref()
+    }
+
+    /// Sets the shared bio. Normalized (trim + NFC); an empty result clears it.
+    /// Rejects a bio longer than [`MAX_BIO_LENGTH`] Unicode scalar values.
+    pub fn set_bio(&mut self, bio: &str) -> Result<(), ContactCardError> {
+        let normalized = normalize_text(bio);
+        if normalized.is_empty() {
+            self.bio = None;
+            return Ok(());
+        }
+        if normalized.chars().count() > MAX_BIO_LENGTH {
+            return Err(ContactCardError::BioTooLong);
+        }
+        self.bio = Some(normalized);
+        Ok(())
     }
 
     /// Returns all fields.

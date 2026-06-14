@@ -170,6 +170,35 @@ impl Vauchi {
             .delete_contact_override(contact_id, field_id)?)
     }
 
+    /// Marks an own-card field as part of the **public base** — visible to an
+    /// ungrouped contact. The public base is per-field (not per-contact);
+    /// per-contact control is `set_field_*` (overrides, Layer C).
+    /// (2026-06-14 visibility layering.)
+    pub fn set_own_field_public(&self, field_id: &str) -> VauchiResult<()> {
+        let mut card = self
+            .storage
+            .contacts()
+            .load_own_card()?
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        card.field_visibility_mut().set_everyone(field_id);
+        self.storage.contacts().save_own_card(&card)?;
+        Ok(())
+    }
+
+    /// Removes an own-card field from the **public base** — hidden from an
+    /// ungrouped contact, so leaving a granting group revokes it. Still visible
+    /// to grouped contacts via their groups (and to anyone via an override).
+    pub fn set_own_field_private(&self, field_id: &str) -> VauchiResult<()> {
+        let mut card = self
+            .storage
+            .contacts()
+            .load_own_card()?
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        card.field_visibility_mut().set_nobody(field_id);
+        self.storage.contacts().save_own_card(&card)?;
+        Ok(())
+    }
+
     /// Gets all per-contact visibility overrides for a contact.
     pub fn get_contact_visibility_overrides(
         &self,
@@ -181,9 +210,14 @@ impl Vauchi {
     /// Determines the effective visibility of a field for a contact.
     ///
     /// Returns visibility determined by (in priority order):
-    /// 1. Per-contact override (if set)
-    /// 2. Label membership (visible if contact is in any label that shows this field)
-    /// 3. Contact's VisibilityRules (the default field visibility)
+    /// 1. Layer C — per-contact override (if set), always wins
+    /// 2. Layer B — group union (visible if any of the contact's groups
+    ///    exposes the field)
+    /// 3. Grouped contacts are default-closed (ADR-054 D3): a grouped contact
+    ///    sees only what its groups grant
+    /// 4. Layer A — public base for an *ungrouped* contact: the contact's
+    ///    legacy `visibility_rules` AND the own card's `field_visibility`
+    ///    (`set_own_field_*`)
     pub fn get_effective_field_visibility(
         &self,
         contact_id: &str,
@@ -219,12 +253,25 @@ impl Vauchi {
             return Ok(false);
         }
 
-        // No group membership for this contact: fall back to its per-contact
-        // Layer-A rules (default `Everyone`) — the public base card. Imported
-        // contacts have no visibility rules; default to not visible.
-        Ok(contact
+        // No group membership for this contact: the public base card. Visible
+        // iff (a) the contact's legacy Layer-A rules allow it — imported
+        // contacts have none → hidden — AND (b) the own card's per-field public
+        // base (`field_visibility`) marks it visible. `set_own_field_*` curates
+        // the public base; per-contact `set_field_*` goes through overrides
+        // (Layer C, checked above). Empty `field_visibility` defaults to
+        // `Everyone`, so this is a no-op until the public base is curated.
+        // (2026-06-14 visibility layering.)
+        let legacy_allows = contact
             .visibility_rules()
-            .is_some_and(|rules| rules.can_see(field_id, contact_id)))
+            .is_some_and(|rules| rules.can_see(field_id, contact_id));
+        if !legacy_allows {
+            return Ok(false);
+        }
+        Ok(self
+            .storage
+            .contacts()
+            .load_own_card()?
+            .is_some_and(|card| card.field_visibility().can_see(field_id, contact_id)))
     }
 
     /// Resolves an own-card field label to its field id.

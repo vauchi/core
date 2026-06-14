@@ -158,6 +158,86 @@ fn set_field_visibility_by_label_rejects_unknown_contact() {
     );
 }
 
+// ============================================================
+// Public base (Layer A) — `set_own_field_public/private` shapes the
+// own card's per-field `field_visibility`, the subset an *ungrouped*
+// contact sees (2026-06-14 visibility layering).
+// ============================================================
+
+// @internal
+#[test]
+fn set_own_field_private_hides_field_from_ungrouped_contact() {
+    let (wb, contact_id) = setup_with_fields();
+    let card = wb.own_card().unwrap().unwrap();
+    let email_id = card
+        .fields()
+        .iter()
+        .find(|f| f.label() == "Work Email")
+        .unwrap()
+        .id()
+        .to_string();
+    let phone_id = card
+        .fields()
+        .iter()
+        .find(|f| f.label() == "Mobile")
+        .unwrap()
+        .id()
+        .to_string();
+
+    // Default public base is `Everyone` → visible to an ungrouped contact.
+    assert!(
+        wb.get_effective_field_visibility(&contact_id, &email_id)
+            .unwrap(),
+        "default public base shows the field"
+    );
+
+    // Remove from the public base → hidden from the ungrouped contact.
+    wb.set_own_field_private(&email_id).unwrap();
+    assert!(
+        !wb.get_effective_field_visibility(&contact_id, &email_id)
+            .unwrap(),
+        "set_own_field_private must hide the field from an ungrouped contact"
+    );
+    // Per-field: the sibling stays in the public base.
+    assert!(
+        wb.get_effective_field_visibility(&contact_id, &phone_id)
+            .unwrap(),
+        "public-base change must be per-field"
+    );
+
+    // Restore to the public base.
+    wb.set_own_field_public(&email_id).unwrap();
+    assert!(
+        wb.get_effective_field_visibility(&contact_id, &email_id)
+            .unwrap(),
+        "set_own_field_public must restore the field to the public base"
+    );
+}
+
+// @internal
+#[test]
+fn set_own_field_private_persists_across_reload() {
+    let (wb, contact_id) = setup_with_fields();
+    let email_id = wb
+        .own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .find(|f| f.label() == "Work Email")
+        .unwrap()
+        .id()
+        .to_string();
+
+    wb.set_own_field_private(&email_id).unwrap();
+
+    let reloaded = wb.own_card().unwrap().unwrap();
+    assert!(
+        !reloaded.field_visibility().can_see(&email_id, &contact_id),
+        "public-base private must persist on the own card"
+    );
+}
+
 // @internal
 #[test]
 fn is_field_visible_by_label_persists_across_reload() {

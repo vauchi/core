@@ -219,6 +219,22 @@ impl ContentManager {
             }
         }
     }
+
+    /// Overlay the CDN-cached `themes.json` into the theme store at
+    /// startup. Mirrors [`load_cached_locales_into_i18n`]; call AFTER the
+    /// cache is readable but BEFORE the first render so screens use the
+    /// cached catalog rather than the bundled one.
+    pub fn load_cached_themes_into_theme_store(&self) {
+        let path = self
+            .cache
+            .content_dir(ContentType::Themes)
+            .join("themes.json");
+        if let Ok(data) = std::fs::read(&path) {
+            // best-effort: a corrupt cached catalog falls back to bundled.
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = crate::theme::load_themes_from_bytes(&data);
+        }
+    }
 }
 
 // Async methods (require content-updates feature)
@@ -464,6 +480,13 @@ impl ContentManager {
                     &data,
                     &entry.checksum,
                 )?;
+
+                // Hot-reload the theme catalog — best-effort (mirrors the
+                // Locales branch). Cached on disk regardless; active on the
+                // next start if this fails. Tokens are global (tokens.json)
+                // and reload via the explicit reload API, not per-theme.
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = crate::theme::load_themes_from_bytes(&data);
             }
             ContentType::Help => {
                 // Download ALL help files (privacy: bundle everything so CDN

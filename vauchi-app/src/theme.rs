@@ -9,6 +9,8 @@
 //!
 //! Feature file: features/theming.feature
 
+use std::sync::RwLock;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -27,6 +29,9 @@ pub enum ThemeError {
 
     #[error("Invalid theme JSON: {0}")]
     InvalidThemeJson(String),
+
+    #[error("Design asset store lock poisoned")]
+    LockPoisoned,
 }
 
 /// Theme mode (light or dark)
@@ -335,6 +340,72 @@ pub fn bundled_themes() -> Vec<Theme> {
     } else {
         themes
     }
+}
+
+// ============================================================
+// Runtime design-asset stores (RwLock, support hot-reload).
+// Mirror i18n::LOCALE_STORE. Tokens are GLOBAL (one tokens.json);
+// themes are a catalog. Both fall back to the bundled default when
+// unloaded, and a poisoned lock falls back to default rather than
+// panicking in the render path (ADR-038 Amendment 2 / hot-reload).
+// ============================================================
+
+static DESIGN_TOKENS_STORE: RwLock<Option<DesignTokens>> = RwLock::new(None);
+static THEME_STORE: RwLock<Option<Vec<Theme>>> = RwLock::new(None);
+
+/// Load or reload the global design tokens from raw `tokens.json` bytes
+/// (e.g. an updated tokens.json delivered via the content system). Until
+/// called, `active_design_tokens()` returns the bundled default.
+pub fn load_design_tokens_from_bytes(data: &[u8]) -> Result<(), ThemeError> {
+    let tokens: DesignTokens =
+        serde_json::from_slice(data).map_err(|e| ThemeError::InvalidThemeJson(e.to_string()))?;
+    let mut lock = DESIGN_TOKENS_STORE
+        .write()
+        .map_err(|_| ThemeError::LockPoisoned)?;
+    *lock = Some(tokens);
+    Ok(())
+}
+
+/// The active design tokens: the hot-reloaded set if loaded, else the
+/// bundled `DesignTokens::default()`. Read-clone-release — never holds the
+/// lock across a render; a poisoned lock falls back to the default.
+pub fn active_design_tokens() -> DesignTokens {
+    if let Ok(lock) = DESIGN_TOKENS_STORE.read()
+        && let Some(tokens) = lock.as_ref()
+    {
+        return tokens.clone();
+    }
+    DesignTokens::default()
+}
+
+/// Whether design tokens have been hot-loaded (vs the bundled default).
+pub fn design_tokens_loaded() -> bool {
+    DESIGN_TOKENS_STORE
+        .read()
+        .map(|lock| lock.is_some())
+        .unwrap_or(false)
+}
+
+/// Load or reload the theme catalog from raw `themes.json` bytes (parsed
+/// via [`load_themes_from_json`]). Until called, [`active_themes`] returns
+/// [`bundled_themes`].
+pub fn load_themes_from_bytes(data: &[u8]) -> Result<(), ThemeError> {
+    let themes = load_themes_from_json(data)?;
+    let mut lock = THEME_STORE.write().map_err(|_| ThemeError::LockPoisoned)?;
+    *lock = Some(themes);
+    Ok(())
+}
+
+/// The active theme catalog: the hot-reloaded set if loaded (and
+/// non-empty), else [`bundled_themes`].
+pub fn active_themes() -> Vec<Theme> {
+    if let Ok(lock) = THEME_STORE.read()
+        && let Some(themes) = lock.as_ref()
+        && !themes.is_empty()
+    {
+        return themes.clone();
+    }
+    bundled_themes()
 }
 
 fn default_dark() -> Theme {
@@ -676,5 +747,91 @@ mod tests {
         }]"##;
         let themes = load_themes_from_json(json.as_bytes()).unwrap();
         assert_eq!(themes[0].tokens, DesignTokens::default());
+    }
+
+    // ── Hot-reload store tests (ADR-038 Amendment 2) ──────────────
+    // The stores are process-global; serialize mutating tests so parallel
+    // nextest threads don't interfere (mirror i18n's I18N_TEST_LOCK), and
+    // reset to the unloaded state around each so other tests see defaults.
+    static STORE_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn reset_design_stores() {
+        *super::DESIGN_TOKENS_STORE.write().unwrap() = None;
+        *super::THEME_STORE.write().unwrap() = None;
+    }
+
+    #[test]
+    fn active_design_tokens_falls_back_to_default_when_unloaded() {
+        let _g = STORE_TEST_LOCK.lock().unwrap();
+        reset_design_stores();
+        assert_eq!(active_design_tokens(), DesignTokens::default());
+        assert!(!design_tokens_loaded());
+    }
+
+    #[test]
+    fn load_design_tokens_then_active_returns_loaded() {
+        let _g = STORE_TEST_LOCK.lock().unwrap();
+        reset_design_stores();
+        let mut t = DesignTokens::default();
+        t.spacing.md = 99; // distinct from the default 16
+        let json = serde_json::to_vec(&t).unwrap();
+        load_design_tokens_from_bytes(&json).unwrap();
+        assert!(design_tokens_loaded());
+        assert_eq!(active_design_tokens().spacing.md, 99);
+        reset_design_stores();
+    }
+
+    #[test]
+    fn malformed_tokens_json_errors_without_poisoning() {
+        let _g = STORE_TEST_LOCK.lock().unwrap();
+        reset_design_stores();
+        assert!(load_design_tokens_from_bytes(b"not json").is_err());
+        // Store untouched -> reads still succeed and return the default.
+        assert_eq!(active_design_tokens(), DesignTokens::default());
+        reset_design_stores();
+    }
+
+    #[test]
+    fn active_themes_falls_back_to_bundled_when_unloaded() {
+        let _g = STORE_TEST_LOCK.lock().unwrap();
+        reset_design_stores();
+        let themes = active_themes();
+        assert!(!themes.is_empty());
+        assert!(themes.iter().any(|t| t.id == default_theme().id));
+    }
+
+    #[test]
+    fn load_themes_then_active_returns_loaded() {
+        let _g = STORE_TEST_LOCK.lock().unwrap();
+        reset_design_stores();
+        let json = br##"[{
+            "id": "hot-loaded","name": "Hot","version": "1.0.0","mode": "dark",
+            "colors": {
+                "bg-primary": "#010203","bg-secondary": "#111111","bg-tertiary": "#222222",
+                "text-primary": "#ffffff","text-secondary": "#cccccc",
+                "accent": "#0000ff","accent-dark": "#000099",
+                "success": "#00ff00","error": "#ff0000","warning": "#ffff00","border": "#333333"
+            }
+        }]"##;
+        load_themes_from_bytes(json).unwrap();
+        let themes = active_themes();
+        assert_eq!(themes.len(), 1);
+        assert_eq!(themes[0].id, "hot-loaded");
+        reset_design_stores();
+    }
+
+    #[test]
+    fn reloaded_tokens_flow_into_new_screenmodels() {
+        let _g = STORE_TEST_LOCK.lock().unwrap();
+        reset_design_stores();
+        let mut t = DesignTokens::default();
+        t.spacing.md = 99;
+        load_design_tokens_from_bytes(&serde_json::to_vec(&t).unwrap()).unwrap();
+        let screen = crate::ui::ScreenModel::new("s", "T", Vec::new(), Vec::new());
+        assert_eq!(
+            screen.tokens.spacing.md, 99,
+            "a reloaded tokens.json must flow into emitted ScreenModels"
+        );
+        reset_design_stores();
     }
 }

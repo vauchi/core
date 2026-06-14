@@ -136,7 +136,11 @@ impl Default for ScreenModel {
             components: Vec::new(),
             actions: Vec::new(),
             progress: None,
-            tokens: DesignTokens::default(),
+            // Active tokens here too, so struct-literal builders using
+            // `..Default::default()` reflect a token hot-reload. The serde
+            // field default (deserialization) stays on the type default via
+            // the `#[serde(default)]` on `tokens` — unaffected by this.
+            tokens: crate::theme::active_design_tokens(),
             deprecated_components: Vec::new(),
             parent_screen_id: None,
             presentation_kind: ScreenPresentationKind::Page,
@@ -162,7 +166,10 @@ impl ScreenModel {
             components,
             actions,
             progress: None,
-            tokens: DesignTokens::default(),
+            // Source tokens from the hot-reload store so a reloaded
+            // tokens.json shows up in every emitted screen; falls back to
+            // the bundled default until a reload (ADR-038 Amendment 2).
+            tokens: crate::theme::active_design_tokens(),
             deprecated_components: Vec::new(),
             parent_screen_id: None,
             presentation_kind: ScreenPresentationKind::Page,

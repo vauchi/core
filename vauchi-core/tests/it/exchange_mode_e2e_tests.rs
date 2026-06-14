@@ -25,6 +25,7 @@ fn config_with_mode_selection() -> ExchangeConfig {
         },
         mode: None, // triggers mode selection
         card_snapshot: None,
+        transport_readiness: Default::default(),
         available_group_data: Vec::new(),
     }
 }

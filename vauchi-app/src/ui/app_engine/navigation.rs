@@ -177,6 +177,7 @@ impl AppEngine {
                 &screen,
                 preview_as,
                 &self.device_capabilities,
+                &self.transport_readiness,
                 &self.render_context,
                 &self.pending_exchange_groups,
             )

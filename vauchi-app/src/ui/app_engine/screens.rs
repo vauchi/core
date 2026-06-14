@@ -53,6 +53,7 @@ impl AppEngine {
         screen: &AppScreen,
         preview_as: Option<&str>,
         device_capabilities: &vauchi_core::exchange::capability::types::DeviceCapabilities,
+        transport_readiness: &vauchi_core::exchange::capability::TransportReadiness,
         render_context: &crate::ui::RenderContext,
         pending_groups: &[String],
     ) -> Box<dyn WorkflowEngine> {
@@ -256,9 +257,13 @@ impl AppEngine {
             | AppScreen::BleExchange { .. }
             | AppScreen::NfcExchange
             | AppScreen::DirectTransport
-            | AppScreen::MultiStageExchange { .. } => {
-                Self::create_exchange_engine(vauchi, screen, device_capabilities, pending_groups)
-            }
+            | AppScreen::MultiStageExchange { .. } => Self::create_exchange_engine(
+                vauchi,
+                screen,
+                device_capabilities,
+                transport_readiness,
+                pending_groups,
+            ),
             AppScreen::Help => Box::new(HelpEngine::new(help_catalog::default_help_items())),
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None, vauchi.has_identity())),
             AppScreen::Lock => Box::new(LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)),

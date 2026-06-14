@@ -410,6 +410,7 @@ impl AppEngine {
             &AppScreen::MyInfo,
             None,
             &self.device_capabilities,
+            &self.transport_readiness,
             &self.render_context,
             &self.pending_exchange_groups,
         );
@@ -766,6 +767,7 @@ impl AppEngine {
             &screen,
             self.preview_as_contact.as_deref(),
             &self.device_capabilities,
+            &self.transport_readiness,
             &self.render_context,
             &self.pending_exchange_groups,
         );
@@ -931,6 +933,7 @@ impl AppEngine {
             &screen,
             self.preview_as_contact.as_deref(),
             &self.device_capabilities,
+            &self.transport_readiness,
             &self.render_context,
             &self.pending_exchange_groups,
         );

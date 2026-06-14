@@ -10,10 +10,13 @@
 //! labels — notably `"location"` (the ADR-051 capture-geolocation permission)
 //! — are ignored, so declining a capture prompt never gates a BLE mode.
 
-use vauchi_app::ui::AppEngine;
+use vauchi_app::ui::{
+    ActionResult, AppEngine, AppScreen, Component, ScreenModel, UserAction, WorkflowEngine,
+};
 use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::capability::PermissionState;
+use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::mode::DeviceRequirement;
 
 fn engine() -> AppEngine {
@@ -83,5 +86,105 @@ fn ble_permission_denied_event_updates_the_ledger() {
             .transport_readiness()
             .permission(DeviceRequirement::Ble),
         PermissionState::Denied
+    );
+}
+
+/// Capabilities where Glance's transports (camera + BLE) are both present, so a
+/// camera denial yields a present-but-denied *grant affordance*, not an
+/// `Unavailable` (hardware-absent) row.
+fn caps_camera_and_ble() -> DeviceCapabilities {
+    DeviceCapabilities {
+        has_camera: true,
+        has_ble: true,
+        ..Default::default()
+    }
+}
+
+/// All `ActionList` item ids across a screen, in render order.
+fn item_ids(screen: &ScreenModel) -> Vec<String> {
+    screen
+        .components
+        .iter()
+        .filter_map(|c| match c {
+            Component::ActionList { items, .. } => Some(items),
+            _ => None,
+        })
+        .flatten()
+        .map(|item| item.id.clone())
+        .collect()
+}
+
+// @internal
+#[test]
+fn denied_camera_turns_glance_into_a_grant_affordance_on_the_live_picker() {
+    let mut engine = engine();
+    engine.set_device_capabilities(caps_camera_and_ble());
+    let entry = engine.navigate_to(AppScreen::Exchange);
+    assert_eq!(entry.screen_id, "exchange");
+    assert!(
+        item_ids(&entry).iter().any(|id| id == "mode:glance"),
+        "with camera + BLE present and no denial, Glance is selectable"
+    );
+
+    // Deny camera while the picker is the live screen: the ledger records it
+    // AND `rebuild_exchange_engine` re-renders the picker in place (T2.2).
+    let _ = engine.handle_hardware_event(Event::PermissionDenied {
+        transport: "camera".into(),
+    });
+    assert_eq!(
+        engine
+            .transport_readiness()
+            .permission(DeviceRequirement::Camera),
+        PermissionState::Denied
+    );
+
+    let ids = item_ids(&engine.current_screen());
+    assert!(
+        ids.iter().any(|id| id == "grant:glance:camera"),
+        "a denied-but-present camera turns Glance into a grant affordance; got {ids:?}"
+    );
+    assert!(
+        !ids.iter().any(|id| id == "mode:glance"),
+        "the denied Glance must not also be a selectable mode; got {ids:?}"
+    );
+}
+
+// @internal
+#[test]
+fn tapping_grant_affordance_relearns_permission_and_restores_the_mode() {
+    let mut engine = engine();
+    engine.set_device_capabilities(caps_camera_and_ble());
+    let _ = engine.navigate_to(AppScreen::Exchange);
+    let _ = engine.handle_hardware_event(Event::PermissionDenied {
+        transport: "camera".into(),
+    });
+
+    // Tap the grant affordance the picker now renders.
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "recommended".into(),
+        item_id: "grant:glance:camera".into(),
+    });
+
+    // The device-wide ledger re-learns the permission as granted (no OS
+    // "granted" event exists — ADR-030/031 — so the affordance is the seam).
+    assert_eq!(
+        engine
+            .transport_readiness()
+            .permission(DeviceRequirement::Camera),
+        PermissionState::Granted
+    );
+    // ...and the re-rendered picker offers Glance as a selectable mode again.
+    let screen = match result {
+        ActionResult::UpdateScreen(s) => s,
+        other => panic!("grant tap should return UpdateScreen, got {other:?}"),
+    };
+    let ids = item_ids(&screen);
+    assert!(
+        ids.iter().any(|id| id == "mode:glance"),
+        "granting camera should restore the selectable mode:glance row; got {ids:?}"
+    );
+    assert!(
+        !ids.iter().any(|id| id.starts_with("grant:glance:")),
+        "a granted Glance must no longer be a grant affordance; got {ids:?}"
     );
 }

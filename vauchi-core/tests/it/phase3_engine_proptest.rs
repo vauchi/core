@@ -160,6 +160,7 @@ fn make_exchange() -> ExchangeEngine {
             own_qr_data: "test-qr-data-12345".to_string(),
             available_groups: vec![],
             device_capabilities: Default::default(),
+            transport_readiness: Default::default(),
             mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
             card_snapshot: None,
             available_group_data: Vec::new(),

@@ -53,12 +53,14 @@ fn cable_engine_transmits_only_selected_group_fields() {
         .expect("expose email to Work");
 
     let caps = vauchi_core::exchange::capability::types::DeviceCapabilities::default();
+    let readiness = vauchi_core::exchange::capability::TransportReadiness::default();
     let ctx = crate::ui::RenderContext::default();
     let engine = AppEngine::create_engine(
         &vauchi,
         &AppScreen::DirectTransport,
         None,
         &caps,
+        &readiness,
         &ctx,
         &[work_id],
     );

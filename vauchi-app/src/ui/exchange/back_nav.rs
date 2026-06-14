@@ -84,6 +84,7 @@ impl super::ExchangeEngine {
                 self.selected_groups.clear();
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
+                    self.config.transport_readiness.clone(),
                 ));
                 self.step = ExchangeStep::ModeSelection;
             }

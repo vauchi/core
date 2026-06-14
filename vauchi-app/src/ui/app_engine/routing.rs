@@ -92,9 +92,7 @@ impl AppEngine {
         // capture-geolocation permission, handled separately below).
         if let Event::PermissionDenied { transport } = &event {
             self.transport_readiness.note_permission_denied(transport);
-            // Rebuild the picker on next visit. TODO(T2.2): a cache remove does
-            // not rebuild the LIVE engine — the consult slice must re-render it.
-            self.engine_cache.remove(&AppScreen::Exchange);
+            self.rebuild_exchange_engine();
         }
 
         // ADR-031 file-picker: dispatched by current screen, not by the

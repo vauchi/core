@@ -10,6 +10,7 @@ use super::AppEngine;
 use super::AppScreen;
 use crate::ui::engine::WorkflowEngine;
 use crate::ui::exchange::{ExchangeConfig, ExchangeEngine};
+use crate::ui::{ActionResult, UserAction};
 use vauchi_core::api::Vauchi;
 
 impl AppEngine {
@@ -17,6 +18,7 @@ impl AppEngine {
         vauchi: &Vauchi,
         screen: &AppScreen,
         device_capabilities: &vauchi_core::exchange::capability::types::DeviceCapabilities,
+        transport_readiness: &vauchi_core::exchange::capability::TransportReadiness,
         pending_groups: &[String],
     ) -> Box<dyn WorkflowEngine> {
         match screen {
@@ -39,6 +41,7 @@ impl AppEngine {
                     own_qr_data: vauchi.public_id().unwrap_or_default(),
                     available_groups,
                     device_capabilities: device_capabilities.clone(),
+                    transport_readiness: transport_readiness.clone(),
                     mode: None, // triggers mode selection screen
                     card_snapshot,
                     available_group_data: all_groups,
@@ -226,5 +229,62 @@ fn reconstruct_identity_via_storage_bytes(
             );
             None
         }
+    }
+}
+
+impl AppEngine {
+    /// Re-evaluate the exchange mode picker against the current readiness
+    /// ledger. Always drops the cached `Exchange` engine so the next visit
+    /// rebuilds from the ledger; when the picker is the *active* screen, also
+    /// rebuilds `self.engine` in place so a permission change (a grant-affordance
+    /// tap, or a live `PermissionDenied`) shows without a navigate-away round
+    /// trip. Guarded on `AppScreen::Exchange` so an in-flight transport screen
+    /// (`BleExchange`, `NfcExchange`, …) is never clobbered.
+    pub(super) fn rebuild_exchange_engine(&mut self) {
+        self.engine_cache.remove(&AppScreen::Exchange);
+        // Rebuild in place ONLY when the mode picker itself is showing. The
+        // GroupSelection / FieldPreview sub-steps also live under
+        // `AppScreen::Exchange`; rebuilding there would discard the user's
+        // selected mode + groups (e.g. BLE revoked mid-exchange on Android).
+        // The unconditional cache remove above still re-evaluates on next visit.
+        if self.screen == AppScreen::Exchange
+            && self.engine.current_screen().screen_id == "exchange_mode_selection"
+        {
+            let screen = self.screen.clone();
+            self.engine = Self::create_engine(
+                &self.vauchi,
+                &screen,
+                self.preview_as_contact.as_deref(),
+                &self.device_capabilities,
+                &self.transport_readiness,
+                &self.render_context,
+                &self.pending_exchange_groups,
+            );
+        }
+    }
+
+    /// Intercept a grant-affordance tap (`grant:<mode>:<requirement>`) the mode
+    /// picker renders for a present-but-denied transport. Records the
+    /// requirement as granted on the device-wide ledger — the source of truth,
+    /// from which the picker's snapshot is rebuilt — then re-renders the picker
+    /// so the mode becomes selectable. There is no OS "permission granted" event
+    /// (ADR-030/031), so the affordance is how the ledger re-learns; if the OS
+    /// still withholds the permission, the next attempt re-emits
+    /// `PermissionDenied` and the affordance returns.
+    pub(super) fn intercept_grant_permission(
+        &mut self,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        if self.screen != AppScreen::Exchange {
+            return None;
+        }
+        let UserAction::ListItemSelected { item_id, .. } = action else {
+            return None;
+        };
+        let token = item_id.strip_prefix("grant:")?.rsplit_once(':')?.1;
+        let requirement = crate::ui::exchange::mode_selection::parse_requirement(token)?;
+        self.transport_readiness.note_granted(requirement);
+        self.rebuild_exchange_engine();
+        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 }

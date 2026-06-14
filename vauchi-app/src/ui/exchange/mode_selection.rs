@@ -8,10 +8,11 @@
 //! Wired into `ExchangeEngine` in Phase 1.2.
 
 use crate::ui::*;
+use vauchi_core::exchange::capability::TransportReadiness;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
-use vauchi_core::exchange::mode::{ExchangeMode, ModeCategory};
+use vauchi_core::exchange::mode::{DeviceRequirement, ExchangeMode, ModeCategory};
 use vauchi_core::exchange::mode_availability::{
-    ModeAvailability, check_mode_availability, recommend_mode,
+    ModeAvailability, check_mode_availability_with_readiness, recommend_mode,
 };
 
 /// Engine that displays exchange mode selection.
@@ -21,6 +22,7 @@ use vauchi_core::exchange::mode_availability::{
 /// When the user picks a mode, returns `ModeSelectionResult::Selected`.
 pub struct ModeSelectionEngine {
     capabilities: DeviceCapabilities,
+    readiness: TransportReadiness,
     recommended: ExchangeMode,
 }
 
@@ -41,10 +43,11 @@ const CATEGORY_ORDER: &[(ModeCategory, &str)] = &[
 ];
 
 impl ModeSelectionEngine {
-    pub fn new(capabilities: DeviceCapabilities) -> Self {
+    pub fn new(capabilities: DeviceCapabilities, readiness: TransportReadiness) -> Self {
         let recommended = recommend_mode(&capabilities);
         Self {
             capabilities,
+            readiness,
             recommended,
         }
     }
@@ -93,8 +96,31 @@ impl ModeSelectionEngine {
     /// Build the list item for a single mode: availability-aware detail,
     /// recommendation marker, and per-mode icon.
     fn mode_item(&self, mode: ExchangeMode) -> ActionListItem {
-        let availability = check_mode_availability(mode, &self.capabilities);
+        let availability =
+            check_mode_availability_with_readiness(mode, &self.capabilities, &self.readiness);
         let is_recommended = mode == self.recommended;
+        // A present-but-permission-denied transport is recoverable: render the
+        // row as a grant affordance with its own id prefix (`grant:<mode>:<req>`,
+        // intercepted by AppEngine to re-enable the requirement and rebuild)
+        // rather than a `mode:` selection that would enter a wait it can't win.
+        // See `_private/docs/problems/2026-06-11-exchange-waits-forever-without-capabilities/`.
+        if let ModeAvailability::PermissionRequired { requirement } = &availability {
+            return ActionListItem {
+                id: format!(
+                    "grant:{}:{}",
+                    mode.serde_name(),
+                    requirement_token(*requirement)
+                ),
+                label: mode.display_name().to_string(),
+                icon: Some("lock".into()),
+                detail: Some(format!(
+                    "{} permission needed — tap to grant",
+                    requirement_label(*requirement)
+                )),
+                a11y: None,
+                info_key: None,
+            };
+        }
         // When the mode can't run, the availability reason is the most useful
         // subtitle; otherwise show the short "what to do" instruction. The
         // recommended mode (always available, since `recommend_mode` only picks
@@ -209,6 +235,55 @@ fn parse_mode(name: &str) -> Option<ExchangeMode> {
     }
 }
 
+/// Stable lowercase token for a requirement, used in grant-affordance item ids
+/// (`grant:<mode>:<token>`). Mirrors `DeviceRequirement`'s serde snake_case so
+/// the AppEngine can recover the requirement via [`parse_requirement`].
+pub(crate) fn requirement_token(req: DeviceRequirement) -> &'static str {
+    match req {
+        DeviceRequirement::Camera => "camera",
+        DeviceRequirement::Ble => "ble",
+        DeviceRequirement::Nfc => "nfc",
+        DeviceRequirement::Microphone => "microphone",
+        DeviceRequirement::Speaker => "speaker",
+        DeviceRequirement::Accelerometer => "accelerometer",
+        DeviceRequirement::Internet => "internet",
+        DeviceRequirement::UsbPort => "usb_port",
+        // `DeviceRequirement` is `#[non_exhaustive]`; a new core variant must
+        // add a token here before its modes can ship a grant affordance.
+        _ => "unknown",
+    }
+}
+
+/// Inverse of [`requirement_token`]; `None` for an unknown token.
+pub(crate) fn parse_requirement(token: &str) -> Option<DeviceRequirement> {
+    Some(match token {
+        "camera" => DeviceRequirement::Camera,
+        "ble" => DeviceRequirement::Ble,
+        "nfc" => DeviceRequirement::Nfc,
+        "microphone" => DeviceRequirement::Microphone,
+        "speaker" => DeviceRequirement::Speaker,
+        "accelerometer" => DeviceRequirement::Accelerometer,
+        "internet" => DeviceRequirement::Internet,
+        "usb_port" => DeviceRequirement::UsbPort,
+        _ => return None,
+    })
+}
+
+/// Human-readable requirement name for the grant-affordance detail line.
+fn requirement_label(req: DeviceRequirement) -> &'static str {
+    match req {
+        DeviceRequirement::Camera => "Camera",
+        DeviceRequirement::Ble => "Bluetooth",
+        DeviceRequirement::Nfc => "NFC",
+        DeviceRequirement::Microphone => "Microphone",
+        DeviceRequirement::Speaker => "Speaker",
+        DeviceRequirement::Accelerometer => "Motion",
+        DeviceRequirement::Internet => "Internet",
+        DeviceRequirement::UsbPort => "USB",
+        _ => "Permission",
+    }
+}
+
 // INLINE_TEST_REQUIRED: Tests access private SerdeName trait, parse_mode(), and CATEGORY_ORDER
 #[cfg(test)]
 mod tests {
@@ -241,7 +316,7 @@ mod tests {
 
     #[test]
     fn screen_shows_all_nine_modes() {
-        let engine = ModeSelectionEngine::new(full_caps());
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
         let screen = engine.screen();
         assert_eq!(screen.screen_id, "exchange_mode_selection");
 
@@ -259,7 +334,7 @@ mod tests {
 
     #[test]
     fn screen_groups_modes_by_category() {
-        let engine = ModeSelectionEngine::new(full_caps());
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
         let screen = engine.screen();
 
         let category_ids: Vec<&str> = screen
@@ -286,7 +361,7 @@ mod tests {
     // @internal
     #[test]
     fn recommended_mode_is_first_in_picker() {
-        let engine = ModeSelectionEngine::new(full_caps());
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
         let screen = engine.screen();
         // The recommended mode (Hover with full caps) leads the picker as the
         // first item of the first ("recommended") group — see
@@ -309,7 +384,7 @@ mod tests {
     // @internal
     #[test]
     fn recommended_mode_is_marked_in_detail() {
-        let engine = ModeSelectionEngine::new(full_caps());
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
         let screen = engine.screen();
 
         // With full caps, recommended should be Hover.
@@ -333,7 +408,7 @@ mod tests {
     // @internal
     #[test]
     fn every_mode_has_a_per_mode_icon() {
-        let engine = ModeSelectionEngine::new(full_caps());
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
         let screen = engine.screen();
         for &mode in ExchangeMode::all() {
             let item =
@@ -346,7 +421,7 @@ mod tests {
 
     #[test]
     fn unavailable_modes_show_reason() {
-        let engine = ModeSelectionEngine::new(minimal_caps());
+        let engine = ModeSelectionEngine::new(minimal_caps(), TransportReadiness::default());
         let screen = engine.screen();
 
         // BLE modes should be unavailable
@@ -364,7 +439,7 @@ mod tests {
     // @internal
     #[test]
     fn available_modes_show_instruction_detail() {
-        let engine = ModeSelectionEngine::new(full_caps());
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
         let screen = engine.screen();
 
         // Glance is available with full caps and is not the recommended mode,
@@ -379,7 +454,7 @@ mod tests {
 
     #[test]
     fn selecting_mode_returns_selected() {
-        let engine = ModeSelectionEngine::new(full_caps());
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
         let result = engine.handle_action(&UserAction::ListItemSelected {
             component_id: "category:standard".into(),
             item_id: "mode:hover".into(),
@@ -393,7 +468,7 @@ mod tests {
     #[test]
     fn selecting_unavailable_mode_still_returns_selected() {
         // Availability enforcement is the engine's job, not mode selection's
-        let engine = ModeSelectionEngine::new(minimal_caps());
+        let engine = ModeSelectionEngine::new(minimal_caps(), TransportReadiness::default());
         let result = engine.handle_action(&UserAction::ListItemSelected {
             component_id: "category:fun".into(),
             item_id: "mode:tap_tap".into(),
@@ -406,7 +481,7 @@ mod tests {
 
     #[test]
     fn unknown_action_returns_screen() {
-        let engine = ModeSelectionEngine::new(full_caps());
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
         let result = engine.handle_action(&UserAction::ActionPressed {
             action_id: "something".into(),
         });
@@ -418,7 +493,7 @@ mod tests {
 
     #[test]
     fn all_modes_have_unique_ids() {
-        let engine = ModeSelectionEngine::new(full_caps());
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
         let screen = engine.screen();
         let ids: Vec<&str> = screen
             .components
@@ -450,6 +525,116 @@ mod tests {
         }
     }
 
+    // @internal
+    #[test]
+    fn permission_denied_present_mode_renders_grant_affordance() {
+        // Glance requires Camera + Ble; both present on a full device, but the
+        // camera permission is denied → the row becomes a grant affordance
+        // (`grant:glance:camera`), not a selectable `mode:glance`.
+        let mut led = TransportReadiness::default();
+        led.note_denied(DeviceRequirement::Camera);
+        let engine = ModeSelectionEngine::new(full_caps(), led);
+        let screen = engine.screen();
+
+        let grant = find_item_starting_with(&screen, "grant:glance:")
+            .expect("denied Glance should render a grant affordance");
+        assert_eq!(grant.id, "grant:glance:camera");
+        assert_eq!(grant.icon.as_deref(), Some("lock"));
+        let detail = grant
+            .detail
+            .as_deref()
+            .expect("grant affordance carries a detail line");
+        assert!(
+            detail.contains("Camera"),
+            "detail should name the requirement, got: {detail}"
+        );
+        assert!(
+            find_mode_item(&screen, "glance").is_none(),
+            "a denied mode must not also appear as a selectable mode:glance row"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn granting_restores_selectable_mode_row() {
+        // Last-write-wins: deny then grant Camera → the render reverts to a
+        // normal selectable `mode:glance` row with no grant affordance. (The
+        // AppEngine rebuilds the engine with the updated ledger; this asserts
+        // the render is permission-aware.)
+        let mut led = TransportReadiness::default();
+        led.note_denied(DeviceRequirement::Camera);
+        led.note_granted(DeviceRequirement::Camera);
+        let engine = ModeSelectionEngine::new(full_caps(), led);
+        let screen = engine.screen();
+
+        assert!(
+            find_mode_item(&screen, "glance").is_some(),
+            "granted camera should restore the selectable mode:glance row"
+        );
+        assert!(
+            find_item_starting_with(&screen, "grant:glance:").is_none(),
+            "a granted mode must not render a grant affordance"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn multiple_denied_requirements_yield_one_affordance_for_the_first() {
+        // User-confirmed design (2026-06-14): one grant affordance per mode,
+        // targeting its FIRST denied requirement. Glance requires Camera + BLE;
+        // deny both → exactly one `grant:glance:*` row. Granting the first
+        // re-renders and surfaces the next (progressive disclosure), so the
+        // per-step detail always names the real current blocker.
+        let mut led = TransportReadiness::default();
+        led.note_denied(DeviceRequirement::Camera);
+        led.note_denied(DeviceRequirement::Ble);
+        let engine = ModeSelectionEngine::new(full_caps(), led);
+        let screen = engine.screen();
+
+        let grants: Vec<String> = screen
+            .components
+            .iter()
+            .filter_map(|c| match c {
+                Component::ActionList { items, .. } => Some(items),
+                _ => None,
+            })
+            .flatten()
+            .filter(|i| i.id.starts_with("grant:glance:"))
+            .map(|i| i.id.clone())
+            .collect();
+        assert_eq!(
+            grants.len(),
+            1,
+            "exactly one grant affordance per mode (its first denied req), got {grants:?}"
+        );
+        assert!(
+            find_mode_item(&screen, "glance").is_none(),
+            "a doubly-denied Glance must not also be a selectable mode"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn requirement_token_roundtrips_all_variants() {
+        for req in [
+            DeviceRequirement::Camera,
+            DeviceRequirement::Ble,
+            DeviceRequirement::Nfc,
+            DeviceRequirement::Microphone,
+            DeviceRequirement::Speaker,
+            DeviceRequirement::Accelerometer,
+            DeviceRequirement::Internet,
+            DeviceRequirement::UsbPort,
+        ] {
+            assert_eq!(
+                parse_requirement(requirement_token(req)),
+                Some(req),
+                "token roundtrip failed for {req:?}"
+            );
+        }
+        assert_eq!(parse_requirement("nonsense"), None);
+    }
+
     /// Helper: find a mode item by serde name across all components.
     fn find_mode_item<'a>(screen: &'a ScreenModel, mode_name: &str) -> Option<&'a ActionListItem> {
         let target_id = format!("mode:{}", mode_name);
@@ -462,5 +647,21 @@ mod tests {
             })
             .flatten()
             .find(|item| item.id == target_id)
+    }
+
+    /// Helper: find the first item whose id starts with `prefix`.
+    fn find_item_starting_with<'a>(
+        screen: &'a ScreenModel,
+        prefix: &str,
+    ) -> Option<&'a ActionListItem> {
+        screen
+            .components
+            .iter()
+            .filter_map(|c| match c {
+                Component::ActionList { items, .. } => Some(items),
+                _ => None,
+            })
+            .flatten()
+            .find(|item| item.id.starts_with(prefix))
     }
 }

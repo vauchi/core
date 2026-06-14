@@ -30,6 +30,7 @@ use self::nfc::NfcStep;
 use crate::ui::*;
 use vauchi_core::Command;
 use vauchi_core::clock::Clock;
+use vauchi_core::exchange::capability::TransportReadiness;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::{ExchangeEvent, ExchangeSession};
@@ -49,6 +50,15 @@ pub struct ExchangeConfig {
     #[serde(default)]
     #[cfg_attr(feature = "schema-gen", schemars(skip))]
     pub device_capabilities: DeviceCapabilities,
+    /// Runtime OS-permission ledger (capability × permission). Transient: the
+    /// factory rebuilds it from the live AppEngine field on every build, so it
+    /// is never serialized (the wire form carries no permission state). The
+    /// mode picker consults it to render grant affordances for denied-but-
+    /// present transports. See
+    /// `2026-06-11-exchange-waits-forever-without-capabilities`.
+    #[serde(skip)]
+    #[cfg_attr(feature = "schema-gen", schemars(skip))]
+    pub transport_readiness: TransportReadiness,
     /// Selected exchange mode. `None` = show mode selection first.
     #[serde(default)]
     pub mode: Option<ExchangeMode>,
@@ -167,7 +177,10 @@ impl ExchangeEngine {
     pub fn new(config: ExchangeConfig, clock: Arc<dyn Clock>) -> Self {
         let step = Self::initial_step(&config);
         let mode_selection = if step == ExchangeStep::ModeSelection {
-            Some(ModeSelectionEngine::new(config.device_capabilities.clone()))
+            Some(ModeSelectionEngine::new(
+                config.device_capabilities.clone(),
+                config.transport_readiness.clone(),
+            ))
         } else {
             None
         };
@@ -210,7 +223,10 @@ impl ExchangeEngine {
 
         let step = Self::initial_step(&config);
         let mode_selection = if step == ExchangeStep::ModeSelection {
-            Some(ModeSelectionEngine::new(config.device_capabilities.clone()))
+            Some(ModeSelectionEngine::new(
+                config.device_capabilities.clone(),
+                config.transport_readiness.clone(),
+            ))
         } else {
             None
         };
@@ -330,6 +346,7 @@ impl ExchangeEngine {
                 // (the engine runs no proximity runner for Glance).
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
+                    self.config.transport_readiness.clone(),
                 ));
                 ActionResult::StartBleExchange { mode }
             }
@@ -341,6 +358,7 @@ impl ExchangeEngine {
                 // 2026-06-02-exchange-back-cancel-broken).
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
+                    self.config.transport_readiness.clone(),
                 ));
                 ActionResult::StartNfcExchange
             }
@@ -364,6 +382,7 @@ impl ExchangeEngine {
                 // `2026-06-02-exchange-back-cancel-broken`.
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
+                    self.config.transport_readiness.clone(),
                 ));
                 ActionResult::StartMultiStageExchange { mode }
             }
@@ -375,6 +394,7 @@ impl ExchangeEngine {
                 // 2026-06-02-exchange-back-cancel-broken).
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
+                    self.config.transport_readiness.clone(),
                 ));
                 ActionResult::StartDirectTransport
             }
@@ -383,6 +403,7 @@ impl ExchangeEngine {
             _ => {
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
+                    self.config.transport_readiness.clone(),
                 ));
                 self.step = ExchangeStep::ModeSelection;
                 ActionResult::NavigateTo(self.build_screen())
@@ -899,6 +920,7 @@ impl WorkflowEngine for ExchangeEngine {
                 }
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
+                    self.config.transport_readiness.clone(),
                 ));
                 self.step = ExchangeStep::ModeSelection;
                 ActionResult::NavigateTo(self.build_screen())
@@ -1037,6 +1059,7 @@ mod tests {
             // Pre-set mode to skip mode selection (tests focus on QR flow)
             mode: Some(ExchangeMode::Glance),
             card_snapshot: None,
+            transport_readiness: Default::default(),
             available_group_data: Vec::new(),
         }
     }
@@ -1055,6 +1078,7 @@ mod tests {
             // like Glance). Carries the group-selection machinery tests.
             mode: Some(ExchangeMode::TapHoverShake),
             card_snapshot: None,
+            transport_readiness: Default::default(),
             available_group_data: Vec::new(),
         }
     }
@@ -1182,6 +1206,7 @@ mod tests {
             },
             mode: None, // triggers mode selection
             card_snapshot: None,
+            transport_readiness: Default::default(),
             available_group_data: Vec::new(),
         }
     }

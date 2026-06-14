@@ -311,7 +311,10 @@ vauchi-core/src/storage/mod.rs 1079
 #  silent-stall deadline foundation, ADR-021 / exchange-waits-forever T1.3.)
 # (+11 for the TransportReadiness ledger field + init + accessor + import —
 #  exchange-waits-forever Phase 2 T2.1b capability/permission split.)
-vauchi-app/src/ui/app_engine/mod.rs 690
+# (+15 for T2.2-wiring: readiness threaded into create_engine at the new()
+#  + handle_action grant-affordance intercept wiring — exchange-waits-forever
+#  Phase 2 permission-aware mode picker.)
+vauchi-app/src/ui/app_engine/mod.rs 705
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -405,7 +408,9 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 # (+2 for AppScreen::ChangePassword arm passing is_password_enabled() into
 #  ChangePasswordEngine::new — first-password setup mode,
 #  2026-06-13-ios-app-password-setup-missing.)
-vauchi-app/src/ui/app_engine/screens.rs 908
+# (+5 for T2.2-wiring: TransportReadiness param on create_engine + the
+#  expanded create_exchange_engine dispatch — exchange-waits-forever Phase 2.)
+vauchi-app/src/ui/app_engine/screens.rs 913
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

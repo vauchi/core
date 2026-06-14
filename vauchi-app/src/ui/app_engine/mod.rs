@@ -223,6 +223,7 @@ impl AppEngine {
                 &screen,
                 self.preview_as_contact.as_deref(),
                 &self.device_capabilities,
+                &self.transport_readiness,
                 &self.render_context,
                 &self.pending_exchange_groups,
             );
@@ -253,8 +254,15 @@ impl AppEngine {
         };
         let caps = DeviceCapabilities::default();
         let initial_render_context = crate::ui::RenderContext::default();
-        let engine =
-            Self::create_engine(&vauchi, &screen, None, &caps, &initial_render_context, &[]);
+        let engine = Self::create_engine(
+            &vauchi,
+            &screen,
+            None,
+            &caps,
+            &TransportReadiness::default(),
+            &initial_render_context,
+            &[],
+        );
         let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
         let field_catalog = vauchi_core::contact_card::FieldTypeCatalog::new(&registry);
 
@@ -475,6 +483,13 @@ impl WorkflowEngine for AppEngine {
         // reminder, update link, tab nav, system back, settings gear,
         // demo-contact dismiss). See `dispatch::intercept_global_chrome`.
         if let Some(result) = self.intercept_global_chrome(&action) {
+            return result;
+        }
+
+        // Mode-picker grant affordance (`grant:<mode>:<requirement>`): re-learn
+        // a denied OS permission and re-render the picker. See
+        // `screens_exchange::intercept_grant_permission`.
+        if let Some(result) = self.intercept_grant_permission(&action) {
             return result;
         }
 

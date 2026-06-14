@@ -35,6 +35,7 @@ fn factory() -> ExchangeEngine {
             own_qr_data: "v1:test".into(),
             available_groups: Vec::new(),
             device_capabilities: Default::default(),
+            transport_readiness: Default::default(),
             mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),

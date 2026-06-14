@@ -154,6 +154,7 @@ fn test_contrast_ratio_calculation() {
         error: white.to_string(),
         warning: white.to_string(),
         border: white.to_string(),
+        ..Default::default()
     };
 
     let theme = Theme {
@@ -193,6 +194,7 @@ fn test_low_contrast_fails() {
         error: gray2.to_string(),
         warning: gray2.to_string(),
         border: gray2.to_string(),
+        ..Default::default()
     };
 
     let theme = Theme {

@@ -39,7 +39,7 @@ pub enum ThemeMode {
 }
 
 /// Core color definitions for a theme
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ThemeColors {
     #[serde(rename = "bg-primary")]
     pub bg_primary: String,
@@ -58,6 +58,42 @@ pub struct ThemeColors {
     pub error: String,
     pub warning: String,
     pub border: String,
+    // ADR-038 Amendment 1: known-optional extensions. Option so a theme
+    // may omit any (two-tier contract); None falls back at the renderer.
+    #[serde(default)]
+    pub surface: Option<String>,
+    #[serde(rename = "surface-input", default)]
+    pub surface_input: Option<String>,
+    #[serde(rename = "surface-muted", default)]
+    pub surface_muted: Option<String>,
+    #[serde(rename = "surface-elevated", default)]
+    pub surface_elevated: Option<String>,
+    #[serde(rename = "bottombar-bg", default)]
+    pub bottombar_bg: Option<String>,
+    #[serde(rename = "text-label", default)]
+    pub text_label: Option<String>,
+    #[serde(rename = "text-muted", default)]
+    pub text_muted: Option<String>,
+    #[serde(rename = "accent-bright", default)]
+    pub accent_bright: Option<String>,
+    #[serde(rename = "icon-accent", default)]
+    pub icon_accent: Option<String>,
+    #[serde(default)]
+    pub teal: Option<String>,
+    #[serde(rename = "tint-accent", default)]
+    pub tint_accent: Option<String>,
+    #[serde(rename = "tint-selected", default)]
+    pub tint_selected: Option<String>,
+    #[serde(rename = "tint-teal", default)]
+    pub tint_teal: Option<String>,
+    #[serde(rename = "tint-orange", default)]
+    pub tint_orange: Option<String>,
+    #[serde(rename = "tint-danger", default)]
+    pub tint_danger: Option<String>,
+    #[serde(rename = "tint-green", default)]
+    pub tint_green: Option<String>,
+    #[serde(default)]
+    pub scrim: Option<String>,
 }
 
 /// Design tokens for consistent cross-platform rendering.
@@ -101,6 +137,26 @@ pub struct TypographyTokens {
     pub subtitle_size: u16,
     pub body_size: u16,
     pub caption_size: u16,
+    // ADR-038 Amendment 1: 7-step scale. Defaulted for backward-compat
+    // with DesignTokens serialized before the expansion.
+    #[serde(default = "default_caption_sm")]
+    pub caption_sm: u16,
+    #[serde(default = "default_title_lg")]
+    pub title_lg: u16,
+    #[serde(default = "default_display")]
+    pub display: u16,
+}
+
+fn default_caption_sm() -> u16 {
+    12
+}
+
+fn default_title_lg() -> u16 {
+    20
+}
+
+fn default_display() -> u16 {
+    32
 }
 
 /// Directional spacing tokens for content and list items.
@@ -294,6 +350,7 @@ fn default_dark() -> Theme {
             error: "#f38ba8".to_string(),
             warning: "#fab387".to_string(),
             border: "#45475a".to_string(),
+            ..Default::default()
         },
         tokens: DesignTokens::default(),
     }

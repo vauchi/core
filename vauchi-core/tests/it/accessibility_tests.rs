@@ -406,6 +406,7 @@ fn test_low_contrast_theme_fails() {
         error: "#808080".to_string(),
         warning: "#808080".to_string(),
         border: "#808080".to_string(),
+        ..Default::default()
     };
 
     let bad_theme = Theme {

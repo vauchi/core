@@ -28,6 +28,9 @@ impl Default for DesignTokens {
                 subtitle_size: 18,
                 body_size: 16,
                 caption_size: 14,
+                caption_sm: 12,
+                title_lg: 20,
+                display: 32,
             },
             border_radius: BorderRadiusTokens {
                 sm: 4,

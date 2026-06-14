@@ -303,6 +303,42 @@ pub struct MobileThemeColors {
     pub warning: String,
     /// Border color (hex).
     pub border: String,
+    // ADR-038 Amendment 1: known-optional extensions (None if the theme
+    // omits them — two-tier contract).
+    /// Card / list-item surface (hex).
+    pub surface: Option<String>,
+    /// Text-input / search-field fill (hex).
+    pub surface_input: Option<String>,
+    /// Divider / disabled surface (hex).
+    pub surface_muted: Option<String>,
+    /// Popover / menu / QR elevated surface (hex).
+    pub surface_elevated: Option<String>,
+    /// Tab bar / bottom action bar background (hex).
+    pub bottombar_bg: Option<String>,
+    /// Form-field label text (hex).
+    pub text_label: Option<String>,
+    /// Placeholder / timestamp / hint text (hex).
+    pub text_muted: Option<String>,
+    /// Brighter accent for avatars / inline links (hex).
+    pub accent_bright: Option<String>,
+    /// Accent applied to icons (hex).
+    pub icon_accent: Option<String>,
+    /// Verified / synced / device-trust status (hex).
+    pub teal: Option<String>,
+    /// Chip / banner / info-card tint (hex).
+    pub tint_accent: Option<String>,
+    /// Selected / hover row tint (hex).
+    pub tint_selected: Option<String>,
+    /// Teal-status tint (hex).
+    pub tint_teal: Option<String>,
+    /// Warning-status tint (hex).
+    pub tint_orange: Option<String>,
+    /// Destructive-confirm tint (hex).
+    pub tint_danger: Option<String>,
+    /// Success-status tint (hex).
+    pub tint_green: Option<String>,
+    /// Modal / sheet backdrop (hex, may carry alpha #rrggbbaa).
+    pub scrim: Option<String>,
 }
 
 impl From<&vauchi_app::theme::ThemeColors> for MobileThemeColors {
@@ -319,6 +355,23 @@ impl From<&vauchi_app::theme::ThemeColors> for MobileThemeColors {
             error: colors.error.clone(),
             warning: colors.warning.clone(),
             border: colors.border.clone(),
+            surface: colors.surface.clone(),
+            surface_input: colors.surface_input.clone(),
+            surface_muted: colors.surface_muted.clone(),
+            surface_elevated: colors.surface_elevated.clone(),
+            bottombar_bg: colors.bottombar_bg.clone(),
+            text_label: colors.text_label.clone(),
+            text_muted: colors.text_muted.clone(),
+            accent_bright: colors.accent_bright.clone(),
+            icon_accent: colors.icon_accent.clone(),
+            teal: colors.teal.clone(),
+            tint_accent: colors.tint_accent.clone(),
+            tint_selected: colors.tint_selected.clone(),
+            tint_teal: colors.tint_teal.clone(),
+            tint_orange: colors.tint_orange.clone(),
+            tint_danger: colors.tint_danger.clone(),
+            tint_green: colors.tint_green.clone(),
+            scrim: colors.scrim.clone(),
         }
     }
 }
@@ -349,6 +402,10 @@ pub struct MobileTypographyTokens {
     pub subtitle_size: u16,
     pub body_size: u16,
     pub caption_size: u16,
+    /// ADR-038 Amendment 1: 7-step scale extensions.
+    pub caption_sm: u16,
+    pub title_lg: u16,
+    pub display: u16,
 }
 
 /// Design tokens: border radius.
@@ -406,6 +463,9 @@ impl From<&vauchi_app::theme::DesignTokens> for MobileDesignTokens {
                 subtitle_size: t.typography.subtitle_size,
                 body_size: t.typography.body_size,
                 caption_size: t.typography.caption_size,
+                caption_sm: t.typography.caption_sm,
+                title_lg: t.typography.title_lg,
+                display: t.typography.display,
             },
             border_radius: MobileBorderRadiusTokens {
                 sm: t.border_radius.sm,

@@ -11,6 +11,7 @@
 //! `failed_attempts` instead of hot-looping. These tests cover the durable
 //! marker; the pass + sync wiring are covered alongside the implementation.
 
+use proptest::prelude::*;
 use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::X3DHKeyPair;
@@ -237,4 +238,82 @@ fn pass_backed_off_at_cap_does_not_run() {
         0,
         "a backed-off marker does not run the pass (no hot-loop)"
     );
+}
+
+// --- CC-13 stateful property test for the marker state machine ---
+
+#[derive(Debug, Clone)]
+enum Op {
+    AddField(usize),
+    RemoveField(usize),
+    RunPass,
+}
+
+fn op_strategy() -> impl Strategy<Value = Op> {
+    prop_oneof![
+        (0usize..4).prop_map(Op::AddField),
+        (0usize..4).prop_map(Op::RemoveField),
+        Just(Op::RunPass),
+    ]
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(48))]
+
+    // @scenario: visibility_control :: An own-card edit is repropagated to contacts
+    #[test]
+    fn marker_tracks_owed_edits_over_random_edit_and_pass_sequences(
+        ops in prop::collection::vec(op_strategy(), 0..30),
+    ) {
+        let (wb, bob) = alice_with_ratcheted_bob();
+        let mut owed = false;
+        let mut present: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut last_pending = pending_count(&wb, &bob);
+
+        for op in ops {
+            match op {
+                Op::AddField(i) => {
+                    // Only add a label that is not already present, so the model
+                    // stays in step with the card (avoids duplicate labels).
+                    if present.insert(i) {
+                        wb.add_own_field(ContactField::new(
+                            FieldType::Email,
+                            &format!("f{i}"),
+                            &format!("v{i}@co.com"),
+                            0,
+                        ))
+                        .unwrap();
+                        owed = true;
+                    }
+                }
+                Op::RemoveField(i) => {
+                    if present.remove(&i) {
+                        let removed = wb.remove_own_field(&format!("f{i}")).unwrap();
+                        prop_assert!(removed, "a present field must actually be removed");
+                        owed = true;
+                    }
+                }
+                Op::RunPass => {
+                    wb.run_owed_repropagation().unwrap();
+                    let now = pending_count(&wb, &bob);
+                    prop_assert!(now >= last_pending, "queued updates never decrease");
+                    last_pending = now;
+                    // A successful pass (Bob is always reachable) clears the marker.
+                    owed = false;
+                }
+            }
+
+            let marker = wb.storage().ux().load_own_card_repropagate().unwrap();
+            prop_assert_eq!(
+                marker.needs_repropagate,
+                owed,
+                "the marker must track whether an edit is owed since the last successful pass"
+            );
+            prop_assert_eq!(
+                marker.failed_attempts,
+                0,
+                "every pass succeeds here, so the retry budget is never consumed"
+            );
+        }
+    }
 }

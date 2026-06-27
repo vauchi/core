@@ -392,6 +392,7 @@ fn test_apply_revocation_to_contact_registry() {
     );
 
     // Apply certificate to registry (as if received from contact)
+    let version_before = registry.version();
     registry
         .apply_revocation(&certificate, &signing_key.public_key())
         .unwrap();
@@ -402,6 +403,13 @@ fn test_apply_revocation_to_contact_registry() {
             .find_device(device1.device_id())
             .unwrap()
             .is_active()
+    );
+    // A revocation is a registry mutation: the version must advance by one so
+    // peers re-sync. Pins `self.version += 1` against `-=` / `*= 1` mutants.
+    assert_eq!(
+        registry.version(),
+        version_before + 1,
+        "apply_revocation must bump the registry version exactly once"
     );
 }
 

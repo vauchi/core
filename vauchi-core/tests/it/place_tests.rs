@@ -185,3 +185,25 @@ fn save_place_preserves_id_for_sync() {
     assert_eq!(loaded.id, original.id, "save_place keeps the supplied id");
     assert_eq!(loaded.created_at, 42);
 }
+
+// @scenario: contact-annotations.feature - Name a place and have it auto-suggest by proximity
+// @internal
+#[test]
+fn is_near_includes_radius_boundary_and_excludes_beyond() {
+    let place = Place::new("The Anchor Bar", ANCHOR_LAT, ANCHOR_LON, 0);
+
+    // The place's own coordinates sit at distance 0, which is within any
+    // positive radius. This pins the `<=` in `distance_m(..) <= radius_m`:
+    // a `>` mutant flips this to `0.0 > 50.0` and reports "not near".
+    assert!(
+        place.is_near(ANCHOR_LAT, ANCHOR_LON, 50.0),
+        "a point at the place must be within a 50 m radius"
+    );
+
+    // ~7.5 km east (0.1° lon at this latitude) is far outside 50 m. Under the
+    // `>` mutant this would wrongly report "near".
+    assert!(
+        !place.is_near(ANCHOR_LAT, ANCHOR_LON + 0.1, 50.0),
+        "a point ~7.5 km away must not be within a 50 m radius"
+    );
+}

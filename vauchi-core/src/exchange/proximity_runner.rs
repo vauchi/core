@@ -552,4 +552,33 @@ mod tests {
         // Both constant → zero variance → 0.0
         assert_eq!(super::cross_correlate(&a, &b), 0.0);
     }
+
+    // @internal
+    #[test]
+    fn cross_correlate_correlated_but_not_identical() {
+        // Strongly (but not perfectly) correlated signals. The identical-signal
+        // case can't catch a `da * db` → `da / db` mutant: da/db is 1.0
+        // everywhere and clamps back to 1.0. Here the cross term genuinely
+        // differs — the real product gives ~0.99, the division mutant ~0.19.
+        let a = vec![1.0, 2.0, 4.0];
+        let b = vec![1.0, 2.0, 6.0];
+        let r = super::cross_correlate(&a, &b);
+        assert!((r - 0.989_743).abs() < 1e-3, "Expected ~0.9897, got {r}");
+    }
+
+    // @internal
+    #[test]
+    fn accelerometer_converts_milli_g_with_division() {
+        let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
+        // 1000/2000/2000 milli-g → 1.0/2.0/2.0 g → magnitude √(1+4+4) = 3.0.
+        // A `/ 1000.0` → `% 1000.0` mutant zeroes the converted axis (n % 1000
+        // == 0 for these multiples of 1000), changing the magnitude.
+        runner.feed_event(&Event::AccelerometerData {
+            x_milli_g: 1000,
+            y_milli_g: 2000,
+            z_milli_g: 2000,
+            timestamp_ms: 0,
+        });
+        assert_eq!(runner.accel_samples, vec![3.0]);
+    }
 }

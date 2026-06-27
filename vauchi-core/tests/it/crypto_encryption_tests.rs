@@ -123,6 +123,29 @@ fn test_encrypt_with_ad_prevents_ad_mismatch() {
 // @scenario: security :: Contact cards are encrypted at rest
 // @internal
 #[test]
+fn test_decrypt_with_ad_rejects_short_ciphertext() {
+    use vauchi_core::crypto::encryption::EncryptionError;
+
+    let key = SymmetricKey::generate();
+
+    // Tag 0x03 (AD-bound) followed by a 30-byte body. The AD path requires
+    // at least nonce (24) + tag (16) = 40 bytes after the tag, so 30 must be
+    // rejected as too short. This pins the `+` in `XCHACHA20_NONCE_SIZE +
+    // TAG_SIZE`: a `-` mutant lowers the minimum to 8, lets the 30-byte body
+    // through, and surfaces a `DecryptionFailed` instead.
+    let mut ciphertext = vec![0x03u8];
+    ciphertext.extend_from_slice(&[0u8; 30]);
+
+    let result = decrypt_with_ad(&key, &ciphertext, b"ad");
+    assert!(
+        matches!(result, Err(EncryptionError::CiphertextTooShort)),
+        "30-byte AD ciphertext must be CiphertextTooShort, got {result:?}"
+    );
+}
+
+// @scenario: security :: Contact cards are encrypted at rest
+// @internal
+#[test]
 fn test_ad_bound_ciphertext_cannot_use_plain_decrypt() {
     let key = SymmetricKey::generate();
     let data = b"ad-bound";

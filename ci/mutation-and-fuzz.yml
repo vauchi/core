@@ -71,6 +71,13 @@ mutation:nightly:
     # which run the suite to completion (caught mutants still exit on first
     # failure). 600s leaves headroom while still bounding genuine infinite-loop
     # mutants. Sharding remains the real throughput lever for the 11k budget.
+    #
+    # Confirmed 2026-06-27: a local reclassification of the nightly TIMEOUT set
+    # (apply_revocation / set_nickname / contains_device et al.) ran every one
+    # to completion single-threaded — they are slow *survivors* under jobs-8
+    # contention, NOT hangs. So lowering this value recovers no hang time; it
+    # only relabels slow survivors MISSED -> TIMEOUT (both already flag a gap)
+    # and re-triggers the spurious-survivor-timeout regression noted above.
     MUTATION_TIMEOUT_NIGHTLY: "600"
     # `--in-place` was previously required because vauchi-platform's THEMES_JSON
     # const did include_bytes!("../../../themes/generated/themes.json") — a path
@@ -92,7 +99,13 @@ mutation:nightly:
     # that values >8 overload the machine. min(8, nproc) is applied in
     # before_script because GitLab parameter expansion does not recursively
     # evaluate $(...) — see core!673 for the original substitution bug.
-    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs"
+    #
+    # Exclusions live in .cargo/mutants.toml `exclude_re`, NOT here: a CLI
+    # `--exclude-re` flag REPLACES the config list in cargo-mutants 26.x
+    # rather than merging it, so passing `--exclude-re theme.rs` here silently
+    # dropped the equivalent-mutant exclusions (avatar mod.rs 52:30 / 63:29)
+    # and burned a full per-mutant timeout on each every night.
+    MUTATION_EXTRA_FLAGS: ""
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]

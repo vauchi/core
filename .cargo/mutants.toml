@@ -21,6 +21,12 @@ exclude_re = [
     "test_themes_json_not_empty",
     "test_theme_by_id_found_in_json",
     "test_theme_by_id_not_found_in_json",
+    # theme.rs: same cross-repo include_bytes! constraint. Kept here (not as
+    # a CI `--exclude-re` flag) because cargo-mutants 26.x has a CLI
+    # `--exclude-re` REPLACE every entry in this list rather than merge —
+    # passing it on the command line silently re-enabled the equivalent
+    # avatar mutants below and wasted full-timeout runs on them.
+    "theme\\.rs",
 
     # ── Equivalent mutations in vauchi-core/src/avatar/mod.rs ──
     # Verified 2026-04-27 against an unmutated build. Each of these

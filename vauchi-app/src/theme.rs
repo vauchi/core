@@ -150,6 +150,24 @@ pub struct TypographyTokens {
     pub title_lg: u16,
     #[serde(default = "default_display")]
     pub display: u16,
+    // ADR-038 / inclusive v2 (2026-06-27): a "medium" size step, per-step
+    // line-heights, and the large-text scale (stored as percent so
+    // DesignTokens stays Eq). Defaulted for back-compat with tokens
+    // serialized before the inclusive redesign.
+    #[serde(default = "default_medium_size")]
+    pub medium_size: u16,
+    #[serde(default = "default_title_line")]
+    pub title_line: u16,
+    #[serde(default = "default_subtitle_line")]
+    pub subtitle_line: u16,
+    #[serde(default = "default_medium_line")]
+    pub medium_line: u16,
+    #[serde(default = "default_body_line")]
+    pub body_line: u16,
+    #[serde(default = "default_caption_line")]
+    pub caption_line: u16,
+    #[serde(default = "default_text_scale_percent")]
+    pub text_scale_percent: u16,
 }
 
 fn default_caption_sm() -> u16 {
@@ -162,6 +180,34 @@ fn default_title_lg() -> u16 {
 
 fn default_display() -> u16 {
     32
+}
+
+fn default_medium_size() -> u16 {
+    20
+}
+
+fn default_title_line() -> u16 {
+    30
+}
+
+fn default_subtitle_line() -> u16 {
+    24
+}
+
+fn default_medium_line() -> u16 {
+    28
+}
+
+fn default_body_line() -> u16 {
+    24
+}
+
+fn default_caption_line() -> u16 {
+    20
+}
+
+fn default_text_scale_percent() -> u16 {
+    100
 }
 
 /// Directional spacing tokens for content and list items.
@@ -190,6 +236,26 @@ pub struct BorderRadiusTokens {
     pub md: u16,
     pub md_lg: u16,
     pub lg: u16,
+    // ADR-038 / inclusive v2 (2026-06-27): semantic chip/card/sheet scale.
+    // Defaulted for back-compat with pre-redesign tokens.
+    #[serde(default = "default_radius_chip")]
+    pub chip: u16,
+    #[serde(default = "default_radius_card")]
+    pub card: u16,
+    #[serde(default = "default_radius_sheet")]
+    pub sheet: u16,
+}
+
+fn default_radius_chip() -> u16 {
+    12
+}
+
+fn default_radius_card() -> u16 {
+    20
+}
+
+fn default_radius_sheet() -> u16 {
+    28
 }
 
 /// Touch target size tokens for accessibility.
@@ -657,6 +723,13 @@ mod tests {
         assert_eq!(tokens.typography.subtitle_size, 18);
         assert_eq!(tokens.typography.body_size, 16);
         assert_eq!(tokens.typography.caption_size, 14);
+        assert_eq!(tokens.typography.medium_size, 20);
+        assert_eq!(tokens.typography.title_line, 30);
+        assert_eq!(tokens.typography.subtitle_line, 24);
+        assert_eq!(tokens.typography.medium_line, 28);
+        assert_eq!(tokens.typography.body_line, 24);
+        assert_eq!(tokens.typography.caption_line, 20);
+        assert_eq!(tokens.typography.text_scale_percent, 100);
     }
 
     #[test]
@@ -666,6 +739,9 @@ mod tests {
         assert_eq!(tokens.border_radius.md, 8);
         assert_eq!(tokens.border_radius.md_lg, 12);
         assert_eq!(tokens.border_radius.lg, 16);
+        assert_eq!(tokens.border_radius.chip, 12);
+        assert_eq!(tokens.border_radius.card, 20);
+        assert_eq!(tokens.border_radius.sheet, 28);
     }
 
     #[test]

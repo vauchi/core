@@ -35,8 +35,8 @@ const FROZEN_TOKENS_JSON: &str = r#"{
   "version": "2.0.0",
   "spacing": { "xs": 4, "sm": 8, "sm_md": 12, "md": 16, "lg": 24, "xl": 32 },
   "spacing_direction": { "content_start": 16, "content_end": 16, "list_item_start": 8, "list_item_end": 8, "list_item_inline_start": 12, "list_item_inline_end": 12 },
-  "typography": { "title_size": 24, "subtitle_size": 18, "body_size": 16, "caption_size": 14, "caption_sm": 12, "title_lg": 20, "display": 32 },
-  "border_radius": { "sm": 4, "md": 8, "md_lg": 12, "lg": 16 },
+  "typography": { "title_size": 24, "subtitle_size": 18, "body_size": 16, "caption_size": 14, "caption_sm": 12, "title_lg": 20, "display": 32, "medium_size": 20, "title_line": 30, "subtitle_line": 24, "medium_line": 28, "body_line": 24, "caption_line": 20, "text_scale_percent": 100 },
+  "border_radius": { "sm": 4, "md": 8, "md_lg": 12, "lg": 16, "chip": 12, "card": 20, "sheet": 28 },
   "touch_target": { "minimum": 44 },
   "motion": { "enter_duration_ms": 200, "exit_duration_ms": 150, "emphasis_duration_ms": 300 }
 }"#;

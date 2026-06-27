@@ -21,6 +21,7 @@ mod features;
 mod identity;
 mod import;
 mod merge;
+mod ohttp_key_error;
 mod onboarding;
 mod places;
 mod propagation;

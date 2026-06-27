@@ -36,6 +36,7 @@ pub const PERIODIC_SYNC_INTERVAL_SECONDS: u64 = 900;
 /// configure for a failed periodic sync. Audit P2-C.
 pub const PERIODIC_SYNC_MAX_RETRIES: u32 = 3;
 
+use super::ohttp_key_error::should_refetch_key_and_retry;
 use super::receive_routing::process_received_blobs;
 use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
@@ -76,25 +77,30 @@ impl Vauchi {
             return Ok(VauchiSyncOutcome::TooSoon);
         }
 
-        // 2. Attempt sync, with one retry on stale OHTTP key
-        match self.sync_inner() {
-            Ok(outcome) => {
-                self.update_timing_after_sync();
-                Ok(outcome)
-            }
-            Err(ref e) if is_ohttp_key_error(e) => {
-                // Key is stale — evict cache, re-resolve (bundled or direct), retry.
-                // best-effort: if clear fails the next sync cycle will hit the
-                // same stale-key error and retry this same path
-                let relay_url = self.http_relay_url();
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = self.storage.ohttp_cache().clear_ohttp_key(&relay_url);
-                let key_bytes = self.resolve_ohttp_key(&relay_url)?;
-                let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
-                self.ohttp_key = Some(client);
+        // 2. Attempt sync, with one retry on a stale OHTTP key. A stale-key
+        // failure surfaces on EITHER leg: the receive leg returns a typed
+        // `Err`, the send leg folds it into `Ok { errors }`. Both must reach
+        // the evict+refetch+retry path, otherwise a send-leg 502 is deferred a
+        // full sync cadence (2026-05-25-relay-ohttp-forward-hop-502,
+        // send-phase swallow).
+        let first = self.sync_inner();
+        if should_refetch_key_and_retry(&first) {
+            // Key is stale — evict cache, re-resolve (bundled or direct), retry
+            // once. best-effort: if clear fails the next sync cycle hits the
+            // same stale-key error and retries this same path.
+            let relay_url = self.http_relay_url();
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.storage.ohttp_cache().clear_ohttp_key(&relay_url);
+            let key_bytes = self.resolve_ohttp_key(&relay_url)?;
+            let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
+            self.ohttp_key = Some(client);
 
-                // Retry
-                let outcome = self.sync_inner()?;
+            let outcome = self.sync_inner()?;
+            self.update_timing_after_sync();
+            return Ok(outcome);
+        }
+        match first {
+            Ok(outcome) => {
                 self.update_timing_after_sync();
                 Ok(outcome)
             }
@@ -809,24 +815,6 @@ impl Vauchi {
     }
 }
 
-/// Heuristic: does this error look like a stale/rejected OHTTP key?
-///
-/// Matches HTTP 400/502 or messages containing "ohttp". 400 is the gateway
-/// rejecting decapsulation (stale/rotated key); 502 is the OHTTP relay masking
-/// that decap-400 as Bad Gateway — it never forwards the upstream status, so a
-/// stale key reaches the client as 502, not 400 (problem
-/// 2026-05-25-relay-ohttp-forward-hop-502), and must also trigger a refetch so
-/// key rotation survives without a reinstall. A false positive costs one extra
-/// key fetch (cheap); a false negative just retries on the next sync.
-fn is_ohttp_key_error(err: &VauchiError) -> bool {
-    if let VauchiError::Network(ne) = err {
-        let msg = ne.to_string().to_lowercase();
-        msg.contains("400") || msg.contains("502") || msg.contains("ohttp")
-    } else {
-        false
-    }
-}
-
 /// Merge `source` pins into `target`, skipping duplicates.
 fn merge_pins(target: &mut Vec<PinnedCertificate>, source: &[PinnedCertificate]) {
     for pin in source {
@@ -842,86 +830,6 @@ fn merge_pins(target: &mut Vec<PinnedCertificate>, source: &[PinnedCertificate])
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::network::NetworkError;
-    use crate::storage::StorageError;
-
-    // =========================================================================
-    // W-3: is_ohttp_key_error heuristic
-    // =========================================================================
-
-    // @scenario: ohttp_sync :: key error heuristic matches HTTP 400
-    #[test]
-    fn test_is_ohttp_key_error_http_400() {
-        let err = VauchiError::Network(NetworkError::ConnectionFailed(
-            "400 Bad Request".to_string(),
-        ));
-        assert!(
-            is_ohttp_key_error(&err),
-            "Network error containing '400' must be classified as an OHTTP key error"
-        );
-    }
-
-    // @scenario: ohttp_sync :: key error heuristic matches ohttp keyword
-    #[test]
-    fn test_is_ohttp_key_error_ohttp_in_message() {
-        let err = VauchiError::Network(NetworkError::RelayRejected(
-            "ohttp decapsulation failed".to_string(),
-        ));
-        assert!(
-            is_ohttp_key_error(&err),
-            "Network error containing 'ohttp' must be classified as an OHTTP key error"
-        );
-    }
-
-    // @scenario: ohttp_sync :: key error heuristic matches HTTP 502 (relay-masked decap failure)
-    #[test]
-    fn test_is_ohttp_key_error_http_502() {
-        // The OHTTP relay maps the gateway's decapsulation rejection (HTTP 400
-        // on a stale/rotated key) to 502 Bad Gateway before it reaches the
-        // client — it never forwards the upstream status. So a stale key
-        // surfaces to the client as 502, not 400, and the stale-key
-        // refetch+retry path must trigger on 502 too. Without this, a client
-        // holding a stale gateway key never refetches and stays broken across
-        // every key rotation until reinstall.
-        // Problem record: 2026-05-25-relay-ohttp-forward-hop-502.
-        let err = VauchiError::Network(NetworkError::ConnectionFailed("HTTP 502".to_string()));
-        assert!(
-            is_ohttp_key_error(&err),
-            "Network error containing '502' (relay-masked gateway decap failure) must be classified as an OHTTP key error"
-        );
-    }
-
-    // @scenario: ohttp_sync :: key error heuristic rejects storage errors
-    #[test]
-    fn test_is_ohttp_key_error_storage_error_is_false() {
-        let err = VauchiError::Storage(StorageError::NotFound("key".to_string()));
-        assert!(
-            !is_ohttp_key_error(&err),
-            "Storage error must NOT be classified as an OHTTP key error"
-        );
-    }
-
-    // @scenario: ohttp_sync :: key error heuristic rejects connection refused
-    #[test]
-    fn test_is_ohttp_key_error_connection_refused_is_false() {
-        let err = VauchiError::Network(NetworkError::ConnectionFailed(
-            "connection refused".to_string(),
-        ));
-        assert!(
-            !is_ohttp_key_error(&err),
-            "Connection-refused error must NOT be classified as an OHTTP key error"
-        );
-    }
-
-    // @scenario: ohttp_sync :: key error heuristic rejects timeout
-    #[test]
-    fn test_is_ohttp_key_error_timeout_is_false() {
-        let err = VauchiError::Network(NetworkError::Timeout);
-        assert!(
-            !is_ohttp_key_error(&err),
-            "Timeout error must NOT be classified as an OHTTP key error"
-        );
-    }
 
     // =========================================================================
     // W-4: http_relay_url() scheme conversion

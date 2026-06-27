@@ -99,6 +99,11 @@ pub struct ThemeColors {
     pub tint_green: Option<String>,
     #[serde(default)]
     pub scrim: Option<String>,
+    // ADR-038 Amendment 3 (2026-06-27): v2 inclusive-redesign roles.
+    #[serde(rename = "text-on-accent", default)]
+    pub text_on_accent: Option<String>,
+    #[serde(rename = "focus-ring", default)]
+    pub focus_ring: Option<String>,
 }
 
 /// Design tokens for consistent cross-platform rendering.

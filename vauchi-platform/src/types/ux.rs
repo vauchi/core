@@ -339,6 +339,10 @@ pub struct MobileThemeColors {
     pub tint_green: Option<String>,
     /// Modal / sheet backdrop (hex, may carry alpha #rrggbbaa).
     pub scrim: Option<String>,
+    /// ADR-038 Amendment 3: text/icon colour on an accent fill (hex).
+    pub text_on_accent: Option<String>,
+    /// ADR-038 Amendment 3: focus-visible ring stroke (hex).
+    pub focus_ring: Option<String>,
 }
 
 impl From<&vauchi_app::theme::ThemeColors> for MobileThemeColors {
@@ -372,6 +376,8 @@ impl From<&vauchi_app::theme::ThemeColors> for MobileThemeColors {
             tint_danger: colors.tint_danger.clone(),
             tint_green: colors.tint_green.clone(),
             scrim: colors.scrim.clone(),
+            text_on_accent: colors.text_on_accent.clone(),
+            focus_ring: colors.focus_ring.clone(),
         }
     }
 }

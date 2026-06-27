@@ -559,5 +559,6 @@ vauchi-platform/tests/it/platform_app_engine_domain_command_tests.rs 3372
 # test module (theme_tests.rs) to drop back under 1000. Crossed 1000 with
 # the ADR-038 inclusive-v2 token structs (font_family/font_weight/focus +
 # typography line-heights). Tracked in _private record
-# 2026-06-27-inclusive-component-redesign.
-vauchi-app/src/theme.rs 1016
+# 2026-06-27-inclusive-component-redesign. (+5 2026-06-27: ADR-038
+# Amendment 3 text-on-accent + focus-ring ThemeColors fields.)
+vauchi-app/src/theme.rs 1021

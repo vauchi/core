@@ -13,9 +13,18 @@
 //!
 //! Mirrors `exchange_cancel_navigation_tests.rs` (the multi-stage sibling).
 
+#[cfg(feature = "testing")]
+use std::sync::Arc;
+#[cfg(feature = "testing")]
+use std::time::{Duration, SystemTime};
+
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
+// FakeClock is `#[cfg(any(test, feature = "testing"))]`; the no-feature
+// pre-push compile check excludes the clock-driven test below with it.
+#[cfg(feature = "testing")]
+use vauchi_core::clock::{Clock, FakeClock};
 
 fn engine_with_identity() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -177,5 +186,53 @@ fn cancel_on_ble_exchange_lands_on_mode_picker() {
         !matches!(engine.current_app_screen(), AppScreen::BleExchange { .. }),
         "Cancel must navigate off the BleExchange AppScreen, still on {:?}",
         engine.current_app_screen()
+    );
+}
+
+// @internal
+#[cfg(feature = "testing")]
+#[test]
+fn ble_discovery_times_out_via_poll_notifications_past_budget() {
+    // The wait-forever fix: a peerless BLE discovery ("Searching…") must fail
+    // once the engine's stall budget (BLE_STEP_TIMEOUT_SECS = 60s) elapses,
+    // driven by the `poll_notifications` pump (the only non-test tick driver).
+    // Reproduces the live Pixel 3a observation (discovery never timed out)
+    // through the real AppEngine surface with a FakeClock instead of a wait
+    // (CC-06). Pairs with the Android app-level pump that calls
+    // pollNotifications on every Ready screen.
+    let fake = Arc::new(FakeClock::new(
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+    ));
+    let clock: Arc<dyn Clock> = fake.clone();
+    let mut vauchi = Vauchi::in_memory_with_clock(clock).expect("in-memory Vauchi");
+    vauchi.create_identity("Alice").expect("identity");
+    let mut engine = AppEngine::new(vauchi);
+    let _ = engine.navigate_to(AppScreen::Exchange);
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "category:quick".into(),
+        item_id: "mode:magic".into(),
+    });
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_ble_discovering",
+        "Magic should land on the live BLE discovering screen"
+    );
+
+    // Below the 60s budget: a poll must NOT trip the timeout.
+    fake.advance(Duration::from_secs(55));
+    let _ = engine.poll_notifications();
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_ble_discovering",
+        "must still be discovering before the 60s stall budget"
+    );
+
+    // Past the budget (total 65s): a poll MUST fail the stalled discovery.
+    fake.advance(Duration::from_secs(10));
+    let _ = engine.poll_notifications();
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_failed",
+        "poll_notifications past BLE_STEP_TIMEOUT_SECS must fail the peerless BLE discovery"
     );
 }

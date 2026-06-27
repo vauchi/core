@@ -782,9 +782,27 @@ impl PlatformAppEngine {
                 engine.current_app_screen(),
                 AppScreen::MultiStageExchange { .. }
             );
+        // Bounded-wait exchange engines (BLE / NFC / cable) fail a stalled
+        // step from their own `tick` inside `poll_notifications` above — but,
+        // unlike the multi-stage machine, nothing fired an invalidation, so
+        // the timed-out `Failed` screen never reached the frontend and the
+        // "Searching…" screen waited forever. This is the second half of
+        // `2026-06-11-exchange-waits-forever`: the frontend pump now ticks
+        // the engine, but the resulting screen change must also be surfaced.
+        // Fire one here so the listener's unconditional `loadScreen()`
+        // re-fetches the post-timeout screen (cheap over-fire — renders are
+        // idempotent against the same screen JSON).
+        let bounded_wait_id: Option<String> = match engine.current_app_screen() {
+            s @ (AppScreen::BleExchange { .. }
+            | AppScreen::NfcExchange
+            | AppScreen::DirectTransport) => Some(s.screen_id().to_string()),
+            _ => None,
+        };
         drop(engine);
         if multi_stage_active {
             self.fire_screens_invalidated(vec!["multi_stage_exchange".into()]);
+        } else if let Some(id) = bounded_wait_id {
+            self.fire_screens_invalidated(vec![id]);
         }
         let mapped = items
             .into_iter()

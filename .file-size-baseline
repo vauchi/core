@@ -539,7 +539,10 @@ vauchi-app/src/ui/multi_stage_exchange.rs 2118
 # (+8 for BLE terminal-event invalidation in handle_hardware_event
 # 2026-06-10 — routing logic, not a dispatch arm; the listener-fire
 # helper itself lives in platform_app_engine_internals.rs)
-vauchi-platform/src/platform_app_engine.rs 1133
+# (+18 for bounded-wait BLE/NFC/cable timeout invalidation in
+# poll_notifications 2026-06-27 — routing logic, the second half of
+# 2026-06-11-exchange-waits-forever; mirrors the +8 terminal-event fire)
+vauchi-platform/src/platform_app_engine.rs 1151
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

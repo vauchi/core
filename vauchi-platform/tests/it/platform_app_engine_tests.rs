@@ -1069,3 +1069,44 @@ fn ble_machine_terminal_event_fires_invalidation_and_flips_chrome() {
         "terminal BLE machine event must fire on_screens_invalidated"
     );
 }
+
+// @internal
+#[test]
+fn poll_notifications_on_ble_discovery_fires_invalidation() {
+    // Second half of the wait-forever fix (`2026-06-11-exchange-waits-forever`):
+    // a bounded-wait BLE discovery times out in core via the `tick` inside
+    // `poll_notifications` — but unlike a hardware-event terminal (covered by
+    // `ble_machine_terminal_event_fires_invalidation_and_flips_chrome`), the
+    // pre-fix `poll_notifications` fired NO invalidation for the BLE screen, so
+    // a flipped `Failed` screen never reached the frontend and "Searching…"
+    // waited forever. Assert a bare poll on the BLE screen now invalidates, so
+    // the listener's unconditional `loadScreen()` surfaces a tick-driven flip.
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+
+    let calls: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
+    engine
+        .set_event_listener(Box::new(RecordingListener {
+            calls: Arc::clone(&calls),
+        }))
+        .expect("register listener");
+
+    engine
+        .navigate_to_json_for_test(r#"{"BleExchange":{"mode":"magic"}}"#.into())
+        .expect("navigate to BLE exchange");
+    calls.lock().unwrap().clear(); // ignore navigation-time fires
+
+    // No hardware event — just a bare poll, the cadence the frontend pump runs.
+    engine.poll_notifications().expect("poll");
+
+    assert!(
+        calls
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|ids| ids.iter().any(|id| id == "ble_exchange")),
+        "a bare poll on the BLE discovering screen must fire \
+         on_screens_invalidated([\"ble_exchange\"]) so a tick-driven timeout surfaces; got {:?}",
+        calls.lock().unwrap()
+    );
+}

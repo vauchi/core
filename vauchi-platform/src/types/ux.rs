@@ -412,6 +412,8 @@ pub struct MobileTypographyTokens {
     pub caption_sm: u16,
     pub title_lg: u16,
     pub display: u16,
+    /// ADR-038 Amendment 3: large-text scale (percent; 100 = 1.0x).
+    pub text_scale_percent: u16,
 }
 
 /// Design tokens: border radius.
@@ -472,6 +474,7 @@ impl From<&vauchi_app::theme::DesignTokens> for MobileDesignTokens {
                 caption_sm: t.typography.caption_sm,
                 title_lg: t.typography.title_lg,
                 display: t.typography.display,
+                text_scale_percent: t.typography.text_scale_percent,
             },
             border_radius: MobileBorderRadiusTokens {
                 sm: t.border_radius.sm,

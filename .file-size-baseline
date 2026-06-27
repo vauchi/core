@@ -553,3 +553,11 @@ vauchi-platform/tests/it/platform_app_engine_domain_command_tests.rs 3372
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)
+
+# SPLIT — queued: theme.rs production code is only ~573 lines; the overflow
+# is a ~440-line inline #[cfg(test)] mod tests. Extract it to a #[path]
+# test module (theme_tests.rs) to drop back under 1000. Crossed 1000 with
+# the ADR-038 inclusive-v2 token structs (font_family/font_weight/focus +
+# typography line-heights). Tracked in _private record
+# 2026-06-27-inclusive-component-redesign.
+vauchi-app/src/theme.rs 1016

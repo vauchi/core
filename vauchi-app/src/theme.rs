@@ -115,6 +115,15 @@ pub struct DesignTokens {
     pub border_radius: BorderRadiusTokens,
     pub touch_target: TouchTargetTokens,
     pub motion: MotionTokens,
+    // ADR-038 / inclusive v2 (2026-06-27): font families, weight ramp, and
+    // focus-ring metrics. #[serde(default)] for back-compat with tokens
+    // serialized before these categories existed.
+    #[serde(default)]
+    pub font_family: FontFamilyTokens,
+    #[serde(default)]
+    pub font_weight: FontWeightTokens,
+    #[serde(default)]
+    pub focus: FocusTokens,
 }
 
 /// Spacing scale for margins, padding, and gaps.
@@ -272,6 +281,66 @@ pub struct MotionTokens {
     pub enter_duration_ms: u16,
     pub exit_duration_ms: u16,
     pub emphasis_duration_ms: u16,
+}
+
+/// Font family names (bundled SIL-OFL webfonts; the renderer maps them to
+/// platform font handles).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FontFamilyTokens {
+    pub display: String,
+    pub body: String,
+    pub mono: String,
+}
+
+impl Default for FontFamilyTokens {
+    fn default() -> Self {
+        Self {
+            display: "Bricolage Grotesque".to_string(),
+            body: "Hanken Grotesk".to_string(),
+            mono: "JetBrains Mono".to_string(),
+        }
+    }
+}
+
+/// Font weight ramp.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FontWeightTokens {
+    pub regular: u16,
+    pub medium: u16,
+    pub semibold: u16,
+    pub bold: u16,
+    pub extrabold: u16,
+}
+
+impl Default for FontWeightTokens {
+    fn default() -> Self {
+        Self {
+            regular: 400,
+            medium: 500,
+            semibold: 600,
+            bold: 700,
+            extrabold: 800,
+        }
+    }
+}
+
+/// Focus-visible ring metrics (the ring colour is a Vauchi/Semantic token).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FocusTokens {
+    pub ring_width: u16,
+    pub ring_offset: u16,
+}
+
+impl Default for FocusTokens {
+    fn default() -> Self {
+        Self {
+            ring_width: 3,
+            ring_offset: 2,
+        }
+    }
 }
 
 // DesignTokens defaults are parsed at runtime from the bundled tokens.json
@@ -768,6 +837,34 @@ mod tests {
         assert_eq!(tokens.motion.enter_duration_ms, 200);
         assert_eq!(tokens.motion.exit_duration_ms, 150);
         assert_eq!(tokens.motion.emphasis_duration_ms, 300);
+    }
+
+    // @internal
+    #[test]
+    fn test_design_tokens_default_font_family() {
+        let tokens = DesignTokens::default();
+        assert_eq!(tokens.font_family.display, "Bricolage Grotesque");
+        assert_eq!(tokens.font_family.body, "Hanken Grotesk");
+        assert_eq!(tokens.font_family.mono, "JetBrains Mono");
+    }
+
+    // @internal
+    #[test]
+    fn test_design_tokens_default_font_weight() {
+        let tokens = DesignTokens::default();
+        assert_eq!(tokens.font_weight.regular, 400);
+        assert_eq!(tokens.font_weight.medium, 500);
+        assert_eq!(tokens.font_weight.semibold, 600);
+        assert_eq!(tokens.font_weight.bold, 700);
+        assert_eq!(tokens.font_weight.extrabold, 800);
+    }
+
+    // @internal
+    #[test]
+    fn test_design_tokens_default_focus() {
+        let tokens = DesignTokens::default();
+        assert_eq!(tokens.focus.ring_width, 3);
+        assert_eq!(tokens.focus.ring_offset, 2);
     }
 
     #[test]

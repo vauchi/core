@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Regression: a card UPDATE round-trips over a REAL multi-stage (mobile QR)
-//! exchange — the exact path iOS/Android use.
+//! exchange — the exact path iOS/Android use — and the negative mechanism that
+//! reproduces the device "received=0 rejected=N" symptom.
 //!
 //! `multistage_ratchet_roundtrip_tests` proves the multi-stage ratchet
 //! round-trips DIRECT messages on the in-memory ratchet objects. This pins the
@@ -15,10 +16,13 @@
 //!
 //! The mobile QR exchange routes through `MultiStageSession::build_exchange_ratchet`
 //! (`multi_stage_exchange.rs:373`), keyed off the multistage `transport_key`
-//! (HKDF `vauchi-multistage-v1`), NOT the X3DH `ExchangeSession` path. The
-//! on-device symptom (`sync.receive_phase received=0 rejected=N` — blobs
-//! delivered + token-routed but never decrypt) reproduces here with zero relay
-//! and zero CLI if this layer is the cause.
+//! (HKDF `vauchi-multistage-v1`), NOT the X3DH `ExchangeSession` path.
+//!
+//! The positive test PASSES — core's pipeline is sound. The negative test pins
+//! the device-bug MECHANISM: when the mobile completion's `build_exchange_ratchet`
+//! returns `None` (silenced via `.ok()` at `multi_stage_exchange.rs:379-386`),
+//! the contact is saved WITHOUT a ratchet via `update_contact`, and every later
+//! update is rejected — exactly the on-device `received=0 rejected=N`.
 //!
 //! Problem record: 2026-06-28-sync-delivery-sent-not-received (step 2).
 //! Feature: features/sync_updates.feature, features/contact_exchange.feature @multi-stage
@@ -26,9 +30,23 @@
 use crate::common;
 
 use common::helpers::create_vauchi_with_card;
+use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::ProtocolState;
-use vauchi_core::{Contact, FieldType, SymmetricKey};
+use vauchi_core::{Contact, FieldType, SymmetricKey, Vauchi, VauchiError};
+
+/// Two Vauchis that have completed a real multi-stage exchange, with the
+/// role-correct ratchet built for each side (not yet persisted).
+struct ExchangedPair {
+    alice: Vauchi,
+    bob: Vauchi,
+    alice_ratchet: DoubleRatchetState,
+    alice_is_initiator: bool,
+    bob_ratchet: DoubleRatchetState,
+    bob_is_initiator: bool,
+    bob_at_alice: Contact,
+    alice_at_bob: Contact,
+}
 
 /// Drive two sessions through a full multi-stage exchange to `Finalized`
 /// (mirrors `multistage_ratchet_roundtrip_tests::drive_to_finalized`).
@@ -71,9 +89,9 @@ fn drive_to_finalized(
     (alice, bob)
 }
 
-// @scenario: sync_updates :: A card update propagates after a multi-stage exchange
-#[test]
-fn multistage_in_person_exchange_card_update_round_trips() {
+/// Run a real multi-stage exchange between two fresh Vauchis and build each
+/// side's role-correct ratchet via the production `build_exchange_ratchet` seam.
+fn multistage_exchanged_pair() -> ExchangedPair {
     let alice = create_vauchi_with_card("Alice", vec![(FieldType::Email, "work", "alice@old.com")]);
     let bob = create_vauchi_with_card("Bob", vec![(FieldType::Email, "personal", "bob@old.com")]);
 
@@ -82,8 +100,8 @@ fn multistage_in_person_exchange_card_update_round_trips() {
     let alice_card = alice.own_card().unwrap().unwrap();
     let bob_card = bob.own_card().unwrap().unwrap();
 
-    // ── Real multi-stage exchange to Finalized; the ratchet is keyed off the
-    //    transport ephemerals, so the card bytes here are immaterial.
+    // The ratchet is keyed off the transport ephemerals, so the card bytes
+    // handed to the session here are immaterial.
     let (alice_session, bob_session) =
         drive_to_finalized(b"alice card".to_vec(), b"bob card".to_vec());
     let alice_tk = alice_session
@@ -92,8 +110,8 @@ fn multistage_in_person_exchange_card_update_round_trips() {
     let bob_tk = bob_session.get_transport_key().expect("bob transport key");
     assert_eq!(alice_tk, bob_tk, "transport key must be symmetric");
 
-    // The real identity keys drive the deterministic role decision so the
-    // persisted contact ids (Contact::from_exchange) and the ratchet roles agree.
+    // Real identity keys drive the deterministic role decision so the persisted
+    // contact ids and the ratchet roles agree.
     let (alice_ratchet, alice_is_initiator) = alice_session
         .build_exchange_ratchet(&alice_pk, &bob_pk)
         .expect("alice ratchet builds");
@@ -105,33 +123,120 @@ fn multistage_in_person_exchange_card_update_round_trips() {
         "exactly one side must be the initiator"
     );
 
-    // ── Persist through the real save seam (serialise + reload on prepare/process).
-    let bob_at_alice = Contact::from_exchange(
-        bob_pk,
-        bob_card.clone(),
-        SymmetricKey::from_bytes(alice_tk),
-        0,
-    );
-    let alice_at_bob = Contact::from_exchange(
-        alice_pk,
-        alice_card.clone(),
-        SymmetricKey::from_bytes(bob_tk),
-        0,
-    );
-    let bob_id = bob_at_alice.id().to_string();
-    let alice_id = alice_at_bob.id().to_string();
+    let bob_at_alice =
+        Contact::from_exchange(bob_pk, bob_card, SymmetricKey::from_bytes(alice_tk), 0);
+    let alice_at_bob =
+        Contact::from_exchange(alice_pk, alice_card, SymmetricKey::from_bytes(bob_tk), 0);
 
-    alice
-        .save_exchanged_contact(&bob_at_alice, &alice_ratchet, alice_is_initiator)
-        .unwrap();
-    bob.save_exchanged_contact(&alice_at_bob, &bob_ratchet, bob_is_initiator)
-        .unwrap();
-
-    // ── Card update: the INITIATOR sends first (responder must receive once
-    //    before it can send). This is the device "Alice edits her email" path.
-    if alice_is_initiator {
-        common::helpers::assert_card_update_round_trips(&alice, &bob, &bob_id, &alice_id);
-    } else {
-        common::helpers::assert_card_update_round_trips(&bob, &alice, &alice_id, &bob_id);
+    ExchangedPair {
+        alice,
+        bob,
+        alice_ratchet,
+        alice_is_initiator,
+        bob_ratchet,
+        bob_is_initiator,
+        bob_at_alice,
+        alice_at_bob,
     }
+}
+
+// @scenario: sync_updates :: A card update propagates after a multi-stage exchange
+#[test]
+fn multistage_in_person_exchange_card_update_round_trips() {
+    let p = multistage_exchanged_pair();
+    let bob_id = p.bob_at_alice.id().to_string();
+    let alice_id = p.alice_at_bob.id().to_string();
+
+    // ── Persist through the real save seam (serialise + reload on prepare/process).
+    p.alice
+        .save_exchanged_contact(&p.bob_at_alice, &p.alice_ratchet, p.alice_is_initiator)
+        .unwrap();
+    p.bob
+        .save_exchanged_contact(&p.alice_at_bob, &p.bob_ratchet, p.bob_is_initiator)
+        .unwrap();
+
+    // ── The INITIATOR sends first (responder must receive once before it can
+    //    send). This is the device "Alice edits her email" path.
+    if p.alice_is_initiator {
+        common::helpers::assert_card_update_round_trips(&p.alice, &p.bob, &bob_id, &alice_id);
+    } else {
+        common::helpers::assert_card_update_round_trips(&p.bob, &p.alice, &alice_id, &bob_id);
+    }
+}
+
+/// MECHANISM: a contact persisted WITHOUT a ratchet — the silenced
+/// `build_exchange_ratchet` None-path at mobile completion saves the contact
+/// via `update_contact` instead of `save_exchanged_contact` — rejects every
+/// incoming card update with `NotFound("ratchet state")`. In the receive phase
+/// that is `token_resolved && !decrypted`, i.e. the device's `rejected=N`.
+// @scenario: sync_updates :: A contact saved without a ratchet rejects card updates
+#[test]
+fn multistage_contact_without_ratchet_rejects_card_update() {
+    let p = multistage_exchanged_pair();
+    let bob_id = p.bob_at_alice.id().to_string();
+    let alice_id = p.alice_at_bob.id().to_string();
+
+    // Save the INITIATOR with its ratchet so it can SEND; save the RESPONDER
+    // via the contact-only path (no ratchet) — the silenced None-path.
+    let (sender, sender_old_value, recipient, recipient_id_at_sender, sender_id_at_recipient) =
+        if p.alice_is_initiator {
+            p.alice
+                .save_exchanged_contact(&p.bob_at_alice, &p.alice_ratchet, true)
+                .unwrap();
+            p.bob.add_contact(p.alice_at_bob.clone()).unwrap(); // no ratchet
+            (&p.alice, "alice@old.com", &p.bob, bob_id, alice_id)
+        } else {
+            p.bob
+                .save_exchanged_contact(&p.alice_at_bob, &p.bob_ratchet, true)
+                .unwrap();
+            p.alice.add_contact(p.bob_at_alice.clone()).unwrap(); // no ratchet
+            (&p.bob, "bob@old.com", &p.alice, alice_id, bob_id)
+        };
+
+    // Sender (initiator) edits its email and prepares the encrypted update.
+    let old_card = sender.own_card().unwrap().unwrap();
+    let field_id = old_card.fields().first().unwrap().id().to_string();
+    let mut new_card = old_card.clone();
+    new_card
+        .update_field_value(&field_id, "updated@new.com", 1)
+        .unwrap();
+    sender.update_own_card(&new_card).unwrap();
+    let new_card = sender.own_card().unwrap().unwrap();
+    let encrypted = sender
+        .prepare_card_update_for_contact(&recipient_id_at_sender, &old_card, &new_card)
+        .expect("initiator prepares the card update");
+
+    // The ratchet-less recipient cannot decrypt → NotFound("ratchet state").
+    let result = recipient.process_card_update(&sender_id_at_recipient, &encrypted);
+    match result {
+        Err(VauchiError::NotFound(what)) => {
+            assert!(
+                what.contains("ratchet"),
+                "expected a missing-ratchet rejection, got NotFound({what})"
+            );
+        }
+        other => panic!("ratchet-less contact must reject the update, got {other:?}"),
+    }
+
+    // And the recipient's stored card is unchanged — the edit never crossed.
+    let stored = recipient
+        .get_contact(&sender_id_at_recipient)
+        .unwrap()
+        .unwrap();
+    assert!(
+        stored
+            .card()
+            .fields()
+            .iter()
+            .all(|f| f.value() != "updated@new.com"),
+        "the update must NOT apply at a ratchet-less peer"
+    );
+    assert!(
+        stored
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.value() == sender_old_value),
+        "the recipient must still hold the sender's pre-update value"
+    );
 }

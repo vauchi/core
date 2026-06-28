@@ -21,7 +21,7 @@ members = [
 exclude = ["vendor/rqrr"]
 
 [workspace.package]
-version = "0.51.56"
+version = "0.51.57"
 edition = "2024"
 rust-version = "1.93"
 license = "GPL-3.0-or-later"

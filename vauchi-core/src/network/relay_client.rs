@@ -444,7 +444,15 @@ impl<T: Transport> RelayClient<T> {
                 message_index: ratchet_msg.message_index,
                 previous_chain_length: ratchet_msg.previous_chain_length,
             },
-            ciphertext: ratchet_msg.ciphertext.clone(),
+            // The full serialized RatchetMessage, NOT the bare AEAD body: the
+            // HTTP transport ships only this `ciphertext` (it drops
+            // `ratchet_header`), and the receiver reconstructs via
+            // `from_slice::<RatchetMessage>`. A bare body loses the DH header,
+            // so the responder cannot DH-step the initiator's first message
+            // (2026-06-28-sync-delivery-sent-not-received). to_vec on this
+            // fixed-shape struct is infallible (cf. session.rs commitment).
+            ciphertext: serde_json::to_vec(ratchet_msg)
+                .expect("RatchetMessage serialization is infallible"),
         };
 
         create_envelope(MessagePayload::EncryptedUpdate(encrypted_update), now)
@@ -564,4 +572,57 @@ pub struct ProcessResult {
     pub message_ids: Vec<MessageId>,
     /// Errors encountered.
     pub errors: Vec<(String, NetworkError)>,
+}
+
+// INLINE_TEST_REQUIRED: `create_update_envelope` is a private method on
+// RelayClient; asserting the wire `ciphertext` contract needs same-module
+// access. tests/it/ cannot reach it.
+#[cfg(test)]
+mod wire_format_tests {
+    use super::*;
+    use crate::crypto::ratchet::RatchetMessage;
+    use crate::network::mock::MockTransport;
+
+    // The HTTP transport ships only `EncryptedUpdate.ciphertext`
+    // (`http_adapter::send` base64s that field and drops `ratchet_header`),
+    // and the receiver reconstructs via
+    // `from_slice::<RatchetMessage>(ciphertext)`. So the wire `ciphertext`
+    // MUST be the FULL serialized RatchetMessage, not the bare AEAD body —
+    // otherwise the Double Ratchet header (dh_public/generation/indices) is
+    // lost and the responder can never DH-step the initiator's first message.
+    // Regression for 2026-06-28-sync-delivery-sent-not-received (on hardware:
+    // `blobsFetched=1 rejected=1 cardsUpdated=0`).
+    // @internal
+    #[test]
+    fn update_envelope_ciphertext_is_full_serialized_ratchet_message() {
+        let client = RelayClient::new(
+            MockTransport::new(),
+            RelayClientConfig::default(),
+            "sender-identity".to_string(),
+        );
+        let original = RatchetMessage {
+            dh_public: [9u8; 32],
+            dh_generation: 4,
+            message_index: 7,
+            previous_chain_length: 3,
+            ciphertext: b"aead-body".to_vec(),
+        };
+        let envelope = client.create_update_envelope("recipient-token", &original, None, 0);
+        let MessagePayload::EncryptedUpdate(update) = envelope.payload else {
+            panic!("expected EncryptedUpdate payload");
+        };
+        let reconstructed: RatchetMessage = serde_json::from_slice(&update.ciphertext)
+            .expect("wire ciphertext must be a full serialized RatchetMessage (header preserved)");
+        assert_eq!(
+            reconstructed.dh_public, original.dh_public,
+            "DH public must survive"
+        );
+        assert_eq!(reconstructed.dh_generation, original.dh_generation);
+        assert_eq!(reconstructed.message_index, original.message_index);
+        assert_eq!(
+            reconstructed.previous_chain_length,
+            original.previous_chain_length
+        );
+        assert_eq!(reconstructed.ciphertext, original.ciphertext);
+    }
 }

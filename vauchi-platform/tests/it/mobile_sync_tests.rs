@@ -77,8 +77,14 @@ fn too_soon_maps_to_benign_no_change_result() {
 // @internal
 #[test]
 fn ok_outcome_maps_received_and_sent_counts() {
+    // Distinct fetched/rejected/unresolved values so the delivery-diagnostics
+    // mapping (added for 2026-06-28-sync-delivery-sent-not-received) is
+    // verified field-by-field, not aliased to received/sent.
     let outcome = VauchiSyncOutcome::Ok {
         received: 3,
+        fetched: 5,
+        rejected: 1,
+        unresolved: 1,
         sent: 2,
         acknowledged: 0,
         errors: vec![],
@@ -95,6 +101,9 @@ fn ok_outcome_maps_received_and_sent_counts() {
         result.contacts_added, 0,
         "contacts_added stays 0 (outcome carries no such count, matching legacy)"
     );
+    assert_eq!(result.blobs_fetched, 5, "fetched maps to blobs_fetched");
+    assert_eq!(result.rejected, 1, "rejected maps through");
+    assert_eq!(result.unresolved, 1, "unresolved maps through");
 }
 
 // @internal
@@ -102,6 +111,9 @@ fn ok_outcome_maps_received_and_sent_counts() {
 fn ok_outcome_with_zero_counts_has_no_changes() {
     let outcome = VauchiSyncOutcome::Ok {
         received: 0,
+        fetched: 0,
+        rejected: 0,
+        unresolved: 0,
         sent: 0,
         acknowledged: 0,
         errors: vec![],

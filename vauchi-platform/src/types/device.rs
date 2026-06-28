@@ -97,6 +97,15 @@ pub struct MobileSyncResult {
     pub has_changes: bool,
     /// Display names of contacts whose cards were updated (for UI notification).
     pub updated_contact_names: Vec<String>,
+    /// Diagnostics: total blobs fetched from the mailbox this sync.
+    /// `blobs_fetched=0` = nothing delivered (relay store/forward or token);
+    /// `>0` with `cards_updated=0` = arrived but rejected (decrypt).
+    /// 2026-06-28-sync-delivery-sent-not-received.
+    pub blobs_fetched: u32,
+    /// Diagnostics: token-resolved but undecryptable.
+    pub rejected: u32,
+    /// Diagnostics: token-unresolved (no contact-token match).
+    pub unresolved: u32,
 }
 
 /// Maps a core sync outcome to the mobile result shape.
@@ -116,13 +125,23 @@ impl TryFrom<vauchi_core::api::VauchiSyncOutcome> for MobileSyncResult {
     fn try_from(outcome: vauchi_core::api::VauchiSyncOutcome) -> Result<Self, Self::Error> {
         use vauchi_core::api::VauchiSyncOutcome;
         match outcome {
-            VauchiSyncOutcome::Ok { received, sent, .. } => Ok(MobileSyncResult {
+            VauchiSyncOutcome::Ok {
+                received,
+                fetched,
+                rejected,
+                unresolved,
+                sent,
+                ..
+            } => Ok(MobileSyncResult {
                 contacts_added: 0,
                 cards_updated: received as u32,
                 updates_sent: sent as u32,
                 total: (received + sent) as u32,
                 has_changes: received > 0 || sent > 0,
                 updated_contact_names: vec![],
+                blobs_fetched: fetched as u32,
+                rejected: rejected as u32,
+                unresolved: unresolved as u32,
             }),
             VauchiSyncOutcome::TooSoon => Ok(MobileSyncResult {
                 contacts_added: 0,
@@ -131,6 +150,9 @@ impl TryFrom<vauchi_core::api::VauchiSyncOutcome> for MobileSyncResult {
                 total: 0,
                 has_changes: false,
                 updated_contact_names: vec![],
+                blobs_fetched: 0,
+                rejected: 0,
+                unresolved: 0,
             }),
             VauchiSyncOutcome::NotConnected => Err(crate::error::MobileError::Other {
                 detail: "Not connected".into(),

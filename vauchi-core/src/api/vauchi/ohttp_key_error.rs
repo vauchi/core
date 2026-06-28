@@ -154,6 +154,9 @@ mod tests {
     fn ok_outcome_with_errors(errors: Vec<String>) -> VauchiSyncOutcome {
         VauchiSyncOutcome::Ok {
             received: 0,
+            fetched: 0,
+            rejected: 0,
+            unresolved: 0,
             sent: 0,
             acknowledged: 0,
             errors,

@@ -129,7 +129,8 @@ impl Vauchi {
             .connect(&TransportConfig::default())
             .map_err(VauchiError::Network)?;
 
-        let received = self.run_receive_phase(identity, &contacts, &mut adapter)?;
+        let (received, fetched, rejected, unresolved) =
+            self.run_receive_phase(identity, &contacts, &mut adapter)?;
 
         // Capture version policy from relay response headers before adapter is moved.
         let version_policy = adapter.last_version_policy();
@@ -150,6 +151,9 @@ impl Vauchi {
 
         Ok(VauchiSyncOutcome::Ok {
             received,
+            fetched,
+            rejected,
+            unresolved,
             sent: send_result.sent,
             acknowledged: send_result.acknowledged,
             errors,
@@ -287,14 +291,18 @@ impl Vauchi {
     /// the sender. Failed attempts are safe because they return early before
     /// advancing ratchet state.
     ///
-    /// Returns the number of successfully received (decrypted + applied) updates.
+    /// Returns `(received, fetched, rejected, unresolved)`: applied updates,
+    /// total blobs fetched from the mailbox, token-resolved-but-undecryptable,
+    /// and token-unresolved. The breakdown splits sent-not-received into
+    /// delivery (`fetched=0`) vs decrypt/token (`fetched>0`) — diagnostics for
+    /// 2026-06-28-sync-delivery-sent-not-received.
     #[tracing::instrument(level = "debug", skip_all, name = "sync.receive_phase")]
     fn run_receive_phase(
         &self,
         identity: &crate::identity::Identity,
         contacts: &[Contact],
         adapter: &mut HttpTransportAdapter,
-    ) -> VauchiResult<usize> {
+    ) -> VauchiResult<(usize, usize, usize, usize)> {
         // 1. Register mailbox tokens so the adapter knows what to fetch
         self.register_tokens(identity, contacts, adapter)?;
 
@@ -314,8 +322,9 @@ impl Vauchi {
             }
         }
 
+        let fetched = blobs.len();
         if blobs.is_empty() {
-            return Ok(0);
+            return Ok((0, fetched, 0, 0));
         }
 
         // 2b. Partition self-token (device-sync) blobs out of the contact
@@ -423,7 +432,7 @@ impl Vauchi {
             let _ = adapter.send(&ack_envelope);
         }
 
-        Ok(received + device_applied)
+        Ok((received + device_applied, fetched, rejected, unresolved))
     }
 
     // `register_tokens` moved to `device_sync_loop.rs` (it registers the

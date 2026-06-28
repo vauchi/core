@@ -111,6 +111,15 @@ pub enum VauchiSyncOutcome {
     /// Sync completed — received and sent counts.
     Ok {
         received: usize,
+        /// Total blobs fetched from the mailbox. Delivery diagnostics:
+        /// `fetched=0` = nothing arrived (relay store/forward or token);
+        /// `fetched>0` with `received=0` = arrived but rejected (decrypt).
+        /// 2026-06-28-sync-delivery-sent-not-received.
+        fetched: usize,
+        /// Token-resolved but undecryptable.
+        rejected: usize,
+        /// Token-unresolved (no contact-token match).
+        unresolved: usize,
         sent: usize,
         acknowledged: usize,
         errors: Vec<String>,

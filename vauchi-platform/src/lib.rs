@@ -485,6 +485,9 @@ mod tests {
             total: 0,
             has_changes: false,
             updated_contact_names: vec![],
+            blobs_fetched: 0,
+            rejected: 0,
+            unresolved: 0,
         };
         assert_eq!(empty.total, 0);
         assert!(!empty.has_changes);
@@ -496,6 +499,9 @@ mod tests {
             total: 6,
             has_changes: true,
             updated_contact_names: vec!["Alice".to_string()],
+            blobs_fetched: 0,
+            rejected: 0,
+            unresolved: 0,
         };
         assert_eq!(with_changes.total, 6);
         assert!(with_changes.has_changes);
@@ -507,6 +513,9 @@ mod tests {
             total: 1,
             has_changes: true,
             updated_contact_names: vec![],
+            blobs_fetched: 0,
+            rejected: 0,
+            unresolved: 0,
         };
         assert_eq!(partial.total, 1);
         assert!(partial.has_changes);

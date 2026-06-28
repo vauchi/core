@@ -177,6 +177,60 @@ pub fn setup_three_users() -> (
     (alice, bob, carol, secrets)
 }
 
+/// Drive one card-update through the full Vauchi pipeline over an already
+/// established + persisted ratchet pair, asserting the recipient decrypts and
+/// applies it. `sender` edits its first card field; the `recipient` must see
+/// the new value. The `sender` must be the ratchet INITIATOR — the responder
+/// has no sending chain until it has received once.
+///
+/// `recipient_id_at_sender` is the recipient's contact id as stored at the
+/// sender (the `prepare` target); `sender_id_at_recipient` is the sender's
+/// contact id as stored at the recipient (the `process` source).
+pub fn assert_card_update_round_trips(
+    sender: &Vauchi,
+    recipient: &Vauchi,
+    recipient_id_at_sender: &str,
+    sender_id_at_recipient: &str,
+) {
+    let sender_old = sender.own_card().unwrap().unwrap();
+    let field_id = sender_old
+        .fields()
+        .first()
+        .expect("sender has a card field to edit")
+        .id()
+        .to_string();
+    let mut new_card = sender_old.clone();
+    new_card
+        .update_field_value(&field_id, "updated@new.com", 1)
+        .unwrap();
+    sender.update_own_card(&new_card).unwrap();
+    let sender_new = sender.own_card().unwrap().unwrap();
+
+    let encrypted = sender
+        .prepare_card_update_for_contact(recipient_id_at_sender, &sender_old, &sender_new)
+        .expect("initiator prepares the card update");
+    let changed = recipient
+        .process_card_update(sender_id_at_recipient, &encrypted)
+        .expect("the in-person-exchanged peer must decrypt the first card update");
+    assert!(
+        !changed.is_empty(),
+        "the card update must apply at least one field at the peer"
+    );
+
+    let updated = recipient
+        .get_contact(sender_id_at_recipient)
+        .unwrap()
+        .unwrap();
+    assert!(
+        updated
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.value() == "updated@new.com"),
+        "the updated value must reflect at the peer after a real-exchange decrypt"
+    );
+}
+
 /// Assert that a Vauchi has a specific number of contacts.
 pub fn assert_contact_count(wb: &Vauchi, expected: usize) {
     let contacts = wb.storage().contacts().list_contacts().unwrap();

@@ -366,11 +366,26 @@ impl AppEngine {
         );
         let contact_id = contact.id().to_string();
         // Build the role-correct Double Ratchet (owned data, so the session
-        // borrow ends before the save below).
-        let ratchet = self
-            .multi_stage_session
-            .as_ref()
-            .and_then(|h| h.machine.build_exchange_ratchet(&our_identity, &peer_pk));
+        // borrow ends before the save below). A None splits two ways: no
+        // session at all (benign — the repeat-exchange card-only upsert), or a
+        // live session whose ratchet bootstrap failed. The latter is a broken
+        // channel: the contact is saved WITHOUT a ratchet, so every later card
+        // update fails to decrypt (sync.receive_phase rejected=N) — surface it
+        // instead of swallowing (2026-06-28-sync-delivery-sent-not-received).
+        let ratchet = match self.multi_stage_session.as_ref() {
+            None => None,
+            Some(h) => {
+                let built = h.machine.build_exchange_ratchet(&our_identity, &peer_pk);
+                if built.is_none() {
+                    log::warn!(
+                        "multi-stage: build_exchange_ratchet returned None despite an \
+                         active session — contact saved WITHOUT a ratchet; incoming \
+                         card updates will not decrypt"
+                    );
+                }
+                built
+            }
+        };
         // Upsert + rekey via the unified core routine so a REPEAT multi-stage
         // exchange updates the peer's card and rekeys, instead of silently
         // dropping it: the old `add_contact` rejected the duplicate id and

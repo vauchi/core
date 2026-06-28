@@ -265,8 +265,7 @@ impl LabelStore<'_> {
             _ => Ok(None),
         }
     }
-    /// Decrypts an encrypted blob, falling back to plaintext only for
-    /// pre-migration data (#156).
+
     /// Decrypts an optional binary blob (e.g. an avatar) without UTF-8 decoding.
     fn decrypt_optional_bytes(
         &self,
@@ -281,6 +280,8 @@ impl LabelStore<'_> {
         }
     }
 
+    /// Decrypts an encrypted blob, falling back to plaintext only for
+    /// pre-migration data (#156).
     fn decrypt_or_fallback(
         &self,
         encrypted: Option<&[u8]>,

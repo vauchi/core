@@ -496,6 +496,30 @@ mod tests {
         assert_ne!(resolved, default_avatar.as_slice());
     }
 
+    #[test]
+    fn test_label_bio_override_caps_by_chars_not_bytes() {
+        let mut label = Group::new("Family", 0);
+        let cap = crate::contact_card::MAX_BIO_LENGTH;
+
+        // 'ä' (U+00E4) is NFC-stable and 2 bytes: `cap` of them is within the
+        // char cap but exceeds it in bytes — the cap must count chars.
+        let at_cap = "ä".repeat(cap);
+        assert!(
+            at_cap.len() > cap,
+            "precondition: byte length exceeds char cap"
+        );
+        label
+            .set_bio_override(Some(&at_cap), 0)
+            .expect("cap multibyte chars should succeed (cap is chars, not bytes)");
+        assert_eq!(label.bio_override().map(|b| b.chars().count()), Some(cap));
+
+        let over_cap = "ä".repeat(cap + 1);
+        assert!(matches!(
+            label.set_bio_override(Some(&over_cap), 0),
+            Err(GroupError::InvalidBio(_))
+        ));
+    }
+
     /// Encodes a 1x1 PNG that `normalize_avatar` accepts (mirrors avatar_normalize_tests).
     fn encode_test_png() -> Vec<u8> {
         use image::{ImageBuffer, Rgb};

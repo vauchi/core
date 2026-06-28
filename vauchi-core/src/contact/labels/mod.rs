@@ -10,9 +10,11 @@
 
 mod group;
 mod manager;
+mod resolved_presentation;
 
 pub use group::Group;
 pub use manager::GroupManager;
+pub use resolved_presentation::ResolvedPresentation;
 
 /// Maximum number of labels allowed per user.
 pub const MAX_LABELS: usize = 50;

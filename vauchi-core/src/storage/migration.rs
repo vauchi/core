@@ -541,6 +541,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "own_card_repropagate",
             action: MigrationAction::Sql(MIGRATION_V55_OWN_CARD_REPROPAGATE),
         },
+        Migration {
+            version: 56,
+            name: "group_presentation",
+            action: MigrationAction::Sql(MIGRATION_V56_GROUP_PRESENTATION),
+        },
     ]
 }
 
@@ -864,6 +869,10 @@ const MIGRATION_V54_RELAY_URL: &str = "ALTER TABLE ux_state ADD COLUMN relay_url
 // counter for backoff). Decoupled from device-sync `SyncItem::CardUpdated`.
 const MIGRATION_V55_OWN_CARD_REPROPAGATE: &str =
     "ALTER TABLE ux_state ADD COLUMN own_card_repropagate_encrypted BLOB;";
+
+// Per-group presentation overrides (ADR-054 D2): bio + avatar, shown to a
+// group's contacts instead of the card defaults. Both encrypted at rest.
+const MIGRATION_V56_GROUP_PRESENTATION: &str = "ALTER TABLE visibility_labels ADD COLUMN bio_override_encrypted BLOB; ALTER TABLE visibility_labels ADD COLUMN avatar_override_encrypted BLOB;";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "
     CREATE TABLE IF NOT EXISTS local_groups (

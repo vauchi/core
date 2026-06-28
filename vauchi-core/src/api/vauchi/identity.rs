@@ -325,6 +325,10 @@ impl Vauchi {
                 label.name.clone(),
                 contacts,
                 std::collections::HashSet::new(),
+                // The backup label section carries no presentation overrides
+                // (display name / bio / avatar) — restore them empty.
+                None,
+                None,
                 None,
                 now,
                 now,

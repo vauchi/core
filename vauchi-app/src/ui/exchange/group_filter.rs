@@ -93,6 +93,8 @@ mod tests {
             HashSet::new(),
             visible.iter().map(|s| s.to_string()).collect(),
             None,
+            None,
+            None,
             0,
             0,
         )

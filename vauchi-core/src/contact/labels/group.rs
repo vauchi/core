@@ -30,6 +30,14 @@ pub struct Group {
     /// user's default display name.
     #[serde(default)]
     display_name_override: Option<String>,
+    /// Optional per-group bio override (ADR-054 D2). Shown to this group's
+    /// contacts instead of the card's default bio.
+    #[serde(default)]
+    bio_override: Option<String>,
+    /// Optional per-group avatar override (WebP, ADR-042). Shown to this
+    /// group's contacts instead of the card's default avatar.
+    #[serde(default)]
+    avatar_override: Option<Vec<u8>>,
     /// Timestamp when the label was created.
     created_at: u64,
     /// Timestamp when the label was last modified.
@@ -51,6 +59,8 @@ impl Group {
             contacts: HashSet::new(),
             visible_fields: HashSet::new(),
             display_name_override: None,
+            bio_override: None,
+            avatar_override: None,
             created_at: now,
             modified_at: now,
         }
@@ -63,6 +73,8 @@ impl Group {
         contacts: HashSet<String>,
         visible_fields: HashSet<String>,
         display_name_override: Option<String>,
+        bio_override: Option<String>,
+        avatar_override: Option<Vec<u8>>,
         created_at: u64,
         modified_at: u64,
     ) -> Self {
@@ -72,6 +84,8 @@ impl Group {
             contacts,
             visible_fields,
             display_name_override,
+            bio_override,
+            avatar_override,
             created_at,
             modified_at,
         }
@@ -143,6 +157,69 @@ impl Group {
             Some(override_name) => override_name.as_str(),
             None => default_name,
         }
+    }
+
+    /// Returns the bio override, if set.
+    pub fn bio_override(&self) -> Option<&str> {
+        self.bio_override.as_deref()
+    }
+
+    /// Sets or clears the bio override (ADR-054 D2). Trimmed; an empty result
+    /// clears it. Rejects a bio longer than `MAX_BIO_LENGTH` characters.
+    pub fn set_bio_override(&mut self, bio: Option<&str>, now: u64) -> Result<(), GroupError> {
+        match bio {
+            None => self.bio_override = None,
+            Some(raw) => {
+                let normalized = crate::text::normalize_text(raw);
+                if normalized.is_empty() {
+                    self.bio_override = None;
+                } else if normalized.chars().count() > crate::contact_card::MAX_BIO_LENGTH {
+                    return Err(GroupError::InvalidBio(
+                        "Bio override cannot exceed 160 characters".to_string(),
+                    ));
+                } else {
+                    self.bio_override = Some(normalized);
+                }
+            }
+        }
+        self.touch(now);
+        Ok(())
+    }
+
+    /// Resolves the bio for this group's contacts: the override if set,
+    /// otherwise the provided default (the card's bio).
+    pub fn resolve_bio<'a>(&'a self, default_bio: Option<&'a str>) -> Option<&'a str> {
+        self.bio_override.as_deref().or(default_bio)
+    }
+
+    /// Returns the avatar override bytes, if set.
+    pub fn avatar_override(&self) -> Option<&[u8]> {
+        self.avatar_override.as_deref()
+    }
+
+    /// Sets or clears the avatar override (WebP, ADR-042). `None` clears.
+    /// Accepts any common format and normalizes to WebP <= 32 KB internally.
+    pub fn set_avatar_override(
+        &mut self,
+        avatar: Option<&[u8]>,
+        now: u64,
+    ) -> Result<(), GroupError> {
+        match avatar {
+            None => self.avatar_override = None,
+            Some(raw) => {
+                let webp = crate::contact_card::normalize_avatar(raw)
+                    .map_err(|e| GroupError::InvalidAvatar(e.to_string()))?;
+                self.avatar_override = Some(webp);
+            }
+        }
+        self.touch(now);
+        Ok(())
+    }
+
+    /// Resolves the avatar for this group's contacts: the override if set,
+    /// otherwise the provided default (the card's avatar).
+    pub fn resolve_avatar<'a>(&'a self, default_avatar: Option<&'a [u8]>) -> Option<&'a [u8]> {
+        self.avatar_override.as_deref().or(default_avatar)
     }
 
     /// Returns the set of contact IDs in this label.
@@ -299,6 +376,134 @@ mod tests {
             .set_display_name_override(None, 0)
             .expect("clearing should succeed");
         assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
+    }
+
+    #[test]
+    fn test_label_bio_override() {
+        let mut label = Group::new("Family", 0);
+
+        assert_eq!(label.bio_override(), None);
+
+        label
+            .set_bio_override(Some("Dad of three"), 0)
+            .expect("valid bio should succeed");
+        assert_eq!(label.bio_override(), Some("Dad of three"));
+
+        label
+            .set_bio_override(None, 0)
+            .expect("clearing should succeed");
+        assert_eq!(label.bio_override(), None);
+    }
+
+    #[test]
+    fn test_label_bio_override_validation() {
+        let mut label = Group::new("Friends", 0);
+
+        // Empty / whitespace clears (mirrors ContactCard::set_bio), not an error.
+        label.set_bio_override(Some(""), 0).expect("empty clears");
+        assert_eq!(label.bio_override(), None);
+        label
+            .set_bio_override(Some("   "), 0)
+            .expect("whitespace clears");
+        assert_eq!(label.bio_override(), None);
+
+        let too_long = "a".repeat(crate::contact_card::MAX_BIO_LENGTH + 1);
+        let result = label.set_bio_override(Some(&too_long), 0);
+        assert!(matches!(result, Err(GroupError::InvalidBio(_))));
+
+        let max_bio = "b".repeat(crate::contact_card::MAX_BIO_LENGTH);
+        label
+            .set_bio_override(Some(&max_bio), 0)
+            .expect("160 chars should succeed");
+        assert_eq!(label.bio_override(), Some(max_bio.as_str()));
+
+        label
+            .set_bio_override(Some("  trimmed bio  "), 0)
+            .expect("trimmed bio should succeed");
+        assert_eq!(label.bio_override(), Some("trimmed bio"));
+    }
+
+    #[test]
+    fn test_label_resolve_bio() {
+        let mut label = Group::new("Business", 0);
+
+        assert_eq!(label.resolve_bio(Some("default bio")), Some("default bio"));
+        assert_eq!(label.resolve_bio(None), None);
+
+        label
+            .set_bio_override(Some("work bio"), 0)
+            .expect("valid bio");
+        assert_eq!(label.resolve_bio(Some("default bio")), Some("work bio"));
+        // Override wins even when the card has no default bio.
+        assert_eq!(label.resolve_bio(None), Some("work bio"));
+
+        label.set_bio_override(None, 0).expect("clearing");
+        assert_eq!(label.resolve_bio(Some("default bio")), Some("default bio"));
+    }
+
+    #[test]
+    fn test_label_avatar_override() {
+        let mut label = Group::new("Family", 0);
+        assert_eq!(label.avatar_override(), None);
+
+        let png = encode_test_png();
+        label
+            .set_avatar_override(Some(&png), 0)
+            .expect("valid image should succeed");
+        let stored = label.avatar_override().expect("avatar set");
+        // Stored as WebP (normalized), not the raw PNG bytes.
+        assert_eq!(&stored[0..4], b"RIFF", "avatar override should be WebP");
+        assert_eq!(&stored[8..12], b"WEBP");
+
+        label
+            .set_avatar_override(None, 0)
+            .expect("clearing should succeed");
+        assert_eq!(label.avatar_override(), None);
+    }
+
+    #[test]
+    fn test_label_avatar_override_rejects_invalid() {
+        let mut label = Group::new("Friends", 0);
+
+        let result = label.set_avatar_override(Some(&[]), 0);
+        assert!(matches!(result, Err(GroupError::InvalidAvatar(_))));
+
+        let result = label.set_avatar_override(Some(b"not an image"), 0);
+        assert!(matches!(result, Err(GroupError::InvalidAvatar(_))));
+        // A rejected set leaves the prior value untouched.
+        assert_eq!(label.avatar_override(), None);
+    }
+
+    #[test]
+    fn test_label_resolve_avatar() {
+        let mut label = Group::new("Business", 0);
+        let default_avatar = vec![1u8, 2, 3];
+
+        assert_eq!(
+            label.resolve_avatar(Some(&default_avatar)),
+            Some(default_avatar.as_slice())
+        );
+        assert_eq!(label.resolve_avatar(None), None);
+
+        let png = encode_test_png();
+        label
+            .set_avatar_override(Some(&png), 0)
+            .expect("valid image");
+        let resolved = label
+            .resolve_avatar(Some(&default_avatar))
+            .expect("override resolves");
+        assert_eq!(&resolved[0..4], b"RIFF");
+        assert_ne!(resolved, default_avatar.as_slice());
+    }
+
+    /// Encodes a 1x1 PNG that `normalize_avatar` accepts (mirrors avatar_normalize_tests).
+    fn encode_test_png() -> Vec<u8> {
+        use image::{ImageBuffer, Rgb};
+        let img: image::RgbImage = ImageBuffer::from_pixel(1, 1, Rgb([42u8, 128, 200]));
+        let mut buf = Vec::new();
+        img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+            .expect("PNG encoding should succeed");
+        buf
     }
 
     #[test]

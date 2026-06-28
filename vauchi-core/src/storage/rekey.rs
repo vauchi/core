@@ -103,6 +103,9 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("ux_state", "own_card_repropagate_encrypted"),
     // V30 label display name override
     ("visibility_labels", "display_name_override_encrypted"),
+    // V56 per-group presentation overrides (ADR-054 D2)
+    ("visibility_labels", "bio_override_encrypted"),
+    ("visibility_labels", "avatar_override_encrypted"),
     // V38 exchange state crash recovery
     ("exchange_states", "encrypted_blob"),
     // V43 contact display: nickname, custom avatar, shared avatars
@@ -702,7 +705,7 @@ impl Storage {
         Ok(())
     }
 
-    /// Re-encrypt visibility_labels: contacts_json, visible_fields_json, name, name_hmac, display_name_override
+    /// Re-encrypt visibility_labels: contacts_json, visible_fields_json, name, name_hmac, display_name_override, bio_override, avatar_override
     fn rekey_visibility_labels(
         &self,
         old_key: &SymmetricKey,
@@ -710,13 +713,15 @@ impl Storage {
     ) -> Result<(), StorageError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted FROM visibility_labels WHERE contacts_json_encrypted IS NOT NULL")
+            .prepare("SELECT id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted FROM visibility_labels WHERE contacts_json_encrypted IS NOT NULL")
             .map_err(|e| StorageError::Migration(format!("Read labels: {}", e)))?;
 
         #[allow(clippy::type_complexity)]
         let rows: Vec<(
             String,
             Vec<u8>,
+            Option<Vec<u8>>,
+            Option<Vec<u8>>,
             Option<Vec<u8>>,
             Option<Vec<u8>>,
             Option<Vec<u8>>,
@@ -728,6 +733,8 @@ impl Storage {
                     row.get(2)?,
                     row.get(3)?,
                     row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
                 ))
             })
             .map_err(|e| StorageError::Migration(format!("Query labels: {}", e)))?
@@ -739,7 +746,16 @@ impl Storage {
             HKDF::derive_key(None, new_key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
         let new_hmac_key_ref: &[u8] = &*new_hmac_key_bytes;
 
-        for (id, contacts_enc, fields_enc, name_enc, override_enc) in &rows {
+        for (
+            id,
+            contacts_enc,
+            fields_enc,
+            name_enc,
+            override_enc,
+            bio_override_enc,
+            avatar_override_enc,
+        ) in &rows
+        {
             let contacts_new = if !contacts_enc.is_empty() {
                 let plain = decrypt(old_key, contacts_enc).map_err(|e| {
                     StorageError::Migration(format!("Decrypt label contacts {}: {}", id, e))
@@ -802,9 +818,45 @@ impl Storage {
                 None
             };
 
+            let bio_override_new = if let Some(enc) = bio_override_enc {
+                if !enc.is_empty() {
+                    let plain = decrypt(old_key, enc).map_err(|e| {
+                        StorageError::Migration(format!("Decrypt label bio override {}: {}", id, e))
+                    })?;
+                    Some(encrypt(new_key, &plain).map_err(|e| {
+                        StorageError::Migration(format!("Encrypt label bio override {}: {}", id, e))
+                    })?)
+                } else {
+                    Some(enc.clone())
+                }
+            } else {
+                None
+            };
+
+            let avatar_override_new = if let Some(enc) = avatar_override_enc {
+                if !enc.is_empty() {
+                    let plain = decrypt(old_key, enc).map_err(|e| {
+                        StorageError::Migration(format!(
+                            "Decrypt label avatar override {}: {}",
+                            id, e
+                        ))
+                    })?;
+                    Some(encrypt(new_key, &plain).map_err(|e| {
+                        StorageError::Migration(format!(
+                            "Encrypt label avatar override {}: {}",
+                            id, e
+                        ))
+                    })?)
+                } else {
+                    Some(enc.clone())
+                }
+            } else {
+                None
+            };
+
             self.conn.execute(
-                "UPDATE visibility_labels SET contacts_json_encrypted = ?1, visible_fields_json_encrypted = ?2, name_encrypted = ?3, name_hmac = ?4, display_name_override_encrypted = ?5 WHERE id = ?6",
-                params![contacts_new, fields_new, name_new, name_hmac_new, override_new, id],
+                "UPDATE visibility_labels SET contacts_json_encrypted = ?1, visible_fields_json_encrypted = ?2, name_encrypted = ?3, name_hmac = ?4, display_name_override_encrypted = ?5, bio_override_encrypted = ?6, avatar_override_encrypted = ?7 WHERE id = ?8",
+                params![contacts_new, fields_new, name_new, name_hmac_new, override_new, bio_override_new, avatar_override_new, id],
             ).map_err(|e| StorageError::Migration(format!("Update label: {}", e)))?;
         }
         Ok(())

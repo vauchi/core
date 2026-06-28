@@ -32,6 +32,10 @@ pub enum GroupError {
     MaxLabelsReached,
     /// Invalid group name.
     InvalidName(String),
+    /// Invalid group bio override (e.g. too long).
+    InvalidBio(String),
+    /// Invalid group avatar override (e.g. unsupported format or too large).
+    InvalidAvatar(String),
 }
 
 impl std::fmt::Display for GroupError {
@@ -43,6 +47,8 @@ impl std::fmt::Display for GroupError {
                 write!(f, "Maximum number of groups reached ({})", MAX_LABELS)
             }
             GroupError::InvalidName(msg) => write!(f, "Invalid group name: {}", msg),
+            GroupError::InvalidBio(msg) => write!(f, "Invalid group bio: {}", msg),
+            GroupError::InvalidAvatar(msg) => write!(f, "Invalid group avatar: {}", msg),
         }
     }
 }

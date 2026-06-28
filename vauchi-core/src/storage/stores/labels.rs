@@ -72,13 +72,27 @@ impl LabelStore<'_> {
             }
             None => None,
         };
+        let bio_override_encrypted: Option<Vec<u8>> = match label.bio_override() {
+            Some(bio) => Some(
+                crate::crypto::encrypt(self.key, bio.as_bytes())
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?,
+            ),
+            None => None,
+        };
+        let avatar_override_encrypted: Option<Vec<u8>> = match label.avatar_override() {
+            Some(bytes) => Some(
+                crate::crypto::encrypt(self.key, bytes)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?,
+            ),
+            None => None,
+        };
 
         // Store label id in plaintext `name` column to satisfy UNIQUE constraint
         // without leaking the actual name (which is in name_encrypted).
         self.conn.execute(
             "INSERT OR REPLACE INTO visibility_labels
-             (id, name, name_encrypted, name_hmac, contacts_json, visible_fields_json, contacts_json_encrypted, visible_fields_json_encrypted, created_at, modified_at, display_name_override_encrypted)
-             VALUES (?1, ?2, ?3, ?4, '[]', '[]', ?5, ?6, ?7, ?8, ?9)",
+             (id, name, name_encrypted, name_hmac, contacts_json, visible_fields_json, contacts_json_encrypted, visible_fields_json_encrypted, created_at, modified_at, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted)
+             VALUES (?1, ?2, ?3, ?4, '[]', '[]', ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             rusqlite::params![
                 label.id(),
                 label.id(),
@@ -89,6 +103,8 @@ impl LabelStore<'_> {
                 label.created_at() as i64,
                 label.modified_at() as i64,
                 display_name_override_encrypted,
+                bio_override_encrypted,
+                avatar_override_encrypted,
             ],
         )?;
 
@@ -97,7 +113,7 @@ impl LabelStore<'_> {
     /// Loads a visibility label by ID (decrypted).
     pub fn load_group(&self, label_id: &str) -> Result<Group, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted
+            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted
              FROM visibility_labels WHERE id = ?1",
         )?;
 
@@ -112,6 +128,8 @@ impl LabelStore<'_> {
             let fields_encrypted: Option<Vec<u8>> = row.get(7)?;
             let name_encrypted: Option<Vec<u8>> = row.get(8)?;
             let display_name_override_encrypted: Option<Vec<u8>> = row.get(9)?;
+            let bio_override_encrypted: Option<Vec<u8>> = row.get(10)?;
+            let avatar_override_encrypted: Option<Vec<u8>> = row.get(11)?;
 
             Ok((
                 id,
@@ -124,6 +142,8 @@ impl LabelStore<'_> {
                 fields_encrypted,
                 name_encrypted,
                 display_name_override_encrypted,
+                bio_override_encrypted,
+                avatar_override_encrypted,
             ))
         })?;
 
@@ -134,6 +154,8 @@ impl LabelStore<'_> {
         let fields_json = self.decrypt_or_fallback(label.7.as_deref(), &label.3)?;
 
         let display_name_override = self.decrypt_optional_blob(label.9.as_deref())?;
+        let bio_override = self.decrypt_optional_blob(label.10.as_deref())?;
+        let avatar_override = self.decrypt_optional_bytes(label.11.as_deref())?;
 
         let contacts: HashSet<String> = serde_json::from_str(&contacts_json)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -146,6 +168,8 @@ impl LabelStore<'_> {
             contacts,
             visible_fields,
             display_name_override,
+            bio_override,
+            avatar_override,
             label.4 as u64,
             label.5 as u64,
         ))
@@ -156,7 +180,7 @@ impl LabelStore<'_> {
     /// cannot be sorted in SQL (#128).
     pub fn load_all_groups(&self) -> Result<Vec<Group>, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted
+            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted
              FROM visibility_labels",
         )?;
 
@@ -171,6 +195,8 @@ impl LabelStore<'_> {
             let fields_encrypted: Option<Vec<u8>> = row.get(7)?;
             let name_encrypted: Option<Vec<u8>> = row.get(8)?;
             let display_name_override_encrypted: Option<Vec<u8>> = row.get(9)?;
+            let bio_override_encrypted: Option<Vec<u8>> = row.get(10)?;
+            let avatar_override_encrypted: Option<Vec<u8>> = row.get(11)?;
 
             Ok((
                 id,
@@ -183,6 +209,8 @@ impl LabelStore<'_> {
                 fields_encrypted,
                 name_encrypted,
                 display_name_override_encrypted,
+                bio_override_encrypted,
+                avatar_override_encrypted,
             ))
         })?;
 
@@ -193,6 +221,8 @@ impl LabelStore<'_> {
             let contacts_json = self.decrypt_or_fallback(row.6.as_deref(), &row.2)?;
             let fields_json = self.decrypt_or_fallback(row.7.as_deref(), &row.3)?;
             let display_name_override = self.decrypt_optional_blob(row.9.as_deref())?;
+            let bio_override = self.decrypt_optional_blob(row.10.as_deref())?;
+            let avatar_override = self.decrypt_optional_bytes(row.11.as_deref())?;
 
             let contacts: HashSet<String> = serde_json::from_str(&contacts_json)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -205,6 +235,8 @@ impl LabelStore<'_> {
                 contacts,
                 visible_fields,
                 display_name_override,
+                bio_override,
+                avatar_override,
                 row.4 as u64,
                 row.5 as u64,
             ));
@@ -235,6 +267,20 @@ impl LabelStore<'_> {
     }
     /// Decrypts an encrypted blob, falling back to plaintext only for
     /// pre-migration data (#156).
+    /// Decrypts an optional binary blob (e.g. an avatar) without UTF-8 decoding.
+    fn decrypt_optional_bytes(
+        &self,
+        encrypted: Option<&[u8]>,
+    ) -> Result<Option<Vec<u8>>, StorageError> {
+        match encrypted {
+            Some(enc) if !enc.is_empty() => Ok(Some(
+                crate::crypto::decrypt(self.key, enc)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?,
+            )),
+            _ => Ok(None),
+        }
+    }
+
     fn decrypt_or_fallback(
         &self,
         encrypted: Option<&[u8]>,

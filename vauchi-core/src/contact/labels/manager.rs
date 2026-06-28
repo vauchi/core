@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-use super::{Group, GroupError, MAX_LABELS};
+use super::{Group, GroupError, MAX_LABELS, ResolvedPresentation};
 
 /// Manages contact groups for a user.
 ///
@@ -324,6 +324,54 @@ impl GroupManager {
         }
 
         visible
+    }
+
+    /// Resolves how the user is presented (name/bio/avatar) to a contact, per
+    /// ADR-054 D1.
+    ///
+    /// This resolves *presentation* — what a recipient is shown — not the
+    /// cryptographic identity (which is singular and fixed). Unlike field
+    /// visibility, presentation is **not** unioned across groups: one winning
+    /// group supplies all three presentation fields. The winner is the
+    /// contact's smallest group; ties break deterministically by
+    /// `(created_at, id)`. Each field resolves against the winner's overrides,
+    /// falling back to `default` field-by-field. A contact in no group resolves
+    /// to `default` (D3).
+    ///
+    /// Option B: the `(created_at, id)` parity key stands in for D1's
+    /// "most-recently-assigned" recency, which needs per-membership timestamps
+    /// (a future refinement that swaps only the parity key). The per-contact
+    /// presentation override (D1 escape hatch) is not wired yet (Phase 6); once
+    /// it is, it takes priority over the winning group.
+    pub fn resolve_presentation(
+        &self,
+        contact_id: &str,
+        default: &ResolvedPresentation,
+    ) -> ResolvedPresentation {
+        let winner = self
+            .groups_for_contact(contact_id)
+            .into_iter()
+            .min_by(|a, b| {
+                a.contact_count()
+                    .cmp(&b.contact_count())
+                    .then_with(|| a.created_at().cmp(&b.created_at()))
+                    .then_with(|| a.id().cmp(b.id()))
+            });
+
+        match winner {
+            Some(group) => ResolvedPresentation {
+                display_name: group
+                    .resolve_display_name(&default.display_name)
+                    .to_string(),
+                bio: group
+                    .resolve_bio(default.bio.as_deref())
+                    .map(str::to_string),
+                avatar: group
+                    .resolve_avatar(default.avatar.as_deref())
+                    .map(<[u8]>::to_vec),
+            },
+            None => default.clone(),
+        }
     }
 }
 

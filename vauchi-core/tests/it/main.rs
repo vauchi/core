@@ -330,6 +330,7 @@ mod pin_cache_tests;
 mod pin_config_verification_tests;
 mod place_tests;
 mod pre_signed_operations_tests;
+mod presentation_resolver_tests;
 mod preview_as_proptest;
 mod propagation_sync_item_variant_tests;
 mod property_tests;

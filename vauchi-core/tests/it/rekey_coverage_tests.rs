@@ -401,3 +401,35 @@ fn test_rekey_preserves_label_display_name_override() {
     let plain = vauchi_core::crypto::decrypt(&key2, &loaded.unwrap()).unwrap();
     assert_eq!(plain, b"Custom Label");
 }
+
+// @scenario: security :: Rekey preserves visibility_labels bio/avatar overrides (ADR-054 Phase 2b)
+#[test]
+fn test_rekey_preserves_label_bio_and_avatar_overrides() {
+    let (_dir, mut storage) = open_storage();
+    let key1 = storage.key().clone();
+
+    let contacts_enc = vauchi_core::crypto::encrypt(&key1, b"[]").unwrap();
+    let bio_enc = vauchi_core::crypto::encrypt(&key1, b"Group bio").unwrap();
+    let avatar_enc = vauchi_core::crypto::encrypt(&key1, b"avatar-webp-bytes").unwrap();
+    storage.connection().execute(
+        "INSERT INTO visibility_labels (id, name, contacts_json, visible_fields_json, contacts_json_encrypted, bio_override_encrypted, avatar_override_encrypted, created_at, modified_at) VALUES ('l1', 'test', '[]', '[]', ?1, ?2, ?3, 1000, 1000)",
+        rusqlite::params![contacts_enc, bio_enc, avatar_enc],
+    ).unwrap();
+
+    let key2 = SymmetricKey::generate();
+    storage.rekey(key2.clone()).unwrap();
+
+    let (bio_loaded, avatar_loaded): (Option<Vec<u8>>, Option<Vec<u8>>) = storage
+        .connection()
+        .query_row(
+            "SELECT bio_override_encrypted, avatar_override_encrypted FROM visibility_labels WHERE id = 'l1'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    // Each column re-encrypts under the new key and stays in its own column.
+    let bio_plain = vauchi_core::crypto::decrypt(&key2, &bio_loaded.unwrap()).unwrap();
+    let avatar_plain = vauchi_core::crypto::decrypt(&key2, &avatar_loaded.unwrap()).unwrap();
+    assert_eq!(bio_plain, b"Group bio");
+    assert_eq!(avatar_plain, b"avatar-webp-bytes");
+}

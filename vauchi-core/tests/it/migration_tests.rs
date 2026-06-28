@@ -551,6 +551,56 @@ fn run_migrations_up_to(conn: &Connection, key: &SymmetricKey, up_to_version: u3
 
 // @internal
 #[test]
+fn test_migration_v56_adds_group_presentation_columns() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    // Up to V55 the per-group override columns do not exist yet.
+    run_migrations_up_to(&conn, &key, 55);
+    let cols = get_column_names(&conn, "visibility_labels");
+    assert!(
+        !cols.contains(&"bio_override_encrypted".to_string()),
+        "bio_override_encrypted should not exist before V56"
+    );
+    assert!(
+        !cols.contains(&"avatar_override_encrypted".to_string()),
+        "avatar_override_encrypted should not exist before V56"
+    );
+
+    // A label created before the migration must survive the upgrade in place.
+    conn.execute(
+        "INSERT INTO visibility_labels (id, name, created_at, modified_at) VALUES ('g1', 'Family', 1000, 1000)",
+        [],
+    )
+    .unwrap();
+
+    run_migrations_up_to(&conn, &key, 56);
+
+    let cols = get_column_names(&conn, "visibility_labels");
+    assert!(
+        cols.contains(&"bio_override_encrypted".to_string()),
+        "visibility_labels missing bio_override_encrypted after V56"
+    );
+    assert!(
+        cols.contains(&"avatar_override_encrypted".to_string()),
+        "visibility_labels missing avatar_override_encrypted after V56"
+    );
+
+    // Existing row preserved; the new columns default to NULL.
+    let (name, bio, avatar): (String, Option<Vec<u8>>, Option<Vec<u8>>) = conn
+        .query_row(
+            "SELECT name, bio_override_encrypted, avatar_override_encrypted FROM visibility_labels WHERE id = 'g1'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .unwrap();
+    assert_eq!(name, "Family");
+    assert_eq!(bio, None);
+    assert_eq!(avatar, None);
+}
+
+// @internal
+#[test]
 fn test_migration_v19_adds_password_columns() {
     let conn = Connection::open_in_memory().unwrap();
     let key = SymmetricKey::generate();

@@ -43,6 +43,41 @@ impl Vauchi {
         Ok(())
     }
 
+    /// Sets or clears the per-group bio override (ADR-054 D2).
+    ///
+    /// When set, contacts in this group see this bio instead of the card's
+    /// default bio. Pass `None` to clear. Persists the updated label.
+    pub fn set_group_bio_override(
+        &self,
+        label_id: &str,
+        bio_override: Option<&str>,
+    ) -> VauchiResult<()> {
+        let mut label = self.storage.labels().load_group(label_id)?;
+        label
+            .set_bio_override(bio_override, self.clock.unix_seconds())
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        self.storage.labels().save_group(&label)?;
+        Ok(())
+    }
+
+    /// Sets or clears the per-group avatar override (WebP, ADR-042).
+    ///
+    /// Accepts any common image format; core normalizes to WebP <= 32 KB.
+    /// When set, contacts in this group see this avatar instead of the card's
+    /// default avatar. Pass `None` to clear. Persists the updated label.
+    pub fn set_group_avatar_override(
+        &self,
+        label_id: &str,
+        avatar_override: Option<&[u8]>,
+    ) -> VauchiResult<()> {
+        let mut label = self.storage.labels().load_group(label_id)?;
+        label
+            .set_avatar_override(avatar_override, self.clock.unix_seconds())
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        self.storage.labels().save_group(&label)?;
+        Ok(())
+    }
+
     /// Deletes a visibility label.
     ///
     /// Contacts in the label remain in the contact list; they just lose

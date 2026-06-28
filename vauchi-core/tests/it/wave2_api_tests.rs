@@ -641,6 +641,144 @@ fn test_set_label_display_name_override_whitespace_rejected() {
     );
 }
 
+// ================================================================
+// Label Bio / Avatar Override API Tests (ADR-054 Phase 2b)
+// ================================================================
+
+/// A 1x1 PNG that `normalize_avatar` accepts.
+fn override_test_png() -> Vec<u8> {
+    use image::{ImageBuffer, Rgb};
+    let img: image::RgbImage = ImageBuffer::from_pixel(1, 1, Rgb([10u8, 90, 220]));
+    let mut buf = Vec::new();
+    img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+        .expect("PNG encoding should succeed");
+    buf
+}
+
+// @internal
+#[test]
+fn test_set_label_bio_override_api() {
+    let wb = create_vauchi_with_identity("Matthew Egloff");
+    let label = wb.create_group("Friends").unwrap();
+
+    wb.set_group_bio_override(label.id(), Some("Climbing buddy"))
+        .unwrap();
+
+    let loaded = wb.get_group(label.id()).unwrap();
+    assert_eq!(loaded.bio_override(), Some("Climbing buddy"));
+    assert_eq!(
+        loaded.resolve_bio(Some("default bio")),
+        Some("Climbing buddy")
+    );
+}
+
+// @internal
+#[test]
+fn test_clear_label_bio_override_api() {
+    let wb = create_vauchi_with_identity("Matthew Egloff");
+    let label = wb.create_group("Friends").unwrap();
+
+    wb.set_group_bio_override(label.id(), Some("Climbing buddy"))
+        .unwrap();
+    wb.set_group_bio_override(label.id(), None).unwrap();
+
+    let loaded = wb.get_group(label.id()).unwrap();
+    assert_eq!(loaded.bio_override(), None);
+    assert_eq!(loaded.resolve_bio(Some("default bio")), Some("default bio"));
+}
+
+// @internal
+#[test]
+fn test_set_label_bio_override_empty_clears() {
+    let wb = create_vauchi_with_identity("Alice");
+    let label = wb.create_group("Work").unwrap();
+
+    wb.set_group_bio_override(label.id(), Some("temporary"))
+        .unwrap();
+    // Empty/whitespace clears (mirrors ContactCard::set_bio), not an error.
+    wb.set_group_bio_override(label.id(), Some("   ")).unwrap();
+
+    let loaded = wb.get_group(label.id()).unwrap();
+    assert_eq!(loaded.bio_override(), None);
+}
+
+// @internal
+#[test]
+fn test_set_label_bio_override_too_long_rejected() {
+    let wb = create_vauchi_with_identity("Alice");
+    let label = wb.create_group("Work").unwrap();
+
+    let too_long = "a".repeat(161);
+    let result = wb.set_group_bio_override(label.id(), Some(&too_long));
+    assert!(
+        result.is_err(),
+        "over-160-char bio override should be rejected"
+    );
+}
+
+// @internal
+#[test]
+fn test_set_label_avatar_override_api() {
+    let wb = create_vauchi_with_identity("Matthew Egloff");
+    let label = wb.create_group("Friends").unwrap();
+
+    wb.set_group_avatar_override(label.id(), Some(&override_test_png()))
+        .unwrap();
+
+    let loaded = wb.get_group(label.id()).unwrap();
+    let stored = loaded.avatar_override().expect("avatar override persisted");
+    assert_eq!(&stored[0..4], b"RIFF", "avatar override should be WebP");
+    assert_eq!(&stored[8..12], b"WEBP");
+}
+
+// @internal
+#[test]
+fn test_clear_label_avatar_override_api() {
+    let wb = create_vauchi_with_identity("Matthew Egloff");
+    let label = wb.create_group("Friends").unwrap();
+
+    wb.set_group_avatar_override(label.id(), Some(&override_test_png()))
+        .unwrap();
+    wb.set_group_avatar_override(label.id(), None).unwrap();
+
+    let loaded = wb.get_group(label.id()).unwrap();
+    assert_eq!(loaded.avatar_override(), None);
+}
+
+// @internal
+#[test]
+fn test_set_label_avatar_override_invalid_rejected() {
+    let wb = create_vauchi_with_identity("Alice");
+    let label = wb.create_group("Work").unwrap();
+
+    let result = wb.set_group_avatar_override(label.id(), Some(b"not an image"));
+    assert!(
+        result.is_err(),
+        "non-image avatar override should be rejected"
+    );
+}
+
+/// Both overrides set on one group must survive a save->load roundtrip
+/// distinctly — catches a column/tuple-index slip in the storage wiring.
+// @internal
+#[test]
+fn test_bio_and_avatar_override_survive_distinctly() {
+    let wb = create_vauchi_with_identity("Matthew Egloff");
+    let label = wb.create_group("Family").unwrap();
+
+    wb.set_group_bio_override(label.id(), Some("Loves hiking"))
+        .unwrap();
+    wb.set_group_avatar_override(label.id(), Some(&override_test_png()))
+        .unwrap();
+
+    let loaded = wb.get_group(label.id()).unwrap();
+    assert_eq!(loaded.bio_override(), Some("Loves hiking"));
+    let avatar = loaded.avatar_override().expect("avatar persisted");
+    assert_eq!(&avatar[0..4], b"RIFF");
+    // The bio column did not leak the avatar bytes and vice-versa.
+    assert_ne!(loaded.bio_override().map(|b| b.as_bytes()), Some(avatar));
+}
+
 // @internal
 #[test]
 fn test_set_label_display_name_override_nonexistent_label() {

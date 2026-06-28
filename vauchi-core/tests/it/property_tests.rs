@@ -685,3 +685,43 @@ mod extended_property_tests {
             }
         }
 }
+
+proptest! {
+    /// Group serde roundtrip preserves bio/avatar overrides (present or absent).
+    #[test]
+    fn group_overrides_serde_roundtrip(
+        bio in proptest::option::of("[a-zA-Z0-9 ]{0,160}"),
+        avatar in proptest::option::of(proptest::collection::vec(any::<u8>(), 0..64)),
+    ) {
+        let group = vauchi_core::contact::Group::from_storage(
+            "g1".to_string(),
+            "Family".to_string(),
+            HashSet::new(),
+            HashSet::new(),
+            None,
+            bio.clone(),
+            avatar.clone(),
+            1000,
+            1000,
+        );
+
+        let json = serde_json::to_string(&group).expect("serialize");
+        let restored: vauchi_core::contact::Group =
+            serde_json::from_str(&json).expect("deserialize");
+
+        prop_assert_eq!(restored.bio_override().map(|s| s.to_string()), bio);
+        prop_assert_eq!(restored.avatar_override().map(|a| a.to_vec()), avatar);
+    }
+}
+
+/// A pre-Phase-2b serialized group (no override keys) deserializes with both
+/// overrides None — `serde(default)` back-compat.
+#[test]
+fn group_without_override_keys_deserializes_to_none() {
+    let json = r#"{"id":"g1","name":"Family","contacts":[],"visible_fields":[],"created_at":0,"modified_at":0}"#;
+    let group: vauchi_core::contact::Group =
+        serde_json::from_str(json).expect("back-compat deserialize");
+    assert_eq!(group.bio_override(), None);
+    assert_eq!(group.avatar_override(), None);
+    assert_eq!(group.display_name_override(), None);
+}

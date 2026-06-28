@@ -104,6 +104,15 @@ pub struct ThemeColors {
     pub text_on_accent: Option<String>,
     #[serde(rename = "focus-ring", default)]
     pub focus_ring: Option<String>,
+    // ADR-038 Amendment 4 (2026-06-28): AA-safe status-text foregrounds.
+    #[serde(rename = "status-text-success", default)]
+    pub status_text_success: Option<String>,
+    #[serde(rename = "status-text-warning", default)]
+    pub status_text_warning: Option<String>,
+    #[serde(rename = "status-text-error", default)]
+    pub status_text_error: Option<String>,
+    #[serde(rename = "status-text-info", default)]
+    pub status_text_info: Option<String>,
 }
 
 /// Design tokens for consistent cross-platform rendering.

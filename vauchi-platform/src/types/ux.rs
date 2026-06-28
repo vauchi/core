@@ -343,6 +343,11 @@ pub struct MobileThemeColors {
     pub text_on_accent: Option<String>,
     /// ADR-038 Amendment 3: focus-visible ring stroke (hex).
     pub focus_ring: Option<String>,
+    /// ADR-038 Amendment 4: AA-safe status-text foregrounds (hex).
+    pub status_text_success: Option<String>,
+    pub status_text_warning: Option<String>,
+    pub status_text_error: Option<String>,
+    pub status_text_info: Option<String>,
 }
 
 impl From<&vauchi_app::theme::ThemeColors> for MobileThemeColors {
@@ -378,6 +383,10 @@ impl From<&vauchi_app::theme::ThemeColors> for MobileThemeColors {
             scrim: colors.scrim.clone(),
             text_on_accent: colors.text_on_accent.clone(),
             focus_ring: colors.focus_ring.clone(),
+            status_text_success: colors.status_text_success.clone(),
+            status_text_warning: colors.status_text_warning.clone(),
+            status_text_error: colors.status_text_error.clone(),
+            status_text_info: colors.status_text_info.clone(),
         }
     }
 }

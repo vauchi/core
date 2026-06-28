@@ -29,11 +29,11 @@
 
 use crate::common;
 
-use common::helpers::create_vauchi_with_card;
+use common::helpers::{create_vauchi_with_card, create_vauchi_with_identity};
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::ProtocolState;
-use vauchi_core::{Contact, FieldType, SymmetricKey, Vauchi, VauchiError};
+use vauchi_core::{Contact, ContactField, FieldType, SymmetricKey, Vauchi, VauchiError};
 
 /// Two Vauchis that have completed a real multi-stage exchange, with the
 /// role-correct ratchet built for each side (not yet persisted).
@@ -238,5 +238,109 @@ fn multistage_contact_without_ratchet_rejects_card_update() {
             .iter()
             .any(|f| f.value() == sender_old_value),
         "the recipient must still hold the sender's pre-update value"
+    );
+}
+
+/// Coverage for the device scenario (2026-06-28-sync-delivery-sent-not-received):
+/// both parties onboard with an EMPTY card (skipped contact info), exchange,
+/// then the initiator ADDS its first field and syncs. The existing round-trips
+/// above exchange a card that ALREADY has a field and UPDATE its value; this
+/// pins the empty-exchanged-card + first-Add-delta + first-CEK path the two
+/// phones actually hit. It **passes** — so that path is NOT the device cause
+/// (the on-device `rejected=1` lives in a layer these in-core tests don't
+/// exercise: the live exchange's ratchet state, the `EncryptedUpdate` wire
+/// round-trip, or the at-rest ratchet-blob crypto).
+// @scenario: sync_updates :: First field added to an empty exchanged card propagates
+#[test]
+fn multistage_first_field_add_to_empty_card_round_trips() {
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+    let alice_card = alice.own_card().unwrap().unwrap();
+    let bob_card = bob.own_card().unwrap().unwrap();
+
+    let (alice_session, bob_session) = drive_to_finalized(b"alice".to_vec(), b"bob".to_vec());
+    let alice_tk = alice_session.get_transport_key().expect("alice tk");
+    let bob_tk = bob_session.get_transport_key().expect("bob tk");
+    assert_eq!(alice_tk, bob_tk, "transport key must be symmetric");
+
+    let (alice_ratchet, alice_is_initiator) = alice_session
+        .build_exchange_ratchet(&alice_pk, &bob_pk)
+        .expect("alice ratchet builds");
+    let (bob_ratchet, bob_is_initiator) = bob_session
+        .build_exchange_ratchet(&bob_pk, &alice_pk)
+        .expect("bob ratchet builds");
+    assert_ne!(alice_is_initiator, bob_is_initiator);
+
+    let bob_at_alice =
+        Contact::from_exchange(bob_pk, bob_card, SymmetricKey::from_bytes(alice_tk), 0);
+    let alice_at_bob =
+        Contact::from_exchange(alice_pk, alice_card, SymmetricKey::from_bytes(bob_tk), 0);
+    let bob_id_at_alice = bob_at_alice.id().to_string();
+    let alice_id_at_bob = alice_at_bob.id().to_string();
+
+    alice
+        .save_exchanged_contact(&bob_at_alice, &alice_ratchet, alice_is_initiator)
+        .unwrap();
+    bob.save_exchanged_contact(&alice_at_bob, &bob_ratchet, bob_is_initiator)
+        .unwrap();
+
+    // The initiator speaks first (responder has no sending chain pre-receive),
+    // matching the device: Bob (initiator) added a field and synced.
+    let (sender, recipient, recipient_id_at_sender, sender_id_at_recipient) = if alice_is_initiator
+    {
+        (
+            &alice,
+            &bob,
+            bob_id_at_alice.clone(),
+            alice_id_at_bob.clone(),
+        )
+    } else {
+        (
+            &bob,
+            &alice,
+            alice_id_at_bob.clone(),
+            bob_id_at_alice.clone(),
+        )
+    };
+
+    // The sender's FIRST field added to its previously-empty card.
+    let old_card = sender.own_card().unwrap().unwrap();
+    assert!(
+        old_card.fields().is_empty(),
+        "precondition: the exchanged card was empty"
+    );
+    sender
+        .add_own_field(ContactField::new(
+            FieldType::Email,
+            "personal",
+            "fresh@new.com",
+            1,
+        ))
+        .unwrap();
+    let new_card = sender.own_card().unwrap().unwrap();
+
+    let encrypted = sender
+        .prepare_card_update_for_contact(&recipient_id_at_sender, &old_card, &new_card)
+        .expect("initiator prepares the first card update");
+
+    let changed = recipient
+        .process_card_update(&sender_id_at_recipient, &encrypted)
+        .expect("responder must decrypt the initiator's FIRST add to an empty card");
+    assert!(!changed.is_empty(), "the first add must apply a field");
+
+    let stored = recipient
+        .get_contact(&sender_id_at_recipient)
+        .unwrap()
+        .unwrap();
+    assert!(
+        stored
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.value() == "fresh@new.com"),
+        "the added field must reflect at the peer after the first decrypt"
     );
 }

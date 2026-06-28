@@ -4,7 +4,9 @@
 
 //! Exchange operations: QR code generation for contact exchange.
 
+use crate::contact::Contact;
 use crate::contact_card::ContactCard;
+use crate::crypto::ratchet::DoubleRatchetState;
 use crate::exchange::{ExchangeEvent, ExchangeSession, ManualConfirmationVerifier};
 
 use super::super::error::{VauchiError, VauchiResult};
@@ -82,5 +84,27 @@ impl Vauchi {
             generated_at: qr.timestamp(),
             expires_in_secs: 300, // 5 minutes, matching QR_EXPIRY_SECONDS
         })
+    }
+
+    /// Persist a contact established (or re-established) via an in-person
+    /// exchange: upsert the card and (re)key the channel.
+    ///
+    /// A 2nd-to-nth exchange of the same pair re-exchanges fresh cards and a
+    /// fresh shared secret, so this UPSERTS the card — a repeat must never drop
+    /// the peer's updated card (the historical BLE/multi-stage `add_contact`
+    /// reject-and-return bug) — and rekeys the ratchet. The BLE, QR, and
+    /// multi-stage completion paths all route through here so the three stay
+    /// consistent (ADR-021/043: the reuse-vs-rekey policy lives in core, not
+    /// per-transport in the humble frontends). Repeat-exchange decision
+    /// 2026-06-27.
+    pub fn save_exchanged_contact(
+        &self,
+        contact: &Contact,
+        ratchet: &DoubleRatchetState,
+        is_initiator: bool,
+    ) -> VauchiResult<()> {
+        self.update_contact(contact)?;
+        self.save_exchange_ratchet(contact.id(), ratchet, is_initiator)?;
+        Ok(())
     }
 }

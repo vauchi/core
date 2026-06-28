@@ -344,8 +344,15 @@ impl AppEngine {
             now,
         );
         let contact_id = contact.id().to_string();
-        if self.vauchi.add_contact(contact).is_err() {
-            log::warn!("BLE: failed to add exchanged contact");
+        // Upsert + rekey via the unified core routine so a REPEAT BLE exchange
+        // updates the peer's card and rekeys, instead of silently dropping it:
+        // the old `add_contact` rejected the duplicate id and returned before
+        // the ratchet was saved. Repeat-exchange decision 2026-06-27.
+        if let Err(e) = self
+            .vauchi
+            .save_exchanged_contact(&contact, &ratchet, is_initiator)
+        {
+            log::warn!("BLE: failed to persist exchanged contact/ratchet: {e}");
             return false;
         }
         // G4: file the new contact into the groups chosen in the exchange
@@ -365,13 +372,6 @@ impl AppEngine {
         // multi-stage path. The Event::LocationResult reply is consumed in
         // handle_hardware_event.
         self.request_exchange_location(contact_id.clone());
-        if self
-            .vauchi
-            .save_exchange_ratchet(&contact_id, &ratchet, is_initiator)
-            .is_err()
-        {
-            log::warn!("BLE: failed to persist exchange ratchet for {contact_id}");
-        }
         true
     }
 }

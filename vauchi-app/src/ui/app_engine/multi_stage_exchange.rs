@@ -365,23 +365,29 @@ impl AppEngine {
             now,
         );
         let contact_id = contact.id().to_string();
-        if self.vauchi.add_contact(contact).is_err() {
-            return;
-        }
-        // Persist the role-correct Double Ratchet so future card updates
-        // from this contact decrypt. Returns owned data, so the session
-        // borrow ends before the `self.vauchi` save.
+        // Build the role-correct Double Ratchet (owned data, so the session
+        // borrow ends before the save below).
         let ratchet = self
             .multi_stage_session
             .as_ref()
             .and_then(|h| h.machine.build_exchange_ratchet(&our_identity, &peer_pk));
-        if let Some((ratchet, is_initiator)) = ratchet
-            && self
-                .vauchi
-                .save_exchange_ratchet(&contact_id, &ratchet, is_initiator)
-                .is_err()
-        {
-            log::warn!("multi-stage: failed to persist exchange ratchet");
+        // Upsert + rekey via the unified core routine so a REPEAT multi-stage
+        // exchange updates the peer's card and rekeys, instead of silently
+        // dropping it: the old `add_contact` rejected the duplicate id and
+        // returned before the ratchet was saved. Repeat-exchange decision
+        // 2026-06-27.
+        let persisted = match ratchet {
+            Some((ratchet, is_initiator)) => {
+                self.vauchi
+                    .save_exchanged_contact(&contact, &ratchet, is_initiator)
+            }
+            // No session ratchet at completion — upsert the card alone; the
+            // channel can't be (re)keyed without the session.
+            None => self.vauchi.update_contact(&contact),
+        };
+        if let Err(e) = persisted {
+            log::warn!("multi-stage: failed to persist exchanged contact: {e}");
+            return;
         }
 
         // Capture-at-exchange (ADR-051): ask the frontend for the current

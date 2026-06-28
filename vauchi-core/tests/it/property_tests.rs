@@ -688,6 +688,7 @@ mod extended_property_tests {
 
 proptest! {
     /// Group serde roundtrip preserves bio/avatar overrides (present or absent).
+    // @internal
     #[test]
     fn group_overrides_serde_roundtrip(
         bio in proptest::option::of("[a-zA-Z0-9 ]{0,160}"),
@@ -716,6 +717,7 @@ proptest! {
 
 /// A pre-Phase-2b serialized group (no override keys) deserializes with both
 /// overrides None — `serde(default)` back-compat.
+// @internal
 #[test]
 fn group_without_override_keys_deserializes_to_none() {
     let json = r#"{"id":"g1","name":"Family","contacts":[],"visible_fields":[],"created_at":0,"modified_at":0}"#;

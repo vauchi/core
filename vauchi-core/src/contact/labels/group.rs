@@ -67,6 +67,10 @@ impl Group {
     }
 
     /// Creates a label from storage data.
+    // Positional row args mirror the `visibility_labels` columns one-to-one;
+    // a GroupRow struct refactor is deliberately out of scope (ADR-054
+    // Phase 2b plan, Tidy-First seam).
+    #[allow(clippy::too_many_arguments)]
     pub fn from_storage(
         id: String,
         name: String,
@@ -378,6 +382,7 @@ mod tests {
         assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
     }
 
+    // @internal
     #[test]
     fn test_label_bio_override() {
         let mut label = Group::new("Family", 0);
@@ -395,6 +400,7 @@ mod tests {
         assert_eq!(label.bio_override(), None);
     }
 
+    // @internal
     #[test]
     fn test_label_bio_override_validation() {
         let mut label = Group::new("Friends", 0);
@@ -423,6 +429,7 @@ mod tests {
         assert_eq!(label.bio_override(), Some("trimmed bio"));
     }
 
+    // @internal
     #[test]
     fn test_label_resolve_bio() {
         let mut label = Group::new("Business", 0);
@@ -441,6 +448,7 @@ mod tests {
         assert_eq!(label.resolve_bio(Some("default bio")), Some("default bio"));
     }
 
+    // @internal
     #[test]
     fn test_label_avatar_override() {
         let mut label = Group::new("Family", 0);
@@ -461,6 +469,7 @@ mod tests {
         assert_eq!(label.avatar_override(), None);
     }
 
+    // @internal
     #[test]
     fn test_label_avatar_override_rejects_invalid() {
         let mut label = Group::new("Friends", 0);
@@ -474,6 +483,7 @@ mod tests {
         assert_eq!(label.avatar_override(), None);
     }
 
+    // @internal
     #[test]
     fn test_label_resolve_avatar() {
         let mut label = Group::new("Business", 0);
@@ -496,6 +506,7 @@ mod tests {
         assert_ne!(resolved, default_avatar.as_slice());
     }
 
+    // @internal
     #[test]
     fn test_label_bio_override_caps_by_chars_not_bytes() {
         let mut label = Group::new("Family", 0);

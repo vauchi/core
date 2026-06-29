@@ -858,6 +858,13 @@ bench:save-baseline:
 
 bench:compare:
   extends: [.bench-compare, .linux-runner, .timeout-standard, .bench-cache]
+  # Perf-benchmark comparison is informational and must NOT gate releases. On a
+  # release (tag) pipeline a failure here cancelled the trigger-stage
+  # update:swift-bindings and silently blocked the vauchi-platform-swift publish
+  # (observed on v0.51.59 — package/publish all green, bindings never shipped).
+  # allow_failure surfaces a regression (red job) without blocking merge or
+  # release; a real regression is then investigated, not auto-blocking.
+  allow_failure: true
   variables:
     BENCH_PACKAGE: "vauchi-core"
     BENCH_TARGETS: "--bench crypto_benchmarks --bench performance_regression"

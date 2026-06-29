@@ -251,6 +251,33 @@
       "additionalProperties": false
     },
     {
+      "description": "The lazy list is approaching the edge of the emitted window — the renderer asks the engine to re-slice the windowed [`crate::ui::Component::List`] from `offset`. Only meaningful for windowed emissions (`total_count > 0`); the engine clamps the offset, re-slices, and answers with the usual `UpdateScreen` (`2026-06-11-contacts-list-eager-render-anr` Track B).",
+      "type": "object",
+      "required": [
+        "ListWindowRequested"
+      ],
+      "properties": {
+        "ListWindowRequested": {
+          "type": "object",
+          "required": [
+            "component_id",
+            "offset"
+          ],
+          "properties": {
+            "component_id": {
+              "type": "string"
+            },
+            "offset": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "User pressed Undo on a toast with an undo action.",
       "type": "object",
       "required": [

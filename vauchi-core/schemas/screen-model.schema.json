@@ -90,10 +90,29 @@
       "description": "Resolved design tokens for layout consistency. Frontends read spacing, radius, typography from here — never hardcode values.",
       "default": {
         "border_radius": {
+          "card": 20,
+          "chip": 12,
           "lg": 16,
           "md": 8,
           "md_lg": 12,
+          "sheet": 28,
           "sm": 4
+        },
+        "focus": {
+          "ring_offset": 2,
+          "ring_width": 3
+        },
+        "font_family": {
+          "body": "Hanken Grotesk",
+          "display": "Bricolage Grotesque",
+          "mono": "JetBrains Mono"
+        },
+        "font_weight": {
+          "bold": 700,
+          "extrabold": 800,
+          "medium": 500,
+          "regular": 400,
+          "semibold": 600
         },
         "motion": {
           "emphasis_duration_ms": 300,
@@ -120,9 +139,19 @@
           "minimum": 44
         },
         "typography": {
+          "body_line": 24,
           "body_size": 16,
+          "caption_line": 20,
           "caption_size": 14,
+          "caption_sm": 12,
+          "display": 32,
+          "medium_line": 28,
+          "medium_size": 20,
+          "subtitle_line": 24,
           "subtitle_size": 18,
+          "text_scale_percent": 100,
+          "title_lg": 20,
+          "title_line": 30,
           "title_size": 24
         }
       },
@@ -243,6 +272,18 @@
         "sm"
       ],
       "properties": {
+        "card": {
+          "default": 20,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "chip": {
+          "default": 12,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
         "lg": {
           "type": "integer",
           "format": "uint16",
@@ -254,6 +295,12 @@
           "minimum": 0.0
         },
         "md_lg": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "sheet": {
+          "default": 28,
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0
@@ -611,8 +658,26 @@
                     "$ref": "#/definitions/Item"
                   }
                 },
+                "offset": {
+                  "description": "Window start within the filtered set (windowed emissions only).",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0.0
+                },
                 "searchable": {
                   "type": "boolean"
+                },
+                "total_count": {
+                  "description": "Size of the full filtered set when the emission is windowed; zero/absent = unwindowed (`items` is the complete set, the exact pre-windowing wire shape). Windowing keeps multi-MB emissions off the wire at 10k items (`2026-06-11-contacts-list-eager-render-anr` Track B).",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0.0
+                },
+                "window": {
+                  "description": "Emitted window length. The renderer dispatches [`crate::ui::UserAction::ListWindowRequested`] as scrolling approaches the loaded window's edge.",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0.0
                 }
               }
             }
@@ -1304,6 +1369,43 @@
         "border_radius": {
           "$ref": "#/definitions/BorderRadiusTokens"
         },
+        "focus": {
+          "default": {
+            "ring_offset": 2,
+            "ring_width": 3
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/FocusTokens"
+            }
+          ]
+        },
+        "font_family": {
+          "default": {
+            "body": "Hanken Grotesk",
+            "display": "Bricolage Grotesque",
+            "mono": "JetBrains Mono"
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/FontFamilyTokens"
+            }
+          ]
+        },
+        "font_weight": {
+          "default": {
+            "bold": 700,
+            "extrabold": 800,
+            "medium": 500,
+            "regular": 400,
+            "semibold": 600
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/FontWeightTokens"
+            }
+          ]
+        },
         "motion": {
           "$ref": "#/definitions/MotionTokens"
         },
@@ -1378,6 +1480,84 @@
         },
         "visibility": {
           "$ref": "#/definitions/UiFieldVisibility"
+        }
+      }
+    },
+    "FocusTokens": {
+      "description": "Focus-visible ring metrics (the ring colour is a Vauchi/Semantic token).",
+      "type": "object",
+      "required": [
+        "ring_offset",
+        "ring_width"
+      ],
+      "properties": {
+        "ring_offset": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "ring_width": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        }
+      }
+    },
+    "FontFamilyTokens": {
+      "description": "Font family names (bundled SIL-OFL webfonts; the renderer maps them to platform font handles).",
+      "type": "object",
+      "required": [
+        "body",
+        "display",
+        "mono"
+      ],
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "display": {
+          "type": "string"
+        },
+        "mono": {
+          "type": "string"
+        }
+      }
+    },
+    "FontWeightTokens": {
+      "description": "Font weight ramp.",
+      "type": "object",
+      "required": [
+        "bold",
+        "extrabold",
+        "medium",
+        "regular",
+        "semibold"
+      ],
+      "properties": {
+        "bold": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "extrabold": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "medium": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "regular": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "semibold": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
         }
       }
     },
@@ -2071,7 +2251,19 @@
         "title_size"
       ],
       "properties": {
+        "body_line": {
+          "default": 24,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
         "body_size": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "caption_line": {
+          "default": 20,
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0
@@ -2081,7 +2273,55 @@
           "format": "uint16",
           "minimum": 0.0
         },
+        "caption_sm": {
+          "default": 12,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "display": {
+          "default": 32,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "medium_line": {
+          "default": 28,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "medium_size": {
+          "default": 20,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "subtitle_line": {
+          "default": 24,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
         "subtitle_size": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "text_scale_percent": {
+          "default": 100,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "title_lg": {
+          "default": 20,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "title_line": {
+          "default": 30,
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0

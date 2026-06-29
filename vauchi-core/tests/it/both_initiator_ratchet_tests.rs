@@ -27,7 +27,7 @@
 use crate::common;
 
 use common::helpers::create_vauchi_with_card;
-use vauchi_core::{Contact, FieldType, SymmetricKey, VauchiError};
+use vauchi_core::{Contact, FieldType, SymmetricKey, api::CardUpdateError};
 
 // @scenario: sync_updates :: A both-initiator exchange cannot decrypt updates
 #[test]
@@ -69,13 +69,16 @@ fn both_initiator_setup_cannot_decrypt_card_update() {
         .unwrap();
     alice.update_own_card(&new).unwrap();
     let new = alice.own_card().unwrap().unwrap();
-    let encrypted = alice
-        .prepare_card_update_for_contact(&bob_id, &old, &new)
-        .unwrap();
+    let encrypted = common::card_update::seal_update_default(&alice, &bob_id, &old, &new);
 
-    let result = bob.process_card_update(&alice_id, &encrypted);
+    let result = vauchi_core::api::process_single_card_update(
+        bob.identity().unwrap(),
+        bob.storage(),
+        &alice_id,
+        &encrypted,
+    );
     assert!(
-        matches!(result, Err(VauchiError::Crypto(_))),
+        matches!(result, Err(CardUpdateError::DecryptionFailed)),
         "two initiators must fail to decrypt each other (got {result:?})"
     );
 

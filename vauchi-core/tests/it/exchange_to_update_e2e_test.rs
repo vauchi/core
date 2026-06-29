@@ -9,8 +9,8 @@
 //! → process (decrypt+verify+apply) → storage persistence.
 //!
 //! Existing tests cover these steps individually with manual wiring between them.
-//! This test exercises the API-level functions (`prepare_card_update_for_contact`,
-//! `process_card_update`) to verify the handoff seams.
+//! This test exercises the seal→open contract (`common::card_update::seal_update`
+//! + the shipping `process_single_card_update`) to verify the handoff seams.
 //!
 //! Feature: contact_exchange.feature, sync_updates.feature
 
@@ -19,7 +19,7 @@ use crate::common;
 use common::helpers::{create_vauchi_with_card, setup_ratchets};
 use vauchi_core::{Contact, ContactField, FieldType};
 
-/// Full pipeline: exchange → ratchet → prepare_card_update → process_card_update → verify.
+/// Full pipeline: exchange → ratchet → seal_update → process_single_card_update → verify.
 ///
 /// This is the single test that guards every seam in the update propagation path.
 /// A regression in CEK wrapping, signature binding, ratchet state persistence,
@@ -93,21 +93,19 @@ fn test_full_path_exchange_to_card_update() {
     let new_card = alice.own_card().unwrap().unwrap();
 
     // Step 5: Alice prepares encrypted update via production API
-    let encrypted = alice
-        .prepare_card_update_for_contact(&bob_contact_id, &old_card, &new_card)
-        .expect("prepare_card_update_for_contact should succeed");
+    let encrypted =
+        common::card_update::seal_update_default(&alice, &bob_contact_id, &old_card, &new_card);
 
     assert!(!encrypted.is_empty(), "encrypted payload must be non-empty");
 
-    // Step 6: Bob processes the update via production API
-    let changed_fields = bob
-        .process_card_update(&alice_contact_id, &encrypted)
-        .expect("process_card_update should succeed");
-
-    assert!(
-        !changed_fields.is_empty(),
-        "at least one field should have changed"
-    );
+    // Step 6: Bob processes the update via the shipping receiver
+    vauchi_core::api::process_single_card_update(
+        bob.identity().unwrap(),
+        bob.storage(),
+        &alice_contact_id,
+        &encrypted,
+    )
+    .expect("process_single_card_update should succeed");
 
     // Step 7: Verify Bob's copy of Alice's card reflects the update
     let alice_at_bob = bob.get_contact(&alice_contact_id).unwrap().unwrap();

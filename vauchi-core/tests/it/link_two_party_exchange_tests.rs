@@ -114,16 +114,15 @@ fn link_exchange_yields_live_updatable_contacts_on_both_sides() {
         .unwrap();
     let new_card = sender.own_card().unwrap().unwrap();
 
-    let encrypted = sender
-        .prepare_card_update_for_contact(recipient_in_sender, &old_card, &new_card)
-        .expect("sender prepares the card update over the link channel");
-    let changed = receiver
-        .process_card_update(sender_in_receiver, &encrypted)
-        .expect("receiver applies the card update over the link channel");
-    assert!(
-        !changed.is_empty(),
-        "the update must report at least one changed field",
-    );
+    let encrypted =
+        common::card_update::seal_update_default(sender, recipient_in_sender, &old_card, &new_card);
+    vauchi_core::api::process_single_card_update(
+        receiver.identity().unwrap(),
+        receiver.storage(),
+        sender_in_receiver,
+        &encrypted,
+    )
+    .expect("receiver applies the card update over the link channel");
 
     // The receiver's copy of the sender's card reflects the new field — proof
     // the Link contact is live/updatable, which a v1 import never was.

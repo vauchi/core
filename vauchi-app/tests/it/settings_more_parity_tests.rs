@@ -341,3 +341,69 @@ fn more_section_headers_are_semantic_and_backup_recovery_disambiguated() {
          not a second `Backup & Recovery` string adjacent to the file-backup entry"
     );
 }
+
+// @internal
+#[test]
+fn display_name_renders_as_link_so_renderers_emit_list_item_selected() {
+    // Orphan handler (2026-04-06-display-name-rename-fails, reopened): the rename
+    // handler (`intercept.rs`, `ListItemSelected{display_name}` → `EditName`
+    // dialog) is unreachable while the row is a display-only `Value` — every
+    // Humble UI renderer makes `Value` non-tappable. The row must be a `Link`
+    // carrying the current name as detail, so the renderer emits the action.
+    let engine = SettingsEngine::new(sample_settings_config());
+    let screen = engine.current_screen();
+
+    let profile_items = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::SettingsGroup { id, items, .. } if id == "profile" => Some(items),
+            _ => None,
+        })
+        .expect("settings screen must emit a profile group");
+
+    let item = profile_items
+        .iter()
+        .find(|i| i.id == "display_name")
+        .expect("profile group must contain the display_name item");
+
+    assert_eq!(
+        item.kind,
+        SettingsItemKind::Link {
+            detail: Some("Sample User".into())
+        },
+        "display_name must render as a tappable Link with the current name as detail"
+    );
+}
+
+// @internal
+#[test]
+fn backup_reminders_renders_as_link_so_renderers_emit_list_item_selected() {
+    // Same orphan class: the backup-reminder-frequency cycle handler
+    // (`settings.rs`, `ListItemSelected{backup_reminders}`) is unreachable while
+    // the row is a `Value`. It must be a tappable `Link`.
+    let engine = SettingsEngine::new(sample_settings_config());
+    let screen = engine.current_screen();
+
+    let backup_items = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::SettingsGroup { id, items, .. } if id == "backup" => Some(items),
+            _ => None,
+        })
+        .expect("settings screen must emit a backup group");
+
+    let item = backup_items
+        .iter()
+        .find(|i| i.id == "backup_reminders")
+        .expect("backup group must contain the backup_reminders item");
+
+    assert_eq!(
+        item.kind,
+        SettingsItemKind::Link {
+            detail: Some("Weekly".into())
+        },
+        "backup_reminders must render as a tappable Link with the current frequency as detail"
+    );
+}

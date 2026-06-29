@@ -84,8 +84,12 @@ impl SettingsEngine {
                 SettingsItem {
                     id: "display_name".into(),
                     label: "Display Name".into(),
-                    kind: SettingsItemKind::Value {
-                        value: self.config.display_name.clone(),
+                    // Link (not Value): Value rows are non-tappable in every
+                    // Humble UI renderer, which orphaned the rename handler
+                    // (2026-04-06-display-name-rename-fails). Link emits
+                    // ListItemSelected{display_name} → EditName dialog.
+                    kind: SettingsItemKind::Link {
+                        detail: Some(self.config.display_name.clone()),
                     },
                     a11y: Some(A11y {
                         label: Some("Display Name".into()),
@@ -407,8 +411,11 @@ impl SettingsEngine {
                 SettingsItem {
                     id: "backup_reminders".into(),
                     label: "Backup reminders".into(),
-                    kind: SettingsItemKind::Value {
-                        value: self.config.backup_reminder_frequency.clone(),
+                    // Link (not Value): same orphan class as display_name —
+                    // Value is non-tappable, so the frequency-cycle handler was
+                    // unreachable. Link emits ListItemSelected{backup_reminders}.
+                    kind: SettingsItemKind::Link {
+                        detail: Some(self.config.backup_reminder_frequency.clone()),
                     },
                     a11y: Some(A11y {
                         label: Some("Backup reminder frequency".into()),

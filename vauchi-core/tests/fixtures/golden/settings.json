@@ -13,8 +13,8 @@
             "id": "display_name",
             "label": "Display Name",
             "kind": {
-              "Value": {
-                "value": "Alice"
+              "Link": {
+                "detail": "Alice"
               }
             },
             "a11y": {
@@ -336,8 +336,8 @@
             "id": "backup_reminders",
             "label": "Backup reminders",
             "kind": {
-              "Value": {
-                "value": "Weekly"
+              "Link": {
+                "detail": "Weekly"
               }
             },
             "a11y": {

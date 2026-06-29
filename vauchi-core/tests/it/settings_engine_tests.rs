@@ -129,8 +129,10 @@ fn settings_reflects_config_values() {
     let engine = SettingsEngine::new(sample_config());
     let screen = engine.current_screen();
 
-    let name_value = find_value(&screen, "profile", "display_name");
-    assert_eq!(name_value, "Alice");
+    // display_name is now a tappable Link (carries the name as detail) so its
+    // rename handler is reachable — see settings_more_parity_tests.
+    let name_detail = find_link_detail(&screen, "profile", "display_name");
+    assert_eq!(name_detail.as_deref(), Some("Alice"));
 
     let relay_detail = find_link_detail(&screen, "network", "relay_url");
     assert_eq!(relay_detail.as_deref(), Some("https://relay.vauchi.app"));
@@ -481,7 +483,10 @@ fn settings_backup_section_has_links() {
     assert_eq!(items[2].id, "setup_new_device");
     assert!(matches!(items[3].kind, SettingsItemKind::Value { .. }));
     assert_eq!(items[3].id, "last_backup");
-    assert!(matches!(items[4].kind, SettingsItemKind::Value { .. }));
+    // backup_reminders is a Link (tappable, cycles frequency) — it was a Value
+    // that orphaned its handler (2026-04-06-display-name-rename-fails sibling).
+    // last_backup above stays a Value: display-only, no handler.
+    assert!(matches!(items[4].kind, SettingsItemKind::Link { .. }));
     assert_eq!(items[4].id, "backup_reminders");
 }
 

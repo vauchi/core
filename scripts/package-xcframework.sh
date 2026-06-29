@@ -190,10 +190,15 @@ xcodebuild -create-xcframework \
 
 echo -e "${GREEN}XCFramework created at: $XCFRAMEWORK_PATH${NC}"
 
-# Post-process: Re-inject CFBundleExecutable into framework slice plists
-# xcodebuild -create-xcframework regenerates Info.plists and strips
-# CFBundleExecutable for static-library frameworks. iOS requires this key.
-echo -e "${YELLOW}Post-processing: Ensuring CFBundleExecutable in framework slices...${NC}"
+# Post-process: Re-inject keys that xcodebuild -create-xcframework strips when
+# it regenerates Info.plists for static-library frameworks.
+#   - CFBundleExecutable: iOS requires it.
+#   - MinimumOSVersion (iOS slices only): App Store Connect rejects the
+#     embedding app ("MinimumOSVersion ... is ''") when this is empty. Set it
+#     to the IPHONEOS_DEPLOYMENT_TARGET the libs are built with
+#     (build-bindings.sh => 10.0); >= 8.0 is the App Store requirement.
+echo -e "${YELLOW}Post-processing: Ensuring CFBundleExecutable + MinimumOSVersion in framework slices...${NC}"
+FFI_MIN_IOS="10.0"
 while IFS= read -r plist; do
     if ! /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$plist" 2>/dev/null; then
         echo "  Adding CFBundleExecutable to: $plist"
@@ -201,6 +206,17 @@ while IFS= read -r plist; do
     else
         echo "  CFBundleExecutable already present in: $plist"
     fi
+    # iOS device + simulator slices only — macOS uses LSMinimumSystemVersion.
+    case "$plist" in
+        *ios-arm64*|*simulator*)
+            if ! /usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$plist" 2>/dev/null; then
+                echo "  Adding MinimumOSVersion ${FFI_MIN_IOS} to: $plist"
+                /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string ${FFI_MIN_IOS}" "$plist"
+            else
+                echo "  MinimumOSVersion already present in: $plist"
+            fi
+            ;;
+    esac
 done < <(find "$XCFRAMEWORK_PATH" -name "Info.plist" -path "*/VauchiPlatformFFI.framework/*")
 echo -e "${GREEN}Post-processing complete${NC}"
 

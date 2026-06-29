@@ -204,8 +204,13 @@ fn test_process_cek_wrapped_update_saves_cek() {
     let ratchet_msg = bob_ratchet.encrypt(&versioned).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    let changed = alice.process_card_update(&bob_id, &encrypted).unwrap();
-    assert!(!changed.is_empty());
+    process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted,
+    )
+    .unwrap();
 
     // Verify CEK was saved
     let stored_cek = alice
@@ -257,9 +262,21 @@ fn test_process_cek_wrapped_update() {
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
     // Alice processes the update — should work
-    let changed = alice.process_card_update(&bob_id, &encrypted).unwrap();
-    assert!(!changed.is_empty());
-    assert!(changed.iter().any(|f| f == "work"));
+    process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted,
+    )
+    .unwrap();
+    let bob_contact = alice.get_contact(&bob_id).unwrap().unwrap();
+    assert!(
+        bob_contact
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.label() == "work")
+    );
 }
 
 // @internal
@@ -297,7 +314,12 @@ fn test_process_update_from_revoked_sender_rejected() {
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    let result = alice.process_card_update(&bob_id, &encrypted);
+    let result = process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted,
+    );
     assert!(
         result.is_err(),
         "Updates from revoked senders should be rejected"
@@ -339,8 +361,13 @@ fn test_process_cek_wrapped_update_applies_delta() {
     let ratchet_msg = bob_ratchet.encrypt(&versioned).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    let changed = alice.process_card_update(&bob_id, &encrypted).unwrap();
-    assert!(changed.iter().any(|f| f == "personal"));
+    process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted,
+    )
+    .unwrap();
 
     let bob_contact = alice.get_contact(&bob_id).unwrap().unwrap();
     assert!(
@@ -390,7 +417,12 @@ fn test_cek_wrapped_forged_signature_rejected() {
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    let result = alice.process_card_update(&bob_id, &encrypted);
+    let result = process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted,
+    );
     assert!(
         result.is_err(),
         "Updates with forged signatures must be rejected"
@@ -572,10 +604,21 @@ fn test_cek_wrapped_end_to_end_flow() {
         .unwrap();
     assert_eq!(pending.len(), 1);
 
-    let changed = bob
-        .process_card_update(&alice_id, &pending[0].payload)
-        .unwrap();
-    assert!(changed.iter().any(|f| f == "work"));
+    process_single_card_update(
+        bob.identity().unwrap(),
+        bob.storage(),
+        &alice_id,
+        &pending[0].payload,
+    )
+    .unwrap();
+    let alice_at_bob = bob.get_contact(&alice_id).unwrap().unwrap();
+    assert!(
+        alice_at_bob
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.label() == "work")
+    );
 
     // Bob should now have Alice's CEK stored
     let bob_alice_cek = bob

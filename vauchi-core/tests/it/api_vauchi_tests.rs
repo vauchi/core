@@ -523,10 +523,13 @@ fn test_process_incoming_card_update() {
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    let changed = alice_wb.process_card_update(&bob_id, &encrypted).unwrap();
-
-    assert!(!changed.is_empty());
-    assert!(changed.iter().any(|f| f == "work"));
+    process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_id,
+        &encrypted,
+    )
+    .unwrap();
 
     let bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
     let bob_card = bob_contact.card();
@@ -710,8 +713,13 @@ fn test_process_update_rejects_invalid_signature() {
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    let result = alice_wb.process_card_update(&bob_id, &encrypted);
-    assert!(matches!(result, Err(VauchiError::SignatureInvalid)));
+    let result = process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_id,
+        &encrypted,
+    );
+    assert!(matches!(result, Err(CardUpdateError::SignatureInvalid)));
 }
 
 // === Malformed data tests for process_card_update (#195) ===
@@ -743,7 +751,12 @@ fn test_process_card_update_truncated_message() {
         .unwrap();
 
     // Send truncated bytes — should fail to parse as RatchetMessage
-    let result = alice_wb.process_card_update(&bob_id, &[0xDE, 0xAD, 0xBE, 0xEF]);
+    let result = process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_id,
+        &[0xDE, 0xAD, 0xBE, 0xEF],
+    );
     assert!(result.is_err(), "Truncated message should be rejected");
 }
 
@@ -773,7 +786,12 @@ fn test_process_card_update_empty_payload() {
         )
         .unwrap();
 
-    let result = alice_wb.process_card_update(&bob_id, &[]);
+    let result = process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_id,
+        &[],
+    );
     assert!(result.is_err(), "Empty payload should be rejected");
 }
 
@@ -811,7 +829,12 @@ fn test_process_card_update_malformed_json_in_ratchet() {
     let ratchet_msg = bob_ratchet.encrypt(garbage_json).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    let result = alice_wb.process_card_update(&bob_id, &encrypted);
+    let result = process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_id,
+        &encrypted,
+    );
     assert!(result.is_err(), "Malformed delta JSON should be rejected");
 }
 
@@ -822,6 +845,11 @@ fn test_process_card_update_unknown_contact() {
     alice_wb.create_identity("Alice").unwrap();
 
     // Process update for a contact that doesn't exist
-    let result = alice_wb.process_card_update("nonexistent-contact-id", &[1, 2, 3]);
+    let result = process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        "nonexistent-contact-id",
+        &[1, 2, 3],
+    );
     assert!(result.is_err(), "Unknown contact should be rejected");
 }

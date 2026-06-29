@@ -11,8 +11,8 @@
 //! layer the device sync actually uses but that file does not: the ratchet is
 //! **persisted then reloaded** through `save_exchanged_contact` (as on a device
 //! between the exchange and the later sync), and the payload crosses the full
-//! **card-update pipeline** (`prepare_card_update_for_contact` →
-//! `process_card_update`: CEK wrap, signature binding, delta/replay).
+//! **card-update pipeline** (`seal_update` → `process_single_card_update`:
+//! CEK wrap, signature binding, delta/replay).
 //!
 //! The mobile QR exchange routes through `MultiStageSession::build_exchange_ratchet`
 //! (`multi_stage_exchange.rs:373`), keyed off the multistage `transport_key`
@@ -33,7 +33,10 @@ use common::helpers::{create_vauchi_with_card, create_vauchi_with_identity};
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::ProtocolState;
-use vauchi_core::{Contact, ContactField, FieldType, SymmetricKey, Vauchi, VauchiError};
+use vauchi_core::{
+    Contact, ContactField, FieldType, SymmetricKey, Vauchi,
+    api::{CardUpdateError, process_single_card_update},
+};
 
 /// Two Vauchis that have completed a real multi-stage exchange, with the
 /// role-correct ratchet built for each side (not yet persisted).
@@ -244,21 +247,24 @@ fn multistage_contact_without_ratchet_rejects_card_update() {
         .unwrap();
     sender.update_own_card(&new_card).unwrap();
     let new_card = sender.own_card().unwrap().unwrap();
-    let encrypted = sender
-        .prepare_card_update_for_contact(&recipient_id_at_sender, &old_card, &new_card)
-        .expect("initiator prepares the card update");
+    let encrypted = common::card_update::seal_update_default(
+        sender,
+        &recipient_id_at_sender,
+        &old_card,
+        &new_card,
+    );
 
-    // The ratchet-less recipient cannot decrypt → NotFound("ratchet state").
-    let result = recipient.process_card_update(&sender_id_at_recipient, &encrypted);
-    match result {
-        Err(VauchiError::NotFound(what)) => {
-            assert!(
-                what.contains("ratchet"),
-                "expected a missing-ratchet rejection, got NotFound({what})"
-            );
-        }
-        other => panic!("ratchet-less contact must reject the update, got {other:?}"),
-    }
+    // The ratchet-less recipient cannot decrypt → NoRatchetState.
+    let result = process_single_card_update(
+        recipient.identity().unwrap(),
+        recipient.storage(),
+        &sender_id_at_recipient,
+        &encrypted,
+    );
+    assert!(
+        matches!(result, Err(CardUpdateError::NoRatchetState)),
+        "ratchet-less contact must reject the update with NoRatchetState, got {result:?}"
+    );
 
     // And the recipient's stored card is unchanged — the edit never crossed.
     let stored = recipient
@@ -364,14 +370,20 @@ fn multistage_first_field_add_to_empty_card_round_trips() {
         .unwrap();
     let new_card = sender.own_card().unwrap().unwrap();
 
-    let encrypted = sender
-        .prepare_card_update_for_contact(&recipient_id_at_sender, &old_card, &new_card)
-        .expect("initiator prepares the first card update");
+    let encrypted = common::card_update::seal_update_default(
+        sender,
+        &recipient_id_at_sender,
+        &old_card,
+        &new_card,
+    );
 
-    let changed = recipient
-        .process_card_update(&sender_id_at_recipient, &encrypted)
-        .expect("responder must decrypt the initiator's FIRST add to an empty card");
-    assert!(!changed.is_empty(), "the first add must apply a field");
+    process_single_card_update(
+        recipient.identity().unwrap(),
+        recipient.storage(),
+        &sender_id_at_recipient,
+        &encrypted,
+    )
+    .expect("responder must decrypt the initiator's FIRST add to an empty card");
 
     let stored = recipient
         .get_contact(&sender_id_at_recipient)

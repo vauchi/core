@@ -212,12 +212,15 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
         let total = ready_updates.len();
         for (idx, update) in ready_updates.into_iter().enumerate() {
-            let ratchet = match self.ratchets.get_mut(&update.contact_id) {
-                Some(r) => r,
-                None => {
-                    continue;
-                }
-            };
+            // The pending payload was already ratchet-encrypted by
+            // `prepare_card_update_for_contact`; the send must NOT re-encrypt
+            // it (double-encrypting makes the recipient decrypt to a serialized
+            // RatchetMessage instead of the versioned payload — `bad_payload`,
+            // 2026-06-28-sync-delivery-sent-not-received). Skip only when the
+            // contact has no ratchet at all.
+            if !self.ratchets.contains_key(&update.contact_id) {
+                continue;
+            }
 
             // Load contact's shared key for anonymous sender ID and mailbox token.
             // ADR-029 forbids stable (non-rotating) recipient_ids: if we can't
@@ -262,11 +265,22 @@ impl<'a, T: Transport> SyncController<'a, T> {
                 compute_mailbox_token(&key, current_day_epoch(self.storage.clock().unix_seconds()));
             let recipient_id = token_hex(&token);
 
-            match self.relay.send_update(
+            // Send the PRE-BUILT message as-is — no re-encryption.
+            let ratchet_msg: crate::crypto::ratchet::RatchetMessage =
+                match serde_json::from_slice(&update.payload) {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        result.failed += 1;
+                        result
+                            .errors
+                            .push((update.contact_id.clone(), format!("payload decode: {e}")));
+                        continue;
+                    }
+                };
+            match self.relay.send_raw_update(
                 self.storage.clock().unix_seconds(),
                 &recipient_id,
-                ratchet,
-                &update.payload,
+                &ratchet_msg,
                 &update.id,
                 shared_key.as_ref(),
             ) {
@@ -317,15 +331,14 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
         let mut result = SyncResult::default();
 
-        let ratchet = match self.ratchets.get_mut(contact_id) {
-            Some(r) => r,
-            None => {
-                return Err(VauchiError::InvalidState(format!(
-                    "No ratchet for contact {}",
-                    contact_id
-                )));
-            }
-        };
+        // Pre-built pending payloads are already ratchet-encrypted; the send
+        // below must not re-encrypt (see the per-update loop above).
+        if !self.ratchets.contains_key(contact_id) {
+            return Err(VauchiError::InvalidState(format!(
+                "No ratchet for contact {}",
+                contact_id
+            )));
+        }
 
         // Load contact's shared key for anonymous sender ID and mailbox token.
         // ADR-029 forbids stable (non-rotating) recipient_ids: if we can't
@@ -355,11 +368,22 @@ impl<'a, T: Transport> SyncController<'a, T> {
         let updates = self.sync_manager.get_pending(contact_id)?;
 
         for update in updates {
-            match self.relay.send_update(
+            // Send the PRE-BUILT message as-is — no re-encryption.
+            let ratchet_msg: crate::crypto::ratchet::RatchetMessage =
+                match serde_json::from_slice(&update.payload) {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        result.failed += 1;
+                        result
+                            .errors
+                            .push((contact_id.to_string(), format!("payload decode: {e}")));
+                        continue;
+                    }
+                };
+            match self.relay.send_raw_update(
                 self.storage.clock().unix_seconds(),
                 &recipient_id,
-                ratchet,
-                &update.payload,
+                &ratchet_msg,
                 &update.id,
                 shared_key.as_ref(),
             ) {

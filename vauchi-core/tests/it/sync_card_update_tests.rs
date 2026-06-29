@@ -96,9 +96,31 @@ fn create_valid_update(
     old_card: &ContactCard,
     new_card: &ContactCard,
 ) -> Vec<u8> {
+    // Default delta version is 1, so this matches the historical behavior.
+    create_valid_update_versioned(
+        bob_wb,
+        alice_signing_pk,
+        alice_contact_id,
+        old_card,
+        new_card,
+        1,
+    )
+}
+
+/// Like [`create_valid_update`] but stamps an explicit delta version (#42), so a
+/// test can drive the receiver's stale-version downgrade rejection.
+fn create_valid_update_versioned(
+    bob_wb: &vauchi_core::Vauchi,
+    alice_signing_pk: &[u8; 32],
+    alice_contact_id: &str,
+    old_card: &ContactCard,
+    new_card: &ContactCard,
+    version: u32,
+) -> Vec<u8> {
     let bob_identity = bob_wb.identity().unwrap();
 
     let mut delta = CardDelta::compute(old_card, new_card, 0);
+    delta.set_version(version);
     delta.sign(bob_identity, alice_signing_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();

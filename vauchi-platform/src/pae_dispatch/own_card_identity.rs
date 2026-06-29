@@ -183,6 +183,13 @@ impl PlatformAppEngine {
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
                     })?;
+                // Flush the owed repropagation immediately, mirroring the field
+                // handlers (AddField/UpdateField/RemoveField). update_display_name
+                // arms the marker; without this the rename only repropagates on a
+                // later sync tick — and a throttled tick made the rename look like
+                // it did nothing (2026-06-29-card-update-duplicate-message-paths).
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = engine.vauchi().run_owed_repropagation();
                 engine.invalidate_screen(&AppScreen::MyInfo);
                 Ok(DomainCommandResult::Unit)
             }

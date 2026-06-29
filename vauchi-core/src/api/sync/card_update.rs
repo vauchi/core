@@ -53,6 +53,8 @@ pub enum CardUpdateError {
     SignatureInvalid,
     /// Replay attack detected (nonce already seen).
     ReplayDetected,
+    /// Delta version is older than the last applied version (downgrade, #42).
+    StaleVersion { delta: u32, last: u32 },
     /// Delta application failed (invalid field changes).
     DeltaApplicationFailed,
     /// Storage error during transaction.
@@ -183,6 +185,20 @@ pub fn process_single_card_update(
         return Err(CardUpdateError::ReplayDetected);
     }
 
+    // 7b. Reject stale/downgraded delta versions (#42). A withheld or reordered
+    // older delta carries an unseen nonce and so passes the replay check above;
+    // the version floor is what stops it from downgrading the stored card.
+    let last_version = storage
+        .contacts()
+        .last_delta_version(sender_id)
+        .unwrap_or(0);
+    if delta.version > 0 && delta.version < last_version {
+        return Err(CardUpdateError::StaleVersion {
+            delta: delta.version,
+            last: last_version,
+        });
+    }
+
     // 8. Apply delta to contact card.
     let mut card = contact.card().clone();
     // Heal any pre-upsert duplicate fields before applying, so a single
@@ -229,6 +245,12 @@ pub fn process_single_card_update(
             .replay()
             .save_replay_nonce(sender_id, &delta.nonce, delta.timestamp)?;
         storage.contacts().save_contact(&contact)?;
+        // Track applied delta version so a later older delta is rejected (#42).
+        if delta.version > 0 {
+            storage
+                .contacts()
+                .record_delta_version(sender_id, delta.version)?;
+        }
         Ok(())
     })();
 

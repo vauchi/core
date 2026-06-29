@@ -132,6 +132,7 @@ fn reject_category(e: &CardUpdateError) -> &'static str {
         CardUpdateError::InvalidDelta => "bad_delta",
         CardUpdateError::SignatureInvalid => "signature",
         CardUpdateError::ReplayDetected => "replay",
+        CardUpdateError::StaleVersion { .. } => "stale",
         CardUpdateError::DeltaApplicationFailed => "delta_apply",
         CardUpdateError::Storage(_) => "storage",
     }

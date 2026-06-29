@@ -11,7 +11,7 @@ use crate::common;
 
 use common::helpers::create_vauchi_with_identity;
 use vauchi_core::SymmetricKey;
-use vauchi_core::api::{process_card_updates, process_single_card_update};
+use vauchi_core::api::{CardUpdateError, process_card_updates, process_single_card_update};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
@@ -997,5 +997,116 @@ fn removed_field_fully_revokes_despite_stored_duplicate() {
     assert_eq!(
         leaked, 0,
         "a single Removed left {leaked} stale copy(ies) of a revoked field"
+    );
+}
+
+// The shipping device receiver must reject a stale (downgraded) delta version
+// (#42) and record the version it applied. A withheld or reordered older delta
+// carries an unseen nonce, so it passes replay detection; without a version
+// floor it downgrades the stored card. The test-only receiver enforced this;
+// the device receiver neither checked nor recorded the version
+// (root cause 2026-06-29-card-update-duplicate-message-paths finding #2).
+// @scenario: sync_updates :: A stale-version delta is rejected by the device receiver
+#[test]
+fn stale_version_delta_rejected_by_device_receiver() {
+    let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
+        setup_exchange_with_ratchets();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+
+    let base = ContactCard::new("Bob");
+
+    // v2: Bob adds a Phone field, stamped delta version 2.
+    let mut card_v2 = ContactCard::new("Bob");
+    card_v2
+        .add_field(ContactField::new(
+            FieldType::Phone,
+            "Phone",
+            "+41 79 000",
+            0,
+        ))
+        .unwrap();
+    let ct_v2 = create_valid_update_versioned(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        &base,
+        &card_v2,
+        2,
+    );
+
+    // v1: an OLDER delta (version 1) adding a different Email field, encrypted
+    // after v2 so the relay could deliver it second — the downgrade window.
+    let mut card_v1 = ContactCard::new("Bob");
+    card_v1
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "stale@x.com",
+            0,
+        ))
+        .unwrap();
+    let ct_v1 = create_valid_update_versioned(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        &base,
+        &card_v1,
+        1,
+    );
+
+    process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_contact_id,
+        &ct_v2,
+    )
+    .expect("v2 update must apply");
+    assert_eq!(
+        alice_wb
+            .storage()
+            .contacts()
+            .last_delta_version(&bob_contact_id)
+            .unwrap(),
+        2,
+        "applying v2 must record delta version 2"
+    );
+
+    let stale = process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_contact_id,
+        &ct_v1,
+    );
+    assert!(
+        matches!(
+            stale,
+            Err(CardUpdateError::StaleVersion { delta: 1, last: 2 })
+        ),
+        "a version-1 delta after version 2 must be rejected as StaleVersion{{delta:1,last:2}}; got {stale:?}"
+    );
+
+    // The stored card must still reflect v2 only — no downgrade leaked through.
+    let stored = alice_wb
+        .storage()
+        .contacts()
+        .load_contact(&bob_contact_id)
+        .unwrap()
+        .unwrap();
+    assert!(
+        stored.card().fields().iter().any(|f| f.label() == "Phone"),
+        "v2 Phone field must remain after the stale delta is rejected"
+    );
+    assert!(
+        !stored.card().fields().iter().any(|f| f.label() == "Email"),
+        "the stale v1 Email field must NOT have been applied"
+    );
+    assert_eq!(
+        alice_wb
+            .storage()
+            .contacts()
+            .last_delta_version(&bob_contact_id)
+            .unwrap(),
+        2,
+        "a rejected stale delta must not move the recorded version"
     );
 }

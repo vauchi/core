@@ -164,6 +164,48 @@ fn multistage_in_person_exchange_card_update_round_trips() {
     }
 }
 
+/// Bidirectional: the initiator sends first (responder receives + applies),
+/// THEN the responder replies and the initiator applies it. This is the
+/// device "both peers added a field" case — the responder can only send after
+/// it has received once, so the receive-then-send sync order must hold both
+/// ways. Repro target for the bidirectional desync seen on hardware
+/// (2026-06-28-sync-delivery-sent-not-received, "added mails on both").
+// @scenario: sync_updates :: Bidirectional card updates after a multi-stage exchange
+#[test]
+fn multistage_bidirectional_card_updates_round_trip() {
+    let p = multistage_exchanged_pair();
+    let bob_id = p.bob_at_alice.id().to_string();
+    let alice_id = p.alice_at_bob.id().to_string();
+
+    p.alice
+        .save_exchanged_contact(&p.bob_at_alice, &p.alice_ratchet, p.alice_is_initiator)
+        .unwrap();
+    p.bob
+        .save_exchanged_contact(&p.alice_at_bob, &p.bob_ratchet, p.bob_is_initiator)
+        .unwrap();
+
+    let (initiator, responder, resp_id_at_init, init_id_at_resp) = if p.alice_is_initiator {
+        (&p.alice, &p.bob, bob_id, alice_id)
+    } else {
+        (&p.bob, &p.alice, alice_id, bob_id)
+    };
+
+    // 1. Initiator → responder (establishes the responder's sending chain).
+    common::helpers::assert_card_update_round_trips(
+        initiator,
+        responder,
+        &resp_id_at_init,
+        &init_id_at_resp,
+    );
+    // 2. Responder → initiator (the reply the device's bidirectional case needs).
+    common::helpers::assert_card_update_round_trips(
+        responder,
+        initiator,
+        &init_id_at_resp,
+        &resp_id_at_init,
+    );
+}
+
 /// MECHANISM: a contact persisted WITHOUT a ratchet — the silenced
 /// `build_exchange_ratchet` None-path at mobile completion saves the contact
 /// via `update_contact` instead of `save_exchanged_contact` — rejects every

@@ -34,6 +34,24 @@ pub struct Recipient {
 /// CEK-wrapped path the receiver requires), and an initiator/responder
 /// ratchet pair over a shared secret.
 pub fn add_recipient(sharer: &Vauchi, sharer_pk: &[u8; 32], name: &str) -> Recipient {
+    add_recipient_impl(sharer, sharer_pk, name, true)
+}
+
+/// Like [`add_recipient`] but leaves the sharer-side contact **without a CEK**,
+/// matching a freshly-exchanged contact (`Contact::from_exchange` sets
+/// `cek: None`). This exercises the device first-send path the default
+/// `add_recipient` masks by pre-seeding a CEK
+/// (2026-06-29-card-update-duplicate-message-paths: CEK-less first send).
+pub fn add_recipient_no_cek(sharer: &Vauchi, sharer_pk: &[u8; 32], name: &str) -> Recipient {
+    add_recipient_impl(sharer, sharer_pk, name, false)
+}
+
+fn add_recipient_impl(
+    sharer: &Vauchi,
+    sharer_pk: &[u8; 32],
+    name: &str,
+    with_cek: bool,
+) -> Recipient {
     let mut wb = Vauchi::in_memory().unwrap();
     wb.create_identity(name).unwrap();
     let recipient_pk = *wb.identity().unwrap().signing_public_key();
@@ -41,7 +59,9 @@ pub fn add_recipient(sharer: &Vauchi, sharer_pk: &[u8; 32], name: &str) -> Recip
 
     let mut at_sharer =
         Contact::from_exchange(recipient_pk, ContactCard::new(name), shared.clone(), 0);
-    at_sharer.set_cek(ContentEncryptionKey::generate());
+    if with_cek {
+        at_sharer.set_cek(ContentEncryptionKey::generate());
+    }
     let id_at_sharer = at_sharer.id().to_string();
     sharer.add_contact(at_sharer).unwrap();
 

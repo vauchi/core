@@ -16,7 +16,7 @@ use vauchi_core::{
     exchange::X3DHKeyPair,
 };
 
-use crate::common::two_recipient::{add_recipient, deliver, stored_card_has};
+use crate::common::two_recipient::{add_recipient, add_recipient_no_cek, deliver, stored_card_has};
 
 fn create_test_vauchi() -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
@@ -289,5 +289,48 @@ fn set_own_field_private_revokes_a_public_field_from_an_ungrouped_contact() {
     assert!(
         !stored_card_has(&bob, "work"),
         "set_own_field_private revokes `work` from the ungrouped contact's stored card"
+    );
+}
+
+// A freshly-exchanged contact has NO CEK (`Contact::from_exchange` sets
+// cek=None). The mobile first-send `repropagate_to_contact` must still ship a
+// CEK-wrapped (v0x02) payload — the receiver rejects a raw delta as
+// `bad_payload`. Before the fix, repropagate CEK-wrapped only
+// `if contact.cek().is_some()`, so the first device-to-device card update was
+// rejected. The default `add_recipient` masks this by pre-seeding a CEK; this
+// test uses `add_recipient_no_cek`
+// (2026-06-29-card-update-duplicate-message-paths: CEK-less first send).
+// @scenario: sync_updates :: First update to a freshly-exchanged (cek-less) contact is accepted
+#[test]
+fn first_repropagate_to_cek_less_contact_is_accepted() {
+    let alice = create_test_vauchi();
+    alice
+        .add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+    let work = own_field_id(&alice, "work");
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+
+    let group = alice.create_group("Work").unwrap();
+    alice
+        .set_group_field_visibility(group.id(), &work, true)
+        .unwrap();
+
+    // Freshly-exchanged contact: NO CEK.
+    let mut bob = add_recipient_no_cek(&alice, &alice_pk, "Bob");
+
+    // First repropagate to bob (grant `work` via the group). The receiver only
+    // accepts CEK-wrapped payloads, so a raw delta to this cek-less contact is
+    // rejected — `deliver` panics on the resulting bad_payload before the fix.
+    alice
+        .add_contact_to_group_and_repropagate(group.id(), &bob.id_at_sharer)
+        .unwrap();
+    assert_eq!(
+        deliver(&alice, &mut bob),
+        1,
+        "the first update to a cek-less freshly-exchanged contact must be accepted"
+    );
+    assert!(
+        stored_card_has(&bob, "work"),
+        "the granted field must apply at the freshly-exchanged peer"
     );
 }

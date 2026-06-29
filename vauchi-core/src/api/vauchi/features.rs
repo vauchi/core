@@ -558,26 +558,28 @@ impl Vauchi {
         let delta_bytes =
             serde_json::to_vec(&delta).map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
-        // Wrap with CEK if contact has one, otherwise legacy
-        let payload_bytes = if contact.cek().is_some() {
-            let new_cek = ContentEncryptionKey::generate();
-            let cek_ciphertext = new_cek
-                .encrypt(&delta_bytes)
-                .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
+        // Always CEK-wrap (v0x02). A freshly-exchanged contact has no CEK yet
+        // (`Contact::from_exchange` sets `cek: None`), and the receiver only
+        // accepts CEK-wrapped payloads — shipping a raw delta to a cek-less
+        // contact is a `bad_payload` the peer rejects, which broke the FIRST
+        // device-to-device card update. Generate a CEK when absent, mirroring
+        // `prepare_card_update_for_contact`
+        // (2026-06-29-card-update-duplicate-message-paths: CEK-less first send).
+        let new_cek = ContentEncryptionKey::generate();
+        let cek_ciphertext = new_cek
+            .encrypt(&delta_bytes)
+            .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
 
-            let wrapped = CekWrappedPayload {
-                cek: new_cek.to_bytes(),
-                cek_ciphertext,
-                signature: delta.signature,
-                nonce: delta.nonce,
-            };
-
-            contact.set_cek(new_cek);
-            self.storage.contacts().save_contact(&contact)?;
-            VersionedPayload::encode_cek(&wrapped)
-        } else {
-            delta_bytes
+        let wrapped = CekWrappedPayload {
+            cek: new_cek.to_bytes(),
+            cek_ciphertext,
+            signature: delta.signature,
+            nonce: delta.nonce,
         };
+
+        contact.set_cek(new_cek);
+        self.storage.contacts().save_contact(&contact)?;
+        let payload_bytes = VersionedPayload::encode_cek(&wrapped);
 
         // Encrypt with ratchet
         let ratchet_msg = ratchet

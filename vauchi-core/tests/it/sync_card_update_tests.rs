@@ -887,3 +887,93 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
         "Field note for retained field '{retained_field_id}' must NOT be deleted — only orphaned notes are cleaned up"
     );
 }
+
+// A `Removed` must FULLY revoke even when the recipient's STORED card carries a
+// pre-upsert duplicate of that field. The shipping device receiver
+// (process_single_card_update) must heal duplicates before applying, or one
+// stale copy stays visible on the recipient — a privacy leak. Cards stored
+// before `add_field` became an upsert (2026-06-14-delta-apply-duplicate-fields)
+// accumulated such duplicates; the test-only receiver healed them, the device
+// receiver did not (root cause 2026-06-29-card-update-duplicate-message-paths
+// finding #1).
+// @scenario: sync_updates :: A removed field fully revokes despite a stored duplicate
+#[test]
+fn removed_field_fully_revokes_despite_stored_duplicate() {
+    let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
+        setup_exchange_with_ratchets();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+
+    // Bob's authentic card: a single Email field.
+    let mut old_card = ContactCard::new("Bob");
+    old_card
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@test.com",
+            0,
+        ))
+        .unwrap();
+    let email_id = old_card.fields()[0].id().to_string();
+
+    // Persist a CORRUPTED copy into Alice's storage: the Email field appears
+    // twice. add_field upserts now, so the duplicate is injected via serde
+    // (mirrors deduplicate_fields_collapses_same_id_duplicates).
+    let mut value = serde_json::to_value(&old_card).unwrap();
+    let fields = value.get_mut("fields").unwrap().as_array_mut().unwrap();
+    let dup = fields[0].clone();
+    fields.push(dup);
+    let corrupted: ContactCard = serde_json::from_value(value).unwrap();
+    assert_eq!(
+        corrupted.fields().len(),
+        2,
+        "constructed a duplicated stored card"
+    );
+
+    let mut alice_bob = alice_wb
+        .storage()
+        .contacts()
+        .load_contact(&bob_contact_id)
+        .unwrap()
+        .unwrap();
+    alice_bob.update_card(corrupted, 0);
+    alice_wb
+        .storage()
+        .contacts()
+        .save_contact(&alice_bob)
+        .unwrap();
+
+    // Bob removes the Email field (delta computed from his authentic 1-field card).
+    let new_card = ContactCard::new("Bob");
+    let ciphertext = create_valid_update(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        &old_card,
+        &new_card,
+    );
+
+    process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_contact_id,
+        &ciphertext,
+    )
+    .expect("removal update must apply");
+
+    let stored = alice_wb
+        .storage()
+        .contacts()
+        .load_contact(&bob_contact_id)
+        .unwrap()
+        .unwrap();
+    let leaked = stored
+        .card()
+        .fields()
+        .iter()
+        .filter(|f| f.id() == email_id)
+        .count();
+    assert_eq!(
+        leaked, 0,
+        "a single Removed left {leaked} stale copy(ies) of a revoked field"
+    );
+}

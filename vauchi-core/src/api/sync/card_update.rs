@@ -183,8 +183,11 @@ pub fn process_single_card_update(
         return Err(CardUpdateError::ReplayDetected);
     }
 
-    // 8. Apply delta to contact card
+    // 8. Apply delta to contact card.
     let mut card = contact.card().clone();
+    // Heal any pre-upsert duplicate fields before applying, so a single
+    // `Removed` fully revokes (2026-06-14-delta-apply-duplicate-fields).
+    card.deduplicate_fields();
     delta
         .apply(&mut card, storage.clock().unix_seconds())
         .map_err(|_| CardUpdateError::DeltaApplicationFailed)?;

@@ -10,7 +10,8 @@
 
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VauchiError,
-    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, sync::delta::CardDelta,
+    api::CardUpdateError, crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair,
+    sync::delta::CardDelta,
 };
 
 fn create_test_vauchi() -> Vauchi {
@@ -197,9 +198,14 @@ fn test_blocked_contact_update_rejected() {
 
     alice.block_contact(&bob_id).unwrap();
 
-    let result = alice.process_card_update(&bob_id, &encrypted);
+    let result = vauchi_core::api::process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted,
+    );
     assert!(
-        matches!(result, Err(VauchiError::ContactBlocked(_))),
+        matches!(result, Err(CardUpdateError::ContactBlocked)),
         "Updates from blocked contacts should be rejected with ContactBlocked, got: {:?}",
         result.err()
     );

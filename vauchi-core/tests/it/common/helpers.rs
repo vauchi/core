@@ -206,16 +206,19 @@ pub fn assert_card_update_round_trips(
     sender.update_own_card(&new_card).unwrap();
     let sender_new = sender.own_card().unwrap().unwrap();
 
-    let encrypted = sender
-        .prepare_card_update_for_contact(recipient_id_at_sender, &sender_old, &sender_new)
-        .expect("initiator prepares the card update");
-    let changed = recipient
-        .process_card_update(sender_id_at_recipient, &encrypted)
-        .expect("the in-person-exchanged peer must decrypt the first card update");
-    assert!(
-        !changed.is_empty(),
-        "the card update must apply at least one field at the peer"
+    let encrypted = super::card_update::seal_update_default(
+        sender,
+        recipient_id_at_sender,
+        &sender_old,
+        &sender_new,
     );
+    vauchi_core::api::process_single_card_update(
+        recipient.identity().unwrap(),
+        recipient.storage(),
+        sender_id_at_recipient,
+        &encrypted,
+    )
+    .expect("the in-person-exchanged peer must decrypt the first card update");
 
     let updated = recipient
         .get_contact(sender_id_at_recipient)

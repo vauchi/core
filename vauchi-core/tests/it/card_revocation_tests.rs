@@ -16,7 +16,9 @@ use vauchi_core::{
     exchange::X3DHKeyPair,
 };
 
-use crate::common::two_recipient::{add_recipient, add_recipient_no_cek, deliver, stored_card_has};
+use crate::common::two_recipient::{
+    add_recipient, add_recipient_no_cek, deliver, stored_card_display_name, stored_card_has,
+};
 
 fn create_test_vauchi() -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
@@ -332,5 +334,33 @@ fn first_repropagate_to_cek_less_contact_is_accepted() {
     assert!(
         stored_card_has(&bob, "work"),
         "the granted field must apply at the freshly-exchanged peer"
+    );
+}
+
+// A display-name change must repropagate to contacts. Before the fix,
+// `update_display_name` did not mark the own card for repropagation, AND the
+// repropagate baseline was stamped with the current name so the diff emitted no
+// `DisplayNameChanged` — so a rename never reached contacts (they kept the
+// exchange-time name forever). The fix marks repropagation on rename and tracks
+// `last_sent_display_name` per contact so the baseline carries the last-sent
+// name. (2026-06-29 device test: "renamed but it did not sync".)
+// @scenario: sync_updates :: A display-name change propagates to contacts
+#[test]
+fn renaming_own_card_propagates_the_new_name_to_contacts() {
+    let mut alice = create_test_vauchi(); // identity "Alice"
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+    let mut bob = add_recipient_no_cek(&alice, &alice_pk, "Bob");
+
+    alice.update_display_name("Alice Renamed").unwrap();
+    alice.run_owed_repropagation().unwrap();
+
+    assert!(
+        deliver(&alice, &mut bob) >= 1,
+        "a display-name change must repropagate to the contact"
+    );
+    assert_eq!(
+        stored_card_display_name(&bob),
+        "Alice Renamed",
+        "the contact's stored card must adopt the renamed display name"
     );
 }

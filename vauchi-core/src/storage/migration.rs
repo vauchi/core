@@ -546,6 +546,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "group_presentation",
             action: MigrationAction::Sql(MIGRATION_V56_GROUP_PRESENTATION),
         },
+        Migration {
+            version: 57,
+            name: "contact_last_sent_display_name",
+            action: MigrationAction::Sql(MIGRATION_V57_LAST_SENT_DISPLAY_NAME),
+        },
     ]
 }
 
@@ -926,6 +931,14 @@ const MIGRATION_V51_EXCHANGE_LOCATION: &str =
 /// forever. See `2026-06-08-card-revocation-not-propagated`.
 const MIGRATION_V52_LAST_SENT_VISIBLE_FIELDS: &str =
     "ALTER TABLE contacts ADD COLUMN last_sent_visible_fields TEXT;";
+
+/// Migration v57: per-contact last-sent display name. `repropagate_to_contact`
+/// diffs the current name against what the contact last received and emits a
+/// `DisplayNameChanged` only when it actually changed — without it a rename
+/// never reached contacts because the diff baseline carried the current name
+/// (2026-06-29-card-update-duplicate-message-paths: "renamed but didn't sync").
+const MIGRATION_V57_LAST_SENT_DISPLAY_NAME: &str =
+    "ALTER TABLE contacts ADD COLUMN last_sent_display_name TEXT;";
 
 /// Migration v44: In-progress recovery state persistence.
 ///

@@ -458,6 +458,12 @@ impl Vauchi {
             self.events.dispatch(VauchiEvent::OwnCardUpdated {
                 changed_fields: vec!["display_name".into()],
             });
+            // A renamed card must repropagate to contacts — the display name is
+            // shared with every contact (mirrors add/remove/update_own_field).
+            // The per-contact last_sent_display_name baseline makes the
+            // repropagate emit a DisplayNameChanged exactly when the name
+            // changed (2026-06-29-card-update-duplicate-message-paths).
+            self.mark_own_card_repropagate()?;
         }
 
         Ok(())

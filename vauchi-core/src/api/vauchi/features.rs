@@ -516,8 +516,18 @@ impl Vauchi {
             .collect();
 
         // Add/modify delta for the currently-visible fields (from an empty
-        // baseline, so the receiver re-applies idempotently).
-        let empty_card = ContactCard::new(own_card.display_name());
+        // baseline, so the receiver re-applies idempotently). The baseline name
+        // is the name the contact LAST received (default "" forces the current
+        // name onto the first send) — so a rename emits a `DisplayNameChanged`
+        // exactly when it changed. Stamping the baseline with the *current* name
+        // (the old behaviour) neutralised the diff, so renames never propagated
+        // (2026-06-29-card-update-duplicate-message-paths).
+        let last_sent_name = self
+            .storage
+            .contacts()
+            .load_last_sent_display_name(contact_id)?
+            .unwrap_or_default();
+        let empty_card = ContactCard::new(&last_sent_name);
         let mut delta = CardDelta::compute(&empty_card, &own_card, self.clock.unix_seconds())
             .filter_with(|field_id| new_visible.contains(field_id));
 
@@ -613,6 +623,11 @@ impl Vauchi {
         self.storage
             .contacts()
             .save_last_sent_visible_fields(contact_id, &new_visible)?;
+        // Record the display name this send carried, so a later rename diffs
+        // against it and emits a `DisplayNameChanged` exactly once.
+        self.storage
+            .contacts()
+            .save_last_sent_display_name(contact_id, own_card.display_name())?;
 
         Ok(())
     }

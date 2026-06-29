@@ -110,6 +110,18 @@ pub fn deliver(sharer: &Vauchi, r: &mut Recipient) -> usize {
     count
 }
 
+/// The display name on the recipient's stored copy of the sharer's card.
+pub fn stored_card_display_name(r: &Recipient) -> String {
+    r.wb.storage()
+        .contacts()
+        .load_contact(&r.sharer_id_here)
+        .unwrap()
+        .unwrap()
+        .card()
+        .display_name()
+        .to_string()
+}
+
 /// Whether the recipient's stored copy of the sharer's card holds a field.
 pub fn stored_card_has(r: &Recipient, label: &str) -> bool {
     r.wb.storage()

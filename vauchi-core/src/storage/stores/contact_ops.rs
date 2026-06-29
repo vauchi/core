@@ -322,6 +322,38 @@ impl ContactStore<'_> {
         )?;
         Ok(())
     }
+    /// The display name last sent (repropagated) to a contact, or `None` if no
+    /// name has been sent yet. `repropagate_to_contact` uses this as the diff
+    /// baseline so a rename emits a `DisplayNameChanged` exactly when it changes.
+    pub fn load_last_sent_display_name(
+        &self,
+        contact_id: &str,
+    ) -> Result<Option<String>, StorageError> {
+        self.conn
+            .query_row(
+                "SELECT last_sent_display_name FROM contacts WHERE id = ?1",
+                params![contact_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => {
+                    StorageError::NotFound("Contact not found".to_string())
+                }
+                other => StorageError::Database(other),
+            })
+    }
+    /// Records the display name last sent (repropagated) to a contact.
+    pub fn save_last_sent_display_name(
+        &self,
+        contact_id: &str,
+        name: &str,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "UPDATE contacts SET last_sent_display_name = ?1 WHERE id = ?2",
+            params![name, contact_id],
+        )?;
+        Ok(())
+    }
     /// Records a revoked sender in the tombstone table.
     ///
     /// Prevents future updates from this sender from being processed,

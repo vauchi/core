@@ -194,11 +194,16 @@ echo -e "${GREEN}XCFramework created at: $XCFRAMEWORK_PATH${NC}"
 # it regenerates Info.plists for static-library frameworks.
 #   - CFBundleExecutable: iOS requires it.
 #   - MinimumOSVersion (iOS slices only): App Store Connect rejects the
-#     embedding app ("MinimumOSVersion ... is ''") when this is empty. Set it
-#     to the IPHONEOS_DEPLOYMENT_TARGET the libs are built with
-#     (build-bindings.sh => 10.0); >= 8.0 is the App Store requirement.
+#     embedding app two ways here — empty ("MinimumOSVersion ... is ''") and,
+#     more subtly, a value LOWER than the embedding app's deployment target
+#     (App Store error 90208: "framework does not support the minimum OS
+#     Version specified in the Info.plist").
+#     So this must MATCH the consuming iOS app's deployment target, NOT the
+#     libs' build target. The Rust libs build for iOS 10.0 (build-bindings.sh)
+#     and that binary supports 15.0 fine; the declared minimum just has to be
+#     >= the app. Keep in sync with ios/project.yml IPHONEOS_DEPLOYMENT_TARGET.
 echo -e "${YELLOW}Post-processing: Ensuring CFBundleExecutable + MinimumOSVersion in framework slices...${NC}"
-FFI_MIN_IOS="10.0"
+FFI_MIN_IOS="15.0"
 while IFS= read -r plist; do
     if ! /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$plist" 2>/dev/null; then
         echo "  Adding CFBundleExecutable to: $plist"

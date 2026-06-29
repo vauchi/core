@@ -9,6 +9,7 @@
 
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi,
+    api::process_single_card_update,
     crypto::cek::ContentEncryptionKey,
     crypto::ratchet::DoubleRatchetState,
     exchange::X3DHKeyPair,
@@ -94,13 +95,23 @@ fn test_replay_rejects_duplicate_payload() {
         "bob@work.com",
         alice_pk,
     );
-    let result = alice.process_card_update(&bob_id, &encrypted);
+    let result = process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted,
+    );
     assert!(result.is_ok(), "First update should succeed");
 
     // Same encrypted bytes again — ratchet decrypt will fail (already consumed),
     // which is actually caught before replay detection. The ratchet itself prevents
     // raw replay. But let's verify it's rejected.
-    let result2 = alice.process_card_update(&bob_id, &encrypted);
+    let result2 = process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted,
+    );
     assert!(result2.is_err(), "Duplicate payload should be rejected");
 }
 
@@ -132,7 +143,13 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
     let payload = VersionedPayload::encode_cek(&wrapped);
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
-    alice.process_card_update(&bob_id, &encrypted).unwrap();
+    process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted,
+    )
+    .unwrap();
 
     // Create a second delta with the SAME nonce (simulating replay with fresh ratchet encryption)
     let mut new_card2 = ContactCard::new("Bob V3");
@@ -176,7 +193,12 @@ fn test_replay_accepts_fresh_nonces() {
         "bob@v1.com",
         alice_pk,
     );
-    let result1 = alice.process_card_update(&bob_id, &encrypted1);
+    let result1 = process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted1,
+    );
     assert!(result1.is_ok(), "First fresh nonce should succeed");
 
     // Second update with a different nonce (CardDelta::compute generates fresh nonce each time)
@@ -187,7 +209,12 @@ fn test_replay_accepts_fresh_nonces() {
         "bob@v2.com",
         alice_pk,
     );
-    let result2 = alice.process_card_update(&bob_id, &encrypted2);
+    let result2 = process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted2,
+    );
     assert!(result2.is_ok(), "Second fresh nonce should succeed");
 
     let nonces = alice
@@ -218,7 +245,13 @@ fn test_replay_nonce_persisted_after_successful_update() {
         "bob@work.com",
         alice_pk,
     );
-    alice.process_card_update(&bob_id, &encrypted).unwrap();
+    process_single_card_update(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &bob_id,
+        &encrypted,
+    )
+    .unwrap();
 
     let nonces_after = alice
         .storage()

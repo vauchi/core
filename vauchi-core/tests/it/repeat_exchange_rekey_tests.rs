@@ -18,7 +18,9 @@
 use crate::common;
 
 use common::helpers::{create_vauchi_with_card, setup_ratchets};
-use vauchi_core::{Contact, ContactField, FieldType, SymmetricKey};
+use vauchi_core::{
+    Contact, ContactField, FieldType, SymmetricKey, api::process_single_card_update,
+};
 
 /// A 2nd exchange of the same pair updates the peer's card and rekeys, so a
 /// later card-update still round-trips under the new channel.
@@ -110,16 +112,15 @@ fn second_exchange_upserts_card_and_rekeys_so_sync_round_trips() {
     alice.update_own_card(&alice_new).unwrap();
     let alice_new = alice.own_card().unwrap().unwrap();
 
-    let encrypted = alice
-        .prepare_card_update_for_contact(&bob_id, &alice_old, &alice_new)
-        .expect("prepare card update under the rekeyed channel");
-    let changed = bob
-        .process_card_update(&alice_id, &encrypted)
-        .expect("peer must decrypt the update under the rekeyed channel");
-    assert!(
-        !changed.is_empty(),
-        "the post-rekey card-update must apply at the peer"
-    );
+    let encrypted =
+        common::card_update::seal_update_default(&alice, &bob_id, &alice_old, &alice_new);
+    process_single_card_update(
+        bob.identity().unwrap(),
+        bob.storage(),
+        &alice_id,
+        &encrypted,
+    )
+    .expect("peer must decrypt the update under the rekeyed channel");
 
     let alice_at_bob_final = bob.get_contact(&alice_id).unwrap().unwrap();
     let final_email = alice_at_bob_final
@@ -180,13 +181,22 @@ fn first_exchange_inserts_contact_and_card_update_round_trips() {
         ))
         .unwrap();
     let new_card = alice.own_card().unwrap().unwrap();
-    let encrypted = alice
-        .prepare_card_update_for_contact(&bob_id, &old_card, &new_card)
-        .unwrap();
-    let changed = bob.process_card_update(&alice_id, &encrypted).unwrap();
+    let encrypted = common::card_update::seal_update_default(&alice, &bob_id, &old_card, &new_card);
+    process_single_card_update(
+        bob.identity().unwrap(),
+        bob.storage(),
+        &alice_id,
+        &encrypted,
+    )
+    .expect("first-exchange card-update must round-trip");
+    let alice_at_bob = bob.get_contact(&alice_id).unwrap().unwrap();
     assert!(
-        !changed.is_empty(),
-        "first-exchange card-update must round-trip"
+        alice_at_bob
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.label() == "blog" && f.value() == "https://alice.example"),
+        "first-exchange card-update must deliver the new blog field to the peer"
     );
 }
 
@@ -238,9 +248,7 @@ fn stale_pre_rekey_update_is_skipped_and_does_not_break_the_rekeyed_channel() {
         .unwrap();
     alice.update_own_card(&new1).unwrap();
     let new1 = alice.own_card().unwrap().unwrap();
-    let u1 = alice
-        .prepare_card_update_for_contact(&bob_id, &old1, &new1)
-        .unwrap();
+    let u1 = common::card_update::seal_update_default(&alice, &bob_id, &old1, &new1);
 
     // ── Exchange #2 — both rekey to ratchet2 (the re-exchange supersedes U1).
     let secret2 = SymmetricKey::generate();
@@ -261,7 +269,7 @@ fn stale_pre_rekey_update_is_skipped_and_does_not_break_the_rekeyed_channel() {
 
     // Bob receives the stale U1 (old ratchet) AFTER the rekey → skipped, not applied.
     assert!(
-        bob.process_card_update(&alice_id, &u1).is_err(),
+        process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &u1).is_err(),
         "a stale old-ratchet update after a rekey must fail to decrypt (skipped), not apply"
     );
     let alice_at_bob_after = bob.get_contact(&alice_id).unwrap().unwrap();
@@ -289,10 +297,8 @@ fn stale_pre_rekey_update_is_skipped_and_does_not_break_the_rekeyed_channel() {
         ))
         .unwrap();
     let new2 = alice.own_card().unwrap().unwrap();
-    let u2 = alice
-        .prepare_card_update_for_contact(&bob_id, &old2, &new2)
-        .unwrap();
-    bob.process_card_update(&alice_id, &u2)
+    let u2 = common::card_update::seal_update_default(&alice, &bob_id, &old2, &new2);
+    process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &u2)
         .expect("the rekeyed channel must still deliver after a stale message was skipped");
     let final_at_bob = bob.get_contact(&alice_id).unwrap().unwrap();
     assert!(

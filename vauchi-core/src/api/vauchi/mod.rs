@@ -55,7 +55,7 @@ pub use setup::SetupProgress;
 pub use sync_http::{PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES};
 pub use tags::GroupDraft;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::clock::{Clock, SystemClock};
 use crate::crypto::{ShreddingMasterKey, SymmetricKey};
@@ -64,7 +64,6 @@ use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 use crate::rng::{OsSecureRng, SecureRng};
 use crate::sleeper::{Sleeper, SystemSleeper};
 use crate::storage::{SecureStorage, Storage};
-use crate::sync::state::ReplayDetector;
 
 use super::config::VauchiConfig;
 use super::duress::DuressAlert;
@@ -188,7 +187,6 @@ pub struct Vauchi {
     storage: Storage,
     events: Arc<EventDispatcher>,
     secure_storage: Option<Arc<dyn SecureStorage>>,
-    replay_detector: Mutex<ReplayDetector>,
     auth_mode: AuthMode,
     /// Explicit-time seam (Phase 1 / Task 1.1 of the pure-functional-core
     /// program). Every `SystemTime::now` callsite under `vauchi-core`
@@ -383,7 +381,6 @@ impl Vauchi {
             storage,
             events,
             secure_storage,
-            replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             auth_mode: AuthMode::Unauthenticated,
             duress_alerts: Vec::new(),
             clock,
@@ -585,7 +582,6 @@ impl Vauchi {
             storage,
             events,
             secure_storage: None,
-            replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             auth_mode: AuthMode::Unauthenticated,
             duress_alerts: Vec::new(),
             clock,

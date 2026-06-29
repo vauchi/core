@@ -129,7 +129,7 @@ impl Vauchi {
             .connect(&TransportConfig::default())
             .map_err(VauchiError::Network)?;
 
-        let (received, fetched, rejected, unresolved) =
+        let (received, fetched, rejected, unresolved, reject_reasons) =
             self.run_receive_phase(identity, &contacts, &mut adapter)?;
 
         // Capture version policy from relay response headers before adapter is moved.
@@ -154,6 +154,7 @@ impl Vauchi {
             fetched,
             rejected,
             unresolved,
+            reject_reasons,
             sent: send_result.sent,
             acknowledged: send_result.acknowledged,
             errors,
@@ -302,7 +303,7 @@ impl Vauchi {
         identity: &crate::identity::Identity,
         contacts: &[Contact],
         adapter: &mut HttpTransportAdapter,
-    ) -> VauchiResult<(usize, usize, usize, usize)> {
+    ) -> VauchiResult<(usize, usize, usize, usize, String)> {
         // 1. Register mailbox tokens so the adapter knows what to fetch
         self.register_tokens(identity, contacts, adapter)?;
 
@@ -324,7 +325,7 @@ impl Vauchi {
 
         let fetched = blobs.len();
         if blobs.is_empty() {
-            return Ok((0, fetched, 0, 0));
+            return Ok((0, fetched, 0, 0, String::new()));
         }
 
         // 2b. Partition self-token (device-sync) blobs out of the contact
@@ -392,6 +393,23 @@ impl Vauchi {
             .filter(|o| o.token_resolved && !o.decrypted)
             .count();
         let unresolved = outcomes.iter().filter(|o| !o.token_resolved).count();
+        // Per-category reject tally (PII-free, sorted) so the device can name
+        // WHICH receive step failed when card updates don't apply
+        // (2026-06-28-sync-delivery-sent-not-received). E.g. "decrypt:2".
+        let reject_reasons = {
+            let mut tally: std::collections::BTreeMap<&'static str, usize> =
+                std::collections::BTreeMap::new();
+            for outcome in &outcomes {
+                if let Some(reason) = outcome.reject_reason {
+                    *tally.entry(reason).or_insert(0) += 1;
+                }
+            }
+            tally
+                .iter()
+                .map(|(cat, n)| format!("{cat}:{n}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
         if unresolved > 0 {
             // Operational signal: a non-zero unresolved count after the
             // 2026-04-27 relay rollout indicates one of:
@@ -432,7 +450,13 @@ impl Vauchi {
             let _ = adapter.send(&ack_envelope);
         }
 
-        Ok((received + device_applied, fetched, rejected, unresolved))
+        Ok((
+            received + device_applied,
+            fetched,
+            rejected,
+            unresolved,
+            reject_reasons,
+        ))
     }
 
     // `register_tokens` moved to `device_sync_loop.rs` (it registers the

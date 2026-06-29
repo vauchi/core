@@ -36,7 +36,7 @@
 
 use std::collections::HashMap;
 
-use crate::api::sync::process_single_card_update;
+use crate::api::sync::{CardUpdateError, process_single_card_update};
 use crate::contact::Contact;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
 
@@ -61,6 +61,12 @@ pub struct BlobOutcome {
     pub message_id: String,
     pub token_resolved: bool,
     pub decrypted: bool,
+    /// When `token_resolved && !decrypted`, the short category of WHY
+    /// `process_single_card_update` rejected the blob (e.g. `bad_wire`,
+    /// `decrypt`, `signature`, `replay`). Diagnostics for
+    /// 2026-06-28-sync-delivery-sent-not-received — the device couldn't be
+    /// reproduced in-core, so the failing step must be named on-device.
+    pub reject_reason: Option<&'static str>,
 }
 
 /// Route and apply a batch of received blobs.
@@ -88,20 +94,47 @@ pub fn process_received_blobs(
 
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext) in blobs {
-        let (token_resolved, decrypted) = match token_to_contact.get(&mailbox_token_hex) {
-            Some(contact_id) => (
-                true,
-                process_single_card_update(identity, storage, contact_id, &ciphertext).is_ok(),
-            ),
-            None => (false, false),
-        };
+        let (token_resolved, decrypted, reject_reason) =
+            match token_to_contact.get(&mailbox_token_hex) {
+                Some(contact_id) => {
+                    match process_single_card_update(identity, storage, contact_id, &ciphertext) {
+                        Ok(()) => (true, true, None),
+                        Err(e) => (true, false, Some(reject_category(&e))),
+                    }
+                }
+                None => (false, false, None),
+            };
         outcomes.push(BlobOutcome {
             message_id,
             token_resolved,
             decrypted,
+            reject_reason,
         });
     }
     outcomes
+}
+
+/// Short, PII-free category for a rejected blob — names WHICH receive step
+/// failed so the device can report it (logging-rules: no payload contents).
+/// `bad_wire` = the serialized RatchetMessage didn't parse (the wire-header
+/// class, core!1201); `decrypt` = ratchet decrypt failed (key/state);
+/// `signature` = delta signature mismatch; `replay`/`stale` = already applied.
+fn reject_category(e: &CardUpdateError) -> &'static str {
+    match e {
+        CardUpdateError::SenderRevoked => "revoked",
+        CardUpdateError::ContactNotFound => "no_contact",
+        CardUpdateError::ContactBlocked => "blocked",
+        CardUpdateError::NoRatchetState => "no_ratchet",
+        CardUpdateError::InvalidRatchetMessage => "bad_wire",
+        CardUpdateError::DecryptionFailed => "decrypt",
+        CardUpdateError::InvalidPayload(_) => "bad_payload",
+        CardUpdateError::CekDecryptionFailed => "cek",
+        CardUpdateError::InvalidDelta => "bad_delta",
+        CardUpdateError::SignatureInvalid => "signature",
+        CardUpdateError::ReplayDetected => "replay",
+        CardUpdateError::DeltaApplicationFailed => "delta_apply",
+        CardUpdateError::Storage(_) => "storage",
+    }
 }
 
 /// Build a `mailbox_token → contact_id` lookup map for the receive loop.

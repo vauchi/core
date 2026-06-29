@@ -120,6 +120,10 @@ pub enum VauchiSyncOutcome {
         rejected: usize,
         /// Token-unresolved (no contact-token match).
         unresolved: usize,
+        /// PII-free per-category tally of WHY rejected blobs failed
+        /// (e.g. `decrypt:2,signature:1`), so the device can name the
+        /// failing receive step. 2026-06-28-sync-delivery-sent-not-received.
+        reject_reasons: String,
         sent: usize,
         acknowledged: usize,
         errors: Vec<String>,

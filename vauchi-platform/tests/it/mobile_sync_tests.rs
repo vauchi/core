@@ -85,6 +85,7 @@ fn ok_outcome_maps_received_and_sent_counts() {
         fetched: 5,
         rejected: 1,
         unresolved: 1,
+        reject_reasons: "decrypt:1".to_string(),
         sent: 2,
         acknowledged: 0,
         errors: vec![],
@@ -104,6 +105,10 @@ fn ok_outcome_maps_received_and_sent_counts() {
     assert_eq!(result.blobs_fetched, 5, "fetched maps to blobs_fetched");
     assert_eq!(result.rejected, 1, "rejected maps through");
     assert_eq!(result.unresolved, 1, "unresolved maps through");
+    assert_eq!(
+        result.reject_reasons, "decrypt:1",
+        "reject_reasons category tally maps through"
+    );
 }
 
 // @internal
@@ -114,6 +119,7 @@ fn ok_outcome_with_zero_counts_has_no_changes() {
         fetched: 0,
         rejected: 0,
         unresolved: 0,
+        reject_reasons: String::new(),
         sent: 0,
         acknowledged: 0,
         errors: vec![],

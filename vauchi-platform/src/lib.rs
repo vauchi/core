@@ -488,6 +488,7 @@ mod tests {
             blobs_fetched: 0,
             rejected: 0,
             unresolved: 0,
+            reject_reasons: String::new(),
         };
         assert_eq!(empty.total, 0);
         assert!(!empty.has_changes);
@@ -502,6 +503,7 @@ mod tests {
             blobs_fetched: 0,
             rejected: 0,
             unresolved: 0,
+            reject_reasons: String::new(),
         };
         assert_eq!(with_changes.total, 6);
         assert!(with_changes.has_changes);
@@ -516,6 +518,7 @@ mod tests {
             blobs_fetched: 0,
             rejected: 0,
             unresolved: 0,
+            reject_reasons: String::new(),
         };
         assert_eq!(partial.total, 1);
         assert!(partial.has_changes);

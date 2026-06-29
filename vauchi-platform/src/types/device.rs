@@ -106,6 +106,10 @@ pub struct MobileSyncResult {
     pub rejected: u32,
     /// Diagnostics: token-unresolved (no contact-token match).
     pub unresolved: u32,
+    /// Diagnostics: PII-free per-category tally of WHY rejected blobs failed
+    /// (e.g. `decrypt:2,signature:1`) — names the failing receive step.
+    /// 2026-06-28-sync-delivery-sent-not-received.
+    pub reject_reasons: String,
 }
 
 /// Maps a core sync outcome to the mobile result shape.
@@ -130,6 +134,7 @@ impl TryFrom<vauchi_core::api::VauchiSyncOutcome> for MobileSyncResult {
                 fetched,
                 rejected,
                 unresolved,
+                reject_reasons,
                 sent,
                 ..
             } => Ok(MobileSyncResult {
@@ -142,6 +147,7 @@ impl TryFrom<vauchi_core::api::VauchiSyncOutcome> for MobileSyncResult {
                 blobs_fetched: fetched as u32,
                 rejected: rejected as u32,
                 unresolved: unresolved as u32,
+                reject_reasons,
             }),
             VauchiSyncOutcome::TooSoon => Ok(MobileSyncResult {
                 contacts_added: 0,
@@ -153,6 +159,7 @@ impl TryFrom<vauchi_core::api::VauchiSyncOutcome> for MobileSyncResult {
                 blobs_fetched: 0,
                 rejected: 0,
                 unresolved: 0,
+                reject_reasons: String::new(),
             }),
             VauchiSyncOutcome::NotConnected => Err(crate::error::MobileError::Other {
                 detail: "Not connected".into(),

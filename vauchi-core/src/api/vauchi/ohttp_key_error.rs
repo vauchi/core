@@ -157,6 +157,7 @@ mod tests {
             fetched: 0,
             rejected: 0,
             unresolved: 0,
+            reject_reasons: String::new(),
             sent: 0,
             acknowledged: 0,
             errors,

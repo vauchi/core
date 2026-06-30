@@ -384,23 +384,19 @@ impl Vauchi {
         let mut applied = 0;
 
         for item in items {
+            // Map the item to the screen-invalidation event its successful apply
+            // should dispatch — computed before the match consumes `item`, then
+            // fired at the success seam below so a device-synced change
+            // live-refreshes the matching screen (ADR-021/043; Gap A of
+            // 2026-06-30-sync-ui-invalidation-sibling-gaps, same class as !1209).
+            let event = sync_item_event(&item);
             let result = match item {
                 SyncItem::ContactAdded { contact_data, .. } => match contact_data.to_contact() {
-                    Ok(contact) => {
-                        let contact_id = contact.id().to_string();
-                        let result = self
-                            .storage
-                            .contacts()
-                            .save_contact(&contact)
-                            .map_err(|e| e.into());
-                        if result.is_ok() {
-                            self.events.dispatch(VauchiEvent::ContactAdded {
-                                contact_id,
-                                origin: crate::api::events::EventOrigin::Synced,
-                            });
-                        }
-                        result
-                    }
+                    Ok(contact) => self
+                        .storage
+                        .contacts()
+                        .save_contact(&contact)
+                        .map_err(|e| e.into()),
                     Err(e) => Err(VauchiError::InvalidState(e.to_string())),
                 },
                 SyncItem::ContactRemoved { ref contact_id, .. } => self
@@ -623,9 +619,99 @@ impl Vauchi {
 
             if result.is_ok() {
                 applied += 1;
+                if let Some(event) = event {
+                    self.events.dispatch(event);
+                }
             }
         }
 
         Ok(applied)
+    }
+}
+
+/// Map an applied [`SyncItem`] to the screen-invalidation [`VauchiEvent`] its
+/// successful apply should dispatch.
+///
+/// Pure: no storage, no dispatch. [`Vauchi::apply_sync_items`] calls this
+/// before the per-item match consumes the item, then dispatches the result at
+/// the success seam so a device-synced change live-refreshes the matching
+/// screen (ADR-021/043; Gap A of `2026-06-30-sync-ui-invalidation-sibling-gaps`,
+/// same class as the `!1209` relay-receive fix). `None` = no mapped
+/// invalidation event today: deletion-state changes have no `affected_screens`
+/// entry, so the settings screen refreshes on next navigation.
+fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEvent> {
+    use crate::api::events::EventOrigin;
+    use crate::sync::device_sync::SyncItem;
+
+    match item {
+        SyncItem::ContactAdded { contact_data, .. } => {
+            contact_data
+                .to_contact()
+                .ok()
+                .map(|contact| VauchiEvent::ContactAdded {
+                    contact_id: contact.id().to_string(),
+                    origin: EventOrigin::Synced,
+                })
+        }
+        SyncItem::ContactRemoved { contact_id, .. } => Some(VauchiEvent::ContactRemoved {
+            contact_id: contact_id.clone(),
+        }),
+        SyncItem::CardUpdated { field_label, .. } => Some(VauchiEvent::OwnCardUpdated {
+            changed_fields: vec![field_label.clone()],
+        }),
+        SyncItem::VisibilityChanged {
+            contact_id,
+            field_label,
+            ..
+        } => Some(VauchiEvent::VisibilityChanged {
+            contact_id: contact_id.clone(),
+            field: field_label.clone(),
+        }),
+        SyncItem::LabelChange { label_id, .. } => Some(VauchiEvent::LabelSyncCompleted {
+            label_id: label_id.clone(),
+        }),
+        SyncItem::ContactTrustChanged { contact_id, .. } => Some(VauchiEvent::ContactUpdated {
+            contact_id: contact_id.clone(),
+            changed_fields: vec!["recovery_trusted".to_string()],
+        }),
+        SyncItem::PersonalNoteChanged { contact_id, .. } => Some(VauchiEvent::ContactUpdated {
+            contact_id: contact_id.clone(),
+            changed_fields: vec!["personal_note".to_string()],
+        }),
+        SyncItem::ContactFieldNoteChanged { contact_id, .. } => Some(VauchiEvent::ContactUpdated {
+            contact_id: contact_id.clone(),
+            changed_fields: vec!["field_note".to_string()],
+        }),
+        SyncItem::ProposalTrustChanged { contact_id, .. } => Some(VauchiEvent::ContactUpdated {
+            contact_id: contact_id.clone(),
+            changed_fields: vec!["proposal_trusted".to_string()],
+        }),
+        SyncItem::ImportedContactAdded { contact_data, .. } => {
+            contact_data
+                .to_contact()
+                .ok()
+                .map(|contact| VauchiEvent::ContactAdded {
+                    contact_id: contact.id().to_string(),
+                    origin: EventOrigin::Synced,
+                })
+        }
+        SyncItem::ImportedContactUpdated { contact_data, .. } => contact_data
+            .to_contact()
+            .ok()
+            .map(|contact| VauchiEvent::ContactUpdated {
+                contact_id: contact.id().to_string(),
+                changed_fields: Vec::new(),
+            }),
+        SyncItem::ImportedContactRemoved { contact_id, .. } => Some(VauchiEvent::ContactRemoved {
+            contact_id: contact_id.clone(),
+        }),
+        SyncItem::ContactArchived { contact_id, .. } => Some(VauchiEvent::ContactArchived {
+            contact_id: contact_id.clone(),
+        }),
+        SyncItem::ContactUnarchived { contact_id, .. } => Some(VauchiEvent::ContactUnarchived {
+            contact_id: contact_id.clone(),
+        }),
+        // No mapped invalidation event (no affected_screens entry today).
+        SyncItem::DeletionScheduled { .. } | SyncItem::DeletionCancelled { .. } => None,
     }
 }

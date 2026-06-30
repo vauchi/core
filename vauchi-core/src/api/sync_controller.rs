@@ -294,6 +294,19 @@ impl<'a, T: Transport> SyncController<'a, T> {
             ) {
                 Ok(msg_id) => {
                     result.sent += 1;
+                    // The relay accepted (stored) the blob; store-and-forward
+                    // guarantees the recipient fetches it (now, or via catch-up
+                    // token registration). Clear the pending update so it is NOT
+                    // re-sent every sync — re-sending the SAME ratchet message
+                    // makes the receiver decrypt-fail it (its ratchet advanced
+                    // past that message), churning the receive path and burying
+                    // real updates. The prior ack-based clear never fired because
+                    // `run_send_phase` rebuilds the `RelayClient` each cycle, so
+                    // the in-memory in-flight map (and thus the delivery ack) was
+                    // lost before the next poll (2026-06-30). Delivery receipts
+                    // are tracked separately via `delivery_service`.
+                    #[allow(clippy::let_underscore_must_use)]
+                    let _ = self.storage.pending().mark_update_sent(&update.id);
                     self.events.dispatch(VauchiEvent::MessageDelivered {
                         contact_id: update.contact_id.clone(),
                         message_id: msg_id.into_string(),
@@ -404,6 +417,10 @@ impl<'a, T: Transport> SyncController<'a, T> {
             ) {
                 Ok(_) => {
                     result.sent += 1;
+                    // Clear on relay-accept so the update is not re-sent every
+                    // sync (see the matching note in `sync`'s send loop).
+                    #[allow(clippy::let_underscore_must_use)]
+                    let _ = self.storage.pending().mark_update_sent(&update.id);
                 }
                 Err(e) => {
                     result.failed += 1;

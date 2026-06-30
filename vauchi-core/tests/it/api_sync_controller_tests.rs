@@ -555,3 +555,78 @@ fn sync_contact_errors_when_load_contact_returns_none_adr029() {
         result
     );
 }
+
+// Regression (2026-06-30): the send loop counted `sent` but never cleared the
+// pending update, so it re-sent the SAME ratchet message every sync — which the
+// receiver decrypt-fails (its ratchet advanced past that message), churning the
+// receive path and burying real card updates. The intended ack-based clear never
+// fired because the `RelayClient` is rebuilt each sync, losing the in-flight map.
+// A successful send (relay-accept = store-and-forward) must clear the queue.
+// @scenario: sync_updates :: A successfully-sent update is cleared from the queue
+#[test]
+fn test_sync_send_clears_pending_update_on_relay_accept() {
+    use vauchi_core::storage::{PendingUpdate, UpdateStatus};
+
+    let storage = create_test_storage();
+
+    // A sendable contact: shared key + public key (the directional token needs both).
+    let shared = SymmetricKey::generate();
+    let peer_pk = [0x33u8; 32];
+    let contact = Contact::from_exchange(peer_pk, ContactCard::new("Peer"), shared.clone(), 0);
+    let contact_id = contact.id().to_string();
+    storage.contacts().save_contact(&contact).unwrap();
+
+    // Role-correct ratchet + a queued update carrying a real ratchet message.
+    let peer_dh = X3DHKeyPair::generate();
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared, *peer_dh.public_key()).unwrap();
+    let msg = ratchet.encrypt(b"card-delta").unwrap();
+    storage
+        .ratchets()
+        .save_ratchet_state(&contact_id, &ratchet, true)
+        .unwrap();
+    let update = PendingUpdate {
+        id: "u1".to_string(),
+        contact_id: contact_id.clone(),
+        update_type: "card_delta".to_string(),
+        payload: serde_json::to_vec(&msg).unwrap(),
+        created_at: 0,
+        retry_count: 0,
+        status: UpdateStatus::Pending,
+        target_relay_url: None,
+    };
+    storage.pending().queue_update(&update).unwrap();
+    assert_eq!(
+        storage
+            .pending()
+            .get_pending_updates(&contact_id)
+            .unwrap()
+            .len(),
+        1,
+        "precondition: one update queued"
+    );
+
+    // Drive a real send through the controller (MockTransport accepts).
+    let relay = create_test_relay();
+    let events = Arc::new(EventDispatcher::new());
+    let config = SyncConfig::default();
+    let mut controller = SyncController::new(relay, &storage, config, events);
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+    controller.register_ratchet(&contact_id, ratchet);
+    let result = controller
+        .sync(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+
+    assert_eq!(result.sent, 1, "the queued update must be sent");
+    assert_eq!(
+        storage
+            .pending()
+            .get_pending_updates(&contact_id)
+            .unwrap()
+            .len(),
+        0,
+        "a successfully-sent update must be cleared so it is not re-sent every sync"
+    );
+}

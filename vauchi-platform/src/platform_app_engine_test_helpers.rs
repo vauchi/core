@@ -122,6 +122,17 @@ pub trait PlatformAppEngineTestHelpers {
     /// Test-only: number of queued pending card-update payloads for a contact.
     /// Lets a test assert that an own-card edit was propagated.
     fn test_pending_update_count(&self, contact_id: String) -> Result<usize, MobileError>;
+
+    /// Test-only: the effective (override → group → default-closed → public)
+    /// visibility verdict a contact actually receives for a field — the same
+    /// resolver the repropagation path uses. Lets a test assert that a
+    /// visibility edit took effect on the layer that is sent to the peer, not
+    /// merely on a raw layer the resolver may override.
+    fn test_effective_field_visibility(
+        &self,
+        contact_id: String,
+        field_id: String,
+    ) -> Result<bool, MobileError>;
 }
 
 impl PlatformAppEngineTestHelpers for PlatformAppEngine {
@@ -243,5 +254,21 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
                 detail: e.to_string(),
             })?;
         Ok(pending.len())
+    }
+
+    fn test_effective_field_visibility(
+        &self,
+        contact_id: String,
+        field_id: String,
+    ) -> Result<bool, MobileError> {
+        let engine = self.engine().lock().map_err(|e| MobileError::Other {
+            detail: format!("engine lock poisoned: {e}"),
+        })?;
+        engine
+            .vauchi()
+            .get_effective_field_visibility(&contact_id, &field_id)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })
     }
 }

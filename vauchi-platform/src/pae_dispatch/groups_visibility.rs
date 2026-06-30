@@ -39,6 +39,57 @@ fn map_visibility_error(e: vauchi_core::VauchiError) -> MobileError {
     }
 }
 
+/// Resolves an own-card field's id from its label, mapping the not-found and
+/// no-identity cases to the `MobileError` shapes the visibility arms produced
+/// pre-G3 (so frontend-visible error text is unchanged).
+fn resolve_own_field_id(engine: &AppEngine, field_label: &str) -> Result<String, MobileError> {
+    let card = engine
+        .vauchi()
+        .storage()
+        .contacts()
+        .load_own_card()
+        .map_err(|e| MobileError::StorageError {
+            detail: e.to_string(),
+        })?
+        .ok_or(MobileError::Other {
+            detail: "Identity not found".into(),
+        })?;
+    card.fields()
+        .iter()
+        .find(|f| f.label() == field_label)
+        .map(|f| f.id().to_string())
+        .ok_or_else(|| MobileError::InvalidInput {
+            field: String::new(),
+            detail: format!("Field not found: {field_label}"),
+        })
+}
+
+/// Hide, show, and per-contact override are one operation: set the contact's
+/// Layer-C override (the layer the effective resolver reads) and repropagate
+/// so the revocation/grant reaches the peer. Routing the bare Layer-A
+/// `set_field_visibility_by_label` here was the visibility leak — for a grouped
+/// contact the resolver ignored it, so a "hide" never reached the wire
+/// (`2026-06-14-visibility-changes-not-fully-propagated`).
+fn set_contact_override(
+    engine: &mut AppEngine,
+    contact_id: &str,
+    field_label: &str,
+    is_visible: bool,
+) -> Result<DomainCommandResult, MobileError> {
+    let field_id = resolve_own_field_id(engine, field_label)?;
+    engine
+        .vauchi()
+        .set_contact_visibility_override_and_repropagate(contact_id, &field_id, is_visible)
+        .map_err(map_visibility_error)?;
+    engine.invalidate_screen(&AppScreen::ContactVisibility {
+        contact_id: contact_id.to_string(),
+    });
+    engine.invalidate_screen(&AppScreen::ContactDetail {
+        contact_id: contact_id.to_string(),
+    });
+    Ok(DomainCommandResult::Unit)
+}
+
 impl PlatformAppEngine {
     pub(crate) fn dispatch_groups_visibility(
         &self,
@@ -183,32 +234,11 @@ impl PlatformAppEngine {
                 field_label,
                 is_visible,
             } => {
-                let storage = engine.vauchi().storage();
-                let card = storage
-                    .contacts()
-                    .load_own_card()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?
-                    .ok_or(MobileError::Other {
-                        detail: "Identity not found".into(),
-                    })?;
-                let field_id = card
-                    .fields()
-                    .iter()
-                    .find(|f| f.label() == field_label)
-                    .ok_or_else(|| MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: format!("Field not found: {field_label}"),
-                    })?
-                    .id()
-                    .to_string();
-                storage
-                    .labels()
-                    .set_group_field_visibility(&label_id, &field_id, is_visible)
-                    .map_err(|e| MobileError::Other {
-                        detail: e.to_string(),
-                    })?;
+                let field_id = resolve_own_field_id(engine, &field_label)?;
+                engine
+                    .vauchi()
+                    .set_group_field_visibility_and_repropagate(&label_id, &field_id, is_visible)
+                    .map_err(map_visibility_error)?;
                 engine.invalidate_screen(&AppScreen::GroupDetail {
                     group_id: label_id.clone(),
                 });
@@ -219,71 +249,16 @@ impl PlatformAppEngine {
                 contact_id,
                 field_label,
                 is_visible,
-            } => {
-                let storage = engine.vauchi().storage();
-                let card = storage
-                    .contacts()
-                    .load_own_card()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?
-                    .ok_or(MobileError::Other {
-                        detail: "Identity not found".into(),
-                    })?;
-                let field_id = card
-                    .fields()
-                    .iter()
-                    .find(|f| f.label() == field_label)
-                    .ok_or_else(|| MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: format!("Field not found: {field_label}"),
-                    })?
-                    .id()
-                    .to_string();
-                storage
-                    .labels()
-                    .save_contact_override(&contact_id, &field_id, is_visible)
-                    .map_err(|e| MobileError::Other {
-                        detail: e.to_string(),
-                    })?;
-                engine.invalidate_screen(&AppScreen::ContactVisibility {
-                    contact_id: contact_id.clone(),
-                });
-                engine.invalidate_screen(&AppScreen::ContactDetail {
-                    contact_id: contact_id.clone(),
-                });
-                Ok(DomainCommandResult::Unit)
-            }
+            } => set_contact_override(engine, &contact_id, &field_label, is_visible),
             DomainCommand::RemoveContactFieldOverride {
                 contact_id,
                 field_label,
             } => {
-                let storage = engine.vauchi().storage();
-                let card = storage
-                    .contacts()
-                    .load_own_card()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?
-                    .ok_or(MobileError::Other {
-                        detail: "Identity not found".into(),
-                    })?;
-                let field_id = card
-                    .fields()
-                    .iter()
-                    .find(|f| f.label() == field_label)
-                    .ok_or_else(|| MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: format!("Field not found: {field_label}"),
-                    })?
-                    .id()
-                    .to_string();
-                storage
-                    .labels()
-                    .delete_contact_override(&contact_id, &field_id)
-                    .map_err(|e| MobileError::Other {
-                        detail: e.to_string(),
-                    })?;
+                let field_id = resolve_own_field_id(engine, &field_label)?;
+                engine
+                    .vauchi()
+                    .remove_contact_visibility_override_and_repropagate(&contact_id, &field_id)
+                    .map_err(map_visibility_error)?;
                 engine.invalidate_screen(&AppScreen::ContactVisibility {
                     contact_id: contact_id.clone(),
                 });
@@ -295,35 +270,11 @@ impl PlatformAppEngine {
             DomainCommand::HideFieldFromContact {
                 contact_id,
                 field_label,
-            } => {
-                engine
-                    .vauchi()
-                    .set_field_visibility_by_label(&contact_id, &field_label, false)
-                    .map_err(map_visibility_error)?;
-                engine.invalidate_screen(&AppScreen::ContactVisibility {
-                    contact_id: contact_id.clone(),
-                });
-                engine.invalidate_screen(&AppScreen::ContactDetail {
-                    contact_id: contact_id.clone(),
-                });
-                Ok(DomainCommandResult::Unit)
-            }
+            } => set_contact_override(engine, &contact_id, &field_label, false),
             DomainCommand::ShowFieldToContact {
                 contact_id,
                 field_label,
-            } => {
-                engine
-                    .vauchi()
-                    .set_field_visibility_by_label(&contact_id, &field_label, true)
-                    .map_err(map_visibility_error)?;
-                engine.invalidate_screen(&AppScreen::ContactVisibility {
-                    contact_id: contact_id.clone(),
-                });
-                engine.invalidate_screen(&AppScreen::ContactDetail {
-                    contact_id: contact_id.clone(),
-                });
-                Ok(DomainCommandResult::Unit)
-            }
+            } => set_contact_override(engine, &contact_id, &field_label, true),
             DomainCommand::IsFieldVisibleToContact {
                 contact_id,
                 field_label,

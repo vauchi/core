@@ -16,6 +16,7 @@ mod mobile_contact_detail_tests;
 mod mobile_contact_display_tests;
 mod mobile_delivery_tests;
 mod mobile_sync_tests;
+mod mobile_visibility_propagation_tests;
 mod mobile_visibility_resolve_tests;
 mod platform_app_engine_device_link_listener_tests;
 mod platform_app_engine_device_link_tests;

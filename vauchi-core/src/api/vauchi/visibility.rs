@@ -367,24 +367,17 @@ impl Vauchi {
         Ok(())
     }
 
-    /// Reads a field's Layer-A visibility for one contact, addressed
-    /// by the field's own-card label.
-    ///
-    /// Imported contacts (no visibility rules) read as not visible.
+    /// Reads a field's **effective** visibility for one contact, addressed by
+    /// the field's own-card label — the same verdict the repropagation path
+    /// sends to the peer (override → group → default-closed → public base), so
+    /// a frontend readout never contradicts what the contact actually receives.
     pub fn is_field_visible_by_label(
         &self,
         contact_id: &str,
         field_label: &str,
     ) -> VauchiResult<bool> {
-        let contact = self
-            .storage
-            .contacts()
-            .load_contact(contact_id)?
-            .ok_or_else(|| VauchiError::NotFound(format!("contact: {contact_id}")))?;
         let field_id = self.own_field_id_by_label(field_label)?;
-        Ok(contact
-            .visibility_rules()
-            .is_some_and(|r| r.can_see(&field_id, contact_id)))
+        self.get_effective_field_visibility(contact_id, &field_id)
     }
 
     /// Toggles field visibility for a contact.

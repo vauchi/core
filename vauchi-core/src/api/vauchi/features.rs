@@ -440,6 +440,19 @@ impl Vauchi {
         self.repropagate_to_contact(contact_id)
     }
 
+    /// Removes a per-contact visibility override and re-propagates to that
+    /// contact, so the field reverts to its group/public verdict on the wire.
+    pub fn remove_contact_visibility_override_and_repropagate(
+        &self,
+        contact_id: &str,
+        field_id: &str,
+    ) -> VauchiResult<()> {
+        self.storage
+            .labels()
+            .delete_contact_override(contact_id, field_id)?;
+        self.repropagate_to_contact(contact_id)
+    }
+
     /// Records the contact's current effective-visible field set as the
     /// last-sent baseline.
     ///

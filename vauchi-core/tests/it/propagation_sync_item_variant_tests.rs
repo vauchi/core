@@ -7,7 +7,10 @@
 //! `DeletionScheduled`, `DeletionCancelled`, `ImportedContactRemoved`,
 //! and the visibility-changed/personal-note/proposal-trust paths.
 
+use std::sync::{Arc, Mutex};
+
 use vauchi_core::Vauchi;
+use vauchi_core::api::VauchiEvent;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
@@ -380,4 +383,284 @@ fn apply_sync_imported_contact_add_update_remove_roundtrip() {
         .unwrap();
     assert_eq!(applied, 1);
     assert!(wb.get_contact(&imported_id).unwrap().is_none());
+}
+
+// ============================================================
+// Event dispatch — device-synced changes must live-refresh the UI
+//
+// Gap A of `2026-06-30-sync-ui-invalidation-sibling-gaps`: every
+// `apply_sync_items` arm persisted storage but only `ContactAdded`
+// dispatched a `VauchiEvent`, so `affected_screens` never fired and the
+// receiving device's screen stayed stale until navigation. Each arm with a
+// mapped `affected_screens` entry must now dispatch its event (same class as
+// the `!1209` relay-receive fix). Deletion-state arms have no mapped
+// invalidation event and must dispatch nothing.
+// ============================================================
+
+fn capture_events(wb: &Vauchi) -> Arc<Mutex<Vec<VauchiEvent>>> {
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let sink = events.clone();
+    let _ = wb.add_event_handler(Arc::new(move |event| sink.lock().unwrap().push(event)));
+    events
+}
+
+fn added_contact(wb: &mut Vauchi, name: &str) -> String {
+    let contact = make_exchanged_contact(name);
+    let id = contact.id().to_string();
+    wb.add_contact(contact).unwrap();
+    id
+}
+
+// @internal
+#[test]
+fn apply_sync_contact_removed_dispatches_contact_removed_event() {
+    let mut wb = make_vauchi();
+    let bob_id = added_contact(&mut wb, "Bob");
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::ContactRemoved {
+        contact_id: bob_id.clone(),
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let got = events.lock().unwrap();
+    assert!(
+        matches!(got.as_slice(), [VauchiEvent::ContactRemoved { contact_id }] if *contact_id == bob_id),
+        "ContactRemoved sync must dispatch one ContactRemoved event, got {got:?}"
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_card_updated_dispatches_own_card_updated_event() {
+    let wb = make_vauchi();
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::CardUpdated {
+        field_label: "email".to_string(),
+        new_value: "a@b.example".to_string(),
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let got = events.lock().unwrap();
+    assert!(
+        matches!(
+            got.as_slice(),
+            [VauchiEvent::OwnCardUpdated { changed_fields }] if changed_fields == &["email".to_string()]
+        ),
+        "CardUpdated sync must dispatch OwnCardUpdated(['email']), got {got:?}"
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_visibility_changed_dispatches_visibility_changed_event() {
+    let mut wb = make_vauchi();
+    let bob_id = added_contact(&mut wb, "Bob");
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::VisibilityChanged {
+        contact_id: bob_id.clone(),
+        field_label: "email".to_string(),
+        is_visible: false,
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let got = events.lock().unwrap();
+    assert!(
+        matches!(
+            got.as_slice(),
+            [VauchiEvent::VisibilityChanged { contact_id, field }]
+                if *contact_id == bob_id && field == "email"
+        ),
+        "VisibilityChanged sync must dispatch VisibilityChanged, got {got:?}"
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_label_change_dispatches_label_sync_completed_event() {
+    let wb = make_vauchi();
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::LabelChange {
+        label_id: "label-friends".to_string(),
+        label_name: "Friends".to_string(),
+        contacts: vec![],
+        visible_fields: vec![],
+        is_deleted: false,
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let got = events.lock().unwrap();
+    assert!(
+        matches!(
+            got.as_slice(),
+            [VauchiEvent::LabelSyncCompleted { label_id }] if label_id == "label-friends"
+        ),
+        "LabelChange sync must dispatch LabelSyncCompleted, got {got:?}"
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_contact_trust_changed_dispatches_contact_updated_event() {
+    let mut wb = make_vauchi();
+    let bob_id = added_contact(&mut wb, "Bob");
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::ContactTrustChanged {
+        contact_id: bob_id.clone(),
+        recovery_trusted: true,
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let got = events.lock().unwrap();
+    assert!(
+        matches!(
+            got.as_slice(),
+            [VauchiEvent::ContactUpdated { contact_id, changed_fields }]
+                if *contact_id == bob_id && changed_fields == &["recovery_trusted".to_string()]
+        ),
+        "ContactTrustChanged sync must dispatch ContactUpdated(['recovery_trusted']), got {got:?}"
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_personal_note_changed_dispatches_contact_updated_event() {
+    let mut wb = make_vauchi();
+    let bob_id = added_contact(&mut wb, "Bob");
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::PersonalNoteChanged {
+        contact_id: bob_id.clone(),
+        note: "met at conf".to_string(),
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let got = events.lock().unwrap();
+    assert!(
+        matches!(
+            got.as_slice(),
+            [VauchiEvent::ContactUpdated { contact_id, changed_fields }]
+                if *contact_id == bob_id && changed_fields == &["personal_note".to_string()]
+        ),
+        "PersonalNoteChanged sync must dispatch ContactUpdated(['personal_note']), got {got:?}"
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_proposal_trust_changed_dispatches_contact_updated_event() {
+    let mut wb = make_vauchi();
+    let bob_id = added_contact(&mut wb, "Bob");
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::ProposalTrustChanged {
+        contact_id: bob_id.clone(),
+        proposal_trusted: true,
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let got = events.lock().unwrap();
+    assert!(
+        matches!(
+            got.as_slice(),
+            [VauchiEvent::ContactUpdated { contact_id, changed_fields }]
+                if *contact_id == bob_id && changed_fields == &["proposal_trusted".to_string()]
+        ),
+        "ProposalTrustChanged sync must dispatch ContactUpdated(['proposal_trusted']), got {got:?}"
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_contact_archived_then_unarchived_dispatch_matching_events() {
+    let mut wb = make_vauchi();
+    let bob_id = added_contact(&mut wb, "Bob");
+
+    let archived = capture_events(&wb);
+    wb.apply_sync_items(vec![SyncItem::ContactArchived {
+        contact_id: bob_id.clone(),
+        timestamp: now(),
+    }])
+    .unwrap();
+    assert!(
+        matches!(
+            archived.lock().unwrap().as_slice(),
+            [VauchiEvent::ContactArchived { contact_id }] if *contact_id == bob_id
+        ),
+        "ContactArchived sync must dispatch ContactArchived"
+    );
+
+    let unarchived = capture_events(&wb);
+    wb.apply_sync_items(vec![SyncItem::ContactUnarchived {
+        contact_id: bob_id.clone(),
+        timestamp: now(),
+    }])
+    .unwrap();
+    assert!(
+        matches!(
+            unarchived.lock().unwrap().as_slice(),
+            // Two handlers are now attached (archived's + this one); assert the
+            // last handler saw exactly one ContactUnarchived.
+            [VauchiEvent::ContactUnarchived { contact_id }] if *contact_id == bob_id
+        ),
+        "ContactUnarchived sync must dispatch ContactUnarchived"
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_imported_contact_added_dispatches_contact_added_event() {
+    let wb = make_vauchi();
+    let card = ContactCard::new("Dora");
+    let imported = Contact::from_import(card, vauchi_core::contact::ImportSource::Manual, None, 0);
+    let imported_id = imported.id().to_string();
+    let sync_data = ImportedContactSyncData::from_contact(&imported).unwrap();
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::ImportedContactAdded {
+        contact_data: sync_data,
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let got = events.lock().unwrap();
+    assert!(
+        matches!(
+            got.as_slice(),
+            [VauchiEvent::ContactAdded { contact_id, .. }] if *contact_id == imported_id
+        ),
+        "ImportedContactAdded sync must dispatch ContactAdded, got {got:?}"
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_deletion_scheduled_dispatches_no_invalidation_event() {
+    let wb = make_vauchi();
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::DeletionScheduled {
+        scheduled_at: now(),
+        execute_at: now() + 1,
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    // No `VauchiEvent` maps deletion-state to a screen today; the settings
+    // screen still refreshes on next navigation. Documented residual of Gap A.
+    assert!(
+        events.lock().unwrap().is_empty(),
+        "DeletionScheduled has no mapped invalidation event — must dispatch nothing"
+    );
 }

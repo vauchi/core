@@ -249,11 +249,17 @@ impl AppEngine {
                         .get_effective_field_visibility(contact_id, &field_id)
                         .unwrap_or(true);
                     if should_show != is_visible {
-                        // best-effort: visibility toggle is idempotent;
-                        // a failure leaves the row in its prior state
-                        // and the user can retry from the same screen
+                        // best-effort: a failure leaves the prior state and the
+                        // user can retry from the same screen. Route through the
+                        // Layer-C override + repropagate path (not the bare
+                        // Layer-A toggle) so the change reaches the contact on
+                        // the wire (2026-06-14-visibility-changes-not-fully-propagated).
                         #[allow(clippy::let_underscore_must_use)]
-                        let _ = self.vauchi.toggle_field_visibility(contact_id, &field_id);
+                        let _ = self.vauchi.set_contact_visibility_override_and_repropagate(
+                            contact_id,
+                            &field_id,
+                            should_show,
+                        );
                     }
                 }
             }

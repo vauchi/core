@@ -516,3 +516,59 @@ fn no_groups_mode_preserves_default_open() {
         "No-groups mode → default-open fallback keeps `work` visible"
     );
 }
+
+// @scenario: visibility_control :: Deleting a group revokes its fields from members
+#[test]
+fn test_delete_group_revokes_group_only_field_from_members() {
+    let wb = create_test_vauchi();
+    wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+    let work = own_field_id(&wb, "work");
+    // Public base hidden → `work` reaches a grouped contact only via the group.
+    wb.set_own_field_private(&work).unwrap();
+
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+    let label = wb.create_group("Team").unwrap();
+    wb.add_contact_to_group(label.id(), &bob_id).unwrap();
+    wb.set_group_field_visibility(label.id(), &work, true)
+        .unwrap();
+    // Baseline: Bob currently receives `work` via the group grant.
+    wb.initialize_sent_baseline(&bob_id).unwrap();
+    assert!(
+        wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
+        "precondition: the group grant makes `work` visible to Bob"
+    );
+    let before = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&bob_id)
+        .unwrap()
+        .len();
+
+    wb.delete_group_and_repropagate(label.id()).unwrap();
+
+    assert!(
+        !wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
+        "deleting the only granting group hides `work` (public base is private)"
+    );
+    let after_sent = wb
+        .storage()
+        .contacts()
+        .load_last_sent_visible_fields(&bob_id)
+        .unwrap()
+        .unwrap_or_default();
+    assert!(
+        !after_sent.contains(&work),
+        "the revocation drops `work` from the set last sent to Bob (revoked on the wire)"
+    );
+    let after = wb
+        .storage()
+        .pending()
+        .get_pending_updates(&bob_id)
+        .unwrap()
+        .len();
+    assert!(
+        after > before,
+        "deleting the group must queue a revocation update to the former member"
+    );
+}

@@ -404,6 +404,24 @@ impl Vauchi {
         self.repropagate_to_contact(contact_id)
     }
 
+    /// Deletes a group and re-propagates the card to its (former) members, so a
+    /// field the group exposed is revoked on the wire instead of lingering
+    /// until an unrelated own-card edit. Members are snapshotted before the
+    /// delete because `get_effective_field_visibility` reads the live group set.
+    pub fn delete_group_and_repropagate(&self, label_id: &str) -> VauchiResult<()> {
+        let members: Vec<String> = self
+            .storage
+            .labels()
+            .load_group(label_id)
+            .map(|g| g.contacts().iter().cloned().collect())
+            .unwrap_or_default();
+        self.storage.labels().delete_group(label_id)?;
+        for contact_id in &members {
+            self.repropagate_to_contact(contact_id)?;
+        }
+        Ok(())
+    }
+
     /// Sets field visibility for a label and re-propagates to all contacts in that label.
     ///
     /// All contacts in the label receive updated cards reflecting the visibility change.

@@ -268,8 +268,11 @@ fn set_group_field_visibility_queues_repropagation() {
     );
     let bob = add_ratcheted_contact(&engine, "Bob");
     let label = create_label(&engine, "Colleagues");
+    // Adding Bob to a no-grant group already repropagates (revoking his
+    // previously-public fields under default-closed), so measure the delta
+    // the toggle itself produces rather than assuming a zero baseline.
     add_contact_to_group(&engine, &label.id, &bob);
-    assert_eq!(pending(&engine, &bob), 0);
+    let before = pending(&engine, &bob);
 
     engine
         .dispatch_domain_command(DomainCommand::SetGroupFieldVisibility {
@@ -280,7 +283,7 @@ fn set_group_field_visibility_queues_repropagation() {
         .expect("SetGroupFieldVisibility");
 
     assert!(
-        pending(&engine, &bob) > 0,
+        pending(&engine, &bob) > before,
         "a group field-visibility change must repropagate to each contact in the group"
     );
 }

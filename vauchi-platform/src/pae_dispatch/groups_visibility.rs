@@ -159,12 +159,8 @@ impl PlatformAppEngine {
             DomainCommand::DeleteLabel { label_id } => {
                 engine
                     .vauchi()
-                    .storage()
-                    .labels()
-                    .delete_group(&label_id)
-                    .map_err(|e| MobileError::Other {
-                        detail: e.to_string(),
-                    })?;
+                    .delete_group_and_repropagate(&label_id)
+                    .map_err(map_visibility_error)?;
                 engine.invalidate_screen(&AppScreen::Groups);
                 engine.invalidate_screen(&AppScreen::GroupDetail {
                     group_id: label_id.clone(),
@@ -177,12 +173,8 @@ impl PlatformAppEngine {
             } => {
                 engine
                     .vauchi()
-                    .storage()
-                    .labels()
-                    .add_contact_to_group(&label_id, &contact_id)
-                    .map_err(|e| MobileError::Other {
-                        detail: e.to_string(),
-                    })?;
+                    .add_contact_to_group_and_repropagate(&label_id, &contact_id)
+                    .map_err(map_visibility_error)?;
                 engine.invalidate_screen(&AppScreen::Groups);
                 engine.invalidate_screen(&AppScreen::GroupDetail {
                     group_id: label_id.clone(),
@@ -198,12 +190,8 @@ impl PlatformAppEngine {
             } => {
                 engine
                     .vauchi()
-                    .storage()
-                    .labels()
-                    .remove_contact_from_group(&label_id, &contact_id)
-                    .map_err(|e| MobileError::Other {
-                        detail: e.to_string(),
-                    })?;
+                    .remove_contact_from_group_and_repropagate(&label_id, &contact_id)
+                    .map_err(map_visibility_error)?;
                 engine.invalidate_screen(&AppScreen::Groups);
                 engine.invalidate_screen(&AppScreen::GroupDetail {
                     group_id: label_id.clone(),

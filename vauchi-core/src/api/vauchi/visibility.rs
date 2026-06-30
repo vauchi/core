@@ -335,38 +335,6 @@ impl Vauchi {
             .to_string())
     }
 
-    /// Sets a field's Layer-A visibility for one contact, addressed
-    /// by the field's own-card label.
-    ///
-    /// `visible == false` sets the rule to nobody; `true` to
-    /// everyone. Requires an exchanged contact (imported contacts
-    /// carry no visibility rules).
-    pub fn set_field_visibility_by_label(
-        &self,
-        contact_id: &str,
-        field_label: &str,
-        visible: bool,
-    ) -> VauchiResult<()> {
-        let mut contact = self
-            .storage
-            .contacts()
-            .load_contact(contact_id)?
-            .ok_or_else(|| VauchiError::NotFound(format!("contact: {contact_id}")))?;
-        let field_id = self.own_field_id_by_label(field_label)?;
-        let rules = contact
-            .visibility_rules_mut()
-            .ok_or(VauchiError::InvalidState(
-                "Visibility rules require an exchanged contact".into(),
-            ))?;
-        if visible {
-            rules.set_everyone(&field_id);
-        } else {
-            rules.set_nobody(&field_id);
-        }
-        self.storage.contacts().save_contact(&contact)?;
-        Ok(())
-    }
-
     /// Reads a field's **effective** visibility for one contact, addressed by
     /// the field's own-card label — the same verdict the repropagation path
     /// sends to the peer (override → group → default-closed → public base), so

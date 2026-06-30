@@ -105,6 +105,19 @@ impl Vauchi {
     ) -> VauchiResult<()> {
         self.update_contact(contact)?;
         self.save_exchange_ratchet(contact.id(), ratchet, is_initiator)?;
+        // Bootstrap card-update sync to the freshly-exchanged contact. The
+        // initiator's first send establishes the responder's Double-Ratchet
+        // sending chain — until the responder receives that message its
+        // `ratchet.encrypt` errors ("no sending chain (responder must receive
+        // first)"), so a responder that edits first can never propagate. Arming
+        // the durable marker makes the next sync repropagate to the new contact
+        // (a no-op for already-synced contacts, whose baseline is current); the
+        // responder's own send is retried by the marker until that first receive
+        // bootstraps its chain. The CLI does this via
+        // `queue_initial_card_for_contact`; the mobile exchange path omitted it,
+        // which silently broke device-to-device sync
+        // (2026-06-30 device root-cause; `2026-06-28-sync-delivery-sent-not-received`).
+        self.mark_own_card_repropagate()?;
         Ok(())
     }
 }

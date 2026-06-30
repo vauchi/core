@@ -398,3 +398,102 @@ fn multistage_first_field_add_to_empty_card_round_trips() {
         "the added field must reflect at the peer after the first decrypt"
     );
 }
+
+// 2026-06-30 device root-cause (Pixel 3a <-> S7): the mobile exchange persisted
+// the role-correct ratchet but never armed the initiator's first send, so NO
+// card update ever flowed — a responder that edited first hit
+// "no sending chain (responder must receive first)" and its error was swallowed,
+// and if neither side edited nothing propagated at all. The existing round-trip
+// tests masked this by always doing an explicit initiator-first edit (their
+// `assert_card_update_round_trips` IS the bootstrap). The fix arms repropagation
+// inside `save_exchanged_contact`, so the exchange itself bootstraps on the next
+// sync with NO explicit edit. This test asserts that, then that the responder's
+// own owed send succeeds once the initiator's bootstrap has been received.
+// @scenario: sync_updates :: A multi-stage exchange auto-bootstraps card sync without an edit
+#[test]
+fn multistage_exchange_arms_bootstrap_without_an_explicit_edit() {
+    let p = multistage_exchanged_pair();
+    let bob_id = p.bob_at_alice.id().to_string();
+    let alice_id = p.alice_at_bob.id().to_string();
+
+    // `create_vauchi_with_card` armed the repropagate marker via `add_own_field`;
+    // clear it so the EXCHANGE is the only thing that can arm a bootstrap — this
+    // mirrors the device, where onboarding added no field before the exchange.
+    let clear = vauchi_core::types::OwnCardRepropagateState::default();
+    p.alice
+        .storage()
+        .ux()
+        .save_own_card_repropagate(&clear)
+        .unwrap();
+    p.bob
+        .storage()
+        .ux()
+        .save_own_card_repropagate(&clear)
+        .unwrap();
+
+    p.alice
+        .save_exchanged_contact(&p.bob_at_alice, &p.alice_ratchet, p.alice_is_initiator)
+        .unwrap();
+    p.bob
+        .save_exchanged_contact(&p.alice_at_bob, &p.bob_ratchet, p.bob_is_initiator)
+        .unwrap();
+
+    // (initiator, responder, initiator's-target-id, responder's-target-id)
+    let (initiator, responder, init_target, resp_target) = if p.alice_is_initiator {
+        (&p.alice, &p.bob, &bob_id, &alice_id)
+    } else {
+        (&p.bob, &p.alice, &alice_id, &bob_id)
+    };
+
+    // No explicit edit: the exchange alone must have armed repropagation, so the
+    // initiator's owed pass queues a bootstrap send to the new contact.
+    initiator.run_owed_repropagation().unwrap();
+    let bootstrap = initiator
+        .storage()
+        .pending()
+        .get_pending_updates(init_target)
+        .unwrap();
+    assert_eq!(
+        bootstrap.len(),
+        1,
+        "the exchange must arm an initiator bootstrap send with no explicit edit"
+    );
+
+    // The responder's owed pass, armed by the same exchange, cannot send yet —
+    // it has no sending chain until it receives. The error is swallowed, nothing
+    // is queued.
+    responder.run_owed_repropagation().unwrap();
+    assert_eq!(
+        responder
+            .storage()
+            .pending()
+            .get_pending_updates(resp_target)
+            .unwrap()
+            .len(),
+        0,
+        "a responder cannot send before receiving the initiator's first message"
+    );
+
+    // Deliver the bootstrap: the responder receives → its sending chain is
+    // established. Its next owed pass now succeeds where it previously errored.
+    for upd in &bootstrap {
+        process_single_card_update(
+            responder.identity().unwrap(),
+            responder.storage(),
+            resp_target,
+            &upd.payload,
+        )
+        .unwrap();
+    }
+    responder.run_owed_repropagation().unwrap();
+    assert_eq!(
+        responder
+            .storage()
+            .pending()
+            .get_pending_updates(resp_target)
+            .unwrap()
+            .len(),
+        1,
+        "after receiving the initiator's bootstrap, the responder can finally send"
+    );
+}

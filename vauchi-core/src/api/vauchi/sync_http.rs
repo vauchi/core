@@ -37,7 +37,7 @@ pub const PERIODIC_SYNC_INTERVAL_SECONDS: u64 = 900;
 pub const PERIODIC_SYNC_MAX_RETRIES: u32 = 3;
 
 use super::ohttp_key_error::should_refetch_key_and_retry;
-use super::receive_routing::process_received_blobs;
+use super::receive_routing::{incoming_update_events, process_received_blobs};
 use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::sync_controller::SyncController;
@@ -448,6 +448,15 @@ impl Vauchi {
             // sync cycle if this batch's ACK is lost in flight
             #[allow(clippy::let_underscore_must_use)]
             let _ = adapter.send(&ack_envelope);
+        }
+
+        // 5. Invalidate the contacts list / contact-detail screens for each
+        //    applied peer card update so the frontend reloads and renders the
+        //    synced tile. Without this the list only refreshes on the next
+        //    navigation — the 2026-06-30 "S7 synced tile not rendered" symptom
+        //    (ADR-021/043; affected_screens maps IncomingUpdate -> contacts).
+        for event in incoming_update_events(&outcomes) {
+            self.events.dispatch(event);
         }
 
         Ok((

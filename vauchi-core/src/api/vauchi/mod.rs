@@ -47,7 +47,7 @@ pub use import::{ImportResult, ImportWarning};
 #[cfg(feature = "network-http")]
 #[allow(unused_imports)]
 // re-exported for integration tests; lint can't see external consumers
-pub use receive_routing::{BlobOutcome, process_received_blobs};
+pub use receive_routing::{BlobOutcome, incoming_update_events, process_received_blobs};
 pub use search::SearchFacets;
 pub use security::BIOMETRIC_UNLOCK_MIN_DURATION;
 pub use setup::SetupProgress;

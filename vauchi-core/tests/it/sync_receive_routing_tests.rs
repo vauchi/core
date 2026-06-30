@@ -18,7 +18,8 @@ use crate::common;
 
 use common::helpers::create_vauchi_with_identity;
 use vauchi_core::SymmetricKey;
-use vauchi_core::api::vauchi::process_received_blobs;
+use vauchi_core::api::VauchiEvent;
+use vauchi_core::api::vauchi::{incoming_update_events, process_received_blobs};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
@@ -162,6 +163,25 @@ fn test_receive_routes_via_mailbox_token_fast_path() {
     assert_eq!(outcomes.len(), 1);
     assert!(outcomes[0].token_resolved, "token must resolve to Bob");
     assert!(outcomes[0].decrypted, "blob must decrypt via the fast path");
+
+    // The applied blob carries the resolved contact id, and the receive
+    // phase turns it into an IncomingUpdate so the frontend invalidates and
+    // re-renders the contacts list (regression: 2026-06-30
+    // S7-synced-tile-not-rendered; affected_screens maps IncomingUpdate ->
+    // ["contacts", "contact_detail"]).
+    assert_eq!(
+        outcomes[0].contact_id.as_deref(),
+        Some(bob_link.peer_contact_id.as_str()),
+        "applied blob must carry the resolved contact id"
+    );
+    let events = incoming_update_events(&outcomes);
+    assert_eq!(events.len(), 1, "one applied blob -> one IncomingUpdate");
+    match &events[0] {
+        VauchiEvent::IncomingUpdate { contact_id } => {
+            assert_eq!(contact_id, &bob_link.peer_contact_id);
+        }
+        other => panic!("expected IncomingUpdate, got {other:?}"),
+    }
 
     // Card on Alice's side reflects Bob's update.
     let bob_at_alice = alice

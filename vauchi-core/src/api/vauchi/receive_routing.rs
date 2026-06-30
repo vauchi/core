@@ -36,6 +36,7 @@
 
 use std::collections::HashMap;
 
+use crate::api::events::VauchiEvent;
 use crate::api::sync::{CardUpdateError, process_single_card_update};
 use crate::contact::Contact;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
@@ -67,6 +68,12 @@ pub struct BlobOutcome {
     /// 2026-06-28-sync-delivery-sent-not-received — the device couldn't be
     /// reproduced in-core, so the failing step must be named on-device.
     pub reject_reason: Option<&'static str>,
+    /// The resolved contact id when the blob applied (`decrypted == true`);
+    /// `None` for rejected or unresolved blobs. Carries the id out of the
+    /// storage-pure routing so `run_receive_phase` can dispatch an
+    /// `IncomingUpdate` per applied update — without it the contacts list
+    /// never re-renders the synced tile (2026-06-30, ADR-021/043).
+    pub contact_id: Option<String>,
 }
 
 /// Route and apply a batch of received blobs.
@@ -94,24 +101,42 @@ pub fn process_received_blobs(
 
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext) in blobs {
-        let (token_resolved, decrypted, reject_reason) =
+        let (token_resolved, decrypted, reject_reason, applied_contact_id) =
             match token_to_contact.get(&mailbox_token_hex) {
                 Some(contact_id) => {
                     match process_single_card_update(identity, storage, contact_id, &ciphertext) {
-                        Ok(()) => (true, true, None),
-                        Err(e) => (true, false, Some(reject_category(&e))),
+                        Ok(()) => (true, true, None, Some(contact_id.clone())),
+                        Err(e) => (true, false, Some(reject_category(&e)), None),
                     }
                 }
-                None => (false, false, None),
+                None => (false, false, None, None),
             };
         outcomes.push(BlobOutcome {
             message_id,
             token_resolved,
             decrypted,
             reject_reason,
+            contact_id: applied_contact_id,
         });
     }
     outcomes
+}
+
+/// Map applied receive outcomes to `IncomingUpdate` events.
+///
+/// One event per applied blob (`contact_id == Some`); rejected and
+/// unresolved blobs yield nothing. `affected_screens` maps `IncomingUpdate`
+/// to `["contacts", "contact_detail"]`, so dispatching these is what makes
+/// the frontend reload the contacts list after a relay-synced peer card
+/// update (ADR-021/043). Pure: storage stays in [`process_received_blobs`],
+/// dispatch stays in `run_receive_phase`. Duplicate per-contact
+/// invalidations are idempotent, so no de-duplication is needed.
+pub fn incoming_update_events(outcomes: &[BlobOutcome]) -> Vec<VauchiEvent> {
+    outcomes
+        .iter()
+        .filter_map(|outcome| outcome.contact_id.clone())
+        .map(|contact_id| VauchiEvent::IncomingUpdate { contact_id })
+        .collect()
 }
 
 /// Short, PII-free category for a rejected blob — names WHICH receive step
@@ -259,5 +284,49 @@ mod tests {
         let alice = exchanged_contact("A");
         let map = build_token_to_contact_map(&[alice], &OWN_PK, 100);
         assert!(!map.contains_key("00".repeat(32).as_str()));
+    }
+
+    fn outcome(decrypted: bool, contact_id: Option<&str>) -> BlobOutcome {
+        BlobOutcome {
+            message_id: "m".into(),
+            token_resolved: contact_id.is_some() || !decrypted,
+            decrypted,
+            reject_reason: if decrypted { None } else { Some("decrypt") },
+            contact_id: contact_id.map(str::to_string),
+        }
+    }
+
+    // @scenario: receive_phase :: an applied update yields one IncomingUpdate
+    #[test]
+    fn test_incoming_update_events_maps_only_applied_blobs() {
+        let outcomes = vec![
+            outcome(true, Some("contact-A")),
+            outcome(false, None), // rejected: decrypt failed
+            BlobOutcome {
+                message_id: "m".into(),
+                token_resolved: false,
+                decrypted: false,
+                reject_reason: None,
+                contact_id: None, // unresolved token
+            },
+        ];
+
+        let events = incoming_update_events(&outcomes);
+
+        assert_eq!(events.len(), 1, "only the applied blob emits an event");
+        match &events[0] {
+            VauchiEvent::IncomingUpdate { contact_id } => assert_eq!(contact_id, "contact-A"),
+            other => panic!("expected IncomingUpdate, got {other:?}"),
+        }
+    }
+
+    // @scenario: receive_phase :: a batch that applies nothing emits no events
+    #[test]
+    fn test_incoming_update_events_empty_when_nothing_applied() {
+        let outcomes = vec![outcome(false, None)];
+        assert!(
+            incoming_update_events(&outcomes).is_empty(),
+            "a rejected blob must not invalidate the contacts list"
+        );
     }
 }

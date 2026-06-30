@@ -90,7 +90,7 @@ pub fn process_received_blobs(
     blobs: Vec<(String, String, Vec<u8>)>,
 ) -> Vec<BlobOutcome> {
     let day = current_day_epoch(storage.clock().unix_seconds());
-    let token_to_contact = build_token_to_contact_map(contacts, day);
+    let token_to_contact = build_token_to_contact_map(contacts, identity.signing_public_key(), day);
 
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext) in blobs {
@@ -150,6 +150,7 @@ fn reject_category(e: &CardUpdateError) -> &'static str {
 /// against `FetchedBlob.mailbox_token`.
 pub(crate) fn build_token_to_contact_map(
     contacts: &[Contact],
+    own_pubkey: &[u8; 32],
     day: u64,
 ) -> HashMap<String, String> {
     let mut map = HashMap::new();
@@ -162,9 +163,17 @@ pub(crate) fn build_token_to_contact_map(
         };
         let bytes = shared_key.as_bytes();
         let id = contact.id().to_string();
-        map.insert(token_hex(&compute_mailbox_token(bytes, day)), id.clone());
+        // Our directional RECEIVE token from this contact, keyed to our own
+        // identity — so we never resolve (and decrypt-fail) our own sends.
+        map.insert(
+            token_hex(&compute_mailbox_token(bytes, own_pubkey, day)),
+            id.clone(),
+        );
         if day > 0 {
-            map.insert(token_hex(&compute_mailbox_token(bytes, day - 1)), id);
+            map.insert(
+                token_hex(&compute_mailbox_token(bytes, own_pubkey, day - 1)),
+                id,
+            );
         }
     }
     map
@@ -186,6 +195,10 @@ mod tests {
         Contact::from_exchange(pk, ContactCard::new(label), shared, 0)
     }
 
+    // Our (the receiver's) identity key — directional tokens are keyed to it,
+    // so the injected token must use the SAME key the map derives with.
+    const OWN_PK: [u8; 32] = [0xAA; 32];
+
     // @scenario: receive_phase :: token map resolves contact mailbox tokens
     #[test]
     fn test_build_token_to_contact_map_resolves_today_and_yesterday() {
@@ -194,19 +207,22 @@ mod tests {
         let day = 12345;
         let alice_today = token_hex(&compute_mailbox_token(
             alice.shared_key().unwrap().as_bytes(),
+            &OWN_PK,
             day,
         ));
         let alice_yesterday = token_hex(&compute_mailbox_token(
             alice.shared_key().unwrap().as_bytes(),
+            &OWN_PK,
             day - 1,
         ));
         let bob_today = token_hex(&compute_mailbox_token(
             bob.shared_key().unwrap().as_bytes(),
+            &OWN_PK,
             day,
         ));
 
         let contacts = vec![alice.clone(), bob.clone()];
-        let map = build_token_to_contact_map(&contacts, day);
+        let map = build_token_to_contact_map(&contacts, &OWN_PK, day);
 
         assert_eq!(map.get(&alice_today).map(String::as_str), Some(alice.id()));
         assert_eq!(
@@ -225,10 +241,11 @@ mod tests {
         let day = 9999;
         let alice_today = token_hex(&compute_mailbox_token(
             alice.shared_key().unwrap().as_bytes(),
+            &OWN_PK,
             day,
         ));
 
-        let map = build_token_to_contact_map(&[alice], day);
+        let map = build_token_to_contact_map(&[alice], &OWN_PK, day);
 
         assert!(
             !map.contains_key(&alice_today),
@@ -240,7 +257,7 @@ mod tests {
     #[test]
     fn test_build_token_to_contact_map_returns_none_for_unknown_token() {
         let alice = exchanged_contact("A");
-        let map = build_token_to_contact_map(&[alice], 100);
+        let map = build_token_to_contact_map(&[alice], &OWN_PK, 100);
         assert!(!map.contains_key("00".repeat(32).as_str()));
     }
 }

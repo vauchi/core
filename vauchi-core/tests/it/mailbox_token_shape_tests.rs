@@ -31,13 +31,17 @@ use vauchi_core::network::mailbox_token::{compute_mailbox_token, compute_self_to
 // All-bytes-equal sentinels — easy to read in failing diffs.
 const SHARED_KEY: [u8; 32] = [0x55; 32];
 const MASTER_SEED: [u8; 32] = [0x66; 32];
+// Fixed recipient pubkey for these pure shape/determinism tests — the
+// directional `compute_mailbox_token` recipient is arbitrary here, so one
+// constant used consistently keeps the comparisons meaningful.
+const RECIPIENT_PUBKEY: [u8; 32] = [0xAA; 32];
 const DAY: u64 = 19_864; // arbitrary fixed day epoch
 
 // @internal
 #[test]
 fn compute_mailbox_token_is_deterministic_for_same_inputs() {
-    let a = compute_mailbox_token(&SHARED_KEY, DAY);
-    let b = compute_mailbox_token(&SHARED_KEY, DAY);
+    let a = compute_mailbox_token(&SHARED_KEY, &RECIPIENT_PUBKEY, DAY);
+    let b = compute_mailbox_token(&SHARED_KEY, &RECIPIENT_PUBKEY, DAY);
     assert_eq!(a, b);
 }
 
@@ -65,10 +69,10 @@ fn token_hex_byte_identity_via_pinned_inputs() {
     // Pins the exact hex output for known inputs. If the Phase 3
     // swap accidentally re-encodes the bytes (e.g. via `Display`
     // instead of `hex::encode`), this assertion fires.
-    let token = compute_mailbox_token(&SHARED_KEY, DAY);
+    let token = compute_mailbox_token(&SHARED_KEY, &RECIPIENT_PUBKEY, DAY);
     let hex = token_hex(&token);
     // Re-derive and re-encode independently — must match.
-    let token2 = compute_mailbox_token(&SHARED_KEY, DAY);
+    let token2 = compute_mailbox_token(&SHARED_KEY, &RECIPIENT_PUBKEY, DAY);
     let hex2 = hex::encode(&token2);
     assert_eq!(hex, hex2);
     assert_eq!(hex.len(), 64);
@@ -82,7 +86,7 @@ fn mailbox_token_distinct_from_self_token_for_same_seed_and_day() {
     // the seed and day are byte-identical. Guards against the
     // newtype swap accidentally unifying the two derivation paths.
     let seed = [0x77u8; 32];
-    let mailbox = compute_mailbox_token(&seed, DAY);
+    let mailbox = compute_mailbox_token(&seed, &RECIPIENT_PUBKEY, DAY);
     let self_tok = compute_self_token(&seed, DAY);
     assert_ne!(mailbox, self_tok);
 }

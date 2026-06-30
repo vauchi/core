@@ -23,17 +23,31 @@ use crate::identifiers::MailboxToken;
 const CONTACT_DOMAIN: &[u8] = b"Vauchi_Mailbox_v1";
 const DEVICE_SYNC_DOMAIN: &[u8] = b"Vauchi_DeviceSync_v1";
 
-/// Compute a 32-byte mailbox token for a contact.
+/// Compute a 32-byte mailbox token for one **direction** of a contact channel.
 ///
-/// Both parties with the same `shared_key` derive identical tokens for the
-/// same `day_epoch`, enabling the relay to route messages without knowing
-/// who is talking to whom.
+/// The token is keyed to the message's RECIPIENT, so each direction of a
+/// channel has its OWN mailbox: a party derives its receive token with its own
+/// identity key, and a sender derives the peer's token with the peer's identity
+/// key. Both still derive the same value for a given direction + day because the
+/// `shared_key` is symmetric — but a party NEVER computes (and so never polls)
+/// the token it sends to, eliminating the self-echo where each side fetched its
+/// own sends back and decrypt-failed them
+/// (2026-06-30; previously a single symmetric `H(shared_key, day)` token served
+/// both directions).
 ///
 /// - `shared_key`: the shared key established during card exchange.
+/// - `recipient_pubkey`: the 32-byte signing public key of the message's
+///   recipient (own identity key for a receive/register token; the contact's
+///   key for a send token).
 /// - `day_epoch`: current day as Unix timestamp / 86400 (UTC).
-pub fn compute_mailbox_token(shared_key: &[u8; 32], day_epoch: u64) -> MailboxToken {
-    let mut info = Vec::with_capacity(CONTACT_DOMAIN.len() + 8);
+pub fn compute_mailbox_token(
+    shared_key: &[u8; 32],
+    recipient_pubkey: &[u8; 32],
+    day_epoch: u64,
+) -> MailboxToken {
+    let mut info = Vec::with_capacity(CONTACT_DOMAIN.len() + 32 + 8);
     info.extend_from_slice(CONTACT_DOMAIN);
+    info.extend_from_slice(recipient_pubkey);
     info.extend_from_slice(&day_epoch.to_be_bytes());
     MailboxToken::from_bytes(*HKDF::derive_key(None, shared_key, &info))
 }
@@ -88,6 +102,7 @@ use crate::rng::SecureRngExt;
 pub fn batch_register_tokens(
     rng: &dyn crate::rng::SecureRng,
     contact_keys: &[[u8; 32]],
+    own_pubkey: &[u8; 32],
     master_seed: &[u8; 32],
     current_day: u64,
     days_offline: u64,
@@ -101,10 +116,19 @@ pub fn batch_register_tokens(
         if day > 0 {
             all_tokens.push(token_hex(&compute_self_token(master_seed, day - 1)));
         }
+        // Our own RECEIVE token per contact (keyed to our identity), so the
+        // relay routes the peer's sends to us without us also polling the token
+        // we send to (directional tokens, 2026-06-30).
         for shared_key in contact_keys {
-            all_tokens.push(token_hex(&compute_mailbox_token(shared_key, day)));
+            all_tokens.push(token_hex(&compute_mailbox_token(
+                shared_key, own_pubkey, day,
+            )));
             if day > 0 {
-                all_tokens.push(token_hex(&compute_mailbox_token(shared_key, day - 1)));
+                all_tokens.push(token_hex(&compute_mailbox_token(
+                    shared_key,
+                    own_pubkey,
+                    day - 1,
+                )));
             }
         }
     }

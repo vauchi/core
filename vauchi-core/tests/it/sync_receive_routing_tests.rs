@@ -149,6 +149,7 @@ fn test_receive_routes_via_mailbox_token_fast_path() {
 
     let bob_token = token_hex(&compute_mailbox_token(
         bob_link.shared_secret.as_bytes(),
+        &alice_pk,
         current_day_epoch(alice.storage().clock().unix_seconds()),
     ));
 
@@ -337,6 +338,7 @@ fn test_receive_reports_undecryptable_blob() {
         "blob-bad".to_string(),
         token_hex(&compute_mailbox_token(
             bob_link.shared_secret.as_bytes(),
+            alice.identity().unwrap().signing_public_key(),
             current_day_epoch(alice.storage().clock().unix_seconds()),
         )),
         b"not a real ratchet message".to_vec(),
@@ -408,6 +410,7 @@ fn test_receive_fast_path_handles_all_in_spec_input() {
         let token_day = if i == 0 { day - 1 } else { day };
         let token = token_hex(&compute_mailbox_token(
             link.shared_secret.as_bytes(),
+            &alice_pk,
             token_day,
         ));
         blobs.push((format!("blob-{i}"), token, ciphertext));
@@ -480,6 +483,7 @@ fn test_receive_rejects_replayed_blob() {
     );
     let token = token_hex(&compute_mailbox_token(
         bob_link.shared_secret.as_bytes(),
+        &alice_pk,
         current_day_epoch(alice.storage().clock().unix_seconds()),
     ));
 
@@ -593,6 +597,7 @@ fn test_receive_mixed_batch_preserves_order() {
     );
     let bob_token = token_hex(&compute_mailbox_token(
         bob_link.shared_secret.as_bytes(),
+        &alice_pk,
         current_day_epoch(alice.storage().clock().unix_seconds()),
     ));
 
@@ -615,6 +620,7 @@ fn test_receive_mixed_batch_preserves_order() {
     );
     let charlie_token = token_hex(&compute_mailbox_token(
         charlie_link.shared_secret.as_bytes(),
+        &alice_pk,
         current_day_epoch(alice.storage().clock().unix_seconds()),
     ));
 
@@ -630,6 +636,7 @@ fn test_receive_mixed_batch_preserves_order() {
             // Use Bob's token but garbage payload — token resolves, payload rejected.
             token_hex(&compute_mailbox_token(
                 bob_link.shared_secret.as_bytes(),
+                &alice_pk,
                 current_day_epoch(alice.storage().clock().unix_seconds()),
             )),
             b"not a ratchet message".to_vec(),

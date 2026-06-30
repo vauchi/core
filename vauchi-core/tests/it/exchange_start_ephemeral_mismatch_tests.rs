@@ -15,9 +15,11 @@
 //!
 //! Contrast `exchanged_ratchet_roundtrip_tests`, where the SAME two sessions
 //! exchange their live QRs and the secrets match. The mailbox token is
-//! `compute_mailbox_token(shared_key, day)` (network/mailbox_token.rs), keyed
-//! purely off the shared secret — so mismatched secrets ⇒ mismatched tokens ⇒
-//! the initiator posts to a token the responder never polls.
+//! `compute_mailbox_token(shared_key, recipient_pubkey, day)`
+//! (network/mailbox_token.rs); both the poster and the poller key it to the
+//! SAME recipient (Bob), so the shared secret is the only differing input —
+//! mismatched secrets ⇒ mismatched tokens ⇒ the initiator posts to a token
+//! the responder never polls.
 //!
 //! NB: this is a CLI-flow defect (separate process invocations, no persisted
 //! session). The mobile/desktop live handshake exchanges current-session QRs,
@@ -116,10 +118,14 @@ fn cli_independent_start_complete_mismatches_shared_secret_and_mailbox_token() {
 
     // Therefore their daily mailbox tokens differ — the initiator posts to a
     // token the responder never polls ⇒ sent-not-received.
+    // Directional tokens (ADR-029): Alice posts to Bob's mailbox and Bob polls
+    // his own, so both derivations key to Bob's identity pubkey — leaving the
+    // mismatched shared secret as the sole splitting input.
+    let bob_pubkey = bob_at_alice.public_key().expect("bob's signing pubkey");
     let day = current_day_epoch(SystemClock::shared().unix_seconds());
     assert_ne!(
-        token_hex(&compute_mailbox_token(&sa, day)),
-        token_hex(&compute_mailbox_token(&sb, day)),
+        token_hex(&compute_mailbox_token(&sa, bob_pubkey, day)),
+        token_hex(&compute_mailbox_token(&sb, bob_pubkey, day)),
         "mismatched secrets must yield mismatched mailbox tokens"
     );
 }

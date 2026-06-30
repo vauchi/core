@@ -348,6 +348,7 @@ fn test_execute_deletion_produces_decodable_deliveries() {
     // registers it (epoch taken from the revocation to avoid clock coupling).
     let expected = token_hex(&compute_mailbox_token(
         bob.shared_key().unwrap().as_bytes(),
+        bob.public_key().unwrap(),
         current_day_epoch(rev.timestamp),
     ));
     assert_eq!(token, &expected, "delivery must target Bob's mailbox token");

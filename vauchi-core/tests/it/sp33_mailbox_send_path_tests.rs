@@ -48,7 +48,9 @@ fn create_test_ratchet() -> (DoubleRatchetState, DoubleRatchetState) {
 #[test]
 fn test_send_update_recipient_id_is_64_char_hex_token() {
     let shared_key = [0x42u8; 32];
-    let token = compute_mailbox_token(&shared_key, current_day_epoch(0));
+    // Shape/echo test: send_update writes recipient_id to the wire verbatim, so
+    // the recipient pubkey is arbitrary — pin one fixed value.
+    let token = compute_mailbox_token(&shared_key, &[0xAAu8; 32], current_day_epoch(0));
     let recipient_id = token_hex(&token);
 
     assert_eq!(recipient_id.len(), 64, "Mailbox token must be 64 hex chars");
@@ -133,10 +135,12 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
 
     let master_seed = [0xAA; 32];
     let contact_keys = [[0xBB; 32], [0xCC; 32]];
+    let own_pubkey = [0x11u8; 32];
 
     let msg_id = client
         .register_mailbox_tokens(
             &contact_keys,
+            &own_pubkey,
             &master_seed,
             0,
             0,
@@ -159,9 +163,9 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
             "Self-token for today must be in registration batch"
         );
 
-        // Contact tokens must be present
+        // Contact RECEIVE tokens (keyed to our own pubkey) must be present
         for key in &contact_keys {
-            let contact_token = token_hex(&compute_mailbox_token(key, day));
+            let contact_token = token_hex(&compute_mailbox_token(key, &own_pubkey, day));
             assert!(
                 rm.tokens.contains(&contact_token),
                 "Contact token must be in registration batch"
@@ -180,9 +184,11 @@ fn test_register_mailbox_tokens_with_no_contacts() {
     client.connect().unwrap();
 
     let master_seed = [0xDD; 32];
+    let own_pubkey = [0x22u8; 32];
     let msg_id = client
         .register_mailbox_tokens(
             &[],
+            &own_pubkey,
             &master_seed,
             0,
             0,

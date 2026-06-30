@@ -60,8 +60,16 @@ impl Vauchi {
         let day = current_day_epoch(self.clock.unix_seconds());
         let master_seed = identity.master_seed();
 
-        // Build padded token batches (256 per batch, shuffled)
-        let batches = batch_register_tokens(self.rng.as_ref(), &contact_keys, master_seed, day, 0);
+        // Build padded token batches (256 per batch, shuffled). `own_pubkey`
+        // keys our directional receive tokens to our identity.
+        let batches = batch_register_tokens(
+            self.rng.as_ref(),
+            &contact_keys,
+            identity.signing_public_key(),
+            master_seed,
+            day,
+            0,
+        );
 
         // Register each batch with the adapter
         for tokens in batches {

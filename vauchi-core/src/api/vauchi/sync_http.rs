@@ -527,6 +527,7 @@ impl Vauchi {
         #[allow(clippy::let_underscore_must_use)]
         let _ = ctrl.relay_mut().register_mailbox_tokens(
             &contact_keys,
+            identity.signing_public_key(),
             identity.master_seed(),
             0, // days_offline — Task 10 will compute this from last_connected_epoch
             self.clock.unix_seconds(),

@@ -196,11 +196,14 @@ impl<'a> ShredManager<'a> {
             let contacts = self.storage.contacts().list_contacts().unwrap_or_default();
             let mut d = Vec::with_capacity(contacts.len());
             for c in &contacts {
-                if let Some(shared) = c.shared_key() {
+                if let (Some(shared), Some(recipient_pk)) = (c.shared_key(), c.public_key()) {
                     let rev = crate::network::IdentityRevoked::create(self.identity, c.id(), now);
+                    // Directional token: delivered to the contact's receive
+                    // mailbox (keyed to the contact's identity key).
                     let token = crate::network::mailbox_token::token_hex(
                         &crate::network::mailbox_token::compute_mailbox_token(
                             shared.as_bytes(),
+                            recipient_pk,
                             day_epoch,
                         ),
                     );

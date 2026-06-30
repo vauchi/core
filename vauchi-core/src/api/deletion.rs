@@ -91,9 +91,14 @@ pub(crate) fn build_revocation_deliveries(
     let day_epoch = current_day_epoch(now);
     let mut deliveries = Vec::with_capacity(contacts.len());
     for contact in contacts {
-        if let Some(shared) = contact.shared_key() {
+        if let (Some(shared), Some(recipient_pk)) = (contact.shared_key(), contact.public_key()) {
             let revoked = IdentityRevoked::create(identity, contact.id(), now);
-            let token = token_hex(&compute_mailbox_token(shared.as_bytes(), day_epoch));
+            // Directional token: delivered to the contact's receive mailbox.
+            let token = token_hex(&compute_mailbox_token(
+                shared.as_bytes(),
+                recipient_pk,
+                day_epoch,
+            ));
             let blob =
                 base64::engine::general_purpose::STANDARD.encode(encode_revocation_blob(&revoked));
             deliveries.push((token, blob));

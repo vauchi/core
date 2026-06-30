@@ -7,13 +7,18 @@ use vauchi_core::network::mailbox_token::{
     batch_register_tokens, compute_mailbox_token, compute_self_token, token_hex,
 };
 
+// Directional tokens are keyed to the recipient. These tests assert only
+// determinism/uniqueness/shape (not routing), so a single fixed recipient
+// pubkey keeps comparisons honest — the varied input is the shared key or day.
+const TEST_PUBKEY: [u8; 32] = [0xAAu8; 32];
+
 // @internal
 #[test]
 fn test_contact_mailbox_token_deterministic() {
     let shared_key = [0x42u8; 32];
     let day = 19804u64;
-    let t1 = compute_mailbox_token(&shared_key, day);
-    let t2 = compute_mailbox_token(&shared_key, day);
+    let t1 = compute_mailbox_token(&shared_key, &TEST_PUBKEY, day);
+    let t2 = compute_mailbox_token(&shared_key, &TEST_PUBKEY, day);
     assert_eq!(t1, t2);
     assert_eq!(t1.as_bytes().len(), 32);
 }
@@ -22,8 +27,8 @@ fn test_contact_mailbox_token_deterministic() {
 #[test]
 fn test_contact_mailbox_token_rotates_daily() {
     let shared_key = [0x42u8; 32];
-    let day1 = compute_mailbox_token(&shared_key, 19804);
-    let day2 = compute_mailbox_token(&shared_key, 19805);
+    let day1 = compute_mailbox_token(&shared_key, &TEST_PUBKEY, 19804);
+    let day2 = compute_mailbox_token(&shared_key, &TEST_PUBKEY, 19805);
     assert_ne!(day1, day2);
 }
 
@@ -33,8 +38,8 @@ fn test_different_contacts_produce_different_tokens() {
     let key_a = [0x42u8; 32];
     let key_b = [0x43u8; 32];
     let day = 19804u64;
-    let t_a = compute_mailbox_token(&key_a, day);
-    let t_b = compute_mailbox_token(&key_b, day);
+    let t_a = compute_mailbox_token(&key_a, &TEST_PUBKEY, day);
+    let t_b = compute_mailbox_token(&key_b, &TEST_PUBKEY, day);
     assert_ne!(t_a, t_b);
 }
 
@@ -53,7 +58,7 @@ fn test_self_token_deterministic_across_devices() {
 fn test_self_token_differs_from_contact_token() {
     let key = [0x42u8; 32];
     let day = 19804u64;
-    let contact = compute_mailbox_token(&key, day);
+    let contact = compute_mailbox_token(&key, &TEST_PUBKEY, day);
     let self_tok = compute_self_token(&key, day);
     assert_ne!(contact, self_tok);
 }
@@ -61,7 +66,7 @@ fn test_self_token_differs_from_contact_token() {
 // @internal
 #[test]
 fn test_token_hex_produces_64_char_hex() {
-    let token = compute_mailbox_token(&[0x42u8; 32], 19804);
+    let token = compute_mailbox_token(&[0x42u8; 32], &TEST_PUBKEY, 19804);
     let hex = token_hex(&token);
     assert_eq!(hex.len(), 64);
     assert!(hex.chars().all(|c| c.is_ascii_hexdigit()));
@@ -75,6 +80,7 @@ fn test_batch_tokens_padded_to_256() {
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
+        &TEST_PUBKEY,
         &master_seed,
         19804,
         0,
@@ -93,6 +99,7 @@ fn test_batch_tokens_no_duplicates() {
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
+        &TEST_PUBKEY,
         &master_seed,
         19804,
         0,
@@ -112,6 +119,7 @@ fn test_batch_tokens_historical_catchup() {
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
+        &TEST_PUBKEY,
         &master_seed,
         19804,
         3,
@@ -139,6 +147,7 @@ fn test_batch_tokens_many_contacts_splits() {
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
+        &TEST_PUBKEY,
         &master_seed,
         19804,
         0,
@@ -165,6 +174,7 @@ fn test_batch_tokens_shuffled() {
     let batches_a = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
+        &TEST_PUBKEY,
         &master_seed,
         19804,
         0,
@@ -172,6 +182,7 @@ fn test_batch_tokens_shuffled() {
     let batches_b = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
+        &TEST_PUBKEY,
         &master_seed,
         19804,
         0,
@@ -194,6 +205,7 @@ fn test_batch_tokens_no_contacts_returns_one_batch() {
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &[],
+        &TEST_PUBKEY,
         &master_seed,
         19804,
         0,
@@ -211,8 +223,8 @@ proptest! {
         day in 0u64..100000,
     ) {
         prop_assume!(key_a != key_b);
-        let t_a = compute_mailbox_token(&key_a, day);
-        let t_b = compute_mailbox_token(&key_b, day);
+        let t_a = compute_mailbox_token(&key_a, &TEST_PUBKEY, day);
+        let t_b = compute_mailbox_token(&key_b, &TEST_PUBKEY, day);
         prop_assert_ne!(t_a, t_b);
     }
 }

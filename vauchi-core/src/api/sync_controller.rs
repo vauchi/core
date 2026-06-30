@@ -228,31 +228,35 @@ impl<'a, T: Transport> SyncController<'a, T> {
             // update MUST be skipped. Pre-2026-05-23 this path fell back to
             // `update.contact_id.clone()` — a stable plaintext id — under any
             // storage fault, missing contact, or incomplete exchange.
-            let shared_key = match self.storage.contacts().load_contact(&update.contact_id) {
-                Ok(Some(c)) => c.shared_key().map(|k| *k.as_bytes()),
-                Ok(None) => {
-                    result.failed += 1;
-                    result.errors.push((
-                        update.contact_id.clone(),
-                        "contact not found in storage; cannot derive mailbox token \
-                         (ADR-029 forbids stable plaintext recipient_id)"
-                            .into(),
-                    ));
-                    continue;
-                }
-                Err(e) => {
-                    result.failed += 1;
-                    result
-                        .errors
-                        .push((update.contact_id.clone(), e.to_string()));
-                    continue;
-                }
-            };
-            let Some(key) = shared_key else {
+            let (shared_key, recipient_pk) =
+                match self.storage.contacts().load_contact(&update.contact_id) {
+                    Ok(Some(c)) => (
+                        c.shared_key().map(|k| *k.as_bytes()),
+                        c.public_key().copied(),
+                    ),
+                    Ok(None) => {
+                        result.failed += 1;
+                        result.errors.push((
+                            update.contact_id.clone(),
+                            "contact not found in storage; cannot derive mailbox token \
+                             (ADR-029 forbids stable plaintext recipient_id)"
+                                .into(),
+                        ));
+                        continue;
+                    }
+                    Err(e) => {
+                        result.failed += 1;
+                        result
+                            .errors
+                            .push((update.contact_id.clone(), e.to_string()));
+                        continue;
+                    }
+                };
+            let (Some(key), Some(recipient_pk)) = (shared_key, recipient_pk) else {
                 result.failed += 1;
                 result.errors.push((
                     update.contact_id.clone(),
-                    "contact has no shared_key; cannot derive mailbox token \
+                    "contact has no shared_key/public_key; cannot derive mailbox token \
                      (ADR-029 forbids stable plaintext recipient_id)"
                         .into(),
                 ));
@@ -260,9 +264,13 @@ impl<'a, T: Transport> SyncController<'a, T> {
             };
             let shared_key = Some(key);
 
-            // Compute mailbox token as recipient_id (SP-33 Task 4.1).
-            let token =
-                compute_mailbox_token(&key, current_day_epoch(self.storage.clock().unix_seconds()));
+            // Compute the recipient's directional mailbox token (keyed to the
+            // contact's identity) — SP-33 Task 4.1 + directional tokens 2026-06-30.
+            let token = compute_mailbox_token(
+                &key,
+                &recipient_pk,
+                current_day_epoch(self.storage.clock().unix_seconds()),
+            );
             let recipient_id = token_hex(&token);
 
             // Send the PRE-BUILT message as-is — no re-encryption.
@@ -346,23 +354,30 @@ impl<'a, T: Transport> SyncController<'a, T> {
         // a typed error rather than fall back to `contact_id.to_string()`
         // (a stable plaintext id). Pre-2026-05-23 this path also produced
         // the ADR-029 violation.
-        let shared_key = match self.storage.contacts().load_contact(contact_id)? {
-            Some(c) => c.shared_key().map(|k| *k.as_bytes()),
+        let (shared_key, recipient_pk) = match self.storage.contacts().load_contact(contact_id)? {
+            Some(c) => (
+                c.shared_key().map(|k| *k.as_bytes()),
+                c.public_key().copied(),
+            ),
             None => {
                 return Err(VauchiError::ContactNotFound(contact_id.to_string()));
             }
         };
-        let Some(key) = shared_key else {
+        let (Some(key), Some(recipient_pk)) = (shared_key, recipient_pk) else {
             return Err(VauchiError::InvalidState(format!(
-                "contact {contact_id} has no shared_key; cannot derive mailbox token \
+                "contact {contact_id} has no shared_key/public_key; cannot derive mailbox token \
                  (ADR-029 forbids stable plaintext recipient_id)"
             )));
         };
         let shared_key = Some(key);
 
-        // Compute mailbox token as recipient_id (SP-33 Task 4.1).
-        let token =
-            compute_mailbox_token(&key, current_day_epoch(self.storage.clock().unix_seconds()));
+        // Compute the recipient's directional mailbox token (keyed to the
+        // contact's identity) — SP-33 Task 4.1 + directional tokens 2026-06-30.
+        let token = compute_mailbox_token(
+            &key,
+            &recipient_pk,
+            current_day_epoch(self.storage.clock().unix_seconds()),
+        );
         let recipient_id = token_hex(&token);
 
         let updates = self.sync_manager.get_pending(contact_id)?;

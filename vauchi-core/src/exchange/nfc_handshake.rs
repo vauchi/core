@@ -145,12 +145,7 @@ impl NfcHandshakeSession {
         }
 
         let their_nfc = ExchangeNfc::from_bytes(their_offer_bytes)?;
-        if their_nfc.is_expired(now) {
-            return Err(ExchangeError::NfcExpired);
-        }
-        if !their_nfc.verify_signature() {
-            return Err(ExchangeError::InvalidSignature);
-        }
+        verify_peer_payload(&their_nfc, now)?;
 
         // Self-exchange check (mirror of `ble_handshake.rs::process_key_offer:340`).
         // Without this, a reflection attack — an attacker replaying the
@@ -210,12 +205,7 @@ impl NfcHandshakeSession {
         };
 
         let their_nfc = ExchangeNfc::from_bytes(their_ack_bytes)?;
-        if their_nfc.is_expired(now) {
-            return Err(ExchangeError::NfcExpired);
-        }
-        if !their_nfc.verify_signature() {
-            return Err(ExchangeError::InvalidSignature);
-        }
+        verify_peer_payload(&their_nfc, now)?;
 
         // Symmetric DH: our_ephemeral x their_ephemeral
         let shared_key =
@@ -355,6 +345,23 @@ impl Drop for NfcHandshakeSession {
         // SymmetricKey has ZeroizeOnDrop; clear our Option explicitly
         self.shared_key = None;
     }
+}
+
+/// Verifies a peer offer/ack: not expired, and carries a valid Ed25519
+/// signature. Single choke point for both handshake entry points — the
+/// signature is what authenticates each ephemeral key to its identity.
+///
+/// INVARIANT: callers MUST run this before `derive_symmetric_key`. The KDF
+/// identity binding (F-HIGH-2) is defence-in-depth on top of this signature
+/// check, not a replacement for it (security review C-1, 2026-07-01).
+fn verify_peer_payload(their_nfc: &ExchangeNfc, now: u64) -> Result<(), ExchangeError> {
+    if their_nfc.is_expired(now) {
+        return Err(ExchangeError::NfcExpired);
+    }
+    if !their_nfc.verify_signature() {
+        return Err(ExchangeError::InvalidSignature);
+    }
+    Ok(())
 }
 
 /// Derives a symmetric key from DH shared secret + HKDF with sorted public keys.

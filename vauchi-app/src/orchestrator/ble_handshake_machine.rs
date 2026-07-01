@@ -128,6 +128,43 @@ pub enum BleMachineEvent {
     Failed { reason: String },
 }
 
+/// Out-of-band material threaded into a [`BleHandshakeMachine`] when the
+/// exchange was bootstrapped over an OOB channel (scanned QR / NFC tap).
+///
+/// Each field is independently optional; a `None` field leaves that check
+/// inactive, and `None` for the whole binding is the radio-only case
+/// (Magic/Bump/Shake have no OOB peer). The *caller* populates the fields for
+/// its role — the connector/scanner pins [`Self::expected_peer`] and echoes
+/// [`Self::oob_nonce_echo`]; the advertiser/displayer sets
+/// [`Self::required_oob_nonce`]. The machine is a neutral conduit: it forwards
+/// present fields to the session and makes no role decision itself.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BleOobBinding {
+    /// Pin the expected wire identity; a mismatch aborts (scanner side).
+    pub expected_peer: Option<[u8; 32]>,
+    /// Carry this OOB nonce in our KeyOffer so the displayer can verify we
+    /// saw the QR/tap (scanner side).
+    pub oob_nonce_echo: Option<[u8; 16]>,
+    /// Require the peer's KeyOffer to echo this nonce; absence/mismatch
+    /// aborts (displayer side).
+    pub required_oob_nonce: Option<[u8; 16]>,
+}
+
+/// Forward the present [`BleOobBinding`] fields to the session before the
+/// handshake advances. No-op for the radio-only (`None`) case.
+fn apply_oob(inner: &mut BleHandshakeSession, oob: Option<BleOobBinding>) {
+    let Some(binding) = oob else { return };
+    if let Some(peer) = binding.expected_peer {
+        inner.expect_peer(peer);
+    }
+    if let Some(nonce) = binding.oob_nonce_echo {
+        inner.set_oob_nonce(nonce);
+    }
+    if let Some(nonce) = binding.required_oob_nonce {
+        inner.require_oob_nonce(nonce);
+    }
+}
+
 /// Deterministic, event-driven BLE handshake machine.
 ///
 /// Owns the inner [`BleHandshakeSession`] plus the chunker /
@@ -164,19 +201,21 @@ pub struct BleHandshakeMachine {
 impl BleHandshakeMachine {
     /// Construct an initiator machine. No I/O — the KeyOffer is
     /// created on the first `on_connected` call.
+    ///
+    /// `oob` supplies bootstrapped-mode pin/nonce material (Glance QR / NFC);
+    /// `None` is the radio-only case.
     pub fn new_initiator(
         identity_key: [u8; 32],
         identity_x3dh: X3DHKeyPair,
         card: BleCardPayload,
         now: u64,
+        oob: Option<BleOobBinding>,
     ) -> Self {
+        let mut inner =
+            BleHandshakeSession::new_initiator_from_key(identity_key, identity_x3dh, card, now);
+        apply_oob(&mut inner, oob);
         Self {
-            inner: BleHandshakeSession::new_initiator_from_key(
-                identity_key,
-                identity_x3dh,
-                card,
-                now,
-            ),
+            inner,
             role: BleRole::Initiator,
             reassembler: None,
             pending_intermediate: None,
@@ -188,19 +227,21 @@ impl BleHandshakeMachine {
 
     /// Construct a responder machine. No I/O — the KeyOffer ingress
     /// happens on the first `CHAR_HANDSHAKE_WRITE` notification.
+    ///
+    /// `oob` supplies bootstrapped-mode pin/nonce material (Glance QR / NFC);
+    /// `None` is the radio-only case.
     pub fn new_responder(
         identity_key: [u8; 32],
         identity_x3dh: X3DHKeyPair,
         card: BleCardPayload,
         now: u64,
+        oob: Option<BleOobBinding>,
     ) -> Self {
+        let mut inner =
+            BleHandshakeSession::new_responder_from_key(identity_key, identity_x3dh, card, now);
+        apply_oob(&mut inner, oob);
         Self {
-            inner: BleHandshakeSession::new_responder_from_key(
-                identity_key,
-                identity_x3dh,
-                card,
-                now,
-            ),
+            inner,
             role: BleRole::Responder,
             reassembler: None,
             pending_intermediate: None,

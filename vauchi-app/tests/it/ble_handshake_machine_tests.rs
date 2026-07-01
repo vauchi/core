@@ -20,7 +20,7 @@
 //! `BleHandshakeSession` + `BleChunker` types the machine owns.
 
 use vauchi_app::orchestrator::ble_handshake_machine::{
-    BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleRole,
+    BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleOobBinding, BleRole,
 };
 use vauchi_core::Command;
 use vauchi_core::crypto::X3DHKeyPair;
@@ -45,12 +45,12 @@ fn fixture_card() -> (BleCardPayload, [u8; 32], X3DHKeyPair) {
 
 fn fresh_initiator() -> BleHandshakeMachine {
     let (card, id, x3dh) = fixture_card();
-    BleHandshakeMachine::new_initiator(id, x3dh, card, 0)
+    BleHandshakeMachine::new_initiator(id, x3dh, card, 0, None)
 }
 
 fn fresh_responder() -> BleHandshakeMachine {
     let (card, id, x3dh) = fixture_card();
-    BleHandshakeMachine::new_responder(id, x3dh, card, 0)
+    BleHandshakeMachine::new_responder(id, x3dh, card, 0, None)
 }
 
 // @internal
@@ -277,4 +277,57 @@ fn role_is_stable_through_lifecycle() {
     resp.on_connected(0);
     resp.update_mtu(247);
     assert_eq!(resp.role(), BleRole::Responder);
+}
+
+fn initiator_with_oob(oob: Option<BleOobBinding>) -> BleHandshakeMachine {
+    let (card, id, x3dh) = fixture_card();
+    BleHandshakeMachine::new_initiator(id, x3dh, card, 0, oob)
+}
+
+/// The KeyOffer bytes the initiator writes on connect.
+fn key_offer(machine: &mut BleHandshakeMachine) -> Vec<u8> {
+    let (_event, cmds) = machine.on_connected(0);
+    cmds.into_iter()
+        .find_map(|cmd| match cmd {
+            Command::BleWriteCharacteristic { uuid, data }
+                if uuid.as_str() == CHAR_HANDSHAKE_WRITE =>
+            {
+                Some(data)
+            }
+            _ => None,
+        })
+        .expect("initiator emits a KeyOffer on connect")
+}
+
+// @internal
+#[test]
+fn oob_nonce_echo_rides_in_the_key_offer() {
+    // Bootstrapped modes: the scanner echoes the OOB nonce it saw so the
+    // displayer can verify the connector actually saw the QR/tap. It occupies
+    // KeyOffer bytes 121..137 (after version/identity/exchange/ephemeral/
+    // nonce/timestamp).
+    let nonce = [7u8; 16];
+    let offer = key_offer(&mut initiator_with_oob(Some(BleOobBinding {
+        oob_nonce_echo: Some(nonce),
+        ..Default::default()
+    })));
+    assert_eq!(
+        &offer[121..137],
+        &nonce,
+        "set_oob_nonce must be threaded into the KeyOffer's echo field"
+    );
+}
+
+// @internal
+#[test]
+fn radio_only_binding_leaves_the_echo_zero() {
+    // Control: `None` (radio-only Magic/Bump/Shake) has no OOB peer, so the
+    // echo field stays all-zero. Guards against the threading firing
+    // unconditionally.
+    let offer = key_offer(&mut initiator_with_oob(None));
+    assert_eq!(
+        &offer[121..137],
+        &[0u8; 16],
+        "no OOB binding must leave the echo field zero"
+    );
 }

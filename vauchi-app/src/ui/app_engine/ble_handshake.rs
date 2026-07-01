@@ -78,12 +78,15 @@ impl AppEngine {
             return;
         }
         let now = self.vauchi.clock().unix_seconds();
+        // `None`: radio-only modes (Magic/Bump/Shake) have no OOB peer. Tier 1
+        // Slice B (Glance one-sided QR) supplies the `BleOobBinding` here from
+        // the scanned payload (2026-06-10-ble-unauthenticated-peer-identity).
         let machine = match role {
             BleRole::Initiator => {
-                BleHandshakeMachine::new_initiator(identity_key, identity_x3dh, card, now)
+                BleHandshakeMachine::new_initiator(identity_key, identity_x3dh, card, now, None)
             }
             BleRole::Responder => {
-                BleHandshakeMachine::new_responder(identity_key, identity_x3dh, card, now)
+                BleHandshakeMachine::new_responder(identity_key, identity_x3dh, card, now, None)
             }
         };
         self.ble_handshake_session = Some(BleHandshakeHolder { machine });

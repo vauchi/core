@@ -321,6 +321,31 @@ impl PlatformAppEngine {
             engine.apply_multi_stage_event(m_event);
         }
 
+        // Glance one-sided QR: the scan component's TextChanged carries the
+        // scanned OOB payload. Route it to `apply_glance_scan` so the scanner
+        // pins the displayer's identity + exchange key + co-presence nonce; the
+        // subsequent `BleDeviceDiscovered` of that identity then connects
+        // (`handle_glance_discovery`). A malformed / expired QR is rejected
+        // there and latches nothing — the exposure-closer for
+        // `2026-06-10-ble-unauthenticated-peer-identity`.
+        if let vauchi_app::ui::UserAction::TextChanged {
+            component_id,
+            value,
+        } = &action
+            && component_id == vauchi_app::ui::GLANCE_SCAN_COMPONENT_ID
+            && matches!(
+                pre_screen,
+                AppScreen::BleExchange {
+                    mode: vauchi_core::exchange::mode::ExchangeMode::Glance
+                }
+            )
+        {
+            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            let _ = engine.apply_glance_scan(value);
+        }
+
         let (result, pending_commands) = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
@@ -399,12 +424,22 @@ impl PlatformAppEngine {
                 // which emits `BleConnect` for the tiebreak winner. Once the
                 // session is active, the `BleConnected`/data events route into
                 // the real machine via the gate that follows.
-                if let vauchi_core::Event::BleDeviceDiscovered { adv_data, .. } = &hw_event {
+                if let vauchi_core::Event::BleDeviceDiscovered { id, adv_data, .. } = &hw_event {
                     let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                         detail: format!("Lock failed: {e}"),
                     })?;
-                    if matches!(engine.current_app_screen(), AppScreen::BleExchange { .. }) {
-                        engine.start_ble_handshake_on_discovery(adv_data);
+                    match engine.current_app_screen() {
+                        // Glance is asymmetric: connect only to the advertiser
+                        // whose identity matches the scanned QR (no tiebreak, no
+                        // latch race — F1 dissolves). Builds the initiator
+                        // session with the scanned pins + drains a `BleConnect`.
+                        AppScreen::BleExchange {
+                            mode: vauchi_core::exchange::mode::ExchangeMode::Glance,
+                        } => engine.handle_glance_discovery(id, adv_data),
+                        AppScreen::BleExchange { .. } => {
+                            engine.start_ble_handshake_on_discovery(adv_data);
+                        }
+                        _ => {}
                     }
                 }
 

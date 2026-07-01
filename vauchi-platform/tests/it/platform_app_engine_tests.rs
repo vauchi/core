@@ -891,6 +891,74 @@ fn qr_scanned_hardware_event_routes_to_session_when_on_multi_stage_screen() {
 
 // @internal
 #[test]
+fn glance_scanning_a_peer_qr_connects_only_to_that_peer() {
+    // The full exposure-closer live path (2026-06-10-ble-unauthenticated-peer-
+    // identity): device A scans device B's one-sided Glance QR, then its BLE
+    // scan discovers B advertising — A connects specifically to B. A foreign
+    // advertiser A never scanned is ignored (no tiebreak, no latch race → F1).
+    use vauchi_app::ui::GLANCE_SCAN_COMPONENT_ID;
+    use vauchi_core::exchange::oob_bootstrap::OobBootstrapQr;
+    use vauchi_platform::MobileEvent;
+
+    let (a, _da) = create_engine();
+    drive_onboarding(&a);
+    let (b, _db) = create_engine();
+    drive_onboarding(&b);
+
+    for e in [&a, &b] {
+        e.navigate_to_json_for_test(r#""Exchange""#.into())
+            .expect("navigate to Exchange");
+        e.handle_action_json(
+            r#"{"ListItemSelected": {"component_id": "category:quick", "item_id": "mode:glance"}}"#
+                .into(),
+        )
+        .expect("select Glance");
+    }
+
+    // B displays its QR; parse it to learn B's advertised identity.
+    let b_qr = qr_data_from_screen_json(&b.current_screen_json().expect("b glance screen"));
+    let b_identity = *OobBootstrapQr::from_data_string(&b_qr)
+        .expect("B's QR parses")
+        .identity_key();
+
+    // A scans B's QR (the camera Component emits TextChanged on the scan id).
+    a.handle_action_json(
+        serde_json::json!({
+            "TextChanged": { "component_id": GLANCE_SCAN_COMPONENT_ID, "value": b_qr }
+        })
+        .to_string(),
+    )
+    .expect("A scans B's QR");
+
+    // A's BLE scan first surfaces a FOREIGN advertiser A never scanned → ignored.
+    let foreign = a
+        .handle_hardware_event(MobileEvent::BleDeviceDiscovered {
+            id: "mallory-device".into(),
+            rssi: -40,
+            adv_data: vec![0xAB; 32],
+        })
+        .expect("foreign discovery accepted");
+    assert!(
+        !foreign.contains("mallory-device"),
+        "A must ignore an advertiser it did not scan (F1 dissolves), got: {foreign}",
+    );
+
+    // Then B is discovered advertising the scanned identity → A connects to B.
+    let discovery = a
+        .handle_hardware_event(MobileEvent::BleDeviceDiscovered {
+            id: "b-device".into(),
+            rssi: -40,
+            adv_data: b_identity.to_vec(),
+        })
+        .expect("B discovery accepted");
+    assert!(
+        discovery.contains("BleConnect") && discovery.contains("b-device"),
+        "A must connect specifically to the scanned peer, got: {discovery}",
+    );
+}
+
+// @internal
+#[test]
 fn text_changed_from_peer_scan_routes_to_multi_stage_session() {
     // Pair 4 — the iOS / Android QrCode { mode: Scan } component emits
     // `UserAction::TextChanged { component_id: "peer_scan", value }`

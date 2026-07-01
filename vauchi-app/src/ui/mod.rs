@@ -119,7 +119,7 @@ pub use emergency_shred::EmergencyShredEngine;
 pub use engine::WorkflowEngine;
 pub use exchange::ble_engine::{
     ACTION_CANCEL as BLE_EXCHANGE_ACTION_CANCEL, ACTION_DONE as BLE_EXCHANGE_ACTION_DONE,
-    ACTION_RETRY as BLE_EXCHANGE_ACTION_RETRY, BleExchangeEngine,
+    ACTION_RETRY as BLE_EXCHANGE_ACTION_RETRY, BleExchangeEngine, GLANCE_SCAN_COMPONENT_ID,
 };
 pub use exchange::direct_engine::{
     ACTION_CANCEL as DIRECT_TRANSPORT_ACTION_CANCEL, ACTION_DONE as DIRECT_TRANSPORT_ACTION_DONE,

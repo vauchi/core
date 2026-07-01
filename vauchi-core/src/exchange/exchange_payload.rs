@@ -125,9 +125,13 @@ pub fn parse_exchange_payload(
 }
 
 /// Checks if a payload timestamp has expired given the expiry duration.
+///
+/// `saturating_sub` instead of `now > timestamp + expiry_secs`: a plain add on
+/// an adversarially large `timestamp` overflows (debug: panic → DoS; release:
+/// wrap → wrong result), and `saturating_sub` also handles clock skew where
+/// `now < timestamp` (S-1, security review 2026-07-01).
 pub fn is_payload_expired(timestamp: u64, expiry_secs: u64, now: u64) -> bool {
-
-    now > timestamp + expiry_secs
+    now.saturating_sub(timestamp) > expiry_secs
 }
 
 /// Verifies the Ed25519 signature on a parsed payload.
@@ -166,4 +170,35 @@ fn build_sign_message(
     msg.extend_from_slice(token);
     msg.extend_from_slice(&timestamp.to_be_bytes());
     msg
+}
+
+// INLINE_TEST_REQUIRED: is_payload_expired is a crate-internal helper, not
+// re-exported for integration tests; its overflow-safety (S-1) needs a direct
+// unit test against adversarial timestamps.
+#[cfg(test)]
+mod tests {
+    use super::is_payload_expired;
+
+    #[test]
+    fn not_expired_within_window() {
+        assert!(!is_payload_expired(1000, 300, 1200));
+    }
+
+    #[test]
+    fn expired_past_window() {
+        assert!(is_payload_expired(1000, 300, 1400));
+    }
+
+    #[test]
+    fn future_timestamp_is_not_expired() {
+        // Clock skew: now < timestamp must not underflow to "expired".
+        assert!(!is_payload_expired(2000, 300, 1000));
+    }
+
+    #[test]
+    fn adversarial_large_timestamp_does_not_overflow() {
+        // `timestamp + expiry_secs` would overflow here (debug panic / release
+        // wrap); saturating arithmetic returns a well-defined result.
+        assert!(!is_payload_expired(u64::MAX - 10, 300, 1_000_000));
+    }
 }

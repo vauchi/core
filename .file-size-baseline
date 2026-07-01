@@ -427,7 +427,7 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 #  2026-06-13-ios-app-password-setup-missing.)
 # (+5 for T2.2-wiring: TransportReadiness param on create_engine + the
 #  expanded create_exchange_engine dispatch — exchange-waits-forever Phase 2.)
-vauchi-app/src/ui/app_engine/screens.rs 915
+vauchi-app/src/ui/app_engine/screens.rs 920
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

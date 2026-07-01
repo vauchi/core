@@ -44,7 +44,7 @@
 
 use super::{AppEngine, AppScreen};
 use crate::orchestrator::ble_handshake_machine::{
-    BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleRole, decide_ble_role,
+    BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleOobBinding, BleRole, decide_ble_role,
 };
 use vauchi_core::Contact;
 use vauchi_core::Event;
@@ -67,26 +67,30 @@ impl AppEngine {
     /// `role` selects initiator vs responder (the frontend decides
     /// by who-initiated-the-connection convention — same convention
     /// `MobileBleExchangeSession::set_responder` used pre-32m).
+    ///
+    /// `oob` carries the Glance one-sided-QR binding
+    /// (2026-06-10-ble-unauthenticated-peer-identity, Tier 1 Slice B): the
+    /// scanner/initiator supplies `expected_peer` + `oob_nonce_echo`, the
+    /// displayer/responder supplies `required_oob_nonce`. Radio-only modes
+    /// (Magic/Bump/Shake) pass `None` — no OOB peer.
     pub fn ensure_ble_handshake_session(
         &mut self,
         role: BleRole,
         identity_key: [u8; 32],
         identity_x3dh: X3DHKeyPair,
         card: BleCardPayload,
+        oob: Option<BleOobBinding>,
     ) {
         if self.ble_handshake_session.is_some() {
             return;
         }
         let now = self.vauchi.clock().unix_seconds();
-        // `None`: radio-only modes (Magic/Bump/Shake) have no OOB peer. Tier 1
-        // Slice B (Glance one-sided QR) supplies the `BleOobBinding` here from
-        // the scanned payload (2026-06-10-ble-unauthenticated-peer-identity).
         let machine = match role {
             BleRole::Initiator => {
-                BleHandshakeMachine::new_initiator(identity_key, identity_x3dh, card, now, None)
+                BleHandshakeMachine::new_initiator(identity_key, identity_x3dh, card, now, oob)
             }
             BleRole::Responder => {
-                BleHandshakeMachine::new_responder(identity_key, identity_x3dh, card, now, None)
+                BleHandshakeMachine::new_responder(identity_key, identity_x3dh, card, now, oob)
             }
         };
         self.ble_handshake_session = Some(BleHandshakeHolder { machine });
@@ -204,7 +208,10 @@ impl AppEngine {
             return;
         };
         let role = decide_ble_role(&identity_key, peer_token);
-        self.ensure_ble_handshake_session(role, identity_key, x3dh, card);
+        // `None`: radio-only discovery has no OOB peer. The Glance scanner path
+        // (which forces Initiator + supplies the scanned binding) lands in the
+        // engine/orchestration step of Slice B.
+        self.ensure_ble_handshake_session(role, identity_key, x3dh, card, None);
     }
 
     /// Build the BLE handshake session as the **responder** for a device
@@ -231,7 +238,9 @@ impl AppEngine {
             log::warn!("BLE: cannot start responder handshake — no identity / card");
             return;
         };
-        self.ensure_ble_handshake_session(BleRole::Responder, identity_key, x3dh, card);
+        // `None`: radio-only peripheral responder. The Glance displayer path
+        // (which supplies `required_oob_nonce`) lands in the orchestration step.
+        self.ensure_ble_handshake_session(BleRole::Responder, identity_key, x3dh, card, None);
     }
 
     /// Tear down the BLE handshake session when leaving the BLE exchange
@@ -641,7 +650,7 @@ mod tests {
         let (ik, x3dh, card) = initiator
             .build_ble_session_inputs()
             .expect("initiator inputs");
-        initiator.ensure_ble_handshake_session(BleRole::Initiator, ik, x3dh, card);
+        initiator.ensure_ble_handshake_session(BleRole::Initiator, ik, x3dh, card, None);
 
         let mut vb = Vauchi::in_memory().expect("vauchi bob");
         vb.create_identity("Bob").expect("bob identity");
@@ -675,6 +684,161 @@ mod tests {
             1,
             "a peripheral responder built on connect (no discovery) must \
              persist the peer contact"
+        );
+    }
+
+    // ============================================================
+    // Glance Slice B — OOB binding supply (pin + nonce echo) reaches the
+    // session enforcement. The binding is the exposure-closer for
+    // 2026-06-10-ble-unauthenticated-peer-identity.
+    // ============================================================
+
+    fn fresh_engine(name: &str) -> AppEngine {
+        let mut v = Vauchi::in_memory().expect("in-memory vauchi");
+        v.create_identity(name).expect("identity");
+        AppEngine::new(v)
+    }
+
+    fn signing_key(e: &AppEngine) -> [u8; 32] {
+        *e.vauchi.identity().expect("identity").signing_public_key()
+    }
+
+    fn ensure_with_oob(e: &mut AppEngine, role: BleRole, oob: Option<BleOobBinding>) {
+        let (ik, x3dh, card) = e.build_ble_session_inputs().expect("session inputs");
+        e.ensure_ble_handshake_session(role, ik, x3dh, card, oob);
+    }
+
+    fn run_handshake(initiator: &mut AppEngine, responder: &mut AppEngine) {
+        let ei = initiator.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
+            device_id: "responder".into(),
+        });
+        initiator.apply_ble_machine_event(ei);
+        let er = responder.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
+            device_id: "initiator".into(),
+        });
+        responder.apply_ble_machine_event(er);
+        for _ in 0..50 {
+            let a = pump(initiator, responder);
+            let b = pump(responder, initiator);
+            if a + b == 0 {
+                break;
+            }
+        }
+    }
+
+    // @scenario: ble_exchange :: Glance scanner rejects a foreign displayer
+    #[test]
+    fn glance_scanner_rejects_foreign_displayer_via_identity_pin() {
+        // The scanner scanned the REAL displayer's QR and pinned its identity.
+        // A radio-range MITM (Mallory) answers instead — she even knows the
+        // co-presence nonce (worst case: the QR was shoulder-surfed) but not
+        // the pinned identity's signing key, so the scanner must reject her.
+        let mut scanner = fresh_engine("Scanner");
+        let displayer = fresh_engine("RealDisplayer");
+        let mut mallory = fresh_engine("Mallory");
+
+        let pinned = signing_key(&displayer);
+        let nonce = [5u8; 16];
+
+        ensure_with_oob(
+            &mut scanner,
+            BleRole::Initiator,
+            Some(BleOobBinding {
+                expected_peer: Some(pinned),
+                oob_nonce_echo: Some(nonce),
+                ..Default::default()
+            }),
+        );
+        ensure_with_oob(
+            &mut mallory,
+            BleRole::Responder,
+            Some(BleOobBinding {
+                required_oob_nonce: Some(nonce),
+                ..Default::default()
+            }),
+        );
+
+        run_handshake(&mut scanner, &mut mallory);
+
+        assert_eq!(
+            scanner.vauchi.list_contacts().expect("contacts").len(),
+            0,
+            "scanner pinned the scanned identity — Mallory's mismatched \
+             identity must abort the handshake (no contact persisted)"
+        );
+    }
+
+    // @scenario: ble_exchange :: Glance displayer rejects a connector that never scanned
+    #[test]
+    fn glance_displayer_rejects_connector_without_nonce_echo() {
+        // The displayer requires the co-presence nonce it showed in its QR. A
+        // connector that never scanned it (no echo) must be rejected — this is
+        // what stops a non-co-present device from harvesting the displayer's
+        // card by merely winning the radio race.
+        let mut displayer = fresh_engine("Displayer");
+        let mut harvester = fresh_engine("Harvester");
+        let nonce = [9u8; 16];
+
+        ensure_with_oob(
+            &mut displayer,
+            BleRole::Responder,
+            Some(BleOobBinding {
+                required_oob_nonce: Some(nonce),
+                ..Default::default()
+            }),
+        );
+        ensure_with_oob(&mut harvester, BleRole::Initiator, None);
+
+        run_handshake(&mut harvester, &mut displayer);
+
+        assert_eq!(
+            displayer.vauchi.list_contacts().expect("contacts").len(),
+            0,
+            "displayer requires the QR nonce — a connector without the echo \
+             must be rejected (no contact persisted)"
+        );
+    }
+
+    // @scenario: ble_exchange :: Glance matching binding completes for both peers
+    #[test]
+    fn glance_matching_binding_completes_and_persists() {
+        // Happy path: the scanner echoes the displayer's nonce and pins its
+        // identity; the displayer requires that nonce. Both checks pass, the
+        // exchange completes, and both persist the peer.
+        let mut scanner = fresh_engine("Scanner");
+        let mut displayer = fresh_engine("Displayer");
+        let pinned = signing_key(&displayer);
+        let nonce = [7u8; 16];
+
+        ensure_with_oob(
+            &mut scanner,
+            BleRole::Initiator,
+            Some(BleOobBinding {
+                expected_peer: Some(pinned),
+                oob_nonce_echo: Some(nonce),
+                ..Default::default()
+            }),
+        );
+        ensure_with_oob(
+            &mut displayer,
+            BleRole::Responder,
+            Some(BleOobBinding {
+                required_oob_nonce: Some(nonce),
+                ..Default::default()
+            }),
+        );
+
+        run_handshake(&mut scanner, &mut displayer);
+
+        assert_eq!(
+            scanner.vauchi.list_contacts().expect("contacts").len(),
+            1,
+            "scanner must persist the pinned displayer on success"
+        );
+        assert_eq!(
+            displayer.vauchi.list_contacts().expect("contacts").len(),
+            1,
+            "displayer must persist the co-present scanner on success"
         );
     }
 }

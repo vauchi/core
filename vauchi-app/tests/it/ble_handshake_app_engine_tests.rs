@@ -46,7 +46,7 @@ fn fresh_engine_has_no_active_ble_session() {
 fn ensure_then_cancel_round_trip() {
     let mut engine = fresh_engine();
     let (card, id, x3dh) = fixture_card();
-    engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card);
+    engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card, None);
     assert!(engine.ble_handshake_session_active());
     assert_eq!(engine.ble_machine_phase(), Some(BleMachinePhase::Preparing));
 
@@ -60,14 +60,14 @@ fn ensure_then_cancel_round_trip() {
 fn ensure_is_idempotent_under_repeat() {
     let mut engine = fresh_engine();
     let (card, id, x3dh) = fixture_card();
-    engine.ensure_ble_handshake_session(BleRole::Responder, id, x3dh, card);
+    engine.ensure_ble_handshake_session(BleRole::Responder, id, x3dh, card, None);
     let phase_a = engine.ble_machine_phase();
 
     // Second call with a different role must be a no-op — the
     // already-held session wins. X3DHKeyPair has no Clone, so we
     // rebuild from the same secret bytes the fixture used.
     let (card2, id2, x3dh2) = fixture_card();
-    engine.ensure_ble_handshake_session(BleRole::Initiator, id2, x3dh2, card2);
+    engine.ensure_ble_handshake_session(BleRole::Initiator, id2, x3dh2, card2, None);
     let phase_b = engine.ble_machine_phase();
     assert_eq!(phase_a, phase_b);
 }
@@ -77,7 +77,7 @@ fn ensure_is_idempotent_under_repeat() {
 fn forward_mtu_negotiated_updates_machine_without_touching_phase() {
     let mut engine = fresh_engine();
     let (card, id, x3dh) = fixture_card();
-    engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card);
+    engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card, None);
     let _ = engine.forward_ble_hardware_event(&Event::BleMtuNegotiated {
         device_id: "AA:BB".into(),
         mtu: 247,
@@ -94,7 +94,7 @@ fn forward_mtu_negotiated_updates_machine_without_touching_phase() {
 fn forward_ble_connected_advances_initiator_to_handshaking() {
     let mut engine = fresh_engine();
     let (card, id, x3dh) = fixture_card();
-    engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card);
+    engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card, None);
     let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "d1".into(),
     });
@@ -128,7 +128,7 @@ fn forward_event_without_active_session_is_no_op() {
 fn cancel_enqueues_ble_disconnect_into_pending_commands() {
     let mut engine = fresh_engine();
     let (card, id, x3dh) = fixture_card();
-    engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card);
+    engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card, None);
     // Drive past Preparing so cancel emits BleDisconnect.
     let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "d1".into(),
@@ -146,7 +146,7 @@ fn cancel_enqueues_ble_disconnect_into_pending_commands() {
 fn forward_disconnect_marks_machine_failed() {
     let mut engine = fresh_engine();
     let (card, id, x3dh) = fixture_card();
-    engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card);
+    engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card, None);
     let _ = engine.forward_ble_hardware_event(&Event::BleDisconnected {
         reason: "peer left".into(),
     });

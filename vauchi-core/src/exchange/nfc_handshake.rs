@@ -526,6 +526,7 @@ mod tests {
 
     // Both peers pair (identity || ephemeral) and sort the two pairs, so they
     // derive identical HKDF info regardless of who is offer vs ack.
+    // @internal
     #[test]
     fn hkdf_info_symmetric_across_peers() {
         let (a_id, a_eph) = ([1u8; 32], [2u8; 32]);
@@ -539,6 +540,7 @@ mod tests {
 
     // UKS resistance (F-HIGH-2): same ephemerals, different peer identity must
     // NOT collide — the key is bound to the identities, not just the ephemerals.
+    // @internal
     #[test]
     fn hkdf_info_binds_identity_uks_resistance() {
         let (a_id, a_eph) = ([1u8; 32], [2u8; 32]);
@@ -554,6 +556,7 @@ mod tests {
 
     proptest! {
         // Symmetry holds for arbitrary keys (CC-04).
+        // @internal
         #[test]
         fn hkdf_info_symmetric_prop(
             a_id in any::<[u8; 32]>(),
@@ -571,6 +574,7 @@ mod tests {
 
     // W-2: a card ciphertext is bound to the exchange identities via AAD;
     // decrypting with a different sender identity fails at the AEAD tag.
+    // @internal
     #[test]
     fn card_aad_binds_identities() {
         let key = SymmetricKey::from_bytes([7u8; 32]);

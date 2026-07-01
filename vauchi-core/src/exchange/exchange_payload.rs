@@ -179,22 +179,26 @@ fn build_sign_message(
 mod tests {
     use super::is_payload_expired;
 
+    // @internal
     #[test]
     fn not_expired_within_window() {
         assert!(!is_payload_expired(1000, 300, 1200));
     }
 
+    // @internal
     #[test]
     fn expired_past_window() {
         assert!(is_payload_expired(1000, 300, 1400));
     }
 
+    // @internal
     #[test]
     fn future_timestamp_is_not_expired() {
         // Clock skew: now < timestamp must not underflow to "expired".
         assert!(!is_payload_expired(2000, 300, 1000));
     }
 
+    // @internal
     #[test]
     fn adversarial_large_timestamp_does_not_overflow() {
         // `timestamp + expiry_secs` would overflow here (debug panic / release

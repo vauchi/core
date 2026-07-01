@@ -67,6 +67,7 @@ pub struct NfcHandshakeSession {
     our_identity_key: [u8; 32],
     shared_key: Option<SymmetricKey>,
     their_card: Option<NfcCardPayload>,
+    their_identity_key: Option<[u8; 32]>,
     completed_cache: HashMap<[u8; 32], NfcExchangeResult>,
 }
 
@@ -80,6 +81,7 @@ impl NfcHandshakeSession {
             our_identity_key: *identity.signing_public_key(),
             shared_key: None,
             their_card: None,
+            their_identity_key: None,
             completed_cache: HashMap::new(),
         }
     }
@@ -156,6 +158,8 @@ impl NfcHandshakeSession {
         if their_nfc.identity_key() == &self.our_identity_key {
             return Err(ExchangeError::SelfExchange);
         }
+        // Remember the initiator's identity so phase 3's decrypt can bind AAD.
+        self.their_identity_key = Some(*their_nfc.identity_key());
 
         let exchange_id = *their_nfc.token();
 
@@ -180,6 +184,8 @@ impl NfcHandshakeSession {
         let encrypted = encrypt_card(
             &shared_key,
             &self.our_identity_key,
+            their_nfc.identity_key(),
+            &exchange_id,
             &self.our_display_name,
             self.our_x3dh.public_key(),
         )?;
@@ -228,12 +234,20 @@ impl NfcHandshakeSession {
             &exchange_id,
         )?;
 
-        let their_card = decrypt_and_validate_card(&shared_key, their_encrypted_card)?;
+        let their_card = decrypt_and_validate_card(
+            &shared_key,
+            their_encrypted_card,
+            their_nfc.identity_key(),
+            &self.our_identity_key,
+            &exchange_id,
+        )?;
 
         // Encrypt our card with same key, fresh nonce
         let encrypted = encrypt_card(
             &shared_key,
             &self.our_identity_key,
+            their_nfc.identity_key(),
+            &exchange_id,
             &self.our_display_name,
             self.our_x3dh.public_key(),
         )?;
@@ -265,8 +279,17 @@ impl NfcHandshakeSession {
             .shared_key
             .as_ref()
             .ok_or_else(|| ExchangeError::InvalidState("No shared key".into()))?;
+        let their_identity = self
+            .their_identity_key
+            .ok_or_else(|| ExchangeError::InvalidState("No peer identity".into()))?;
 
-        let their_card = decrypt_and_validate_card(shared_key, their_encrypted_card)?;
+        let their_card = decrypt_and_validate_card(
+            shared_key,
+            their_encrypted_card,
+            &their_identity,
+            &self.our_identity_key,
+            &exchange_id,
+        )?;
 
         let our_card = NfcCardPayload::new(
             self.our_identity_key,
@@ -442,27 +465,36 @@ fn build_hkdf_info(
     info
 }
 
-/// Encrypts a card payload with the shared key.
+/// Encrypts a card payload with the shared key, binding the exchange
+/// identities into the AEAD associated data (W-2, parity with BLE).
 fn encrypt_card(
     key: &SymmetricKey,
-    identity_key: &[u8; 32],
+    sender_identity: &[u8; 32],
+    receiver_identity: &[u8; 32],
+    exchange_id: &[u8; 32],
     display_name: &str,
     exchange_key: &[u8; 32],
 ) -> Result<Vec<u8>, ExchangeError> {
-    let payload = NfcCardPayload::new(*identity_key, display_name.to_string(), *exchange_key);
+    let payload = NfcCardPayload::new(*sender_identity, display_name.to_string(), *exchange_key);
     let plaintext = payload
         .to_bytes()
         .map_err(|_| ExchangeError::SerializationFailed)?;
-    encryption::encrypt(key, &plaintext).map_err(|_| ExchangeError::CryptoError)
+    let aad = build_card_aad(sender_identity, receiver_identity, exchange_id);
+    encryption::encrypt_with_ad(key, &plaintext, &aad).map_err(|_| ExchangeError::CryptoError)
 }
 
-/// Decrypts and validates a card payload.
+/// Decrypts and validates a card payload, requiring the AEAD associated data
+/// to match the exchange identities the sender bound (W-2).
 fn decrypt_and_validate_card(
     key: &SymmetricKey,
     ciphertext: &[u8],
+    sender_identity: &[u8; 32],
+    receiver_identity: &[u8; 32],
+    exchange_id: &[u8; 32],
 ) -> Result<NfcCardPayload, ExchangeError> {
-    let plaintext =
-        encryption::decrypt(key, ciphertext).map_err(|_| ExchangeError::NfcDecryptionFailed)?;
+    let aad = build_card_aad(sender_identity, receiver_identity, exchange_id);
+    let plaintext = encryption::decrypt_with_ad(key, ciphertext, &aad)
+        .map_err(|_| ExchangeError::NfcDecryptionFailed)?;
     let card =
         NfcCardPayload::from_bytes(&plaintext).map_err(|_| ExchangeError::SerializationFailed)?;
 
@@ -471,6 +503,17 @@ fn decrypt_and_validate_card(
     }
 
     Ok(card)
+}
+
+/// Builds the AEAD associated data for a card ciphertext: the sender's and
+/// receiver's identity keys plus the session `exchange_id`. Binds each card
+/// to who sent it, to whom, and in which session (W-2, mirrors BLE's AAD).
+fn build_card_aad(sender: &[u8; 32], receiver: &[u8; 32], exchange_id: &[u8; 32]) -> Vec<u8> {
+    let mut aad = Vec::with_capacity(96);
+    aad.extend_from_slice(sender);
+    aad.extend_from_slice(receiver);
+    aad.extend_from_slice(exchange_id);
+    aad
 }
 
 // INLINE_TEST_REQUIRED: build_hkdf_info is a private fn; the UKS
@@ -524,5 +567,26 @@ mod tests {
                 build_hkdf_info(&b_id, &b_eph, &a_id, &a_eph, &eid),
             );
         }
+    }
+
+    // W-2: a card ciphertext is bound to the exchange identities via AAD;
+    // decrypting with a different sender identity fails at the AEAD tag.
+    #[test]
+    fn card_aad_binds_identities() {
+        let key = SymmetricKey::from_bytes([7u8; 32]);
+        let (sender, receiver, eid, eph) = ([1u8; 32], [2u8; 32], [3u8; 32], [4u8; 32]);
+
+        let ct = encrypt_card(&key, &sender, &receiver, &eid, "Alice", &eph).unwrap();
+
+        let card = decrypt_and_validate_card(&key, &ct, &sender, &receiver, &eid)
+            .expect("matching AAD must decrypt");
+        assert_eq!(card.identity_key, sender);
+
+        let wrong = decrypt_and_validate_card(&key, &ct, &receiver, &receiver, &eid);
+        assert!(
+            matches!(wrong, Err(ExchangeError::NfcDecryptionFailed)),
+            "mismatched sender identity in AAD must fail, got {:?}",
+            wrong
+        );
     }
 }

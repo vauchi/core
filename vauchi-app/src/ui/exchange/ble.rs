@@ -311,7 +311,10 @@ impl BleExchangeFlow {
         if let Event::BleDeviceDiscovered { id, adv_data, .. } = event {
             self.connected_device = Some(id.clone());
             self.step = BleStep::Handshaking;
-            if self.decides_initiator(adv_data) {
+            // Glance (one-sided QR) connects asymmetrically to the scanned peer
+            // via the AppEngine (`handle_glance_discovery`); the symmetric
+            // tiebreak here would race that and re-open the multi-peer latch (F1).
+            if self.mode != ExchangeMode::Glance && self.decides_initiator(adv_data) {
                 // We win the tiebreak → initiate the connection (central).
                 return BleHardwareOutcome::StepAdvanced {
                     commands: vec![Command::BleConnect {
@@ -501,6 +504,31 @@ mod tests {
                     &commands[0],
                     Command::BleConnect { device_id } if device_id == "device-1"
                 ));
+            }
+            other => panic!("Expected StepAdvanced, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn glance_discovery_never_tiebreak_connects() {
+        // Glance uses scan-driven asymmetric connection (the AppEngine's
+        // `handle_glance_discovery` connects to the scanned peer). The flow must
+        // NOT tiebreak-connect — even when our token would win — or it races the
+        // scan-driven connect and re-introduces the multi-peer latch (F1).
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Glance, vec![0x01]);
+        let outcome = flow.handle_event(&Event::BleDeviceDiscovered {
+            id: "device-1".into(),
+            rssi: -42,
+            adv_data: vec![0x09], // peer token > ours → we would win the tiebreak
+        });
+        assert_eq!(*flow.step(), BleStep::Handshaking);
+        match outcome {
+            BleHardwareOutcome::StepAdvanced { commands } => {
+                assert!(
+                    commands.is_empty(),
+                    "Glance must not tiebreak-connect (scan-driven connect owns it), got {commands:?}"
+                );
             }
             other => panic!("Expected StepAdvanced, got {other:?}"),
         }

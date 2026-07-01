@@ -323,7 +323,15 @@ vauchi-core/src/storage/mod.rs 1079
 #  engine cache + rebuilds the active engine (incl. the transport_readiness
 #  arg threaded by the origin/main T2.2-wiring rebase), sibling of
 #  set_render_context; ADR-038 Amendment 2 / token-theme hot-reload 2026-06-14.)
-vauchi-app/src/ui/app_engine/mod.rs 736
+# (+8 2026-07-01: two Glance OOB state fields on AppEngine — Slice B,
+#  2026-06-10-ble-unauthenticated-peer-identity.)
+vauchi-app/src/ui/app_engine/mod.rs 744
+# (2026-07-01: Glance orchestration + its INLINE_TEST_REQUIRED test mod —
+#  Slice B. The privacy/binding tests call private build_ble_session_inputs /
+#  pending_exchange_groups so they must stay inline; the pub-API Glance
+#  orchestration tests are a queued extraction to
+#  tests/it/ble_handshake_app_engine_tests.rs. Slice B follow-up.)
+vauchi-app/src/ui/app_engine/ble_handshake.rs 1034
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -495,7 +503,8 @@ vauchi-app/src/ui/contact_detail.rs 1429
 #  runner) + the Glance-None test, 2026-06-07)
 # (+17 for the BLE mid-session PermissionDenied regression pin —
 #  exchange-waits-forever T2.3, the device-observed forever-scan transport.)
-vauchi-app/src/ui/exchange/ble.rs 1219
+# (+28 2026-07-01: Glance flow tiebreak-connect guard + its test — Slice B.)
+vauchi-app/src/ui/exchange/ble.rs 1247
 
 # EXEMPT — state machine: 9 ProtocolState variants + camera-gate transitions need cohesion;
 # inline tests access private state (state, peer_name, session_ended, camera_gate, scan_quality_tracker).

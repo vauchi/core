@@ -84,6 +84,7 @@ fn drive_magic_to_success() -> BleExchangeEngine {
         true,
         vec![],
         vauchi_core::clock::SystemClock::shared(),
+        None,
     );
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),

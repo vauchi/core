@@ -267,6 +267,7 @@ impl AppEngine {
                 &self.transport_readiness,
                 &self.render_context,
                 &self.pending_exchange_groups,
+                self.glance_display_qr.as_deref(),
             );
             return Some(ActionResult::ShowToast {
                 message: "Contact unarchived".into(),

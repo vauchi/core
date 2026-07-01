@@ -320,15 +320,20 @@ impl AppEngine {
         }]);
     }
 
-    /// Tear down the BLE handshake session when leaving the BLE exchange
-    /// screen. The session is built lazily on discovery (its role is
-    /// unknown at screen entry), so there is no entry branch — only
-    /// teardown. Mirrors `sync_multi_stage_lifecycle`.
+    /// Tear down BLE-exchange state on leaving the screen. The handshake
+    /// session is built lazily on discovery/connect (its role is unknown at
+    /// entry), so there is no session entry branch here; the Glance one-sided
+    /// QR is generated pre-engine-build in `navigate_to`. On exit the whole
+    /// Glance OOB state is cleared so it cannot leak into the next exchange.
+    /// Mirrors `sync_multi_stage_lifecycle`.
     pub(super) fn sync_ble_handshake_lifecycle(&mut self, old: &AppScreen, new: &AppScreen) {
         let was = matches!(old, AppScreen::BleExchange { .. });
         let is = matches!(new, AppScreen::BleExchange { .. });
         if was && !is {
             self.cancel_ble_handshake_session();
+            self.glance_display_qr = None;
+            self.glance_display_nonce = None;
+            self.glance_scanned = None;
         }
     }
 

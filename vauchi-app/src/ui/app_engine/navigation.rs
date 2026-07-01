@@ -168,6 +168,17 @@ impl AppEngine {
         // Swap in the new screen, get the old one back
         let old_screen = std::mem::replace(&mut self.screen, screen.clone());
 
+        // Glance's one-sided QR must exist BEFORE `create_engine` builds the
+        // engine that renders it — the post-build lifecycle sync below runs too
+        // late. Generate it ONCE on entry (a stable nonce for the whole attempt;
+        // `BleExchange` is not cacheable, so each entry rebuilds).
+        if old_screen != screen
+            && let AppScreen::BleExchange { mode } = &screen
+            && *mode == vauchi_core::exchange::mode::ExchangeMode::Glance
+        {
+            self.glance_display_qr = self.begin_glance_display();
+        }
+
         // Build or restore the engine for the new screen.
         // Pass preview_as_contact so MyInfo is built in PreviewAs mode when active.
         let preview_as = self.preview_as_contact.as_deref();
@@ -180,6 +191,7 @@ impl AppEngine {
                 &self.transport_readiness,
                 &self.render_context,
                 &self.pending_exchange_groups,
+                self.glance_display_qr.as_deref(),
             )
         });
 

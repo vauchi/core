@@ -413,6 +413,7 @@ impl AppEngine {
             &self.transport_readiness,
             &self.render_context,
             &self.pending_exchange_groups,
+            self.glance_display_qr.as_deref(),
         );
         // best-effort discard: we don't need the old engine value
         #[allow(clippy::let_underscore_must_use)]
@@ -770,6 +771,7 @@ impl AppEngine {
             &self.transport_readiness,
             &self.render_context,
             &self.pending_exchange_groups,
+            self.glance_display_qr.as_deref(),
         );
 
         Some(ActionResult::ShowToast {
@@ -936,6 +938,7 @@ impl AppEngine {
             &self.transport_readiness,
             &self.render_context,
             &self.pending_exchange_groups,
+            self.glance_display_qr.as_deref(),
         );
     }
 }

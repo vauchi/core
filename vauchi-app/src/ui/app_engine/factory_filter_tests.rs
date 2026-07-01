@@ -63,6 +63,7 @@ fn cable_engine_transmits_only_selected_group_fields() {
         &readiness,
         &ctx,
         &[work_id],
+        None,
     );
     let dt = engine
         .as_any()

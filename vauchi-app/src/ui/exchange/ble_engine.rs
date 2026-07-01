@@ -60,6 +60,14 @@ enum BleScreen {
     Failed { reason: Option<String> },
 }
 
+/// Component id of this device's Glance own-QR (display mode).
+const GLANCE_OWN_QR_COMPONENT_ID: &str = "glance_own_qr";
+
+/// Component id of the Glance peer-scan camera. A `UserAction::TextChanged` on
+/// this id carries the scanned OOB QR; the platform facade routes it to
+/// `AppEngine::apply_glance_scan` (the Cycle D contract).
+pub const GLANCE_SCAN_COMPONENT_ID: &str = "glance_peer_scan";
+
 /// Dedicated BLE exchange engine — wraps [`BleExchangeFlow`].
 pub struct BleExchangeEngine {
     mode: ExchangeMode,
@@ -80,6 +88,10 @@ pub struct BleExchangeEngine {
     /// every step transition (and on retry). The `tick` stall deadline
     /// ([`BLE_STEP_TIMEOUT_SECS`]) is measured from it.
     step_entered_unix: u64,
+    /// Glance one-sided-QR payload this device displays, generated ONCE by the
+    /// AppEngine on screen entry (a stable nonce for the whole attempt).
+    /// `None` for radio modes (Magic/Bump/Shake).
+    glance_qr: Option<String>,
 }
 
 impl BleExchangeEngine {
@@ -93,6 +105,7 @@ impl BleExchangeEngine {
         has_camera: bool,
         own_token: Vec<u8>,
         clock: Arc<dyn Clock>,
+        glance_qr: Option<String>,
     ) -> Self {
         let step_entered_unix = clock.unix_seconds();
         Self {
@@ -105,6 +118,7 @@ impl BleExchangeEngine {
             own_token,
             clock,
             step_entered_unix,
+            glance_qr,
         }
     }
 
@@ -147,9 +161,56 @@ impl BleExchangeEngine {
         ]
     }
 
+    /// Glance one-sided-QR active screen: this device's QR (to be scanned) plus
+    /// a camera to scan the peer's. Shown while discovering; once connected the
+    /// exchanging-progress screen takes over. The QR is display-only and the
+    /// scan reports via `TextChanged` on [`GLANCE_SCAN_COMPONENT_ID`], so this
+    /// screen adds no new action handler beyond `cancel`.
+    fn build_glance_active_screen(&self) -> ScreenModel {
+        let mut components: Vec<Component> = Vec::new();
+        if let Some(data) = &self.glance_qr {
+            components.push(Component::QrCode {
+                id: GLANCE_OWN_QR_COMPONENT_ID.into(),
+                data: data.clone(),
+                mode: QrMode::Display,
+                label: Some("Show this to exchange".into()),
+                scan_quality: None,
+                a11y: None,
+            });
+        }
+        if self.has_camera {
+            components.push(Component::QrCode {
+                id: GLANCE_SCAN_COMPONENT_ID.into(),
+                data: String::new(),
+                mode: QrMode::Scan,
+                label: Some("Scan their code".into()),
+                scan_quality: None,
+                a11y: None,
+            });
+        }
+        ScreenModel {
+            screen_id: "exchange_ble_glance".into(),
+            title: "Glance".into(),
+            subtitle: Some("Show your code or scan theirs".into()),
+            components,
+            actions: vec![ScreenAction {
+                id: "cancel".into(),
+                label: "Cancel".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: Some(self.progress()),
+            ..Default::default()
+        }
+    }
+
     fn build_screen(&self) -> ScreenModel {
         match &self.screen {
             BleScreen::Active => match self.flow.step() {
+                BleStep::Discovering if self.mode == ExchangeMode::Glance => {
+                    self.build_glance_active_screen()
+                }
                 BleStep::Discovering => build_discovering_screen(self.mode, self.progress()),
                 BleStep::Handshaking | BleStep::Exchanging => {
                     build_exchanging_screen(self.mode, self.progress())
@@ -441,8 +502,13 @@ mod tests {
     // @internal
     #[test]
     fn new_engine_renders_discovering_and_not_cancelled() {
-        let engine =
-            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
+        let engine = BleExchangeEngine::new(
+            ExchangeMode::Magic,
+            true,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         assert_eq!(
             engine.current_screen().screen_id,
             "exchange_ble_discovering"
@@ -452,9 +518,84 @@ mod tests {
 
     // @internal
     #[test]
+    fn glance_active_screen_shows_injected_qr_and_scan() {
+        let engine = BleExchangeEngine::new(
+            ExchangeMode::Glance,
+            true,
+            vec![1, 2, 3],
+            SystemClock::shared(),
+            Some("QR-PAYLOAD".to_string()),
+        );
+        let screen = engine.current_screen();
+        assert_eq!(screen.screen_id, "exchange_ble_glance");
+        let own_qr = screen.components.iter().find_map(|c| match c {
+            Component::QrCode {
+                data,
+                mode: QrMode::Display,
+                ..
+            } => Some(data.clone()),
+            _ => None,
+        });
+        assert_eq!(
+            own_qr.as_deref(),
+            Some("QR-PAYLOAD"),
+            "the displayed QR must carry the AppEngine-injected payload verbatim"
+        );
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::QrCode {
+                    mode: QrMode::Scan,
+                    ..
+                }
+            )),
+            "a camera device must offer a scan component"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn glance_without_camera_shows_qr_but_no_scan() {
+        let engine = BleExchangeEngine::new(
+            ExchangeMode::Glance,
+            false,
+            vec![9],
+            SystemClock::shared(),
+            Some("Q".to_string()),
+        );
+        let screen = engine.current_screen();
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::QrCode {
+                    mode: QrMode::Display,
+                    ..
+                }
+            )),
+            "own QR is always shown"
+        );
+        assert!(
+            !screen.components.iter().any(|c| matches!(
+                c,
+                Component::QrCode {
+                    mode: QrMode::Scan,
+                    ..
+                }
+            )),
+            "no camera → no scan component"
+        );
+    }
+
+    // @internal
+    #[test]
     fn stalled_step_past_timeout_ticks_to_failed() {
-        let mut engine =
-            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Magic,
+            true,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         // `entered` read just after construction is >= the engine's stamped
         // step-entry second, so `+ budget + 1` is unambiguously past the
         // deadline (CC-06 — explicit now, no FakeClock, no sleep).
@@ -476,8 +617,13 @@ mod tests {
     // @internal
     #[test]
     fn step_within_timeout_stays_active() {
-        let mut engine =
-            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Magic,
+            true,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         let entered = SystemClock::shared().unix_seconds();
 
         engine.tick(entered);
@@ -494,8 +640,13 @@ mod tests {
     fn tick_on_terminal_screen_is_inert() {
         // A tick far past any budget must not mutate a terminal screen
         // (the `screen != Active` guard, CC-14 adversarial case).
-        let mut engine =
-            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Magic,
+            true,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         engine.force_failure(Some("crypto failure".into()));
         let before = engine.current_screen();
 
@@ -512,8 +663,13 @@ mod tests {
     // @internal
     #[test]
     fn screen_entered_emits_advertise_then_scan_once() {
-        let mut engine =
-            BleExchangeEngine::new(ExchangeMode::Bump, true, vec![], SystemClock::shared());
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Bump,
+            true,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         let cmds = engine.screen_entered();
         assert_eq!(cmds.len(), 2);
         assert!(matches!(cmds[0], Command::BleStartAdvertising { .. }));
@@ -525,8 +681,13 @@ mod tests {
     // @internal
     #[test]
     fn discovery_event_emits_connect_command_and_advances() {
-        let mut engine =
-            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Magic,
+            true,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         let result = discover(&mut engine).expect("an active engine handles BLE events");
         match result {
             ActionResult::Commands { commands } => assert!(matches!(
@@ -541,8 +702,13 @@ mod tests {
     // @internal
     #[test]
     fn disconnect_transitions_to_failed_with_all_fallbacks() {
-        let mut engine =
-            BleExchangeEngine::new(ExchangeMode::Shake, true, vec![], SystemClock::shared());
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Shake,
+            true,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         let _ = engine.handle_hardware_event(Event::BleDisconnected {
             reason: "lost".into(),
         });
@@ -558,8 +724,13 @@ mod tests {
     // @internal
     #[test]
     fn no_qr_fallback_offered_without_camera() {
-        let mut engine =
-            BleExchangeEngine::new(ExchangeMode::Magic, false, vec![], SystemClock::shared());
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Magic,
+            false,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         let _ = engine.handle_hardware_event(Event::BleDisconnected { reason: "x".into() });
         let ids: Vec<String> = engine
             .current_screen()
@@ -576,8 +747,13 @@ mod tests {
     fn force_success_flips_chrome_to_success_screen() {
         // P4: the real `BleHandshakeMachine` completion drives the chrome
         // to Success (the hollow flow no longer self-completes).
-        let mut engine =
-            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Magic,
+            true,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         assert_eq!(
             engine.current_screen().screen_id,
             "exchange_ble_discovering"
@@ -589,8 +765,13 @@ mod tests {
     // @internal
     #[test]
     fn cancel_completes_and_marks_cancelled() {
-        let mut engine =
-            BleExchangeEngine::new(ExchangeMode::Magic, true, vec![], SystemClock::shared());
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Magic,
+            true,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "cancel".into(),
         });
@@ -601,8 +782,13 @@ mod tests {
     // @internal
     #[test]
     fn retry_from_failed_resets_to_active_and_re_emits_start() {
-        let mut engine =
-            BleExchangeEngine::new(ExchangeMode::Bump, true, vec![], SystemClock::shared());
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Bump,
+            true,
+            vec![],
+            SystemClock::shared(),
+            None,
+        );
         let _ = engine.handle_hardware_event(Event::BleDisconnected { reason: "x".into() });
         assert_eq!(engine.current_screen().screen_id, "exchange_failed");
         let _ = engine.handle_action(UserAction::ActionPressed {

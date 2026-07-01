@@ -20,6 +20,7 @@ impl AppEngine {
         device_capabilities: &vauchi_core::exchange::capability::types::DeviceCapabilities,
         transport_readiness: &vauchi_core::exchange::capability::TransportReadiness,
         pending_groups: &[String],
+        glance_qr: Option<&str>,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Exchange => {
@@ -113,6 +114,7 @@ impl AppEngine {
                     device_capabilities.has_camera,
                     own_token,
                     vauchi.clock().clone(),
+                    glance_qr.map(str::to_string),
                 ))
             }
             AppScreen::NfcExchange => {
@@ -259,6 +261,7 @@ impl AppEngine {
                 &self.transport_readiness,
                 &self.render_context,
                 &self.pending_exchange_groups,
+                self.glance_display_qr.as_deref(),
             );
         }
     }

@@ -259,6 +259,7 @@ fn exchange_failed_fallback_actions_have_a11y_hints() {
         true,
         vec![],
         vauchi_core::clock::SystemClock::shared(),
+        None,
     );
     let _ = engine.handle_hardware_event(vauchi_core::Event::BleDisconnected {
         reason: "peer hung up".to_string(),

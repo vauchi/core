@@ -175,6 +175,10 @@ pub struct AppEngine {
     /// its presence latches this device into the scanner role.
     glance_display_nonce: Option<[u8; 16]>,
     glance_scanned: Option<crate::orchestrator::ble_handshake_machine::BleOobBinding>,
+    /// The base64 OOB QR this device displays for Glance, generated ONCE on
+    /// screen entry (never per-render — regenerating rotates the nonce and
+    /// breaks the pin) and injected into the `BleExchangeEngine`'s screen.
+    glance_display_qr: Option<String>,
 }
 
 impl AppEngine {
@@ -232,6 +236,7 @@ impl AppEngine {
                 &self.transport_readiness,
                 &self.render_context,
                 &self.pending_exchange_groups,
+                self.glance_display_qr.as_deref(),
             );
         }
     }
@@ -263,6 +268,7 @@ impl AppEngine {
             &self.transport_readiness,
             &self.render_context,
             &self.pending_exchange_groups,
+            self.glance_display_qr.as_deref(),
         );
         Ok(())
     }
@@ -299,6 +305,7 @@ impl AppEngine {
             &TransportReadiness::default(),
             &initial_render_context,
             &[],
+            None,
         );
         let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
         let field_catalog = vauchi_core::contact_card::FieldTypeCatalog::new(&registry);
@@ -368,6 +375,7 @@ impl AppEngine {
             ble_handshake_session: None,
             glance_display_nonce: None,
             glance_scanned: None,
+            glance_display_qr: None,
         }
     }
 

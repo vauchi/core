@@ -48,6 +48,11 @@ use crate::ui::tags_list::{TagSummary, TagsEngine};
 use vauchi_core::api::Vauchi;
 
 impl AppEngine {
+    // Screen-dispatch factory: each argument is an independent input the
+    // per-screen builders read (identity, preview mode, capabilities, transport
+    // readiness, render context, pending groups, the Glance QR). Bundling them
+    // into a struct would only relocate the argument list for a private factory.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn create_engine(
         vauchi: &Vauchi,
         screen: &AppScreen,
@@ -56,6 +61,7 @@ impl AppEngine {
         transport_readiness: &vauchi_core::exchange::capability::TransportReadiness,
         render_context: &crate::ui::RenderContext,
         pending_groups: &[String],
+        glance_qr: Option<&str>,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Onboarding => Box::new(OnboardingEngine::new().with_help_icons(true)),
@@ -263,6 +269,7 @@ impl AppEngine {
                 device_capabilities,
                 transport_readiness,
                 pending_groups,
+                glance_qr,
             ),
             AppScreen::Help => Box::new(HelpEngine::new(help_catalog::default_help_items())),
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None, vauchi.has_identity())),

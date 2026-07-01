@@ -787,8 +787,17 @@ fn picking_glance_from_mode_selection_auto_navigates_to_ble_exchange() {
         .expect("select Glance");
     assert_eq!(
         current_screen_id(&engine),
-        "exchange_ble_discovering",
-        "Glance must route through the BLE screen (G3) — frontend never makes this decision",
+        "exchange_ble_glance",
+        "Glance must route through its one-sided-QR BLE screen (G3) — frontend never makes this decision",
+    );
+    // The dedicated Glance screen shows this device's OOB QR (generated once on
+    // entry) so the exposure-closing pin material is on-screen, not aspirational.
+    let screen_json = engine
+        .current_screen_json()
+        .expect("render the Glance screen");
+    assert!(
+        screen_json.contains("QrCode"),
+        "the Glance screen must render the one-sided QR, got: {screen_json}",
     );
 }
 

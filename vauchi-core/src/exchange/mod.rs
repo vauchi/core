@@ -72,6 +72,7 @@ pub mod link_responder;
 pub mod mode;
 pub mod mode_availability;
 pub mod mode_payload;
+pub mod oob_bootstrap;
 pub mod proximity_runner;
 pub mod ratchet_bootstrap;
 pub mod reciprocity;

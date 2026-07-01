@@ -185,6 +185,31 @@ fn test_nfc_process_key_offer_rejects_self_identity() {
     );
 }
 
+// W-1 (security review 2026-07-01): the F-HIGH-3 self-exchange guard shipped
+// only on process_key_offer; process_key_ack lacked it, so a reflected
+// own-offer replayed as the ack reached derive + decrypt instead of being
+// rejected at the identity layer.
+// @scenario: nfc_exchange :: Self-exchange rejected on the ack path
+#[test]
+fn test_nfc_process_key_ack_rejects_self_identity() {
+    let identity = make_test_identity();
+    let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+
+    let mut alice = NfcHandshakeSession::new_initiator(&identity, "Alice".to_string());
+    alice.create_key_offer(&identity, now).expect("key offer");
+
+    // Reflection on the ack path: an ack signed by Alice's own identity.
+    let self_ack = ExchangeNfc::generate(&identity, &X3DHKeyPair::generate(), now);
+    let ack_bytes = self_ack.to_bytes();
+    let result = alice.process_key_ack(&ack_bytes, &[0u8; 120], now);
+
+    assert!(
+        matches!(result, Err(ExchangeError::SelfExchange)),
+        "NFC initiator must reject an ack with their_identity == our_identity_key, got {:?}",
+        result
+    );
+}
+
 // @internal
 #[test]
 fn test_tampered_ciphertext_rejected() {

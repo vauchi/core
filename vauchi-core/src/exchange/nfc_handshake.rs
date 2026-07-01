@@ -166,8 +166,13 @@ impl NfcHandshakeSession {
         }
 
         // Symmetric DH: our_ephemeral x their_ephemeral
-        let shared_key =
-            derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id)?;
+        let shared_key = derive_symmetric_key(
+            &self.our_x3dh,
+            &self.our_identity_key,
+            their_nfc.identity_key(),
+            their_nfc.exchange_key(),
+            &exchange_id,
+        )?;
 
         let our_nfc = ExchangeNfc::generate(identity, &self.our_x3dh, now);
         let our_nfc_bytes = our_nfc.to_bytes().to_vec();
@@ -207,9 +212,21 @@ impl NfcHandshakeSession {
         let their_nfc = ExchangeNfc::from_bytes(their_ack_bytes)?;
         verify_peer_payload(&their_nfc, now)?;
 
+        // W-1: reject a reflected own-offer replayed as the ack at the identity
+        // layer — parity with `process_key_offer` and BLE (security review
+        // 2026-07-01). Without this it fails only later at AEAD.
+        if their_nfc.identity_key() == &self.our_identity_key {
+            return Err(ExchangeError::SelfExchange);
+        }
+
         // Symmetric DH: our_ephemeral x their_ephemeral
-        let shared_key =
-            derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id)?;
+        let shared_key = derive_symmetric_key(
+            &self.our_x3dh,
+            &self.our_identity_key,
+            their_nfc.identity_key(),
+            their_nfc.exchange_key(),
+            &exchange_id,
+        )?;
 
         let their_card = decrypt_and_validate_card(&shared_key, their_encrypted_card)?;
 
@@ -364,30 +381,62 @@ fn verify_peer_payload(their_nfc: &ExchangeNfc, now: u64) -> Result<(), Exchange
     Ok(())
 }
 
-/// Derives a symmetric key from DH shared secret + HKDF with sorted public keys.
+/// Derives the session key from an ephemeral X25519 DH, with the HKDF `info`
+/// binding BOTH identities and BOTH ephemerals (UKS resistance, F-HIGH-2).
+///
+/// INVARIANT: `verify_peer_payload` MUST have accepted the peer offer/ack
+/// first — the Ed25519 signature is what authenticates each ephemeral to its
+/// identity; this binding is defence-in-depth on top (review C-1).
 fn derive_symmetric_key(
     our_keys: &X3DHKeyPair,
+    our_identity: &[u8; 32],
+    their_identity: &[u8; 32],
     their_pub: &[u8; 32],
     exchange_id: &[u8; 32],
 ) -> Result<SymmetricKey, ExchangeError> {
     let dh_secret = our_keys.diffie_hellman(their_pub)?;
 
     let our_pub = our_keys.public_key();
-    let info = build_hkdf_info(our_pub, their_pub, exchange_id);
+    let info = build_hkdf_info(
+        our_identity,
+        our_pub,
+        their_identity,
+        their_pub,
+        exchange_id,
+    );
     let derived = HKDF::derive_key(None, &*dh_secret, &info);
     Ok(SymmetricKey::from_bytes(*derived))
 }
 
-/// Builds HKDF info string with sorted keys for symmetric derivation.
-fn build_hkdf_info(our_pub: &[u8; 32], their_pub: &[u8; 32], exchange_id: &[u8; 32]) -> Vec<u8> {
+/// Builds the HKDF `info`, binding each party's identity to its ephemeral.
+///
+/// Pairs `identity || ephemeral` per party, then sorts the two 64-byte pairs
+/// so both sides derive the same key. Pairing (not sorting a flat key list)
+/// binds identity to ephemeral, so a peer with the same ephemeral but a
+/// different identity yields a different key — UKS resistance (F-HIGH-2,
+/// ADR-007).
+fn build_hkdf_info(
+    our_identity: &[u8; 32],
+    our_eph: &[u8; 32],
+    their_identity: &[u8; 32],
+    their_eph: &[u8; 32],
+    exchange_id: &[u8; 32],
+) -> Vec<u8> {
+    let mut ours = Vec::with_capacity(64);
+    ours.extend_from_slice(our_identity);
+    ours.extend_from_slice(our_eph);
+    let mut theirs = Vec::with_capacity(64);
+    theirs.extend_from_slice(their_identity);
+    theirs.extend_from_slice(their_eph);
+
     let mut info = NFC_HANDSHAKE_INFO.to_vec();
-    // Sort keys lexicographically so both sides derive the same key
-    if our_pub <= their_pub {
-        info.extend_from_slice(our_pub);
-        info.extend_from_slice(their_pub);
+    // Sort the two pairs so both sides derive the same key.
+    if ours <= theirs {
+        info.extend_from_slice(&ours);
+        info.extend_from_slice(&theirs);
     } else {
-        info.extend_from_slice(their_pub);
-        info.extend_from_slice(our_pub);
+        info.extend_from_slice(&theirs);
+        info.extend_from_slice(&ours);
     }
     info.extend_from_slice(exchange_id);
     info
@@ -422,4 +471,58 @@ fn decrypt_and_validate_card(
     }
 
     Ok(card)
+}
+
+// INLINE_TEST_REQUIRED: build_hkdf_info is a private fn; the UKS
+// identity-binding property (F-HIGH-2) must be asserted against the actual
+// HKDF derivation input, which no integration test in tests/ can reach.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    // Both peers pair (identity || ephemeral) and sort the two pairs, so they
+    // derive identical HKDF info regardless of who is offer vs ack.
+    #[test]
+    fn hkdf_info_symmetric_across_peers() {
+        let (a_id, a_eph) = ([1u8; 32], [2u8; 32]);
+        let (b_id, b_eph) = ([3u8; 32], [4u8; 32]);
+        let eid = [9u8; 32];
+        assert_eq!(
+            build_hkdf_info(&a_id, &a_eph, &b_id, &b_eph, &eid),
+            build_hkdf_info(&b_id, &b_eph, &a_id, &a_eph, &eid),
+        );
+    }
+
+    // UKS resistance (F-HIGH-2): same ephemerals, different peer identity must
+    // NOT collide — the key is bound to the identities, not just the ephemerals.
+    #[test]
+    fn hkdf_info_binds_identity_uks_resistance() {
+        let (a_id, a_eph) = ([1u8; 32], [2u8; 32]);
+        let (b_id, b_eph) = ([3u8; 32], [4u8; 32]);
+        let c_id = [5u8; 32];
+        let eid = [9u8; 32];
+        assert_ne!(
+            build_hkdf_info(&a_id, &a_eph, &b_id, &b_eph, &eid),
+            build_hkdf_info(&a_id, &a_eph, &c_id, &b_eph, &eid),
+            "same ephemerals with a different identity must yield a different key",
+        );
+    }
+
+    proptest! {
+        // Symmetry holds for arbitrary keys (CC-04).
+        #[test]
+        fn hkdf_info_symmetric_prop(
+            a_id in any::<[u8; 32]>(),
+            a_eph in any::<[u8; 32]>(),
+            b_id in any::<[u8; 32]>(),
+            b_eph in any::<[u8; 32]>(),
+            eid in any::<[u8; 32]>(),
+        ) {
+            prop_assert_eq!(
+                build_hkdf_info(&a_id, &a_eph, &b_id, &b_eph, &eid),
+                build_hkdf_info(&b_id, &b_eph, &a_id, &a_eph, &eid),
+            );
+        }
+    }
 }

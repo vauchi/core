@@ -45,6 +45,16 @@ pub enum RatchetError {
     #[error("Invalid message: {0}")]
     InvalidMessage(String),
 
+    /// The responder has no sending chain yet — it must decrypt the initiator's
+    /// first message before it can send. Non-cryptographic + transient: callers
+    /// should DEFER the send (keep it owed and retry after the first inbound
+    /// message), not treat it as a hard failure. Seeding a responder send chain
+    /// at init would be a crypto bug (no matching initiator receive chain).
+    #[error(
+        "Cannot send: responder must receive the initiator's first message before it has a sending chain"
+    )]
+    NoSendingChain,
+
     #[error("Deserialization error: {0}")]
     Deserialization(String),
 
@@ -271,11 +281,10 @@ impl DoubleRatchetState {
     ///
     /// Advances the sending chain and returns an encrypted message.
     pub fn encrypt(&mut self, plaintext: &[u8]) -> Result<RatchetMessage, RatchetError> {
-        let send_chain = self.send_chain.as_ref().ok_or_else(|| {
-            RatchetError::InvalidMessage(
-                "Cannot send: no sending chain (responder must receive first)".into(),
-            )
-        })?;
+        let send_chain = self
+            .send_chain
+            .as_ref()
+            .ok_or(RatchetError::NoSendingChain)?;
 
         let (message_key, next_chain) = send_chain.ratchet()?;
         self.send_chain = Some(next_chain);

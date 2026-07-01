@@ -210,9 +210,19 @@ impl Vauchi {
                 .load_ratchet_state(contact_id)?
                 .ok_or_else(|| VauchiError::NotFound("ratchet state".into()))?;
 
-        let ratchet_msg = ratchet
-            .encrypt(&payload_bytes)
-            .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
+        let ratchet_msg = ratchet.encrypt(&payload_bytes).map_err(|e| match e {
+            // A fresh responder has no sending chain until it decrypts the
+            // initiator's first message. DEFER (skippable InvalidState →
+            // `propagate_card_update` and `run_owed_repropagation` both
+            // `continue`) so the CLI `card add` path never surfaces this
+            // transient state as a hard crypto error; the armed repropagate
+            // marker retries once the first inbound message bootstraps the
+            // chain (2026-06-10 e2e smoke_card_update).
+            crate::crypto::ratchet::RatchetError::NoSendingChain => VauchiError::InvalidState(
+                "responder awaiting initiator's first message; deferring send".into(),
+            ),
+            other => VauchiError::Crypto(format!("{:?}", other)),
+        })?;
         let encrypted = serde_json::to_vec(&ratchet_msg)
             .map_err(|e| VauchiError::Serialization(e.to_string()))?;
 

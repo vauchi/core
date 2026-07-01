@@ -22,6 +22,30 @@ fn create_test_pair() -> (DoubleRatchetState, DoubleRatchetState) {
     (alice, bob)
 }
 
+// @scenario: security :: A fresh responder cannot send before it receives
+// @internal
+#[test]
+fn responder_encrypt_before_receiving_yields_no_sending_chain() {
+    // A responder derives its sending chain only when it decrypts the
+    // initiator's first message (standard Double Ratchet). Until then `encrypt`
+    // must return the typed, DEFERRABLE `NoSendingChain` — so callers can hold
+    // the send owed and retry, not surface a hard crypto error (the
+    // e2e smoke_card_update responder-sends-first regression). Also pins that no
+    // future change silently seeds a responder send chain (which would be a
+    // crypto bug: the initiator would have no matching receive chain).
+    let (_alice, mut bob) = create_test_pair();
+    let err = bob
+        .encrypt(b"responder cannot send yet")
+        .expect_err("a responder must not have a sending chain before receiving");
+    assert!(
+        matches!(
+            err,
+            vauchi_core::crypto::ratchet::RatchetError::NoSendingChain
+        ),
+        "expected NoSendingChain, got {err:?}"
+    );
+}
+
 // @scenario: security :: Forward secrecy via Double Ratchet
 // @internal
 #[test]

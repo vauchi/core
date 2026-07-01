@@ -497,3 +497,44 @@ fn multistage_exchange_arms_bootstrap_without_an_explicit_edit() {
         "after receiving the initiator's bootstrap, the responder can finally send"
     );
 }
+
+// @scenario: a responder's own-card edit before its first receive defers, not errors
+#[test]
+fn responder_card_edit_before_first_receive_defers_via_propagate() {
+    // Regression (e2e smoke_card_update): the CLI `card add` path
+    // (`propagate_card_update`) surfaced the raw ratchet error "Cannot send: no
+    // sending chain (responder must receive first)" as a hard failure. A fresh
+    // responder legitimately has no sending chain until it decrypts the
+    // initiator's first message, so the send must DEFER (skip the not-yet-
+    // sendable contact, keep the repropagate marker armed) — exactly what
+    // `run_owed_repropagation` already does — not abort the whole edit.
+    let p = multistage_exchanged_pair();
+    let responder = if p.alice_is_initiator {
+        &p.bob
+    } else {
+        &p.alice
+    };
+
+    // The responder edits an already-SHARED field (its exchanged Email) BEFORE
+    // receiving anything — so the delta survives the visibility filter and
+    // reaches `ratchet.encrypt`, where a fresh responder has no sending chain.
+    let old_card = responder.own_card().unwrap().expect("responder own card");
+    let field_id = old_card.fields().first().unwrap().id().to_string();
+    let mut new_card = old_card.clone();
+    new_card
+        .update_field_value(&field_id, "updated@new.com", 1)
+        .unwrap();
+    responder.update_own_card(&new_card).unwrap();
+    let new_card = responder.own_card().unwrap().unwrap();
+
+    // Must NOT error: the not-yet-sendable peer is skipped, so nothing queues.
+    let queued = responder
+        .propagate_card_update(&old_card, &new_card)
+        .expect(
+            "a responder's edit before its first receive must defer, not surface a crypto error",
+        );
+    assert_eq!(
+        queued, 0,
+        "a responder cannot send before receiving → its only contact is skipped, nothing queued"
+    );
+}

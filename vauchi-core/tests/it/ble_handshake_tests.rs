@@ -1033,6 +1033,90 @@ fn test_pinned_initiator_accepts_expected_identity() {
     assert!(!alice_card.is_empty(), "encrypted card must be produced");
 }
 
+// @scenario: ble_exchange :: Pinned initiator rejects a KeyAck whose exchange key differs from the OOB-pinned one
+#[test]
+fn test_pinned_initiator_rejects_key_ack_with_wrong_exchange_key() {
+    // The critical MITM the identity pin alone does NOT stop: the Ed25519
+    // identity is public, and it is never used in the DH — the X25519
+    // `exchange_key` drives key agreement. A radio-range attacker presents the
+    // pinned (public) identity but its OWN exchange key; without pinning the
+    // exchange key too, the attacker completes the handshake as the pinned peer.
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    // Alice scanned Bob's QR: it authenticates BOTH his identity AND his
+    // exchange key. She pins both.
+    alice.expect_peer(*bob_id.signing_public_key());
+    alice.expect_exchange_key(*bob_id.x3dh_keypair().public_key());
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let (mut ack, bob_card) = bob.process_key_offer(&offer, now()).expect("process offer");
+    // Keep Bob's identity (bytes 1..33) but substitute a foreign X25519
+    // exchange key (bytes 33..65) — the DH input.
+    ack[33..65].copy_from_slice(&[0x42u8; 32]);
+
+    let err = alice
+        .process_key_ack(&ack, &bob_card, now())
+        .expect_err("an ack presenting the pinned identity but a foreign exchange key must abort");
+    assert!(
+        matches!(err, ExchangeError::ExchangeKeyMismatch),
+        "expected ExchangeKeyMismatch, got {err:?}"
+    );
+}
+
+// @scenario: ble_exchange :: Pinned initiator accepts the expected exchange key
+#[test]
+fn test_pinned_initiator_accepts_expected_exchange_key() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    alice.expect_peer(*bob_id.signing_public_key());
+    alice.expect_exchange_key(*bob_id.x3dh_keypair().public_key());
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let (ack, bob_card) = bob.process_key_offer(&offer, now()).expect("process offer");
+    let (commitment, alice_card) = alice
+        .process_key_ack(&ack, &bob_card, now())
+        .expect("an ack with the pinned exchange key must succeed");
+
+    assert_eq!(commitment.len(), 32, "commitment must be SHA-256 sized");
+    assert!(!alice_card.is_empty(), "encrypted card must be produced");
+}
+
+// @scenario: ble_exchange :: Pinned responder rejects a KeyOffer whose exchange key differs from the pinned one
+#[test]
+fn test_pinned_responder_rejects_offer_with_wrong_exchange_key() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now());
+    let mut bob =
+        BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now());
+    bob.expect_peer(*alice_id.signing_public_key());
+    bob.expect_exchange_key(*alice_id.x3dh_keypair().public_key());
+
+    let mut offer = alice.create_key_offer().expect("key offer");
+    // Keep Alice's identity but substitute a foreign exchange key (bytes 33..65).
+    offer[33..65].copy_from_slice(&[0x37u8; 32]);
+
+    let err = bob.process_key_offer(&offer, now()).expect_err(
+        "an offer presenting the pinned identity but a foreign exchange key must abort",
+    );
+    assert!(
+        matches!(err, ExchangeError::ExchangeKeyMismatch),
+        "expected ExchangeKeyMismatch, got {err:?}"
+    );
+}
+
 // @scenario: ble_exchange :: Pinned responder rejects a KeyOffer from an unexpected identity
 #[test]
 fn test_pinned_responder_rejects_offer_from_unexpected_identity() {

@@ -147,6 +147,20 @@ fn oob_qr_rejects_wrong_magic_and_truncation() {
 
 // @internal
 #[test]
+fn oob_qr_rejects_oversized_payload_with_trailing_bytes() {
+    // Encoding malleability: bytes past the fixed 174 are outside the signed
+    // region; accepting them would give one logical QR unbounded valid encodings.
+    let (id, eph) = displayer();
+    let mut oversized = OobBootstrapQr::generate(&id, &eph, 0).to_bytes().to_vec();
+    oversized.extend_from_slice(&[0xAB; 8]);
+    assert!(
+        OobBootstrapQr::from_bytes(&oversized).is_err(),
+        "a payload with trailing bytes must be rejected, not silently truncated"
+    );
+}
+
+// @internal
+#[test]
 fn verified_from_data_string_enforces_signature_and_expiry() {
     let (id, eph) = displayer();
     let qr = OobBootstrapQr::generate_with_timestamp(&id, &eph, [9u8; 32], 1_000);

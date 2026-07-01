@@ -448,6 +448,10 @@ vauchi-core/tests/it/sync_device_orchestrator_tests.rs 1286
 vauchi-core/tests/it/visibility_label_tests.rs 1220
 # (+14 2026-06-28: migration v56 column-add test — ADR-054 Phase 2b)
 vauchi-core/tests/it/migration_tests.rs 1240
+# (2026-07-01: OOB exchange-key pin tests — the critical-MITM fix for Glance
+#  Slice B, 2026-06-10-ble-unauthenticated-peer-identity. Cohesive
+#  BLE-handshake suite; "well-structured test file" exemption — do not split.)
+vauchi-core/tests/it/ble_handshake_tests.rs 1275
 
 # vauchi-app — extracted from vauchi-core, inherits exemption
 # (+150 for G4 visibility helpers + ReciprocityBannerKind + inline tests

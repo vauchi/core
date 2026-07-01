@@ -142,6 +142,10 @@ pub enum BleMachineEvent {
 pub struct BleOobBinding {
     /// Pin the expected wire identity; a mismatch aborts (scanner side).
     pub expected_peer: Option<[u8; 32]>,
+    /// Pin the expected wire X25519 exchange key (the DH input). Without this,
+    /// the identity pin is cosmetic — the Ed25519 identity never enters the DH
+    /// (scanner side).
+    pub expected_exchange_key: Option<[u8; 32]>,
     /// Carry this OOB nonce in our KeyOffer so the displayer can verify we
     /// saw the QR/tap (scanner side).
     pub oob_nonce_echo: Option<[u8; 16]>,
@@ -156,6 +160,9 @@ fn apply_oob(inner: &mut BleHandshakeSession, oob: Option<BleOobBinding>) {
     let Some(binding) = oob else { return };
     if let Some(peer) = binding.expected_peer {
         inner.expect_peer(peer);
+    }
+    if let Some(exchange) = binding.expected_exchange_key {
+        inner.expect_exchange_key(exchange);
     }
     if let Some(nonce) = binding.oob_nonce_echo {
         inner.set_oob_nonce(nonce);

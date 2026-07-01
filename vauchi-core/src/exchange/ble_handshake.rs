@@ -183,9 +183,14 @@ pub struct BleHandshakeSession {
     their_commitment: Option<[u8; 32]>,
     their_encrypted_card: Option<Vec<u8>>,
     completed_cache: HashMap<[u8; 32], BleExchangeResult>,
-    /// OOB-bootstrap binding (v4): identity pin + nonce echo. See
-    /// `2026-06-10-oob-bootstrap-exchange-rituals-design.md` Tier 0.
+    /// OOB-bootstrap binding (v4): identity pin + exchange-key pin + nonce
+    /// echo. See `2026-06-10-oob-bootstrap-exchange-rituals-design.md` Tier 0.
     expected_peer: Option<[u8; 32]>,
+    /// Pinned X25519 exchange key (from the scanned QR). The identity pin
+    /// alone is insufficient — the Ed25519 identity never enters the DH; the
+    /// X25519 exchange key does — so an unpinned exchange key lets a MITM
+    /// present the (public) identity while substituting its own DH key.
+    expected_exchange_key: Option<[u8; 32]>,
     oob_nonce: Option<[u8; NONCE_SIZE]>,
     required_oob_nonce: Option<[u8; NONCE_SIZE]>,
 }
@@ -257,6 +262,17 @@ impl BleHandshakeSession {
         self.expected_peer = Some(identity_key);
     }
 
+    /// Pin the expected peer X25519 exchange key received over the same OOB
+    /// channel as [`Self::expect_peer`]. Required for real MITM defense: the
+    /// pinned Ed25519 identity is never used in the DH, so without also pinning
+    /// the exchange key (the actual DH input) an attacker presenting the
+    /// public identity but its own exchange key completes the handshake as the
+    /// pinned peer. A wire exchange key that differs aborts with
+    /// [`ExchangeError::ExchangeKeyMismatch`].
+    pub fn expect_exchange_key(&mut self, exchange_key: [u8; 32]) {
+        self.expected_exchange_key = Some(exchange_key);
+    }
+
     /// Carry the OOB session nonce (from the scanned/tapped payload)
     /// in our KeyOffer so the displayer can verify we actually saw it.
     /// Initiator-side counterpart of [`Self::require_oob_nonce`].
@@ -303,6 +319,7 @@ impl BleHandshakeSession {
             their_encrypted_card: None,
             completed_cache: HashMap::new(),
             expected_peer: None,
+            expected_exchange_key: None,
             oob_nonce: None,
             required_oob_nonce: None,
         }
@@ -413,6 +430,13 @@ impl BleHandshakeSession {
             && !bool::from(their_identity.ct_eq(&expected))
         {
             return Err(ExchangeError::IdentityMismatch);
+        }
+        // Pin the DH input, not just the (public, DH-inert) identity: the
+        // exchange key is what derive_session_key actually consumes.
+        if let Some(expected_exchange) = self.expected_exchange_key
+            && !bool::from(their_exchange.ct_eq(&expected_exchange))
+        {
+            return Err(ExchangeError::ExchangeKeyMismatch);
         }
         let their_oob_echo: [u8; NONCE_SIZE] = their_offer[121..137]
             .try_into()
@@ -564,6 +588,14 @@ impl BleHandshakeSession {
         let their_exchange: [u8; 32] = their_ack[33..65]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
+        // Pin the DH input (see process_key_offer): the scanner pinned the
+        // displayer's QR-authenticated exchange key; a foreign one is a MITM
+        // presenting the public identity but its own key-agreement key.
+        if let Some(expected_exchange) = self.expected_exchange_key
+            && !bool::from(their_exchange.ct_eq(&expected_exchange))
+        {
+            return Err(ExchangeError::ExchangeKeyMismatch);
+        }
         let their_ephemeral: [u8; 32] = their_ack[65..97]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;

@@ -140,6 +140,12 @@ impl OobBootstrapQr {
     /// then check [`Self::verify_signature`] + [`Self::is_expired`], or use
     /// [`Self::verified_from_data_string`].
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ExchangeError> {
+        // Exact length: the shared codec only rejects *short* buffers, so
+        // trailing bytes (outside the signed region) would otherwise be
+        // silently dropped, giving one logical QR many valid encodings.
+        if bytes.len() != EXCHANGE_PAYLOAD_SIZE {
+            return Err(ExchangeError::InvalidQRFormat);
+        }
         let inner = parse_exchange_payload(bytes, OOB_QR_MAGIC, ExchangeError::InvalidQRFormat)?;
         Ok(Self { inner })
     }

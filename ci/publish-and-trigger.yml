@@ -238,6 +238,18 @@ publish:maven:
       CLEAN_VERSION="${CI_COMMIT_TAG#v}"
       echo "Publishing Maven AAR version $CLEAN_VERSION"
 
+      # Idempotency guard: skip if this version is already in the GitLab Maven
+      # registry. A duplicate Maven PUT returns HTTP 400 (duplicates disallowed),
+      # so a redundant release re-run of an already-published version turned into
+      # a false-red even though the aar was fully published (2026-07-01: the
+      # v0.51.67 re-run 400ed 48 min after the successful publish).
+      if curl -sf --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?package_type=maven&package_name=vauchi-platform&per_page=100" \
+         | grep -q "\"version\":\"${CLEAN_VERSION}\""; then
+        echo "✓ app.vauchi:vauchi-platform:$CLEAN_VERSION already in the Maven registry — skipping publish (idempotent re-run)"
+        exit 0
+      fi
+
       # Verify cosign signature on the zip before repackaging as AAR
       CHECKSUM_FILE="dist/vauchi-platform-kotlin-${CLEAN_VERSION}.zip.sha256"
       BUNDLE_FILE="${CHECKSUM_FILE}.bundle"

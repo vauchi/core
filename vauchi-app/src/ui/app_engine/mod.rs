@@ -169,6 +169,12 @@ pub struct AppEngine {
     /// Replaces the `MobileBleExchangeSession` cycle thread; T2.2c
     /// routes BLE events through `forward_ble_hardware_event`.
     ble_handshake_session: Option<ble_handshake::BleHandshakeHolder>,
+    /// Glance (one-sided QR) OOB state. `glance_display_nonce` is the nonce
+    /// this device shows in its QR and must require as the responder;
+    /// `glance_scanned` is the scanner-side binding built from a scanned QR —
+    /// its presence latches this device into the scanner role.
+    glance_display_nonce: Option<[u8; 16]>,
+    glance_scanned: Option<crate::orchestrator::ble_handshake_machine::BleOobBinding>,
 }
 
 impl AppEngine {
@@ -360,6 +366,8 @@ impl AppEngine {
             device_link_initiator: None,
             multi_stage_session: None,
             ble_handshake_session: None,
+            glance_display_nonce: None,
+            glance_scanned: None,
         }
     }
 

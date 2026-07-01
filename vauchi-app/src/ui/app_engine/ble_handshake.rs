@@ -238,9 +238,86 @@ impl AppEngine {
             log::warn!("BLE: cannot start responder handshake — no identity / card");
             return;
         };
-        // `None`: radio-only peripheral responder. The Glance displayer path
-        // (which supplies `required_oob_nonce`) lands in the orchestration step.
-        self.ensure_ble_handshake_session(BleRole::Responder, identity_key, x3dh, card, None);
+        // Glance displayer: require the nonce this device showed in its QR, so
+        // a connector that never scanned it is rejected (`OobNonceMismatch`).
+        // Radio-only modes never called `begin_glance_display`, so the nonce is
+        // `None` and this is the unchanged radio-responder path.
+        let oob = self.glance_display_nonce.map(|nonce| BleOobBinding {
+            required_oob_nonce: Some(nonce),
+            ..Default::default()
+        });
+        self.ensure_ble_handshake_session(BleRole::Responder, identity_key, x3dh, card, oob);
+    }
+
+    /// Begin the Glance one-sided-QR display: build this device's OOB bootstrap
+    /// payload and remember the nonce it must require as the responder. Returns
+    /// the base64 payload for a `Component::QrCode`. The QR's exchange key is
+    /// the identity's X3DH public key — the same value the handshake feeds into
+    /// the DH — so the scanner's exchange-key pin accepts the honest peer (a
+    /// fresh ephemeral would be rejected).
+    pub fn begin_glance_display(&mut self) -> Option<String> {
+        let now = self.vauchi.clock().unix_seconds();
+        let qr = {
+            let identity = self.vauchi.identity()?;
+            let ephemeral = identity.x3dh_keypair();
+            vauchi_core::exchange::oob_bootstrap::OobBootstrapQr::generate(
+                identity, &ephemeral, now,
+            )
+        };
+        self.glance_display_nonce = Some(qr.oob_nonce());
+        Some(qr.to_data_string())
+    }
+
+    /// Apply a scanned Glance QR: verify it (signature + expiry), latch this
+    /// device into the scanner role, and pin the displayer's identity +
+    /// exchange key + co-presence nonce. A tampered or expired QR returns an
+    /// error and latches nothing.
+    pub fn apply_glance_scan(&mut self, data: &str) -> Result<(), vauchi_core::ExchangeError> {
+        let now = self.vauchi.clock().unix_seconds();
+        let qr = vauchi_core::exchange::oob_bootstrap::OobBootstrapQr::verified_from_data_string(
+            data, now,
+        )?;
+        self.glance_scanned = Some(BleOobBinding {
+            expected_peer: Some(*qr.identity_key()),
+            expected_exchange_key: Some(*qr.exchange_key()),
+            oob_nonce_echo: Some(qr.oob_nonce()),
+            required_oob_nonce: None,
+        });
+        Ok(())
+    }
+
+    /// Scanner-side discovery gate for Glance: connect to a discovered device
+    /// ONLY if its advertised identity is the one this device scanned. Builds
+    /// the initiator session with the scanned pins and drains a
+    /// `Command::BleConnect`. A no-op for a non-scanner or a non-matching
+    /// advertiser — asymmetric discovery, no tiebreak, no latch race.
+    pub fn handle_glance_discovery(&mut self, device_id: &str, adv_data: &[u8]) {
+        let Some(binding) = self.glance_scanned else {
+            return; // not the scanner — this device waits to be connected to
+        };
+        let Some(expected) = binding.expected_peer else {
+            return;
+        };
+        if adv_data != &expected[..] {
+            return; // an advertiser we did not scan — ignore it
+        }
+        if self.ble_handshake_session_active() {
+            return;
+        }
+        let Some((identity_key, x3dh, card)) = self.build_ble_session_inputs() else {
+            log::warn!("BLE: cannot start Glance scanner handshake — no identity / card");
+            return;
+        };
+        self.ensure_ble_handshake_session(
+            BleRole::Initiator,
+            identity_key,
+            x3dh,
+            card,
+            Some(binding),
+        );
+        self.extend_pending_commands(vec![vauchi_core::Command::BleConnect {
+            device_id: device_id.to_string(),
+        }]);
     }
 
     /// Tear down the BLE handshake session when leaving the BLE exchange
@@ -839,6 +916,119 @@ mod tests {
             displayer.vauchi.list_contacts().expect("contacts").len(),
             1,
             "displayer must persist the co-present scanner on success"
+        );
+    }
+
+    // ============================================================
+    // Glance orchestration — scan → binding → gated discovery. The AppEngine
+    // computes the BleOobBinding from live QR state (the layer above the
+    // binding-threading tests: those inject the binding directly).
+    // ============================================================
+
+    // @scenario: ble_exchange :: Glance symmetric one-sided-QR completes for both peers
+    #[test]
+    fn glance_orchestration_symmetric_happy_path_both_persist() {
+        // Symmetric UX: both devices display a QR + advertise + scan. Bob scans
+        // Alice's QR (latching scanner), discovers Alice advertising, connects;
+        // Alice (peripheral) responds. The pins are computed from the QR — no
+        // binding is injected by hand.
+        let mut alice = fresh_engine("Alice"); // displayer/responder
+        let mut bob = fresh_engine("Bob"); // scanner/initiator
+
+        let alice_qr = alice.begin_glance_display().expect("alice shows a QR");
+        let _bob_qr = bob
+            .begin_glance_display()
+            .expect("bob also shows a QR (symmetric)");
+
+        bob.apply_glance_scan(&alice_qr)
+            .expect("bob scans alice's QR");
+        let alice_id = signing_key(&alice);
+        bob.handle_glance_discovery("alice-device", &alice_id);
+        assert!(
+            bob.ble_handshake_session_active(),
+            "bob (scanner) builds an initiator session on discovering the scanned peer"
+        );
+        let connect: Vec<_> = bob
+            .drain_pending_commands()
+            .into_iter()
+            .filter(|c| matches!(c, vauchi_core::Command::BleConnect { device_id } if device_id == "alice-device"))
+            .collect();
+        assert_eq!(
+            connect.len(),
+            1,
+            "bob must emit exactly one BleConnect to the scanned peer"
+        );
+
+        alice.start_ble_handshake_as_responder();
+        assert!(
+            alice.ble_handshake_session_active(),
+            "alice (displayer/peripheral) builds a responder session on connect"
+        );
+
+        run_handshake(&mut bob, &mut alice);
+
+        assert_eq!(
+            bob.vauchi.list_contacts().expect("contacts").len(),
+            1,
+            "scanner persists the displayer"
+        );
+        assert_eq!(
+            alice.vauchi.list_contacts().expect("contacts").len(),
+            1,
+            "displayer persists the scanner"
+        );
+    }
+
+    // @scenario: ble_exchange :: Glance scanner ignores an advertiser it did not scan (F1 dissolves)
+    #[test]
+    fn glance_orchestration_scanner_ignores_foreign_advertiser() {
+        let mut alice = fresh_engine("Alice");
+        let mut bob = fresh_engine("Bob");
+        let alice_qr = alice.begin_glance_display().expect("alice QR");
+        bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
+
+        let mallory = fresh_engine("Mallory");
+        let mallory_id = signing_key(&mallory);
+        bob.handle_glance_discovery("mallory-device", &mallory_id);
+
+        assert!(
+            !bob.ble_handshake_session_active(),
+            "bob must not connect to an advertiser whose identity != the scanned QR"
+        );
+        assert!(
+            bob.drain_pending_commands().is_empty(),
+            "no BleConnect to a foreign advertiser (no latch race, F1 dissolves)"
+        );
+    }
+
+    // @scenario: ble_exchange :: Glance identity-spoofing advertiser is rejected at the handshake pin
+    #[test]
+    fn glance_orchestration_identity_spoofing_advertiser_rejected_at_handshake() {
+        // Mallory advertises Alice's (public) identity to satisfy bob's
+        // discovery match, then answers with her own keys. The advertisement
+        // match is NOT the security boundary — the session pin is.
+        let mut alice = fresh_engine("Alice");
+        let mut bob = fresh_engine("Bob");
+        let mut mallory = fresh_engine("Mallory");
+
+        let alice_qr = alice.begin_glance_display().expect("alice QR");
+        bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
+
+        let alice_id = signing_key(&alice);
+        bob.handle_glance_discovery("mallory-device", &alice_id);
+        assert!(
+            bob.ble_handshake_session_active(),
+            "bob connects — the advertisement claimed alice's identity"
+        );
+        let _ = bob.drain_pending_commands();
+
+        mallory.start_ble_handshake_as_responder();
+        run_handshake(&mut bob, &mut mallory);
+
+        assert_eq!(
+            bob.vauchi.list_contacts().expect("contacts").len(),
+            0,
+            "the handshake pin rejects Mallory — she is not the scanned Alice"
         );
     }
 }

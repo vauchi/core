@@ -294,6 +294,12 @@ impl Vauchi {
     /// The new-contact arm deliberately bypasses `ContactManager::add_contact`:
     /// its contact-limit and duplicate-id rejection must not apply to an
     /// exchange persist (repeat-exchange decision 2026-06-27).
+    ///
+    /// KNOWN GAP: unlike `Vauchi::add_contact`, the new-contact arm does not
+    /// `record_sync_item(SyncItem::ContactAdded)`, so an exchanged contact
+    /// does not journal to the user's other linked devices — tracked in
+    /// 2026-06-27-repeat-exchange-sync-propagation (blocked on a
+    /// device-registry test harness).
     pub fn update_contact(&self, contact: &Contact) -> VauchiResult<()> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
         match manager.update_contact(contact) {

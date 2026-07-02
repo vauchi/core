@@ -64,7 +64,14 @@ fn own_card_updated_invalidates_my_info() {
 
 // @internal
 #[test]
-fn sync_events_invalidate_sync_and_contacts() {
+fn sync_lifecycle_events_invalidate_sync_only() {
+    // Lifecycle chatter (progress ticks, per-contact state, label-sync
+    // completion) does NOT touch contact data — applied changes dispatch
+    // their own precise per-item events (5d13a463). Mapping chatter to
+    // "contacts" was the pre-5d13a463 coarse catch-all; with
+    // invalidate_screen now rebuilding the live current engine, keeping
+    // it would wipe in-progress list state (search query, facets) on
+    // every background-sync tick.
     let events = [
         VauchiEvent::SyncStateChanged {
             contact_id: "c1".into(),
@@ -84,8 +91,8 @@ fn sync_events_invalidate_sync_and_contacts() {
         let ids = affected_screens(event);
         assert_eq!(
             ids,
-            vec!["sync", "contacts"],
-            "event {event:?} should invalidate sync + contacts"
+            vec!["sync"],
+            "event {event:?} should invalidate only the sync screen"
         );
     }
 }

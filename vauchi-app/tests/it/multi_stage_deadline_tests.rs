@@ -16,7 +16,8 @@
 //! so these tests drive time directly — no clock, no sleeps.
 
 use vauchi_app::orchestrator::multi_stage_machine::{
-    MULTI_STAGE_STEP_TIMEOUT_MS, MultiStageEvent, MultiStageMachine, MultiStagePhase,
+    MULTI_STAGE_DISCOVERY_TIMEOUT_MS, MULTI_STAGE_STEP_TIMEOUT_MS, MultiStageEvent,
+    MultiStageMachine, MultiStagePhase,
 };
 use vauchi_core::Event;
 
@@ -42,13 +43,13 @@ fn advertising_machine() -> MultiStageMachine {
 
 // @internal
 #[test]
-fn stalled_phase_past_step_budget_emits_failed() {
+fn stalled_advertising_past_discovery_budget_emits_failed() {
     let mut machine = advertising_machine();
 
-    let event = machine.advance(NOW + MULTI_STAGE_STEP_TIMEOUT_MS + 1);
+    let event = machine.advance(NOW + MULTI_STAGE_DISCOVERY_TIMEOUT_MS + 1);
 
     let MultiStageEvent::Failed { reason } = event else {
-        panic!("a stalled phase past the step budget must emit Failed, got {event:?}");
+        panic!("stalled Advertising past the discovery budget must emit Failed, got {event:?}");
     };
     // T1.5: the reason renders directly on the failed screen, so it must be
     // a user-readable message, not the old stable id.
@@ -65,14 +66,14 @@ fn stalled_phase_past_step_budget_emits_failed() {
 
 // @internal
 #[test]
-fn phase_just_before_step_budget_does_not_fail() {
+fn advertising_just_before_discovery_budget_does_not_fail() {
     let mut machine = advertising_machine();
 
-    let event = machine.advance(NOW + MULTI_STAGE_STEP_TIMEOUT_MS - 1);
+    let event = machine.advance(NOW + MULTI_STAGE_DISCOVERY_TIMEOUT_MS - 1);
 
     assert!(
         !matches!(event, MultiStageEvent::Failed { .. }),
-        "must not fail before the step budget elapses, got {event:?}"
+        "must not fail before the discovery budget elapses, got {event:?}"
     );
     assert!(
         !matches!(machine.phase(), MultiStagePhase::Failed { .. }),
@@ -147,20 +148,25 @@ fn peer_engaged_phase_still_fails_at_step_budget() {
              the 120s step budget, got {event:?}"
         );
     };
+    assert!(
+        matches!(machine.phase(), MultiStagePhase::Failed { .. }),
+        "phase must be Failed after the step budget, got {:?}",
+        machine.phase()
+    );
 }
 
 // @internal
 #[test]
 fn timed_out_machine_is_terminal_and_absorbing() {
     let mut machine = advertising_machine();
-    let _ = machine.advance(NOW + MULTI_STAGE_STEP_TIMEOUT_MS + 1);
+    let _ = machine.advance(NOW + MULTI_STAGE_DISCOVERY_TIMEOUT_MS + 1);
     assert!(
         matches!(machine.phase(), MultiStagePhase::Failed { .. }),
         "precondition: machine must have timed out"
     );
 
     // A later advance must not resurrect the machine out of Failed.
-    let later = machine.advance(NOW + 2 * MULTI_STAGE_STEP_TIMEOUT_MS);
+    let later = machine.advance(NOW + 2 * MULTI_STAGE_DISCOVERY_TIMEOUT_MS);
 
     assert!(
         matches!(later, MultiStageEvent::None),

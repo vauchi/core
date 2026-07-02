@@ -81,16 +81,26 @@ const AUDIO_LISTEN_TIMEOUT_MS: u64 = 5000;
 /// Format: `[version: 1][public_key: 32][card_json: rest]`.
 const EXCHANGE_PAYLOAD_VERSION: u8 = 1;
 
-/// Maximum a single non-terminal exchange phase may persist with no
-/// forward progress before the machine fails to a retry/cancel screen.
-/// The deadline resets on every phase transition, so a healthy exchange
-/// (steady QR/chunk progress) never trips it; only a wait state with no
-/// peer and no progress does — the device-verified infinite "Searching…"
+/// Maximum a single non-terminal, peer-engaged exchange phase may persist
+/// with no forward progress before the machine fails to a retry/cancel
+/// screen. The deadline resets on every phase transition, so a healthy
+/// exchange (steady QR/chunk progress) never trips it; only a wait state
+/// with no progress does — the device-verified infinite "Searching…"
 /// (problem `2026-06-11-exchange-waits-forever-without-capabilities`,
 /// ADR-021: core owns the timer, never the frontend). Milliseconds — the
 /// machine's time domain is `unix_millis` (per the 2026-06-03 per-frame
 /// gating fix; seconds froze the QR ~1000× its window).
 pub const MULTI_STAGE_STEP_TIMEOUT_MS: u64 = 120_000;
+
+/// Deadline for the peerless `Advertising` phase. Discovery is
+/// human-paced — two people opening the mode on both devices and
+/// aligning cameras burned the flat 120 s step budget on-device before
+/// any peer contact (Phase 1 field feedback 2026-07-02 in the record
+/// above). Still finite: every waiting state keeps a core-owned deadline
+/// that lands on a retry/cancel screen; a longer flat budget was chosen
+/// over reset-on-scan-activity because a foreign scanner could otherwise
+/// keep the session alive indefinitely.
+pub const MULTI_STAGE_DISCOVERY_TIMEOUT_MS: u64 = 300_000;
 
 /// Observable phase of the multi-stage machine. 1:1 with
 /// [`ProtocolState`] (renamed for engine-side ergonomics — the
@@ -331,13 +341,19 @@ impl MultiStageMachine {
         event
     }
 
-    /// Whether the current phase has stalled past
-    /// [`MULTI_STAGE_STEP_TIMEOUT_MS`]. `Finalized` is success-pending
-    /// (no peer wait — it never times out); `Completed`/`Failed`/
-    /// `Cancelled` are excluded by the caller's `is_terminal` guard.
+    /// Whether the current phase has stalled past its budget —
+    /// [`MULTI_STAGE_DISCOVERY_TIMEOUT_MS`] for the human-paced peerless
+    /// `Advertising` phase, [`MULTI_STAGE_STEP_TIMEOUT_MS`] for every
+    /// peer-engaged phase. `Finalized` is success-pending (no peer wait —
+    /// it never times out); `Completed`/`Failed`/`Cancelled` are excluded
+    /// by the caller's `is_terminal` guard.
     fn step_timed_out(&self, now: u64) -> bool {
-        !matches!(self.phase, MultiStagePhase::Finalized { .. })
-            && now.saturating_sub(self.phase_entered_ms) >= MULTI_STAGE_STEP_TIMEOUT_MS
+        let budget = match self.phase {
+            MultiStagePhase::Finalized { .. } => return false,
+            MultiStagePhase::Advertising => MULTI_STAGE_DISCOVERY_TIMEOUT_MS,
+            _ => MULTI_STAGE_STEP_TIMEOUT_MS,
+        };
+        now.saturating_sub(self.phase_entered_ms) >= budget
     }
 
     /// Transition to the stall-timeout terminal failure with a

@@ -200,10 +200,15 @@ pub fn affected_screens(event: &vauchi_core::api::VauchiEvent) -> Vec<&'static s
             vec!["contacts", "contact_detail"]
         }
         VauchiEvent::OwnCardUpdated { .. } => vec!["my_info"],
+        // Lifecycle chatter only — applied changes dispatch their own
+        // precise per-item events (5d13a463), so "contacts" here would be
+        // the retired pre-5d13a463 catch-all; keeping it would wipe live
+        // list state (search/facets) on every background-sync tick now
+        // that invalidate_screen rebuilds the current engine.
         VauchiEvent::SyncStateChanged { .. }
         | VauchiEvent::SyncProgress { .. }
         | VauchiEvent::LabelSyncCompleted { .. } => {
-            vec!["sync", "contacts"]
+            vec!["sync"]
         }
         VauchiEvent::MessageDelivered { .. }
         | VauchiEvent::MessageFailed { .. }

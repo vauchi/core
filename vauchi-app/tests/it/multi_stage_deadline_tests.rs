@@ -18,6 +18,7 @@
 use vauchi_app::orchestrator::multi_stage_machine::{
     MULTI_STAGE_STEP_TIMEOUT_MS, MultiStageEvent, MultiStageMachine, MultiStagePhase,
 };
+use vauchi_core::Event;
 
 /// Unix-millis base, mirroring the poll-cadence test anchor. A non-zero
 /// base catches any `now - phase_entered` math that assumes `now > 0`.
@@ -78,6 +79,74 @@ fn phase_just_before_step_budget_does_not_fail() {
         "phase must stay non-Failed before the budget, got {:?}",
         machine.phase()
     );
+}
+
+/// Drive a machine into a peer-engaged phase by cross-feeding one live
+/// peer's frames (the two-party pattern), then return it with the time
+/// cursor. Bounded — engagement must happen within a minute of ticks.
+fn peer_engaged_machine() -> (MultiStageMachine, u64) {
+    let mut alice = MultiStageMachine::new_glance(local_card(), NOW);
+    let mut bob = MultiStageMachine::new_glance(b"name:Bob\nemail:bob@example.com".to_vec(), NOW);
+
+    let mut now = NOW;
+    loop {
+        now += 500;
+        let _ = alice.advance(now);
+        if let MultiStageEvent::QrFrameReady(p) = bob.advance(now) {
+            let _ = alice.handle_hardware_event(&Event::QrScanned { data: p.data }, now);
+        }
+        if !matches!(
+            alice.phase(),
+            MultiStagePhase::Preparing | MultiStagePhase::Advertising
+        ) {
+            return (alice, now);
+        }
+        assert!(
+            now < NOW + 60_000,
+            "peer engagement must happen within the drive budget, stuck in {:?}",
+            alice.phase()
+        );
+    }
+}
+
+// Discovery-budget differentiation (Phase 1 field feedback 2026-07-02 in
+// `2026-06-11-exchange-waits-forever-without-capabilities`): peerless
+// `Advertising` is human-paced — two people aligning phones burned the
+// flat 120 s budget on-device before any peer contact. Discovery gets a
+// longer budget; every peer-engaged phase keeps the 120 s step budget.
+// @internal
+#[test]
+fn peerless_advertising_outlives_the_step_budget() {
+    let mut machine = advertising_machine();
+
+    let event = machine.advance(NOW + MULTI_STAGE_STEP_TIMEOUT_MS + 1);
+
+    assert!(
+        !matches!(event, MultiStageEvent::Failed { .. }),
+        "human-paced discovery must outlive the machine-paced step \
+         budget (device regression 2026-07-02), got {event:?}"
+    );
+    assert!(
+        !matches!(machine.phase(), MultiStagePhase::Failed { .. }),
+        "Advertising must not fail at the step budget, got {:?}",
+        machine.phase()
+    );
+}
+
+// @internal
+#[test]
+fn peer_engaged_phase_still_fails_at_step_budget() {
+    let (mut machine, now) = peer_engaged_machine();
+    let engaged_phase = machine.phase().clone();
+
+    let event = machine.advance(now + MULTI_STAGE_STEP_TIMEOUT_MS + 1);
+
+    let MultiStageEvent::Failed { .. } = event else {
+        panic!(
+            "a stalled peer-engaged phase ({engaged_phase:?}) must keep \
+             the 120s step budget, got {event:?}"
+        );
+    };
 }
 
 // @internal

@@ -497,11 +497,19 @@ impl MultiStageExchangeEngine {
 
     /// Success chrome with the own-QR broadcast retained — shown from
     /// `Finalized` until `session_ended` (grace expiry drops the strip).
-    /// The camera is omitted: post-Finalized scans are no-ops.
+    ///
+    /// Mirrors `build_active_screen`'s pinned-QR contract: QR FIRST on a
+    /// fixed (non-scrolling) layout so the peer's camera always sees it —
+    /// appended below a scrollable summary it lands below the fold exactly
+    /// when the peer needs it. The rich success summary is deferred to
+    /// `session_ended` for the same reason. The camera is omitted
+    /// (post-Finalized scans are no-ops), and Done is styled Secondary:
+    /// it tears the broadcast down early while the caption asks the user
+    /// to hold position.
     fn build_finalized_broadcast_screen(&self, title: String) -> ScreenModel {
-        let mut screen = self.build_success_screen(title);
+        let mut components: Vec<Component> = Vec::new();
         if let Some(data) = &self.current_qr_data {
-            screen.components.push(Component::QrCode {
+            components.push(Component::QrCode {
                 id: COMPONENT_ID_OWN_QR.into(),
                 data: data.clone(),
                 mode: QrMode::Display,
@@ -510,6 +518,38 @@ impl MultiStageExchangeEngine {
                 a11y: None,
             });
         }
+        components.push(Component::StatusIndicator {
+            id: COMPONENT_ID_STATUS.into(),
+            icon: Some("checkmark.circle".into()),
+            title: "Exchange Complete".into(),
+            detail: None,
+            status: Status::Success,
+            a11y: None,
+        });
+        let detail = self
+            .peer_name
+            .as_ref()
+            .map(|name| format!("Exchanged with {name}"))
+            .unwrap_or_else(|| "Exchange complete.".into());
+        components.push(Component::Text {
+            id: COMPONENT_ID_PEER_NAME.into(),
+            content: detail,
+            style: TextStyle::Body,
+        });
+
+        let mut screen = ScreenModel::new(
+            SCREEN_ID,
+            title,
+            components,
+            vec![ScreenAction {
+                id: DONE_ACTION_ID.into(),
+                label: "Done".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            }],
+        );
+        screen.layout = ScreenLayout::Fixed;
         screen
     }
 

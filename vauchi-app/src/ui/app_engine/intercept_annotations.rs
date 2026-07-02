@@ -39,9 +39,12 @@ impl AppEngine {
             {
                 let _ = e; // Silently ignore — UI already shows the field unchanged
             }
-            self.invalidate_screen(&AppScreen::ContactDetail {
-                contact_id: contact_id.to_string(),
-            });
+            // No invalidate_screen: this screen IS current (never cached
+            // while displayed) and navigate-away re-caches the live
+            // engine, so eviction was a no-op — while a rebuild would
+            // wipe transient state (in-progress add-tag query) on every
+            // keystroke now that invalidate_screen rebuilds the current
+            // engine.
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
         None
@@ -69,9 +72,7 @@ impl AppEngine {
             {
                 let _ = e;
             }
-            self.invalidate_screen(&AppScreen::ContactDetail {
-                contact_id: contact_id.to_string(),
-            });
+            // No invalidate_screen — see intercept_personal_note_change.
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
         None
@@ -90,12 +91,13 @@ impl AppEngine {
     /// - `ActionPressed { "remove_tag:<id>" }` → `remove_tag_from_contact`,
     ///   then optimistically drop the row from the in-memory engine.
     ///
-    /// Persistence-then-optimistic-render mirrors the hide/trust toggles:
-    /// `invalidate_screen` only clears the cache, it does not rebuild
-    /// `self.engine`, so a fresh tag row must be applied in memory. Storage
-    /// errors are swallowed (best-effort) — the in-memory edit is only
-    /// applied when the corresponding `Vauchi` call succeeded, so the engine
-    /// stays consistent with storage on the next genuine reload.
+    /// Persistence-then-optimistic-render mirrors the hide/trust toggles.
+    /// `invalidate_screen` is deliberately NOT called here: it now rebuilds
+    /// the live current engine, which would wipe the in-progress query —
+    /// so the fresh tag row is applied in memory instead. Storage errors
+    /// are swallowed (best-effort) — the in-memory edit is only applied
+    /// when the corresponding `Vauchi` call succeeded, so the engine stays
+    /// consistent with storage on the next genuine reload.
     pub(super) fn intercept_tag_action(
         &mut self,
         contact_id: &str,

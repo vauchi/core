@@ -310,3 +310,65 @@ fn stale_pre_rekey_update_is_skipped_and_does_not_break_the_rekeyed_channel() {
         "the post-rekey update must apply at the peer"
     );
 }
+
+/// A first exchange on a multi-device identity journals
+/// `SyncItem::ContactAdded` for the user's other linked devices — the
+/// same recording `Vauchi::add_contact` does. RED while the exchange
+/// persist seam bare-saves without `record_sync_item`: the exchanged
+/// contact never reaches the user's tablet
+/// (2026-06-27-repeat-exchange-sync-propagation, journal gap).
+// @scenario: sync_updates :: Exchanged contact reaches linked devices
+#[test]
+fn first_exchange_journals_contact_added_for_linked_devices() {
+    use vauchi_core::api::sync::DeviceSyncOrchestrator;
+    use vauchi_core::crypto::SigningKeyPair;
+    use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
+    use vauchi_core::sync::SyncItem;
+
+    let alice = create_vauchi_with_card("Alice", vec![(FieldType::Email, "work", "a@w.com")]);
+    let bob = create_vauchi_with_card("Bob", vec![(FieldType::Email, "personal", "b@v1.com")]);
+
+    // Two linked devices — record_sync_item is a deliberate no-op below 2.
+    const SEED: [u8; 32] = [7u8; 32];
+    let signing = SigningKeyPair::from_seed(&SEED);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
+        &signing,
+    );
+    registry
+        .add_device_unsigned(DeviceInfo::derive(&SEED, 1, "tablet".into(), 0).to_registered(&SEED))
+        .unwrap();
+    alice
+        .storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+    let bob_card = bob.own_card().unwrap().unwrap();
+    let secret = SymmetricKey::generate();
+    let (a_rat, _) = setup_ratchets(&secret);
+    let bob_at_alice = Contact::from_exchange(bob_pk, bob_card, secret, 0);
+    let bob_id = bob_at_alice.id().to_string();
+    alice
+        .save_exchanged_contact(&bob_at_alice, &a_rat, true)
+        .unwrap();
+
+    let device_info = alice.identity().unwrap().create_device_info(0);
+    let orchestrator =
+        DeviceSyncOrchestrator::load(alice.storage(), device_info, registry).unwrap();
+    let queued_added_ids: Vec<String> = orchestrator
+        .devices_with_pending()
+        .iter()
+        .flat_map(|d| orchestrator.pending_for_device(d).to_vec())
+        .filter_map(|item| match item {
+            SyncItem::ContactAdded { contact_data, .. } => Some(contact_data.id.clone()),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        queued_added_ids.contains(&bob_id),
+        "an exchange on a multi-device identity must journal ContactAdded \
+         for the linked devices, journaled ids: {queued_added_ids:?}"
+    );
+}

@@ -140,3 +140,52 @@ fn cancel_delete_tag_keeps_the_tag() {
         "cancel keeps the tag in the list"
     );
 }
+
+// A personal-note keystroke persists the note but must NOT rebuild the
+// live ContactDetail engine — the in-progress add-tag query is transient
+// engine state that a rebuild wipes mid-typing
+// (2026-07-01-android-contacts-list-stale-after-mutation residual).
+// @internal
+#[test]
+fn note_keystroke_preserves_in_progress_tag_query() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Me").unwrap();
+    vauchi
+        .import_contacts_from_vcf(b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Bob\r\nEND:VCARD\r\n")
+        .unwrap();
+    let cid = vauchi.list_contacts().unwrap()[0].id().to_string();
+
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: cid.clone(),
+    });
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "add_tag".into(),
+        value: "cli".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "personal_note".into(),
+        value: "met at conf".into(),
+    });
+
+    let tag_query = engine.current_screen().components.iter().find_map(|c| {
+        if let Component::TextInput { id, value, .. } = c
+            && id == "add_tag"
+        {
+            Some(value.clone())
+        } else {
+            None
+        }
+    });
+    assert_eq!(
+        tag_query,
+        Some("cli".to_string()),
+        "the in-progress add-tag query must survive a note keystroke"
+    );
+    assert_eq!(
+        engine.vauchi().load_personal_notes(&cid).unwrap(),
+        Some(b"met at conf".to_vec()),
+        "the note keystroke must still persist"
+    );
+}

@@ -317,8 +317,24 @@ impl AppEngine {
 
     /// Invalidates a cached engine for a specific screen.
     /// Next navigation to this screen will create a fresh engine.
+    /// When the invalidated screen IS the current one, the live engine is
+    /// rebuilt too — eviction alone would leave the user parked on a stale
+    /// snapshot until a navigate-away-and-back round trip
+    /// (2026-07-01-android-contacts-list-stale-after-mutation).
     pub fn invalidate_screen(&mut self, screen: &AppScreen) {
         self.engine_cache.remove(screen);
+        if *screen == self.screen {
+            self.engine = Self::create_engine(
+                &self.vauchi,
+                &self.screen,
+                self.preview_as_contact.as_deref(),
+                &self.device_capabilities,
+                &self.transport_readiness,
+                &self.render_context,
+                &self.pending_exchange_groups,
+                self.glance_display_qr.as_deref(),
+            );
+        }
     }
 
     /// Invalidates all cached engines. Use after bulk mutations.

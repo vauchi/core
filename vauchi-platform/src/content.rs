@@ -152,6 +152,9 @@ pub(crate) fn content_cycle_outcome(
                     .iter()
                     .any(|t| matches!(t, MobileContentType::Themes)),
             },
+            // NoUpdates: benign check→apply race, data already current.
+            // Disabled: ContentManager deactivated internally even with
+            // the compile-time feature on — retrying won't help.
             Some(MobileApplyResult::NoUpdates) | Some(MobileApplyResult::Disabled) => noop,
             Some(MobileApplyResult::Error { .. }) | None => MobileContentCycleOutcome {
                 retryable_failure: true,

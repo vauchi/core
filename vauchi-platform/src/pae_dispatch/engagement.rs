@@ -90,19 +90,13 @@ impl PlatformAppEngine {
             }
             DomainCommand::ApplyContentUpdates => {
                 let result = self.apply_content_updates_dispatch();
-                // Content updates can refresh on-disk content cache;
-                // invalidate any screen that reads social-network labels.
-                engine.invalidate_screen(&AppScreen::Settings);
-                engine.invalidate_screen(&AppScreen::MyInfo);
+                invalidate_content_screens(engine);
                 Ok(DomainCommandResult::ApplyResult { result })
             }
             DomainCommand::RunContentUpdateCycle => {
                 let outcome = self.run_content_update_cycle_dispatch();
                 if outcome.applied {
-                    // Same invalidation set as ApplyContentUpdates: any
-                    // screen reading social-network labels re-renders.
-                    engine.invalidate_screen(&AppScreen::Settings);
-                    engine.invalidate_screen(&AppScreen::MyInfo);
+                    invalidate_content_screens(engine);
                 }
                 Ok(DomainCommandResult::ContentUpdateCycle { outcome })
             }
@@ -295,4 +289,13 @@ impl PlatformAppEngine {
             }
         }
     }
+}
+
+/// Content updates refresh the on-disk content cache; every screen
+/// reading social-network labels re-renders. Single update point so
+/// `ApplyContentUpdates` and `RunContentUpdateCycle` cannot drift when
+/// a new content type needs a wider invalidation set.
+fn invalidate_content_screens(engine: &mut AppEngine) {
+    engine.invalidate_screen(&AppScreen::Settings);
+    engine.invalidate_screen(&AppScreen::MyInfo);
 }

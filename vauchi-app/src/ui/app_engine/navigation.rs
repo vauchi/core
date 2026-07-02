@@ -295,13 +295,18 @@ impl AppEngine {
     /// Onboarding IS cacheable: user navigates to FormDialog (add field)
     /// and back, must return to their current step with accumulated data.
     ///
-    /// `DirectTransport`, `BleExchange` and `NfcExchange` are excluded: each
-    /// owns a live hardware exchange engine with a `tick`-driven stall
-    /// deadline stamped at construction / step entry. Caching one across a
-    /// navigate-away would carry a stale timestamp and fire a spurious
-    /// timeout on return; a fresh engine restarts the handshake cleanly
-    /// (hardware can't be paused)
+    /// `DirectTransport`, `BleExchange`, `NfcExchange` and
+    /// `MultiStageExchange` are excluded: each owns a live hardware
+    /// exchange engine with a `tick`-driven stall deadline stamped at
+    /// construction / step entry. Caching one across a navigate-away
+    /// would carry a stale timestamp and fire a spurious timeout on
+    /// return; a fresh engine restarts the handshake cleanly (hardware
+    /// can't be paused)
     /// (2026-06-11-exchange-waits-forever-without-capabilities).
+    /// `MultiStageExchange` additionally latches `cancelled` on Cancel,
+    /// so a cached engine revives as an un-repaintable zombie frozen on
+    /// its mid-transfer chrome
+    /// (2026-07-02-multistage-zombie-engine-across-mode-reentry).
     fn is_cacheable(screen: &AppScreen) -> bool {
         !matches!(
             screen,
@@ -312,6 +317,7 @@ impl AppEngine {
                 | AppScreen::DirectTransport
                 | AppScreen::BleExchange { .. }
                 | AppScreen::NfcExchange
+                | AppScreen::MultiStageExchange { .. }
         )
     }
 

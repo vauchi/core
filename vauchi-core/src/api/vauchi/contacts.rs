@@ -12,6 +12,7 @@ use crate::crypto::ratchet::DoubleRatchetState;
 
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
+use super::super::events::{EventOrigin, VauchiEvent};
 use super::builder::decoy_id_to_fake_pk;
 use super::{AuthMode, Vauchi};
 
@@ -286,10 +287,29 @@ impl Vauchi {
         Ok(removed)
     }
 
-    /// Updates an existing contact.
+    /// Upserts a contact and dispatches the matching screen-invalidation
+    /// event (`ContactUpdated` with the card diff, or `ContactAdded{Local}`
+    /// when new). This is the persist seam all exchange transports converge
+    /// on; without a dispatch the contacts list stays stale until restart
+    /// (2026-07-01-android-contacts-list-stale-after-mutation).
+    ///
+    /// The new-contact arm deliberately bypasses `ContactManager::add_contact`:
+    /// its contact-limit and duplicate-id rejection must not apply to an
+    /// exchange persist (repeat-exchange decision 2026-06-27).
     pub fn update_contact(&self, contact: &Contact) -> VauchiResult<()> {
-        self.storage.contacts().save_contact(contact)?;
-        Ok(())
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        match manager.update_contact(contact) {
+            Ok(_) => Ok(()),
+            Err(VauchiError::ContactNotFound(_)) => {
+                self.storage.contacts().save_contact(contact)?;
+                self.events.dispatch(VauchiEvent::contact_added(
+                    contact.id().to_string(),
+                    EventOrigin::Local,
+                ));
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Returns the contact limit.

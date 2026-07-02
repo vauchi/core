@@ -550,6 +550,13 @@ impl<'a> ContactManager<'a> {
             changed.push("display_name".to_string());
         }
 
+        // Avatar renders on the contacts list/detail, so an avatar-only
+        // change is a visible change (ADR-042) — without this sentinel it
+        // would slip through undispatched.
+        if old.avatar() != new.avatar() {
+            changed.push("avatar".to_string());
+        }
+
         changed
     }
 }

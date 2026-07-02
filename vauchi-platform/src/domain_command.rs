@@ -85,6 +85,10 @@ pub enum DomainCommand {
     /// Reload the social-networks list from the content cache after
     /// `ApplyContentUpdates` succeeds.
     ReloadSocialNetworks,
+    /// Whole cycle core-side (check → apply → invalidation), returning
+    /// a presentation-only outcome. Supersedes frontend-sequenced
+    /// Check→Apply→Reload for schedulers (ADR-021/ADR-043).
+    RunContentUpdateCycle,
 
     // ── GDPR / Deletion + read-only shred status (B7 batch 3) ──
     //
@@ -787,6 +791,10 @@ pub enum DomainCommandResult {
     /// List of `MobileSocialNetwork` (B7 batch 2 — `ReloadSocialNetworks`).
     SocialNetworks {
         networks: Vec<MobileSocialNetwork>,
+    },
+    /// Outcome of `RunContentUpdateCycle`.
+    ContentUpdateCycle {
+        outcome: crate::content::MobileContentCycleOutcome,
     },
     /// Numeric `u32` result — used by both B7 batch 3
     /// (`ExecuteIdentityDeletion` revocation count) and B7 batch 5

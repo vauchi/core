@@ -96,6 +96,16 @@ impl PlatformAppEngine {
                 engine.invalidate_screen(&AppScreen::MyInfo);
                 Ok(DomainCommandResult::ApplyResult { result })
             }
+            DomainCommand::RunContentUpdateCycle => {
+                let outcome = self.run_content_update_cycle_dispatch();
+                if outcome.applied {
+                    // Same invalidation set as ApplyContentUpdates: any
+                    // screen reading social-network labels re-renders.
+                    engine.invalidate_screen(&AppScreen::Settings);
+                    engine.invalidate_screen(&AppScreen::MyInfo);
+                }
+                Ok(DomainCommandResult::ContentUpdateCycle { outcome })
+            }
             DomainCommand::ReloadSocialNetworks => {
                 let registry = vauchi_core::SocialNetworkRegistry::with_defaults();
                 let networks = registry

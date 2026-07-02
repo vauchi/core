@@ -288,6 +288,37 @@ fn apply_content_updates_returns_disabled_when_feature_off() {
 
 // @internal
 #[test]
+fn run_content_update_cycle_is_benign_noop_when_feature_off() {
+    // Same guard as the check/apply tests above: with the feature on
+    // the cycle would attempt a network check we don't want in
+    // unit-time tests. The feature-on mapping is covered exhaustively
+    // by the pure `content_cycle_outcome` table tests in content.rs.
+    if cfg!(feature = "content-updates") {
+        return;
+    }
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::RunContentUpdateCycle)
+        .expect("dispatch")
+    {
+        DomainCommandResult::ContentUpdateCycle { outcome } => {
+            assert!(!outcome.applied, "disabled build must not report applied");
+            assert!(
+                !outcome.retryable_failure,
+                "disabled is a benign no-op, not a retryable failure"
+            );
+            assert!(
+                !outcome.refresh_appearance,
+                "no theme refresh when disabled"
+            );
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
 fn reload_social_networks_returns_default_registry() {
     let (engine, _dir) = create_engine_with_identity();
 

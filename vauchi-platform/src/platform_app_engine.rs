@@ -987,8 +987,6 @@ impl PlatformAppEngine {
     // Device Linking as direct typed methods (B2/B3/B4); everything
     // else collapses into `DomainCommand`. New domains are added
     // batch-by-batch in their own MRs.
-    //
-    // First batch (this MR): Consent (5 variants).
 
     /// Dispatch a typed domain command. Pattern match on the
     /// returned [`DomainCommandResult`] in the calling code; see
@@ -1014,6 +1012,7 @@ impl PlatformAppEngine {
             | DomainCommand::CheckContentUpdates
             | DomainCommand::ApplyContentUpdates
             | DomainCommand::ReloadSocialNetworks
+            | DomainCommand::RunContentUpdateCycle
             | DomainCommand::HasSeenAhaMoment { .. }
             | DomainCommand::TryTriggerAhaMoment { .. }
             | DomainCommand::TryTriggerAhaMomentWithContext { .. }

@@ -106,6 +106,61 @@ pub struct MobileApplyFailure {
     pub error: String,
 }
 
+/// Presentation-only outcome of `DomainCommand::RunContentUpdateCycle`.
+///
+/// Frontends schedule the cycle (WorkManager / BGTask / app launch) and
+/// read only scheduler/appearance signals; the check→apply→refresh
+/// domain sequencing lives core-side (ADR-021/ADR-043 — F-3 of the
+/// pure-functional-core program record, Findings 2026-07-02).
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct MobileContentCycleOutcome {
+    /// At least one content type was updated on disk.
+    pub applied: bool,
+    /// The cycle failed in a way a scheduler may retry (check or
+    /// per-type download failure). Disabled/up-to-date is not a failure.
+    pub retryable_failure: bool,
+    /// Themes changed — re-apply the selected theme through the
+    /// native appearance API.
+    pub refresh_appearance: bool,
+}
+
+/// Pure mapping from (check status, optional apply result) to the
+/// cycle outcome. `apply` is `None` when the check did not surface
+/// `UpdatesAvailable` (the driver skips apply) — if it is `None`
+/// *despite* `UpdatesAvailable`, the cycle did not complete and the
+/// outcome is retryable.
+pub(crate) fn content_cycle_outcome(
+    status: &MobileUpdateStatus,
+    apply: Option<&MobileApplyResult>,
+) -> MobileContentCycleOutcome {
+    let noop = MobileContentCycleOutcome {
+        applied: false,
+        retryable_failure: false,
+        refresh_appearance: false,
+    };
+    match status {
+        MobileUpdateStatus::UpToDate | MobileUpdateStatus::Disabled => noop,
+        MobileUpdateStatus::CheckFailed { .. } => MobileContentCycleOutcome {
+            retryable_failure: true,
+            ..noop
+        },
+        MobileUpdateStatus::UpdatesAvailable { .. } => match apply {
+            Some(MobileApplyResult::Applied { applied, failed }) => MobileContentCycleOutcome {
+                applied: !applied.is_empty(),
+                retryable_failure: !failed.is_empty(),
+                refresh_appearance: applied
+                    .iter()
+                    .any(|t| matches!(t, MobileContentType::Themes)),
+            },
+            Some(MobileApplyResult::NoUpdates) | Some(MobileApplyResult::Disabled) => noop,
+            Some(MobileApplyResult::Error { .. }) | None => MobileContentCycleOutcome {
+                retryable_failure: true,
+                ..noop
+            },
+        },
+    }
+}
+
 /// Configuration for content updates.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileContentConfig {
@@ -145,5 +200,134 @@ impl MobileContentConfig {
         }
 
         config
+    }
+}
+
+// INLINE_TEST_REQUIRED: content_cycle_outcome is pub(crate), cannot be tested from external tests/
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn outcome(applied: bool, retryable: bool, refresh: bool) -> MobileContentCycleOutcome {
+        MobileContentCycleOutcome {
+            applied,
+            retryable_failure: retryable,
+            refresh_appearance: refresh,
+        }
+    }
+
+    // @internal
+    #[test]
+    fn cycle_outcome_up_to_date_and_disabled_are_noop() {
+        assert_eq!(
+            content_cycle_outcome(&MobileUpdateStatus::UpToDate, None),
+            outcome(false, false, false)
+        );
+        assert_eq!(
+            content_cycle_outcome(&MobileUpdateStatus::Disabled, None),
+            outcome(false, false, false)
+        );
+    }
+
+    // @internal
+    #[test]
+    fn cycle_outcome_check_failure_is_retryable() {
+        assert_eq!(
+            content_cycle_outcome(
+                &MobileUpdateStatus::CheckFailed {
+                    error: "timeout".into()
+                },
+                None
+            ),
+            outcome(false, true, false)
+        );
+    }
+
+    // @internal
+    #[test]
+    fn cycle_outcome_applied_themes_requests_appearance_refresh() {
+        let status = MobileUpdateStatus::UpdatesAvailable {
+            types: vec![MobileContentType::Themes, MobileContentType::Networks],
+        };
+        let apply = MobileApplyResult::Applied {
+            applied: vec![MobileContentType::Themes, MobileContentType::Networks],
+            failed: vec![],
+        };
+        assert_eq!(
+            content_cycle_outcome(&status, Some(&apply)),
+            outcome(true, false, true)
+        );
+    }
+
+    // @internal
+    #[test]
+    fn cycle_outcome_applied_without_themes_skips_appearance_refresh() {
+        let status = MobileUpdateStatus::UpdatesAvailable {
+            types: vec![MobileContentType::Locales],
+        };
+        let apply = MobileApplyResult::Applied {
+            applied: vec![MobileContentType::Locales],
+            failed: vec![],
+        };
+        assert_eq!(
+            content_cycle_outcome(&status, Some(&apply)),
+            outcome(true, false, false)
+        );
+    }
+
+    // @internal
+    #[test]
+    fn cycle_outcome_partial_failure_is_applied_and_retryable() {
+        let status = MobileUpdateStatus::UpdatesAvailable {
+            types: vec![MobileContentType::Locales, MobileContentType::Help],
+        };
+        let apply = MobileApplyResult::Applied {
+            applied: vec![MobileContentType::Locales],
+            failed: vec![MobileApplyFailure {
+                content_type: MobileContentType::Help,
+                error: "404".into(),
+            }],
+        };
+        assert_eq!(
+            content_cycle_outcome(&status, Some(&apply)),
+            outcome(true, true, false)
+        );
+    }
+
+    // @internal
+    #[test]
+    fn cycle_outcome_apply_error_and_missing_apply_are_retryable() {
+        let status = MobileUpdateStatus::UpdatesAvailable {
+            types: vec![MobileContentType::Networks],
+        };
+        assert_eq!(
+            content_cycle_outcome(
+                &status,
+                Some(&MobileApplyResult::Error {
+                    error: "disk full".into()
+                })
+            ),
+            outcome(false, true, false)
+        );
+        assert_eq!(
+            content_cycle_outcome(&status, None),
+            outcome(false, true, false)
+        );
+    }
+
+    // @internal
+    #[test]
+    fn cycle_outcome_apply_noop_variants_are_noop() {
+        let status = MobileUpdateStatus::UpdatesAvailable {
+            types: vec![MobileContentType::Networks],
+        };
+        assert_eq!(
+            content_cycle_outcome(&status, Some(&MobileApplyResult::NoUpdates)),
+            outcome(false, false, false)
+        );
+        assert_eq!(
+            content_cycle_outcome(&status, Some(&MobileApplyResult::Disabled)),
+            outcome(false, false, false)
+        );
     }
 }

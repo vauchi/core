@@ -186,6 +186,21 @@ impl PlatformAppEngine {
         }
     }
 
+    /// Whole content-update cycle: check, then apply only when updates
+    /// are available. Owns the sequencing frontends used to duplicate
+    /// (ADR-021/ADR-043 — F-3, pure-functional-core program record).
+    pub(crate) fn run_content_update_cycle_dispatch(
+        &self,
+    ) -> crate::content::MobileContentCycleOutcome {
+        let status = self.check_content_updates_dispatch();
+        let apply = matches!(
+            status,
+            crate::content::MobileUpdateStatus::UpdatesAvailable { .. }
+        )
+        .then(|| self.apply_content_updates_dispatch());
+        crate::content::content_cycle_outcome(&status, apply.as_ref())
+    }
+
     /// Feature-gated content-update apply (B7 batch 2). Mirrors the
     /// legacy `VauchiPlatform::apply_content_updates` semantics —
     /// returns `Disabled` when the feature is off.

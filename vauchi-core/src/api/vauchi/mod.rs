@@ -7,6 +7,7 @@
 //! Main entry point for the Vauchi API.
 
 mod builder;
+mod contact_annotations;
 mod contacts;
 #[cfg(feature = "network-http")]
 mod device_sync_loop;

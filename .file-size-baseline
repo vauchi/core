@@ -181,10 +181,10 @@ vauchi-core/src/network/http_transport.rs 1253
 # split (e.g. carve contact CRUD out of api/vauchi/contacts.rs). The four
 # entries below absorb the mechanical growth until then.
 # 2026-06-10: +27 for set_contact_display_name (contact-edit persistence
-# fix). The nickname/display-preference cluster (~490 lines) is the
-# natural carve-out target when the split lands.
+# fix). 2026-07-02: the prescribed carve-out landed — notes/nickname/
+# avatar/display-preference cluster moved to contact_annotations.rs;
+# contacts.rs dropped under the hard limit and left the baseline.
 vauchi-core/src/api/vauchi/sync_http.rs 1160
-vauchi-core/src/api/vauchi/contacts.rs 1063
 
 # EXEMPT — security-critical: crypto + verification belong together
 vauchi-core/src/recovery/mod.rs 1253

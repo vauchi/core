@@ -64,6 +64,26 @@ fn invalidate_of_current_screen_rebuilds_live_engine() {
     );
 }
 
+/// `invalidate_all` (bulk mutations: restore, import) must refresh the
+/// live current screen too — the sibling entry point of
+/// `invalidate_screen`, same parked-on-a-stale-screen hole.
+// @internal
+#[test]
+fn invalidate_all_rebuilds_live_current_screen() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Contacts);
+
+    add_contact_named(&engine, "Bob");
+    engine.invalidate_all();
+
+    assert_eq!(
+        contact_names(&engine),
+        vec!["Bob".to_string()],
+        "invalidate_all must rebuild the live current engine, \
+         not only clear the cache"
+    );
+}
+
 /// Invalidating a non-current screen keeps evicting the cache so the
 /// next navigation builds fresh (pins the pre-existing behavior).
 // @internal

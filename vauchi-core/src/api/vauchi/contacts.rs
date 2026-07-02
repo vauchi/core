@@ -293,18 +293,22 @@ impl Vauchi {
     ///
     /// The new-contact arm deliberately bypasses `ContactManager::add_contact`:
     /// its contact-limit and duplicate-id rejection must not apply to an
-    /// exchange persist (repeat-exchange decision 2026-06-27).
-    ///
-    /// KNOWN GAP: unlike `Vauchi::add_contact`, the new-contact arm does not
-    /// `record_sync_item(SyncItem::ContactAdded)`, so an exchanged contact
-    /// does not journal to the user's other linked devices — tracked in
-    /// 2026-06-27-repeat-exchange-sync-propagation (blocked on a
-    /// device-registry test harness).
+    /// exchange persist (repeat-exchange decision 2026-06-27) — but it
+    /// mirrors `Vauchi::add_contact`'s device-sync journal, so a contact
+    /// acquired via exchange still reaches the user's other linked devices
+    /// (2026-06-27-repeat-exchange-sync-propagation, journal gap).
     pub fn update_contact(&self, contact: &Contact) -> VauchiResult<()> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
         match manager.update_contact(contact) {
             Ok(_) => Ok(()),
             Err(VauchiError::ContactNotFound(_)) => {
+                if contact.is_exchanged() {
+                    let sync_data = crate::sync::ContactSyncData::from_contact(contact);
+                    self.record_sync_item(crate::sync::SyncItem::ContactAdded {
+                        contact_data: sync_data,
+                        timestamp: self.now_timestamp(),
+                    });
+                }
                 self.storage.contacts().save_contact(contact)?;
                 self.events.dispatch(VauchiEvent::contact_added(
                     contact.id().to_string(),

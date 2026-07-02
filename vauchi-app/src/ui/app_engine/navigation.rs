@@ -344,8 +344,10 @@ impl AppEngine {
     }
 
     /// Invalidates all cached engines. Use after bulk mutations.
+    /// Rebuilds the live current engine too, same as `invalidate_screen`.
     pub fn invalidate_all(&mut self) {
         self.engine_cache.clear();
+        self.invalidate_screen(&self.screen.clone());
     }
 
     /// Returns the default landing screen.

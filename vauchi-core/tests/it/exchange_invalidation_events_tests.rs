@@ -159,6 +159,63 @@ fn repeat_exchange_with_changed_card_dispatches_contact_updated() {
     }
 }
 
+/// A repeat exchange whose ONLY change is the avatar must still
+/// dispatch `ContactUpdated` — the avatar renders on the contacts
+/// list/detail, so an avatar-only diff is a visible change
+/// (ADR-042 flow; blind spot of a fields/display_name-only diff).
+// @scenario: contact_exchange :: Repeat in-person exchange of the same pair
+#[test]
+fn repeat_exchange_with_avatar_only_change_dispatches_contact_updated() {
+    let alice = create_vauchi_with_card("Alice", vec![(FieldType::Email, "work", "a@work.com")]);
+    let bob = create_vauchi_with_card("Bob", vec![(FieldType::Email, "personal", "bob@v1.com")]);
+
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+    let bob_card_v1 = bob.own_card().unwrap().unwrap();
+
+    let secret1 = SymmetricKey::generate();
+    let (a_rat1, _) = setup_ratchets(&secret1);
+    let bob_at_alice_v1 = Contact::from_exchange(bob_pk, bob_card_v1.clone(), secret1, 0);
+    alice
+        .save_exchanged_contact(&bob_at_alice_v1, &a_rat1, true)
+        .unwrap();
+
+    let mut bob_card_v2 = bob_card_v1.clone();
+    let red_pixel_png = {
+        let img = image::RgbaImage::from_pixel(1, 1, image::Rgba([255, 0, 0, 255]));
+        let mut buf = std::io::Cursor::new(Vec::new());
+        img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
+        buf.into_inner()
+    };
+    bob_card_v2.set_avatar(red_pixel_png).unwrap();
+
+    let secret2 = SymmetricKey::generate();
+    let (a_rat2, _) = setup_ratchets(&secret2);
+    let bob_at_alice_v2 = Contact::from_exchange(bob_pk, bob_card_v2, secret2, 2);
+
+    let events = capture_events(&alice);
+    alice
+        .save_exchanged_contact(&bob_at_alice_v2, &a_rat2, true)
+        .unwrap();
+
+    let captured = events.lock().unwrap();
+    let contact_evts = contact_events(&captured);
+    assert_eq!(
+        contact_evts.len(),
+        1,
+        "avatar-only repeat exchange must dispatch exactly one contact event, got: {contact_evts:?}"
+    );
+    match contact_evts[0] {
+        VauchiEvent::ContactUpdated { changed_fields, .. } => {
+            assert_eq!(
+                changed_fields,
+                &vec!["avatar".to_string()],
+                "the avatar change must be named in changed_fields"
+            );
+        }
+        other => panic!("expected ContactUpdated, got {other:?}"),
+    }
+}
+
 /// A repeat exchange with an UNCHANGED card (pure rekey) → no contact
 /// event: nothing on the contacts list changed, so no invalidation.
 // @scenario: contact_exchange :: Repeat in-person exchange of the same pair

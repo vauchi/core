@@ -198,6 +198,7 @@ mod exchange_e2e_tests;
 mod exchange_edge_cases_tests;
 mod exchange_encrypted_message_tests;
 mod exchange_engine_tests;
+mod exchange_invalidation_events_tests;
 mod exchange_latency_budget_tests;
 mod exchange_latency_tests;
 mod exchange_mode_e2e_tests;

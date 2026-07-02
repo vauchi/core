@@ -1627,23 +1627,31 @@ mod tests {
             "Finalized before session end must already show the success indicator"
         );
 
-        let broadcast_qr = screen.components.iter().find_map(|c| match c {
-            Component::QrCode {
+        // The peer's camera must always see the QR: FIRST component on a
+        // fixed (non-scrolling) layout — same pinned-QR contract as the
+        // active screen. Appending it below a scrollable success summary
+        // would push it below the fold exactly when the peer needs it.
+        let broadcast_qr = match screen.components.first() {
+            Some(Component::QrCode {
                 data,
                 mode: QrMode::Display,
                 label,
                 ..
-            } => Some((data.clone(), label.clone())),
+            }) => Some((data.clone(), label.clone())),
             _ => None,
-        });
+        };
         assert_eq!(
             broadcast_qr,
             Some((
                 "GRACE-QR".to_string(),
                 Some("Keep screens facing each other until the other phone finishes".to_string())
             )),
-            "the own-QR must keep broadcasting through the grace window, \
-             captioned so the wait is legible"
+            "the own-QR must keep broadcasting FIRST on the grace screen"
+        );
+        assert_eq!(
+            screen.layout,
+            ScreenLayout::Fixed,
+            "the grace screen must not scroll — the QR must stay visible"
         );
 
         assert!(
@@ -1657,6 +1665,63 @@ mod tests {
             "post-Finalized scans are no-ops — the camera must be dropped"
         );
         assert_eq!(action_ids(&screen), vec![DONE_ACTION_ID]);
+        let done_style = screen
+            .actions
+            .iter()
+            .find(|a| a.id == DONE_ACTION_ID)
+            .map(|a| a.style.clone());
+        assert_eq!(
+            done_style,
+            Some(ActionStyle::Secondary),
+            "Done tears the broadcast down early — de-emphasize it while \
+             the caption asks the user to hold position"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn grace_screen_defers_rich_summary_until_session_ends() {
+        // The production path attaches the rich success summary at the
+        // same Finalized event. During the grace the QR must win the
+        // viewport (Fixed layout cannot scroll) — the summary renders
+        // once session_ended drops the strip.
+        let mut engine = engine_with_qr(ProtocolState::Finalized, "GRACE-QR");
+        engine.set_finalized("Bob".into());
+        engine.set_success_summary(crate::ui::exchange::success::ExchangeSuccessSummary {
+            peer_name: "Bob".into(),
+            received_fields: vec![("email".into(), "Email".into(), "bob@example.com".into())],
+            my_visible_fields: vec!["Phone".into()],
+            group_names: Vec::new(),
+        });
+
+        let grace = engine.current_screen();
+        assert!(
+            matches!(
+                grace.components.first(),
+                Some(Component::QrCode {
+                    mode: QrMode::Display,
+                    ..
+                })
+            ),
+            "with a summary attached the QR must still be the first component"
+        );
+        assert!(
+            !grace
+                .components
+                .iter()
+                .any(|c| matches!(c, Component::FieldList { .. })),
+            "the rich summary is deferred while the broadcast runs"
+        );
+
+        engine.set_session_ended();
+        let ended = engine.current_screen();
+        assert!(
+            ended.components.iter().any(|c| matches!(
+                c,
+                Component::FieldList { id, .. } if id == "received_fields"
+            )),
+            "once the grace ends the rich summary renders"
+        );
     }
 
     // @internal

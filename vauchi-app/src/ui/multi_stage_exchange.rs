@@ -480,8 +480,37 @@ impl MultiStageExchangeEngine {
             {
                 self.build_success_screen(title)
             }
+            // Finalized before the grace expires: the contact IS already
+            // persisted (persist fires on the Finalized event), and the
+            // FINALIZED_GRACE broadcast exists only for the peer — a
+            // still-Complete peer needs to scan our RDYY (two-generals
+            // last-ack, session.rs FINALIZED_GRACE_DURATION). So show
+            // Success now with the QR still broadcasting instead of
+            // parking the user on "Almost done" for the whole window
+            // (2026-07-01-hover-exchange-completion-latency). Complete/
+            // RetryReady keep the active chrome — they still need the
+            // camera to see that RDYY.
+            ProtocolState::Finalized => self.build_finalized_broadcast_screen(title),
             _ => self.build_active_screen(title),
         }
+    }
+
+    /// Success chrome with the own-QR broadcast retained — shown from
+    /// `Finalized` until `session_ended` (grace expiry drops the strip).
+    /// The camera is omitted: post-Finalized scans are no-ops.
+    fn build_finalized_broadcast_screen(&self, title: String) -> ScreenModel {
+        let mut screen = self.build_success_screen(title);
+        if let Some(data) = &self.current_qr_data {
+            screen.components.push(Component::QrCode {
+                id: COMPONENT_ID_OWN_QR.into(),
+                data: data.clone(),
+                mode: QrMode::Display,
+                label: Some("Keep screens facing each other until the other phone finishes".into()),
+                scan_quality: None,
+                a11y: None,
+            });
+        }
+        screen
     }
 
     /// Active rendering — both QR (own card display) and camera

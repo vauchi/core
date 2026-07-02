@@ -539,7 +539,9 @@ vauchi-app/src/ui/exchange/ble.rs 1247
 #  audio-failed precedence. Option-agnostic — engine-side
 #  surface common to A/B/C; session-side 1.C.3+ commits to
 #  Option B per the design pass.)
-vauchi-app/src/ui/multi_stage_exchange.rs 2118
+# (2026-07-02: multi_stage_exchange.rs left the baseline — in-file test
+#  module split to multi_stage_exchange_tests.rs via #[path], engine
+#  file now ~998 lines.)
 
 # EXEMPT — UniFFI export surface only: the uniffi::Object struct, the
 # PlatformEventListener callback trait, and the exported typed-method

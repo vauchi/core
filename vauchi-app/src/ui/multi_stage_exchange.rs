@@ -1574,6 +1574,82 @@ mod tests {
 
     // @internal
     #[test]
+    fn finalized_before_session_ended_shows_success_with_qr_broadcast() {
+        // The contact is persisted at Finalized; the FINALIZED_GRACE
+        // broadcast that follows exists only for the peer (two-generals
+        // last-ack: a still-Complete peer needs our RDYY). The user must
+        // see Success immediately — with the own-QR still broadcasting
+        // under a keep-facing caption — instead of parking on
+        // "Almost done" for the whole grace window
+        // (2026-07-01-hover-exchange-completion-latency).
+        let mut engine = engine_with_qr(ProtocolState::Finalized, "GRACE-QR");
+        engine.set_finalized("Alice".into());
+        let screen = engine.current_screen();
+
+        let has_success = screen.components.iter().any(|c| {
+            matches!(
+                c,
+                Component::StatusIndicator { title, status: Status::Success, .. }
+                    if title == "Exchange Complete",
+            )
+        });
+        assert!(
+            has_success,
+            "Finalized before session end must already show the success indicator"
+        );
+
+        let broadcast_qr = screen.components.iter().find_map(|c| match c {
+            Component::QrCode {
+                data,
+                mode: QrMode::Display,
+                label,
+                ..
+            } => Some((data.clone(), label.clone())),
+            _ => None,
+        });
+        assert_eq!(
+            broadcast_qr,
+            Some((
+                "GRACE-QR".to_string(),
+                Some("Keep screens facing each other until the other phone finishes".to_string())
+            )),
+            "the own-QR must keep broadcasting through the grace window, \
+             captioned so the wait is legible"
+        );
+
+        assert!(
+            !screen.components.iter().any(|c| matches!(
+                c,
+                Component::QrCode {
+                    mode: QrMode::Scan,
+                    ..
+                }
+            )),
+            "post-Finalized scans are no-ops — the camera must be dropped"
+        );
+        assert_eq!(action_ids(&screen), vec![DONE_ACTION_ID]);
+    }
+
+    // @internal
+    #[test]
+    fn finalized_after_session_ended_drops_qr_broadcast() {
+        // session_ended (grace expiry) is the stop condition: the QR
+        // strip disappears from the success screen.
+        let mut engine = engine_with_qr(ProtocolState::Finalized, "GRACE-QR");
+        engine.set_finalized("Alice".into());
+        engine.set_session_ended();
+        let screen = engine.current_screen();
+        assert!(
+            !screen
+                .components
+                .iter()
+                .any(|c| matches!(c, Component::QrCode { .. })),
+            "after the grace expires the success screen carries no QR"
+        );
+    }
+
+    // @internal
+    #[test]
     fn finalized_with_session_ended_but_no_name_falls_back() {
         let mut engine = engine_with_state(ProtocolState::Finalized);
         engine.set_session_ended();

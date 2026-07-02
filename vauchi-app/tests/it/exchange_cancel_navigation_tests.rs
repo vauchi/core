@@ -14,6 +14,7 @@
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
+use vauchi_core::exchange::{ProtocolState, QrPayload};
 
 fn engine_with_identity() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -87,6 +88,70 @@ fn cancel_on_multi_stage_exchange_lands_on_real_screen() {
     assert_eq!(
         landed, "exchange",
         "Cancel should return to the mode picker (canonical tab-root id)"
+    );
+}
+
+// Zombie-engine regression (`2026-07-02-multistage-zombie-engine-across-
+// mode-reentry`): a cancelled `MultiStageExchangeEngine` was cached by
+// `is_cacheable` and revived verbatim on the next entry to the same mode —
+// stale "Transferring N/M" chrome with the `cancelled` latch set, so no
+// bridge update could ever repaint it (device-confirmed, Pixel 3a +
+// iPhone SE 2026-07-02). Re-entry must always build a fresh engine.
+// @internal
+#[test]
+fn reentering_multi_stage_after_cancel_starts_fresh() {
+    let mut engine = engine_with_identity();
+
+    let enter_hover = |engine: &mut AppEngine| {
+        let _ = engine.navigate_to(AppScreen::Exchange);
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:quick".into(),
+            item_id: "mode:hover".into(),
+        });
+    };
+    let rendered = |engine: &AppEngine| serde_json::to_string(&engine.current_screen()).unwrap();
+
+    enter_hover(&mut engine);
+    // Reproduce the device precondition: a peer engaged and the transfer
+    // was allocated before the user cancelled.
+    assert!(engine.apply_multi_stage_qr_payload(&QrPayload {
+        data: "frame-1".into(),
+        error_correction: "L".into(),
+        display_duration_ms: 300,
+    }));
+    assert!(engine.apply_multi_stage_state(ProtocolState::Transferring {
+        chunks_sent: 0,
+        chunks_total: 3,
+        chunks_received: 0,
+        peer_chunks_total: 3,
+    }));
+    assert!(
+        rendered(&engine).contains("Transferring 0/3"),
+        "precondition: the first session renders mid-transfer chrome"
+    );
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+
+    enter_hover(&mut engine);
+    let reentered = rendered(&engine);
+    assert!(
+        !reentered.contains("Transferring"),
+        "re-entry after cancel must not revive the cancelled engine's \
+         mid-transfer chrome (zombie screen), got: {reentered}"
+    );
+
+    // The fresh engine must accept bridge updates and repaint — the
+    // zombie's `cancelled` latch silently dropped every update.
+    assert!(engine.apply_multi_stage_qr_payload(&QrPayload {
+        data: "frame-2".into(),
+        error_correction: "L".into(),
+        display_duration_ms: 300,
+    }));
+    assert!(
+        rendered(&engine).contains("Show this"),
+        "fresh engine must repaint with the idle QR label after re-entry"
     );
 }
 

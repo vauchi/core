@@ -118,7 +118,15 @@ impl WorkflowEngine for LockScreenEngine {
                 self.entered_pin = value;
                 ActionResult::UpdateScreen(self.current_screen())
             }
-            UserAction::ActionPressed { action_id } if action_id == "unlock" => {
+            // "unlock" is the rendered button; "submit_pin" is what frontends
+            // emit when the user presses Enter/return in the password
+            // TextInput (the `submit_{id}` convention shared by onboarding,
+            // backup, etc.). Both must unlock — else Enter-to-unlock is dead
+            // (a TUI regression from the lock input becoming a TextInput,
+            // 2026-07-03-lock-screen-pin-cap-locks-out-passwords).
+            UserAction::ActionPressed { action_id }
+                if action_id == "unlock" || action_id == "submit_pin" =>
+            {
                 if self.entered_pin.is_empty() {
                     ActionResult::ValidationError {
                         component_id: "pin".into(),

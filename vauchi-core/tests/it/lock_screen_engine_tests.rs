@@ -102,6 +102,24 @@ fn lock_screen_submit_returns_complete() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// Enter/return in the password field emits `submit_pin` (the `submit_{id}`
+// convention, TextInput). It must unlock exactly like the "unlock" button —
+// else Enter-to-unlock is dead in the TUI (regression from PinInput →
+// TextInput).
+// @internal
+#[test]
+fn lock_screen_submit_pin_action_unlocks() {
+    let mut engine = LockScreenEngine::new(3);
+    enter(&mut engine, "my-long-password");
+    assert_eq!(
+        engine.handle_action(UserAction::ActionPressed {
+            action_id: "submit_pin".into(),
+        }),
+        ActionResult::Complete,
+        "Enter (submit_pin) must unlock, not just the rendered unlock button"
+    );
+}
+
 // @internal
 #[test]
 fn lock_screen_empty_submit_shows_validation() {

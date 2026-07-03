@@ -191,7 +191,11 @@ lint:semver:
   needs: []
   allow_failure: true
   script:
-    - command -v cargo-semver-checks >/dev/null 2>&1 || cargo binstall cargo-semver-checks --no-confirm 2>/dev/null || cargo install cargo-semver-checks
+    # Always refresh the binary: shell runners persist a preinstalled
+    # cargo-semver-checks forever, and a stale one cannot parse newer
+    # nightly rustdoc JSON (format v60 broke v56/v57-era binaries,
+    # 2026-07-02). On download failure fall back to whatever exists.
+    - cargo binstall cargo-semver-checks --no-confirm --force 2>/dev/null || command -v cargo-semver-checks >/dev/null 2>&1 || cargo install cargo-semver-checks
     - rustup toolchain install nightly --profile minimal --component rustdoc 2>/dev/null || true
     - git fetch origin main
     # vauchi-protocol: no workspace path deps, can check directly

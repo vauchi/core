@@ -93,17 +93,27 @@ impl DuressPinEngine {
                 }],
                 a11y: None,
             },
-            Component::ToggleList {
-                id: "duress_toggle".into(),
-                label: "Status".into(),
-                items: vec![ToggleItem {
-                    id: "enabled".into(),
-                    label: "Duress PIN enabled".into(),
-                    selected: self.config.enabled,
-                    subtitle: None,
-                    a11y: None,
-                    info_key: None,
-                }],
+            Component::StatusIndicator {
+                id: "duress_status".into(),
+                icon: Some(
+                    if self.config.enabled {
+                        "checkmark.shield.fill"
+                    } else {
+                        "exclamationmark.shield"
+                    }
+                    .into(),
+                ),
+                title: if self.config.enabled {
+                    "Duress PIN enabled".into()
+                } else {
+                    "Duress PIN not set up".into()
+                },
+                detail: None,
+                status: if self.config.enabled {
+                    Status::Success
+                } else {
+                    Status::Warning
+                },
                 a11y: None,
             },
         ];

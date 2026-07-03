@@ -111,17 +111,27 @@ impl EmergencyBroadcastEngine {
                 }],
                 a11y: None,
             },
-            Component::ToggleList {
-                id: "emergency_toggle".into(),
-                label: "Status".into(),
-                items: vec![ToggleItem {
-                    id: "configured".into(),
-                    label: "Emergency broadcast configured".into(),
-                    selected: self.configured,
-                    subtitle: None,
-                    a11y: None,
-                    info_key: None,
-                }],
+            Component::StatusIndicator {
+                id: "emergency_status".into(),
+                icon: Some(
+                    if self.configured {
+                        "checkmark.circle.fill"
+                    } else {
+                        "exclamationmark.circle"
+                    }
+                    .into(),
+                ),
+                title: if self.configured {
+                    "Emergency broadcast configured".into()
+                } else {
+                    "Emergency broadcast not set up".into()
+                },
+                detail: None,
+                status: if self.configured {
+                    Status::Success
+                } else {
+                    Status::Warning
+                },
                 a11y: None,
             },
         ];

@@ -27,6 +27,38 @@ fn overview_unconfigured_offers_only_configure() {
     assert_eq!(ids, vec!["configure"], "unconfigured offers only configure");
 }
 
+// The overview status must be a read-only StatusIndicator, not an
+// interactive ToggleList the engine snaps back (a control that cannot
+// act — 2026-07-03-coercion-safety-config-gaps defect 3).
+// @internal
+#[test]
+fn overview_shows_read_only_status_not_dead_toggle() {
+    let engine = EmergencyBroadcastEngine::new(None);
+    let screen = engine.current_screen();
+    assert!(
+        !screen.components.iter().any(|c| matches!(
+            c,
+            Component::ToggleList { id, .. } if id == "emergency_toggle"
+        )),
+        "overview must not render a dead interactive toggle for status"
+    );
+    let status = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::StatusIndicator { id, status, .. } if id == "emergency_status" => {
+                Some(status.clone())
+            }
+            _ => None,
+        })
+        .expect("overview must show a read-only StatusIndicator");
+    assert_eq!(
+        status,
+        Status::Warning,
+        "unconfigured emergency broadcast must surface a Warning status"
+    );
+}
+
 // @internal
 #[test]
 fn overview_configured_offers_send_and_disable() {

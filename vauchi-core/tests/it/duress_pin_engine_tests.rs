@@ -47,34 +47,37 @@ fn duress_starts_at_overview() {
     );
 }
 
+// The overview status must be a read-only StatusIndicator, not an
+// interactive ToggleList the engine snaps back (a control that cannot
+// act — 2026-07-03-coercion-safety-config-gaps defect 3).
 // @internal
 #[test]
-fn duress_overview_shows_enable_toggle() {
+fn duress_overview_shows_read_only_status_not_dead_toggle() {
     let engine = DuressPinEngine::new(default_config());
     let screen = engine.current_screen();
 
-    let toggle_list = screen
+    assert!(
+        !screen.components.iter().any(|c| matches!(
+            c,
+            Component::ToggleList { id, .. } if id == "duress_toggle"
+        )),
+        "overview must not render a dead interactive toggle for status"
+    );
+    let status = screen
         .components
         .iter()
-        .find(|c| {
-            matches!(c, Component::ToggleList { id, ..
-        } if id == "duress_toggle")
+        .find_map(|c| match c {
+            Component::StatusIndicator { id, status, .. } if id == "duress_status" => {
+                Some(status.clone())
+            }
+            _ => None,
         })
-        .expect("should have a ToggleList for duress toggle");
-
-    match toggle_list {
-        Component::ToggleList { items, .. } => {
-            let enabled_item = items
-                .iter()
-                .find(|i| i.id == "enabled")
-                .expect("should have 'enabled' toggle item");
-            assert!(
-                !enabled_item.selected,
-                "enabled toggle should be off for default config"
-            );
-        }
-        _ => unreachable!(),
-    }
+        .expect("overview must show a read-only StatusIndicator for enabled state");
+    assert_eq!(
+        status,
+        Status::Warning,
+        "default (not set up) duress must surface a Warning status"
+    );
 
     // When disabled, should show "Set Up PIN" and no disable action
     let configure = screen

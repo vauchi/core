@@ -20,18 +20,12 @@
       }
     },
     {
-      "ToggleList": {
-        "id": "duress_toggle",
-        "label": "Status",
-        "items": [
-          {
-            "id": "enabled",
-            "label": "Duress PIN enabled",
-            "selected": false,
-            "subtitle": null,
-            "a11y": null
-          }
-        ],
+      "StatusIndicator": {
+        "id": "duress_status",
+        "icon": "exclamationmark.shield",
+        "title": "Duress PIN not set up",
+        "detail": null,
+        "status": "Warning",
         "a11y": null
       }
     }

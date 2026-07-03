@@ -20,18 +20,12 @@
       }
     },
     {
-      "ToggleList": {
-        "id": "emergency_toggle",
-        "label": "Status",
-        "items": [
-          {
-            "id": "configured",
-            "label": "Emergency broadcast configured",
-            "selected": false,
-            "subtitle": null,
-            "a11y": null
-          }
-        ],
+      "StatusIndicator": {
+        "id": "emergency_status",
+        "icon": "exclamationmark.circle",
+        "title": "Emergency broadcast not set up",
+        "detail": null,
+        "status": "Warning",
         "a11y": null
       }
     }

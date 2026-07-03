@@ -116,6 +116,11 @@ pub struct ExchangeEngine {
     field_preview: Option<FieldPreviewConfig>,
     /// Reciprocity confirmation cascade driver (created on exchange completion).
     reciprocity_confirmer: Option<ReciprocityConfirmer>,
+    /// Terminal reciprocity outcome, once the confirmer resolves. Latched so
+    /// the `Complete` step-sync does not re-arm a fresh confirmer — session
+    /// confirmation tokens persist through `Complete`, so without this the
+    /// re-create guard fires forever and the flow never leaves `Verifying`.
+    reciprocity_outcome: Option<vauchi_core::exchange::reciprocity::Reciprocity>,
     /// Wall-clock source for time-stamped sub-engines
     /// (`ReciprocityConfirmer`). Threaded through both constructors;
     /// production callers pass `vauchi.clock()`, tests use
@@ -201,6 +206,7 @@ impl ExchangeEngine {
             mode_selection,
             field_preview: None,
             reciprocity_confirmer: None,
+            reciprocity_outcome: None,
             clock,
             success_summary: None,
         }
@@ -248,6 +254,7 @@ impl ExchangeEngine {
             mode_selection,
             field_preview: None,
             reciprocity_confirmer: None,
+            reciprocity_outcome: None,
             clock,
             success_summary: None,
         }
@@ -795,14 +802,15 @@ impl WorkflowEngine for ExchangeEngine {
         // Route escrow events to reciprocity confirmer if active.
         // Check reciprocity result before clearing — the step sync below
         // uses it to decide Success vs Failed.
-        let mut reciprocity_result = None;
         if let Some(ref mut confirmer) = self.reciprocity_confirmer {
             if let Some(ref evt) = event_for_confirmer {
                 let cmds = confirmer.handle_event(evt);
                 commands.extend(cmds);
             }
             if confirmer.is_done() {
-                reciprocity_result = Some(confirmer.reciprocity());
+                // Latch the terminal outcome so the `Complete` arm below does
+                // not re-arm a fresh confirmer (tokens persist in `Complete`).
+                self.reciprocity_outcome = Some(confirmer.reciprocity());
                 self.reciprocity_confirmer = None;
             }
         }
@@ -825,6 +833,7 @@ impl WorkflowEngine for ExchangeEngine {
                 // this prevents asymmetric exchanges where one side saves a
                 // contact but the other never received the data.
                 if self.reciprocity_confirmer.is_none()
+                    && self.reciprocity_outcome.is_none()
                     && let (Some(our_token), Some(their_token)) = (
                         session.our_confirmation_token().copied(),
                         session.expected_their_token().copied(),
@@ -844,20 +853,14 @@ impl WorkflowEngine for ExchangeEngine {
                     self.reciprocity_confirmer = Some(confirmer);
                     // Stay on Verifying while waiting for peer confirmation
                     self.step = ExchangeStep::Verifying;
-                } else if let Some(result) = reciprocity_result {
-                    // Confirmer just finished — check result
-                    match result {
-                        vauchi_core::exchange::reciprocity::Reciprocity::Confirmed => {
-                            self.step = ExchangeStep::Success;
-                        }
-                        _ => {
-                            // Escrow exhausted without confirmation — peer
-                            // didn't deposit their token. Exchange failed.
-                            self.failure_detail =
-                                Some("Exchange not confirmed by the other device".into());
-                            self.step = ExchangeStep::Failed;
-                        }
-                    }
+                } else if self.reciprocity_outcome.is_some() {
+                    // Reciprocity resolved. Both Confirmed and Pending keep the
+                    // received contact: at Complete the peer's card + keys are
+                    // already in hand; Pending only means the peer's save of
+                    // ours is unconfirmed, which relay sync resolves later. Done
+                    // persists via complete_exchange. Failed is reserved for a
+                    // true protocol failure (the ExchangeState::Failed arm).
+                    self.step = ExchangeStep::Success;
                 } else if self.reciprocity_confirmer.is_some() {
                     // Confirmer still running — stay on Verifying
                     self.step = ExchangeStep::Verifying;
@@ -1435,6 +1438,146 @@ mod tests {
                 },
             ),
             "start_exchange must hand off to multi-stage; got {result:?}",
+        );
+    }
+
+    /// Drive a QR `ExchangeSession` to `Complete` (peer card received, keys
+    /// agreed, escrow tokens derived). Returns the session and its escrow
+    /// gate (hex) for building matching `RelayEscrow*` events.
+    fn qr_session_at_complete() -> (vauchi_core::exchange::ExchangeSession, String) {
+        use vauchi_core::contact_card::ContactCard;
+        use vauchi_core::exchange::{
+            ExchangeEvent, ExchangeSession, ManualConfirmationVerifier, ProximityConfidence,
+        };
+        use vauchi_core::identity::Identity;
+        let clock = vauchi_core::clock::SystemClock::shared();
+        let mut alice = ExchangeSession::new_qr(
+            Identity::create("Alice", 0),
+            ContactCard::new("Alice"),
+            ManualConfirmationVerifier::new(),
+            clock.clone(),
+        );
+        let mut bob = ExchangeSession::new_qr(
+            Identity::create("Bob", 1),
+            ContactCard::new("Bob"),
+            ManualConfirmationVerifier::new(),
+            clock.clone(),
+        );
+        alice.apply(ExchangeEvent::StartQR).unwrap();
+        bob.apply(ExchangeEvent::StartQR).unwrap();
+        let qr_bob = bob.qr().unwrap().clone();
+        // Mirror the engine's own QR auto-advance sequence (handle_hardware_event).
+        alice.apply(ExchangeEvent::ProcessQR(qr_bob)).unwrap();
+        alice.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+        alice
+            .apply(ExchangeEvent::ProximityCheckCompleted {
+                confidence: ProximityConfidence::Medium,
+            })
+            .unwrap();
+        alice.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
+        alice
+            .apply(ExchangeEvent::CompleteExchange(ContactCard::new("Alice")))
+            .unwrap();
+        assert!(
+            matches!(
+                alice.state(),
+                vauchi_core::exchange::ExchangeState::Complete { .. }
+            ),
+            "session must reach Complete, got {:?}",
+            alice.state()
+        );
+        let gate = alice
+            .confirmation_escrow()
+            .expect("escrow tokens available at Complete")
+            .0
+            .to_string();
+        (alice, gate)
+    }
+
+    // Regression: a Pending reciprocity outcome (transient relay hiccup)
+    // must NOT route to the Failed screen. At Complete the peer's card is
+    // fully received; Pending only means the peer's save is unconfirmed.
+    // Failed discarded the received contact (the received data + ratchet),
+    // the data-loss bug from 2026-06-04-exchange-terminal-screens (New
+    // finding) / 2026-07-03 GUI audit ranked #2. Map Pending to Success so
+    // the Done handler persists via complete_exchange.
+    // @internal
+    #[test]
+    fn pending_reciprocity_routes_to_success_not_failed() {
+        let (session, gate) = qr_session_at_complete();
+        let gate_hash = hex::decode(&gate).expect("escrow gate is hex");
+        let mut engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
+
+        // First escrow event: the Complete session no-ops it; the engine
+        // creates the reciprocity confirmer and moves to Verifying.
+        let _ = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowReady {
+            gate_hash: gate_hash.clone(),
+        });
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Verifying,
+            "an active confirmer keeps the flow on Verifying"
+        );
+
+        // Peer deposited a non-matching blob → confirmer resolves Pending.
+        let _ = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowBlobReceived {
+            gate_hash,
+            blob: vec![0xFF; 32],
+        });
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Success,
+            "Pending reciprocity must land on Success (contact kept), not Failed/stuck-Verifying"
+        );
+    }
+
+    // Happy path: a Confirmed reciprocity outcome must reach Success and stay
+    // there — the confirmer must not be re-armed after it resolves (tokens
+    // persist in Complete, so the pre-fix code looped back to Verifying).
+    // @internal
+    #[test]
+    fn confirmed_reciprocity_reaches_and_stays_on_success() {
+        let (session, gate) = qr_session_at_complete();
+        let gate_hash = hex::decode(&gate).expect("escrow gate is hex");
+        // The matching blob is our expected peer token — read it before the
+        // session is moved into the engine.
+        let expected_peer_token = *session
+            .expected_their_token()
+            .expect("expected-peer token available at Complete");
+        let mut engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
+
+        let _ = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowReady {
+            gate_hash: gate_hash.clone(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Verifying);
+
+        let _ = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowBlobReceived {
+            gate_hash,
+            blob: expected_peer_token.to_vec(),
+        });
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Success,
+            "Confirmed reciprocity must reach Success"
+        );
+
+        // A further escrow event must not re-arm the confirmer / bounce back
+        // to Verifying — the outcome is latched.
+        let _ = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowReady {
+            gate_hash: hex::decode(&gate).expect("hex"),
+        });
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Success,
+            "resolved exchange must stay on Success, not re-arm the confirmer"
         );
     }
 

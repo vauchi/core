@@ -1008,10 +1008,6 @@ impl PlatformAppEngine {
             | DomainCommand::CheckConsent { .. }
             | DomainCommand::GetConsentStatus { .. }
             | DomainCommand::GetConsentRecords
-            | DomainCommand::IsContentUpdatesSupported
-            | DomainCommand::CheckContentUpdates
-            | DomainCommand::ApplyContentUpdates
-            | DomainCommand::ReloadSocialNetworks
             | DomainCommand::RunContentUpdateCycle
             | DomainCommand::HasSeenAhaMoment { .. }
             | DomainCommand::TryTriggerAhaMoment { .. }

@@ -27,7 +27,6 @@
 //! with new variants without breaking existing call sites — UniFFI
 //! treats added enum cases as additive on the binding side.
 
-use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::mobile_contact_detail::MobileContactDetailViewState;
 use crate::mobile_import::MobileImportResult;
 use crate::types::{
@@ -73,21 +72,12 @@ pub enum DomainCommand {
     GetConsentRecords,
 
     // ── Content Updates (B7 batch 2) ──
-    /// Returns `true` when the `content-updates` Cargo feature is
-    /// enabled at compile time.
-    IsContentUpdatesSupported,
-    /// Check the remote update server for available content updates.
-    /// Blocking — returns `Disabled` when the feature is off.
-    CheckContentUpdates,
-    /// Download and cache available updates. Returns the per-type
-    /// outcome (applied vs failed). `Disabled` when the feature is off.
-    ApplyContentUpdates,
-    /// Reload the social-networks list from the content cache after
-    /// `ApplyContentUpdates` succeeds.
-    ReloadSocialNetworks,
     /// Whole cycle core-side (check → apply → invalidation), returning
-    /// a presentation-only outcome. Supersedes frontend-sequenced
-    /// Check→Apply→Reload for schedulers (ADR-021/ADR-043).
+    /// a presentation-only outcome. The sole content-update entry point
+    /// after all frontends adopted it (2026-07-03); the per-step
+    /// `IsContentUpdatesSupported`/`CheckContentUpdates`/
+    /// `ApplyContentUpdates`/`ReloadSocialNetworks` variants were retired
+    /// with their frontend consumers (ADR-021/ADR-043).
     RunContentUpdateCycle,
 
     // ── GDPR / Deletion + read-only shred status (B7 batch 3) ──
@@ -780,15 +770,7 @@ pub enum DomainCommandResult {
     ConsentRecords {
         records: Vec<MobileConsentRecord>,
     },
-    /// Outcome of `CheckContentUpdates` (B7 batch 2).
-    UpdateStatus {
-        status: MobileUpdateStatus,
-    },
-    /// Outcome of `ApplyContentUpdates` (B7 batch 2).
-    ApplyResult {
-        result: MobileApplyResult,
-    },
-    /// List of `MobileSocialNetwork` (B7 batch 2 — `ReloadSocialNetworks`).
+    /// List of `MobileSocialNetwork` (`List`/`SearchSocialNetworks`).
     SocialNetworks {
         networks: Vec<MobileSocialNetwork>,
     },

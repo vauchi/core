@@ -132,11 +132,16 @@ pub fn engine_with_password(password: &str) -> AppEngine {
 
 /// Helper: enter a PIN into the lock screen engine.
 pub fn enter_pin(engine: &mut AppEngine, pin: &str) {
+    // Simulate a text renderer: each keystroke forwards the full field
+    // value so far. The lock screen is a masked TextInput that echoes the
+    // value and replaces wholesale (not a per-char PinInput), so single
+    // chars would leave only the last one — unlock result asserted by caller.
+    let mut entered = String::new();
     for ch in pin.chars() {
-        // Intermediate step: accumulate PIN digits — unlock result asserted by caller
+        entered.push(ch);
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),
-            value: ch.to_string(),
+            value: entered.clone(),
         });
     }
 }

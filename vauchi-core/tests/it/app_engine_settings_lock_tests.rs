@@ -632,7 +632,7 @@ fn lock_screen_tracks_failed_attempts() {
     let has_validation_error = screen.components.iter().any(|c| {
         matches!(
             c,
-            vauchi_app::ui::Component::PinInput {
+            vauchi_app::ui::Component::TextInput {
                 validation_error: Some(_),
                 ..
             }

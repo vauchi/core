@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Lock screen engine — PIN entry screen with attempt tracking.
+//! Lock screen engine — credential entry with attempt tracking.
 
 use crate::ui::*;
 use zeroize::Zeroize;
@@ -14,7 +14,6 @@ pub const DEFAULT_LOCK_MAX_ATTEMPTS: usize = 5;
 #[derive(Debug)]
 pub struct LockScreenEngine {
     entered_pin: String,
-    pin_length: usize,
     max_attempts: usize,
     attempts: usize,
 }
@@ -29,7 +28,6 @@ impl LockScreenEngine {
     pub fn new(max_attempts: usize) -> Self {
         Self {
             entered_pin: String::new(),
-            pin_length: 6,
             max_attempts,
             attempts: 0,
         }
@@ -57,18 +55,27 @@ impl LockScreenEngine {
 
 impl WorkflowEngine for LockScreenEngine {
     fn current_screen(&self) -> ScreenModel {
-        let components = vec![Component::PinInput {
+        // A masked free-text field, not a fixed-length PinInput: the app
+        // password can be up to 128 chars and alphanumeric, and the duress
+        // PIN is typed into this same field — a numeric 6-slot widget locks
+        // both out (2026-07-03-lock-screen-pin-cap-locks-out-passwords).
+        let components = vec![Component::TextInput {
             id: "pin".into(),
             label: "Password".into(),
-            length: self.pin_length,
-            filled: self.entered_pin.len(),
-            masked: true,
+            // Echo the entered value: the TUI reconstructs the field from
+            // this on every keystroke (no local buffer); masking is the
+            // renderer's job via `input_type` (matches `display_name`).
+            value: self.entered_pin.clone(),
+            placeholder: None,
+            max_length: Some(128),
             validation_error: self.pin_validation_error(),
+            input_type: InputType::Password,
             a11y: Some(A11y {
-                label: Some("PIN entry".into()),
-                hint: Some("Enter your PIN to unlock".into()),
+                label: Some("Password entry".into()),
+                hint: Some("Enter your password to unlock".into()),
                 role: None,
             }),
+            info_key: None,
         }];
 
         let actions = vec![ScreenAction {
@@ -106,18 +113,9 @@ impl WorkflowEngine for LockScreenEngine {
                 component_id,
                 value,
             } if component_id == "pin" => {
-                if value.is_empty() {
-                    // Backspace: remove last character
-                    self.entered_pin.pop();
-                } else if value.len() == 1 {
-                    // Single character: accumulate (ignore if at max length)
-                    if self.entered_pin.len() < self.pin_length {
-                        self.entered_pin.push_str(&value);
-                    }
-                } else {
-                    // Full value (e.g. from programmatic input): replace
-                    self.entered_pin = value;
-                }
+                // Masked TextInput sends the full current value on each change.
+                self.entered_pin.zeroize();
+                self.entered_pin = value;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ActionPressed { action_id } if action_id == "unlock" => {

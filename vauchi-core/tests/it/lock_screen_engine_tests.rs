@@ -2,84 +2,100 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! Lock screen renders a masked free-text password field, not a
+//! fixed-length numeric PinInput.
+//!
+//! Regression suite for the P0 lockout bug (2026-07-03 GUI audit,
+//! `2026-07-03-lock-screen-pin-cap-locks-out-passwords`): the app
+//! password is free-text up to 128 chars and the duress PIN is typed
+//! into the same field, so the unlock surface must accept the whole
+//! credential unchanged. A 6-slot numeric PinInput locked both out.
+
 use vauchi_app::ui::*;
+
+fn lock_input(screen: &ScreenModel) -> (&str, &InputType, &Option<String>) {
+    match screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::TextInput { id, .. } if id == "pin"))
+        .expect("lock screen must render a TextInput with id 'pin'")
+    {
+        Component::TextInput {
+            value,
+            input_type,
+            validation_error,
+            ..
+        } => (value.as_str(), input_type, validation_error),
+        _ => unreachable!(),
+    }
+}
+
+fn enter(engine: &mut LockScreenEngine, value: &str) {
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: value.into(),
+    });
+}
+
+fn unlock_enabled(screen: &ScreenModel) -> bool {
+    screen
+        .actions
+        .iter()
+        .find(|a| a.id == "unlock")
+        .expect("should have unlock action")
+        .enabled
+}
 
 // @internal
 #[test]
 fn lock_screen_id() {
     let engine = LockScreenEngine::new(3);
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "lock_screen");
+    assert_eq!(engine.current_screen().screen_id, "lock_screen");
 }
 
 // @internal
 #[test]
-fn lock_screen_has_pin_input() {
+fn lock_screen_renders_masked_password_field_not_pin_input() {
     let engine = LockScreenEngine::new(3);
     let screen = engine.current_screen();
-    let pin = screen
-        .components
-        .iter()
-        .find(|c| {
-            matches!(c, Component::PinInput { id, ..
-        } if id == "pin")
-        })
-        .expect("should have a PinInput component with id 'pin'");
-    match pin {
-        Component::PinInput { masked, .. } => {
-            assert!(*masked, "PinInput should be masked");
-        }
-        _ => unreachable!(),
-    }
+    assert!(
+        !screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::PinInput { .. })),
+        "lock screen must not render a fixed-length PinInput"
+    );
+    let (_, input_type, _) = lock_input(&screen);
+    assert_eq!(
+        *input_type,
+        InputType::Password,
+        "the credential field must be a masked password input"
+    );
 }
 
 // @internal
 #[test]
 fn lock_screen_unlock_disabled_when_empty() {
     let engine = LockScreenEngine::new(3);
-    let screen = engine.current_screen();
-    let unlock = screen
-        .actions
-        .iter()
-        .find(|a| a.id == "unlock")
-        .expect("should have unlock action");
     assert!(
-        !unlock.enabled,
-        "unlock should be disabled when pin is empty"
+        !unlock_enabled(&engine.current_screen()),
+        "unlock should be disabled when the field is empty"
     );
 }
 
 // @internal
 #[test]
-fn lock_screen_text_input_enables_unlock() {
+fn lock_screen_full_value_enables_unlock() {
     let mut engine = LockScreenEngine::new(3);
-    let result = engine.handle_action(UserAction::TextChanged {
-        component_id: "pin".into(),
-        value: "1234".into(),
-    });
-    let screen = match result {
-        ActionResult::UpdateScreen(s) => s,
-        other => panic!("expected UpdateScreen, got {:?}", other),
-    };
-    let unlock = screen
-        .actions
-        .iter()
-        .find(|a| a.id == "unlock")
-        .expect("should have unlock action");
-    assert!(
-        unlock.enabled,
-        "unlock should be enabled after entering pin"
-    );
+    enter(&mut engine, "1234");
+    assert!(unlock_enabled(&engine.current_screen()));
 }
 
 // @internal
 #[test]
 fn lock_screen_submit_returns_complete() {
     let mut engine = LockScreenEngine::new(3);
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "pin".into(),
-        value: "123456".into(),
-    });
+    enter(&mut engine, "123456");
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "unlock".into(),
     });
@@ -109,38 +125,18 @@ fn lock_screen_empty_submit_shows_validation() {
 #[test]
 fn lock_screen_failed_attempt_shows_remaining() {
     let mut engine = LockScreenEngine::new(3);
-    let locked_out = engine.record_failed_attempt();
-    assert!(!locked_out, "should not be locked out after 1 attempt");
+    assert!(!engine.record_failed_attempt(), "1 attempt is not lockout");
 
     let screen = engine.current_screen();
-    let pin = screen
-        .components
-        .iter()
-        .find(|c| {
-            matches!(c, Component::PinInput { id, ..
-        } if id == "pin")
-        })
-        .expect("should have PinInput");
-    match pin {
-        Component::PinInput {
-            validation_error, ..
-        } => {
-            let error = validation_error
-                .as_ref()
-                .expect("should have validation error after failed attempt");
-            assert!(
-                error.contains("2"),
-                "should show 2 remaining attempts, got: {}",
-                error
-            );
-            assert!(
-                error.contains("remaining"),
-                "should mention 'remaining', got: {}",
-                error
-            );
-        }
-        _ => unreachable!(),
-    }
+    let (_, _, validation_error) = lock_input(&screen);
+    let error = validation_error
+        .as_ref()
+        .expect("a failed attempt must surface a remaining-attempts message");
+    assert!(error.contains('2'), "should show 2 remaining, got: {error}");
+    assert!(
+        error.contains("remaining"),
+        "should mention 'remaining', got: {error}"
+    );
 }
 
 // @internal
@@ -151,159 +147,68 @@ fn lock_screen_max_attempts_lockout() {
     assert!(!engine.record_failed_attempt()); // 2 of 3
     assert!(
         engine.record_failed_attempt(),
-        "should return true when max attempts reached"
+        "should lock out at max attempts"
     ); // 3 of 3
 }
 
+// The TUI has no local edit buffer — it reconstructs the field from the
+// value core echoes, appending each keystroke. If core stops echoing the
+// value, TUI unlock silently degrades to last-char-only. Lock that in.
 // @internal
 #[test]
-fn lock_screen_pin_accumulates_single_chars() {
+fn lock_screen_echoes_entered_value_for_tui_accumulation() {
     let mut engine = LockScreenEngine::new(3);
-
-    // Type "1", "2", "3", "4" one char at a time (simulating TUI key presses)
-    for ch in ['1', '2', '3', '4'] {
-        let _ = engine.handle_action(UserAction::TextChanged {
-            component_id: "pin".into(),
-            value: ch.to_string(),
-        });
-    }
-
-    // The unlock button should be enabled (pin is non-empty)
-    let screen = engine.current_screen();
-    let unlock = screen
-        .actions
-        .iter()
-        .find(|a| a.id == "unlock")
-        .expect("should have unlock action");
-    assert!(
-        unlock.enabled,
-        "unlock should be enabled after typing 4 chars"
-    );
-
-    let pin = screen
-        .components
-        .iter()
-        .find(|c| {
-            matches!(c, Component::PinInput { id, ..
-        } if id == "pin")
-        })
-        .expect("should have PinInput");
-    match pin {
-        Component::PinInput { filled, .. } => {
-            assert_eq!(
-                *filled, 4,
-                "should have 4 filled positions after typing 1234"
-            );
-        }
-        _ => unreachable!(),
-    }
+    enter(&mut engine, "1");
+    assert_eq!(lock_input(&engine.current_screen()).0, "1");
+    enter(&mut engine, "12");
+    assert_eq!(lock_input(&engine.current_screen()).0, "12");
 }
 
 // @internal
 #[test]
-fn lock_screen_pin_backspace_removes_last_char() {
+fn lock_screen_shorter_value_replaces_on_backspace() {
     let mut engine = LockScreenEngine::new(3);
-
-    for ch in ['1', '2', '3'] {
-        let _ = engine.handle_action(UserAction::TextChanged {
-            component_id: "pin".into(),
-            value: ch.to_string(),
-        });
-    }
-
-    // Backspace (empty value = delete last char)
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "pin".into(),
-        value: String::new(),
-    });
-
+    enter(&mut engine, "123");
+    enter(&mut engine, "12"); // backspace in a full-value field sends the shorter value
     let screen = engine.current_screen();
-    let pin = screen
-        .components
-        .iter()
-        .find(|c| {
-            matches!(c, Component::PinInput { id, ..
-        } if id == "pin")
-        })
-        .expect("should have PinInput");
-    match pin {
-        Component::PinInput { filled, .. } => {
-            assert_eq!(
-                *filled, 2,
-                "should have 2 filled positions after typing 123 then backspace"
-            );
-        }
-        _ => unreachable!(),
-    }
+    assert_eq!(lock_input(&screen).0, "12");
+    assert!(unlock_enabled(&screen));
 }
 
 // @internal
 #[test]
-fn lock_screen_pin_backspace_on_empty_is_noop() {
+fn lock_screen_clearing_disables_unlock() {
     let mut engine = LockScreenEngine::new(3);
-
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "pin".into(),
-        value: String::new(),
-    });
-
+    enter(&mut engine, "123");
+    enter(&mut engine, "");
     let screen = engine.current_screen();
-    let pin = screen
-        .components
-        .iter()
-        .find(|c| {
-            matches!(c, Component::PinInput { id, ..
-        } if id == "pin")
-        })
-        .expect("should have PinInput");
-    match pin {
-        Component::PinInput { filled, .. } => {
-            assert_eq!(
-                *filled, 0,
-                "should have 0 filled positions after backspace on empty"
-            );
-        }
-        _ => unreachable!(),
-    }
-
-    let unlock = screen
-        .actions
-        .iter()
-        .find(|a| a.id == "unlock")
-        .expect("should have unlock action");
+    assert_eq!(lock_input(&screen).0, "");
     assert!(
-        !unlock.enabled,
-        "unlock should be disabled when pin is empty"
+        !unlock_enabled(&screen),
+        "clearing the field must disable unlock"
     );
 }
 
+// Core regression for the lockout: a long alphanumeric password must be
+// retained unchanged — no 6-char cap, no numeric-only restriction.
 // @internal
 #[test]
-fn lock_screen_pin_does_not_exceed_length() {
-    let mut engine = LockScreenEngine::new(3);
-
-    // Type 8 chars (length is 6)
-    for ch in ['1', '2', '3', '4', '5', '6', '7', '8'] {
-        let _ = engine.handle_action(UserAction::TextChanged {
-            component_id: "pin".into(),
-            value: ch.to_string(),
-        });
-    }
-
+fn lock_screen_accepts_long_alphanumeric_password() {
+    let mut engine = LockScreenEngine::new(5);
+    let password = "Tr0ub4dour&3!longphrase";
+    enter(&mut engine, password);
     let screen = engine.current_screen();
-    let pin = screen
-        .components
-        .iter()
-        .find(|c| {
-            matches!(c, Component::PinInput { id, ..
-        } if id == "pin")
-        })
-        .expect("should have PinInput");
-    match pin {
-        Component::PinInput { filled, length, .. } => {
-            assert_eq!(*filled, 6, "filled should be capped at length");
-            assert_eq!(*length, 6);
-        }
-        _ => unreachable!(),
-    }
+    assert_eq!(
+        lock_input(&screen).0,
+        password,
+        "the full credential must be retained, not truncated to 6"
+    );
+    assert!(unlock_enabled(&screen));
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::Lock {
+            pin: password.into()
+        }),
+        "the full password must reach authenticate() unchanged"
+    );
 }

@@ -10,8 +10,8 @@
 //! the hub will read (CC-03).
 
 use vauchi_app::ui::{
-    BackupFormSnapshot, EmergencyBroadcastPlan, EngineOutput, OnboardingEngine, UserAction,
-    WorkflowEngine,
+    BackupFormSnapshot, Component, EmergencyBroadcastPlan, EngineOutput, InputType,
+    OnboardingEngine, UserAction, WorkflowEngine,
 };
 
 // @scenario: onboarding.feature - Completing onboarding creates identity
@@ -87,7 +87,7 @@ fn backup_output_redacts_password_in_debug() {
 
 // @scenario: lock.feature - Unlocking with the app password
 #[test]
-fn lock_output_carries_pin_and_redacts_debug() {
+fn lock_output_carries_credential_and_redacts_debug() {
     use vauchi_app::ui::LockScreenEngine;
     let mut engine = LockScreenEngine::new(4);
     assert_eq!(
@@ -95,18 +95,57 @@ fn lock_output_carries_pin_and_redacts_debug() {
         None,
         "empty entry must expose no output"
     );
-    for digit in ["1", "2", "3", "4"] {
+    // A masked TextInput emits the full current value on each change
+    // (standard text-field semantics), not one char per keystroke.
+    for value in ["1", "12", "123", "1234"] {
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),
-            value: digit.into(),
+            value: value.into(),
         });
     }
-    let output = engine.engine_output().expect("pin output");
+    let output = engine.engine_output().expect("credential output");
     assert_eq!(output, EngineOutput::Lock { pin: "1234".into() });
     let debug = format!("{output:?}");
     assert!(
         !debug.contains("1234") && debug.contains("<redacted>"),
-        "Debug must redact the PIN: {debug}"
+        "Debug must redact the credential: {debug}"
+    );
+}
+
+// Regression for the P0 lockout bug (2026-07-03 GUI audit, ranked #1):
+// the lock screen rendered a 6-slot numeric PinInput while ChangePassword
+// accepts free-text up to 128 chars, so any non-6-digit password could
+// never reach authenticate(). The unlock surface must be a masked
+// free-text TextInput that accepts the whole credential unchanged.
+// @scenario: lock.feature - Unlocking with a long alphanumeric password
+#[test]
+fn lock_screen_accepts_long_alphanumeric_password() {
+    use vauchi_app::ui::LockScreenEngine;
+    let mut engine = LockScreenEngine::new(5);
+
+    // The rendered entry surface must be a masked password TextInput,
+    // NOT a fixed-length PinInput (which caps + forces a numeric keypad).
+    let screen = engine.current_screen();
+    match screen.components.first().expect("an input component") {
+        Component::TextInput { input_type, .. } => assert_eq!(
+            *input_type,
+            InputType::Password,
+            "lock input must be a masked password field"
+        ),
+        other => panic!("lock screen must render a masked TextInput, got {other:?}"),
+    }
+
+    let password = "Tr0ub4dour&3!longphrase";
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: password.into(),
+    });
+    assert_eq!(
+        engine.engine_output().expect("credential output"),
+        EngineOutput::Lock {
+            pin: password.into()
+        },
+        "the full free-text password must reach authenticate() unchanged"
     );
 }
 

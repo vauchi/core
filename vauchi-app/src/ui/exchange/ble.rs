@@ -34,21 +34,6 @@ pub(super) enum BleStep {
     Complete,
 }
 
-impl BleStep {
-    pub(super) fn step_number(&self, base: u8) -> u8 {
-        base + match self {
-            Self::Discovering => 0,
-            Self::Handshaking => 1,
-            Self::Exchanging => 1,
-            Self::Verifying => 2,
-            Self::Complete => 2,
-        }
-    }
-
-    /// Matches QrStep/LinkStep for consistent progress bar.
-    pub(super) const STEP_COUNT: u8 = 3;
-}
-
 // ── Action/hardware outcomes ───────────────────────────────────────────────
 
 /// Result of handling a user action in the BLE sub-flow.

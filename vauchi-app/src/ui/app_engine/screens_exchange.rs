@@ -34,6 +34,22 @@ impl AppEngine {
                 let card_snapshot = card.as_ref().cloned().map(|c| {
                     vauchi_core::exchange::card_snapshot::CardSnapshot::freeze(c, snapshot_now)
                 });
+                // Last-used defaults (M2 S1): a repeat user skips the group
+                // gate with their prior groups pre-applied. Stored ids are
+                // filtered against the live group list (deleted groups drop
+                // out; an empty result still marks a repeat user).
+                let last_used_group_ids = vauchi
+                    .storage()
+                    .ux()
+                    .load_exchange_defaults()
+                    .ok()
+                    .flatten()
+                    .map(|d| {
+                        d.group_ids
+                            .into_iter()
+                            .filter(|id| all_groups.iter().any(|g| g.id() == id))
+                            .collect::<Vec<_>>()
+                    });
                 let config = ExchangeConfig {
                     own_name: card
                         .as_ref()
@@ -44,6 +60,7 @@ impl AppEngine {
                     device_capabilities: device_capabilities.clone(),
                     transport_readiness: transport_readiness.clone(),
                     mode: None, // triggers mode selection screen
+                    last_used_group_ids,
                     card_snapshot,
                     available_group_data: all_groups,
                 };

@@ -168,6 +168,48 @@ impl UxStore<'_> {
             None => Ok(false), // Not yet initialized
         }
     }
+    /// Saves the last-used exchange defaults (encrypted). M2 S1
+    /// (`2026-07-03-one-tap-exchange`): written on every mode commit so a
+    /// repeat exchange skips the group gate with the prior selection.
+    pub fn save_exchange_defaults(
+        &self,
+        defaults: &crate::types::ExchangeDefaults,
+    ) -> Result<(), StorageError> {
+        let json = serde_json::to_string(defaults)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(self.key, json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let now = self.now_secs();
+        self.conn.execute(
+            "INSERT INTO ux_state (id, exchange_defaults_encrypted, updated_at)
+             VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET exchange_defaults_encrypted = ?1, updated_at = ?2",
+            params![encrypted, now as i64],
+        )?;
+        Ok(())
+    }
+    /// Loads the last-used exchange defaults, if any were stored.
+    pub fn load_exchange_defaults(
+        &self,
+    ) -> Result<Option<crate::types::ExchangeDefaults>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT exchange_defaults_encrypted FROM ux_state WHERE id = 1",
+            [],
+            |row| row.get::<_, Option<Vec<u8>>>(0),
+        );
+        match result {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
+                let decrypted = crate::crypto::decrypt(self.key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let defaults = serde_json::from_slice(&decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(defaults))
+            }
+            Ok(_) => Ok(None),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
     /// Saves the onboarding progress (encrypted).
     pub fn save_onboarding_progress(
         &self,

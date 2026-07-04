@@ -101,6 +101,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("ux_state", "relay_url_encrypted"),
     // V55 own-card repropagation marker
     ("ux_state", "own_card_repropagate_encrypted"),
+    // V58 last-used exchange defaults (M2 S1)
+    ("ux_state", "exchange_defaults_encrypted"),
     // V30 label display name override
     ("visibility_labels", "display_name_override_encrypted"),
     // V56 per-group presentation overrides (ADR-054 D2)
@@ -1251,7 +1253,7 @@ impl Storage {
         new_key: &SymmetricKey,
     ) -> Result<(), StorageError> {
         let result = self.conn.query_row(
-            "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted, onboarding_progress_encrypted, backup_reminder_encrypted, settings_flags_encrypted, relay_url_encrypted, own_card_repropagate_encrypted FROM ux_state WHERE id = 1",
+            "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted, onboarding_progress_encrypted, backup_reminder_encrypted, settings_flags_encrypted, relay_url_encrypted, own_card_repropagate_encrypted, exchange_defaults_encrypted FROM ux_state WHERE id = 1",
             [],
             |row| {
                 let id: i64 = row.get(0)?;
@@ -1262,6 +1264,7 @@ impl Storage {
                 let settings_flags: Option<Vec<u8>> = row.get(5)?;
                 let relay_url: Option<Vec<u8>> = row.get(6)?;
                 let own_card_repropagate: Option<Vec<u8>> = row.get(7)?;
+                let exchange_defaults: Option<Vec<u8>> = row.get(8)?;
                 Ok((
                     id,
                     aha,
@@ -1271,6 +1274,7 @@ impl Storage {
                     settings_flags,
                     relay_url,
                     own_card_repropagate,
+                    exchange_defaults,
                 ))
             },
         );
@@ -1284,6 +1288,7 @@ impl Storage {
             settings_flags_enc,
             relay_url_enc,
             own_card_repropagate_enc,
+            exchange_defaults_enc,
         )) = result
         {
             if let Some(enc) = aha_enc
@@ -1394,6 +1399,24 @@ impl Storage {
                     )
                     .map_err(|e| {
                         StorageError::Migration(format!("Update own_card_repropagate: {}", e))
+                    })?;
+            }
+            if let Some(enc) = exchange_defaults_enc
+                && !enc.is_empty()
+            {
+                let plain = decrypt(old_key, &enc).map_err(|e| {
+                    StorageError::Migration(format!("Decrypt exchange_defaults: {}", e))
+                })?;
+                let new_enc = encrypt(new_key, &plain).map_err(|e| {
+                    StorageError::Migration(format!("Encrypt exchange_defaults: {}", e))
+                })?;
+                self.conn
+                    .execute(
+                        "UPDATE ux_state SET exchange_defaults_encrypted = ?1 WHERE id = ?2",
+                        params![new_enc, id],
+                    )
+                    .map_err(|e| {
+                        StorageError::Migration(format!("Update exchange_defaults: {}", e))
                     })?;
             }
         }

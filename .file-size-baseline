@@ -212,7 +212,9 @@ vauchi-core/src/recovery/mod.rs 1253
 #  2026-06-08-settings-toggle-not-persisting P1; migration ledger exemption)
 # (+9 2026-06-28: migration v56 visibility_labels bio/avatar_override columns —
 #  ADR-054 Phase 2b; migration ledger exemption)
-vauchi-core/src/storage/migration.rs 1993
+# (+12 2026-07-04: migration v58 ux_state.exchange_defaults_encrypted —
+#  M2 S1 last-used defaults; migration ledger exemption)
+vauchi-core/src/storage/migration.rs 2005
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
 # (+4 for #[allow(clippy::let_underscore_must_use)] attr + comment on
@@ -237,7 +239,10 @@ vauchi-core/src/storage/migration.rs 1993
 # (+52 2026-06-28: bio/avatar_override re-encrypt blocks in
 #  rekey_visibility_labels + 2 ENCRYPTED_COLUMNS entries — ADR-054 Phase 2b;
 #  co-located EXEMPT, all encrypted columns rekeyed together)
-vauchi-core/src/storage/rekey.rs 1851
+# (+23 2026-07-04: exchange_defaults_encrypted re-encrypt block in
+#  rekey_ux_state + REKEY_COLUMNS entry — M2 S1 v58; co-located EXEMPT,
+#  all encrypted columns rekeyed together)
+vauchi-core/src/storage/rekey.rs 1874
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

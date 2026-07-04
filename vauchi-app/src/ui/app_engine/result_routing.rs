@@ -11,6 +11,7 @@
 
 use super::{AppEngine, AppScreen};
 use crate::ui::action::{ActionResult, PostOnboardingDestination};
+use vauchi_core::exchange::mode::ExchangeMode;
 
 impl AppEngine {
     /// Route engine results to appropriate navigation targets.
@@ -36,19 +37,23 @@ impl AppEngine {
             // handoff (see start_exchange_to). The `mode` payload threads down
             // to the screen factory so it can pick the right session variant.
             ActionResult::StartMultiStageExchange { mode } => {
-                self.start_exchange_to(AppScreen::MultiStageExchange { mode })
+                self.start_exchange_to(AppScreen::MultiStageExchange { mode }, mode)
             }
             // StartLinkExchange carries no group preamble — the engine-owned
             // initiator on the LinkExchange screen drives the relay handshake.
+            // The commit still becomes the last-used default (M2 S1).
             ActionResult::StartLinkExchange => {
+                self.persist_exchange_defaults(ExchangeMode::Link, self.current_exchange_groups());
                 ActionResult::NavigateTo(self.navigate_to(AppScreen::LinkExchange))
             }
             ActionResult::StartBleExchange { mode } => {
-                self.start_exchange_to(AppScreen::BleExchange { mode })
+                self.start_exchange_to(AppScreen::BleExchange { mode }, mode)
             }
-            ActionResult::StartNfcExchange => self.start_exchange_to(AppScreen::NfcExchange),
+            ActionResult::StartNfcExchange => {
+                self.start_exchange_to(AppScreen::NfcExchange, ExchangeMode::TapTap)
+            }
             ActionResult::StartDirectTransport => {
-                self.start_exchange_to(AppScreen::DirectTransport)
+                self.start_exchange_to(AppScreen::DirectTransport, ExchangeMode::Cable)
             }
             ActionResult::OpenEntryDetail { field_id } => ActionResult::NavigateTo(
                 self.navigate_to(AppScreen::MyInfoEntryDetail { field_id }),
@@ -109,14 +114,31 @@ impl AppEngine {
     /// (navigate_to replaces the ExchangeEngine) so persist_exchanged_contact
     /// can assign the new contact + show the group on the success screen
     /// (2026-06-04-exchange-terminal-screens), then navigate to `target`.
-    fn start_exchange_to(&mut self, target: AppScreen) -> ActionResult {
-        self.pending_exchange_groups = self
-            .engine
+    fn start_exchange_to(&mut self, target: AppScreen, mode: ExchangeMode) -> ActionResult {
+        self.pending_exchange_groups = self.current_exchange_groups();
+        // M2 S1: the committed (groups, mode) pair becomes the last-used
+        // default, so the next exchange skips the group gate.
+        self.persist_exchange_defaults(mode, self.pending_exchange_groups.clone());
+        ActionResult::NavigateTo(self.navigate_to(target))
+    }
+
+    /// The active ExchangeEngine's selected groups (empty when the current
+    /// engine is not the exchange flow).
+    fn current_exchange_groups(&self) -> Vec<String> {
+        self.engine
             .as_any()
             .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
             .map(|ex| ex.selected_groups().to_vec())
-            .unwrap_or_default();
-        ActionResult::NavigateTo(self.navigate_to(target))
+            .unwrap_or_default()
+    }
+
+    /// Persist the last-used exchange defaults (M2 S1). Best-effort: a
+    /// storage failure must not block starting the exchange.
+    fn persist_exchange_defaults(&self, mode: ExchangeMode, group_ids: Vec<String>) {
+        let defaults = vauchi_core::types::ExchangeDefaults { group_ids, mode };
+        if let Err(e) = self.vauchi.storage().ux().save_exchange_defaults(&defaults) {
+            log::warn!("exchange defaults not persisted: {e}");
+        }
     }
 
     /// `CompleteWith` — run completion, then route to the post-onboarding

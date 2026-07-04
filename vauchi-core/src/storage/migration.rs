@@ -551,8 +551,20 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "contact_last_sent_display_name",
             action: MigrationAction::Sql(MIGRATION_V57_LAST_SENT_DISPLAY_NAME),
         },
+        Migration {
+            version: 58,
+            name: "ux_exchange_defaults",
+            action: MigrationAction::Sql(MIGRATION_V58_EXCHANGE_DEFAULTS),
+        },
     ]
 }
+
+/// Migration v58: last-used exchange defaults (groups + mode) on ux_state.
+///
+/// Encrypted JSON blob, same pattern as the other ux_state columns.
+/// M2 S1 of the GUI-audit sweep (`2026-07-03-one-tap-exchange`).
+const MIGRATION_V58_EXCHANGE_DEFAULTS: &str =
+    "ALTER TABLE ux_state ADD COLUMN exchange_defaults_encrypted BLOB;";
 
 // DEPRECATED: Tor support removed (2026-03-24). Column remains for
 // DB schema compatibility. See 2026-03-24-ip-privacy-ohttp-strategy.

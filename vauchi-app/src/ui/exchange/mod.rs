@@ -65,6 +65,12 @@ pub struct ExchangeConfig {
     /// Selected exchange mode. `None` = show mode selection first.
     #[serde(default)]
     pub mode: Option<ExchangeMode>,
+    /// Last-used group ids (already filtered to existing groups) from the
+    /// stored exchange defaults. `Some` marks a repeat user: the G4 group
+    /// gate is skipped, the ids seed `selected_groups`, and the mode picker
+    /// renders the "Sharing: …" chip (M2 S1, `2026-07-03-one-tap-exchange`).
+    #[serde(default)]
+    pub last_used_group_ids: Option<Vec<String>>,
     /// Frozen card snapshot for exchange. `None` = snapshot at exchange start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema-gen", schemars(skip))]
@@ -174,16 +180,36 @@ impl ExchangeEngine {
     fn initial_step(config: &ExchangeConfig) -> ExchangeStep {
         // G4 (group-first): when groups exist the exchange begins with group
         // selection, then mode (a shared ritual chosen together). No groups →
-        // straight to mode selection.
-        if config.available_groups.is_empty() {
+        // straight to mode selection. Repeat users (stored last-used defaults)
+        // skip the gate: their prior groups pre-apply and the mode picker's
+        // "Sharing" chip is the opt-in refinement (M2 S1, D2.1).
+        if config.available_groups.is_empty() || config.last_used_group_ids.is_some() {
             ExchangeStep::ModeSelection
         } else {
             ExchangeStep::GroupSelection
         }
     }
 
+    /// Text for the mode picker's "Sharing" chip: the selected group names,
+    /// or the default-card fallback when nothing is selected (M2 S1).
+    fn sharing_chip_text(&self) -> String {
+        let names: Vec<&str> = self
+            .config
+            .available_groups
+            .iter()
+            .filter(|(id, _)| self.selected_groups.contains(id))
+            .map(|(_, name)| name.as_str())
+            .collect();
+        if names.is_empty() {
+            "Sharing: default card".to_string()
+        } else {
+            format!("Sharing: {}", names.join(", "))
+        }
+    }
+
     pub fn new(config: ExchangeConfig, clock: Arc<dyn Clock>) -> Self {
         let step = Self::initial_step(&config);
+        let seeded_groups = config.last_used_group_ids.clone().unwrap_or_default();
         let mode_selection = if step == ExchangeStep::ModeSelection {
             Some(ModeSelectionEngine::new(
                 config.device_capabilities.clone(),
@@ -197,7 +223,7 @@ impl ExchangeEngine {
             step_history: Vec::new(),
             config,
             scanned_data: None,
-            selected_groups: Vec::new(),
+            selected_groups: seeded_groups,
             show_preview_after_mode: false,
             session: None,
             failure_detail: None,
@@ -231,6 +257,7 @@ impl ExchangeEngine {
         session.enable_debug_log();
 
         let step = Self::initial_step(&config);
+        let seeded_groups = config.last_used_group_ids.clone().unwrap_or_default();
         let mode_selection = if step == ExchangeStep::ModeSelection {
             Some(ModeSelectionEngine::new(
                 config.device_capabilities.clone(),
@@ -245,7 +272,7 @@ impl ExchangeEngine {
             step_history: Vec::new(),
             config,
             scanned_data: None,
-            selected_groups: Vec::new(),
+            selected_groups: seeded_groups,
             show_preview_after_mode: false,
             session: Some(session),
             failure_detail: None,
@@ -549,7 +576,21 @@ impl ExchangeEngine {
         match self.step {
             ExchangeStep::ModeSelection => {
                 if let Some(ref ms) = self.mode_selection {
-                    ms.screen()
+                    let mut screen = ms.screen();
+                    // Repeat users see their pre-applied groups as a chip —
+                    // the opt-in entry to group refinement (M2 S1, D2.1).
+                    if self.config.last_used_group_ids.is_some() {
+                        screen.components.insert(
+                            0,
+                            Component::Banner {
+                                text: self.sharing_chip_text(),
+                                action_label: "Change".into(),
+                                action_id: "sharing_chip".into(),
+                                a11y: None,
+                            },
+                        );
+                    }
+                    screen
                 } else {
                     // Shouldn't happen — mode_selection is always Some when step is ModeSelection
                     ScreenModel::default()
@@ -941,6 +982,15 @@ impl WorkflowEngine for ExchangeEngine {
             {
                 return ActionResult::Complete;
             }
+            // "Sharing" chip → group selection as an opt-in refinement
+            // (M2 S1). BACK or Continue both return to the mode picker.
+            if let UserAction::ActionPressed { action_id } = &action
+                && action_id == "sharing_chip"
+            {
+                self.step_history.push(ExchangeStep::ModeSelection);
+                self.step = ExchangeStep::GroupSelection;
+                return ActionResult::NavigateTo(self.build_screen());
+            }
             if let Some(ref ms) = self.mode_selection {
                 match ms.handle_action(&action) {
                     ModeSelectionResult::Selected(mode) => {
@@ -1154,6 +1204,7 @@ mod tests {
             device_capabilities: DeviceCapabilities::default(),
             // Pre-set mode to skip mode selection (tests focus on QR flow)
             mode: Some(ExchangeMode::Glance),
+            last_used_group_ids: None,
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
@@ -1173,6 +1224,7 @@ mod tests {
             // the TapHoverShake plan; routes to multi-stage even with groups,
             // like Glance). Carries the group-selection machinery tests.
             mode: Some(ExchangeMode::TapHoverShake),
+            last_used_group_ids: None,
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
@@ -1301,6 +1353,7 @@ mod tests {
                 ..Default::default()
             },
             mode: None, // triggers mode selection
+            last_used_group_ids: None,
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
@@ -1946,6 +1999,7 @@ mod tests {
             device_capabilities: all_present_caps(),
             transport_readiness: ledger,
             mode: None,
+            last_used_group_ids: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
         }

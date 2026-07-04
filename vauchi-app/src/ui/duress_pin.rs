@@ -256,6 +256,24 @@ impl DuressPinEngine {
             title: "Configure Alerts".into(),
             subtitle: None,
             components: vec![
+                Component::ToggleList {
+                    id: "recipients".into(),
+                    label: "Alert Recipients".into(),
+                    items: self
+                        .config
+                        .available_contacts
+                        .iter()
+                        .map(|c| ToggleItem {
+                            id: c.id.clone(),
+                            label: c.name.clone(),
+                            selected: self.config.selected_contact_ids.contains(&c.id),
+                            subtitle: None,
+                            a11y: None,
+                            info_key: None,
+                        })
+                        .collect(),
+                    a11y: None,
+                },
                 Component::TextInput {
                     id: "alert_message".into(),
                     label: "Alert Message".into(),
@@ -297,7 +315,8 @@ impl DuressPinEngine {
                     id: "save".into(),
                     label: "Save".into(),
                     style: ActionStyle::Primary,
-                    enabled: true,
+                    // A duress alert with no recipient reaches nobody — require ≥1.
+                    enabled: !self.config.selected_contact_ids.is_empty(),
                     a11y: None,
                 },
             ],
@@ -456,12 +475,34 @@ impl WorkflowEngine for DuressPinEngine {
                     component_id,
                     item_id,
                 },
+            ) if component_id == "recipients" => {
+                if let Some(pos) = self
+                    .config
+                    .selected_contact_ids
+                    .iter()
+                    .position(|id| id == &item_id)
+                {
+                    self.config.selected_contact_ids.remove(pos);
+                } else {
+                    self.config.selected_contact_ids.push(item_id);
+                }
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            (
+                DuressPinStep::ConfigureAlerts,
+                UserAction::ItemToggled {
+                    component_id,
+                    item_id,
+                },
             ) if component_id == "alerts" && item_id == "include_location" => {
                 self.config.include_location = !self.config.include_location;
                 ActionResult::UpdateScreen(self.current_screen())
             }
+            // Save is gated on ≥1 recipient; with none, this arm's guard fails
+            // and the fallback re-renders (the disabled Save is a no-op).
             (DuressPinStep::ConfigureAlerts, UserAction::ActionPressed { action_id })
-                if action_id == "save" || action_id == "submit_alert_message" =>
+                if (action_id == "save" || action_id == "submit_alert_message")
+                    && !self.config.selected_contact_ids.is_empty() =>
             {
                 self.config.enabled = true;
                 ActionResult::Complete

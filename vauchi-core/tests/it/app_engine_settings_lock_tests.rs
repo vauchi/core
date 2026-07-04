@@ -9,6 +9,9 @@ use crate::common;
 use common::app_engine_helpers::{engine_with_password, enter_pin, find_settings_toggle};
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
+use vauchi_core::crypto::SymmetricKey;
 
 // ── settings toggle persistence tests (HIGH-4) ──────────────────────
 
@@ -124,6 +127,15 @@ fn duress_pin_setup_persists_via_handle_completion() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("123456").unwrap();
+    // A recipient must exist + be chosen for duress setup to complete.
+    let bob = Contact::from_exchange(
+        [7u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
+    let bob_id = bob.id().to_string();
+    vauchi.add_contact(bob).unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     engine.navigate_to(AppScreen::DuressPin);
@@ -149,6 +161,12 @@ fn duress_pin_setup_persists_via_handle_completion() {
     });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
+    });
+
+    // Choose Bob as the alert recipient (required before Save is enabled).
+    let _ = engine.handle_action(UserAction::ItemToggled {
+        component_id: "recipients".into(),
+        item_id: bob_id.clone(),
     });
 
     // Step 4: Save (triggers Complete → handle_completion)

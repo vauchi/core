@@ -24,6 +24,56 @@ fn enabled_config() -> DuressConfig {
     }
 }
 
+fn contact_item(id: &str, name: &str) -> Item {
+    Item {
+        id: id.into(),
+        name: name.into(),
+        subtitle: None,
+        avatar_initials: name
+            .chars()
+            .next()
+            .map(|c| c.to_string())
+            .unwrap_or_default(),
+        status: None,
+        actions: vec![],
+        a11y: None,
+    }
+}
+
+/// A config whose picker offers two contacts, none selected yet.
+fn config_with_contacts() -> DuressConfig {
+    DuressConfig {
+        enabled: false,
+        available_contacts: vec![contact_item("c1", "Alice"), contact_item("c2", "Bob")],
+        selected_contact_ids: vec![],
+        alert_message: String::new(),
+        include_location: false,
+    }
+}
+
+/// Drive a fresh engine through the PIN steps to the ConfigureAlerts screen.
+fn engine_at_alerts(config: DuressConfig) -> DuressPinEngine {
+    let mut engine = DuressPinEngine::new(config);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "configure".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: "123456".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_pin".into(),
+        value: "123456".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    engine
+}
+
 // @scenario: duress_mode :: Duress mode is opt-in and disabled by default
 // @internal
 #[test]
@@ -239,26 +289,8 @@ fn duress_pin_match_to_alerts() {
 // @internal
 #[test]
 fn duress_alerts_save_enables() {
-    let mut engine = DuressPinEngine::new(default_config());
+    let mut engine = engine_at_alerts(config_with_contacts());
     assert!(!engine.config().enabled, "should start disabled");
-
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
-    });
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "pin".into(),
-        value: "123456".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "confirm_pin".into(),
-        value: "123456".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
 
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "alert_message".into(),
@@ -274,6 +306,12 @@ fn duress_alerts_save_enables() {
         engine.config().include_location,
         "include_location should be toggled on"
     );
+
+    // A recipient must be chosen before the alert can be saved.
+    let _ = engine.handle_action(UserAction::ItemToggled {
+        component_id: "recipients".into(),
+        item_id: "c1".into(),
+    });
 
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "save".into(),
@@ -521,4 +559,116 @@ fn duress_pin_backspace_removes_last_char() {
         }
         _ => unreachable!(),
     }
+}
+
+// The ConfigureAlerts step renders a picker over ALL contacts, marking
+// the already-selected ones (2026-07-03-coercion-safety-config-gaps
+// defect 1 — the wizard previously had no way to add a recipient).
+// @scenario: duress_mode :: Configure trusted contacts for duress alerts
+// @internal
+#[test]
+fn duress_alerts_renders_recipient_picker() {
+    let mut engine = engine_at_alerts(config_with_contacts());
+    let _ = engine.handle_action(UserAction::ItemToggled {
+        component_id: "recipients".into(),
+        item_id: "c1".into(),
+    });
+
+    let screen = engine.current_screen();
+    let recipients = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::ToggleList { id, items, .. } if id == "recipients" => Some(items),
+            _ => None,
+        })
+        .expect("a 'recipients' ToggleList");
+
+    assert_eq!(recipients.len(), 2, "both contacts are offered");
+    assert!(
+        recipients.iter().any(|i| i.id == "c1" && i.selected),
+        "c1 shows as selected"
+    );
+    assert!(
+        recipients.iter().any(|i| i.id == "c2" && !i.selected),
+        "c2 shows as unselected"
+    );
+}
+
+// A completed duress setup must address at least one recipient — else the
+// alert path (once wired) would send to nobody. The Save affordance is
+// disabled AND pressing it is a no-op with zero recipients.
+// @scenario: duress_mode :: Duress setup requires at least one alert recipient
+// @internal
+#[test]
+fn duress_save_blocked_without_recipient() {
+    let mut engine = engine_at_alerts(config_with_contacts());
+
+    let save = engine
+        .current_screen()
+        .actions
+        .into_iter()
+        .find(|a| a.id == "save")
+        .expect("a 'save' action");
+    assert!(!save.enabled, "save is disabled with zero recipients");
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "save".into(),
+    });
+    assert_ne!(
+        result,
+        ActionResult::Complete,
+        "save must not complete with zero recipients"
+    );
+    assert!(!engine.config().enabled, "config stays disabled");
+}
+
+// Selecting a recipient enables Save and round-trips the chosen id into
+// the engine output (which persistence writes to alert_contact_ids).
+// @internal
+#[test]
+fn duress_recipient_selection_round_trips_to_output() {
+    let mut engine = engine_at_alerts(config_with_contacts());
+    let _ = engine.handle_action(UserAction::ItemToggled {
+        component_id: "recipients".into(),
+        item_id: "c2".into(),
+    });
+
+    let save = engine
+        .current_screen()
+        .actions
+        .into_iter()
+        .find(|a| a.id == "save")
+        .expect("a 'save' action");
+    assert!(save.enabled, "save enabled once a recipient is chosen");
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "save".into(),
+    });
+    assert_eq!(result, ActionResult::Complete);
+
+    match engine.engine_output() {
+        Some(EngineOutput::DuressPin(setup)) => {
+            assert_eq!(setup.alert_contact_ids, vec!["c2".to_string()]);
+        }
+        other => panic!("expected DuressPin output, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn duress_recipient_toggle_is_reversible() {
+    let mut engine = engine_at_alerts(config_with_contacts());
+    let _ = engine.handle_action(UserAction::ItemToggled {
+        component_id: "recipients".into(),
+        item_id: "c1".into(),
+    });
+    let _ = engine.handle_action(UserAction::ItemToggled {
+        component_id: "recipients".into(),
+        item_id: "c1".into(),
+    });
+    assert!(
+        engine.config().selected_contact_ids.is_empty(),
+        "toggling the same recipient twice deselects it"
+    );
 }

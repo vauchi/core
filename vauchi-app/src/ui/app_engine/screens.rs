@@ -297,9 +297,8 @@ impl AppEngine {
                 Box::new(DeviceManagementEngine::new(devices))
             }
             AppScreen::DuressPin => {
-                // The whole contact list is the picker's pool — loaded even on
-                // first-time setup (no stored settings yet) so a recipient can
-                // be chosen at all (2026-07-03-coercion-safety-config-gaps).
+                // Load ALL contacts as the picker pool (even with no stored
+                // settings) so a recipient can be chosen (config-gaps defect 1).
                 let available_contacts = vauchi
                     .list_contacts()
                     .unwrap_or_default()
@@ -311,28 +310,26 @@ impl AppEngine {
                         avatar_initials: initials(c.display_name()),
                         status: None,
                         actions: vec![],
-                        a11y: Some(A11y {
-                            label: Some(format!("Contact: {}", c.display_name())),
-                            hint: Some("Double tap to toggle as an alert recipient".into()),
-                            role: None,
-                        }),
+                        a11y: None,
                     })
                     .collect();
-                let settings = vauchi.load_duress_settings().ok().flatten();
-                let config = DuressConfig {
-                    enabled: settings.is_some(),
+                let (enabled, selected_contact_ids, alert_message, include_location) =
+                    match vauchi.load_duress_settings().ok().flatten() {
+                        Some(s) => (
+                            true,
+                            s.alert_contact_ids,
+                            s.alert_message,
+                            s.include_location,
+                        ),
+                        None => (false, Vec::new(), String::new(), false),
+                    };
+                Box::new(DuressPinEngine::new(DuressConfig {
+                    enabled,
                     available_contacts,
-                    selected_contact_ids: settings
-                        .as_ref()
-                        .map(|s| s.alert_contact_ids.clone())
-                        .unwrap_or_default(),
-                    alert_message: settings
-                        .as_ref()
-                        .map(|s| s.alert_message.clone())
-                        .unwrap_or_default(),
-                    include_location: settings.map(|s| s.include_location).unwrap_or(false),
-                };
-                Box::new(DuressPinEngine::new(config))
+                    selected_contact_ids,
+                    alert_message,
+                    include_location,
+                }))
             }
             AppScreen::DecoyContacts => {
                 let decoys: Vec<DecoyContactItem> = vauchi

@@ -3068,6 +3068,13 @@
           ]
         },
         {
+          "description": "Always fires, no toggle. Distinct from `EmergencyAlert` so the recipient can respond to a coerced sender appropriately (the sender entered their duress PIN — 2026-07-04-coercion-safety-alerts-never-received).",
+          "type": "string",
+          "enum": [
+            "DuressAlert"
+          ]
+        },
+        {
           "description": "Opt-in, off by default.",
           "type": "string",
           "enum": [

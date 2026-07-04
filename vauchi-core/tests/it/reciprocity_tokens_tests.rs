@@ -130,3 +130,83 @@ fn ble_sessions_derive_cross_matching_confirmation_tokens() {
         "own vs expected token must differ (echo protection)"
     );
 }
+
+/// Drive a full two-party BLE handshake; both sides end with a session key +
+/// derived confirmation tokens, ready to exchange reciprocity acks.
+fn ble_handshake_pair() -> (BleHandshakeSession, BleHandshakeSession) {
+    let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+    let mut alice =
+        BleHandshakeSession::new_initiator(&alice_id, make_test_card(&alice_id, "Alice"), now);
+    let mut bob = BleHandshakeSession::new_responder(&bob_id, make_test_card(&bob_id, "Bob"), now);
+    let offer = alice.create_key_offer().expect("key offer");
+    let (ack, bob_card) = bob.process_key_offer(&offer, now).expect("process offer");
+    alice
+        .process_key_ack(&ack, &bob_card, now)
+        .expect("process ack");
+    (alice, bob)
+}
+
+// CC-03: a valid post-persist reciprocity ack over the BLE channel confirms.
+// @scenario: ble_exchange :: reciprocity ack confirms both directions
+#[test]
+fn ble_reciprocity_ack_confirms() {
+    let (alice, bob) = ble_handshake_pair();
+
+    let alice_ack = alice.build_reciprocity_ack().expect("alice builds ack");
+    assert!(
+        bob.process_reciprocity_ack(&alice_ack)
+            .expect("bob processes"),
+        "a matching ack must resolve Confirmed"
+    );
+
+    let bob_ack = bob.build_reciprocity_ack().expect("bob builds ack");
+    assert!(
+        alice
+            .process_reciprocity_ack(&bob_ack)
+            .expect("alice processes"),
+        "a matching ack must resolve Confirmed (other direction)"
+    );
+}
+
+// CC-14: a tampered ack must never confirm (the AEAD tag fails).
+// @scenario: ble_exchange :: tampered reciprocity ack is rejected
+#[test]
+fn ble_reciprocity_ack_tampered_never_confirms() {
+    let (alice, bob) = ble_handshake_pair();
+    let mut ack = alice.build_reciprocity_ack().expect("ack");
+    let last = ack.len() - 1;
+    ack[last] ^= 0xFF;
+    assert!(
+        !matches!(bob.process_reciprocity_ack(&ack), Ok(true)),
+        "a tampered ack must never confirm"
+    );
+}
+
+// CC-14: an ack from a DIFFERENT session (fresh DH → different session key)
+// must never confirm — cross-session replay is defeated.
+// @scenario: ble_exchange :: foreign-session reciprocity ack is rejected
+#[test]
+fn ble_reciprocity_ack_foreign_session_never_confirms() {
+    let (_alice, bob) = ble_handshake_pair();
+    let (other_alice, _other_bob) = ble_handshake_pair();
+    let foreign_ack = other_alice.build_reciprocity_ack().expect("ack");
+    assert!(
+        !matches!(bob.process_reciprocity_ack(&foreign_ack), Ok(true)),
+        "an ack from another session must never confirm"
+    );
+}
+
+// Confidentiality: the ack on the wire is AEAD ciphertext, not the raw token.
+// @internal
+#[test]
+fn ble_reciprocity_ack_does_not_leak_raw_token() {
+    let (alice, _bob) = ble_handshake_pair();
+    let token = *alice.our_confirmation_token().expect("token");
+    let ack = alice.build_reciprocity_ack().expect("ack");
+    assert!(
+        !ack.windows(token.len()).any(|w| w == token),
+        "the raw confirmation token must not appear on the wire"
+    );
+}

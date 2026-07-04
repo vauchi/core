@@ -349,6 +349,48 @@ impl BleHandshakeSession {
         self.expected_their_token.as_ref()
     }
 
+    /// Build the encrypted reciprocity confirmation ack (design P1) — our token
+    /// AEAD-sealed under the session key, via the transport-agnostic
+    /// `reciprocity_tokens::build_ack`. MUST be emitted only after our contact
+    /// and ratchet are durably persisted (G1: "peer received my token ⇒ I
+    /// persisted"). `None` until key agreement produced the tokens.
+    pub fn build_reciprocity_ack(&self) -> Option<Vec<u8>> {
+        super::reciprocity_tokens::build_ack(
+            self.session_key.as_ref()?,
+            &self.our_confirmation_token?,
+            self.our_identity_key.as_slice(),
+            self.their_identity_key?.as_slice(),
+        )
+    }
+
+    /// Verify an incoming reciprocity ack against `expected_their_token` via the
+    /// transport-agnostic [`reciprocity_tokens::verify_ack`]. `Ok(true)` =
+    /// Confirmed; `Ok(false)` = mismatch (caller keeps Pending, fail-safe);
+    /// `Err` = malformed / undecryptable. Tampering, a MITM's token, or a
+    /// foreign-session replay all fail — a false Confirmed is impossible.
+    ///
+    /// [`reciprocity_tokens::verify_ack`]: super::reciprocity_tokens::verify_ack
+    pub fn process_reciprocity_ack(&self, ack: &[u8]) -> Result<bool, ExchangeError> {
+        let session_key = self
+            .session_key
+            .as_ref()
+            .ok_or_else(|| ExchangeError::InvalidState("no session key for ack".into()))?;
+        let expected = self
+            .expected_their_token
+            .ok_or_else(|| ExchangeError::InvalidState("no expected token for ack".into()))?;
+        let their_id = self
+            .their_identity_key
+            .ok_or_else(|| ExchangeError::InvalidState("no peer identity for ack".into()))?;
+        super::reciprocity_tokens::verify_ack(
+            session_key,
+            &expected,
+            self.our_identity_key.as_slice(),
+            their_id.as_slice(),
+            ack,
+        )
+        .map_err(|()| ExchangeError::BleDecryptionFailed)
+    }
+
     /// Derive + store the reciprocity confirmation token pair from the agreed
     /// session key (design spec §2), via the shared transport-agnostic
     /// primitive. No-op until `session_key` + `their_identity_key` are set;

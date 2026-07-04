@@ -348,43 +348,40 @@ impl Vauchi {
         self.get_effective_field_visibility(contact_id, &field_id)
     }
 
-    /// Toggles field visibility for a contact.
+    /// Toggles a field's per-contact visibility, addressed by own-card label.
     ///
-    /// If the field is currently visible to this contact, hides it.
-    /// If hidden, makes it visible. Returns the new visibility state.
+    /// Reads the field's current *effective* visibility, then writes the
+    /// negation as a per-contact **override** (Layer C). Routing through the
+    /// override — not the legacy `visibility_rules` — makes the toggle robust:
+    /// it wins over a group grant and the default-closed gate and persists
+    /// through group-membership changes, matching `set_field_private`/`public`
+    /// (2026-06-14 visibility layering, G2/F3). The override is keyed by field
+    /// **id**, the key every read path resolves to; writing it by label was a
+    /// no-op (F1). Returns the new visibility state.
     pub fn toggle_field_visibility(
         &self,
         contact_id: &str,
         field_label: &str,
     ) -> VauchiResult<bool> {
-        let mut contact = self
+        let contact = self
             .storage
             .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::InvalidState("Contact not found".into()))?;
-
-        let rules = contact.visibility_rules().ok_or(VauchiError::InvalidState(
-            "Visibility rules require an exchanged contact".into(),
-        ))?;
-        let current_can_see = rules.can_see(field_label, contact_id);
-
-        if current_can_see {
-            contact
-                .visibility_rules_mut()
-                .expect("checked above")
-                .set_nobody(field_label);
-        } else {
-            contact
-                .visibility_rules_mut()
-                .expect("checked above")
-                .set_everyone(field_label);
+        if !contact.is_exchanged() {
+            return Err(VauchiError::InvalidState(
+                "Visibility rules require an exchanged contact".into(),
+            ));
         }
 
-        self.storage.contacts().save_contact(&contact)?;
-        let new_visible = !current_can_see;
+        let field_id = self.own_field_id_by_label(field_label)?;
+        let new_visible = !self.get_effective_field_visibility(contact_id, &field_id)?;
+        self.storage
+            .labels()
+            .save_contact_override(contact_id, &field_id, new_visible)?;
         self.record_sync_item(crate::sync::SyncItem::VisibilityChanged {
             contact_id: contact_id.to_string(),
-            field_label: field_label.to_string(),
+            field_id: field_id.clone(),
             is_visible: new_visible,
             timestamp: self.now_timestamp(),
         });

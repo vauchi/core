@@ -465,12 +465,14 @@ fn test_sync_item_visibility_changed_compatibility_v1() {
     match item {
         SyncItem::VisibilityChanged {
             contact_id,
-            field_label,
+            field_id,
             is_visible,
             timestamp,
         } => {
             assert_eq!(contact_id, "contact-xyz-789");
-            assert_eq!(field_label, "phone");
+            // V1 wire key `field_label` deserializes into `field_id` via
+            // #[serde(rename)]; the value is historical (a label pre-fix).
+            assert_eq!(field_id, "phone");
             assert!(!is_visible);
             assert_eq!(timestamp, 1700003000);
         }

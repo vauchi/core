@@ -519,7 +519,7 @@ fn test_conflict_visibility_changed() {
 
     let items = vec![SyncItem::VisibilityChanged {
         contact_id: "contact-1".to_string(),
-        field_label: "phone".to_string(),
+        field_id: "phone".to_string(),
         is_visible: false,
         timestamp: 1000,
     }];
@@ -528,7 +528,7 @@ fn test_conflict_visibility_changed() {
 
     let stale = vec![SyncItem::VisibilityChanged {
         contact_id: "contact-1".to_string(),
-        field_label: "phone".to_string(),
+        field_id: "phone".to_string(),
         is_visible: true,
         timestamp: 500,
     }];
@@ -541,7 +541,7 @@ fn test_conflict_visibility_changed() {
     // Different contact_id should be independent (different conflict key)
     let independent = vec![SyncItem::VisibilityChanged {
         contact_id: "contact-2".to_string(),
-        field_label: "phone".to_string(),
+        field_id: "phone".to_string(),
         is_visible: true,
         timestamp: 500,
     }];

@@ -309,7 +309,7 @@ fn test_apply_sync_items_processes_visibility_changed() {
 
     let vis_items = vec![SyncItem::VisibilityChanged {
         contact_id: diana_id.clone(),
-        field_label: "email".to_string(),
+        field_id: "email".to_string(),
         is_visible: false,
         timestamp: now() + 1,
     }];

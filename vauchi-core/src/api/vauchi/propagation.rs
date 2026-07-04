@@ -452,13 +452,13 @@ impl Vauchi {
                 }
                 SyncItem::VisibilityChanged {
                     ref contact_id,
-                    ref field_label,
+                    ref field_id,
                     is_visible,
                     ..
                 } => self
                     .storage
                     .labels()
-                    .save_contact_override(contact_id, field_label, is_visible)
+                    .save_contact_override(contact_id, field_id, is_visible)
                     .map_err(|e| e.into()),
                 SyncItem::LabelChange {
                     ref label_id,
@@ -671,11 +671,11 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
         }),
         SyncItem::VisibilityChanged {
             contact_id,
-            field_label,
+            field_id,
             ..
         } => Some(VauchiEvent::VisibilityChanged {
             contact_id: contact_id.clone(),
-            field: field_label.clone(),
+            field: field_id.clone(),
         }),
         SyncItem::LabelChange { label_id, .. } => Some(VauchiEvent::LabelSyncCompleted {
             label_id: label_id.clone(),

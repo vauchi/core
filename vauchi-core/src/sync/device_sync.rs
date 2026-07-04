@@ -454,8 +454,13 @@ pub enum SyncItem {
     VisibilityChanged {
         /// Contact ID whose visibility changed.
         contact_id: String,
-        /// Field label affected.
-        field_label: String,
+        /// Own-card field **id** the override targets — the key the resolver
+        /// reads. The wire key stays `field_label` (frozen by the V1 sync
+        /// format, `protocol_compatibility_tests`) so cross-version device
+        /// sync does not break; it carried a label pre-2026-06-14, when the
+        /// toggle wrote label-keyed rules no read path consulted (F1).
+        #[serde(rename = "field_label")]
+        field_id: String,
         /// New visibility state.
         is_visible: bool,
         /// Timestamp of change.

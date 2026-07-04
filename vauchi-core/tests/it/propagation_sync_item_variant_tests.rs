@@ -326,7 +326,7 @@ fn apply_sync_visibility_changed_writes_per_contact_override() {
     let applied = wb
         .apply_sync_items(vec![SyncItem::VisibilityChanged {
             contact_id: bob_id.clone(),
-            field_label: "email".to_string(),
+            field_id: "email".to_string(),
             is_visible: false,
             timestamp: now(),
         }])
@@ -463,7 +463,7 @@ fn apply_sync_visibility_changed_dispatches_visibility_changed_event() {
 
     wb.apply_sync_items(vec![SyncItem::VisibilityChanged {
         contact_id: bob_id.clone(),
-        field_label: "email".to_string(),
+        field_id: "email".to_string(),
         is_visible: false,
         timestamp: now(),
     }])

@@ -164,7 +164,7 @@ fn test_conflict_resolution_last_write_wins() {
 fn test_sync_item_visibility_changed() {
     let item = SyncItem::VisibilityChanged {
         contact_id: "contact-123".to_string(),
-        field_label: "phone".to_string(),
+        field_id: "phone".to_string(),
         is_visible: false,
         timestamp: 3000,
     };

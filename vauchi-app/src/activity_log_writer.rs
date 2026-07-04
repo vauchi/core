@@ -119,6 +119,13 @@ impl ActivityLogWriter {
                 };
                 Some((key, entry))
             }
+            VauchiEvent::DuressAlertReceived { contact_id, .. } => {
+                let key = format!("duress:{contact_id}:{now_secs}");
+                let entry = ActivityLogEntry::DuressAlertReceived {
+                    contact_id: contact_id.clone(),
+                };
+                Some((key, entry))
+            }
             VauchiEvent::OwnCardUpdated { changed_fields } => {
                 let fields_tag = changed_fields.join(",");
                 let key = format!("own_card_updated:{fields_tag}:{now_secs}");

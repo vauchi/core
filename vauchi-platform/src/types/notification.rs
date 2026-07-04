@@ -8,6 +8,9 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum MobileNotificationCategory {
     EmergencyAlert,
+    /// A contact sent a duress alert (they entered their duress PIN). Distinct
+    /// from `EmergencyAlert` so the frontend can convey the coercion context.
+    DuressAlert,
     ContactAdded,
 }
 

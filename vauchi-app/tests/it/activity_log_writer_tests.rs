@@ -87,6 +87,33 @@ fn duplicate_event_returns_empty() {
     assert_eq!(rows.len(), 1, "storage must contain only one row");
 }
 
+// @scenario: activity-log.feature - DuressAlertReceived creates a log entry
+// @internal
+#[test]
+fn duress_alert_creates_log_entry() {
+    let storage = test_storage();
+    let contact_id = "contact-duress".to_owned();
+
+    let events = vec![VauchiEvent::DuressAlertReceived {
+        contact_id: contact_id.clone(),
+        message: "under duress".to_owned(),
+        timestamp: NOW,
+        location: None,
+    }];
+
+    let result = ActivityLogWriter::write(&storage, &events, NOW).unwrap();
+    assert_eq!(result.len(), 1, "exactly one entry should be inserted");
+
+    let (event_key, entry) = &result[0];
+    assert_eq!(event_key, &format!("duress:{contact_id}:{NOW}"));
+    match entry {
+        ActivityLogEntry::DuressAlertReceived { contact_id: cid } => {
+            assert_eq!(cid, &contact_id);
+        }
+        other => panic!("unexpected entry variant: {other:?}"),
+    }
+}
+
 // @scenario: activity-log.feature - EmergencyAlertReceived creates a log entry
 // @internal
 #[test]

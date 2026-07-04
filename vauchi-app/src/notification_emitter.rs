@@ -57,6 +57,16 @@ impl NotificationEmitter {
                     contact_id: contact_id.clone(),
                 })
             }
+            ActivityLogEntry::DuressAlertReceived { contact_id } => {
+                let name = name_resolver(contact_id);
+                Some(PendingNotification {
+                    event_key: event_key.to_string(),
+                    category: NotificationCategory::DuressAlert,
+                    title: "Duress Alert".to_string(),
+                    body: format!("{name} may be in danger"),
+                    contact_id: contact_id.clone(),
+                })
+            }
             ActivityLogEntry::ContactAdded {
                 contact_id,
                 origin: EventOrigin::Synced,

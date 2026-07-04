@@ -90,6 +90,7 @@ fn format_entry(entry: &ActivityLogEntry, name: &str) -> (String, Option<String>
         ActivityLogEntry::EmergencyAlertReceived { .. } => {
             (format!("Emergency alert from {name}"), None)
         }
+        ActivityLogEntry::DuressAlertReceived { .. } => (format!("Duress alert from {name}"), None),
         ActivityLogEntry::OwnCardUpdated { changed_fields } => {
             let detail = if changed_fields.is_empty() {
                 None

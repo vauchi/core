@@ -37,6 +37,10 @@ pub struct VauchiWorld {
     pub backup_data: Option<Vec<u8>>,
     pub last_result: Result<(), String>,
     pub last_error_message: Option<String>,
+    /// Reusable core vocabulary: named test contacts → contact id.
+    pub contacts: std::collections::BTreeMap<String, String>,
+    /// Reusable core vocabulary: named visibility groups → label id.
+    pub groups: std::collections::BTreeMap<String, String>,
 }
 
 impl std::fmt::Debug for VauchiWorld {
@@ -67,7 +71,56 @@ impl VauchiWorld {
             backup_data: None,
             last_result: Ok(()),
             last_error_message: None,
+            contacts: std::collections::BTreeMap::new(),
+            groups: std::collections::BTreeMap::new(),
         }
+    }
+
+    /// Mints a synthetic *exchanged* contact (so `is_exchanged()` holds, as
+    /// visibility overrides require) and registers it by name. The public key
+    /// is a deterministic distinct filler — visibility tests never do crypto
+    /// with it, only address the contact by its derived id.
+    pub fn add_test_contact(&mut self, name: &str) -> String {
+        use vauchi_core::{Contact, SymmetricKey};
+        let mut public_key = [0u8; 32];
+        public_key[0] = (self.contacts.len() as u8).wrapping_add(1);
+        for (i, b) in name.bytes().enumerate().take(31) {
+            public_key[i + 1] = b;
+        }
+        let card = ContactCard::new(name);
+        let contact = Contact::from_exchange(public_key, card, SymmetricKey::generate(), 0);
+        let id = contact.id().to_string();
+        self.vauchi.add_contact(contact).unwrap();
+        self.contacts.insert(name.to_string(), id.clone());
+        id
+    }
+
+    pub fn contact_id(&self, name: &str) -> String {
+        self.contacts
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| panic!("no test contact named {name:?}"))
+    }
+
+    pub fn group_id(&self, name: &str) -> String {
+        self.groups
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| panic!("no visibility group named {name:?}"))
+    }
+
+    /// Resolves an own-card field label to its generated id.
+    pub fn own_field_id(&self, label: &str) -> String {
+        self.vauchi
+            .own_card()
+            .unwrap()
+            .unwrap()
+            .fields()
+            .iter()
+            .find(|f| f.label() == label)
+            .unwrap_or_else(|| panic!("no own-card field labeled {label:?}"))
+            .id()
+            .to_string()
     }
 }
 
@@ -126,7 +179,7 @@ fn main() {
     // scenario loses its binding. Bump this when you wire more step
     // definitions; if CI reports a drop, a wired scenario lost its binding —
     // investigate the binding, don't just lower the floor.
-    const MIN_WIRED_SCENARIOS: usize = 17;
+    const MIN_WIRED_SCENARIOS: usize = 39;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

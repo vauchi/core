@@ -3,4 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pub mod card_management;
+pub mod contacts;
 pub mod identity_management;
+pub mod visibility;

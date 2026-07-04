@@ -598,7 +598,13 @@ test:cucumber:
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]
-    - if [ ! -d ../features ]; then git clone --depth=1 https://gitlab.com/vauchi/features.git ../features; else git -C ../features pull --ff-only 2>/dev/null || true; fi
+    # Force the cached ../features checkout to the tip of main. A plain
+    # `pull --ff-only … || true` silently kept a STALE checkout on any
+    # runner whose cache had diverged, so cucumber ran against old .feature
+    # files and previously-wired scenarios regressed to skipped — a
+    # spurious gate failure that had nothing to do with the MR. fetch +
+    # hard-reset always lands on origin/main and fails loudly if it can't.
+    - if [ ! -d ../features/.git ]; then git clone --depth=1 https://gitlab.com/vauchi/features.git ../features; else git -C ../features fetch --depth=1 origin main && git -C ../features reset --hard FETCH_HEAD; fi
   script:
     # @ui features (theming/a11y/navigation/onboarding/…) describe frontend
     # rendering — untestable against core; they belong in the frontend

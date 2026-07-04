@@ -30,7 +30,10 @@ pub enum EmergencyOutcome {
 pub struct EmergencyBroadcastEngine {
     step: EmergencyStep,
     configured: bool,
-    contact_ids_input: String,
+    /// All of the user's contacts — the pool the recipient picker renders.
+    available_contacts: Vec<Item>,
+    /// Ids (subset of `available_contacts`) chosen as trusted recipients.
+    selected_contact_ids: Vec<String>,
     message: String,
     include_location: bool,
     pending_disable: bool,
@@ -52,7 +55,8 @@ impl EmergencyBroadcastEngine {
             Some(c) => Self {
                 step: EmergencyStep::Overview,
                 configured: true,
-                contact_ids_input: c.trusted_contact_ids.join(", "),
+                available_contacts: Vec::new(),
+                selected_contact_ids: c.trusted_contact_ids,
                 message: c.message,
                 include_location: c.include_location,
                 pending_disable: false,
@@ -61,7 +65,8 @@ impl EmergencyBroadcastEngine {
             None => Self {
                 step: EmergencyStep::Overview,
                 configured: false,
-                contact_ids_input: String::new(),
+                available_contacts: Vec::new(),
+                selected_contact_ids: Vec::new(),
                 message: String::new(),
                 include_location: false,
                 pending_disable: false,
@@ -70,14 +75,16 @@ impl EmergencyBroadcastEngine {
         }
     }
 
-    /// Parsed trusted contact IDs (comma-separated input → list). Parsing
-    /// lives in core, not the frontend (ADR-021 / ADR-043).
+    /// Inject the contact pool the picker renders. `screens.rs` supplies the
+    /// full contact list; the stored selection (from config) is preserved.
+    pub fn with_available_contacts(mut self, contacts: Vec<Item>) -> Self {
+        self.available_contacts = contacts;
+        self
+    }
+
+    /// The chosen trusted contact IDs (the picker's selected subset).
     pub fn contact_ids(&self) -> Vec<String> {
-        self.contact_ids_input
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect()
+        self.selected_contact_ids.clone()
     }
 
     /// The configured alert message.
@@ -197,22 +204,22 @@ impl EmergencyBroadcastEngine {
             screen_id: "emergency_contacts".into(),
             title: "Trusted Contacts".into(),
             subtitle: None,
-            components: vec![Component::TextInput {
+            components: vec![Component::ToggleList {
                 id: "contact_ids".into(),
-                label: "Trusted contact IDs".into(),
-                value: self.contact_ids_input.clone(),
-                placeholder: Some("Comma-separated contact IDs".into()),
-                max_length: None,
-                validation_error: None,
-                input_type: InputType::Text,
-                a11y: Some(A11y {
-                    label: Some("Trusted contact IDs input".into()),
-                    hint: Some(
-                        "Enter the IDs of contacts who should receive your emergency alert.".into(),
-                    ),
-                    role: Some(AccessibilityRole::TextField),
-                }),
-                info_key: None,
+                label: "Trusted Contacts".into(),
+                items: self
+                    .available_contacts
+                    .iter()
+                    .map(|c| ToggleItem {
+                        id: c.id.clone(),
+                        label: c.name.clone(),
+                        selected: self.selected_contact_ids.contains(&c.id),
+                        subtitle: None,
+                        a11y: None,
+                        info_key: None,
+                    })
+                    .collect(),
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -385,16 +392,24 @@ impl WorkflowEngine for EmergencyBroadcastEngine {
             // --- ContactIds ---
             (
                 EmergencyStep::ContactIds,
-                UserAction::TextChanged {
+                UserAction::ItemToggled {
                     component_id,
-                    value,
+                    item_id,
                 },
             ) if component_id == "contact_ids" => {
-                self.contact_ids_input = value;
+                if let Some(pos) = self
+                    .selected_contact_ids
+                    .iter()
+                    .position(|id| id == &item_id)
+                {
+                    self.selected_contact_ids.remove(pos);
+                } else {
+                    self.selected_contact_ids.push(item_id);
+                }
                 ActionResult::UpdateScreen(self.current_screen())
             }
             (EmergencyStep::ContactIds, UserAction::ActionPressed { action_id })
-                if action_id == "continue" || action_id == "submit_contact_ids" =>
+                if action_id == "continue" =>
             {
                 let ids = self.contact_ids();
                 if ids.is_empty() {

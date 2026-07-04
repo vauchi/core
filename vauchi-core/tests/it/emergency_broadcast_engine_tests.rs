@@ -17,6 +17,31 @@ fn configured() -> EmergencyBroadcastConfig {
     }
 }
 
+fn contact_item(id: &str, name: &str) -> Item {
+    Item {
+        id: id.into(),
+        name: name.into(),
+        subtitle: None,
+        avatar_initials: name
+            .chars()
+            .next()
+            .map(|c| c.to_string())
+            .unwrap_or_default(),
+        status: None,
+        actions: vec![],
+        a11y: None,
+    }
+}
+
+/// A fresh engine advanced to the ContactIds step with the given pool available.
+fn engine_at_contacts(available: Vec<Item>) -> EmergencyBroadcastEngine {
+    let mut engine = EmergencyBroadcastEngine::new(None).with_available_contacts(available);
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "configure".into(),
+    });
+    engine
+}
+
 // @internal
 #[test]
 fn overview_unconfigured_offers_only_configure() {
@@ -73,15 +98,12 @@ fn overview_configured_offers_send_and_disable() {
 // @internal
 #[test]
 fn configure_flow_saves_with_save_outcome() {
-    let mut engine = EmergencyBroadcastEngine::new(None);
+    let mut engine = engine_at_contacts(vec![
+        contact_item("abc", "Abby"),
+        contact_item("def", "Deb"),
+    ]);
 
-    // configure → contacts screen
-    let r = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
-    });
-    assert!(matches!(r, ActionResult::NavigateTo(ref s) if s.screen_id == "emergency_contacts"));
-
-    // empty contacts → validation error
+    // no recipient selected yet → validation error
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -90,10 +112,14 @@ fn configure_flow_saves_with_save_outcome() {
         "empty contacts must fail, got {r:?}"
     );
 
-    // paste contacts → continue to message
-    engine.handle_action(UserAction::TextChanged {
+    // pick both recipients → continue to message
+    engine.handle_action(UserAction::ItemToggled {
         component_id: "contact_ids".into(),
-        value: "abc, def".into(),
+        item_id: "abc".into(),
+    });
+    engine.handle_action(UserAction::ItemToggled {
+        component_id: "contact_ids".into(),
+        item_id: "def".into(),
     });
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -128,19 +154,17 @@ fn configure_flow_saves_with_save_outcome() {
 // @internal
 #[test]
 fn too_many_contacts_is_rejected() {
-    let mut engine = EmergencyBroadcastEngine::new(None);
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
-    });
-    // 11 contacts > MAX_TRUSTED_CONTACTS (10)
-    let many = (0..11)
-        .map(|i| format!("c{i}"))
-        .collect::<Vec<_>>()
-        .join(", ");
-    engine.handle_action(UserAction::TextChanged {
-        component_id: "contact_ids".into(),
-        value: many,
-    });
+    // 11 available contacts > MAX_TRUSTED_CONTACTS (10); select all of them.
+    let available: Vec<Item> = (0..11)
+        .map(|i| contact_item(&format!("c{i}"), &format!("C{i}")))
+        .collect();
+    let mut engine = engine_at_contacts(available.clone());
+    for c in &available {
+        engine.handle_action(UserAction::ItemToggled {
+            component_id: "contact_ids".into(),
+            item_id: c.id.clone(),
+        });
+    }
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -222,23 +246,19 @@ fn disable_requires_confirmation_and_sets_disable_outcome() {
 // @internal
 #[test]
 fn textinput_enter_submit_advances_like_continue_and_save() {
-    // Keyboard frontends emit `submit_<id>` when Enter is pressed on a
-    // non-empty TextInput (the FormDialog convention). The engine must treat
-    // those as continue / save so a typed field can advance via Enter.
-    let mut engine = EmergencyBroadcastEngine::new(None);
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
-    });
-    engine.handle_action(UserAction::TextChanged {
+    // The message field keeps the keyboard Enter convention (`submit_<id>`);
+    // the contacts step is now a picker advanced by `continue`.
+    let mut engine = engine_at_contacts(vec![contact_item("abc", "Abby")]);
+    engine.handle_action(UserAction::ItemToggled {
         component_id: "contact_ids".into(),
-        value: "abc".into(),
+        item_id: "abc".into(),
     });
     let r = engine.handle_action(UserAction::ActionPressed {
-        action_id: "submit_contact_ids".into(),
+        action_id: "continue".into(),
     });
     assert!(
         matches!(r, ActionResult::NavigateTo(ref s) if s.screen_id == "emergency_message"),
-        "submit_contact_ids must advance like continue, got {r:?}"
+        "continue advances to message, got {r:?}"
     );
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "submit_message".into(),
@@ -250,28 +270,35 @@ fn textinput_enter_submit_advances_like_continue_and_save() {
     assert_eq!(engine.outcome(), Some(&EmergencyOutcome::Save));
 }
 
+// The contacts step renders a picker over ALL contacts, marking the chosen
+// ones — replacing the old hex-ID TextInput (config-gaps defect 2).
 // @internal
 #[test]
-fn captured_values_are_reflected_for_keyboard_frontends() {
-    let mut engine = EmergencyBroadcastEngine::new(None);
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
-    });
-    engine.handle_action(UserAction::TextChanged {
+fn contacts_picker_renders_pool_and_reflects_selection() {
+    let mut engine =
+        engine_at_contacts(vec![contact_item("x", "Xander"), contact_item("y", "Yara")]);
+    engine.handle_action(UserAction::ItemToggled {
         component_id: "contact_ids".into(),
-        value: "x, y".into(),
+        item_id: "x".into(),
     });
-    let reflected = engine
+
+    let items = engine
         .current_screen()
         .components
-        .iter()
+        .into_iter()
         .find_map(|c| match c {
-            Component::TextInput { id, value, .. } if id == "contact_ids" => Some(value.clone()),
+            Component::ToggleList { id, items, .. } if id == "contact_ids" => Some(items),
             _ => None,
-        });
-    assert_eq!(
-        reflected.as_deref(),
-        Some("x, y"),
-        "contact_ids must reflect input"
+        })
+        .expect("a 'contact_ids' ToggleList");
+
+    assert_eq!(items.len(), 2, "both contacts are offered");
+    assert!(
+        items.iter().any(|i| i.id == "x" && i.selected),
+        "x shows as selected"
+    );
+    assert!(
+        items.iter().any(|i| i.id == "y" && !i.selected),
+        "y shows as unselected"
     );
 }

@@ -299,20 +299,7 @@ impl AppEngine {
             AppScreen::DuressPin => {
                 // Load ALL contacts as the picker pool (even with no stored
                 // settings) so a recipient can be chosen (config-gaps defect 1).
-                let available_contacts = vauchi
-                    .list_contacts()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|c| Item {
-                        id: c.id().to_string(),
-                        name: c.display_name().to_string(),
-                        subtitle: None,
-                        avatar_initials: initials(c.display_name()),
-                        status: None,
-                        actions: vec![],
-                        a11y: None,
-                    })
-                    .collect();
+                let available_contacts = Self::picker_contacts(vauchi);
                 let (enabled, selected_contact_ids, alert_message, include_location) =
                     match vauchi.load_duress_settings().ok().flatten() {
                         Some(s) => (
@@ -346,7 +333,10 @@ impl AppEngine {
             AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),
             AppScreen::EmergencyBroadcast => {
                 let config = vauchi.load_emergency_config().ok().flatten();
-                Box::new(EmergencyBroadcastEngine::new(config))
+                Box::new(
+                    EmergencyBroadcastEngine::new(config)
+                        .with_available_contacts(Self::picker_contacts(vauchi)),
+                )
             }
             AppScreen::DeliveryStatus => {
                 let items = Self::load_delivery_items(vauchi);
@@ -787,6 +777,25 @@ impl AppEngine {
                 .collect(),
             Err(_) => vec![],
         }
+    }
+
+    /// Full contact list as picker `Item`s (the pool duress/emergency pickers
+    /// render). a11y omitted: each maps to a ToggleItem whose label labels it.
+    fn picker_contacts(vauchi: &Vauchi) -> Vec<Item> {
+        vauchi
+            .list_contacts()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|c| Item {
+                id: c.id().to_string(),
+                name: c.display_name().to_string(),
+                subtitle: None,
+                avatar_initials: initials(c.display_name()),
+                status: None,
+                actions: vec![],
+                a11y: None,
+            })
+            .collect()
     }
 
     fn load_delivery_items(vauchi: &Vauchi) -> Vec<DeliveryItem> {

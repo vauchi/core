@@ -427,7 +427,11 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 #  2026-06-13-ios-app-password-setup-missing.)
 # (+5 for T2.2-wiring: TransportReadiness param on create_engine + the
 #  expanded create_exchange_engine dispatch — exchange-waits-forever Phase 2.)
-vauchi-app/src/ui/app_engine/screens.rs 920
+# (+9 for the recipient pickers: a shared picker_contacts helper (DRYs the
+#  duress + emergency contact-pool loaders) + EmergencyBroadcast injecting
+#  the pool via with_available_contacts — 2026-07-03-coercion-safety-config-gaps
+#  defects 1-2. The helper is net cheaper than inlining the map at both sites.)
+vauchi-app/src/ui/app_engine/screens.rs 929
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

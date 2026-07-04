@@ -146,6 +146,11 @@ impl AppEngine {
                             .apply_update(crate::ui::EngineUpdate::LinkExchange(
                                 crate::ui::LinkExchangeUpdate::Succeeded(summary),
                             ));
+                        // Ceremony (M2 S4): the card completed + persisted just
+                        // above — validated success, once per link session.
+                        self.extend_pending_commands(vec![
+                            crate::ui::exchange::ceremony::exchange_celebrate(),
+                        ]);
                     }
                     Err(_) => {
                         let _ = self

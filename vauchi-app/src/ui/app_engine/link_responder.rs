@@ -51,6 +51,9 @@ impl AppEngine {
         // Build the summary first so the immutable `self.vauchi` borrow ends
         // before the `&mut self` engine borrow. Link mode assigns no group.
         let summary = self.build_exchange_summary(contact_id, Vec::new());
+        // Ceremony (M2 S4): the sender's card was retrieved + persisted —
+        // validated success, once per responder session.
+        self.extend_pending_commands(vec![crate::ui::exchange::ceremony::exchange_celebrate()]);
         self.engine
             .apply_update(crate::ui::EngineUpdate::LinkResponder(
                 crate::ui::LinkResponderUpdate::Completed(summary),

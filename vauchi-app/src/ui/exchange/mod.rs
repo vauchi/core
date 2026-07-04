@@ -14,6 +14,7 @@ use std::sync::Arc;
 mod back_nav;
 pub(crate) mod ble;
 pub mod ble_engine;
+pub(crate) mod ceremony;
 pub mod direct_engine;
 pub(crate) mod field_preview;
 pub(crate) mod group_filter;

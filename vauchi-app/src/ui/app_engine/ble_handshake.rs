@@ -360,6 +360,10 @@ impl AppEngine {
                     if let Some(cmd) = ack_cmd {
                         self.extend_pending_commands(vec![cmd]);
                     }
+                    // Ceremony (M2 S4): validated + persisted success — once.
+                    self.extend_pending_commands(vec![
+                        crate::ui::exchange::ceremony::exchange_celebrate(),
+                    ]);
                 }
                 // Drive the chrome to its terminal Success screen. The
                 // hollow `BleExchangeFlow` no longer self-completes from

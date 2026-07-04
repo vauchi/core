@@ -101,6 +101,9 @@ pub struct DirectTransportEngine {
     /// `screen_entered` is idempotent across re-renders.
     started: bool,
     cancelled: bool,
+    /// `true` once the success ceremony has been emitted (M2 S4) —
+    /// `sync_completed` can run again on a later reciprocity result.
+    celebrated: bool,
     /// Unix-seconds when the engine entered `Waiting` (construction). The
     /// `tick`-driven stall deadline ([`DIRECT_WAITING_TIMEOUT_SECS`]) is
     /// measured from it. `Waiting` is only entered at construction (retry
@@ -152,6 +155,7 @@ impl DirectTransportEngine {
             screen,
             started: false,
             cancelled: false,
+            celebrated: false,
             waiting_entered_unix,
         }
     }
@@ -361,6 +365,12 @@ impl DirectTransportEngine {
         } else {
             // No confirmation tokens (e.g. no relay configured) — complete.
             self.screen = DirectScreen::Success;
+        }
+        // Ceremony (M2 S4): validated success — once, even though this fn
+        // can run again on a later reciprocity result.
+        if matches!(self.screen, DirectScreen::Success) && !self.celebrated {
+            self.celebrated = true;
+            commands.push(crate::ui::exchange::ceremony::exchange_celebrate());
         }
     }
 }

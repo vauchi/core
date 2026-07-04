@@ -270,6 +270,62 @@ pub enum Command {
     /// declines, or [`Event::HardwareUnavailable`] if there is no location
     /// provider. `timeout_ms` bounds how long the frontend waits for a fix.
     LocationRequest { timeout_ms: u32 },
+
+    // ── Feedback (exchange ceremony, M2 S4) ────────────────────────
+    // Appended to preserve serde discriminant ordering.
+    /// Render the exchange-success ceremony: a celebratory haptic + sound +
+    /// animation (`designs/2026-06-06-exchange-ceremony-design.md`). The
+    /// tokens are closed intent enums looked up against a static per-platform
+    /// table (Wire-Humble kind rule) — core never sends assets or frequencies.
+    /// Frontends skip any axis they can't render; the others still play.
+    /// Emitted exactly once per validated exchange success, never on failure,
+    /// and byte-identical regardless of auth mode (ADR-032 duress parity).
+    Celebrate {
+        haptic: HapticPattern,
+        sound: SoundToken,
+        animation: AnimationToken,
+    },
+}
+
+/// Haptic intent for [`Command::Celebrate`]. Closed enum — platforms map
+/// to native patterns (e.g. `UINotificationFeedbackGenerator.success`).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum HapticPattern {
+    /// The platform's "success" notification haptic.
+    Success,
+    /// A single light tap.
+    Light,
+    /// No haptic.
+    None,
+}
+
+/// Sound intent for [`Command::Celebrate`]. Closed enum — platforms map
+/// to a bundled asset; respecting the ringer is the frontend's call.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum SoundToken {
+    /// The short exchange chime ("clinking glasses").
+    ExchangeChime,
+    /// No sound.
+    None,
+}
+
+/// Animation intent for [`Command::Celebrate`]. Closed enum — platforms
+/// map to a native one-beat animation, respecting reduce-motion.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum AnimationToken {
+    /// The two cards meet — the exchange-success beat (~600 ms, then still).
+    CardsMeet,
+    /// No animation.
+    None,
 }
 
 /// Screen orientation a frontend should pin to via
@@ -345,6 +401,7 @@ impl Command {
             Self::SetIdleTimerDisabled { .. } => "SetIdleTimerDisabled",
             Self::SetOrientationLock { .. } => "SetOrientationLock",
             Self::LocationRequest { .. } => "LocationRequest",
+            Self::Celebrate { .. } => "Celebrate",
         }
     }
 }

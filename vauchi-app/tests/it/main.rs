@@ -12,6 +12,9 @@ mod app_engine_invalidation_tests;
 mod app_engine_navigation_tests;
 mod app_engine_onboarding_completion_tests;
 mod ble_handshake_app_engine_tests;
+// The multi-stage half needs FakeClock (gated inside the file); the
+// BLE half runs featureless.
+mod ceremony_wiring_tests;
 // The stateful proptest needs FakeClock + DeterministicRng, both
 // behind `vauchi-core/testing`. Gated so plain `cargo clippy
 // --all-targets` (no features) compiles the binary cleanly.

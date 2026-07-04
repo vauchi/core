@@ -417,6 +417,10 @@ impl AppEngine {
         // (Event::LocationResult) is consumed in handle_hardware_event.
         self.request_exchange_location(contact_id.clone());
 
+        // Ceremony (M2 S4): validated + persisted success — once per
+        // Finalized (persist bails above on any earlier failure).
+        self.extend_pending_commands(vec![crate::ui::exchange::ceremony::exchange_celebrate()]);
+
         // Assemble the rich success screen: what they shared (above),
         // which of our own fields this new contact can now see, and the
         // group(s) they joined (none on the multi-stage path yet).

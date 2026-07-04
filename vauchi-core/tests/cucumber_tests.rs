@@ -45,6 +45,12 @@ pub struct VauchiWorld {
     /// Multi-party vocabulary: named parties (Alice, Bob, …), each a full
     /// Vauchi instance, so two of them can drive a real exchange.
     pub parties: std::collections::BTreeMap<String, Vauchi>,
+    /// Per-party own-card snapshots taken before an edit, so a later sync step
+    /// can compute the delta (party name → pre-edit card).
+    pub old_cards: std::collections::BTreeMap<String, ContactCard>,
+    /// Humble-UI driver: the AppEngine hosting `self.vauchi` after
+    /// `I open the app` (ADR-021 — flows are ScreenModel-testable in core).
+    pub engine: Option<vauchi_app::ui::AppEngine>,
 }
 
 impl std::fmt::Debug for VauchiWorld {
@@ -78,6 +84,8 @@ impl VauchiWorld {
             contacts: std::collections::BTreeMap::new(),
             groups: std::collections::BTreeMap::new(),
             parties: std::collections::BTreeMap::new(),
+            old_cards: std::collections::BTreeMap::new(),
+            engine: None,
         }
     }
 
@@ -191,7 +199,7 @@ fn main() {
     // scenario loses its binding. Bump this when you wire more step
     // definitions; if CI reports a drop, a wired scenario lost its binding —
     // investigate the binding, don't just lower the floor.
-    const MIN_WIRED_SCENARIOS: usize = 40;
+    const MIN_WIRED_SCENARIOS: usize = 41;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

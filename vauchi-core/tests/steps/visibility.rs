@@ -50,6 +50,32 @@ fn address_field(world: &mut VauchiWorld, label: String, value: String) {
         .unwrap();
 }
 
+/// Table form of the field setup — one step seeds a whole card:
+///   | type  | label      | value           |
+///   | phone | Work Phone | +1-555-222-2222 |
+#[given(expr = "I have the following fields on my contact card:")]
+fn fields_from_table(world: &mut VauchiWorld, step: &cucumber::gherkin::Step) {
+    let table = step
+        .table
+        .as_ref()
+        .expect("step requires a |type|label|value| table");
+    for row in table.rows.iter().skip(1) {
+        let (kind, label, value) = (&row[0], &row[1], &row[2]);
+        let field_type = match kind.to_lowercase().as_str() {
+            "phone" => FieldType::Phone,
+            "email" => FieldType::Email,
+            "address" => FieldType::Address,
+            "website" => FieldType::Website,
+            "custom" => FieldType::Custom,
+            other => panic!("unsupported field type {other:?} in table"),
+        };
+        world
+            .vauchi
+            .add_own_field(ContactField::new(field_type, label, value, 0))
+            .unwrap();
+    }
+}
+
 #[given(expr = "I have a contact {string}")]
 fn have_contact(world: &mut VauchiWorld, name: String) {
     world.add_test_contact(&name);

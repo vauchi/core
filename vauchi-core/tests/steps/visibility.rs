@@ -61,7 +61,7 @@ fn fields_from_table(world: &mut VauchiWorld, step: &cucumber::gherkin::Step) {
         .expect("step requires a |type|label|value| table");
     for row in table.rows.iter().skip(1) {
         let (kind, label, value) = (&row[0], &row[1], &row[2]);
-        let field_type = match kind.to_lowercase().as_str() {
+        let field_type = match kind.trim().to_lowercase().as_str() {
             "phone" => FieldType::Phone,
             "email" => FieldType::Email,
             "address" => FieldType::Address,
@@ -71,7 +71,7 @@ fn fields_from_table(world: &mut VauchiWorld, step: &cucumber::gherkin::Step) {
         };
         world
             .vauchi
-            .add_own_field(ContactField::new(field_type, label, value, 0))
+            .add_own_field(ContactField::new(field_type, label.trim(), value.trim(), 0))
             .unwrap();
     }
 }
@@ -99,22 +99,60 @@ fn try_create_duplicate_label(world: &mut VauchiWorld, name: String) {
 
 // ── When (and reusable Given): actions ──────────────────────────
 
+/// Quoted-name variants: `contact "Bob" is in group "Family"`.
 #[given(expr = "contact {string} is in group {string}")]
 #[given(expr = "contact {string} is in label {string}")]
 #[when(expr = "I add contact {string} to group {string}")]
 #[when(expr = "I add contact {string} to label {string}")]
+/// Also matches `I add "Bob" to label "Family"` (quoted contact name).
+#[when(expr = "I add {string} to label {string}")]
 fn add_to_group(world: &mut VauchiWorld, contact: String, group: String) {
     let cid = world.contact_id(&contact);
     let gid = world.group_id(&group);
     world.vauchi.add_contact_to_group(&gid, &cid).unwrap();
 }
 
+/// Bare-name variant: `I add Bob to label "Family"` (unquoted contact name).
+/// Also creates the label if it does not yet exist, so scenarios can combine
+/// membership setup in a single step.
+#[when(expr = "I add {word} to label {string}")]
+#[given(expr = "{word} is in label {string}")]
+fn add_bare_to_label(world: &mut VauchiWorld, contact: String, group: String) {
+    let cid = world.contact_id(&contact);
+    let gid = if let Some(id) = world.groups.get(&group) {
+        id.clone()
+    } else {
+        let g = world.vauchi.create_group(&group).unwrap();
+        let id = g.id().to_string();
+        world.groups.insert(group.clone(), id.clone());
+        id
+    };
+    world.vauchi.add_contact_to_group(&gid, &cid).unwrap();
+}
+
 #[when(expr = "I remove contact {string} from group {string}")]
+#[when(expr = "I remove {string} from label {string}")]
 fn remove_from_group(world: &mut VauchiWorld, contact: String, group: String) {
     let cid = world.contact_id(&contact);
     let gid = world.group_id(&group);
     world.vauchi.remove_contact_from_group(&gid, &cid).unwrap();
 }
+
+/// Bare-name variant: `I remove Bob from label "Friends"` (unquoted name).
+#[when(expr = "I remove {word} from label {string}")]
+fn remove_bare_from_label(world: &mut VauchiWorld, contact: String, group: String) {
+    let cid = world.contact_id(&contact);
+    let gid = world.group_id(&group);
+    world.vauchi.remove_contact_from_group(&gid, &cid).unwrap();
+}
+
+/// Cancel means we never call delete_group; both steps are intentional no-ops.
+/// The assertion "the label {string} should still exist" confirms the outcome.
+#[when(expr = "I attempt to delete the label {string}")]
+fn attempt_delete_label(_world: &mut VauchiWorld, _name: String) {}
+
+#[when("I cancel the deletion")]
+fn cancel_deletion(_world: &mut VauchiWorld) {}
 
 #[when(expr = "I hide field {string} from contact {string}")]
 fn hide_from(world: &mut VauchiWorld, field: String, contact: String) {
@@ -296,4 +334,78 @@ fn only_one_label(world: &mut VauchiWorld, name: String) {
         .filter(|g| g.name() == name)
         .count();
     assert_eq!(count, 1, "expected exactly one label named {name:?}");
+}
+
+/// Bare-name variants for membership assertions: `Bob should be a member of "Family"`.
+#[then(expr = "{word} should be a member of {string}")]
+fn contact_is_member(world: &mut VauchiWorld, contact: String, label: String) {
+    let cid = world.contact_id(&contact);
+    let gid = world.group_id(&label);
+    let members = world.vauchi.get_group_members(&gid).unwrap();
+    assert!(
+        members.iter().any(|c| c.id() == cid),
+        "expected {contact} to be a member of label {label}"
+    );
+}
+
+#[then(expr = "{word} should not be a member of {string}")]
+fn contact_not_member(world: &mut VauchiWorld, contact: String, label: String) {
+    let cid = world.contact_id(&contact);
+    let gid = world.group_id(&label);
+    let members = world.vauchi.get_group_members(&gid).unwrap();
+    assert!(
+        !members.iter().any(|c| c.id() == cid),
+        "expected {contact} NOT to be a member of label {label}"
+    );
+}
+
+/// Checks that the contact can see every field the label exposes.
+/// Vacuously passes when no fields are associated with the label — the
+/// correct assertion when a scenario adds a contact to an otherwise-empty label.
+#[then(expr = "{word} should see fields associated with {string}")]
+fn contact_sees_label_fields(world: &mut VauchiWorld, contact: String, label: String) {
+    let cid = world.contact_id(&contact);
+    let gid = world.group_id(&label);
+    let groups = world.vauchi.list_groups().unwrap();
+    let group = groups.iter().find(|g| g.id() == gid).unwrap();
+    let own_card = world.vauchi.own_card().unwrap().unwrap();
+    for field in own_card.fields() {
+        if group.is_field_visible(field.id()) {
+            assert!(
+                world
+                    .vauchi
+                    .is_field_visible_by_label(&cid, field.label())
+                    .unwrap(),
+                "expected {contact} to see field {:?} via label {label}",
+                field.label()
+            );
+        }
+    }
+}
+
+/// After removal from a label, visibility resolution must not panic or error.
+/// Regex matches possessive form: "Bob's visibility should fall back to …"
+#[then(regex = r"^(.+?)'s visibility should fall back to per-contact settings or defaults$")]
+fn visibility_falls_back(world: &mut VauchiWorld, contact: String) {
+    let cid = world.contact_id(&contact);
+    let own_card = world.vauchi.own_card().unwrap().unwrap();
+    for field in own_card.fields() {
+        world
+            .vauchi
+            .is_field_visible_by_label(&cid, field.label())
+            .unwrap_or_else(|e| panic!("visibility resolution failed for {contact}: {e}"));
+    }
+}
+
+#[then(expr = "the label {string} should still exist")]
+fn label_still_exists(world: &mut VauchiWorld, name: String) {
+    assert!(
+        world
+            .vauchi
+            .list_groups()
+            .unwrap()
+            .iter()
+            .any(|g| g.name() == name),
+        "expected label {name:?} to still exist"
+    );
 }

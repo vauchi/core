@@ -333,3 +333,67 @@ fn two_party_ble_exchange_persists_each_others_contact() {
         "BLE finalize should queue Command::LocationRequest, got {alice_emitted:?}"
     );
 }
+
+// P1 step 2a: a BLE exchange records the contact as reciprocity `Pending`
+// (confirmable, unconfirmed) and emits the post-persist confirmation ack (G1)
+// on the notify characteristic — the peer verifies it once its receive-side
+// handler lands (step 2b).
+// @internal
+#[test]
+fn two_party_ble_exchange_records_pending_reciprocity_and_emits_ack() {
+    let mut alice = engine_named("Alice");
+    let mut bob = engine_named("Bob");
+    let alice_token = token_of(&alice);
+    let bob_token = token_of(&bob);
+
+    alice.start_ble_handshake_on_discovery(&bob_token);
+    bob.start_ble_handshake_on_discovery(&alice_token);
+    let ea = alice.forward_ble_hardware_event(&Event::BleConnected {
+        device_id: "bob".into(),
+    });
+    alice.apply_ble_machine_event(ea);
+    let eb = bob.forward_ble_hardware_event(&Event::BleConnected {
+        device_id: "alice".into(),
+    });
+    bob.apply_ble_machine_event(eb);
+
+    // Pump to completion, capturing every write Alice routes so the
+    // post-persist ack is observable.
+    let mut alice_writes: Vec<Vec<u8>> = Vec::new();
+    for _ in 0..50 {
+        let mut a = 0;
+        for cmd in alice.drain_pending_commands() {
+            if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = cmd {
+                alice_writes.push(data.clone());
+                let ev = bob
+                    .forward_ble_hardware_event(&Event::BleCharacteristicNotified { uuid, data });
+                bob.apply_ble_machine_event(ev);
+                a += 1;
+            }
+        }
+        let b = pump(&mut bob, &mut alice);
+        if a + b == 0 {
+            break;
+        }
+    }
+
+    let now = alice.vauchi().clock().unix_seconds();
+    let alice_contacts = alice.vauchi().list_contacts().expect("list");
+    assert_eq!(alice_contacts.len(), 1, "Alice persisted Bob");
+    assert_eq!(
+        alice_contacts[0].reciprocity(now),
+        vauchi_core::exchange::reciprocity::Reciprocity::Pending,
+        "a BLE contact must be recorded Pending (confirmable, not yet confirmed)"
+    );
+
+    // The reciprocity ack is our version byte + the AEAD sealing of the 32-byte
+    // token (enc-version 1 + nonce 24 + ct 32 + tag 16) = 74 bytes, distinct
+    // from the handshake frames — emitted only after the contact persisted
+    // (structural: same Completed arm, post-persist).
+    const ACK_LEN: usize = 1 + (1 + 24 + 32 + 16);
+    assert!(
+        alice_writes.iter().any(|w| w.len() == ACK_LEN),
+        "Alice must emit the post-persist reciprocity ack ({ACK_LEN}B); write sizes: {:?}",
+        alice_writes.iter().map(|w| w.len()).collect::<Vec<_>>()
+    );
+}

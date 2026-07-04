@@ -281,6 +281,20 @@ impl BleHandshakeMachine {
         self.inner.session_key()
     }
 
+    /// Build the post-persist reciprocity confirmation ack (design P1) as a BLE
+    /// write on the handshake-notify characteristic. The AppEngine calls this
+    /// ONLY after durably persisting the contact (G1 ordering: "peer received
+    /// my token ⇒ I persisted") and queues the command; the peer verifies it
+    /// against its `expected_their_token`. `None` until key agreement derived
+    /// the tokens.
+    pub fn build_reciprocity_ack_command(&self) -> Option<Command> {
+        let ack = self.inner.build_reciprocity_ack()?;
+        Some(Command::BleWriteCharacteristic {
+            uuid: CHAR_HANDSHAKE_NOTIFY.to_string(),
+            data: ack,
+        })
+    }
+
     /// Currently negotiated usable MTU (payload bytes per chunk).
     pub fn mtu_usable(&self) -> usize {
         self.mtu_usable

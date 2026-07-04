@@ -349,6 +349,18 @@ impl AppEngine {
         match event {
             BleMachineEvent::Completed(result) => {
                 let persisted = self.persist_ble_exchanged_contact(&result);
+                // G1: emit the reciprocity ack ONLY AFTER the contact persisted,
+                // so "peer got my token ⇒ I persisted" (design P1). Inert on the
+                // peer until its receive-side handler lands (step 2b).
+                if persisted {
+                    let ack_cmd = self
+                        .ble_handshake_session
+                        .as_ref()
+                        .and_then(|h| h.machine.build_reciprocity_ack_command());
+                    if let Some(cmd) = ack_cmd {
+                        self.extend_pending_commands(vec![cmd]);
+                    }
+                }
                 // Drive the chrome to its terminal Success screen. The
                 // hollow `BleExchangeFlow` no longer self-completes from
                 // BLE data bytes (P4), so the real machine's completion is
@@ -429,7 +441,7 @@ impl AppEngine {
         };
 
         let card = result.remote_card.to_contact_card(now);
-        let contact = Contact::from_exchange_full(
+        let mut contact = Contact::from_exchange_full(
             their_identity,
             card,
             shared_key,
@@ -437,6 +449,9 @@ impl AppEngine {
             vauchi_core::types::ExchangeTransport::Ble,
             now,
         );
+        // Confirmable but unconfirmed until the peer's ack — record Pending so
+        // it surfaces via the banner (2026-06-04-exchange-terminal-screens).
+        contact.set_reciprocity(vauchi_core::exchange::reciprocity::Reciprocity::Pending);
         let contact_id = contact.id().to_string();
         // Upsert + rekey via the unified core routine so a REPEAT BLE exchange
         // updates the peer's card and rekeys, instead of silently dropping it:

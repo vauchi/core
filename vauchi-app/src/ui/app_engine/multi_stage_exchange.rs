@@ -358,18 +358,19 @@ impl AppEngine {
         };
         let our_identity = *identity.signing_public_key();
         let now = self.vauchi.clock().unix_seconds();
-        let contact = vauchi_core::Contact::from_exchange(
+        let mut contact = vauchi_core::Contact::from_exchange(
             peer_pk,
             card,
             vauchi_core::crypto::SymmetricKey::from_bytes(transport_key),
             now,
         );
-        // NB: reciprocity is intentionally NOT stamped here. Multi-stage derives
-        // confirmation tokens, but its QR channel is not reliably live
-        // post-Finalized for a native ack (unlike BLE's radio), so there is no
-        // in-person resolution path. Stamping Pending without one would decay
-        // every real exchange to Unreciprocated. The Pending stamp + resolution
-        // land together with relay-sync (design P3).
+        // Confirmable but unconfirmed: multi-stage has no in-person ack (its QR
+        // channel is not reliably live post-Finalized, unlike BLE's radio), but
+        // P3 relay-sync resolves it after the parties part — the tokens derive
+        // from the stored shared key. So record Pending; the banner surfaces it,
+        // and the 7-day timer decays to Unreciprocated only if sync never
+        // confirms (2026-06-04-exchange-terminal-screens; P3 relay-sync).
+        contact.set_reciprocity(vauchi_core::exchange::reciprocity::Reciprocity::Pending);
         let contact_id = contact.id().to_string();
         // Build the role-correct Double Ratchet (owned data, so the session
         // borrow ends before the save below). A None splits two ways: no

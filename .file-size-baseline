@@ -164,7 +164,9 @@ vauchi-core/src/platform.rs 1192
 # (+3 for #[allow(clippy::let_underscore_must_use)] attrs on 3 intentional
 #  best-effort test sites — fail-closed counter tests, problem
 #  2026-05-21-silent-failures-in-security-paths)
-vauchi-core/src/network/http_transport.rs 1253
+# (+8 for CC-03: 3 connection-failure tests now assert the specific
+#  NetworkError::ConnectionFailed variant instead of bare is_err())
+vauchi-core/src/network/http_transport.rs 1261
 
 # EXEMPT — security-critical sync + OHTTP-bootstrap flow: the sync state
 # machine, OHTTP key resolution/rotation handling, and version/pin gates

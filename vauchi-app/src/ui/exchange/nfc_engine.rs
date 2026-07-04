@@ -25,6 +25,7 @@
 //!   `ActionResult::StartNfcExchange` (a fresh engine re-provisions it),
 //!   mirroring `LinkExchangeEngine` rather than BLE's in-place reset.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use std::sync::Arc;
 use vauchi_core::clock::Clock;
@@ -92,6 +93,7 @@ pub struct NfcExchangeEngine {
     /// entry (role pick) and re-stamped on step progress. The `tick` stall
     /// deadline ([`NFC_STEP_TIMEOUT_SECS`]) is measured from it.
     step_entered_unix: u64,
+    locale: Locale,
 }
 
 impl NfcExchangeEngine {
@@ -104,6 +106,7 @@ impl NfcExchangeEngine {
         display_name: String,
         has_camera: bool,
         clock: Arc<dyn Clock>,
+        locale: Locale,
     ) -> Self {
         let step_entered_unix = clock.unix_seconds();
         Self {
@@ -115,7 +118,12 @@ impl NfcExchangeEngine {
             cancelled: false,
             clock,
             step_entered_unix,
+            locale,
         }
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// The sub-flow step currently driving the Active screen — the flow's step
@@ -181,23 +189,23 @@ impl NfcExchangeEngine {
     fn build_success_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "exchange_success".into(),
-            title: "Success".into(),
+            title: self.t("exchange.terminal.success"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "success_status".into(),
                 icon: None,
-                title: "Exchange Complete".into(),
+                title: self.t("exchange.terminal.complete"),
                 detail: None,
                 status: Status::Success,
                 a11y: Some(A11y {
-                    label: Some("Exchange complete".into()),
-                    hint: Some("Contact cards have been exchanged successfully".into()),
+                    label: Some(self.t("exchange.terminal.complete")),
+                    hint: Some(self.t("exchange.terminal.complete_hint")),
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -209,7 +217,7 @@ impl NfcExchangeEngine {
     fn build_failed_screen(&self, detail: Option<String>) -> ScreenModel {
         let mut actions = vec![ScreenAction {
             id: ACTION_RETRY.into(),
-            label: "Retry".into(),
+            label: self.t("action.retry"),
             style: ActionStyle::Primary,
             enabled: true,
             a11y: None,
@@ -217,53 +225,47 @@ impl NfcExchangeEngine {
         if self.has_camera {
             actions.push(ScreenAction {
                 id: "fallback_qr".into(),
-                label: "Switch to QR".into(),
+                label: self.t("exchange.terminal.switch_qr"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: Some(A11y {
                     label: None,
-                    hint: Some(
-                        "Abandons this attempt and restarts the exchange using camera QR codes."
-                            .into(),
-                    ),
+                    hint: Some(self.t("exchange.terminal.switch_qr_hint")),
                     role: None,
                 }),
             });
         }
         actions.push(ScreenAction {
             id: "fallback_relay".into(),
-            label: "Switch to encrypted relay".into(),
+            label: self.t("exchange.terminal.switch_relay"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: Some(A11y {
                 label: None,
-                hint: Some(
-                    "Abandons this attempt and completes the exchange over the encrypted relay server."
-                        .into(),
-                ),
+                hint: Some(self.t("exchange.terminal.switch_relay_hint")),
                 role: None,
             }),
         });
         actions.push(ScreenAction {
             id: ACTION_CANCEL.into(),
-            label: "Cancel".into(),
+            label: self.t("action.cancel"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: None,
         });
         ScreenModel {
             screen_id: "exchange_failed".into(),
-            title: "Failed".into(),
+            title: self.t("exchange.terminal.failed"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "failed_status".into(),
                 icon: None,
-                title: "Exchange Failed".into(),
+                title: self.t("exchange.terminal.failed_status"),
                 detail,
                 status: Status::Failed,
                 a11y: Some(A11y {
-                    label: Some("Exchange failed".into()),
-                    hint: Some("The exchange did not complete. Retry or cancel.".into()),
+                    label: Some(self.t("exchange.terminal.failed_status")),
+                    hint: Some(self.t("exchange.terminal.failed_hint")),
                     role: None,
                 }),
             }],
@@ -493,6 +495,7 @@ mod tests {
             "Alice".into(),
             true,
             SystemClock::shared(),
+            Locale::English,
         )
     }
 
@@ -550,7 +553,13 @@ mod tests {
     fn tick_on_terminal_screen_is_inert() {
         // No identity → role pick fails straight to the terminal Failed
         // screen; a tick far past any budget must not mutate it (CC-14).
-        let mut e = NfcExchangeEngine::new(None, "A".into(), true, SystemClock::shared());
+        let mut e = NfcExchangeEngine::new(
+            None,
+            "A".into(),
+            true,
+            SystemClock::shared(),
+            Locale::English,
+        );
         let _ = e.handle_action(select(ROLE_SEND));
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
         let before = e.current_screen();
@@ -621,7 +630,13 @@ mod tests {
     // @internal
     #[test]
     fn send_without_identity_fails_gracefully() {
-        let mut e = NfcExchangeEngine::new(None, "Alice".into(), true, SystemClock::shared());
+        let mut e = NfcExchangeEngine::new(
+            None,
+            "Alice".into(),
+            true,
+            SystemClock::shared(),
+            Locale::English,
+        );
         let _ = e.handle_action(select(ROLE_SEND));
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
     }
@@ -648,7 +663,13 @@ mod tests {
     // @internal
     #[test]
     fn retry_from_failed_requests_a_fresh_engine() {
-        let mut e = NfcExchangeEngine::new(None, "Alice".into(), true, SystemClock::shared());
+        let mut e = NfcExchangeEngine::new(
+            None,
+            "Alice".into(),
+            true,
+            SystemClock::shared(),
+            Locale::English,
+        );
         let _ = e.handle_action(select(ROLE_SEND)); // -> Failed (no identity)
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
         let result = e.handle_action(press(ACTION_RETRY));
@@ -661,7 +682,13 @@ mod tests {
     // @internal
     #[test]
     fn failed_screen_offers_qr_fallback_only_with_camera() {
-        let mut with = NfcExchangeEngine::new(None, "A".into(), true, SystemClock::shared());
+        let mut with = NfcExchangeEngine::new(
+            None,
+            "A".into(),
+            true,
+            SystemClock::shared(),
+            Locale::English,
+        );
         let _ = with.handle_action(select(ROLE_SEND));
         let with_ids: Vec<String> = with
             .current_screen()
@@ -671,7 +698,13 @@ mod tests {
             .collect();
         assert!(with_ids.iter().any(|i| i == "fallback_qr"));
 
-        let mut without = NfcExchangeEngine::new(None, "A".into(), false, SystemClock::shared());
+        let mut without = NfcExchangeEngine::new(
+            None,
+            "A".into(),
+            false,
+            SystemClock::shared(),
+            Locale::English,
+        );
         let _ = without.handle_action(select(ROLE_SEND));
         let without_ids: Vec<String> = without
             .current_screen()

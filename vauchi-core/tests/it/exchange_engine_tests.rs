@@ -183,9 +183,13 @@ fn exchange_success_status_indicator_has_a11y() {
             let a11y = a11y
                 .as_ref()
                 .expect("success StatusIndicator must have a11y populated");
+            // M3 S4b-2: the a11y label now shares the visible-title key
+            // (exchange.terminal.complete) — one canonical string per
+            // concept. Case-only difference from the former "Exchange
+            // complete"; screen readers pronounce it identically.
             assert_eq!(
                 a11y.label.as_deref(),
-                Some("Exchange complete"),
+                Some("Exchange Complete"),
                 "a11y label should describe the outcome"
             );
             assert!(

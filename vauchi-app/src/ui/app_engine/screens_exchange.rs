@@ -156,6 +156,7 @@ impl AppEngine {
                     display_name,
                     device_capabilities.has_camera,
                     vauchi.clock().clone(),
+                    locale,
                 ))
             }
             AppScreen::DirectTransport => {
@@ -178,6 +179,7 @@ impl AppEngine {
                     card,
                     vauchi_core::exchange::UsbRole::Initiator,
                     clock,
+                    locale,
                 ))
             }
             AppScreen::MultiStageExchange { mode } => {

@@ -27,6 +27,7 @@ pub(crate) mod verifying;
 
 use self::field_preview::{FieldPreviewConfig, FieldPreviewResult};
 use self::mode_selection::{ModeSelectionEngine, ModeSelectionResult};
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::Command;
 use vauchi_core::clock::Clock;
@@ -200,9 +201,13 @@ impl ExchangeEngine {
             .map(|(_, name)| name.as_str())
             .collect();
         if names.is_empty() {
-            "Sharing: default card".to_string()
+            self.t("exchange.chip.sharing_default")
         } else {
-            format!("Sharing: {}", names.join(", "))
+            crate::i18n::get_string_with_args(
+                self.config.locale,
+                "exchange.chip.sharing",
+                &[("names", &names.join(", "))],
+            )
         }
     }
 
@@ -237,6 +242,10 @@ impl ExchangeEngine {
             clock,
             success_summary: None,
         }
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.config.locale, key)
     }
 
     /// Creates a new ExchangeEngine with a protocol session (ADR-031).
@@ -589,7 +598,7 @@ impl ExchangeEngine {
                             0,
                             Component::Banner {
                                 text: self.sharing_chip_text(),
-                                action_label: "Change".into(),
+                                action_label: self.t("exchange.chip.change"),
                                 action_id: "sharing_chip".into(),
                                 a11y: None,
                             },
@@ -601,17 +610,19 @@ impl ExchangeEngine {
                     ScreenModel::default()
                 }
             }
-            ExchangeStep::GroupSelection => {
-                build_group_selection_screen(&self.config.available_groups, &self.selected_groups)
-            }
+            ExchangeStep::GroupSelection => build_group_selection_screen(
+                &self.config.available_groups,
+                &self.selected_groups,
+                self.config.locale,
+            ),
             ExchangeStep::FieldPreview => {
                 if let Some(ref fp) = self.field_preview {
-                    field_preview::build_field_preview_screen(fp)
+                    field_preview::build_field_preview_screen(fp, self.config.locale)
                 } else {
                     ScreenModel::default()
                 }
             }
-            ExchangeStep::Verifying => verifying::build_verifying_screen(),
+            ExchangeStep::Verifying => verifying::build_verifying_screen(self.config.locale),
             ExchangeStep::Success if self.success_summary.is_some() => {
                 let summary = self.success_summary.as_ref().expect("guarded by is_some()");
                 crate::ui::exchange::success::build_exchange_success_screen(
@@ -623,23 +634,23 @@ impl ExchangeEngine {
             }
             ExchangeStep::Success => ScreenModel {
                 screen_id: "exchange_success".into(),
-                title: "Success".into(),
+                title: self.t("exchange.terminal.success"),
                 subtitle: None,
                 components: vec![Component::StatusIndicator {
                     id: "success_status".into(),
                     icon: None,
-                    title: "Exchange Complete".into(),
+                    title: self.t("exchange.terminal.complete"),
                     detail: None,
                     status: Status::Success,
                     a11y: Some(A11y {
-                        label: Some("Exchange complete".into()),
-                        hint: Some("Contact cards have been exchanged successfully".into()),
+                        label: Some(self.t("exchange.terminal.complete")),
+                        hint: Some(self.t("exchange.terminal.complete_hint")),
                         role: None,
                     }),
                 }],
                 actions: vec![ScreenAction {
                     id: "done".into(),
-                    label: "Done".into(),
+                    label: self.t("action.done"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
@@ -653,7 +664,7 @@ impl ExchangeEngine {
     fn build_failed_screen(&self) -> ScreenModel {
         let mut actions = vec![ScreenAction {
             id: "retry".into(),
-            label: "Retry".into(),
+            label: self.t("action.retry"),
             style: ActionStyle::Primary,
             enabled: true,
             a11y: None,
@@ -662,7 +673,7 @@ impl ExchangeEngine {
         if self.qr_fallback_available {
             actions.push(ScreenAction {
                 id: "fallback_qr".into(),
-                label: "Switch to QR".into(),
+                label: self.t("exchange.terminal.switch_qr"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 // d4-a11y (selective): "Switch to QR" names a
@@ -671,50 +682,44 @@ impl ExchangeEngine {
                 // label is the accessible name; no redundant role).
                 a11y: Some(A11y {
                     label: None,
-                    hint: Some(
-                        "Abandons this attempt and restarts the exchange using camera QR codes."
-                            .into(),
-                    ),
+                    hint: Some(self.t("exchange.terminal.switch_qr_hint")),
                     role: None,
                 }),
             });
         }
         if self.ble_fallback_available {
             actions.push(ScreenAction {
-                        id: "fallback_relay".into(),
-                        label: "Switch to encrypted relay".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: Some(A11y {
-                            label: None,
-                            hint: Some(
-                                "Abandons this attempt and completes the exchange over the encrypted relay server."
-                                    .into(),
-                            ),
-                            role: None,
-                        }),
-                    });
+                id: "fallback_relay".into(),
+                label: self.t("exchange.terminal.switch_relay"),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: Some(A11y {
+                    label: None,
+                    hint: Some(self.t("exchange.terminal.switch_relay_hint")),
+                    role: None,
+                }),
+            });
         }
         actions.push(ScreenAction {
             id: "cancel".into(),
-            label: "Cancel".into(),
+            label: self.t("action.cancel"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: None,
         });
         ScreenModel {
             screen_id: "exchange_failed".into(),
-            title: "Failed".into(),
+            title: self.t("exchange.terminal.failed"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "failed_status".into(),
                 icon: None,
-                title: "Exchange Failed".into(),
+                title: self.t("exchange.terminal.failed_status"),
                 detail: self.failure_detail.clone(),
                 status: Status::Failed,
                 a11y: Some(A11y {
-                    label: Some("Exchange failed".into()),
-                    hint: Some("The exchange did not complete. Retry or cancel.".into()),
+                    label: Some(self.t("exchange.terminal.failed_status")),
+                    hint: Some(self.t("exchange.terminal.failed_hint")),
                     role: None,
                 }),
             }],
@@ -731,7 +736,9 @@ impl ExchangeEngine {
 fn build_group_selection_screen(
     available_groups: &[(String, String)],
     selected_groups: &[String],
+    locale: Locale,
 ) -> ScreenModel {
+    let t = |key: &str| get_string(locale, key);
     let items: Vec<ToggleItem> = available_groups
         .iter()
         .map(|(id, name)| ToggleItem {
@@ -748,7 +755,7 @@ fn build_group_selection_screen(
             // ScreenAction in the codebase carries a11y (d4-a11y phase 2).
             a11y: Some(A11y {
                 label: Some(format!("{name} group toggle")),
-                hint: Some("Toggle to assign the new contact to this group.".into()),
+                hint: Some(t("exchange.assign.toggle_hint")),
                 role: Some(AccessibilityRole::Toggle),
             }),
             info_key: None,
@@ -756,11 +763,11 @@ fn build_group_selection_screen(
         .collect();
     ScreenModel {
         screen_id: "exchange_group_selection".into(),
-        title: "Assign to Groups".into(),
-        subtitle: Some("Choose which groups the new contact will be in".into()),
+        title: t("exchange.assign.title"),
+        subtitle: Some(t("exchange.assign.subtitle")),
         components: vec![Component::ToggleList {
             id: "group_picker".into(),
-            label: "Groups".into(),
+            label: t("exchange.assign.groups_label"),
             items,
             a11y: None,
         }],
@@ -773,9 +780,9 @@ fn build_group_selection_screen(
             ScreenAction {
                 id: "continue".into(),
                 label: if selected_groups.is_empty() {
-                    "Skip".into()
+                    t("action.skip")
                 } else {
-                    "Continue".into()
+                    t("action.continue")
                 },
                 style: ActionStyle::Primary,
                 enabled: true,
@@ -783,7 +790,7 @@ fn build_group_selection_screen(
             },
             ScreenAction {
                 id: "cancel".into(),
-                label: "Cancel".into(),
+                label: t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,

@@ -53,6 +53,7 @@ fn role_factory() -> NfcExchangeEngine {
         "Alice".into(),
         true,
         vauchi_core::clock::SystemClock::shared(),
+        vauchi_app::i18n::Locale::English,
     )
 }
 
@@ -64,6 +65,7 @@ fn failed_factory() -> NfcExchangeEngine {
         "Alice".into(),
         true,
         vauchi_core::clock::SystemClock::shared(),
+        vauchi_app::i18n::Locale::English,
     );
     let _ = e.handle_action(vauchi_app::ui::UserAction::ListItemSelected {
         component_id: "nfc_role".into(),

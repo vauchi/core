@@ -44,6 +44,7 @@ mod engine_update_tests;
 mod exchange_ble_invariants_proptest;
 mod exchange_ble_rich_success_tests;
 mod exchange_cancel_navigation_tests;
+mod exchange_flow_i18n_tests;
 mod exchange_group_filter_preview_tests;
 mod exchange_group_selection_actions_tests;
 mod exchange_last_used_defaults_tests;

@@ -14,20 +14,21 @@
 use crate::ui::*;
 
 /// Builds the flow-agnostic "Verifying" screen.
-pub(super) fn build_verifying_screen() -> ScreenModel {
+pub(super) fn build_verifying_screen(locale: crate::i18n::Locale) -> ScreenModel {
+    let t = |key: &str| crate::i18n::get_string(locale, key);
     ScreenModel {
         screen_id: "exchange_verifying".into(),
-        title: "Verifying".into(),
+        title: t("exchange.verifying.title"),
         subtitle: None,
         components: vec![Component::StatusIndicator {
             id: "verifying_status".into(),
             icon: None,
-            title: "Verifying...".into(),
+            title: t("exchange.verifying.status"),
             detail: None,
             status: Status::InProgress,
             a11y: Some(A11y {
-                label: Some("Verifying exchange".into()),
-                hint: Some("Confirming the other person's identity".into()),
+                label: Some(t("exchange.verifying.a11y")),
+                hint: Some(t("exchange.verifying.a11y_hint")),
                 role: None,
             }),
         }],
@@ -45,7 +46,7 @@ mod tests {
     // @internal
     #[test]
     fn verifying_screen_is_flow_agnostic() {
-        let screen = build_verifying_screen();
+        let screen = build_verifying_screen(crate::i18n::Locale::English);
         assert_eq!(screen.screen_id, "exchange_verifying");
         assert!(screen.progress.is_none(), "no numeric progress (M2 S2)");
         // No QR component — the screen is shared across exchange flows.

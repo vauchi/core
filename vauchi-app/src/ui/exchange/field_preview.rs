@@ -34,7 +34,11 @@ pub(super) enum FieldPreviewResult {
 }
 
 /// Build a field preview screen from the config.
-pub(super) fn build_field_preview_screen(config: &FieldPreviewConfig) -> ScreenModel {
+pub(super) fn build_field_preview_screen(
+    config: &FieldPreviewConfig,
+    locale: crate::i18n::Locale,
+) -> ScreenModel {
+    let t = |key: &str| crate::i18n::get_string(locale, key);
     let fields: Vec<Field> = config
         .card
         .fields()
@@ -74,7 +78,7 @@ pub(super) fn build_field_preview_screen(config: &FieldPreviewConfig) -> ScreenM
 
     ScreenModel {
         screen_id: "exchange_field_preview".into(),
-        title: "You will share".into(),
+        title: t("exchange.preview.title"),
         subtitle: None,
         components: vec![
             Component::Text {
@@ -88,7 +92,7 @@ pub(super) fn build_field_preview_screen(config: &FieldPreviewConfig) -> ScreenM
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_groups: vec![],
                 a11y: Some(A11y {
-                    label: Some("Contact fields".into()),
+                    label: Some(t("exchange.preview.fields_a11y")),
                     hint: None,
                     role: None,
                 }),
@@ -97,14 +101,14 @@ pub(super) fn build_field_preview_screen(config: &FieldPreviewConfig) -> ScreenM
         actions: vec![
             ScreenAction {
                 id: "start_exchange".into(),
-                label: "Start Exchange".into(),
+                label: t("exchange.preview.start"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
             },
             ScreenAction {
                 id: "change_groups".into(),
-                label: "Change Groups".into(),
+                label: t("exchange.preview.change_groups"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -158,7 +162,7 @@ mod tests {
             display_name: "Alice".into(),
             visible_field_ids: None,
         };
-        let screen = build_field_preview_screen(&config);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
         assert_eq!(screen.screen_id, "exchange_field_preview");
 
         let fields = extract_fields(&screen);
@@ -180,7 +184,7 @@ mod tests {
             display_name: "Alice".into(),
             visible_field_ids: Some(HashSet::from([email_id.clone()])),
         };
-        let screen = build_field_preview_screen(&config);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
 
         let fields = extract_fields(&screen);
         let email = fields.iter().find(|f| f.id == email_id).unwrap();
@@ -205,7 +209,7 @@ mod tests {
             display_name: "Dr. Egloff".into(),
             visible_field_ids: None,
         };
-        let screen = build_field_preview_screen(&config);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
 
         let name = screen.components.iter().find_map(|c| match c {
             Component::Text { content, .. } => Some(content.as_str()),
@@ -245,7 +249,7 @@ mod tests {
             display_name: "Alice".into(),
             visible_field_ids: None,
         };
-        let screen = build_field_preview_screen(&config);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
         assert_eq!(screen.actions.len(), 2);
         assert_eq!(screen.actions[0].id, "start_exchange");
         assert_eq!(screen.actions[1].id, "change_groups");
@@ -260,7 +264,7 @@ mod tests {
             display_name: "Alice".into(),
             visible_field_ids: None,
         };
-        let screen = build_field_preview_screen(&config);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
         let fields = extract_fields(&screen);
         assert_eq!(fields.len(), 2, "Card with 2 fields should show 2 entries");
         assert_eq!(

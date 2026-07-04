@@ -34,6 +34,7 @@
 
 use std::sync::Arc;
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::reciprocity_confirmer::ReciprocityConfirmer;
 use crate::ui::*;
 use vauchi_core::clock::Clock;
@@ -109,6 +110,7 @@ pub struct DirectTransportEngine {
     /// measured from it. `Waiting` is only entered at construction (retry
     /// re-provisions a fresh engine), so this is never re-stamped.
     waiting_entered_unix: u64,
+    locale: Locale,
 }
 
 impl DirectTransportEngine {
@@ -122,6 +124,7 @@ impl DirectTransportEngine {
         card: Option<ContactCard>,
         role: UsbRole,
         clock: Arc<dyn Clock>,
+        locale: Locale,
     ) -> Self {
         let session = match (identity, card) {
             (Some(identity), Some(card)) => Some(ExchangeSession::new_usb(
@@ -157,7 +160,12 @@ impl DirectTransportEngine {
             cancelled: false,
             celebrated: false,
             waiting_entered_unix,
+            locale,
         }
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// The card this engine will transmit to the peer (the session's frozen
@@ -172,7 +180,7 @@ impl DirectTransportEngine {
         match &self.screen {
             DirectScreen::Waiting => self.build_waiting_screen(),
             DirectScreen::Exchanging => self.build_exchanging_screen(),
-            DirectScreen::Verifying => super::verifying::build_verifying_screen(),
+            DirectScreen::Verifying => super::verifying::build_verifying_screen(self.locale),
             DirectScreen::Success => self.build_success_screen(),
             DirectScreen::Failed { reason } => self.build_failed_screen(reason.clone()),
         }
@@ -181,16 +189,16 @@ impl DirectTransportEngine {
     fn build_waiting_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "exchange_direct_waiting".into(),
-            title: "USB Exchange".into(),
-            subtitle: Some("Connect your phone via USB cable".into()),
+            title: self.t("exchange.usb.title"),
+            subtitle: Some(self.t("exchange.usb.connect_subtitle")),
             components: vec![Component::Text {
                 id: "instructions".into(),
-                content: "1. Connect your phone with a USB cable\n2. Enable USB tethering (Android) or trust this computer (iOS)\n3. Open Vauchi on your phone and start an exchange".into(),
+                content: self.t("exchange.usb.instructions"),
                 style: TextStyle::Body,
             }],
             actions: vec![ScreenAction {
                 id: ACTION_CANCEL.into(),
-                label: "Cancel".into(),
+                label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -202,11 +210,11 @@ impl DirectTransportEngine {
     fn build_exchanging_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "exchange_direct_exchanging".into(),
-            title: "USB Exchange".into(),
-            subtitle: Some("Exchanging contact cards...".into()),
+            title: self.t("exchange.usb.title"),
+            subtitle: Some(self.t("exchange.usb.exchanging_subtitle")),
             components: vec![Component::Text {
                 id: "status".into(),
-                content: "Connected. Exchanging encrypted data...".into(),
+                content: self.t("exchange.usb.exchanging_status"),
                 style: TextStyle::Body,
             }],
             actions: vec![],
@@ -218,30 +226,30 @@ impl DirectTransportEngine {
         if let Some(summary) = self.success_summary.as_ref() {
             return super::success::build_exchange_success_screen(
                 "exchange_success",
-                "Success",
+                self.t("exchange.terminal.success"),
                 ACTION_DONE,
                 summary,
             );
         }
         ScreenModel {
             screen_id: "exchange_success".into(),
-            title: "Success".into(),
+            title: self.t("exchange.terminal.success"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "success_status".into(),
                 icon: None,
-                title: "Exchange Complete".into(),
+                title: self.t("exchange.terminal.complete"),
                 detail: None,
                 status: Status::Success,
                 a11y: Some(A11y {
-                    label: Some("Exchange complete".into()),
-                    hint: Some("Contact cards have been exchanged successfully".into()),
+                    label: Some(self.t("exchange.terminal.complete")),
+                    hint: Some(self.t("exchange.terminal.complete_hint")),
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -253,31 +261,31 @@ impl DirectTransportEngine {
     fn build_failed_screen(&self, detail: Option<String>) -> ScreenModel {
         ScreenModel {
             screen_id: "exchange_failed".into(),
-            title: "Failed".into(),
+            title: self.t("exchange.terminal.failed"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "failed_status".into(),
                 icon: None,
-                title: "Exchange Failed".into(),
+                title: self.t("exchange.terminal.failed_status"),
                 detail,
                 status: Status::Failed,
                 a11y: Some(A11y {
-                    label: Some("Exchange failed".into()),
-                    hint: Some("The exchange did not complete. Retry or cancel.".into()),
+                    label: Some(self.t("exchange.terminal.failed_status")),
+                    hint: Some(self.t("exchange.terminal.failed_hint")),
                     role: None,
                 }),
             }],
             actions: vec![
                 ScreenAction {
                     id: ACTION_RETRY.into(),
-                    label: "Retry".into(),
+                    label: self.t("action.retry"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: ACTION_CANCEL.into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -557,7 +565,13 @@ mod tests {
     fn engine(name: &str) -> DirectTransportEngine {
         let id = identity(name);
         let c = ContactCard::new(id.display_name());
-        DirectTransportEngine::new(Some(id), Some(c), UsbRole::Initiator, SystemClock::shared())
+        DirectTransportEngine::new(
+            Some(id),
+            Some(c),
+            UsbRole::Initiator,
+            SystemClock::shared(),
+            Locale::English,
+        )
     }
 
     /// Pull the `DirectSend` payload out of an engine's `screen_entered` output.
@@ -595,7 +609,13 @@ mod tests {
     // @internal
     #[test]
     fn no_identity_degrades_to_failed_screen() {
-        let e = DirectTransportEngine::new(None, None, UsbRole::Initiator, SystemClock::shared());
+        let e = DirectTransportEngine::new(
+            None,
+            None,
+            UsbRole::Initiator,
+            SystemClock::shared(),
+            Locale::English,
+        );
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
         assert!(!e.was_cancelled());
     }
@@ -642,8 +662,13 @@ mod tests {
         // No identity → the engine constructs straight into Failed. A tick
         // far past any budget must not re-fail it or change the reason
         // (the `screen != Waiting` guard, CC-14 adversarial case).
-        let mut e =
-            DirectTransportEngine::new(None, None, UsbRole::Initiator, SystemClock::shared());
+        let mut e = DirectTransportEngine::new(
+            None,
+            None,
+            UsbRole::Initiator,
+            SystemClock::shared(),
+            Locale::English,
+        );
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
         let before = e.current_screen().components;
 

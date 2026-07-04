@@ -80,3 +80,12 @@ split-debuginfo = "off"
 [profile.mutants]
 inherits = "test"
 debug = "none"        # Skip debug symbols — mutants only need pass/fail
+
+# Shared lint policy (ADR-055). Members opt in with `[lints] workspace = true`.
+# Phase 1: deny dev artifacts that must never ship. Higher-value restriction
+# lints (unwrap_used, indexing_slicing, arithmetic_side_effects) are Phase 2 —
+# they flag existing code and need per-site triage, so they land lint-by-lint.
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"

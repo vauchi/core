@@ -227,3 +227,7 @@ harness = false
 [[bench]]
 name = "performance_regression"
 harness = false
+
+# ADR-055: inherit the workspace lint policy.
+[lints]
+workspace = true

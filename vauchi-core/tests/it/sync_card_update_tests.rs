@@ -11,13 +11,16 @@ use crate::common;
 
 use common::helpers::create_vauchi_with_identity;
 use vauchi_core::SymmetricKey;
-use vauchi_core::api::{CardUpdateError, process_card_updates, process_single_card_update};
+use vauchi_core::api::{
+    CardUpdateError, ReceiveOutcome, process_card_updates, process_single_card_update,
+};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
+use vauchi_core::sync::safety_alert::{AlertKind, SafetyAlertPayload};
 
 /// Helper: create Alice and Bob with a mutual contact, ratchet states stored,
 /// and return everything needed to construct and process card updates.
@@ -1108,5 +1111,113 @@ fn stale_version_delta_rejected_by_device_receiver() {
             .unwrap(),
         2,
         "a rejected stale delta must not move the recorded version"
+    );
+}
+
+// --- Safety-alert receive routing (2026-07-04-coercion-safety-alerts-never-received) ---
+
+/// Build a safety-alert blob Bob sends to Alice: a signed `SafetyAlertPayload`
+/// (`VersionedPayload` 0x04) encrypted with Bob's ratchet — the same envelope
+/// as a card update on the wire (ADR-032).
+fn create_alert_blob(
+    bob_wb: &vauchi_core::Vauchi,
+    alice_signing_pk: &[u8; 32],
+    alice_contact_id: &str,
+    kind: AlertKind,
+    nonce: [u8; 32],
+) -> Vec<u8> {
+    let bob_identity = bob_wb.identity().unwrap();
+    let alert = SafetyAlertPayload::new(
+        kind,
+        "help me".into(),
+        1_720_000_000,
+        None,
+        nonce,
+        bob_identity,
+        alice_signing_pk,
+    )
+    .unwrap();
+    let payload = VersionedPayload::encode_alert(&alert);
+
+    let (mut bob_ratchet, is_init) = bob_wb
+        .storage()
+        .ratchets()
+        .load_ratchet_state(alice_contact_id)
+        .unwrap()
+        .unwrap();
+    let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
+    bob_wb
+        .storage()
+        .ratchets()
+        .save_ratchet_state(alice_contact_id, &bob_ratchet, is_init)
+        .unwrap();
+    serde_json::to_vec(&ratchet_msg).unwrap()
+}
+
+// @internal
+#[test]
+fn received_duress_alert_is_verified_and_surfaced() {
+    let (alice_wb, bob_wb, _s, bob_contact_id, alice_contact_id) = setup_exchange_with_ratchets();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+
+    let blob = create_alert_blob(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        AlertKind::Duress,
+        [9u8; 32],
+    );
+
+    let alice_identity = alice_wb.identity().unwrap();
+    let outcome =
+        process_single_card_update(alice_identity, alice_wb.storage(), &bob_contact_id, &blob)
+            .expect("a signed alert must be received, not dropped");
+    match outcome {
+        ReceiveOutcome::Alert(a) => {
+            assert_eq!(a.kind, AlertKind::Duress);
+            assert_eq!(a.message, "help me");
+            assert_eq!(a.timestamp, 1_720_000_000);
+        }
+        other => panic!("expected an Alert outcome, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn replayed_alert_is_rejected() {
+    let (alice_wb, bob_wb, _s, bob_contact_id, alice_contact_id) = setup_exchange_with_ratchets();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+
+    // Two blobs carrying the SAME alert nonce (a re-sent / captured alert). The
+    // first is surfaced; the second must be rejected by the replay check, not
+    // re-trigger the alert.
+    let blob1 = create_alert_blob(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        AlertKind::Emergency,
+        [3u8; 32],
+    );
+    let blob2 = create_alert_blob(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        AlertKind::Emergency,
+        [3u8; 32],
+    );
+
+    let alice_identity = alice_wb.identity().unwrap();
+    let first =
+        process_single_card_update(alice_identity, alice_wb.storage(), &bob_contact_id, &blob1);
+    assert!(
+        matches!(first, Ok(ReceiveOutcome::Alert(_))),
+        "the first alert must surface, got {first:?}"
+    );
+
+    let second =
+        process_single_card_update(alice_identity, alice_wb.storage(), &bob_contact_id, &blob2);
+    assert!(
+        matches!(second, Err(CardUpdateError::ReplayDetected)),
+        "a replayed alert nonce must be rejected, got {second:?}"
     );
 }

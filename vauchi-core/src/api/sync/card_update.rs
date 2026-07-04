@@ -20,9 +20,11 @@
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::ratchet::RatchetMessage;
 use crate::identity::Identity;
+use crate::network::GeoLocation;
 use crate::network::anonymous::resolve_sender_id;
 use crate::storage::{Storage, StorageError};
 use crate::sync::delta::{CardDelta, FieldChange, PAYLOAD_VERSION_CEK, VersionedPayload};
+use crate::sync::safety_alert::AlertKind;
 
 /// Error returned when a single card update fails.
 ///
@@ -78,6 +80,31 @@ pub struct CardUpdateResult {
     pub updated_names: Vec<String>,
 }
 
+/// A verified safety alert (emergency/duress) received from a contact.
+///
+/// Surfaced by the receive pipeline so the caller can dispatch the matching
+/// `VauchiEvent` — the alert touched no contact card.
+#[derive(Debug, Clone)]
+pub struct ReceivedAlert {
+    /// Emergency vs duress (drives which event is dispatched).
+    pub kind: AlertKind,
+    /// The alert message.
+    pub message: String,
+    /// Unix timestamp when the alert was created.
+    pub timestamp: u64,
+    /// Optional sender location.
+    pub location: Option<GeoLocation>,
+}
+
+/// What a single decrypted, verified receive payload turned out to be.
+#[derive(Debug)]
+pub enum ReceiveOutcome {
+    /// A card delta was applied to the contact's card.
+    CardDelta,
+    /// A safety alert was received (no card change).
+    Alert(ReceivedAlert),
+}
+
 /// Processes a batch of incoming card updates with full security checks.
 ///
 /// Each update goes through the complete secure pipeline:
@@ -110,7 +137,7 @@ pub fn process_card_updates(
         let resolved_id = resolve_sender_id(&contacts, &sender_id, storage.clock().unix_seconds())
             .unwrap_or(sender_id);
         match process_single_card_update(identity, storage, &resolved_id, &ciphertext) {
-            Ok(()) => {
+            Ok(ReceiveOutcome::CardDelta) => {
                 result.processed += 1;
                 // Collect display name for the updated contact
                 if let Some(contact) = contacts.iter().find(|c| c.id() == resolved_id) {
@@ -120,6 +147,9 @@ pub fn process_card_updates(
                     }
                 }
             }
+            // Alerts are surfaced via events on the receive-blob path, not this
+            // batch card-update helper; count as processed, no card name.
+            Ok(ReceiveOutcome::Alert(_)) => result.processed += 1,
             Err(_) => result.skipped += 1,
         }
     }
@@ -136,7 +166,7 @@ pub fn process_single_card_update(
     storage: &Storage,
     sender_id: &str,
     ciphertext: &[u8],
-) -> Result<(), CardUpdateError> {
+) -> Result<ReceiveOutcome, CardUpdateError> {
     // 1. Reject updates from revoked senders
     if storage.contacts().is_sender_revoked(sender_id)? {
         return Err(CardUpdateError::SenderRevoked);
@@ -164,6 +194,49 @@ pub fn process_single_card_update(
     let plaintext = ratchet
         .decrypt(&ratchet_msg)
         .map_err(|_| CardUpdateError::DecryptionFailed)?;
+
+    // 3b. Alerts route separately. Emergency/duress alerts reuse the card-update
+    //     envelope for wire indistinguishability (ADR-032) but carry no card
+    //     delta — a 0x04 payload is verified + surfaced here, before the
+    //     card-delta path (2026-07-04-coercion-safety-alerts-never-received).
+    if let Ok(VersionedPayload::Alert(alert)) = VersionedPayload::decode(&plaintext) {
+        // Verify the sender+recipient signature BEFORE acting on the alert.
+        let sender_pk = contact
+            .public_key()
+            .ok_or(CardUpdateError::SignatureInvalid)?;
+        if !alert.verify(sender_pk, identity.signing_public_key()) {
+            return Err(CardUpdateError::SignatureInvalid);
+        }
+        // Replay detection (reuse the card-update nonce store) — a captured
+        // alert blob must not be replayable to re-trigger the alert.
+        if storage.replay().is_replay_nonce(sender_id, alert.nonce())? {
+            return Err(CardUpdateError::ReplayDetected);
+        }
+        // Persist the advanced ratchet + the nonce atomically. No card is touched.
+        storage.begin_transaction()?;
+        let alert_txn = (|| -> Result<(), CardUpdateError> {
+            storage
+                .ratchets()
+                .save_ratchet_state(sender_id, &ratchet, is_initiator)?;
+            storage
+                .replay()
+                .save_replay_nonce(sender_id, alert.nonce(), alert.timestamp())?;
+            Ok(())
+        })();
+        match alert_txn {
+            Ok(()) => storage.commit()?,
+            Err(e) => {
+                storage.rollback();
+                return Err(e);
+            }
+        }
+        return Ok(ReceiveOutcome::Alert(ReceivedAlert {
+            kind: alert.kind(),
+            message: alert.message().to_string(),
+            timestamp: alert.timestamp(),
+            location: alert.location().cloned(),
+        }));
+    }
 
     // 4. Handle versioned payload (CEK-wrapped or legacy)
     let (delta_bytes, new_cek) = decode_versioned_payload(&plaintext)?;
@@ -257,7 +330,7 @@ pub fn process_single_card_update(
     match txn_result {
         Ok(()) => {
             storage.commit()?;
-            Ok(())
+            Ok(ReceiveOutcome::CardDelta)
         }
         Err(e) => {
             storage.rollback();

@@ -37,9 +37,12 @@
 use std::collections::HashMap;
 
 use crate::api::events::VauchiEvent;
-use crate::api::sync::{CardUpdateError, process_single_card_update};
+use crate::api::sync::{
+    CardUpdateError, ReceiveOutcome, ReceivedAlert, process_single_card_update,
+};
 use crate::contact::Contact;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
+use crate::sync::safety_alert::AlertKind;
 
 /// Outcome of processing a single received blob.
 ///
@@ -74,6 +77,10 @@ pub struct BlobOutcome {
     /// `IncomingUpdate` per applied update — without it the contacts list
     /// never re-renders the synced tile (2026-06-30, ADR-021/043).
     pub contact_id: Option<String>,
+    /// `Some` when the applied blob was a verified safety alert (not a card
+    /// delta). Drives an `Emergency`/`DuressAlertReceived` event instead of an
+    /// `IncomingUpdate` (2026-07-04-coercion-safety-alerts-never-received).
+    pub alert: Option<ReceivedAlert>,
 }
 
 /// Route and apply a batch of received blobs.
@@ -101,15 +108,20 @@ pub fn process_received_blobs(
 
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext) in blobs {
-        let (token_resolved, decrypted, reject_reason, applied_contact_id) =
+        let (token_resolved, decrypted, reject_reason, applied_contact_id, alert) =
             match token_to_contact.get(&mailbox_token_hex) {
                 Some(contact_id) => {
                     match process_single_card_update(identity, storage, contact_id, &ciphertext) {
-                        Ok(()) => (true, true, None, Some(contact_id.clone())),
-                        Err(e) => (true, false, Some(reject_category(&e)), None),
+                        Ok(ReceiveOutcome::CardDelta) => {
+                            (true, true, None, Some(contact_id.clone()), None)
+                        }
+                        Ok(ReceiveOutcome::Alert(a)) => {
+                            (true, true, None, Some(contact_id.clone()), Some(a))
+                        }
+                        Err(e) => (true, false, Some(reject_category(&e)), None, None),
                     }
                 }
-                None => (false, false, None, None),
+                None => (false, false, None, None, None),
             };
         outcomes.push(BlobOutcome {
             message_id,
@@ -117,6 +129,7 @@ pub fn process_received_blobs(
             decrypted,
             reject_reason,
             contact_id: applied_contact_id,
+            alert,
         });
     }
     outcomes
@@ -134,9 +147,37 @@ pub fn process_received_blobs(
 pub fn incoming_update_events(outcomes: &[BlobOutcome]) -> Vec<VauchiEvent> {
     outcomes
         .iter()
-        .filter_map(|outcome| outcome.contact_id.clone())
-        .map(|contact_id| VauchiEvent::IncomingUpdate { contact_id })
+        .filter_map(|outcome| {
+            let contact_id = outcome.contact_id.clone()?;
+            Some(match &outcome.alert {
+                Some(alert) => alert_event(contact_id, alert),
+                None => VauchiEvent::IncomingUpdate { contact_id },
+            })
+        })
         .collect()
+}
+
+/// Map a received safety alert to its recipient-side event. Emergency and
+/// duress get distinct events so the recipient can respond appropriately; the
+/// distinction only exists here (post-decryption), never on the wire (ADR-032).
+fn alert_event(contact_id: String, alert: &ReceivedAlert) -> VauchiEvent {
+    let message = alert.message.clone();
+    let timestamp = alert.timestamp;
+    let location = alert.location.as_ref().map(|l| (l.latitude, l.longitude));
+    match alert.kind {
+        AlertKind::Emergency => VauchiEvent::EmergencyAlertReceived {
+            contact_id,
+            message,
+            timestamp,
+            location,
+        },
+        AlertKind::Duress => VauchiEvent::DuressAlertReceived {
+            contact_id,
+            message,
+            timestamp,
+            location,
+        },
+    }
 }
 
 /// Short, PII-free category for a rejected blob — names WHICH receive step

@@ -26,7 +26,8 @@ pub mod manager;
 mod manager;
 
 pub use card_update::{
-    CardUpdateError, CardUpdateResult, process_card_updates, process_single_card_update,
+    CardUpdateError, CardUpdateResult, ReceiveOutcome, ReceivedAlert, process_card_updates,
+    process_single_card_update,
 };
 pub use device_orchestrator::{DeviceSyncOrchestrator, build_device_sync_envelopes};
 pub use manager::{SyncError, SyncManager};

@@ -10,7 +10,10 @@
 //! (ADR-032 duress parity: emission sites never consult it; the exact
 //! serialization is pinned here so any conditioning would break the pin).
 
-use vauchi_app::ui::{AppEngine, AppScreen, UserAction, WorkflowEngine};
+// `AppScreen`/`UserAction`/`WorkflowEngine` are used only by the
+// testing-gated multi-stage module below — imported there, so the
+// featureless `--all-targets` clippy (CI lint:clippy) stays clean.
+use vauchi_app::ui::AppEngine;
 use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
 use vauchi_core::platform::{AnimationToken, HapticPattern, SoundToken};
@@ -144,7 +147,7 @@ mod multi_stage {
     use super::*;
     use std::sync::Arc;
     use std::time::{Duration, SystemTime};
-    use vauchi_app::ui::Component;
+    use vauchi_app::ui::{AppScreen, Component, UserAction, WorkflowEngine};
     use vauchi_core::clock::{Clock, FakeClock};
 
     fn own_qr_data(engine: &AppEngine) -> Option<String> {

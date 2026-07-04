@@ -2,6 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Memory safety by construction (ADR-055): core carries no unsafe. The
+// FFI crates (vauchi-platform, vauchi-cabi) are exempt — forbid is
+// per-crate, not workspace-wide.
+#![forbid(unsafe_code)]
+
 //! Vauchi Core Library
 //!
 //! Privacy-focused contact card exchange library.

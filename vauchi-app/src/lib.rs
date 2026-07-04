@@ -2,6 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Memory safety by construction (ADR-055): the app layer carries no
+// unsafe. FFI crates are exempt — forbid is per-crate, not workspace-wide.
+#![forbid(unsafe_code)]
+
 //! Vauchi App Layer
 //!
 //! Presentation, content, and i18n modules extracted from vauchi-core.

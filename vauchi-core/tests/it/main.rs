@@ -346,6 +346,7 @@ mod ratchet_error_tests;
 mod rate_limit_handling;
 mod reciprocity_sync_tests;
 mod reciprocity_tests;
+mod reciprocity_tokens_tests;
 mod recovery_boundary_tests;
 mod recovery_claim_review_tests;
 mod recovery_comprehensive_tests;

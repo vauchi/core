@@ -1429,16 +1429,14 @@ impl ExchangeSession {
         let derived = HKDF::derive_key(None, &*shared_bytes, &info);
         let shared_key = crate::crypto::SymmetricKey::from_bytes(*derived);
 
-        // Derive reciprocity confirmation tokens (design spec §2).
-        // Asymmetric: each side's token binds their own identity key.
-        let our_confirm_info = [b"vauchi-reciprocity-confirm-v1".as_slice(), our_id].concat();
-        let their_confirm_info = [
-            b"vauchi-reciprocity-confirm-v1".as_slice(),
+        // Derive reciprocity confirmation tokens (design spec §2) via the
+        // shared, transport-agnostic primitive so BLE / multi-stage derive
+        // identically. Asymmetric: each side's token binds one identity key.
+        let (our_confirm, their_confirm) = super::reciprocity_tokens::derive_confirmation_tokens(
+            &shared_bytes[..],
+            our_id.as_slice(),
             their_public_key.as_slice(),
-        ]
-        .concat();
-        let our_confirm = HKDF::derive_key(None, &*shared_bytes, &our_confirm_info);
-        let their_confirm = HKDF::derive_key(None, &*shared_bytes, &their_confirm_info);
+        );
         self.our_confirmation_token = Some(our_confirm);
         self.expected_their_token = Some(their_confirm);
 

@@ -76,6 +76,7 @@ pub mod oob_bootstrap;
 pub mod proximity_runner;
 pub mod ratchet_bootstrap;
 pub mod reciprocity;
+pub mod reciprocity_tokens;
 pub mod relay_exchange;
 pub mod shake_protocol;
 pub mod tcp_transport;

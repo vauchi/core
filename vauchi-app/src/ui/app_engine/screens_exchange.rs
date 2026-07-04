@@ -38,18 +38,19 @@ impl AppEngine {
                 // gate with their prior groups pre-applied. Stored ids are
                 // filtered against the live group list (deleted groups drop
                 // out; an empty result still marks a repeat user).
-                let last_used_group_ids = vauchi
+                let stored_defaults = vauchi
                     .storage()
                     .ux()
                     .load_exchange_defaults()
                     .ok()
-                    .flatten()
-                    .map(|d| {
-                        d.group_ids
-                            .into_iter()
-                            .filter(|id| all_groups.iter().any(|g| g.id() == id))
-                            .collect::<Vec<_>>()
-                    });
+                    .flatten();
+                let last_used_mode = stored_defaults.as_ref().map(|d| d.mode);
+                let last_used_group_ids = stored_defaults.map(|d| {
+                    d.group_ids
+                        .into_iter()
+                        .filter(|id| all_groups.iter().any(|g| g.id() == id))
+                        .collect::<Vec<_>>()
+                });
                 let config = ExchangeConfig {
                     own_name: card
                         .as_ref()
@@ -61,6 +62,7 @@ impl AppEngine {
                     transport_readiness: transport_readiness.clone(),
                     mode: None, // triggers mode selection screen
                     last_used_group_ids,
+                    last_used_mode,
                     card_snapshot,
                     available_group_data: all_groups,
                 };

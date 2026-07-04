@@ -38,6 +38,7 @@ fn factory() -> ExchangeEngine {
             transport_readiness: Default::default(),
             mode: None,
             last_used_group_ids: None,
+            last_used_mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
         },

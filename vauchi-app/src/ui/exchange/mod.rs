@@ -70,6 +70,10 @@ pub struct ExchangeConfig {
     /// renders the "Sharing: …" chip (M2 S1, `2026-07-03-one-tap-exchange`).
     #[serde(default)]
     pub last_used_group_ids: Option<Vec<String>>,
+    /// The mode last committed to, from the stored exchange defaults. The
+    /// picker makes it the hero action when it can run here (M2 S3, D2.3).
+    #[serde(default)]
+    pub last_used_mode: Option<ExchangeMode>,
     /// Frozen card snapshot for exchange. `None` = snapshot at exchange start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema-gen", schemars(skip))]
@@ -202,6 +206,7 @@ impl ExchangeEngine {
             Some(ModeSelectionEngine::new(
                 config.device_capabilities.clone(),
                 config.transport_readiness.clone(),
+                config.last_used_mode,
             ))
         } else {
             None
@@ -250,6 +255,7 @@ impl ExchangeEngine {
             Some(ModeSelectionEngine::new(
                 config.device_capabilities.clone(),
                 config.transport_readiness.clone(),
+                config.last_used_mode,
             ))
         } else {
             None
@@ -457,6 +463,7 @@ impl ExchangeEngine {
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
+                    self.config.last_used_mode,
                 ));
                 ActionResult::StartBleExchange { mode }
             }
@@ -469,6 +476,7 @@ impl ExchangeEngine {
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
+                    self.config.last_used_mode,
                 ));
                 ActionResult::StartNfcExchange
             }
@@ -493,6 +501,7 @@ impl ExchangeEngine {
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
+                    self.config.last_used_mode,
                 ));
                 ActionResult::StartMultiStageExchange { mode }
             }
@@ -505,6 +514,7 @@ impl ExchangeEngine {
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
+                    self.config.last_used_mode,
                 ));
                 ActionResult::StartDirectTransport
             }
@@ -514,6 +524,7 @@ impl ExchangeEngine {
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
+                    self.config.last_used_mode,
                 ));
                 self.step = ExchangeStep::ModeSelection;
                 ActionResult::NavigateTo(self.build_screen())
@@ -963,7 +974,7 @@ impl WorkflowEngine for ExchangeEngine {
                 self.step = ExchangeStep::GroupSelection;
                 return ActionResult::NavigateTo(self.build_screen());
             }
-            if let Some(ref ms) = self.mode_selection {
+            if let Some(ref mut ms) = self.mode_selection {
                 match ms.handle_action(&action) {
                     ModeSelectionResult::Selected(mode) => {
                         self.config.mode = Some(mode);
@@ -1034,6 +1045,7 @@ impl WorkflowEngine for ExchangeEngine {
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
+                    self.config.last_used_mode,
                 ));
                 self.step = ExchangeStep::ModeSelection;
                 ActionResult::NavigateTo(self.build_screen())
@@ -1177,6 +1189,7 @@ mod tests {
             // Pre-set mode to skip mode selection (tests focus on QR flow)
             mode: Some(ExchangeMode::Glance),
             last_used_group_ids: None,
+            last_used_mode: None,
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
@@ -1197,6 +1210,7 @@ mod tests {
             // like Glance). Carries the group-selection machinery tests.
             mode: Some(ExchangeMode::TapHoverShake),
             last_used_group_ids: None,
+            last_used_mode: None,
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
@@ -1326,6 +1340,7 @@ mod tests {
             },
             mode: None, // triggers mode selection
             last_used_group_ids: None,
+            last_used_mode: None,
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
@@ -1972,6 +1987,7 @@ mod tests {
             transport_readiness: ledger,
             mode: None,
             last_used_group_ids: None,
+            last_used_mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
         }

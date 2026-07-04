@@ -163,6 +163,7 @@ fn make_exchange() -> ExchangeEngine {
             transport_readiness: Default::default(),
             mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
             last_used_group_ids: None,
+            last_used_mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
         },

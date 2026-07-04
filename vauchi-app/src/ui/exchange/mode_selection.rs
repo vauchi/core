@@ -10,20 +10,23 @@
 use crate::ui::*;
 use vauchi_core::exchange::capability::TransportReadiness;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
-use vauchi_core::exchange::mode::{DeviceRequirement, ExchangeMode, ModeCategory};
+use vauchi_core::exchange::mode::{DeviceRequirement, ExchangeMode};
 use vauchi_core::exchange::mode_availability::{
     ModeAvailability, check_mode_availability_with_readiness, recommend_mode,
 };
 
 /// Engine that displays exchange mode selection.
 ///
-/// Shows all 9 modes grouped by `ModeCategory`, highlights the
-/// recommended mode, and grays out unavailable modes with a reason.
-/// When the user picks a mode, returns `ModeSelectionResult::Selected`.
+/// One hero action (the last-used mode when it can run here, else Glance,
+/// else the capability recommendation) with every other mode behind a
+/// single "Other ways to connect" disclosure — de-clutter only, nothing
+/// hidden (M2 S3, D2.3, user decision 2026-07-04). When the user picks a
+/// mode, returns `ModeSelectionResult::Selected`.
 pub struct ModeSelectionEngine {
     capabilities: DeviceCapabilities,
     readiness: TransportReadiness,
-    recommended: ExchangeMode,
+    hero: ExchangeMode,
+    expanded: bool,
 }
 
 /// Result of handling an action in the mode selection engine.
@@ -34,51 +37,96 @@ pub enum ModeSelectionResult {
     Screen(Box<ScreenModel>),
 }
 
-/// Display-order categories with human-readable labels.
-const CATEGORY_ORDER: &[(ModeCategory, &str)] = &[
-    (ModeCategory::Quick, "Quick"),
-    (ModeCategory::Standard, "Standard"),
-    (ModeCategory::Fun, "Fun"),
-    (ModeCategory::Remote, "Remote"),
+/// Approved disclosure order (design D2.3): Glance first-class, then the
+/// remaining authenticated modes, then the unauthenticated BLE trio
+/// (annotated), NFC last (hardware-gated). The hero is filtered out so it
+/// is never listed twice.
+const DISCLOSURE_ORDER: &[ExchangeMode] = &[
+    ExchangeMode::Glance,
+    ExchangeMode::Hover,
+    ExchangeMode::TapHoverShake,
+    ExchangeMode::Link,
+    ExchangeMode::Cable,
+    ExchangeMode::Bump,
+    ExchangeMode::Shake,
+    ExchangeMode::Magic,
+    ExchangeMode::TapTap,
 ];
 
+/// Whether a mode can actually start on this device right now.
+fn runnable(
+    mode: ExchangeMode,
+    capabilities: &DeviceCapabilities,
+    readiness: &TransportReadiness,
+) -> bool {
+    matches!(
+        check_mode_availability_with_readiness(mode, capabilities, readiness),
+        ModeAvailability::Available | ModeAvailability::Degraded { .. }
+    )
+}
+
+/// Hero pick (D2.3): last-used when runnable, else Glance (implemented +
+/// peer-authenticated), else the capability recommendation.
+fn pick_hero(
+    last_used: Option<ExchangeMode>,
+    capabilities: &DeviceCapabilities,
+    readiness: &TransportReadiness,
+) -> ExchangeMode {
+    if let Some(mode) = last_used
+        && runnable(mode, capabilities, readiness)
+    {
+        return mode;
+    }
+    if runnable(ExchangeMode::Glance, capabilities, readiness) {
+        return ExchangeMode::Glance;
+    }
+    recommend_mode(capabilities)
+}
+
 impl ModeSelectionEngine {
-    pub fn new(capabilities: DeviceCapabilities, readiness: TransportReadiness) -> Self {
-        let recommended = recommend_mode(&capabilities);
+    pub fn new(
+        capabilities: DeviceCapabilities,
+        readiness: TransportReadiness,
+        last_used: Option<ExchangeMode>,
+    ) -> Self {
+        let hero = pick_hero(last_used, &capabilities, &readiness);
         Self {
             capabilities,
             readiness,
-            recommended,
+            hero,
+            expanded: false,
         }
     }
 
-    /// Build the mode selection screen.
-    ///
-    /// The dynamically-recommended mode (e.g. Hover with full capabilities)
-    /// leads the picker in its own `recommended` group so the suggested ritual
-    /// comes first; the remaining modes follow grouped by category, with the
-    /// recommended mode excluded so it is never listed twice. See
-    /// `_private/docs/problems/2026-06-06-exchange-ritual-flow/` (Hover first).
+    /// Build the mode selection screen: the hero action, then either the
+    /// collapsed "Other ways to connect" entry or (once expanded) the full
+    /// ordered mode list with the hero excluded.
     pub fn screen(&self) -> ScreenModel {
         let mut components: Vec<Component> = vec![Component::ActionList {
-            id: "recommended".into(),
-            items: vec![self.mode_item(self.recommended)],
+            id: "hero".into(),
+            items: vec![self.mode_item(self.hero)],
         }];
 
-        for (category, label) in CATEGORY_ORDER {
-            let items: Vec<ActionListItem> = ExchangeMode::all()
-                .iter()
-                .filter(|m| m.category() == *category && **m != self.recommended)
-                .map(|&mode| self.mode_item(mode))
-                .collect();
-
-            if items.is_empty() {
-                continue;
-            }
-
+        if self.expanded {
             components.push(Component::ActionList {
-                id: format!("category:{}", label.to_lowercase()),
-                items,
+                id: "other_modes".into(),
+                items: DISCLOSURE_ORDER
+                    .iter()
+                    .filter(|m| **m != self.hero)
+                    .map(|&mode| self.mode_item(mode))
+                    .collect(),
+            });
+        } else {
+            components.push(Component::ActionList {
+                id: "more".into(),
+                items: vec![ActionListItem {
+                    id: "show_other_modes".into(),
+                    label: "Other ways to connect".into(),
+                    icon: Some("more".into()),
+                    detail: None,
+                    a11y: None,
+                    info_key: None,
+                }],
             });
         }
 
@@ -98,7 +146,7 @@ impl ModeSelectionEngine {
     fn mode_item(&self, mode: ExchangeMode) -> ActionListItem {
         let availability =
             check_mode_availability_with_readiness(mode, &self.capabilities, &self.readiness);
-        let is_recommended = mode == self.recommended;
+        let is_recommended = mode == self.hero;
         // A present-but-permission-denied transport is recoverable: render the
         // row as a grant affordance with its own id prefix (`grant:<mode>:<req>`,
         // intercepted by AppEngine to re-enable the requirement and rebuild)
@@ -126,12 +174,24 @@ impl ModeSelectionEngine {
         // recommended mode (always available, since `recommend_mode` only picks
         // runnable modes) gets a leading marker so the suggestion survives
         // without a dedicated badge field on the wire item.
-        let detail = match &availability {
+        let base_detail = match &availability {
             ModeAvailability::Degraded { reason } | ModeAvailability::Unavailable { reason } => {
-                Some(reason.clone())
+                reason.clone()
             }
-            _ if is_recommended => Some(format!("Recommended · {}", mode_instruction(mode))),
-            _ => Some(mode_instruction(mode).to_string()),
+            _ if is_recommended => format!("Recommended · {}", mode_instruction(mode)),
+            _ => mode_instruction(mode).to_string(),
+        };
+        // Bump/Shake/Magic run unauthenticated BLE today (decorative
+        // proximity, no peer verification) — say so on the row until their
+        // auth tiers land (2026-06-10 BLE records; D2.3 user decision:
+        // annotate, don't hide).
+        let detail = if matches!(
+            mode,
+            ExchangeMode::Bump | ExchangeMode::Shake | ExchangeMode::Magic
+        ) {
+            Some(format!("Unauthenticated · {base_detail}"))
+        } else {
+            Some(base_detail)
         };
         ActionListItem {
             id: format!("mode:{}", mode.serde_name()),
@@ -144,15 +204,21 @@ impl ModeSelectionEngine {
     }
 
     /// Handle a user action. Returns `Selected` if a mode was picked.
-    pub fn handle_action(&self, action: &UserAction) -> ModeSelectionResult {
+    pub fn handle_action(&mut self, action: &UserAction) -> ModeSelectionResult {
         if let UserAction::ListItemSelected {
             component_id: _,
             item_id,
         } = action
-            && let Some(name) = item_id.strip_prefix("mode:")
-            && let Some(mode) = parse_mode(name)
         {
-            return ModeSelectionResult::Selected(mode);
+            if item_id == "show_other_modes" {
+                self.expanded = true;
+                return ModeSelectionResult::Screen(Box::new(self.screen()));
+            }
+            if let Some(name) = item_id.strip_prefix("mode:")
+                && let Some(mode) = parse_mode(name)
+            {
+                return ModeSelectionResult::Selected(mode);
+            }
         }
         ModeSelectionResult::Screen(Box::new(self.screen()))
     }
@@ -324,16 +390,19 @@ mod tests {
 
     #[test]
     fn screen_shows_all_nine_modes() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
+        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        engine.expanded = true;
         let screen = engine.screen();
         assert_eq!(screen.screen_id, "exchange_mode_selection");
 
-        // Count total mode items across all ActionList components
+        // Hero + expanded disclosure together list every mode exactly once.
         let mode_count: usize = screen
             .components
             .iter()
             .filter_map(|c| match c {
-                Component::ActionList { items, .. } => Some(items.len()),
+                Component::ActionList { items, .. } => {
+                    Some(items.iter().filter(|i| i.id.starts_with("mode:")).count())
+                }
                 _ => None,
             })
             .sum();
@@ -341,39 +410,32 @@ mod tests {
     }
 
     #[test]
-    fn screen_groups_modes_by_category() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
-        let screen = engine.screen();
-
-        let category_ids: Vec<&str> = screen
-            .components
-            .iter()
-            .filter_map(|c| match c {
-                Component::ActionList { id, .. } => Some(id.as_str()),
-                _ => None,
-            })
-            .collect();
-
-        assert_eq!(
-            category_ids,
-            vec![
-                "recommended",
-                "category:quick",
-                "category:standard",
-                "category:fun",
-                "category:remote",
-            ]
-        );
+    fn screen_is_hero_plus_disclosure() {
+        // Collapsed: hero + the single "Other ways to connect" entry.
+        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        let list_ids = |screen: &ScreenModel| -> Vec<String> {
+            screen
+                .components
+                .iter()
+                .filter_map(|c| match c {
+                    Component::ActionList { id, .. } => Some(id.clone()),
+                    _ => None,
+                })
+                .collect()
+        };
+        assert_eq!(list_ids(&engine.screen()), vec!["hero", "more"]);
+        // Expanded: hero + the full ordered list (M2 S3, D2.3).
+        engine.expanded = true;
+        assert_eq!(list_ids(&engine.screen()), vec!["hero", "other_modes"]);
     }
 
     // @internal
     #[test]
-    fn recommended_mode_is_first_in_picker() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
+    fn hero_is_first_in_picker() {
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
         let screen = engine.screen();
-        // The recommended mode (Hover with full caps) leads the picker as the
-        // first item of the first ("recommended") group — see
-        // _private/docs/problems/2026-06-06-exchange-ritual-flow/ (Hover first).
+        // First-run hero (no last-used) is Glance — implemented +
+        // peer-authenticated (M2 S3, D2.3 user decision 2026-07-04).
         let first_item_id = screen
             .components
             .iter()
@@ -384,39 +446,60 @@ mod tests {
             .map(|item| item.id.as_str());
         assert_eq!(
             first_item_id,
-            Some("mode:hover"),
-            "the recommended mode (Hover) should be the first item in the picker"
+            Some("mode:glance"),
+            "the first-run hero (Glance) should be the first item in the picker"
         );
     }
 
     // @internal
     #[test]
-    fn recommended_mode_is_marked_in_detail() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
+    fn last_used_mode_becomes_the_hero() {
+        let engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            Some(ExchangeMode::Hover),
+        );
+        let screen = engine.screen();
+        let hero_first = screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::ActionList { id, items } if id == "hero" => items.first(),
+                _ => None,
+            })
+            .map(|item| item.id.as_str());
+        assert_eq!(hero_first, Some("mode:hover"), "last-used mode is the hero");
+    }
+
+    // @internal
+    #[test]
+    fn hero_mode_is_marked_in_detail() {
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
         let screen = engine.screen();
 
-        // With full caps, recommended should be Hover.
-        let hover_item = find_mode_item(&screen, "hover").expect("Hover should be in the list");
-        let detail = hover_item
+        // First-run hero is Glance.
+        let glance_item = find_mode_item(&screen, "glance").expect("Glance should be the hero");
+        let detail = glance_item
             .detail
             .as_deref()
-            .expect("recommended mode has a detail subtitle");
+            .expect("hero mode has a detail subtitle");
         assert!(
             detail.starts_with("Recommended · "),
-            "recommended detail should carry the marker, got: {detail}"
+            "hero detail should carry the marker, got: {detail}"
         );
         assert!(
-            detail.contains("Hold the phones close together"),
-            "recommended detail should still include the instruction, got: {detail}"
+            detail.contains("Point cameras at each other's screen"),
+            "hero detail should still include the instruction, got: {detail}"
         );
-        // Recommendation no longer rides on the icon — that's now the per-mode glyph.
-        assert_eq!(hover_item.icon.as_deref(), Some("nfc"));
+        // Recommendation no longer rides on the icon — that's the per-mode glyph.
+        assert_eq!(glance_item.icon.as_deref(), Some("qrcode"));
     }
 
     // @internal
     #[test]
     fn every_mode_has_a_per_mode_icon() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
+        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        engine.expanded = true;
         let screen = engine.screen();
         for &mode in ExchangeMode::all() {
             let item =
@@ -429,7 +512,9 @@ mod tests {
 
     #[test]
     fn unavailable_modes_show_reason() {
-        let engine = ModeSelectionEngine::new(minimal_caps(), TransportReadiness::default());
+        let mut engine =
+            ModeSelectionEngine::new(minimal_caps(), TransportReadiness::default(), None);
+        engine.expanded = true;
         let screen = engine.screen();
 
         // BLE modes should be unavailable
@@ -447,22 +532,23 @@ mod tests {
     // @internal
     #[test]
     fn available_modes_show_instruction_detail() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
+        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        engine.expanded = true;
         let screen = engine.screen();
 
-        // Glance is available with full caps and is not the recommended mode,
+        // Hover is available with full caps and is not the hero (Glance is),
         // so its detail is the plain instruction (no "Recommended" marker).
-        let glance = find_mode_item(&screen, "glance").expect("Glance should be listed");
+        let hover = find_mode_item(&screen, "hover").expect("Hover should be listed");
         assert_eq!(
-            glance.detail.as_deref(),
-            Some("Point cameras at each other's screen"),
-            "available non-recommended mode shows its instruction"
+            hover.detail.as_deref(),
+            Some("Hold the phones close together"),
+            "available non-hero mode shows its instruction"
         );
     }
 
     #[test]
     fn selecting_mode_returns_selected() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
+        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
         let result = engine.handle_action(&UserAction::ListItemSelected {
             component_id: "category:standard".into(),
             item_id: "mode:hover".into(),
@@ -476,7 +562,8 @@ mod tests {
     #[test]
     fn selecting_unavailable_mode_still_returns_selected() {
         // Availability enforcement is the engine's job, not mode selection's
-        let engine = ModeSelectionEngine::new(minimal_caps(), TransportReadiness::default());
+        let mut engine =
+            ModeSelectionEngine::new(minimal_caps(), TransportReadiness::default(), None);
         let result = engine.handle_action(&UserAction::ListItemSelected {
             component_id: "category:fun".into(),
             item_id: "mode:tap_tap".into(),
@@ -489,7 +576,7 @@ mod tests {
 
     #[test]
     fn unknown_action_returns_screen() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
+        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
         let result = engine.handle_action(&UserAction::ActionPressed {
             action_id: "something".into(),
         });
@@ -501,7 +588,7 @@ mod tests {
 
     #[test]
     fn all_modes_have_unique_ids() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default());
+        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
         let screen = engine.screen();
         let ids: Vec<&str> = screen
             .components
@@ -541,7 +628,8 @@ mod tests {
         // (`grant:glance:camera`), not a selectable `mode:glance`.
         let mut led = TransportReadiness::default();
         led.note_denied(DeviceRequirement::Camera);
-        let engine = ModeSelectionEngine::new(full_caps(), led);
+        let mut engine = ModeSelectionEngine::new(full_caps(), led, None);
+        engine.expanded = true;
         let screen = engine.screen();
 
         let grant = find_item_starting_with(&screen, "grant:glance:")
@@ -572,7 +660,7 @@ mod tests {
         let mut led = TransportReadiness::default();
         led.note_denied(DeviceRequirement::Camera);
         led.note_granted(DeviceRequirement::Camera);
-        let engine = ModeSelectionEngine::new(full_caps(), led);
+        let engine = ModeSelectionEngine::new(full_caps(), led, None);
         let screen = engine.screen();
 
         assert!(
@@ -596,7 +684,8 @@ mod tests {
         let mut led = TransportReadiness::default();
         led.note_denied(DeviceRequirement::Camera);
         led.note_denied(DeviceRequirement::Ble);
-        let engine = ModeSelectionEngine::new(full_caps(), led);
+        let mut engine = ModeSelectionEngine::new(full_caps(), led, None);
+        engine.expanded = true;
         let screen = engine.screen();
 
         let grants: Vec<String> = screen

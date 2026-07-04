@@ -219,7 +219,9 @@ fn record_symptom_camera_and_ble_denied_offers_grant_and_other_mode() {
     assert_eq!(entry.screen_id, "exchange");
 
     let ids = item_ids(&engine.current_screen());
-    // Glance (camera + BLE, both denied) → grant affordance, not a silent mode row.
+    // Glance (camera + BLE, both denied) → grant affordance, not a silent mode
+    // row. With the M2 S3 hero+disclosure picker the denied hero itself renders
+    // as the grant affordance — the recoverable state is front and center.
     assert!(
         ids.iter().any(|id| id.starts_with("grant:glance:")),
         "denied camera+BLE must turn Glance into a grant affordance; got {ids:?}"
@@ -228,8 +230,14 @@ fn record_symptom_camera_and_ble_denied_offers_grant_and_other_mode() {
         !ids.iter().any(|id| id == "mode:glance"),
         "Glance must not stay a silently-selectable wait; got {ids:?}"
     );
-    // A transport-independent fallback (Link, internet-only) stays selectable —
-    // the "other-mode affordance" the record requires alongside grant.
+    // A transport-independent fallback (Link, internet-only) stays selectable
+    // as the alternative the record requires — one visible disclosure tap away
+    // (M2 S3: "Other ways to connect").
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "more".into(),
+        item_id: "show_other_modes".into(),
+    });
+    let ids = item_ids(&engine.current_screen());
     assert!(
         ids.iter().any(|id| id == "mode:link"),
         "an internet-only mode must remain selectable as an alternative; got {ids:?}"

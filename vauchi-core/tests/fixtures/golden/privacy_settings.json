@@ -49,7 +49,7 @@
   "actions": [
     {
       "id": "export",
-      "label": "Export Data",
+      "label": "Export My Data",
       "style": "Primary",
       "enabled": true
     },

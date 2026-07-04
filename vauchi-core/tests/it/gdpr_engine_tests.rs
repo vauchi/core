@@ -7,7 +7,11 @@ use vauchi_app::ui::*;
 // @internal
 #[test]
 fn gdpr_screen_id() {
-    let engine = GdprEngine::new(None, "All consents granted".into());
+    let engine = GdprEngine::new(
+        None,
+        "All consents granted".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "privacy_settings");
 }
@@ -15,7 +19,11 @@ fn gdpr_screen_id() {
 // @internal
 #[test]
 fn gdpr_title() {
-    let engine = GdprEngine::new(None, "All consents granted".into());
+    let engine = GdprEngine::new(
+        None,
+        "All consents granted".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     let screen = engine.current_screen();
     assert_eq!(screen.title, "Privacy & Data");
 }
@@ -23,7 +31,11 @@ fn gdpr_title() {
 // @internal
 #[test]
 fn gdpr_shows_deletion_status() {
-    let engine = GdprEngine::new(Some("Pending".into()), "All consents granted".into());
+    let engine = GdprEngine::new(
+        Some("Pending".into()),
+        "All consents granted".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     let screen = engine.current_screen();
 
     let detail = find_info_detail(&screen, "privacy_info", "Deletion Status");
@@ -33,7 +45,11 @@ fn gdpr_shows_deletion_status() {
 // @internal
 #[test]
 fn gdpr_shows_no_deletion_requested_when_none() {
-    let engine = GdprEngine::new(None, "All consents granted".into());
+    let engine = GdprEngine::new(
+        None,
+        "All consents granted".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     let screen = engine.current_screen();
 
     let detail = find_info_detail(&screen, "privacy_info", "Deletion Status");
@@ -43,7 +59,11 @@ fn gdpr_shows_no_deletion_requested_when_none() {
 // @internal
 #[test]
 fn gdpr_export_completes() {
-    let mut engine = GdprEngine::new(None, "All consents granted".into());
+    let mut engine = GdprEngine::new(
+        None,
+        "All consents granted".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "export".into(),
     });
@@ -53,7 +73,11 @@ fn gdpr_export_completes() {
 // @internal
 #[test]
 fn gdpr_export_engine_output() {
-    let mut engine = GdprEngine::new(None, "All consents granted".into());
+    let mut engine = GdprEngine::new(
+        None,
+        "All consents granted".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "export".into(),
     });
@@ -66,7 +90,11 @@ fn gdpr_export_engine_output() {
 // @internal
 #[test]
 fn gdpr_delete_navigates_to_confirmation() {
-    let mut engine = GdprEngine::new(None, "All consents granted".into());
+    let mut engine = GdprEngine::new(
+        None,
+        "All consents granted".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete".into(),
     });
@@ -84,7 +112,11 @@ fn gdpr_delete_navigates_to_confirmation() {
 // @internal
 #[test]
 fn gdpr_confirm_delete_completes() {
-    let mut engine = GdprEngine::new(None, "All consents granted".into());
+    let mut engine = GdprEngine::new(
+        None,
+        "All consents granted".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete".into(),
     });
@@ -101,14 +133,22 @@ fn gdpr_confirm_delete_completes() {
 // @internal
 #[test]
 fn gdpr_engine_output_initially_none() {
-    let engine = GdprEngine::new(None, "All consents granted".into());
+    let engine = GdprEngine::new(
+        None,
+        "All consents granted".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     assert_eq!(engine.engine_output(), None);
 }
 
 // @internal
 #[test]
 fn gdpr_unknown_action_returns_update_screen() {
-    let mut engine = GdprEngine::new(None, "All consents granted".into());
+    let mut engine = GdprEngine::new(
+        None,
+        "All consents granted".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "unknown".into(),
     });

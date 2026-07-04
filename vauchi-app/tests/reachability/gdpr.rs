@@ -42,13 +42,21 @@ const HANDLED_SCHEDULED: &[&str] = &[
 ];
 
 fn factory() -> GdprEngine {
-    GdprEngine::new(None, "Consent summary".into())
+    GdprEngine::new(
+        None,
+        "Consent summary".into(),
+        vauchi_app::i18n::Locale::English,
+    )
 }
 
 fn scheduled_factory() -> GdprEngine {
-    GdprEngine::new(Some("Scheduled".into()), "Consent summary".into())
-        .with_deletion_scheduled(true)
-        .with_deletion_executable(true)
+    GdprEngine::new(
+        Some("Scheduled".into()),
+        "Consent summary".into(),
+        vauchi_app::i18n::Locale::English,
+    )
+    .with_deletion_scheduled(true)
+    .with_deletion_executable(true)
 }
 
 // @internal

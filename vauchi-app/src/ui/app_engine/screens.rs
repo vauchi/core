@@ -546,15 +546,23 @@ impl AppEngine {
                     _ => (None, false, false),
                 };
                 Box::new(
-                    GdprEngine::new(deletion_status, "Active".into())
-                        .with_deletion_summary(crate::ui::gdpr::DeletionSummary {
-                            contact_count,
-                            has_backup: false,
-                            device_count: 1,
-                        })
-                        .with_consent(consent)
-                        .with_deletion_scheduled(scheduled)
-                        .with_deletion_executable(executable),
+                    GdprEngine::new(
+                        deletion_status,
+                        "Active".into(),
+                        render_context
+                            .locale
+                            .as_deref()
+                            .and_then(crate::i18n::Locale::from_code)
+                            .unwrap_or_default(),
+                    )
+                    .with_deletion_summary(crate::ui::gdpr::DeletionSummary {
+                        contact_count,
+                        has_backup: false,
+                        device_count: 1,
+                    })
+                    .with_consent(consent)
+                    .with_deletion_scheduled(scheduled)
+                    .with_deletion_executable(executable),
                 )
             }
             AppScreen::Support => Box::new(SupportEngine::new()),

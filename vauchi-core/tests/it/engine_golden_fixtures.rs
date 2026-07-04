@@ -397,7 +397,11 @@ fn archived_contacts_fixture_is_fresh() {
 // @internal
 #[test]
 fn privacy_settings_fixture_is_fresh() {
-    let engine = GdprEngine::new(None, "2 contacts, 1 group".into());
+    let engine = GdprEngine::new(
+        None,
+        "2 contacts, 1 group".into(),
+        vauchi_app::i18n::Locale::English,
+    );
     assert_fixture_fresh(&engine.current_screen(), "privacy_settings.json");
 }
 
@@ -538,7 +542,12 @@ fn regenerate_all_engine_fixtures() {
         ),
         (
             "privacy_settings.json",
-            GdprEngine::new(None, "2 contacts, 1 group".into()).current_screen(),
+            GdprEngine::new(
+                None,
+                "2 contacts, 1 group".into(),
+                vauchi_app::i18n::Locale::English,
+            )
+            .current_screen(),
         ),
     ];
 

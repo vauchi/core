@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! GDPR / privacy engine — data export, deletion, and consent management.
+//! Copy resolves through `i18n::get_string` in the locale threaded at
+//! construction (M3 S3b of `2026-07-03-core-screens-bypass-i18n`); keys
+//! live in the `privacy.*` / `shred.panic_*` + shared `action.*` families.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Summary of what will be deleted, shown on the confirmation screen.
@@ -59,6 +63,7 @@ pub struct GdprEngine {
     /// Whether a scheduled deletion's grace period has elapsed, so it can
     /// be executed now. Drives the "Delete Now" action.
     deletion_executable: bool,
+    locale: Locale,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -76,7 +81,7 @@ enum GdprStep {
 }
 
 impl GdprEngine {
-    pub fn new(deletion_status: Option<String>, consent_summary: String) -> Self {
+    pub fn new(deletion_status: Option<String>, consent_summary: String, locale: Locale) -> Self {
         Self {
             step: GdprStep::Overview,
             deletion_status,
@@ -86,7 +91,16 @@ impl GdprEngine {
             consent: ConsentStatus::default(),
             deletion_scheduled: false,
             deletion_executable: false,
+            locale,
         }
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
+    }
+
+    fn t_count(&self, key: &str, count: usize) -> String {
+        get_string_with_args(self.locale, key, &[("count", &count.to_string())])
     }
 
     /// Set the deletion summary data (contact count, backup status, device count).
@@ -121,26 +135,26 @@ impl GdprEngine {
         let deletion_detail = self
             .deletion_status
             .clone()
-            .unwrap_or_else(|| "No deletion requested".into());
+            .unwrap_or_else(|| self.t("privacy.no_deletion_requested"));
 
         ScreenModel {
             screen_id: "privacy_settings".into(),
-            title: "Privacy & Data".into(),
+            title: self.t("privacy.title"),
             subtitle: None,
             components: vec![
                 Component::InfoPanel {
                     id: "privacy_info".into(),
                     icon: Some("privacy".into()),
-                    title: "Data Status".into(),
+                    title: self.t("privacy.data_status"),
                     items: vec![
                         InfoItem {
                             icon: None,
-                            title: "Deletion Status".into(),
+                            title: self.t("privacy.deletion_status"),
                             detail: deletion_detail,
                         },
                         InfoItem {
                             icon: None,
-                            title: "Consent".into(),
+                            title: self.t("privacy.consent"),
                             detail: self.consent_summary.clone(),
                         },
                     ],
@@ -151,17 +165,17 @@ impl GdprEngine {
                     items: vec![
                         ActionListItem {
                             id: "view_data".into(),
-                            label: "View My Data".into(),
+                            label: self.t("privacy.view_data"),
                             icon: Some("data".into()),
-                            detail: Some("See what data is stored locally".into()),
+                            detail: Some(self.t("privacy.view_data_desc")),
                             a11y: None,
                             info_key: None,
                         },
                         ActionListItem {
                             id: "manage_consent".into(),
-                            label: "Manage Consent".into(),
+                            label: self.t("privacy.manage_consent"),
                             icon: Some("consent".into()),
-                            detail: Some("Review and update data consent".into()),
+                            detail: Some(self.t("privacy.manage_consent_desc")),
                             a11y: None,
                             info_key: None,
                         },
@@ -171,7 +185,7 @@ impl GdprEngine {
             actions: {
                 let mut actions = vec![ScreenAction {
                     id: "export".into(),
-                    label: "Export Data".into(),
+                    label: self.t("privacy.export_data"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
@@ -179,7 +193,7 @@ impl GdprEngine {
                 if self.deletion_scheduled {
                     actions.push(ScreenAction {
                         id: "cancel_deletion".into(),
-                        label: "Cancel Deletion".into(),
+                        label: self.t("privacy.cancel_deletion"),
                         style: ActionStyle::Secondary,
                         enabled: true,
                         a11y: None,
@@ -187,7 +201,7 @@ impl GdprEngine {
                     if self.deletion_executable {
                         actions.push(ScreenAction {
                             id: "execute_deletion".into(),
-                            label: "Delete Now".into(),
+                            label: self.t("privacy.delete_now"),
                             style: ActionStyle::Destructive,
                             enabled: true,
                             a11y: None,
@@ -196,7 +210,7 @@ impl GdprEngine {
                 } else {
                     actions.push(ScreenAction {
                         id: "delete".into(),
-                        label: "Delete Identity".into(),
+                        label: self.t("privacy.delete_identity"),
                         style: ActionStyle::Destructive,
                         enabled: true,
                         a11y: None,
@@ -204,7 +218,7 @@ impl GdprEngine {
                 }
                 actions.push(ScreenAction {
                     id: "panic_shred".into(),
-                    label: "Panic Shred".into(),
+                    label: self.t("shred.panic_title"),
                     style: ActionStyle::Destructive,
                     enabled: true,
                     a11y: None,
@@ -221,57 +235,55 @@ impl GdprEngine {
         let mut items = vec![
             InfoItem {
                 icon: Some("identity".into()),
-                title: "Your identity".into(),
-                detail: "Cryptographic keys and display name — permanently destroyed".into(),
+                title: self.t("privacy.delete.identity_title"),
+                detail: self.t("privacy.delete.identity_detail"),
             },
             InfoItem {
                 icon: Some("contacts".into()),
-                title: format!("{} contact(s)", s.contact_count),
-                detail: "All contact cards and exchange history — permanently deleted".into(),
+                title: self.t_count("privacy.delete.contacts_title", s.contact_count),
+                detail: self.t("privacy.delete.contacts_detail"),
             },
             InfoItem {
                 icon: Some("cloud".into()),
-                title: "Relay data".into(),
-                detail: "Revocation broadcast sent to contacts, relay blobs purged".into(),
+                title: self.t("privacy.delete.relay_title"),
+                detail: self.t("privacy.delete.relay_detail"),
             },
             InfoItem {
                 icon: Some("key".into()),
-                title: "Keychain entry".into(),
-                detail: "Device keystore/keychain entry — removed".into(),
+                title: self.t("privacy.delete.keychain_title"),
+                detail: self.t("privacy.delete.keychain_detail"),
             },
         ];
 
         if s.device_count > 1 {
             items.push(InfoItem {
                 icon: Some("devices".into()),
-                title: format!("{} linked device(s)", s.device_count - 1),
-                detail: "Other devices will lose access to this identity".into(),
+                title: self.t_count("privacy.delete.devices_title", s.device_count - 1),
+                detail: self.t("privacy.delete.devices_detail"),
             });
         }
 
         items.push(InfoItem {
             icon: Some("warning".into()),
-            title: "This cannot be undone".into(),
-            detail: "After a 7-day grace period, all data is permanently destroyed. \
-                     You can cancel during the grace period."
-                .into(),
+            title: self.t("privacy.delete.irreversible_title"),
+            detail: self.t("privacy.delete.irreversible_detail"),
         });
 
         ScreenModel {
             screen_id: "delete_identity_summary".into(),
-            title: "Delete Identity".into(),
-            subtitle: Some("Review what will be deleted".into()),
+            title: self.t("privacy.delete_identity"),
+            subtitle: Some(self.t("privacy.delete.review_subtitle")),
             components: vec![Component::InfoPanel {
                 id: "deletion_summary".into(),
                 icon: Some("warning".into()),
-                title: "The following will be deleted".into(),
+                title: self.t("privacy.delete.list_title"),
                 items,
                 a11y: None,
             }],
             actions: vec![
                 ScreenAction {
                     id: "confirm_delete".into(),
-                    label: "Delete Identity".into(),
+                    label: self.t("privacy.delete_identity"),
                     style: ActionStyle::Destructive,
                     enabled: true,
                     // Screen-reader context for the most irreversible
@@ -280,18 +292,14 @@ impl GdprEngine {
                     // "Delete Identity" button text, then read the hint
                     // as the usage guidance.
                     a11y: Some(A11y {
-                        label: Some("Delete identity permanently".into()),
-                        hint: Some(
-                            "Starts a 7-day grace period after which all your data is destroyed. \
-                             Cannot be undone once the grace period ends."
-                                .into(),
-                        ),
+                        label: Some(self.t("privacy.delete.a11y_confirm")),
+                        hint: Some(self.t("privacy.delete.a11y_confirm_hint")),
                         role: None,
                     }),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -305,15 +313,15 @@ impl GdprEngine {
     fn build_consent(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "manage_consent".into(),
-            title: "Manage Consent".into(),
-            subtitle: Some("Review and update your data consent".into()),
+            title: self.t("privacy.manage_consent"),
+            subtitle: Some(self.t("privacy.manage_consent_desc")),
             components: vec![Component::SettingsGroup {
                 id: "consent".into(),
-                label: "Consent".into(),
+                label: self.t("privacy.consent"),
                 items: vec![
                     SettingsItem {
                         id: "data_processing".into(),
-                        label: "Data Processing".into(),
+                        label: self.t("privacy.consent_data_processing"),
                         kind: SettingsItemKind::Toggle {
                             enabled: self.consent.data_processing,
                         },
@@ -322,7 +330,7 @@ impl GdprEngine {
                     },
                     SettingsItem {
                         id: "contact_sharing".into(),
-                        label: "Contact Sharing".into(),
+                        label: self.t("privacy.consent_contact_sharing"),
                         kind: SettingsItemKind::Toggle {
                             enabled: self.consent.contact_sharing,
                         },
@@ -331,7 +339,7 @@ impl GdprEngine {
                     },
                     SettingsItem {
                         id: "recovery_vouching".into(),
-                        label: "Recovery Vouching".into(),
+                        label: self.t("privacy.consent_recovery_vouching"),
                         kind: SettingsItemKind::Toggle {
                             enabled: self.consent.recovery_vouching,
                         },
@@ -342,7 +350,7 @@ impl GdprEngine {
             }],
             actions: vec![ScreenAction {
                 id: "cancel".into(),
-                label: "Back".into(),
+                label: self.t("action.back"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -355,31 +363,30 @@ impl GdprEngine {
     fn build_confirm_execute(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "confirm_execute_deletion".into(),
-            title: "Delete Now".into(),
-            subtitle: Some("The grace period has elapsed".into()),
+            title: self.t("privacy.delete_now"),
+            subtitle: Some(self.t("privacy.delete_now.subtitle")),
             components: vec![Component::InfoPanel {
                 id: "execute_warning".into(),
                 icon: Some("warning".into()),
-                title: "Permanently delete now".into(),
+                title: self.t("privacy.delete_now.panel_title"),
                 items: vec![InfoItem {
                     icon: Some("warning".into()),
-                    title: "This cannot be undone".into(),
-                    detail: "All identity, contact, and relay data is destroyed immediately."
-                        .into(),
+                    title: self.t("privacy.delete.irreversible_title"),
+                    detail: self.t("privacy.delete_now.detail"),
                 }],
                 a11y: None,
             }],
             actions: vec![
                 ScreenAction {
                     id: "confirm_execute".into(),
-                    label: "Delete Permanently".into(),
+                    label: self.t("privacy.delete_now.confirm"),
                     style: ActionStyle::Destructive,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Keep My Data".into(),
+                    label: self.t("privacy.delete_now.keep"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -393,31 +400,30 @@ impl GdprEngine {
     fn build_confirm_shred(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "confirm_panic_shred".into(),
-            title: "Panic Shred".into(),
-            subtitle: Some("Emergency wipe".into()),
+            title: self.t("shred.panic_title"),
+            subtitle: Some(self.t("shred.panic_subtitle")),
             components: vec![Component::InfoPanel {
                 id: "shred_warning".into(),
                 icon: Some("warning".into()),
-                title: "Immediately wipe everything".into(),
+                title: self.t("shred.panic_panel_title"),
                 items: vec![InfoItem {
                     icon: Some("warning".into()),
-                    title: "This cannot be undone".into(),
-                    detail: "All data is cryptographically shredded now, with no grace period."
-                        .into(),
+                    title: self.t("privacy.delete.irreversible_title"),
+                    detail: self.t("shred.panic_detail"),
                 }],
                 a11y: None,
             }],
             actions: vec![
                 ScreenAction {
                     id: "confirm_shred".into(),
-                    label: "Shred Everything".into(),
+                    label: self.t("shred.panic_confirm_button"),
                     style: ActionStyle::Destructive,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -572,11 +578,13 @@ mod tests {
     use super::*;
 
     fn engine() -> GdprEngine {
-        GdprEngine::new(None, "Active".into()).with_deletion_summary(DeletionSummary {
-            contact_count: 5,
-            has_backup: true,
-            device_count: 2,
-        })
+        GdprEngine::new(None, "Active".into(), Locale::English).with_deletion_summary(
+            DeletionSummary {
+                contact_count: 5,
+                has_backup: true,
+                device_count: 2,
+            },
+        )
     }
 
     #[test]
@@ -631,11 +639,13 @@ mod tests {
 
     #[test]
     fn summary_hides_devices_when_single() {
-        let mut e = GdprEngine::new(None, "Active".into()).with_deletion_summary(DeletionSummary {
-            contact_count: 0,
-            has_backup: false,
-            device_count: 1,
-        });
+        let mut e = GdprEngine::new(None, "Active".into(), Locale::English).with_deletion_summary(
+            DeletionSummary {
+                contact_count: 0,
+                has_backup: false,
+                device_count: 1,
+            },
+        );
         e.step = GdprStep::ConfirmDelete;
         let screen = e.current_screen();
         let items = match &screen.components[0] {
@@ -726,11 +736,12 @@ mod tests {
     // @internal
     #[test]
     fn consent_screen_reflects_grant_state() {
-        let mut e = GdprEngine::new(None, "Active".into()).with_consent(ConsentStatus {
-            data_processing: true,
-            contact_sharing: false,
-            recovery_vouching: true,
-        });
+        let mut e =
+            GdprEngine::new(None, "Active".into(), Locale::English).with_consent(ConsentStatus {
+                data_processing: true,
+                contact_sharing: false,
+                recovery_vouching: true,
+            });
         e.step = GdprStep::ManageConsent;
         let screen = e.current_screen();
         let items = match &screen.components[0] {
@@ -769,7 +780,7 @@ mod tests {
     // @internal
     #[test]
     fn overview_shows_cancel_when_deletion_scheduled() {
-        let e = GdprEngine::new(Some("Scheduled".into()), "Active".into())
+        let e = GdprEngine::new(Some("Scheduled".into()), "Active".into(), Locale::English)
             .with_deletion_scheduled(true);
         let ids: Vec<String> = e
             .current_screen()
@@ -805,14 +816,15 @@ mod tests {
     // @internal
     #[test]
     fn overview_shows_execute_when_grace_elapsed() {
-        let ids: Vec<String> = GdprEngine::new(Some("Scheduled".into()), "Active".into())
-            .with_deletion_scheduled(true)
-            .with_deletion_executable(true)
-            .current_screen()
-            .actions
-            .iter()
-            .map(|a| a.id.clone())
-            .collect();
+        let ids: Vec<String> =
+            GdprEngine::new(Some("Scheduled".into()), "Active".into(), Locale::English)
+                .with_deletion_scheduled(true)
+                .with_deletion_executable(true)
+                .current_screen()
+                .actions
+                .iter()
+                .map(|a| a.id.clone())
+                .collect();
         assert!(
             ids.contains(&"execute_deletion".to_string()),
             "grace elapsed shows the Delete Now action"

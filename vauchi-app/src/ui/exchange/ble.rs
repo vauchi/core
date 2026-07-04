@@ -83,7 +83,7 @@ pub(super) enum BleHardwareOutcome {
 
 // ── Screen builders ────────────────────────────────────────────────────────
 
-pub(super) fn build_discovering_screen(mode: ExchangeMode, progress: Progress) -> ScreenModel {
+pub(super) fn build_discovering_screen(mode: ExchangeMode) -> ScreenModel {
     let (title, subtitle) = match mode {
         ExchangeMode::Magic => (
             "Searching nearby...",
@@ -110,12 +110,11 @@ pub(super) fn build_discovering_screen(mode: ExchangeMode, progress: Progress) -
             enabled: true,
             a11y: None,
         }],
-        progress: Some(progress),
         ..Default::default()
     }
 }
 
-pub(super) fn build_exchanging_screen(mode: ExchangeMode, progress: Progress) -> ScreenModel {
+pub(super) fn build_exchanging_screen(mode: ExchangeMode) -> ScreenModel {
     let title = match mode {
         ExchangeMode::Magic => "Exchanging cards",
         ExchangeMode::Bump => "Exchanging cards",
@@ -133,12 +132,11 @@ pub(super) fn build_exchanging_screen(mode: ExchangeMode, progress: Progress) ->
             style: TextStyle::Body,
         }],
         actions: vec![],
-        progress: Some(progress),
         ..Default::default()
     }
 }
 
-pub(super) fn build_verifying_screen(mode: ExchangeMode, progress: Progress) -> ScreenModel {
+pub(super) fn build_verifying_screen(mode: ExchangeMode) -> ScreenModel {
     let subtitle = match mode {
         ExchangeMode::Magic => "Confirming proximity via audio...",
         ExchangeMode::Bump => "Confirming proximity via impact...",
@@ -152,7 +150,6 @@ pub(super) fn build_verifying_screen(mode: ExchangeMode, progress: Progress) -> 
         subtitle: Some(subtitle.into()),
         components: vec![],
         actions: vec![],
-        progress: Some(progress),
         ..Default::default()
     }
 }

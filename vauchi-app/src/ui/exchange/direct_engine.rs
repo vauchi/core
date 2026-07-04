@@ -62,9 +62,6 @@ pub const ACTION_DONE: &str = "done";
 /// seconds; this is the no-response backstop, not a tight bound.
 pub const DIRECT_WAITING_TIMEOUT_SECS: u64 = 60;
 
-/// Three coarse progress steps: connect → exchange → verify.
-const TOTAL_STEPS: u8 = 3;
-
 /// Presentation state of the Cable engine.
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum DirectScreen {
@@ -167,24 +164,11 @@ impl DirectTransportEngine {
         self.session.as_ref().map(|s| s.our_card())
     }
 
-    fn progress(&self) -> Progress {
-        let current_step: u8 = match self.screen {
-            DirectScreen::Waiting => 1,
-            DirectScreen::Exchanging => 2,
-            DirectScreen::Verifying | DirectScreen::Success | DirectScreen::Failed { .. } => 3,
-        };
-        Progress {
-            current_step,
-            total_steps: TOTAL_STEPS,
-            label: None,
-        }
-    }
-
     fn build_screen(&self) -> ScreenModel {
         match &self.screen {
             DirectScreen::Waiting => self.build_waiting_screen(),
             DirectScreen::Exchanging => self.build_exchanging_screen(),
-            DirectScreen::Verifying => super::verifying::build_verifying_screen(self.progress()),
+            DirectScreen::Verifying => super::verifying::build_verifying_screen(),
             DirectScreen::Success => self.build_success_screen(),
             DirectScreen::Failed { reason } => self.build_failed_screen(reason.clone()),
         }
@@ -207,7 +191,6 @@ impl DirectTransportEngine {
                 enabled: true,
                 a11y: None,
             }],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -223,21 +206,18 @@ impl DirectTransportEngine {
                 style: TextStyle::Body,
             }],
             actions: vec![],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
 
     fn build_success_screen(&self) -> ScreenModel {
         if let Some(summary) = self.success_summary.as_ref() {
-            let mut screen = super::success::build_exchange_success_screen(
+            return super::success::build_exchange_success_screen(
                 "exchange_success",
                 "Success",
                 ACTION_DONE,
                 summary,
             );
-            screen.progress = Some(self.progress());
-            return screen;
         }
         ScreenModel {
             screen_id: "exchange_success".into(),
@@ -262,7 +242,6 @@ impl DirectTransportEngine {
                 enabled: true,
                 a11y: None,
             }],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -300,7 +279,6 @@ impl DirectTransportEngine {
                     a11y: None,
                 },
             ],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }

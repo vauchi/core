@@ -26,7 +26,6 @@ pub(crate) mod verifying;
 
 use self::field_preview::{FieldPreviewConfig, FieldPreviewResult};
 use self::mode_selection::{ModeSelectionEngine, ModeSelectionResult};
-use self::nfc::NfcStep;
 use crate::ui::*;
 use vauchi_core::Command;
 use vauchi_core::clock::Clock;
@@ -156,21 +155,10 @@ enum ExchangeStep {
     Failed,
 }
 
-impl ExchangeStep {
-    fn step_number(&self) -> u8 {
-        match self {
-            Self::ModeSelection => 1,
-            Self::GroupSelection => 2,
-            Self::FieldPreview => 3,
-            Self::Verifying => 6,
-            Self::Success => 4 + NfcStep::STEP_COUNT,
-            Self::Failed => 5 + NfcStep::STEP_COUNT,
-        }
-    }
-}
-
-// mode + group + preview + sub-flow + success/failed
-const TOTAL_STEPS: u8 = 3 + NfcStep::STEP_COUNT + 2;
+// No numeric progress anywhere in the exchange flow (M2 S2, D2.2): a
+// handshake is not a wizard, and the old numbering (group=2, picker=none,
+// preview=3, verifying=6, failed=8/8) regressed and skipped across the
+// flow's path variants. `2026-07-03-one-tap-exchange` goal 2.
 
 impl ExchangeEngine {
     /// Determine the initial step based on config.
@@ -564,14 +552,6 @@ impl ExchangeEngine {
         }
     }
 
-    fn progress(&self) -> Progress {
-        Progress {
-            current_step: self.step.step_number(),
-            total_steps: TOTAL_STEPS,
-            label: None,
-        }
-    }
-
     fn build_screen(&self) -> ScreenModel {
         match self.step {
             ExchangeStep::ModeSelection => {
@@ -596,29 +576,25 @@ impl ExchangeEngine {
                     ScreenModel::default()
                 }
             }
-            ExchangeStep::GroupSelection => build_group_selection_screen(
-                &self.config.available_groups,
-                &self.selected_groups,
-                self.progress(),
-            ),
+            ExchangeStep::GroupSelection => {
+                build_group_selection_screen(&self.config.available_groups, &self.selected_groups)
+            }
             ExchangeStep::FieldPreview => {
                 if let Some(ref fp) = self.field_preview {
-                    field_preview::build_field_preview_screen(fp, self.progress())
+                    field_preview::build_field_preview_screen(fp)
                 } else {
                     ScreenModel::default()
                 }
             }
-            ExchangeStep::Verifying => verifying::build_verifying_screen(self.progress()),
+            ExchangeStep::Verifying => verifying::build_verifying_screen(),
             ExchangeStep::Success if self.success_summary.is_some() => {
                 let summary = self.success_summary.as_ref().expect("guarded by is_some()");
-                let mut screen = crate::ui::exchange::success::build_exchange_success_screen(
+                crate::ui::exchange::success::build_exchange_success_screen(
                     "exchange_success",
                     "Success",
                     "done",
                     summary,
-                );
-                screen.progress = Some(self.progress());
-                screen
+                )
             }
             ExchangeStep::Success => ScreenModel {
                 screen_id: "exchange_success".into(),
@@ -643,7 +619,6 @@ impl ExchangeEngine {
                     enabled: true,
                     a11y: None,
                 }],
-                progress: Some(self.progress()),
                 ..Default::default()
             },
             ExchangeStep::Failed => self.build_failed_screen(),
@@ -719,7 +694,6 @@ impl ExchangeEngine {
                 }),
             }],
             actions,
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -732,7 +706,6 @@ impl ExchangeEngine {
 fn build_group_selection_screen(
     available_groups: &[(String, String)],
     selected_groups: &[String],
-    progress: Progress,
 ) -> ScreenModel {
     let items: Vec<ToggleItem> = available_groups
         .iter()
@@ -782,7 +755,6 @@ fn build_group_selection_screen(
                 a11y: None,
             },
         ],
-        progress: Some(progress),
         ..Default::default()
     }
 }

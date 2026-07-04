@@ -14,7 +14,7 @@
 use crate::ui::*;
 
 /// Builds the flow-agnostic "Verifying" screen.
-pub(super) fn build_verifying_screen(progress: Progress) -> ScreenModel {
+pub(super) fn build_verifying_screen() -> ScreenModel {
     ScreenModel {
         screen_id: "exchange_verifying".into(),
         title: "Verifying".into(),
@@ -32,7 +32,6 @@ pub(super) fn build_verifying_screen(progress: Progress) -> ScreenModel {
             }),
         }],
         actions: vec![],
-        progress: Some(progress),
         ..Default::default()
     }
 }
@@ -46,12 +45,9 @@ mod tests {
     // @internal
     #[test]
     fn verifying_screen_is_flow_agnostic() {
-        let screen = build_verifying_screen(Progress {
-            current_step: 6,
-            total_steps: 8,
-            label: None,
-        });
+        let screen = build_verifying_screen();
         assert_eq!(screen.screen_id, "exchange_verifying");
+        assert!(screen.progress.is_none(), "no numeric progress (M2 S2)");
         // No QR component — the screen is shared across exchange flows.
         assert!(
             !screen

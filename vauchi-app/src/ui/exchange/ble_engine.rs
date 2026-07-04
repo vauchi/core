@@ -140,14 +140,6 @@ impl BleExchangeEngine {
         self.screen = BleScreen::Failed { reason };
     }
 
-    fn progress(&self) -> Progress {
-        Progress {
-            current_step: self.flow.step().step_number(0),
-            total_steps: BleStep::STEP_COUNT,
-            label: None,
-        }
-    }
-
     /// The advertise + scan commands that open a BLE exchange (lifted from the
     /// legacy `ExchangeEngine::start_ble_mode`).
     fn start_commands(&self) -> Vec<Command> {
@@ -200,7 +192,6 @@ impl BleExchangeEngine {
                 enabled: true,
                 a11y: None,
             }],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -211,15 +202,13 @@ impl BleExchangeEngine {
                 BleStep::Discovering if self.mode == ExchangeMode::Glance => {
                     self.build_glance_active_screen()
                 }
-                BleStep::Discovering => build_discovering_screen(self.mode, self.progress()),
-                BleStep::Handshaking | BleStep::Exchanging => {
-                    build_exchanging_screen(self.mode, self.progress())
-                }
-                BleStep::Verifying => build_verifying_screen(self.mode, self.progress()),
+                BleStep::Discovering => build_discovering_screen(self.mode),
+                BleStep::Handshaking | BleStep::Exchanging => build_exchanging_screen(self.mode),
+                BleStep::Verifying => build_verifying_screen(self.mode),
                 // Complete is transitional — `apply_outcome` flips `screen` to
                 // `Success` before this renders; show the exchanging screen if
                 // it is ever observed mid-transition.
-                BleStep::Complete => build_exchanging_screen(self.mode, self.progress()),
+                BleStep::Complete => build_exchanging_screen(self.mode),
             },
             BleScreen::Success => self.build_success_screen(),
             BleScreen::Failed { reason } => self.build_failed_screen(reason.clone()),
@@ -250,7 +239,6 @@ impl BleExchangeEngine {
                 enabled: true,
                 a11y: None,
             }],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -317,7 +305,6 @@ impl BleExchangeEngine {
                 }),
             }],
             actions,
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }

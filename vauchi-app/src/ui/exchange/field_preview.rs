@@ -34,10 +34,7 @@ pub(super) enum FieldPreviewResult {
 }
 
 /// Build a field preview screen from the config.
-pub(super) fn build_field_preview_screen(
-    config: &FieldPreviewConfig,
-    progress: Progress,
-) -> ScreenModel {
+pub(super) fn build_field_preview_screen(config: &FieldPreviewConfig) -> ScreenModel {
     let fields: Vec<Field> = config
         .card
         .fields()
@@ -113,7 +110,6 @@ pub(super) fn build_field_preview_screen(
                 a11y: None,
             },
         ],
-        progress: Some(progress),
         ..Default::default()
     }
 }
@@ -155,14 +151,6 @@ mod tests {
         card
     }
 
-    fn sample_progress() -> Progress {
-        Progress {
-            current_step: 3,
-            total_steps: 8,
-            label: None,
-        }
-    }
-
     #[test]
     fn preview_shows_all_fields_when_no_visibility_filter() {
         let config = FieldPreviewConfig {
@@ -170,7 +158,7 @@ mod tests {
             display_name: "Alice".into(),
             visible_field_ids: None,
         };
-        let screen = build_field_preview_screen(&config, sample_progress());
+        let screen = build_field_preview_screen(&config);
         assert_eq!(screen.screen_id, "exchange_field_preview");
 
         let fields = extract_fields(&screen);
@@ -192,7 +180,7 @@ mod tests {
             display_name: "Alice".into(),
             visible_field_ids: Some(HashSet::from([email_id.clone()])),
         };
-        let screen = build_field_preview_screen(&config, sample_progress());
+        let screen = build_field_preview_screen(&config);
 
         let fields = extract_fields(&screen);
         let email = fields.iter().find(|f| f.id == email_id).unwrap();
@@ -217,7 +205,7 @@ mod tests {
             display_name: "Dr. Egloff".into(),
             visible_field_ids: None,
         };
-        let screen = build_field_preview_screen(&config, sample_progress());
+        let screen = build_field_preview_screen(&config);
 
         let name = screen.components.iter().find_map(|c| match c {
             Component::Text { content, .. } => Some(content.as_str()),
@@ -257,7 +245,7 @@ mod tests {
             display_name: "Alice".into(),
             visible_field_ids: None,
         };
-        let screen = build_field_preview_screen(&config, sample_progress());
+        let screen = build_field_preview_screen(&config);
         assert_eq!(screen.actions.len(), 2);
         assert_eq!(screen.actions[0].id, "start_exchange");
         assert_eq!(screen.actions[1].id, "change_groups");
@@ -272,7 +260,7 @@ mod tests {
             display_name: "Alice".into(),
             visible_field_ids: None,
         };
-        let screen = build_field_preview_screen(&config, sample_progress());
+        let screen = build_field_preview_screen(&config);
         let fields = extract_fields(&screen);
         assert_eq!(fields.len(), 2, "Card with 2 fields should show 2 entries");
         assert_eq!(

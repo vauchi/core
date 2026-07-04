@@ -156,21 +156,6 @@ impl LinkExchangeEngine {
         self.state = InitiatorScreen::Failed { reason };
     }
 
-    fn progress(&self) -> Progress {
-        let current = match self.state {
-            InitiatorScreen::ShareUrl => 1,
-            InitiatorScreen::WaitingForResponse => 2,
-            InitiatorScreen::Retrieving
-            | InitiatorScreen::Success
-            | InitiatorScreen::Failed { .. } => 3,
-        };
-        Progress {
-            current_step: current,
-            total_steps: 3,
-            label: None,
-        }
-    }
-
     fn build_screen(&self) -> ScreenModel {
         match &self.state {
             InitiatorScreen::ShareUrl => self.build_share_url_screen(),
@@ -207,7 +192,6 @@ impl LinkExchangeEngine {
                     a11y: None,
                 },
             ],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -238,7 +222,6 @@ impl LinkExchangeEngine {
                 enabled: true,
                 a11y: None,
             }],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -261,7 +244,6 @@ impl LinkExchangeEngine {
                 }),
             }],
             actions: vec![],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -271,14 +253,12 @@ impl LinkExchangeEngine {
         // groups) when the lifecycle attached a summary; otherwise the
         // minimal completion chrome below.
         if let Some(summary) = &self.success_summary {
-            let mut screen = crate::ui::exchange::success::build_exchange_success_screen(
+            return crate::ui::exchange::success::build_exchange_success_screen(
                 "exchange_link_success",
                 "Contact Added",
                 ACTION_DONE,
                 summary,
             );
-            screen.progress = Some(self.progress());
-            return screen;
         }
         ScreenModel {
             screen_id: "exchange_link_success".into(),
@@ -303,7 +283,6 @@ impl LinkExchangeEngine {
                 enabled: true,
                 a11y: None,
             }],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -341,7 +320,6 @@ impl LinkExchangeEngine {
                     a11y: None,
                 },
             ],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }

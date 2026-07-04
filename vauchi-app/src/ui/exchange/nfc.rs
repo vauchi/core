@@ -71,19 +71,6 @@ pub(super) enum NfcStep {
     Complete,
 }
 
-impl NfcStep {
-    pub(super) fn step_number(&self, base: u8) -> u8 {
-        base + match self {
-            Self::Idle | Self::AwaitingTap => 0,
-            Self::PayloadSent | Self::AckSent => 1,
-            Self::Complete => 2,
-        }
-    }
-
-    /// Matches QrStep/LinkStep/BleStep for the parent progress bar.
-    pub(super) const STEP_COUNT: u8 = 3;
-}
-
 // ── Outcome enum ───────────────────────────────────────────────────────────
 
 /// Result of handling a hardware event in the NFC sub-flow.
@@ -374,7 +361,7 @@ pub(super) enum NfcFlowError {
 /// minimal placeholder shape — the production renderer copy follows
 /// in a later phase once `NfcExchangeView` is retired. The screen-id
 /// + cancel action are stable so iOS/Android can route on them today.
-pub(super) fn build_nfc_screen(step: &NfcStep, progress: Progress) -> ScreenModel {
+pub(super) fn build_nfc_screen(step: &NfcStep) -> ScreenModel {
     let (screen_id, title, subtitle): (&str, &str, &str) = match step {
         NfcStep::Idle => ("exchange_nfc_idle", "Preparing NFC", "Just a moment..."),
         NfcStep::AwaitingTap => (
@@ -406,7 +393,6 @@ pub(super) fn build_nfc_screen(step: &NfcStep, progress: Progress) -> ScreenMode
             enabled: !matches!(step, NfcStep::Complete),
             a11y: None,
         }],
-        progress: Some(progress),
         ..Default::default()
     }
 }
@@ -657,14 +643,6 @@ mod tests {
 
     // ── Screen-builder coverage ────────────────────────────────────────────
 
-    fn dummy_progress() -> Progress {
-        Progress {
-            current_step: 4,
-            total_steps: 8,
-            label: None,
-        }
-    }
-
     fn action_ids(screen: &ScreenModel) -> Vec<String> {
         screen.actions.iter().map(|a| a.id.clone()).collect()
     }
@@ -672,7 +650,7 @@ mod tests {
     // @internal
     #[test]
     fn idle_screen_has_cancel_affordance() {
-        let s = build_nfc_screen(&NfcStep::Idle, dummy_progress());
+        let s = build_nfc_screen(&NfcStep::Idle);
         assert_eq!(s.screen_id, "exchange_nfc_idle");
         assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
         assert!(s.actions.iter().any(|a| a.id == "cancel" && a.enabled));
@@ -681,7 +659,7 @@ mod tests {
     // @internal
     #[test]
     fn awaiting_tap_screen_has_cancel_affordance() {
-        let s = build_nfc_screen(&NfcStep::AwaitingTap, dummy_progress());
+        let s = build_nfc_screen(&NfcStep::AwaitingTap);
         assert_eq!(s.screen_id, "exchange_nfc_awaiting_tap");
         assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
         assert!(s.actions.iter().any(|a| a.id == "cancel" && a.enabled));
@@ -690,8 +668,8 @@ mod tests {
     // @internal
     #[test]
     fn in_progress_screens_share_screen_id_and_keep_cancel_enabled() {
-        let sent = build_nfc_screen(&NfcStep::PayloadSent, dummy_progress());
-        let ack = build_nfc_screen(&NfcStep::AckSent, dummy_progress());
+        let sent = build_nfc_screen(&NfcStep::PayloadSent);
+        let ack = build_nfc_screen(&NfcStep::AckSent);
         assert_eq!(sent.screen_id, "exchange_nfc_in_progress");
         assert_eq!(ack.screen_id, "exchange_nfc_in_progress");
         assert_eq!(action_ids(&sent), vec!["cancel".to_string()]);
@@ -701,7 +679,7 @@ mod tests {
     // @internal
     #[test]
     fn complete_screen_disables_cancel() {
-        let s = build_nfc_screen(&NfcStep::Complete, dummy_progress());
+        let s = build_nfc_screen(&NfcStep::Complete);
         assert_eq!(s.screen_id, "exchange_nfc_complete");
         // Cancel is still listed (so the action surface is stable across
         // states) but disabled — the exchange has already completed.

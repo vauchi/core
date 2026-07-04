@@ -42,6 +42,7 @@ mod exchange_cancel_navigation_tests;
 mod exchange_group_filter_preview_tests;
 mod exchange_last_used_defaults_tests;
 mod exchange_location_capture_tests;
+mod exchange_no_numeric_progress_tests;
 mod exchange_step_back_tests;
 mod f2_new_4_settings_nav_tests;
 mod file_picker_wiring_tests;

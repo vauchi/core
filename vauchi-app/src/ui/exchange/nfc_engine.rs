@@ -128,14 +128,6 @@ impl NfcExchangeEngine {
             .unwrap_or(NfcStep::AwaitingTap)
     }
 
-    fn progress(&self) -> Progress {
-        Progress {
-            current_step: self.active_step().step_number(0),
-            total_steps: NfcStep::STEP_COUNT,
-            label: None,
-        }
-    }
-
     /// Send: build the initiator flow now and emit its key-offer activation.
     fn start_send(&mut self) -> ActionResult {
         let identity = match self.identity.take() {
@@ -179,8 +171,8 @@ impl NfcExchangeEngine {
 
     fn build_screen(&self) -> ScreenModel {
         match &self.screen {
-            NfcScreen::RoleSelection => build_nfc_role_screen(self.progress()),
-            NfcScreen::Active => build_nfc_screen(&self.active_step(), self.progress()),
+            NfcScreen::RoleSelection => build_nfc_role_screen(),
+            NfcScreen::Active => build_nfc_screen(&self.active_step()),
             NfcScreen::Success => self.build_success_screen(),
             NfcScreen::Failed { reason } => self.build_failed_screen(reason.clone()),
         }
@@ -210,7 +202,6 @@ impl NfcExchangeEngine {
                 enabled: true,
                 a11y: None,
             }],
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -277,7 +268,6 @@ impl NfcExchangeEngine {
                 }),
             }],
             actions,
-            progress: Some(self.progress()),
             ..Default::default()
         }
     }
@@ -449,7 +439,7 @@ impl WorkflowEngine for NfcExchangeEngine {
 /// Per ADR-043/044 the renderer is humble: a generic `ActionList` whose
 /// item/title strings are i18n keys the frontend resolves (ADR-038). The item
 /// ids route in `handle_action` to the initiator / responder entry.
-fn build_nfc_role_screen(progress: Progress) -> ScreenModel {
+fn build_nfc_role_screen() -> ScreenModel {
     ScreenModel {
         screen_id: "exchange_nfc_role".into(),
         title: "exchange.nfc.choose_role".into(),
@@ -482,7 +472,6 @@ fn build_nfc_role_screen(progress: Progress) -> ScreenModel {
             enabled: true,
             a11y: None,
         }],
-        progress: Some(progress),
         ..Default::default()
     }
 }

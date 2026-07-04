@@ -38,7 +38,7 @@ fn exchange_mark_success() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_success");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 7);
+    assert!(screen.progress.is_none(), "no numeric progress (M2 S2)");
 
     match &screen.components[0] {
         Component::StatusIndicator { title, status, .. } => {
@@ -65,7 +65,7 @@ fn exchange_mark_failed() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_failed");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 8);
+    assert!(screen.progress.is_none(), "no numeric progress (M2 S2)");
 
     match &screen.components[0] {
         Component::StatusIndicator { title, status, .. } => {

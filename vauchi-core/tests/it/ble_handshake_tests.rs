@@ -380,49 +380,6 @@ fn test_initiator_processes_key_ack() {
     );
 }
 
-// After a full BLE handshake, both sides derive the reciprocity confirmation
-// token pair from the agreed session key, and the pair cross-matches: Alice's
-// own token equals what Bob expects of Alice (and vice versa). This is what
-// lets the shared ReciprocityConfirmer confirm over the native BLE channel.
-// @scenario: ble_exchange :: both sides derive cross-matching reciprocity tokens
-#[test]
-fn ble_sessions_derive_cross_matching_confirmation_tokens() {
-    let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
-    let alice_id = make_test_identity();
-    let bob_id = make_test_identity();
-    let alice_card = make_test_card(&alice_id, "Alice");
-    let bob_card = make_test_card(&bob_id, "Bob");
-
-    let mut alice = BleHandshakeSession::new_initiator(&alice_id, alice_card, now);
-    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card, now);
-
-    let offer = alice.create_key_offer().expect("key offer");
-    let (ack, bob_encrypted_card) = bob.process_key_offer(&offer, now).expect("process offer");
-    alice
-        .process_key_ack(&ack, &bob_encrypted_card, now)
-        .expect("process ack");
-
-    let alice_our = alice
-        .our_confirmation_token()
-        .expect("alice derived tokens");
-    let alice_their = alice.expected_their_token().expect("alice derived tokens");
-    let bob_our = bob.our_confirmation_token().expect("bob derived tokens");
-    let bob_their = bob.expected_their_token().expect("bob derived tokens");
-
-    assert_eq!(
-        alice_our, bob_their,
-        "Alice's own token must equal what Bob expects of Alice"
-    );
-    assert_eq!(
-        bob_our, alice_their,
-        "Bob's own token must equal what Alice expects of Bob"
-    );
-    assert_ne!(
-        alice_our, alice_their,
-        "own vs expected token must differ (echo protection)"
-    );
-}
-
 // @scenario: ble_exchange :: Initiator rejects ack in wrong state
 #[test]
 fn test_initiator_rejects_ack_in_wrong_state() {

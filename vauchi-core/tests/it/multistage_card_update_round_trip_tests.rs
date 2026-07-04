@@ -92,6 +92,39 @@ fn drive_to_finalized(
     (alice, bob)
 }
 
+// After a full multi-stage exchange both sides hold the same transport key, so
+// the reciprocity confirmation token pair (derived from it + role-swapped
+// identity keys) cross-matches — the property that lets the shared
+// ReciprocityConfirmer confirm over the multi-stage channel (relay-free).
+// @scenario: multi_stage :: both sides derive cross-matching reciprocity tokens
+#[test]
+fn multistage_sessions_derive_cross_matching_confirmation_tokens() {
+    let alice_pk = [1u8; 32];
+    let bob_pk = [2u8; 32];
+    let (alice_session, bob_session) =
+        drive_to_finalized(b"alice card".to_vec(), b"bob card".to_vec());
+
+    let (alice_our, alice_their) = alice_session
+        .confirmation_tokens(&alice_pk, &bob_pk)
+        .expect("alice tokens (transport key present after finalize)");
+    let (bob_our, bob_their) = bob_session
+        .confirmation_tokens(&bob_pk, &alice_pk)
+        .expect("bob tokens");
+
+    assert_eq!(
+        *alice_our, *bob_their,
+        "Alice's own token must equal what Bob expects of Alice"
+    );
+    assert_eq!(
+        *bob_our, *alice_their,
+        "Bob's own token must equal what Alice expects of Bob"
+    );
+    assert_ne!(
+        *alice_our, *alice_their,
+        "own vs expected token must differ (echo protection)"
+    );
+}
+
 /// Run a real multi-stage exchange between two fresh Vauchis and build each
 /// side's role-correct ratchet via the production `build_exchange_ratchet` seam.
 fn multistage_exchanged_pair() -> ExchangedPair {

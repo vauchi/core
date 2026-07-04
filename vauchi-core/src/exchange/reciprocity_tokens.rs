@@ -21,6 +21,9 @@ use crate::crypto::kdf::HKDF;
 /// HKDF domain-separation label for reciprocity confirmation tokens (ADR-007).
 const DOMAIN_RECIPROCITY_CONFIRM: &[u8] = b"vauchi-reciprocity-confirm-v1";
 
+/// A `(our_token, expected_their_token)` reciprocity confirmation pair.
+pub type ConfirmationTokenPair = (Zeroizing<[u8; 32]>, Zeroizing<[u8; 32]>);
+
 /// Derive the `(our_token, expected_their_token)` confirmation pair from the
 /// exchange shared secret and both parties' identity signing keys.
 ///
@@ -33,7 +36,7 @@ pub fn derive_confirmation_tokens(
     shared_secret: &[u8],
     our_id: &[u8],
     their_id: &[u8],
-) -> (Zeroizing<[u8; 32]>, Zeroizing<[u8; 32]>) {
+) -> ConfirmationTokenPair {
     let our_info = [DOMAIN_RECIPROCITY_CONFIRM, our_id].concat();
     let their_info = [DOMAIN_RECIPROCITY_CONFIRM, their_id].concat();
     let our_token = HKDF::derive_key(None, shared_secret, &our_info);

@@ -550,6 +550,28 @@ impl MultiStageSession {
         })
     }
 
+    /// Derive the reciprocity confirmation token pair from the agreed transport
+    /// key + both identity keys (design spec §2), via the shared transport-
+    /// agnostic primitive. `None` until key agreement has produced a transport
+    /// key. Pure (like `build_exchange_ratchet`): multi-stage does not store the
+    /// identities, so the caller supplies them. Both peers derive a cross-
+    /// matching pair, so the shared `ReciprocityConfirmer` can confirm over the
+    /// multi-stage session's own channel (relay-free).
+    pub fn confirmation_tokens(
+        &self,
+        our_identity: &[u8; 32],
+        their_identity: &[u8; 32],
+    ) -> Option<super::super::reciprocity_tokens::ConfirmationTokenPair> {
+        let transport_key = self.transport_key?;
+        Some(
+            super::super::reciprocity_tokens::derive_confirmation_tokens(
+                &transport_key,
+                our_identity,
+                their_identity,
+            ),
+        )
+    }
+
     /// Returns the peer's relay URL (available after INIT exchange).
     pub fn peer_relay_url(&self) -> Option<&str> {
         self.peer_relay_url.as_deref()

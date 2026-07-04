@@ -56,6 +56,15 @@ impl Vauchi {
                 continue;
             };
             let contact_id = contact.id().to_string();
+            // Slice D: one confirmation in flight per contact is enough — it is
+            // idempotent and ratchet-deduped on receipt. Skip while any prior
+            // update is still queued, so an unreachable relay (or an offline
+            // peer whose mailbox we can't yet reach) can't pile up duplicate
+            // confirmations cycle after cycle. Once the queued one delivers and
+            // clears, the next Pending cycle re-queues.
+            if self.storage.pending().count_pending_updates(&contact_id)? > 0 {
+                continue;
+            }
             let (mut ratchet, is_initiator) =
                 match self.storage.ratchets().load_ratchet_state(&contact_id)? {
                     Some(r) => r,

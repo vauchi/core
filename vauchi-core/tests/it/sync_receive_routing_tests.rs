@@ -946,3 +946,46 @@ fn queue_skips_already_confirmed_contacts() {
         "a Confirmed contact must not be re-sent"
     );
 }
+
+// Slice D: a second sync cycle does not queue a duplicate confirmation while the
+// first is still awaiting delivery — bounding the pending queue if the relay is
+// unreachable.
+// @scenario: receive_phase :: one reciprocity confirmation in flight per contact
+// @internal
+#[test]
+fn queue_does_not_duplicate_confirmation_in_flight() {
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let link = link_contacts(&alice, &bob, "Bob");
+    let now = bob.storage().clock().unix_seconds();
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+
+    let mut bob_of_alice = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        link.shared_secret.clone(),
+        now,
+    );
+    bob_of_alice.set_reciprocity(Reciprocity::Pending);
+    bob.storage()
+        .contacts()
+        .save_contact(&bob_of_alice)
+        .unwrap();
+
+    // First cycle queues one; it is NOT delivered (no sync in this test).
+    assert_eq!(bob.queue_reciprocity_confirmations().unwrap(), 1);
+    // Second cycle: one is still queued → skip, no duplicate.
+    assert_eq!(
+        bob.queue_reciprocity_confirmations().unwrap(),
+        0,
+        "no duplicate confirmation while one is in flight"
+    );
+    assert_eq!(
+        bob.storage()
+            .pending()
+            .count_pending_updates(&link.host_contact_id)
+            .unwrap(),
+        1,
+        "exactly one confirmation queued for the contact"
+    );
+}

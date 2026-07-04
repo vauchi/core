@@ -136,6 +136,7 @@ impl AppEngine {
                     own_token,
                     vauchi.clock().clone(),
                     glance_qr.map(str::to_string),
+                    locale,
                 ))
             }
             AppScreen::NfcExchange => {

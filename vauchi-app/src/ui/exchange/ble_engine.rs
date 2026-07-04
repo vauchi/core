@@ -18,6 +18,7 @@
 //! entry (`ActionResult::StartBleExchange`) + the legacy parent-arm retirement
 //! land in slices 2–3.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use std::sync::Arc;
 use vauchi_core::clock::Clock;
@@ -95,6 +96,7 @@ pub struct BleExchangeEngine {
     /// AppEngine on screen entry (a stable nonce for the whole attempt).
     /// `None` for radio modes (Magic/Bump/Shake).
     glance_qr: Option<String>,
+    locale: Locale,
 }
 
 impl BleExchangeEngine {
@@ -109,6 +111,7 @@ impl BleExchangeEngine {
         own_token: Vec<u8>,
         clock: Arc<dyn Clock>,
         glance_qr: Option<String>,
+        locale: Locale,
     ) -> Self {
         let step_entered_unix = clock.unix_seconds();
         Self {
@@ -123,7 +126,12 @@ impl BleExchangeEngine {
             clock,
             step_entered_unix,
             glance_qr,
+            locale,
         }
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Drive the chrome to the terminal Success screen. Called by the
@@ -173,7 +181,7 @@ impl BleExchangeEngine {
                 id: GLANCE_OWN_QR_COMPONENT_ID.into(),
                 data: data.clone(),
                 mode: QrMode::Display,
-                label: Some("Show this to exchange".into()),
+                label: Some(self.t("exchange.ble.glance_show_qr")),
                 scan_quality: None,
                 a11y: None,
             });
@@ -183,19 +191,19 @@ impl BleExchangeEngine {
                 id: GLANCE_SCAN_COMPONENT_ID.into(),
                 data: String::new(),
                 mode: QrMode::Scan,
-                label: Some("Scan their code".into()),
+                label: Some(self.t("exchange.ble.glance_scan")),
                 scan_quality: None,
                 a11y: None,
             });
         }
         ScreenModel {
             screen_id: "exchange_ble_glance".into(),
-            title: "Glance".into(),
-            subtitle: Some("Show your code or scan theirs".into()),
+            title: self.t("exchange.mode_name.glance"),
+            subtitle: Some(self.t("exchange.ble.glance_subtitle")),
             components,
             actions: vec![ScreenAction {
                 id: "cancel".into(),
-                label: "Cancel".into(),
+                label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -210,13 +218,15 @@ impl BleExchangeEngine {
                 BleStep::Discovering if self.mode == ExchangeMode::Glance => {
                     self.build_glance_active_screen()
                 }
-                BleStep::Discovering => build_discovering_screen(self.mode),
-                BleStep::Handshaking | BleStep::Exchanging => build_exchanging_screen(self.mode),
-                BleStep::Verifying => build_verifying_screen(self.mode),
+                BleStep::Discovering => build_discovering_screen(self.mode, self.locale),
+                BleStep::Handshaking | BleStep::Exchanging => {
+                    build_exchanging_screen(self.mode, self.locale)
+                }
+                BleStep::Verifying => build_verifying_screen(self.mode, self.locale),
                 // Complete is transitional — `apply_outcome` flips `screen` to
                 // `Success` before this renders; show the exchanging screen if
                 // it is ever observed mid-transition.
-                BleStep::Complete => build_exchanging_screen(self.mode),
+                BleStep::Complete => build_exchanging_screen(self.mode, self.locale),
             },
             BleScreen::Success => self.build_success_screen(),
             BleScreen::Failed { reason } => self.build_failed_screen(reason.clone()),
@@ -231,30 +241,30 @@ impl BleExchangeEngine {
         if let Some(summary) = &self.success_summary {
             return crate::ui::exchange::success::build_exchange_success_screen(
                 "exchange_success",
-                "Success",
+                self.t("exchange.terminal.success"),
                 ACTION_DONE,
                 summary,
             );
         }
         ScreenModel {
             screen_id: "exchange_success".into(),
-            title: "Success".into(),
+            title: self.t("exchange.terminal.success"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "success_status".into(),
                 icon: None,
-                title: "Exchange Complete".into(),
+                title: self.t("exchange.terminal.complete"),
                 detail: None,
                 status: Status::Success,
                 a11y: Some(A11y {
-                    label: Some("Exchange complete".into()),
-                    hint: Some("Contact cards have been exchanged successfully".into()),
+                    label: Some(self.t("exchange.terminal.complete")),
+                    hint: Some(self.t("exchange.terminal.complete_hint")),
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -266,7 +276,7 @@ impl BleExchangeEngine {
     fn build_failed_screen(&self, detail: Option<String>) -> ScreenModel {
         let mut actions = vec![ScreenAction {
             id: ACTION_RETRY.into(),
-            label: "Retry".into(),
+            label: self.t("action.retry"),
             style: ActionStyle::Primary,
             enabled: true,
             a11y: None,
@@ -274,53 +284,47 @@ impl BleExchangeEngine {
         if self.has_camera {
             actions.push(ScreenAction {
                 id: "fallback_qr".into(),
-                label: "Switch to QR".into(),
+                label: self.t("exchange.terminal.switch_qr"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: Some(A11y {
                     label: None,
-                    hint: Some(
-                        "Abandons this attempt and restarts the exchange using camera QR codes."
-                            .into(),
-                    ),
+                    hint: Some(self.t("exchange.terminal.switch_qr_hint")),
                     role: None,
                 }),
             });
         }
         actions.push(ScreenAction {
             id: "fallback_relay".into(),
-            label: "Switch to encrypted relay".into(),
+            label: self.t("exchange.terminal.switch_relay"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: Some(A11y {
                 label: None,
-                hint: Some(
-                    "Abandons this attempt and completes the exchange over the encrypted relay server."
-                        .into(),
-                ),
+                hint: Some(self.t("exchange.terminal.switch_relay_hint")),
                 role: None,
             }),
         });
         actions.push(ScreenAction {
             id: ACTION_CANCEL.into(),
-            label: "Cancel".into(),
+            label: self.t("action.cancel"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: None,
         });
         ScreenModel {
             screen_id: "exchange_failed".into(),
-            title: "Failed".into(),
+            title: self.t("exchange.terminal.failed"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "failed_status".into(),
                 icon: None,
-                title: "Exchange Failed".into(),
+                title: self.t("exchange.terminal.failed_status"),
                 detail,
                 status: Status::Failed,
                 a11y: Some(A11y {
-                    label: Some("Exchange failed".into()),
-                    hint: Some("The exchange did not complete. Retry or cancel.".into()),
+                    label: Some(self.t("exchange.terminal.failed_status")),
+                    hint: Some(self.t("exchange.terminal.failed_hint")),
                     role: None,
                 }),
             }],
@@ -515,6 +519,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         assert_eq!(
             engine.current_screen().screen_id,
@@ -532,6 +537,7 @@ mod tests {
             vec![1, 2, 3],
             SystemClock::shared(),
             Some("QR-PAYLOAD".to_string()),
+            Locale::English,
         );
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, "exchange_ble_glance");
@@ -569,6 +575,7 @@ mod tests {
             vec![9],
             SystemClock::shared(),
             Some("Q".to_string()),
+            Locale::English,
         );
         let screen = engine.current_screen();
         assert!(
@@ -602,6 +609,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         // `entered` read just after construction is >= the engine's stamped
         // step-entry second, so `+ budget + 1` is unambiguously past the
@@ -630,6 +638,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         let entered = SystemClock::shared().unix_seconds();
 
@@ -653,6 +662,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         engine.force_failure(Some("crypto failure".into()));
         let before = engine.current_screen();
@@ -676,6 +686,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         let cmds = engine.screen_entered();
         assert_eq!(cmds.len(), 2);
@@ -694,6 +705,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         let result = discover(&mut engine).expect("an active engine handles BLE events");
         match result {
@@ -715,6 +727,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         let _ = engine.handle_hardware_event(Event::BleDisconnected {
             reason: "lost".into(),
@@ -737,6 +750,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         let _ = engine.handle_hardware_event(Event::BleDisconnected { reason: "x".into() });
         let ids: Vec<String> = engine
@@ -760,6 +774,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         assert_eq!(
             engine.current_screen().screen_id,
@@ -778,6 +793,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "cancel".into(),
@@ -795,6 +811,7 @@ mod tests {
             vec![],
             SystemClock::shared(),
             None,
+            Locale::English,
         );
         let _ = engine.handle_hardware_event(Event::BleDisconnected { reason: "x".into() });
         assert_eq!(engine.current_screen().screen_id, "exchange_failed");

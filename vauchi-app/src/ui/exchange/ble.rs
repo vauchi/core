@@ -10,6 +10,7 @@
 //! steps, screen builders, action/hardware-event handlers that
 //! return outcomes for the parent engine to act on.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::proximity_runner::{ProximityMethod, ProximityRunner};
@@ -68,29 +69,39 @@ pub(super) enum BleHardwareOutcome {
 
 // ── Screen builders ────────────────────────────────────────────────────────
 
-pub(super) fn build_discovering_screen(mode: ExchangeMode) -> ScreenModel {
-    let (title, subtitle) = match mode {
+pub(super) fn build_discovering_screen(mode: ExchangeMode, locale: Locale) -> ScreenModel {
+    let t = |key: &str| get_string(locale, key);
+    let (title_key, subtitle_key) = match mode {
         ExchangeMode::Magic => (
-            "Searching nearby...",
-            "Hold your phone near the other device",
+            "exchange.ble.searching_magic_title",
+            "exchange.ble.searching_magic_subtitle",
         ),
-        ExchangeMode::Bump => ("Ready to bump", "Bump your phones together to exchange"),
-        ExchangeMode::Shake => ("Ready to shake", "Shake both phones together to exchange"),
-        _ => ("Searching...", "Looking for nearby devices"),
+        ExchangeMode::Bump => (
+            "exchange.ble.ready_bump_title",
+            "exchange.ble.ready_bump_subtitle",
+        ),
+        ExchangeMode::Shake => (
+            "exchange.ble.ready_shake_title",
+            "exchange.ble.ready_shake_subtitle",
+        ),
+        _ => (
+            "exchange.ble.searching_default_title",
+            "exchange.ble.searching_default_subtitle",
+        ),
     };
 
     ScreenModel {
         screen_id: "exchange_ble_discovering".into(),
-        title: title.into(),
-        subtitle: Some(subtitle.into()),
+        title: t(title_key),
+        subtitle: Some(t(subtitle_key)),
         components: vec![Component::Text {
             id: "ble_status".into(),
-            content: "Scanning for nearby devices...".into(),
+            content: t("exchange.ble.scanning"),
             style: TextStyle::Body,
         }],
         actions: vec![ScreenAction {
             id: "cancel".into(),
-            label: "Cancel".into(),
+            label: t("action.cancel"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: None,
@@ -99,21 +110,22 @@ pub(super) fn build_discovering_screen(mode: ExchangeMode) -> ScreenModel {
     }
 }
 
-pub(super) fn build_exchanging_screen(mode: ExchangeMode) -> ScreenModel {
-    let title = match mode {
-        ExchangeMode::Magic => "Exchanging cards",
-        ExchangeMode::Bump => "Exchanging cards",
-        ExchangeMode::Shake => "Exchanging cards",
-        _ => "Exchanging...",
+pub(super) fn build_exchanging_screen(mode: ExchangeMode, locale: Locale) -> ScreenModel {
+    let t = |key: &str| get_string(locale, key);
+    let title_key = match mode {
+        ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake => {
+            "exchange.ble.exchanging_title"
+        }
+        _ => "exchange.ble.exchanging_default_title",
     };
 
     ScreenModel {
         screen_id: "exchange_ble_exchanging".into(),
-        title: title.into(),
-        subtitle: Some("Transferring contact information securely".into()),
+        title: t(title_key),
+        subtitle: Some(t("exchange.ble.transferring_subtitle")),
         components: vec![Component::Text {
             id: "ble_exchange_status".into(),
-            content: "Encrypted exchange in progress...".into(),
+            content: t("exchange.ble.transferring_status"),
             style: TextStyle::Body,
         }],
         actions: vec![],
@@ -121,18 +133,19 @@ pub(super) fn build_exchanging_screen(mode: ExchangeMode) -> ScreenModel {
     }
 }
 
-pub(super) fn build_verifying_screen(mode: ExchangeMode) -> ScreenModel {
-    let subtitle = match mode {
-        ExchangeMode::Magic => "Confirming proximity via audio...",
-        ExchangeMode::Bump => "Confirming proximity via impact...",
-        ExchangeMode::Shake => "Confirming proximity via motion...",
-        _ => "Verifying proximity...",
+pub(super) fn build_verifying_screen(mode: ExchangeMode, locale: Locale) -> ScreenModel {
+    let t = |key: &str| get_string(locale, key);
+    let subtitle_key = match mode {
+        ExchangeMode::Magic => "exchange.ble.verifying_magic",
+        ExchangeMode::Bump => "exchange.ble.verifying_bump",
+        ExchangeMode::Shake => "exchange.ble.verifying_shake",
+        _ => "exchange.ble.verifying_default",
     };
 
     ScreenModel {
         screen_id: "exchange_ble_verifying".into(),
-        title: "Verifying".into(),
-        subtitle: Some(subtitle.into()),
+        title: t("exchange.verifying.title"),
+        subtitle: Some(t(subtitle_key)),
         components: vec![],
         actions: vec![],
         ..Default::default()

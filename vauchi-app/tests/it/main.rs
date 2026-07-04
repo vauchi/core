@@ -41,6 +41,7 @@ mod drain_notifications_tests;
 mod duress_backup_i18n_tests;
 mod engine_output_tests;
 mod engine_update_tests;
+mod exchange_ble_chrome_i18n_tests;
 mod exchange_ble_invariants_proptest;
 mod exchange_ble_rich_success_tests;
 mod exchange_cancel_navigation_tests;

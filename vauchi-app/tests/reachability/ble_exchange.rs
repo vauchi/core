@@ -58,6 +58,7 @@ fn discovering_factory() -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
+        vauchi_app::i18n::Locale::English,
     )
 }
 
@@ -70,6 +71,7 @@ fn exchanging_factory() -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
+        vauchi_app::i18n::Locale::English,
     );
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
@@ -89,6 +91,7 @@ fn verifying_factory() -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
+        vauchi_app::i18n::Locale::English,
     );
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
@@ -114,6 +117,7 @@ fn success_factory() -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
+        vauchi_app::i18n::Locale::English,
     );
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
@@ -139,6 +143,7 @@ fn failed_factory() -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
+        vauchi_app::i18n::Locale::English,
     );
     e.handle_hardware_event(Event::BleDisconnected {
         reason: "peer hung up".into(),

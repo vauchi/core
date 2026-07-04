@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Backup & recovery workflow engine.
+//! Copy resolves through `i18n::get_string` in the locale threaded at
+//! construction (M3 S3d of `2026-07-03-core-screens-bypass-i18n`); keys
+//! live in the `backup.wizard.*` + shared `backup.*` / `action.*` families.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use zeroize::Zeroize;
 
@@ -41,6 +45,7 @@ pub struct BackupRecoveryEngine {
     /// Pasted backup blob (Restore mode only). Hex-encoded ASCII matching
     /// `Vauchi::export_full_backup` output. Captured on the password screen.
     restore_data: String,
+    locale: Locale,
 }
 
 impl Drop for BackupRecoveryEngine {
@@ -67,7 +72,7 @@ impl BackupRecoveryEngine {
     ///
     /// If `mode` is `Some`, starts at the password entry step.
     /// If `None`, starts at the mode selection step.
-    pub fn new(mode: Option<BackupMode>, has_identity: bool) -> Self {
+    pub fn new(mode: Option<BackupMode>, has_identity: bool, locale: Locale) -> Self {
         let (step, mode) = match mode {
             Some(m) => (BackupStep::EnterPassword, m),
             None => (BackupStep::ChooseMode, BackupMode::Create),
@@ -80,7 +85,12 @@ impl BackupRecoveryEngine {
             confirm_password: String::new(),
             has_identity,
             restore_data: String::new(),
+            locale,
         }
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Returns the pasted backup blob (Restore mode). Only meaningful once
@@ -151,47 +161,40 @@ impl BackupRecoveryEngine {
 
     fn choose_screen(&self) -> ScreenModel {
         let detail = match self.level {
-            BackupLevel::Full => {
-                "Create an encrypted backup of your identity, contacts, and labels."
-            }
-            BackupLevel::IdentityOnly => {
-                "Create an encrypted backup of your identity only. Contacts and labels are not included."
-            }
+            BackupLevel::Full => self.t("backup.wizard.full_detail"),
+            BackupLevel::IdentityOnly => self.t("backup.wizard.identity_only_detail"),
         };
         let toggle_label = match self.level {
-            BackupLevel::Full => "Full backup (recommended)",
-            BackupLevel::IdentityOnly => "Identity only",
+            BackupLevel::Full => self.t("backup.wizard.level_full"),
+            BackupLevel::IdentityOnly => self.t("backup.wizard.level_identity_only"),
         };
         ScreenModel {
             screen_id: "backup_choose".into(),
-            title: "Backup & Recovery".into(),
+            title: self.t("backup.wizard.title"),
             subtitle: None,
             components: vec![
                 Component::InfoPanel {
                     id: "backup_info".into(),
                     icon: Some("backup".into()),
-                    title: "Protect your data".into(),
+                    title: self.t("backup.wizard.protect_title"),
                     items: vec![InfoItem {
                         icon: None,
-                        title: "Backup".into(),
-                        detail: detail.into(),
+                        title: self.t("backup.wizard.backup_item"),
+                        detail,
                     }],
                     a11y: None,
                 },
                 Component::ToggleList {
                     id: "backup_level".into(),
-                    label: "Backup level".into(),
+                    label: self.t("backup.wizard.level_label"),
                     items: vec![ToggleItem {
                         id: "level_toggle".into(),
-                        label: toggle_label.into(),
+                        label: toggle_label,
                         selected: self.level == BackupLevel::Full,
                         subtitle: None,
                         a11y: Some(A11y {
-                            label: Some("Backup level toggle".into()),
-                            hint: Some(
-                                "When on, backs up everything. When off, backs up identity only."
-                                    .into(),
-                            ),
+                            label: Some(self.t("backup.wizard.level_a11y")),
+                            hint: Some(self.t("backup.wizard.level_a11y_hint")),
                             role: Some(AccessibilityRole::Toggle),
                         }),
                         info_key: None,
@@ -202,14 +205,14 @@ impl BackupRecoveryEngine {
             actions: vec![
                 ScreenAction {
                     id: "create".into(),
-                    label: "Create Backup".into(),
+                    label: self.t("backup.wizard.create"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "restore".into(),
-                    label: "Restore Backup".into(),
+                    label: self.t("backup.wizard.restore"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -222,8 +225,8 @@ impl BackupRecoveryEngine {
 
     fn password_screen(&self) -> ScreenModel {
         let label = match self.mode {
-            BackupMode::Create => "Choose a backup password",
-            BackupMode::Restore => "Enter your backup password",
+            BackupMode::Create => self.t("backup.wizard.choose_password"),
+            BackupMode::Restore => self.t("backup.wizard.enter_password"),
         };
         let mut components = Vec::new();
         // Restore needs the backup blob. Offer a paste field (keyboard
@@ -232,15 +235,15 @@ impl BackupRecoveryEngine {
         if matches!(self.mode, BackupMode::Restore) {
             components.push(Component::TextInput {
                 id: "backup_data".into(),
-                label: "Paste your backup".into(),
+                label: self.t("backup.wizard.paste_label"),
                 value: self.restore_data.clone(),
-                placeholder: Some("Paste the backup text you saved".into()),
+                placeholder: Some(self.t("backup.wizard.paste_placeholder")),
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Text,
                 a11y: Some(A11y {
-                    label: Some("Backup data input".into()),
-                    hint: Some("Paste the encrypted backup you exported earlier.".into()),
+                    label: Some(self.t("backup.wizard.paste_a11y")),
+                    hint: Some(self.t("backup.wizard.paste_a11y_hint")),
                     role: Some(AccessibilityRole::TextField),
                 }),
                 info_key: None,
@@ -250,14 +253,18 @@ impl BackupRecoveryEngine {
         // model value rather than holding their own buffer) keep the input.
         components.push(Component::TextInput {
             id: "password".into(),
-            label: label.into(),
+            label: label.clone(),
             value: self.password.clone(),
             placeholder: None,
             max_length: None,
             validation_error: None,
             input_type: InputType::Password,
             a11y: Some(A11y {
-                label: Some(format!("{} input", label)),
+                label: Some(get_string_with_args(
+                    self.locale,
+                    "backup.wizard.password_a11y",
+                    &[("label", &label)],
+                )),
                 hint: None,
                 role: Some(AccessibilityRole::TextField),
             }),
@@ -265,20 +272,20 @@ impl BackupRecoveryEngine {
         });
         ScreenModel {
             screen_id: "backup_password".into(),
-            title: "Backup Password".into(),
+            title: self.t("backup.wizard.password_title"),
             subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "continue".into(),
-                    label: "Continue".into(),
+                    label: self.t("action.continue"),
                     style: ActionStyle::Primary,
                     enabled: !self.password.is_empty(),
                     a11y: None,
@@ -292,21 +299,17 @@ impl BackupRecoveryEngine {
     fn confirm_replace_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "backup_confirm_replace".into(),
-            title: "Replace Identity?".into(),
+            title: self.t("backup.replace_confirm"),
             subtitle: None,
             components: vec![Component::InlineConfirm {
                 id: "replace".into(),
-                warning: "This will permanently replace your current identity and all contacts."
-                    .into(),
-                confirm_text: "Replace".into(),
-                cancel_text: "Cancel".into(),
+                warning: self.t("backup.wizard.replace_warning"),
+                confirm_text: self.t("backup.replace_button"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: Some(A11y {
-                    label: Some("Confirm replace identity".into()),
-                    hint: Some(
-                        "This will permanently replace your current identity and all contacts."
-                            .into(),
-                    ),
+                    label: Some(self.t("backup.wizard.replace_a11y")),
+                    hint: Some(self.t("backup.wizard.replace_warning")),
                     role: Some(AccessibilityRole::Alert),
                 }),
             }],
@@ -319,18 +322,22 @@ impl BackupRecoveryEngine {
     fn confirm_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "backup_confirm".into(),
-            title: "Confirm Password".into(),
+            title: self.t("backup.confirm_password"),
             subtitle: None,
             components: vec![Component::TextInput {
                 id: "confirm_password".into(),
-                label: "Confirm your backup password".into(),
+                label: self.t("backup.wizard.confirm_label"),
                 value: self.confirm_password.clone(),
                 placeholder: None,
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Password,
                 a11y: Some(A11y {
-                    label: Some("Confirm your backup password input".into()),
+                    label: Some(get_string_with_args(
+                        self.locale,
+                        "backup.wizard.password_a11y",
+                        &[("label", &self.t("backup.wizard.confirm_label"))],
+                    )),
                     hint: None,
                     role: Some(AccessibilityRole::TextField),
                 }),
@@ -339,14 +346,14 @@ impl BackupRecoveryEngine {
             actions: vec![
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "continue".into(),
-                    label: "Continue".into(),
+                    label: self.t("action.continue"),
                     style: ActionStyle::Primary,
                     enabled: !self.confirm_password.is_empty(),
                     a11y: None,
@@ -360,29 +367,31 @@ impl BackupRecoveryEngine {
     fn processing_screen(&self) -> ScreenModel {
         let (title, detail) = match self.mode {
             BackupMode::Create => (
-                "Creating backup…",
-                "Securing your data with a strong encryption key. \
-                 This may take a few seconds on older devices.",
+                self.t("backup.wizard.creating_title"),
+                self.t("backup.wizard.creating_detail"),
             ),
             BackupMode::Restore => (
-                "Restoring backup…",
-                "Decrypting your backup. \
-                 This may take a few seconds on older devices.",
+                self.t("backup.wizard.restoring_title"),
+                self.t("backup.wizard.restoring_detail"),
             ),
         };
         ScreenModel {
             screen_id: "backup_processing".into(),
-            title: title.into(),
+            title: title.clone(),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "processing_status".into(),
                 icon: None,
-                title: title.into(),
-                detail: Some(detail.into()),
+                title: title.clone(),
+                detail: Some(detail.clone()),
                 status: Status::InProgress,
                 a11y: Some(A11y {
-                    label: Some(format!("{} status", title)),
-                    hint: Some(detail.into()),
+                    label: Some(get_string_with_args(
+                        self.locale,
+                        "backup.wizard.status_a11y",
+                        &[("title", &title)],
+                    )),
+                    hint: Some(detail),
                     role: None,
                 }),
             }],
@@ -394,28 +403,32 @@ impl BackupRecoveryEngine {
 
     fn complete_screen(&self) -> ScreenModel {
         let title = match self.mode {
-            BackupMode::Create => "Backup Created",
-            BackupMode::Restore => "Backup Restored",
+            BackupMode::Create => self.t("backup.wizard.created_title"),
+            BackupMode::Restore => self.t("backup.wizard.restored_title"),
         };
         ScreenModel {
             screen_id: "backup_complete".into(),
-            title: title.into(),
+            title: title.clone(),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "complete_status".into(),
                 icon: None,
-                title: title.into(),
+                title: title.clone(),
                 detail: None,
                 status: Status::Success,
                 a11y: Some(A11y {
-                    label: Some(format!("{} status", title)),
-                    hint: Some("Your backup operation completed successfully.".into()),
+                    label: Some(get_string_with_args(
+                        self.locale,
+                        "backup.wizard.status_a11y",
+                        &[("title", &title)],
+                    )),
+                    hint: Some(self.t("backup.wizard.complete_hint")),
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: "done".into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -427,36 +440,40 @@ impl BackupRecoveryEngine {
 
     fn failed_screen(&self) -> ScreenModel {
         let title = match self.mode {
-            BackupMode::Create => "Backup Failed",
-            BackupMode::Restore => "Restore Failed",
+            BackupMode::Create => self.t("backup.wizard.create_failed_title"),
+            BackupMode::Restore => self.t("backup.wizard.restore_failed_title"),
         };
         ScreenModel {
             screen_id: "backup_failed".into(),
-            title: title.into(),
+            title: title.clone(),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "failed_status".into(),
                 icon: None,
-                title: title.into(),
+                title: title.clone(),
                 detail: None,
                 status: Status::Failed,
                 a11y: Some(A11y {
-                    label: Some(format!("{} status", title)),
-                    hint: Some("The backup operation failed. You may retry or cancel.".into()),
+                    label: Some(get_string_with_args(
+                        self.locale,
+                        "backup.wizard.status_a11y",
+                        &[("title", &title)],
+                    )),
+                    hint: Some(self.t("backup.wizard.failed_hint")),
                     role: None,
                 }),
             }],
             actions: vec![
                 ScreenAction {
                     id: "retry".into(),
-                    label: "Retry".into(),
+                    label: self.t("action.retry"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -550,13 +567,13 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 if self.password.is_empty() {
                     return ActionResult::ValidationError {
                         component_id: "password".into(),
-                        message: "Password is required".into(),
+                        message: self.t("backup.error_enter_password"),
                     };
                 }
                 if matches!(self.mode, BackupMode::Restore) && self.restore_data.trim().is_empty() {
                     return ActionResult::ValidationError {
                         component_id: "backup_data".into(),
-                        message: "Paste your backup to restore".into(),
+                        message: self.t("backup.error_paste_data"),
                     };
                 }
                 match self.mode {
@@ -611,7 +628,7 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 if self.confirm_password != self.password {
                     return ActionResult::ValidationError {
                         component_id: "confirm_password".into(),
-                        message: "Passwords do not match".into(),
+                        message: self.t("backup.error_passwords_mismatch"),
                     };
                 }
                 self.step = BackupStep::Processing;

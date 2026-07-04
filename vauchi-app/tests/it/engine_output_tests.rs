@@ -59,7 +59,11 @@ fn emergency_broadcast_output_snapshots_empty_plan() {
 #[test]
 fn backup_output_redacts_password_in_debug() {
     use vauchi_app::ui::{BackupMode, BackupRecoveryEngine};
-    let engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), true);
+    let engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Restore),
+        true,
+        vauchi_app::i18n::Locale::English,
+    );
 
     let output = engine.engine_output().expect("backup engine output");
     let EngineOutput::Backup(ref snap) = output else {
@@ -225,13 +229,16 @@ fn change_password_output_redacts_both_credentials() {
 #[test]
 fn duress_pin_output_redacts_pin_in_debug() {
     use vauchi_app::ui::{DuressConfig, DuressPinEngine};
-    let engine = DuressPinEngine::new(DuressConfig {
-        enabled: true,
-        available_contacts: vec![],
-        selected_contact_ids: vec![],
-        alert_message: "help".into(),
-        include_location: true,
-    });
+    let engine = DuressPinEngine::new(
+        DuressConfig {
+            enabled: true,
+            available_contacts: vec![],
+            selected_contact_ids: vec![],
+            alert_message: "help".into(),
+            include_location: true,
+        },
+        vauchi_app::i18n::Locale::English,
+    );
 
     let output = engine.engine_output().expect("duress output");
     let EngineOutput::DuressPin(ref setup) = output else {

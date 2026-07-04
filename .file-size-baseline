@@ -452,7 +452,9 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 # (+6 2026-07-04: M3 S3a — EmergencyShred factory arm resolves Locale from
 #  the frontend-pushed RenderContext (ADR-047 seam), multi-line builder call.)
 # (+8 2026-07-04: M3 S3b — same Locale resolution in the Gdpr factory arm.)
-vauchi-app/src/ui/app_engine/screens.rs 943
+# (+15 2026-07-04: M3 S3c/d — same Locale resolution in the DuressPin and
+#  Backup factory arms.)
+vauchi-app/src/ui/app_engine/screens.rs 958
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

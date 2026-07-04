@@ -302,14 +302,14 @@ fn device_linking_fixture_is_fresh() {
 // @internal
 #[test]
 fn backup_choose_fixture_is_fresh() {
-    let engine = BackupRecoveryEngine::new(None, false);
+    let engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
     assert_fixture_fresh(&engine.current_screen(), "backup_choose.json");
 }
 
 // @internal
 #[test]
 fn duress_overview_fixture_is_fresh() {
-    let engine = DuressPinEngine::new(sample_duress_config());
+    let engine = DuressPinEngine::new(sample_duress_config(), vauchi_app::i18n::Locale::English);
     assert_fixture_fresh(&engine.current_screen(), "duress_overview.json");
 }
 
@@ -495,11 +495,13 @@ fn regenerate_all_engine_fixtures() {
         ),
         (
             "backup_choose.json",
-            BackupRecoveryEngine::new(None, false).current_screen(),
+            BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English)
+                .current_screen(),
         ),
         (
             "duress_overview.json",
-            DuressPinEngine::new(sample_duress_config()).current_screen(),
+            DuressPinEngine::new(sample_duress_config(), vauchi_app::i18n::Locale::English)
+                .current_screen(),
         ),
         (
             "emergency_shred.json",

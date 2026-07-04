@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Duress PIN engine — configure a duress PIN that triggers silent alerts.
+//! Copy resolves through `i18n::get_string` in the locale threaded at
+//! construction (M3 S3c of `2026-07-03-core-screens-bypass-i18n`); keys
+//! live in the `resistance.duress.*` + shared `action.*` families.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
@@ -30,6 +34,7 @@ pub struct DuressPinEngine {
     new_pin: String,
     confirm_pin: String,
     pending_disable: bool,
+    locale: Locale,
 }
 
 impl Drop for DuressPinEngine {
@@ -48,14 +53,19 @@ enum DuressPinStep {
 }
 
 impl DuressPinEngine {
-    pub fn new(config: DuressConfig) -> Self {
+    pub fn new(config: DuressConfig, locale: Locale) -> Self {
         Self {
             step: DuressPinStep::Overview,
             config,
             new_pin: String::new(),
             confirm_pin: String::new(),
             pending_disable: false,
+            locale,
         }
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     pub fn config(&self) -> &DuressConfig {
@@ -86,13 +96,11 @@ impl DuressPinEngine {
             Component::InfoPanel {
                 id: "duress_info".into(),
                 icon: Some("shield".into()),
-                title: "Duress PIN".into(),
+                title: self.t("resistance.duress.pin_label"),
                 items: vec![InfoItem {
                     icon: Some("info".into()),
-                    title: "What is a Duress PIN?".into(),
-                    detail: "A secondary PIN that, when entered, silently alerts \
-                             your chosen contacts while appearing to unlock normally."
-                        .into(),
+                    title: self.t("resistance.duress.what_is_title"),
+                    detail: self.t("resistance.duress.what_is_detail"),
                 }],
                 a11y: None,
             },
@@ -107,9 +115,9 @@ impl DuressPinEngine {
                     .into(),
                 ),
                 title: if self.config.enabled {
-                    "Duress PIN enabled".into()
+                    self.t("resistance.duress.enabled")
                 } else {
-                    "Duress PIN not set up".into()
+                    self.t("resistance.duress.not_set_up")
                 },
                 detail: None,
                 status: if self.config.enabled {
@@ -124,9 +132,9 @@ impl DuressPinEngine {
         let mut actions = vec![ScreenAction {
             id: "configure".into(),
             label: if self.config.enabled {
-                "Change PIN".into()
+                self.t("resistance.duress.change_pin")
             } else {
-                "Set Up PIN".into()
+                self.t("resistance.duress.set_up_pin")
             },
             style: ActionStyle::Primary,
             enabled: true,
@@ -136,7 +144,7 @@ impl DuressPinEngine {
         if self.config.enabled {
             actions.push(ScreenAction {
                 id: "disable".into(),
-                label: "Disable".into(),
+                label: self.t("resistance.duress.disable_button"),
                 style: ActionStyle::Destructive,
                 enabled: true,
                 a11y: None,
@@ -146,13 +154,13 @@ impl DuressPinEngine {
         if self.pending_disable {
             components.push(Component::InlineConfirm {
                 id: "disable".into(),
-                warning: "Disabling the duress PIN removes protection. Alert contacts will no longer be notified.".into(),
-                confirm_text: "Disable".into(),
-                cancel_text: "Cancel".into(),
+                warning: self.t("resistance.duress.disable_warning"),
+                confirm_text: self.t("resistance.duress.disable_button"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: Some(A11y {
-                    label: Some("Confirm disable duress PIN".into()),
-                    hint: Some("Disabling removes silent alert protection for your contacts.".into()),
+                    label: Some(self.t("resistance.duress.disable_a11y")),
+                    hint: Some(self.t("resistance.duress.disable_a11y_hint")),
                     role: Some(AccessibilityRole::Alert),
                 }),
             });
@@ -160,7 +168,7 @@ impl DuressPinEngine {
 
         ScreenModel {
             screen_id: "duress_overview".into(),
-            title: "Duress PIN".into(),
+            title: self.t("resistance.duress.pin_label"),
             subtitle: None,
             components,
             actions,
@@ -172,35 +180,32 @@ impl DuressPinEngine {
     fn enter_pin_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "duress_enter_pin".into(),
-            title: "Set Duress PIN".into(),
+            title: self.t("resistance.duress.setup"),
             subtitle: None,
             components: vec![Component::PinInput {
                 id: "pin".into(),
-                label: "Enter Duress PIN".into(),
+                label: self.t("resistance.duress.enter_pin"),
                 length: PIN_LENGTH,
                 filled: self.new_pin.len(),
                 masked: true,
                 validation_error: None,
                 a11y: Some(A11y {
-                    label: Some("Enter duress PIN".into()),
-                    hint: Some(
-                        "Enter a 6-digit PIN that will silently alert your contacts when used."
-                            .into(),
-                    ),
+                    label: Some(self.t("resistance.duress.enter_pin")),
+                    hint: Some(self.t("resistance.duress.enter_hint")),
                     role: None,
                 }),
             }],
             actions: vec![
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "continue".into(),
-                    label: "Continue".into(),
+                    label: self.t("action.continue"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
@@ -214,32 +219,32 @@ impl DuressPinEngine {
     fn confirm_pin_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "duress_confirm_pin".into(),
-            title: "Confirm Duress PIN".into(),
+            title: self.t("resistance.duress.confirm_pin"),
             subtitle: None,
             components: vec![Component::PinInput {
                 id: "confirm_pin".into(),
-                label: "Confirm Duress PIN".into(),
+                label: self.t("resistance.duress.confirm_pin"),
                 length: PIN_LENGTH,
                 filled: self.confirm_pin.len(),
                 masked: true,
                 validation_error: None,
                 a11y: Some(A11y {
-                    label: Some("Confirm duress PIN".into()),
-                    hint: Some("Re-enter the same 6-digit duress PIN to confirm.".into()),
+                    label: Some(self.t("resistance.duress.confirm_pin")),
+                    hint: Some(self.t("resistance.duress.confirm_hint")),
                     role: None,
                 }),
             }],
             actions: vec![
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "continue".into(),
-                    label: "Continue".into(),
+                    label: self.t("action.continue"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
@@ -253,12 +258,12 @@ impl DuressPinEngine {
     fn alerts_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "duress_alerts".into(),
-            title: "Configure Alerts".into(),
+            title: self.t("resistance.duress.configure_alerts"),
             subtitle: None,
             components: vec![
                 Component::ToggleList {
                     id: "recipients".into(),
-                    label: "Alert Recipients".into(),
+                    label: self.t("resistance.duress.setup.alert_recipients"),
                     items: self
                         .config
                         .available_contacts
@@ -276,27 +281,27 @@ impl DuressPinEngine {
                 },
                 Component::TextInput {
                     id: "alert_message".into(),
-                    label: "Alert Message".into(),
+                    label: self.t("resistance.duress.alert_message"),
                     value: self.config.alert_message.clone(),
-                    placeholder: Some("Message to send when duress PIN is used".into()),
+                    placeholder: Some(self.t("resistance.duress.message_placeholder")),
                     max_length: None,
                     validation_error: None,
                     input_type: InputType::Text,
                     a11y: Some(A11y {
-                        label: Some("Alert message input".into()),
-                        hint: Some("Message to send when duress PIN is used".into()),
+                        label: Some(self.t("resistance.duress.message_a11y")),
+                        hint: Some(self.t("resistance.duress.message_placeholder")),
                         role: Some(AccessibilityRole::TextField),
                     }),
                     info_key: None,
                 },
                 Component::ToggleList {
                     id: "alerts".into(),
-                    label: "Options".into(),
+                    label: self.t("resistance.duress.options"),
                     items: vec![ToggleItem {
                         id: "include_location".into(),
-                        label: "Include Location".into(),
+                        label: self.t("resistance.duress.setup.include_location"),
                         selected: self.config.include_location,
-                        subtitle: Some("Share your location in the alert".into()),
+                        subtitle: Some(self.t("resistance.duress.include_location_desc")),
                         a11y: None,
                         info_key: None,
                     }],
@@ -306,14 +311,14 @@ impl DuressPinEngine {
             actions: vec![
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "save".into(),
-                    label: "Save".into(),
+                    label: self.t("action.save"),
                     style: ActionStyle::Primary,
                     // A duress alert with no recipient reaches nobody — require ≥1.
                     enabled: !self.config.selected_contact_ids.is_empty(),
@@ -405,7 +410,7 @@ impl WorkflowEngine for DuressPinEngine {
                 if self.new_pin.is_empty() {
                     ActionResult::ValidationError {
                         component_id: "pin".into(),
-                        message: "Please enter a PIN".into(),
+                        message: self.t("resistance.duress.error_empty"),
                     }
                 } else {
                     self.step = DuressPinStep::ConfirmPin;
@@ -444,7 +449,7 @@ impl WorkflowEngine for DuressPinEngine {
                 if self.confirm_pin != self.new_pin {
                     ActionResult::ValidationError {
                         component_id: "confirm_pin".into(),
-                        message: "PINs do not match".into(),
+                        message: self.t("resistance.duress.error_mismatch"),
                     }
                 } else {
                     self.step = DuressPinStep::ConfigureAlerts;

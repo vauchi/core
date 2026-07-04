@@ -272,7 +272,15 @@ impl AppEngine {
                 glance_qr,
             ),
             AppScreen::Help => Box::new(HelpEngine::new(help_catalog::default_help_items())),
-            AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None, vauchi.has_identity())),
+            AppScreen::Backup => Box::new(BackupRecoveryEngine::new(
+                None,
+                vauchi.has_identity(),
+                render_context
+                    .locale
+                    .as_deref()
+                    .and_then(crate::i18n::Locale::from_code)
+                    .unwrap_or_default(),
+            )),
             AppScreen::Lock => Box::new(LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)),
             AppScreen::DeviceLinking => {
                 let qr_data = vauchi
@@ -310,13 +318,20 @@ impl AppEngine {
                         ),
                         None => (false, Vec::new(), String::new(), false),
                     };
-                Box::new(DuressPinEngine::new(DuressConfig {
-                    enabled,
-                    available_contacts,
-                    selected_contact_ids,
-                    alert_message,
-                    include_location,
-                }))
+                Box::new(DuressPinEngine::new(
+                    DuressConfig {
+                        enabled,
+                        available_contacts,
+                        selected_contact_ids,
+                        alert_message,
+                        include_location,
+                    },
+                    render_context
+                        .locale
+                        .as_deref()
+                        .and_then(crate::i18n::Locale::from_code)
+                        .unwrap_or_default(),
+                ))
             }
             AppScreen::DecoyContacts => {
                 let decoys: Vec<DecoyContactItem> = vauchi

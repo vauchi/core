@@ -176,25 +176,28 @@ fn make_device_linking() -> DeviceLinkingEngine {
 }
 
 fn make_backup(mode: Option<BackupMode>) -> BackupRecoveryEngine {
-    BackupRecoveryEngine::new(mode, false)
+    BackupRecoveryEngine::new(mode, false, vauchi_app::i18n::Locale::English)
 }
 
 fn make_duress() -> DuressPinEngine {
-    DuressPinEngine::new(DuressConfig {
-        enabled: false,
-        available_contacts: vec![Item {
-            id: "c1".into(),
-            name: "Contact".into(),
-            subtitle: None,
-            avatar_initials: "C".into(),
-            status: None,
-            actions: vec![],
-            a11y: None,
-        }],
-        selected_contact_ids: vec![],
-        alert_message: String::new(),
-        include_location: false,
-    })
+    DuressPinEngine::new(
+        DuressConfig {
+            enabled: false,
+            available_contacts: vec![Item {
+                id: "c1".into(),
+                name: "Contact".into(),
+                subtitle: None,
+                avatar_initials: "C".into(),
+                status: None,
+                actions: vec![],
+                a11y: None,
+            }],
+            selected_contact_ids: vec![],
+            alert_message: String::new(),
+            include_location: false,
+        },
+        vauchi_app::i18n::Locale::English,
+    )
 }
 
 fn make_shred() -> EmergencyShredEngine {

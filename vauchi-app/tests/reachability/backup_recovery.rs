@@ -61,7 +61,7 @@ fn factory() -> BackupRecoveryEngine {
     // identical either way (both gated behind the password), but
     // pinning the identity-present construction documents the
     // realistic post-onboarding entry state.
-    BackupRecoveryEngine::new(None, true)
+    BackupRecoveryEngine::new(None, true, vauchi_app::i18n::Locale::English)
 }
 
 // @internal

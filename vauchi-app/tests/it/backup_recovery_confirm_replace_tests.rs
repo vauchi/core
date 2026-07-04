@@ -24,7 +24,11 @@ fn enter_password(engine: &mut BackupRecoveryEngine) {
 // @internal
 #[test]
 fn restore_with_identity_shows_confirm_replace() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), true);
+    let mut engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Restore),
+        true,
+        vauchi_app::i18n::Locale::English,
+    );
     enter_password(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -44,7 +48,11 @@ fn restore_with_identity_shows_confirm_replace() {
 // @internal
 #[test]
 fn restore_without_identity_skips_confirm_replace() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), false);
+    let mut engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Restore),
+        false,
+        vauchi_app::i18n::Locale::English,
+    );
     enter_password(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -59,7 +67,11 @@ fn restore_without_identity_skips_confirm_replace() {
 // @internal
 #[test]
 fn confirm_replace_proceeds_to_processing() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), true);
+    let mut engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Restore),
+        true,
+        vauchi_app::i18n::Locale::English,
+    );
     enter_password(&mut engine);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -77,7 +89,11 @@ fn confirm_replace_proceeds_to_processing() {
 // @internal
 #[test]
 fn cancel_replace_returns_to_password() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), true);
+    let mut engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Restore),
+        true,
+        vauchi_app::i18n::Locale::English,
+    );
     enter_password(&mut engine);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -96,7 +112,11 @@ fn cancel_replace_returns_to_password() {
 #[test]
 fn create_backup_flow_unaffected_by_has_identity() {
     // Create flow should be identical regardless of has_identity
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), true);
+    let mut engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Create),
+        true,
+        vauchi_app::i18n::Locale::English,
+    );
     enter_password(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),

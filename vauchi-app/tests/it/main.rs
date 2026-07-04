@@ -38,6 +38,7 @@ mod device_link_bridge_tests;
 mod direct_transport_app_engine_tests;
 mod display_hint_tests;
 mod drain_notifications_tests;
+mod duress_backup_i18n_tests;
 mod engine_output_tests;
 mod engine_update_tests;
 mod exchange_ble_invariants_proptest;

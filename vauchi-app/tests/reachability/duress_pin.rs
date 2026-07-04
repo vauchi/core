@@ -38,13 +38,16 @@ fn factory() -> DuressPinEngine {
     // `enabled = true` so the `Overview` step renders the `disable`
     // affordance (it is hidden when duress is off). Empty alert
     // config — the alerts step still renders `save` / `back`.
-    DuressPinEngine::new(DuressConfig {
-        enabled: true,
-        available_contacts: Vec::new(),
-        selected_contact_ids: Vec::new(),
-        alert_message: String::new(),
-        include_location: false,
-    })
+    DuressPinEngine::new(
+        DuressConfig {
+            enabled: true,
+            available_contacts: Vec::new(),
+            selected_contact_ids: Vec::new(),
+            alert_message: String::new(),
+            include_location: false,
+        },
+        vauchi_app::i18n::Locale::English,
+    )
 }
 
 // @internal

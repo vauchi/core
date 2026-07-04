@@ -64,7 +64,15 @@ impl AppEngine {
         glance_qr: Option<&str>,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
-            AppScreen::Onboarding => Box::new(OnboardingEngine::new().with_help_icons(true)),
+            AppScreen::Onboarding => Box::new(
+                OnboardingEngine::new().with_help_icons(true).with_locale(
+                    render_context
+                        .locale
+                        .as_deref()
+                        .and_then(crate::i18n::Locale::from_code)
+                        .unwrap_or_default(),
+                ),
+            ),
             AppScreen::MyInfo => {
                 // If a preview-as contact is active, build in PreviewAs view mode.
                 if let Some(contact_id) = preview_as {

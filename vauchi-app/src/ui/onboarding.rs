@@ -6,7 +6,12 @@
 //! onboarding flow (2 pre-gate + 4 main).  No Storage or Vauchi
 //! dependency; the caller persists results when [`ActionResult::Complete`]
 //! is returned.
+//! Copy resolves through `i18n::get_string` in the locale set via
+//! [`OnboardingEngine::with_locale`] (M3 S4a of
+//! `2026-07-03-core-screens-bypass-i18n`); keys are the live-copy flat
+//! `onboarding.*` family + shared `action.*` / `field_type.*`.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::contact::labels::SUGGESTED_LABELS;
 use vauchi_core::types::OnboardingStep as Step;
@@ -73,6 +78,7 @@ pub struct OnboardingEngine {
     /// Password the user typed on the BackupPasswordEntry screen.
     /// Used in concert with `pending_backup_bytes` at submit time.
     pending_backup_password: String,
+    locale: Locale,
 }
 
 impl Default for OnboardingEngine {
@@ -111,7 +117,19 @@ impl OnboardingEngine {
             show_help_icons: false,
             pending_backup_bytes: None,
             pending_backup_password: String::new(),
+            locale: Locale::English,
         }
+    }
+
+    /// Sets the render locale (defaults to English). Threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory.
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Stores the picked backup bytes and transitions the wizard to
@@ -171,8 +189,8 @@ impl OnboardingEngine {
     fn build_identity_check(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "identity_check".into(),
-            title: "Welcome to Vauchi".into(),
-            subtitle: Some("Privacy-focused contact cards.".into()),
+            title: self.t("onboarding.welcome_title"),
+            subtitle: Some(self.t("onboarding.welcome_subtitle")),
             components: vec![Component::InfoPanel {
                 id: "identity_check_info".into(),
                 icon: None,
@@ -180,18 +198,17 @@ impl OnboardingEngine {
                 items: vec![
                     InfoItem {
                         icon: Some("lock".into()),
-                        title: "Private by design".into(),
-                        detail: "Your data is end-to-end encrypted and never leaves your control."
-                            .into(),
+                        title: self.t("onboarding.welcome_private_title"),
+                        detail: self.t("onboarding.welcome_private_desc"),
                     },
                     InfoItem {
                         icon: Some("devices".into()),
-                        title: "Multi-device".into(),
-                        detail: "Use Vauchi on all your devices with seamless sync.".into(),
+                        title: self.t("onboarding.welcome_multidevice_title"),
+                        detail: self.t("onboarding.welcome_multidevice_desc"),
                     },
                 ],
                 a11y: Some(A11y {
-                    label: Some("Welcome to Vauchi".into()),
+                    label: Some(self.t("onboarding.welcome_title")),
                     hint: None,
                     role: Some(AccessibilityRole::Heading),
                 }),
@@ -199,14 +216,14 @@ impl OnboardingEngine {
             actions: vec![
                 ScreenAction {
                     id: "create_new".into(),
-                    label: "Create new identity".into(),
+                    label: self.t("onboarding.create_identity"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "have_identity".into(),
-                    label: "I already have an identity".into(),
+                    label: self.t("onboarding.have_identity"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -220,8 +237,8 @@ impl OnboardingEngine {
     fn build_link_choice(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "link_choice".into(),
-            title: "Restore your identity".into(),
-            subtitle: Some("Choose how to restore your existing identity.".into()),
+            title: self.t("onboarding.restore_title"),
+            subtitle: Some(self.t("onboarding.restore_subtitle")),
             components: vec![Component::InfoPanel {
                 id: "link_choice_info".into(),
                 icon: None,
@@ -229,24 +246,22 @@ impl OnboardingEngine {
                 items: vec![
                     InfoItem {
                         icon: Some("devices".into()),
-                        title: "Transfer from another device".into(),
-                        detail: "Move all contacts and data from your old device via QR code."
-                            .into(),
+                        title: self.t("onboarding.restore_transfer_title"),
+                        detail: self.t("onboarding.restore_transfer_desc"),
                     },
                     InfoItem {
                         icon: Some("link".into()),
-                        title: "Link from another device".into(),
-                        detail: "Scan a QR code on your other device to link this one.".into(),
+                        title: self.t("onboarding.restore_link_title"),
+                        detail: self.t("onboarding.restore_link_desc"),
                     },
                     InfoItem {
                         icon: Some("backup".into()),
-                        title: "Restore from backup".into(),
-                        detail: "Restore your identity, contacts, and card from an encrypted backup file."
-                            .into(),
+                        title: self.t("onboarding.restore_backup_title"),
+                        detail: self.t("onboarding.restore_backup_desc"),
                     },
                 ],
                 a11y: Some(A11y {
-                    label: Some("Restore your identity".into()),
+                    label: Some(self.t("onboarding.restore_title")),
                     hint: None,
                     role: Some(AccessibilityRole::Heading),
                 }),
@@ -254,28 +269,28 @@ impl OnboardingEngine {
             actions: vec![
                 ScreenAction {
                     id: "transfer_device".into(),
-                    label: "Transfer from another device".into(),
+                    label: self.t("onboarding.restore_transfer_title"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "link_device".into(),
-                    label: "Link from another device".into(),
+                    label: self.t("onboarding.restore_link_title"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "restore_backup".into(),
-                    label: "Restore from backup".into(),
+                    label: self.t("onboarding.restore_backup_title"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -294,13 +309,13 @@ impl OnboardingEngine {
         let password_filled = !self.pending_backup_password.is_empty();
         ScreenModel {
             screen_id: "backup_password_entry".into(),
-            title: "Enter backup password".into(),
-            subtitle: Some("The password you set when you exported the backup.".into()),
+            title: self.t("onboarding.backup_password_title"),
+            subtitle: Some(self.t("onboarding.backup_password_subtitle")),
             components: vec![Component::TextInput {
                 id: "backup_password".into(),
-                label: "Password".into(),
+                label: self.t("backup.password"),
                 value: String::new(),
-                placeholder: Some("Backup password".into()),
+                placeholder: Some(self.t("onboarding.backup_password_placeholder")),
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Password,
@@ -310,14 +325,14 @@ impl OnboardingEngine {
             actions: vec![
                 ScreenAction {
                     id: "submit_backup_password".into(),
-                    label: "Restore".into(),
+                    label: self.t("onboarding.restore_button"),
                     style: ActionStyle::Primary,
                     enabled: password_filled,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -332,25 +347,25 @@ impl OnboardingEngine {
         let name_filled = !self.data.display_name.trim().is_empty();
         ScreenModel {
             screen_id: "default_name".into(),
-            title: "What's your name?".into(),
-            subtitle: Some("How you appear to contacts".into()),
+            title: self.t("onboarding.name_title"),
+            subtitle: Some(self.t("onboarding.name_subtitle")),
             components: vec![
                 Component::Text {
                     id: "name_instruction".into(),
-                    content: "Enter the name you'd like to show on your contact card.".into(),
+                    content: self.t("onboarding.name_instruction"),
                     style: TextStyle::Body,
                 },
                 Component::TextInput {
                     id: "display_name".into(),
-                    label: "Display name".into(),
+                    label: self.t("onboarding.name_label"),
                     value: self.data.display_name.clone(),
-                    placeholder: Some("Enter your name".into()),
+                    placeholder: Some(self.t("onboarding.name_placeholder")),
                     max_length: Some(100),
                     validation_error: None,
                     input_type: InputType::Text,
                     a11y: Some(A11y {
-                        label: Some("Display name input".into()),
-                        hint: Some("Enter the name others will see on your contact card".into()),
+                        label: Some(self.t("onboarding.name_a11y")),
+                        hint: Some(self.t("onboarding.name_a11y_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -358,7 +373,7 @@ impl OnboardingEngine {
             ],
             actions: vec![ScreenAction {
                 id: "continue".into(),
-                label: "Continue".into(),
+                label: self.t("action.continue"),
                 style: ActionStyle::Primary,
                 enabled: name_filled,
                 a11y: None,
@@ -388,12 +403,12 @@ impl OnboardingEngine {
                         "{}, {}",
                         g.name,
                         if g.selected {
-                            "selected"
+                            self.t("onboarding.a11y_selected")
                         } else {
-                            "not selected"
+                            self.t("onboarding.a11y_not_selected")
                         }
                     )),
-                    hint: Some("Double tap to toggle".into()),
+                    hint: Some(self.t("onboarding.a11y_toggle_hint")),
                     role: Some(AccessibilityRole::Toggle),
                 }),
                 info_key: groups_info_key.clone(),
@@ -402,37 +417,35 @@ impl OnboardingEngine {
 
         ScreenModel {
             screen_id: "groups_setup".into(),
-            title: "Choose your groups".into(),
-            subtitle: Some("Organize who sees what".into()),
+            title: self.t("onboarding.groups_title"),
+            subtitle: Some(self.t("onboarding.groups_subtitle")),
             components: vec![
                 Component::Text {
                     id: "groups_recommendation".into(),
-                    content: "Groups are optional, but we strongly recommend them. \
-                              They let you control exactly who sees what on your card."
-                        .into(),
+                    content: self.t("onboarding.groups_recommendation"),
                     style: TextStyle::Body,
                 },
                 Component::ToggleList {
                     id: "groups".into(),
-                    label: "Suggested groups".into(),
+                    label: self.t("onboarding.groups_suggested"),
                     items,
                     a11y: Some(A11y {
-                        label: Some("Suggested groups options".into()),
-                        hint: Some("Select items to include".into()),
+                        label: Some(self.t("onboarding.groups_suggested_a11y")),
+                        hint: Some(self.t("onboarding.groups_suggested_a11y_hint")),
                         role: None,
                     }),
                 },
                 Component::TextInput {
                     id: "custom_group".into(),
-                    label: "Add a custom group".into(),
+                    label: self.t("onboarding.groups_custom_label"),
                     value: self.custom_group_input.clone(),
-                    placeholder: Some("Type a group name and press Enter".into()),
+                    placeholder: Some(self.t("onboarding.groups_custom_placeholder")),
                     max_length: Some(50),
                     validation_error: None,
                     input_type: InputType::Text,
                     a11y: Some(A11y {
-                        label: Some("Custom group name input".into()),
-                        hint: Some("Enter a name for a custom contact group".into()),
+                        label: Some(self.t("onboarding.groups_custom_a11y")),
+                        hint: Some(self.t("onboarding.groups_custom_a11y_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -447,21 +460,21 @@ impl OnboardingEngine {
                 // `_private/docs/problems/2026-04-20-onboarding-custom-group-add-invisible`.
                 ScreenAction {
                     id: "submit_custom_group".into(),
-                    label: "Add group".into(),
+                    label: self.t("onboarding.groups_add"),
                     style: ActionStyle::Secondary,
                     enabled: !self.custom_group_input.trim().is_empty(),
                     a11y: None,
                 },
                 ScreenAction {
                     id: "continue".into(),
-                    label: "Continue".into(),
+                    label: self.t("action.continue"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "skip".into(),
-                    label: "Skip".into(),
+                    label: self.t("onboarding.skip"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -483,15 +496,15 @@ impl OnboardingEngine {
         if self.phone_input_visible {
             components.push(Component::TextInput {
                 id: "phone_input".into(),
-                label: "Phone number".into(),
+                label: self.t("onboarding.phone_placeholder"),
                 value: self.phone_value.clone(),
                 placeholder: Some("+1 555 123 4567".into()),
                 max_length: Some(30),
                 validation_error: None,
                 input_type: InputType::Phone,
                 a11y: Some(A11y {
-                    label: Some("Phone number input".into()),
-                    hint: Some("Enter your phone number".into()),
+                    label: Some(self.t("onboarding.phone_a11y")),
+                    hint: Some(self.t("onboarding.phone_a11y_hint")),
                     role: None,
                 }),
                 info_key: contact_info_key.clone(),
@@ -501,15 +514,15 @@ impl OnboardingEngine {
         if self.email_input_visible {
             components.push(Component::TextInput {
                 id: "email_input".into(),
-                label: "Email address".into(),
+                label: self.t("onboarding.email_placeholder"),
                 value: self.email_value.clone(),
-                placeholder: Some("you@example.com".into()),
+                placeholder: Some(self.t("onboarding.email_example")),
                 max_length: Some(254),
                 validation_error: None,
                 input_type: InputType::Email,
                 a11y: Some(A11y {
-                    label: Some("Email address input".into()),
-                    hint: Some("Enter your email address".into()),
+                    label: Some(self.t("onboarding.email_a11y")),
+                    hint: Some(self.t("onboarding.email_a11y_hint")),
                     role: None,
                 }),
                 info_key: contact_info_key,
@@ -528,7 +541,7 @@ impl OnboardingEngine {
         if !self.phone_input_visible {
             actions.push(ScreenAction {
                 id: "show_phone".into(),
-                label: "Add phone number".into(),
+                label: self.t("onboarding.add_phone"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -537,7 +550,7 @@ impl OnboardingEngine {
         if !self.email_input_visible {
             actions.push(ScreenAction {
                 id: "show_email".into(),
-                label: "Add email address".into(),
+                label: self.t("onboarding.add_email"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -545,21 +558,21 @@ impl OnboardingEngine {
         }
         actions.push(ScreenAction {
             id: "add_social".into(),
-            label: "Add social profile".into(),
+            label: self.t("onboarding.add_social"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: None,
         });
         actions.push(ScreenAction {
             id: "continue".into(),
-            label: "Continue".into(),
+            label: self.t("action.continue"),
             style: ActionStyle::Primary,
             enabled: true,
             a11y: None,
         });
         actions.push(ScreenAction {
             id: "skip".into(),
-            label: "Skip".into(),
+            label: self.t("onboarding.skip"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: None,
@@ -567,8 +580,8 @@ impl OnboardingEngine {
 
         ScreenModel {
             screen_id: "contact_info".into(),
-            title: "Add contact info".into(),
-            subtitle: Some("Optional \u{2014} you can add more later.".into()),
+            title: self.t("onboarding.info_title"),
+            subtitle: Some(self.t("onboarding.info_subtitle")),
             components,
             actions,
             progress: self.progress(3),
@@ -579,8 +592,8 @@ impl OnboardingEngine {
     fn build_what_next(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "what_next".into(),
-            title: "What would you like to do?".into(),
-            subtitle: Some("This is what contacts will see".into()),
+            title: self.t("onboarding.done_title"),
+            subtitle: Some(self.t("onboarding.done_subtitle")),
             components: vec![],
             actions: vec![
                 // The final onboarding step's job is to land the user
@@ -599,21 +612,21 @@ impl OnboardingEngine {
                 // final-step-and-skip-fold G2/G3.
                 ScreenAction {
                     id: "start_app".into(),
-                    label: "Start using the app".into(),
+                    label: self.t("onboarding.start_app"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "exchange".into(),
-                    label: "Exchange cards".into(),
+                    label: self.t("onboarding.exchange_cards"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "import_contacts".into(),
-                    label: "Import existing contacts".into(),
+                    label: self.t("onboarding.import_existing"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -694,7 +707,7 @@ impl OnboardingEngine {
                 if self.pending_backup_password.is_empty() || self.pending_backup_bytes.is_none() {
                     return ActionResult::ValidationError {
                         component_id: "backup_password".into(),
-                        message: "Enter the backup password.".into(),
+                        message: self.t("onboarding.error_backup_password"),
                     };
                 }
                 // AppEngine completion routing reads `current_step()` and
@@ -725,7 +738,7 @@ impl OnboardingEngine {
                 if self.data.display_name.trim().is_empty() {
                     ActionResult::ValidationError {
                         component_id: "display_name".into(),
-                        message: "Please enter your name.".into(),
+                        message: self.t("onboarding.error_name_required"),
                     }
                 } else {
                     self.navigate_to(Step::GroupsSetup)
@@ -857,7 +870,7 @@ impl OnboardingEngine {
         if !self.phone_value.trim().is_empty() {
             self.data.fields.push(FieldSetup {
                 field_type: "phone".into(),
-                label: "Phone".into(),
+                label: self.t("field_type.phone"),
                 value: self.phone_value.trim().to_string(),
                 visible_to_groups: Vec::new(),
                 shown: true,
@@ -866,7 +879,7 @@ impl OnboardingEngine {
         if !self.email_value.trim().is_empty() {
             self.data.fields.push(FieldSetup {
                 field_type: "email".into(),
-                label: "Email".into(),
+                label: self.t("field_type.email"),
                 value: self.email_value.trim().to_string(),
                 visible_to_groups: Vec::new(),
                 shown: true,

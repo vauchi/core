@@ -747,4 +747,23 @@ impl Vauchi {
         }
         Ok(count)
     }
+
+    /// Resolve an exchanged contact's reciprocity to `Confirmed` once the peer's
+    /// confirmation ack has verified (design P1). The contact id is
+    /// `hex(identity)` (see `Contact::from_exchange`). Returns `true` if a
+    /// contact was updated, `false` if none matched. Idempotent and
+    /// transport-agnostic (BLE + multi-stage both call it).
+    pub fn confirm_contact_reciprocity(&self, their_identity: &[u8; 32]) -> VauchiResult<bool> {
+        use crate::exchange::reciprocity::Reciprocity;
+
+        let contact_id = hex::encode(their_identity);
+        match self.storage.contacts().load_contact(&contact_id)? {
+            Some(mut contact) => {
+                contact.set_reciprocity(Reciprocity::Confirmed);
+                self.storage.contacts().save_contact(&contact)?;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+    }
 }

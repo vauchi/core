@@ -388,6 +388,12 @@ impl AppEngine {
                 }
                 false
             }
+            BleMachineEvent::ReciprocityConfirmed { their_identity } => {
+                // P1 step 2b: the peer's ack verified — flip the contact to
+                // Confirmed (banner clears). Best-effort.
+                let _confirmed = self.vauchi.confirm_contact_reciprocity(&their_identity);
+                false
+            }
             _ => false,
         }
     }

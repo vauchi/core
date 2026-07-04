@@ -124,6 +124,11 @@ pub enum BleMachineEvent {
     /// Exchange completed; the peer's card + ratchet keys are
     /// available in the carried result.
     Completed(Box<BleExchangeResult>),
+    /// The peer's reciprocity confirmation ack verified (P1 step 2b): the
+    /// exchange is now mutually confirmed. Carries the peer's identity key so
+    /// the AppEngine can flip that contact's reciprocity to Confirmed. NOT a
+    /// terminal event — the exchange already completed and persisted.
+    ReciprocityConfirmed { their_identity: [u8; 32] },
     /// Terminal failure.
     Failed { reason: String },
 }
@@ -366,6 +371,20 @@ impl BleHandshakeMachine {
         data: &[u8],
         now: u64,
     ) -> (BleMachineEvent, Vec<Command>) {
+        // P1 step 2b: once we've Completed, a notify on the handshake channel
+        // may be the peer's post-persist reciprocity ack. Handle it BEFORE the
+        // terminal guard drops it. `process_reciprocity_ack` rejects anything
+        // that is not a valid ack (wrong version / undecryptable / token
+        // mismatch), so residue never yields a false Confirmed.
+        if matches!(self.phase, BleMachinePhase::Completed) && uuid == CHAR_HANDSHAKE_NOTIFY {
+            if let Ok(Some(their_identity)) = self.inner.process_reciprocity_ack(data) {
+                return (
+                    BleMachineEvent::ReciprocityConfirmed { their_identity },
+                    Vec::new(),
+                );
+            }
+            return (BleMachineEvent::None, Vec::new());
+        }
         if self.cancelled || self.is_terminal() {
             return (BleMachineEvent::None, Vec::new());
         }

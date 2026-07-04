@@ -364,13 +364,12 @@ impl BleHandshakeSession {
     }
 
     /// Verify an incoming reciprocity ack against `expected_their_token` via the
-    /// transport-agnostic [`reciprocity_tokens::verify_ack`]. `Ok(true)` =
-    /// Confirmed; `Ok(false)` = mismatch (caller keeps Pending, fail-safe);
-    /// `Err` = malformed / undecryptable. Tampering, a MITM's token, or a
-    /// foreign-session replay all fail — a false Confirmed is impossible.
-    ///
-    /// [`reciprocity_tokens::verify_ack`]: super::reciprocity_tokens::verify_ack
-    pub fn process_reciprocity_ack(&self, ack: &[u8]) -> Result<bool, ExchangeError> {
+    /// transport-agnostic `reciprocity_tokens::verify_ack`. `Ok(Some(peer_id))`
+    /// = Confirmed (returns the peer identity so the caller resolves the
+    /// contact); `Ok(None)` = mismatch (keep Pending, fail-safe); `Err` =
+    /// malformed / undecryptable. Tampering, a MITM's token, or a foreign-
+    /// session replay all fail — a false Confirmed is impossible.
+    pub fn process_reciprocity_ack(&self, ack: &[u8]) -> Result<Option<[u8; 32]>, ExchangeError> {
         let session_key = self
             .session_key
             .as_ref()
@@ -381,14 +380,15 @@ impl BleHandshakeSession {
         let their_id = self
             .their_identity_key
             .ok_or_else(|| ExchangeError::InvalidState("no peer identity for ack".into()))?;
-        super::reciprocity_tokens::verify_ack(
+        let confirmed = super::reciprocity_tokens::verify_ack(
             session_key,
             &expected,
             self.our_identity_key.as_slice(),
             their_id.as_slice(),
             ack,
         )
-        .map_err(|()| ExchangeError::BleDecryptionFailed)
+        .map_err(|()| ExchangeError::BleDecryptionFailed)?;
+        Ok(confirmed.then_some(their_id))
     }
 
     /// Derive + store the reciprocity confirmation token pair from the agreed

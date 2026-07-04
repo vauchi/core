@@ -157,7 +157,8 @@ fn ble_reciprocity_ack_confirms() {
     let alice_ack = alice.build_reciprocity_ack().expect("alice builds ack");
     assert!(
         bob.process_reciprocity_ack(&alice_ack)
-            .expect("bob processes"),
+            .expect("bob processes")
+            .is_some(),
         "a matching ack must resolve Confirmed"
     );
 
@@ -165,7 +166,8 @@ fn ble_reciprocity_ack_confirms() {
     assert!(
         alice
             .process_reciprocity_ack(&bob_ack)
-            .expect("alice processes"),
+            .expect("alice processes")
+            .is_some(),
         "a matching ack must resolve Confirmed (other direction)"
     );
 }
@@ -179,7 +181,7 @@ fn ble_reciprocity_ack_tampered_never_confirms() {
     let last = ack.len() - 1;
     ack[last] ^= 0xFF;
     assert!(
-        !matches!(bob.process_reciprocity_ack(&ack), Ok(true)),
+        !matches!(bob.process_reciprocity_ack(&ack), Ok(Some(_))),
         "a tampered ack must never confirm"
     );
 }
@@ -193,7 +195,7 @@ fn ble_reciprocity_ack_foreign_session_never_confirms() {
     let (other_alice, _other_bob) = ble_handshake_pair();
     let foreign_ack = other_alice.build_reciprocity_ack().expect("ack");
     assert!(
-        !matches!(bob.process_reciprocity_ack(&foreign_ack), Ok(true)),
+        !matches!(bob.process_reciprocity_ack(&foreign_ack), Ok(Some(_))),
         "an ack from another session must never confirm"
     );
 }

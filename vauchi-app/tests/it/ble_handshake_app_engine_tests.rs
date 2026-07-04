@@ -334,13 +334,12 @@ fn two_party_ble_exchange_persists_each_others_contact() {
     );
 }
 
-// P1 step 2a: a BLE exchange records the contact as reciprocity `Pending`
-// (confirmable, unconfirmed) and emits the post-persist confirmation ack (G1)
-// on the notify characteristic — the peer verifies it once its receive-side
-// handler lands (step 2b).
+// P1 step 2a+2b (full loop): a BLE exchange stamps the contact Pending, emits
+// the post-persist confirmation ack (G1), the peer verifies it, and reciprocity
+// resolves to Confirmed on both sides — relay-free over the native channel.
 // @internal
 #[test]
-fn two_party_ble_exchange_records_pending_reciprocity_and_emits_ack() {
+fn two_party_ble_exchange_confirms_reciprocity_both_sides() {
     let mut alice = engine_named("Alice");
     let mut bob = engine_named("Bob");
     let alice_token = token_of(&alice);
@@ -382,8 +381,8 @@ fn two_party_ble_exchange_records_pending_reciprocity_and_emits_ack() {
     assert_eq!(alice_contacts.len(), 1, "Alice persisted Bob");
     assert_eq!(
         alice_contacts[0].reciprocity(now),
-        vauchi_core::exchange::reciprocity::Reciprocity::Pending,
-        "a BLE contact must be recorded Pending (confirmable, not yet confirmed)"
+        vauchi_core::exchange::reciprocity::Reciprocity::Confirmed,
+        "after the ack round-trip the BLE contact must resolve to Confirmed"
     );
 
     // The reciprocity ack is our version byte + the AEAD sealing of the 32-byte

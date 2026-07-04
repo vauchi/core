@@ -449,7 +449,9 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 #  duress + emergency contact-pool loaders) + EmergencyBroadcast injecting
 #  the pool via with_available_contacts — 2026-07-03-coercion-safety-config-gaps
 #  defects 1-2. The helper is net cheaper than inlining the map at both sites.)
-vauchi-app/src/ui/app_engine/screens.rs 929
+# (+6 2026-07-04: M3 S3a — EmergencyShred factory arm resolves Locale from
+#  the frontend-pushed RenderContext (ADR-047 seam), multi-line builder call.)
+vauchi-app/src/ui/app_engine/screens.rs 935
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

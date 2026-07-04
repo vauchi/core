@@ -7,7 +7,7 @@ use vauchi_app::ui::*;
 // @internal
 #[test]
 fn shred_starts_at_warning() {
-    let engine = EmergencyShredEngine::new();
+    let engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "shred_warning");
     assert_eq!(screen.progress.as_ref().unwrap().current_step, 1);
@@ -17,7 +17,7 @@ fn shred_starts_at_warning() {
 // @internal
 #[test]
 fn shred_warning_has_info_panel() {
-    let engine = EmergencyShredEngine::new();
+    let engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
     let screen = engine.current_screen();
 
     let info_panel = screen.components.first().expect("should have a component");
@@ -43,7 +43,7 @@ fn shred_warning_has_info_panel() {
 // @internal
 #[test]
 fn shred_continue_to_confirm() {
-    let mut engine = EmergencyShredEngine::new();
+    let mut engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -61,7 +61,7 @@ fn shred_continue_to_confirm() {
 // @internal
 #[test]
 fn shred_confirm_requires_delete_text() {
-    let mut engine = EmergencyShredEngine::new();
+    let mut engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -96,7 +96,7 @@ fn shred_confirm_requires_delete_text() {
 // @internal
 #[test]
 fn shred_confirm_wrong_text_validation_error() {
-    let mut engine = EmergencyShredEngine::new();
+    let mut engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -126,7 +126,7 @@ fn shred_confirm_wrong_text_validation_error() {
 // @internal
 #[test]
 fn shred_confirm_delete_starts_wipe() {
-    let mut engine = EmergencyShredEngine::new();
+    let mut engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -166,7 +166,7 @@ fn shred_confirm_delete_starts_wipe() {
 // @internal
 #[test]
 fn shred_wipe_complete() {
-    let mut engine = EmergencyShredEngine::new();
+    let mut engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
 
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -204,13 +204,13 @@ fn shred_wipe_complete() {
 // @internal
 #[test]
 fn shred_cancel_returns_complete() {
-    let mut engine = EmergencyShredEngine::new();
+    let mut engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
     assert_eq!(result, ActionResult::Complete);
 
-    let mut engine = EmergencyShredEngine::new();
+    let mut engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });

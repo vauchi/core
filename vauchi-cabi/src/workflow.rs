@@ -35,7 +35,11 @@ pub unsafe extern "C" fn vauchi_workflow_create(
 
         let engine: Box<dyn WorkflowEngineAny> = match wtype.as_str() {
             "onboarding" => Box::new(OnboardingEngine::new()),
-            "emergency_shred" => Box::new(EmergencyShredEngine::new()),
+            // English pending locale threading through the cabi workflow
+            // surface — S6 of 2026-07-03-core-screens-bypass-i18n.
+            "emergency_shred" => {
+                Box::new(EmergencyShredEngine::new(vauchi_app::i18n::Locale::English))
+            }
             "lock_screen" => Box::new(LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)),
             _ => return std::ptr::null_mut(),
         };

@@ -30,7 +30,7 @@ use vauchi_app::ui::{EmergencyShredEngine, WorkflowEngine};
 const HANDLED: &[&str] = &["continue", "cancel", "wipe"];
 
 fn factory() -> EmergencyShredEngine {
-    EmergencyShredEngine::new()
+    EmergencyShredEngine::new(vauchi_app::i18n::Locale::English)
 }
 
 // @internal

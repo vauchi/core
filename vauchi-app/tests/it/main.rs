@@ -82,6 +82,7 @@ mod reciprocity_confirmer_tests;
 mod render_context_tests;
 mod settings_more_parity_tests;
 mod settings_render_context_tests;
+mod shred_i18n_tests;
 mod sync_chrome_overlay_tests;
 mod sync_status_engine_tests;
 mod update_overlay_tests;

@@ -198,7 +198,7 @@ fn make_duress() -> DuressPinEngine {
 }
 
 fn make_shred() -> EmergencyShredEngine {
-    EmergencyShredEngine::new()
+    EmergencyShredEngine::new(vauchi_app::i18n::Locale::English)
 }
 
 // ── Property 1: Random actions never panic ──────────────────────────

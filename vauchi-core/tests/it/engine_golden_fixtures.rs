@@ -316,7 +316,7 @@ fn duress_overview_fixture_is_fresh() {
 // @internal
 #[test]
 fn emergency_shred_fixture_is_fresh() {
-    let engine = EmergencyShredEngine::new();
+    let engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
     assert_fixture_fresh(&engine.current_screen(), "emergency_shred.json");
 }
 
@@ -499,7 +499,7 @@ fn regenerate_all_engine_fixtures() {
         ),
         (
             "emergency_shred.json",
-            EmergencyShredEngine::new().current_screen(),
+            EmergencyShredEngine::new(vauchi_app::i18n::Locale::English).current_screen(),
         ),
         (
             "emergency_broadcast_overview.json",

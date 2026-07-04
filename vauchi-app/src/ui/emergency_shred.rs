@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Emergency shred engine — full data wipe workflow with confirmation.
+//! Copy resolves through `i18n::get_string` in the locale threaded at
+//! construction (M3 S3 of `2026-07-03-core-screens-bypass-i18n`); the
+//! keys live in the `shred.wipe.*` + shared `action.*` families.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 
 /// Emergency data shred workflow engine.
@@ -11,6 +15,7 @@ use crate::ui::*;
 pub struct EmergencyShredEngine {
     step: ShredStep,
     typed_confirmation: String,
+    locale: Locale,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -23,16 +28,21 @@ enum ShredStep {
 
 impl Default for EmergencyShredEngine {
     fn default() -> Self {
-        Self::new()
+        Self::new(Locale::English)
     }
 }
 
 impl EmergencyShredEngine {
-    pub fn new() -> Self {
+    pub fn new(locale: Locale) -> Self {
         Self {
             step: ShredStep::Warning,
             typed_confirmation: String::new(),
+            locale,
         }
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Signal that the wipe operation has finished. Moves from Wiping to Complete.
@@ -45,31 +55,27 @@ impl EmergencyShredEngine {
     fn warning_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "shred_warning".into(),
-            title: "Emergency Data Wipe".into(),
+            title: self.t("shred.wipe.title"),
             subtitle: None,
             components: vec![Component::InfoPanel {
                 id: "warning_info".into(),
                 icon: Some("warning".into()),
-                title: "Emergency Data Wipe".into(),
+                title: self.t("shred.wipe.title"),
                 items: vec![
                     InfoItem {
                         icon: Some("delete".into()),
-                        title: "All contacts will be deleted".into(),
-                        detail:
-                            "Your contact cards and exchange history will be permanently removed."
-                                .into(),
+                        title: self.t("shred.wipe.contacts_title"),
+                        detail: self.t("shred.wipe.contacts_detail"),
                     },
                     InfoItem {
                         icon: Some("key".into()),
-                        title: "All keys will be destroyed".into(),
-                        detail:
-                            "Encryption keys will be securely shredded and cannot be recovered."
-                                .into(),
+                        title: self.t("shred.wipe.keys_title"),
+                        detail: self.t("shred.wipe.keys_detail"),
                     },
                     InfoItem {
                         icon: Some("warning".into()),
-                        title: "This action is irreversible".into(),
-                        detail: "There is no way to undo this operation.".into(),
+                        title: self.t("shred.wipe.irreversible_title"),
+                        detail: self.t("shred.wipe.irreversible_detail"),
                     },
                 ],
                 a11y: None,
@@ -77,14 +83,14 @@ impl EmergencyShredEngine {
             actions: vec![
                 ScreenAction {
                     id: "continue".into(),
-                    label: "I Understand".into(),
+                    label: self.t("shred.wipe.understand"),
                     style: ActionStyle::Destructive,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -102,11 +108,11 @@ impl EmergencyShredEngine {
     fn confirm_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "shred_confirm".into(),
-            title: "Confirm Wipe".into(),
+            title: self.t("shred.wipe.confirm_title"),
             subtitle: None,
             components: vec![Component::TextInput {
                 id: "confirmation".into(),
-                label: "Type DELETE to confirm".into(),
+                label: self.t("shred.wipe.type_delete"),
                 value: self.typed_confirmation.clone(),
                 placeholder: None,
                 max_length: None,
@@ -118,14 +124,14 @@ impl EmergencyShredEngine {
             actions: vec![
                 ScreenAction {
                     id: "wipe".into(),
-                    label: "Wipe All Data".into(),
+                    label: self.t("shred.wipe.wipe_all"),
                     style: ActionStyle::Destructive,
                     enabled: self.typed_confirmation == "DELETE",
                     a11y: None,
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -143,12 +149,12 @@ impl EmergencyShredEngine {
     fn wiping_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "shred_wiping".into(),
-            title: "Wiping Data".into(),
+            title: self.t("shred.wipe.wiping_title"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "wipe_status".into(),
                 icon: None,
-                title: "Wiping data...".into(),
+                title: self.t("shred.wipe.wiping_status"),
                 detail: None,
                 status: Status::InProgress,
                 a11y: None,
@@ -166,19 +172,19 @@ impl EmergencyShredEngine {
     fn complete_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "shred_complete".into(),
-            title: "Data Wiped".into(),
+            title: self.t("shred.wipe.complete_title"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "wipe_status".into(),
                 icon: None,
-                title: "Data Wiped".into(),
+                title: self.t("shred.wipe.complete_title"),
                 detail: None,
                 status: Status::Success,
                 a11y: None,
             }],
             actions: vec![ScreenAction {
                 id: "done".into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -228,10 +234,13 @@ impl WorkflowEngine for EmergencyShredEngine {
             }
             UserAction::ActionPressed { action_id } if action_id == "wipe" => {
                 if self.step == ShredStep::Confirm {
+                    // The typed token stays the literal DELETE in every
+                    // locale — the gate checks the token, the label
+                    // explains it (see shred_i18n_tests).
                     if self.typed_confirmation != "DELETE" {
                         ActionResult::ValidationError {
                             component_id: "confirmation".into(),
-                            message: "Type DELETE to confirm".into(),
+                            message: self.t("shred.wipe.type_delete"),
                         }
                     } else {
                         self.step = ShredStep::Wiping;

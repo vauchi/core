@@ -330,7 +330,13 @@ impl AppEngine {
             AppScreen::ChangePassword => Box::new(ChangePasswordEngine::new(
                 vauchi.is_password_enabled().unwrap_or(false),
             )),
-            AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),
+            AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new(
+                render_context
+                    .locale
+                    .as_deref()
+                    .and_then(crate::i18n::Locale::from_code)
+                    .unwrap_or_default(),
+            )),
             AppScreen::EmergencyBroadcast => {
                 let config = vauchi.load_emergency_config().ok().flatten();
                 Box::new(

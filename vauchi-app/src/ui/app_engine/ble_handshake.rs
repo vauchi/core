@@ -429,9 +429,7 @@ impl AppEngine {
             log::warn!("BLE: completion without a session key — contact not created");
             return None;
         };
-        let Some(identity) = self.vauchi.identity() else {
-            return None;
-        };
+        let identity = self.vauchi.identity()?;
         let our_identity = *identity.signing_public_key();
         let our_x3dh = identity.x3dh_keypair();
         let their_identity = result.remote_card.identity_key;

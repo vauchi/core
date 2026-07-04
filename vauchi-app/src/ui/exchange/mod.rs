@@ -304,8 +304,19 @@ impl ExchangeEngine {
         let session = self.session()?;
         if let vauchi_core::exchange::ExchangeState::Complete { contact } = session.state() {
             let mut contact = (**contact).clone();
-            if let Some(outcome) = self.reciprocity_outcome {
-                contact.set_reciprocity(outcome);
+            // Resolved outcome wins. Before resolution, a *confirmable* exchange
+            // (one that has confirmation tokens) is Pending — "completed
+            // locally, awaiting confirmation" — so persist-at-Complete records
+            // Pending, not Unknown, and the banner surfaces it. A
+            // non-confirmable exchange (no tokens, e.g. no relay) stays Unknown.
+            let reciprocity = self.reciprocity_outcome.or_else(|| {
+                session
+                    .our_confirmation_token()
+                    .is_some()
+                    .then_some(vauchi_core::exchange::reciprocity::Reciprocity::Pending)
+            });
+            if let Some(r) = reciprocity {
+                contact.set_reciprocity(r);
             }
             Some(contact)
         } else {
@@ -1619,6 +1630,31 @@ mod tests {
             contact.reciprocity(now),
             vauchi_core::exchange::reciprocity::Reciprocity::Confirmed,
             "a confirmed exchange must be stamped Confirmed"
+        );
+    }
+
+    // Persist-at-Complete semantic: a Complete-but-not-yet-resolved exchange
+    // (confirmation in flight) must stamp Pending — "completed locally,
+    // awaiting confirmation" — not Unknown. This is what lets persist-at-Complete
+    // save the contact as Pending before the confirmer resolves.
+    // @internal
+    #[test]
+    fn complete_but_unresolved_stamps_contact_pending() {
+        let (session, _gate) = qr_session_at_complete();
+        // No escrow events fed → the confirmer never resolves; reciprocity_outcome
+        // stays None, but the session carries confirmation tokens (confirmable).
+        let engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        let contact = engine
+            .reciprocity_stamped_contact()
+            .expect("a Complete session yields a contact to persist");
+        assert_eq!(
+            contact.reciprocity(0),
+            vauchi_core::exchange::reciprocity::Reciprocity::Pending,
+            "a confirmable but unresolved exchange must be stamped Pending, not Unknown"
         );
     }
 

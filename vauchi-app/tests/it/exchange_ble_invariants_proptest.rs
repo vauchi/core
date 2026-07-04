@@ -98,7 +98,7 @@ fn drive_magic_to_success() -> BleExchangeEngine {
     // the real `BleHandshakeMachine` completion drives the chrome to
     // Success via `force_success`. Call it to reach the terminal screen
     // (the invariant under test is that Success stays terminal).
-    e.force_success();
+    e.force_success(None);
     assert_eq!(e.current_screen().screen_id, "exchange_success");
     e
 }

@@ -352,7 +352,7 @@ impl AppEngine {
                 // G1: emit the reciprocity ack ONLY AFTER the contact persisted,
                 // so "peer got my token ⇒ I persisted" (design P1). Inert on the
                 // peer until its receive-side handler lands (step 2b).
-                if persisted {
+                if persisted.is_some() {
                     let ack_cmd = self
                         .ble_handshake_session
                         .as_ref()
@@ -365,17 +365,21 @@ impl AppEngine {
                         crate::ui::exchange::ceremony::exchange_celebrate(),
                     ]);
                 }
-                // Drive the chrome to its terminal Success screen. The
+                // Drive the chrome to its terminal Success screen with the
+                // rich summary (M2 S6) — who you met + what they shared. The
                 // hollow `BleExchangeFlow` no longer self-completes from
                 // BLE data bytes (P4), so the real machine's completion is
                 // what flips the UI to success.
+                let summary = persisted.as_ref().map(|(contact_id, group_names)| {
+                    Box::new(self.build_exchange_summary(contact_id, group_names.clone()))
+                });
                 if !self
                     .engine
-                    .apply_update(crate::ui::EngineUpdate::BleForceSuccess)
+                    .apply_update(crate::ui::EngineUpdate::BleForceSuccess { summary })
                 {
                     tracing::warn!("BleForceSuccess not consumed by active engine");
                 }
-                persisted
+                persisted.is_some()
             }
             BleMachineEvent::Failed { reason } => {
                 // Machine-level failure (crypto / protocol error) has no
@@ -410,7 +414,10 @@ impl AppEngine {
     /// key / identity leaves the exchange complete on-screen but
     /// uncreated rather than panicking on the completion path. Returns
     /// `true` when the contact was added.
-    fn persist_ble_exchanged_contact(&mut self, result: &BleExchangeResult) -> bool {
+    fn persist_ble_exchanged_contact(
+        &mut self,
+        result: &BleExchangeResult,
+    ) -> Option<(String, Vec<String>)> {
         // Clone the owned session key off the held machine under a short
         // borrow so the `self.vauchi` persistence calls below don't fight
         // the borrow.
@@ -420,10 +427,10 @@ impl AppEngine {
             .and_then(|h| h.machine.session_key().cloned())
         else {
             log::warn!("BLE: completion without a session key — contact not created");
-            return false;
+            return None;
         };
         let Some(identity) = self.vauchi.identity() else {
-            return false;
+            return None;
         };
         let our_identity = *identity.signing_public_key();
         let our_x3dh = identity.x3dh_keypair();
@@ -443,7 +450,7 @@ impl AppEngine {
                 Ok(r) => r,
                 Err(e) => {
                     log::warn!("BLE: ratchet init (initiator) failed: {e:?}");
-                    return false;
+                    return None;
                 }
             }
         } else {
@@ -472,16 +479,25 @@ impl AppEngine {
             .save_exchanged_contact(&contact, &ratchet, is_initiator)
         {
             log::warn!("BLE: failed to persist exchanged contact/ratchet: {e}");
-            return false;
+            return None;
         }
         // G4: file the new contact into the groups chosen in the exchange
         // preamble (best-effort — a group failure doesn't undo the
         // exchange). Same `pending_exchange_groups` carry the multi-stage
         // path uses; populated by `start_exchange_to` on mode dispatch.
         let pending_groups = std::mem::take(&mut self.pending_exchange_groups);
+        let mut group_names = Vec::new();
         for group_id in &pending_groups {
-            // Best-effort; bind (not `let _`) to satisfy the must-use lint.
-            let _added = self.vauchi.add_contact_to_group(group_id, &contact_id);
+            // Best-effort; names collected for the rich success summary
+            // (M2 S6), mirroring the multi-stage persist.
+            if self
+                .vauchi
+                .add_contact_to_group(group_id, &contact_id)
+                .is_ok()
+                && let Ok(group) = self.vauchi.get_group(group_id)
+            {
+                group_names.push(group.name().to_string());
+            }
         }
         // Snapshot what this contact can now see as the revocation baseline
         // (2026-06-08-card-revocation-not-propagated). Best-effort.
@@ -491,7 +507,7 @@ impl AppEngine {
         // multi-stage path. The Event::LocationResult reply is consumed in
         // handle_hardware_event.
         self.request_exchange_location(contact_id.clone());
-        true
+        Some((contact_id, group_names))
     }
 }
 

@@ -126,7 +126,7 @@ fn success_factory() -> BleExchangeEngine {
     // P4: the hollow flow no longer self-completes from notified bytes;
     // the real `BleHandshakeMachine` completion drives Success via
     // `force_success`.
-    e.force_success();
+    e.force_success(None);
     e
 }
 

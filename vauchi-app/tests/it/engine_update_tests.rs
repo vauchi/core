@@ -33,7 +33,7 @@ fn multi_stage_consumes_finalized_update() {
 #[test]
 fn multi_stage_rejects_foreign_update() {
     let mut engine = MultiStageExchangeEngine::new_glance();
-    assert!(!engine.apply_update(EngineUpdate::BleForceSuccess));
+    assert!(!engine.apply_update(EngineUpdate::BleForceSuccess { summary: None }));
     assert!(!engine.apply_update(EngineUpdate::ConfirmPendingDelete));
 }
 
@@ -66,7 +66,7 @@ fn device_link_consumes_transitions_and_rejects_foreign() {
         json.contains("expired") || json.contains("Expired"),
         "QR-expired state must reach the screen: {json}"
     );
-    assert!(!engine.apply_update(EngineUpdate::BleForceSuccess));
+    assert!(!engine.apply_update(EngineUpdate::BleForceSuccess { summary: None }));
 }
 
 // @scenario: exchange.feature - Link exchange shares a URL
@@ -90,7 +90,7 @@ fn link_exchange_consumes_share_url_and_failure() {
 #[test]
 fn engines_without_apply_update_reject_everything() {
     let mut engine = FingerprintVerifyEngine::new("c1", "AAAA", "BBBB", false);
-    assert!(!engine.apply_update(EngineUpdate::BleForceSuccess));
+    assert!(!engine.apply_update(EngineUpdate::BleForceSuccess { summary: None }));
     assert_eq!(
         engine.engine_output(),
         Some(EngineOutput::FingerprintVerify(VerifyAction::None)),

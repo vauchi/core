@@ -127,8 +127,12 @@ pub enum EngineUpdate {
     DeviceLink(DeviceLinkUpdate),
     LinkResponder(LinkResponderUpdate),
     LinkExchange(LinkExchangeUpdate),
-    /// Flip the BLE exchange chrome to its terminal Success screen.
-    BleForceSuccess,
+    /// Flip the BLE exchange chrome to its terminal Success screen. Carries
+    /// the rich exchange summary when the AppEngine persisted the contact
+    /// (M2 S6) — `None` degrades to the minimal completion chrome.
+    BleForceSuccess {
+        summary: Option<Box<crate::ui::exchange::success::ExchangeSuccessSummary>>,
+    },
     /// Flip the BLE exchange chrome to its terminal Failed screen.
     BleForceFailure {
         reason: Option<String>,
@@ -280,7 +284,7 @@ impl EngineUpdate {
                 LinkExchangeUpdate::Succeeded(_) => "LinkExchange::Succeeded",
                 LinkExchangeUpdate::Failed(_) => "LinkExchange::Failed",
             },
-            Self::BleForceSuccess => "BleForceSuccess",
+            Self::BleForceSuccess { .. } => "BleForceSuccess",
             Self::BleForceFailure { .. } => "BleForceFailure",
             Self::ContactDetail(u) => match u {
                 ContactDetailUpdate::ToggleProposalTrusted => {

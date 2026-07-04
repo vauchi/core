@@ -79,6 +79,9 @@ pub struct BleExchangeEngine {
     /// `screen_entered` is idempotent across re-renders.
     started: bool,
     cancelled: bool,
+    /// Rich exchange summary handed over by the AppEngine once the contact
+    /// persisted (M2 S6). `None` renders the minimal completion chrome.
+    success_summary: Option<Box<crate::ui::exchange::success::ExchangeSuccessSummary>>,
     /// This device's role-tiebreak token, advertised in the
     /// `BleStartAdvertising.payload` so the peer can compare and exactly
     /// one side initiates the connection (see [`BleExchangeFlow`]).
@@ -114,6 +117,7 @@ impl BleExchangeEngine {
             screen: BleScreen::Active,
             has_camera,
             started: false,
+            success_summary: None,
             cancelled: false,
             own_token,
             clock,
@@ -126,7 +130,11 @@ impl BleExchangeEngine {
     /// AppEngine when the real `BleHandshakeMachine` reports `Completed`:
     /// the hollow flow no longer self-completes from BLE data bytes (P4),
     /// so the real completion is what flips the UI to success.
-    pub fn force_success(&mut self) {
+    pub fn force_success(
+        &mut self,
+        summary: Option<Box<crate::ui::exchange::success::ExchangeSuccessSummary>>,
+    ) {
+        self.success_summary = summary;
         self.screen = BleScreen::Success;
     }
 
@@ -216,6 +224,18 @@ impl BleExchangeEngine {
     }
 
     fn build_success_screen(&self) -> ScreenModel {
+        // Rich shared summary when the AppEngine persisted the contact
+        // (M2 S6) — who you met + what they shared, matching every other
+        // transport's ending. The minimal chrome below is the degraded
+        // fallback (persist failed / no summary handed over).
+        if let Some(summary) = &self.success_summary {
+            return crate::ui::exchange::success::build_exchange_success_screen(
+                "exchange_success",
+                "Success",
+                ACTION_DONE,
+                summary,
+            );
+        }
         ScreenModel {
             screen_id: "exchange_success".into(),
             title: "Success".into(),
@@ -452,8 +472,8 @@ impl WorkflowEngine for BleExchangeEngine {
 
     fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
         match update {
-            crate::ui::EngineUpdate::BleForceSuccess => {
-                self.force_success();
+            crate::ui::EngineUpdate::BleForceSuccess { summary } => {
+                self.force_success(summary);
                 true
             }
             crate::ui::EngineUpdate::BleForceFailure { reason } => {
@@ -745,7 +765,7 @@ mod tests {
             engine.current_screen().screen_id,
             "exchange_ble_discovering"
         );
-        engine.force_success();
+        engine.force_success(None);
         assert_eq!(engine.current_screen().screen_id, "exchange_success");
     }
 

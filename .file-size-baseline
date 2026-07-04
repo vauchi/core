@@ -346,7 +346,10 @@ vauchi-app/src/ui/app_engine/mod.rs 752
 # (+6 2026-07-04: step 2b — apply_ble_machine_event handles ReciprocityConfirmed
 #  by resolving the contact to Confirmed via Vauchi::confirm_contact_reciprocity.)
 # (+4 2026-07-04: ceremony emission at the post-persist Completed arm — M2 S4.)
-vauchi-app/src/ui/app_engine/ble_handshake.rs 1064
+# (+16 2026-07-04: M2 S6 rich success — persist returns (contact_id,
+#  group_names) with names collected on assignment; Completed arm builds the
+#  summary for BleForceSuccess.)
+vauchi-app/src/ui/app_engine/ble_handshake.rs 1080
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts

@@ -210,6 +210,51 @@ fn all_can_see(world: &mut VauchiWorld, field: String) {
     }
 }
 
+#[then(expr = "no contact can see my {string} field")]
+fn no_contact_can_see(world: &mut VauchiWorld, field: String) {
+    assert!(
+        !world.contacts.is_empty(),
+        "vacuous check — the Background must create contacts first"
+    );
+    for (name, cid) in &world.contacts {
+        assert!(
+            !world.vauchi.is_field_visible_by_label(cid, &field).unwrap(),
+            "expected {name} NOT to see field {field} (fields default hidden)"
+        );
+    }
+    // Worlds are per-scenario, so this hands the field to the
+    // explicit-grant follow-up step without a dedicated slot.
+    world.pending_label = Some(field);
+}
+
+#[then("the field stays hidden until I explicitly grant visibility")]
+fn hidden_until_granted(world: &mut VauchiWorld) {
+    let field = world
+        .pending_label
+        .clone()
+        .expect("a preceding no-contact-can-see step names the field");
+    // Not a re-assertion of hidden: the "until I explicitly grant" half
+    // means one grant must flip visibility for exactly that contact.
+    let (name, cid) = world
+        .contacts
+        .iter()
+        .next()
+        .map(|(n, c)| (n.clone(), c.clone()))
+        .expect("Background creates contacts");
+    let fid = world.own_field_id(&field);
+    world
+        .vauchi
+        .set_field_public_and_repropagate(&cid, &fid)
+        .unwrap();
+    assert!(
+        world
+            .vauchi
+            .is_field_visible_by_label(&cid, &field)
+            .unwrap(),
+        "explicit grant makes {field} visible to {name}"
+    );
+}
+
 #[then(expr = "group {string} contains contact {string}")]
 fn group_contains(world: &mut VauchiWorld, group: String, contact: String) {
     let gid = world.group_id(&group);

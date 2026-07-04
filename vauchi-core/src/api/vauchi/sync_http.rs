@@ -141,6 +141,14 @@ impl Vauchi {
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.run_owed_repropagation();
 
+        // Queue reciprocity confirmations (P3 Slice B) for still-Pending
+        // confirmable contacts so the send phase below delivers them this tick.
+        // Ordered AFTER the receive phase: a confirm we just received may have
+        // flipped a contact to Confirmed, and the Pending gate then excludes it —
+        // so a mutually-confirmed pair stops re-sending (convergence). Best-effort.
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.queue_reciprocity_confirmations();
+
         // Send phase — adapter moves into RelayClient → SyncController
         let send_result = self.run_send_phase(identity, &contacts, adapter)?;
 

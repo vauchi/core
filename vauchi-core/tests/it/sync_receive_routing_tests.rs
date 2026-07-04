@@ -855,3 +855,94 @@ fn reciprocity_confirm_wrong_token_never_confirms() {
         "a wrong-token confirmation must never resolve to Confirmed"
     );
 }
+
+// CC-03 end-to-end (Slice B → Slice A): a Pending contact's queued confirmation,
+// delivered to the peer, resolves the peer to Confirmed — the full relay-sync
+// loop. Bob (ratchet initiator) sends; Alice (responder) receives.
+// @scenario: receive_phase :: queued reciprocity confirmation closes the loop
+// @internal
+#[test]
+fn queued_reciprocity_confirmation_resolves_peer_to_confirmed() {
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let link = link_contacts(&alice, &bob, "Bob");
+    let now = alice.storage().clock().unix_seconds();
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+
+    // Bob's contact-of-Alice is a Pending confirmable exchange. Rebuild it with a
+    // recent exchange timestamp (link_contacts uses 0, which the 7-day read-time
+    // timer would decay to Unreciprocated); the ratchet is keyed by contact id so
+    // it survives the upsert.
+    let mut bob_of_alice = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        link.shared_secret.clone(),
+        now,
+    );
+    bob_of_alice.set_reciprocity(Reciprocity::Pending);
+    bob.storage()
+        .contacts()
+        .save_contact(&bob_of_alice)
+        .unwrap();
+
+    // Slice B: Bob queues one confirmation for Alice.
+    let queued = bob.queue_reciprocity_confirmations().unwrap();
+    assert_eq!(
+        queued, 1,
+        "one Pending confirmable contact -> one queued confirmation"
+    );
+
+    // Extract the queued payload (what the send phase would post) and deliver it
+    // to Alice via the receive path, under Alice's mailbox token.
+    let updates = bob.storage().pending().get_all_pending_updates().unwrap();
+    assert_eq!(updates.len(), 1, "exactly one pending update queued");
+    let payload = updates[0].payload.clone();
+    let alice_token = token_hex(&compute_mailbox_token(
+        link.shared_secret.as_bytes(),
+        &alice_pk,
+        current_day_epoch(now),
+    ));
+    let blobs = vec![("confirm-loop".to_string(), alice_token, payload)];
+    let alice_contacts = alice.storage().contacts().list_contacts().unwrap();
+    let _ = process_received_blobs(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &alice_contacts,
+        blobs,
+    );
+
+    let alice_of_bob = alice.get_contact(&link.peer_contact_id).unwrap().unwrap();
+    assert_eq!(
+        alice_of_bob.reciprocity(now),
+        Reciprocity::Confirmed,
+        "the delivered confirmation resolves the peer to Confirmed"
+    );
+    assert_eq!(
+        alice_of_bob.confirmation_channel(),
+        Some(ConfirmationChannel::RelaySync)
+    );
+}
+
+// The send gate: a Confirmed contact is not re-sent (convergence — the loop
+// terminates once both sides agree).
+// @scenario: receive_phase :: confirmed contacts are not re-confirmed
+// @internal
+#[test]
+fn queue_skips_already_confirmed_contacts() {
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let link = link_contacts(&alice, &bob, "Bob");
+
+    let mut bob_of_alice = bob.get_contact(&link.host_contact_id).unwrap().unwrap();
+    bob_of_alice.set_reciprocity(Reciprocity::Confirmed);
+    bob.storage()
+        .contacts()
+        .save_contact(&bob_of_alice)
+        .unwrap();
+
+    assert_eq!(
+        bob.queue_reciprocity_confirmations().unwrap(),
+        0,
+        "a Confirmed contact must not be re-sent"
+    );
+}

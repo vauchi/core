@@ -191,37 +191,21 @@ lint:semver:
   needs: []
   allow_failure: true
   script:
-    # Always refresh the binary: shell runners persist a preinstalled
-    # cargo-semver-checks forever, and a stale one cannot parse newer
-    # nightly rustdoc JSON (format v60 broke v56/v57-era binaries,
-    # 2026-07-02). On download failure fall back to whatever exists.
+    # Refresh the binary: shell runners persist a preinstalled
+    # cargo-semver-checks forever. 0.48.0 (current on 2026-07-04)
+    # resolves the vauchi-protocol workspace path dep for vauchi-core
+    # natively — upstream #638 (https://github.com/obi1kenobi/cargo-semver-checks/issues/638)
+    # no longer bites — so both crates let semver-checks self-generate
+    # current + baseline rustdoc. The old manual `cargo +nightly doc`
+    # JSON was rejected by the --current-rustdoc file-loader once the
+    # nightly rustdoc format reached v60 (2026-07-02); dropping it removes
+    # both the format-mismatch failure and the /tmp worktree dance.
     - cargo binstall cargo-semver-checks --no-confirm --force 2>/dev/null || command -v cargo-semver-checks >/dev/null 2>&1 || cargo install cargo-semver-checks
+    # rustdoc JSON is nightly-only; semver-checks invokes nightly itself.
     - rustup toolchain install nightly --profile minimal --component rustdoc 2>/dev/null || true
     - git fetch origin main
-    # vauchi-protocol: no workspace path deps, can check directly
     - cargo semver-checks check-release -p vauchi-protocol --baseline-rev origin/main
-    # vauchi-core: depends on vauchi-protocol (workspace path dep) which can't
-    # resolve in semver-checks' isolated temp project.
-    # Upstream: https://github.com/obi1kenobi/cargo-semver-checks/issues/638
-    # Workaround: pre-generate rustdoc JSON in workspace context with nightly,
-    # then pass to semver-checks via --current-rustdoc / --baseline-rustdoc.
-    - |
-      echo "Generating current rustdoc JSON for vauchi-core..."
-      RUSTDOCFLAGS="-Z unstable-options --output-format json" cargo +nightly doc -p vauchi-core --no-deps
-      echo "Generating baseline rustdoc JSON from origin/main..."
-      # Per-job baseline path — shared shell runner persists /tmp across jobs,
-      # and a foreign-owned /tmp/baseline would fail both `rm -rf` and the
-      # subsequent worktree add with EACCES.
-      BASELINE_DIR="/tmp/baseline-${CI_JOB_ID}"
-      git worktree remove -f "$BASELINE_DIR" 2>/dev/null || true
-      git worktree prune
-      rm -rf "$BASELINE_DIR"
-      git worktree add -f "$BASELINE_DIR" origin/main --detach
-      RUSTDOCFLAGS="-Z unstable-options --output-format json" cargo +nightly doc --manifest-path "$BASELINE_DIR/Cargo.toml" -p vauchi-core --no-deps
-      cargo semver-checks check-release -p vauchi-core \
-        --current-rustdoc target/doc/vauchi_core.json \
-        --baseline-rustdoc "$BASELINE_DIR/target/doc/vauchi_core.json"
-      git worktree remove "$BASELINE_DIR" 2>/dev/null || true
+    - cargo semver-checks check-release -p vauchi-core --baseline-rev origin/main
     # vauchi-platform: include_bytes! references sibling themes/ repo —
     # skipped until themes are vendored or a similar workaround is applied
 

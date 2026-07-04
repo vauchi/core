@@ -958,7 +958,10 @@ mod tests {
             pinned_certs: vec![],
         });
         let result = transport.health_check();
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(NetworkError::ConnectionFailed(_))),
+            "expected ConnectionFailed, got {result:?}"
+        );
     }
 
     #[test]
@@ -971,7 +974,6 @@ mod tests {
             pinned_certs: vec![],
         });
         let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
-        assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("OHTTP not configured"),
@@ -984,7 +986,10 @@ mod tests {
         let transport =
             HttpTransport::new(HttpTransportConfig::for_testing("http://127.0.0.1:1", 1000));
         let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(NetworkError::ConnectionFailed(_))),
+            "expected ConnectionFailed, got {result:?}"
+        );
     }
 
     // @internal
@@ -1082,7 +1087,10 @@ mod tests {
 
         // Should try to POST to /v2/ohttp and fail (connection refused)
         let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(NetworkError::ConnectionFailed(_))),
+            "expected ConnectionFailed, got {result:?}"
+        );
     }
 
     #[test]

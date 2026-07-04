@@ -536,7 +536,11 @@ mod tests {
             mailbox_token: None,
         };
         let result = HttpTransportAdapter::blob_to_envelope(&blob);
-        assert!(result.is_err());
+        let err = result.expect_err("invalid base64 ciphertext must fail to decode");
+        assert!(
+            matches!(err, NetworkError::Serialization(ref msg) if msg.contains("invalid base64")),
+            "expected Serialization('invalid base64...'), got {err:?}"
+        );
     }
 
     #[test]

@@ -752,16 +752,25 @@ fn build_group_selection_screen(
             a11y: None,
         }],
         actions: vec![
+            // One primary button whose label follows the selection (record D,
+            // 2026-06-02-exchange-group-selection-ux): nothing selected reads
+            // "Skip", ≥1 reads "Continue" — the handler routes both the same
+            // way, keyed off the selection, so the old skip/continue pair
+            // collapses without a behavior change.
             ScreenAction {
                 id: "continue".into(),
-                label: "Continue".into(),
+                label: if selected_groups.is_empty() {
+                    "Skip".into()
+                } else {
+                    "Continue".into()
+                },
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
             },
             ScreenAction {
-                id: "skip".into(),
-                label: "Skip".into(),
+                id: "cancel".into(),
+                label: "Cancel".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -1018,19 +1027,26 @@ impl WorkflowEngine for ExchangeEngine {
                 }
                 ActionResult::UpdateScreen(self.build_screen())
             }
-            // Group selection: continue or skip
+            // Group selection: Cancel exits the exchange (record D,
+            // 2026-06-02-exchange-group-selection-ux) — the gate is the flow
+            // root when groups exist, so this mirrors the ModeSelection
+            // cancel above (Complete routes off the exchange).
+            (ExchangeStep::GroupSelection, UserAction::ActionPressed { action_id })
+                if action_id == "cancel" =>
+            {
+                ActionResult::Complete
+            }
+            // Group selection: the single primary button (labeled Skip at 0
+            // selected, Continue at ≥1). Semantics keyed off the selection —
+            // "skip" is still accepted for older renderers.
             (ExchangeStep::GroupSelection, UserAction::ActionPressed { action_id })
                 if action_id == "continue" || action_id == "skip" =>
             {
                 // Record the group step so BACK from mode / preview / sub-flow
                 // rewinds here (see navigate_back_within).
                 self.step_history.push(ExchangeStep::GroupSelection);
-                // "continue" shows the field preview after mode; "skip" clears
-                // the chosen groups and skips the preview.
-                self.show_preview_after_mode = action_id == "continue";
-                if action_id == "skip" {
-                    self.selected_groups.clear();
-                }
+                // A selection arms the field preview after mode; none skips it.
+                self.show_preview_after_mode = !self.selected_groups.is_empty();
                 // G4 (group-first): mode selection comes after groups. When the
                 // mode was pre-set (deep link / tests) there is no picker — go
                 // straight to the field preview (continue) or the sub-flow
@@ -1485,7 +1501,13 @@ mod tests {
             vauchi_core::clock::SystemClock::shared(),
         );
 
-        // Continue from group selection → FieldPreview (not QR directly)
+        // Select a group, then Continue → FieldPreview (not QR directly).
+        // M2 S7: the unified button keys the preview off the selection, so
+        // an empty selection is the Skip path — pick one first.
+        let _ = engine.handle_action(UserAction::ItemToggled {
+            component_id: "group_picker".into(),
+            item_id: "g1".into(),
+        });
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });

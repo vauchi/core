@@ -125,23 +125,12 @@ fn selecting_group_hides_non_group_fields_in_preview() {
     );
 }
 
-// @internal
-#[test]
-fn no_group_selected_shows_all_fields_in_preview() {
-    // Continue without toggling any group → no audience filter → share all.
-    let (mut engine, _work) = engine_with_card_and_work_group();
-    let pairs = preview_field_visibilities(&mut engine, &[]);
-    assert_eq!(
-        visibility_of(&pairs, "Email"),
-        UiFieldVisibility::Shown,
-        "no group → Email shown"
-    );
-    assert_eq!(
-        visibility_of(&pairs, "Phone"),
-        UiFieldVisibility::Shown,
-        "no group selected → full card, Phone shown"
-    );
-}
+// NOTE (M2 S7): the "continue with zero groups → preview shows all" case
+// was removed — under the unified Skip/Continue button an empty selection
+// takes the skip path and no preview renders (the preview is a selection
+// refinement, never a gate). The share-all resolver semantics that case
+// pinned stay covered at the unit level:
+// `group_filter::tests::no_groups_selected_returns_none_share_all`.
 
 // @internal
 #[test]

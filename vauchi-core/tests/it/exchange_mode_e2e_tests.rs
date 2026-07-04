@@ -48,7 +48,13 @@ fn glance_full_flow_mode_to_ble_handoff() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_group_selection");
 
-    // Step 2: Continue with groups → mode selection.
+    // Step 2: select a group, Continue → mode selection. (M2 S7: the
+    // unified button keys the preview off the selection, so an empty
+    // selection would take the Skip path.)
+    let _ = engine.handle_action(UserAction::ItemToggled {
+        component_id: "group_picker".to_string(),
+        item_id: "g1".to_string(),
+    });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
     });
@@ -154,7 +160,11 @@ fn link_full_flow_mode_to_field_preview_hands_off() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_group_selection");
 
-    // Continue → mode selection.
+    // Select a group, Continue → mode selection (M2 S7: selection-keyed).
+    let _ = engine.handle_action(UserAction::ItemToggled {
+        component_id: "group_picker".to_string(),
+        item_id: "g1".to_string(),
+    });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
     });

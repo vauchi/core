@@ -36,6 +36,9 @@ pub struct ValidationSummary {
 pub const PAYLOAD_VERSION_CEK: u8 = 0x02;
 /// Version byte for reciprocity confirmation payload.
 pub const PAYLOAD_VERSION_RECIPROCITY: u8 = 0x03;
+/// Version byte for a safety-alert payload (emergency broadcast / duress).
+/// Inside the ratchet ciphertext, so indistinguishable on the wire (ADR-032).
+pub const PAYLOAD_VERSION_ALERT: u8 = 0x04;
 
 /// Delta encoding error types.
 #[derive(Error, Debug)]
@@ -503,6 +506,9 @@ pub enum VersionedPayload {
     CekWrapped(CekWrappedPayload),
     /// Reciprocity confirmation (version 0x03): token + Ed25519 signature.
     ReciprocityConfirm(ReciprocityConfirmPayload),
+    /// Safety alert (version 0x04): signed, nonce-bearing emergency/duress
+    /// envelope routed at the caller (`crate::sync::safety_alert`).
+    Alert(crate::sync::safety_alert::SafetyAlertPayload),
 }
 
 impl VersionedPayload {
@@ -524,6 +530,15 @@ impl VersionedPayload {
         buf
     }
 
+    /// Encode a safety alert with version prefix.
+    pub fn encode_alert(payload: &crate::sync::safety_alert::SafetyAlertPayload) -> Vec<u8> {
+        let inner = payload.encode();
+        let mut buf = Vec::with_capacity(1 + inner.len());
+        buf.push(PAYLOAD_VERSION_ALERT);
+        buf.extend_from_slice(&inner);
+        buf
+    }
+
     /// Decode a version-tagged payload.
     pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
         if data.is_empty() {
@@ -538,6 +553,10 @@ impl VersionedPayload {
             PAYLOAD_VERSION_RECIPROCITY => {
                 let payload = ReciprocityConfirmPayload::decode(&data[1..])?;
                 Ok(VersionedPayload::ReciprocityConfirm(payload))
+            }
+            PAYLOAD_VERSION_ALERT => {
+                let payload = crate::sync::safety_alert::SafetyAlertPayload::decode(&data[1..])?;
+                Ok(VersionedPayload::Alert(payload))
             }
             v => Err(DeltaError::UnknownPayloadVersion(v)),
         }

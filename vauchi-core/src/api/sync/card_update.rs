@@ -286,6 +286,14 @@ fn decode_versioned_payload(
                     "reciprocity confirm not handled here".into(),
                 ))
             }
+            Ok(VersionedPayload::Alert(_)) => {
+                // Safety alerts (emergency/duress) are not card deltas — routed
+                // at the caller by version byte, like ReciprocityConfirm
+                // (2026-07-04-coercion-safety-alerts-never-received).
+                Err(CardUpdateError::InvalidPayload(
+                    "safety alert not handled here".into(),
+                ))
+            }
             Err(e) => Err(CardUpdateError::InvalidPayload(e.to_string())),
         }
     } else {

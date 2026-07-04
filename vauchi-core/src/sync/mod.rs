@@ -10,6 +10,7 @@
 pub mod delta;
 pub mod device_sync;
 pub mod merkle;
+pub mod safety_alert;
 pub mod state;
 
 pub use delta::{CardDelta, DeltaError, FieldChange, ValidationSummary};

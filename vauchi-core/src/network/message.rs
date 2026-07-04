@@ -296,7 +296,7 @@ pub struct EmergencyAlert {
 }
 
 /// Geographic location with optional accuracy.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GeoLocation {
     /// Latitude in decimal degrees.
     pub latitude: f64,

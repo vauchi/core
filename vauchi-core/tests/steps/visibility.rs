@@ -88,6 +88,15 @@ fn have_group(world: &mut VauchiWorld, name: String) {
     world.groups.insert(name, group.id().to_string());
 }
 
+#[when(expr = "I try to create another label named {string}")]
+fn try_create_duplicate_label(world: &mut VauchiWorld, name: String) {
+    world.last_result = world
+        .vauchi
+        .create_group(&name)
+        .map(|_| ())
+        .map_err(|e| e.to_string());
+}
+
 // ── When (and reusable Given): actions ──────────────────────────
 
 #[given(expr = "contact {string} is in group {string}")]
@@ -275,4 +284,16 @@ fn group_not_contains(world: &mut VauchiWorld, group: String, contact: String) {
         !members.iter().any(|c| c.id() == cid),
         "expected group {group} NOT to contain {contact}"
     );
+}
+
+#[then(expr = "only one {string} label should exist")]
+fn only_one_label(world: &mut VauchiWorld, name: String) {
+    let count = world
+        .vauchi
+        .list_groups()
+        .unwrap()
+        .into_iter()
+        .filter(|g| g.name() == name)
+        .count();
+    assert_eq!(count, 1, "expected exactly one label named {name:?}");
 }

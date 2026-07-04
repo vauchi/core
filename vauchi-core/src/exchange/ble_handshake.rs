@@ -178,6 +178,13 @@ pub struct BleHandshakeSession {
     session_key: Option<SymmetricKey>,
     their_card: Option<BleCardPayload>,
     their_identity_key: Option<[u8; 32]>,
+    /// Reciprocity confirmation tokens (design spec §2), derived from the
+    /// agreed session key once key agreement completes. `our_confirmation_token`
+    /// is sent to prove our side persisted; `expected_their_token` is checked
+    /// against the peer's token to confirm reciprocity over the native BLE
+    /// channel (relay-free). Both peers derive a cross-matching pair.
+    our_confirmation_token: Option<[u8; 32]>,
+    expected_their_token: Option<[u8; 32]>,
     our_encrypted_card: Option<Vec<u8>>,
     our_commitment: Option<[u8; 32]>,
     their_commitment: Option<[u8; 32]>,
@@ -313,6 +320,8 @@ impl BleHandshakeSession {
             session_key: None,
             their_card: None,
             their_identity_key: None,
+            our_confirmation_token: None,
+            expected_their_token: None,
             our_encrypted_card: None,
             our_commitment: None,
             their_commitment: None,
@@ -328,6 +337,34 @@ impl BleHandshakeSession {
     /// Returns the current handshake state.
     pub fn state(&self) -> &BleHandshakeState {
         &self.state
+    }
+
+    /// Our reciprocity confirmation token, once key agreement completes.
+    pub fn our_confirmation_token(&self) -> Option<&[u8; 32]> {
+        self.our_confirmation_token.as_ref()
+    }
+
+    /// The peer's expected confirmation token, once key agreement completes.
+    pub fn expected_their_token(&self) -> Option<&[u8; 32]> {
+        self.expected_their_token.as_ref()
+    }
+
+    /// Derive + store the reciprocity confirmation token pair from the agreed
+    /// session key (design spec §2), via the shared transport-agnostic
+    /// primitive. No-op until `session_key` + `their_identity_key` are set;
+    /// both peers derive a cross-matching pair.
+    fn store_confirmation_tokens(&mut self) {
+        if let (Some(session_key), Some(their_id)) =
+            (self.session_key.as_ref(), self.their_identity_key)
+        {
+            let (our, their) = super::reciprocity_tokens::derive_confirmation_tokens(
+                session_key.as_bytes(),
+                &self.our_identity_key,
+                &their_id,
+            );
+            self.our_confirmation_token = Some(*our);
+            self.expected_their_token = Some(*their);
+        }
     }
 
     /// The derived session key, available once the handshake has
@@ -497,6 +534,7 @@ impl BleHandshakeSession {
 
         self.session_key = Some(session_key);
         self.their_identity_key = Some(their_identity);
+        self.store_confirmation_tokens();
         // Persist initiator's offer-timestamp for the reciprocal-decrypt
         // AAD reconstruction in `complete_exchange` (v3 AAD-asymmetry fix).
         self.their_timestamp = Some(their_timestamp);
@@ -661,6 +699,7 @@ impl BleHandshakeSession {
         self.session_key = Some(session_key);
         self.their_card = Some(their_card);
         self.their_identity_key = Some(their_identity);
+        self.store_confirmation_tokens();
         self.their_commitment = Some(their_commitment);
         self.their_encrypted_card = Some(their_encrypted_card.to_vec());
         self.our_encrypted_card = Some(our_encrypted.clone());

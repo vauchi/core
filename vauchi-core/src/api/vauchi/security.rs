@@ -345,18 +345,32 @@ impl Vauchi {
     /// (indistinguishable from normal sync traffic).
     pub(super) fn queue_duress_alert(&mut self) -> VauchiResult<()> {
         let settings = self.storage.duress().load_duress_settings()?;
-        if let Some(_settings) = settings {
+        if let Some(settings) = settings {
             let now = self.clock.unix_seconds();
-
             let device_id = self.device_id_string();
 
-            let alert = DuressAlert {
+            // Local record that a duress unlock occurred.
+            self.duress_alerts.push(DuressAlert {
                 timestamp: now,
                 device_id,
                 alert_type: DuressAlertType::Unlock,
-            };
+            });
 
-            self.duress_alerts.push(alert);
+            // Send the disguised duress alert to the configured recipients.
+            // Best-effort: a send/queue failure must NEVER block the duress
+            // unlock (the user must still reach the decoy UI). There is no
+            // observable network activity here — alerts are queued locally and
+            // delivered on the next sync, indistinguishable from card updates
+            // (ADR-032), so the timing does not betray duress to an observer.
+            let recipients = settings.alert_contact_ids.clone();
+            let message = settings.alert_message.clone();
+            // Result deliberately ignored (best-effort — see above).
+            let _sent = self.queue_safety_alerts(
+                crate::sync::safety_alert::AlertKind::Duress,
+                &recipients,
+                &message,
+                None,
+            );
         }
         Ok(())
     }

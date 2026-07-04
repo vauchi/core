@@ -368,6 +368,7 @@ mod replay_detection_tests;
 mod retry_queue_tests;
 mod revocation_protocol_tests;
 mod rng_tests;
+mod safety_alert_receive_tests;
 mod safety_alert_tests;
 mod schema_compat_tests;
 mod sealed_box_tests;

@@ -68,9 +68,6 @@ impl Vauchi {
     ///
     /// Returns a `BroadcastResult` with sent/total counts.
     pub fn send_emergency_broadcast(&mut self) -> VauchiResult<BroadcastResult> {
-        use crate::network::EmergencyAlert;
-        use crate::storage::{PendingUpdate, UpdateStatus};
-
         let config = self
             .storage
             .emergency()
@@ -79,66 +76,99 @@ impl Vauchi {
                 VauchiError::InvalidState("emergency broadcast not configured".into())
             })?;
 
+        let total = config.trusted_contact_ids.len();
+        let recipients = config.trusted_contact_ids.clone();
+        let message = config.message.clone();
+
+        let sent = self.queue_safety_alerts(
+            crate::sync::safety_alert::AlertKind::Emergency,
+            &recipients,
+            &message,
+            None,
+        )?;
+
+        self.events.dispatch(VauchiEvent::EmergencyBroadcastSent {
+            sent_count: sent,
+            total,
+        });
+
+        Ok(BroadcastResult { sent, total })
+    }
+
+    /// Queue disguised safety alerts (emergency or duress) to a set of
+    /// recipient contacts.
+    ///
+    /// For each recipient with an established ratchet, builds a signed
+    /// [`SafetyAlertPayload`], encrypts it with the ratchet, and queues it as a
+    /// `card_delta` `PendingUpdate` — indistinguishable from a normal card
+    /// update on the wire (ADR-032). Returns the number queued. Recipients
+    /// without a local contact/ratchet, or blocked, are skipped. Shared by the
+    /// emergency broadcast and the duress-unlock alert path.
+    ///
+    /// [`SafetyAlertPayload`]: crate::sync::safety_alert::SafetyAlertPayload
+    pub(crate) fn queue_safety_alerts(
+        &mut self,
+        kind: crate::sync::safety_alert::AlertKind,
+        recipient_ids: &[String],
+        message: &str,
+        location: Option<crate::network::GeoLocation>,
+    ) -> VauchiResult<usize> {
+        use crate::storage::{PendingUpdate, UpdateStatus};
+        use crate::sync::delta::VersionedPayload;
+        use crate::sync::safety_alert::SafetyAlertPayload;
+
         let identity = self
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
-
-        let sender_id = identity.public_id();
-        let total = config.trusted_contact_ids.len();
+        let now = self.clock.unix_seconds();
         let mut sent = 0;
 
-        let now = self.clock.unix_seconds();
-
-        for contact_id in &config.trusted_contact_ids {
-            // Skip contacts that don't exist locally
+        for contact_id in recipient_ids {
             let contact = match self.storage.contacts().load_contact(contact_id)? {
                 Some(c) => c,
                 None => continue,
             };
-
-            // Skip blocked contacts
             if contact.is_blocked() {
                 continue;
             }
-
-            // Skip contacts without ratchet (can't encrypt)
+            let recipient_pk = match contact.public_key() {
+                Some(pk) => *pk,
+                None => continue,
+            };
             let (mut ratchet, is_initiator) =
                 match self.storage.ratchets().load_ratchet_state(contact_id)? {
                     Some(r) => r,
                     None => continue,
                 };
 
-            // Create the emergency alert payload
-            let alert = EmergencyAlert {
-                sender_id: crate::identifiers::ContactId::from(sender_id.clone()),
-                message: config.message.clone(),
-                timestamp: now,
-                location: None, // Location is provided by mobile layer at send time
-            };
-
-            // Serialize the alert as JSON (same format as card delta)
-            let alert_bytes = serde_json::to_vec(&alert)
-                .map_err(|e| VauchiError::Serialization(e.to_string()))?;
-
-            // Encrypt with ratchet (indistinguishable from card update)
+            // Random nonce → the receiver's replay check dedupes re-sends.
+            let nonce: [u8; 32] = crate::crypto::random_bytes();
+            let alert = SafetyAlertPayload::new(
+                kind,
+                message.to_string(),
+                now,
+                location.clone(),
+                nonce,
+                identity,
+                &recipient_pk,
+            )
+            .map_err(|e| VauchiError::Serialization(format!("{e:?}")))?;
+            let payload = VersionedPayload::encode_alert(&alert);
             let ratchet_msg = ratchet
-                .encrypt(&alert_bytes)
-                .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
+                .encrypt(&payload)
+                .map_err(|e| VauchiError::Crypto(format!("{e:?}")))?;
             let encrypted = serde_json::to_vec(&ratchet_msg)
                 .map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
-            // Save updated ratchet state
             self.storage
                 .ratchets()
                 .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
 
-            // Queue for delivery (update_type = "emergency_alert" internally,
-            // but on the wire it's just an EncryptedUpdate like any other)
             let update = PendingUpdate {
                 id: uuid::Uuid::new_v4().to_string(),
                 contact_id: contact_id.to_string(),
-                update_type: "card_delta".to_string(), // Indistinguishable
+                update_type: "card_delta".to_string(), // Indistinguishable (ADR-032)
                 payload: encrypted,
                 created_at: now,
                 retry_count: 0,
@@ -149,13 +179,7 @@ impl Vauchi {
             sent += 1;
         }
 
-        // Dispatch event
-        self.events.dispatch(VauchiEvent::EmergencyBroadcastSent {
-            sent_count: sent,
-            total,
-        });
-
-        Ok(BroadcastResult { sent, total })
+        Ok(sent)
     }
 
     /// Deletes the emergency broadcast configuration.

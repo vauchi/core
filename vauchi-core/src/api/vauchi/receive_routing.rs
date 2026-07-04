@@ -334,6 +334,7 @@ mod tests {
             decrypted,
             reject_reason: if decrypted { None } else { Some("decrypt") },
             contact_id: contact_id.map(str::to_string),
+            alert: None,
         }
     }
 
@@ -349,6 +350,7 @@ mod tests {
                 decrypted: false,
                 reject_reason: None,
                 contact_id: None, // unresolved token
+                alert: None,
             },
         ];
 

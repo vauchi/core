@@ -72,10 +72,11 @@ impl VauchiWorld {
 }
 
 fn main() {
-    // A wired scenario that fails now fails the process; unbound scenarios are
-    // skipped and reported below. Deferred (needs features-repo coordination +
-    // a pinned features checkout so the count is deterministic): a passing-count
-    // ratchet + `@wip`-tagging to also gate silent skip-*regressions*. See
+    // Two gates below: a genuine step failure fails the process, and a coverage
+    // FLOOR fails if a previously-wired scenario silently regresses to skipped
+    // (a lost step binding). Unbound scenarios are otherwise tolerated and
+    // reported. Still deferred: `@wip`-tagging the aspirational features so the
+    // exclusion is explicit rather than implicit. See
     // `problems/2026-07-04-cucumber-backgrounds-fail-silently`.
     //
     //   cargo test --test cucumber_tests -- --tags @contact-card
@@ -114,6 +115,24 @@ fn main() {
             writer.failed_steps(),
             writer.parsing_errors(),
             writer.hook_errors(),
+        );
+        std::process::exit(1);
+    }
+
+    // Coverage floor: a currently-wired scenario (all steps bound) must not
+    // silently drop to skipped — e.g. a renamed or removed step definition. A
+    // FLOOR, not an exact count, so the features repo authoring more scenarios
+    // only grows `passed` and never flakes this; it trips only when a wired
+    // scenario loses its binding. Bump this when you wire more step
+    // definitions; if CI reports a drop, a wired scenario lost its binding —
+    // investigate the binding, don't just lower the floor.
+    const MIN_WIRED_SCENARIOS: usize = 17;
+    if scenarios.passed < MIN_WIRED_SCENARIOS {
+        eprintln!(
+            "cucumber GATE failed: {} wired scenario(s) passed, expected at least \
+             {MIN_WIRED_SCENARIOS} — a previously-wired scenario regressed to \
+             skipped (lost its step binding).",
+            scenarios.passed,
         );
         std::process::exit(1);
     }

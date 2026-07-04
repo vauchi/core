@@ -153,18 +153,15 @@ impl AppEngine {
             .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
             .and_then(|ex| {
                 let groups = ex.selected_groups().to_vec();
-                // QR path: contact is in session.state() → Complete { contact }.
-                // Build the ratchet here while `session` is in scope; it owns
-                // the correct role + exchange-key selection (see
-                // ExchangeSession::build_exchange_ratchet).
+                // QR path: the contact to persist carries its reciprocity outcome
+                // (Confirmed/Pending) stamped by the engine, so an unconfirmed
+                // exchange surfaces via the banner rather than looking mutual.
+                // Build the ratchet from the session (owns the correct role +
+                // exchange-key selection, see build_exchange_ratchet).
+                let contact = ex.reciprocity_stamped_contact()?;
                 let session = ex.session()?;
-                if let vauchi_core::exchange::ExchangeState::Complete { contact } = session.state()
-                {
-                    let contact = (**contact).clone();
-                    let ratchet = session.build_exchange_ratchet(&contact);
-                    return Some((contact, ratchet, groups));
-                }
-                None
+                let ratchet = session.build_exchange_ratchet(&contact);
+                Some((contact, ratchet, groups))
             });
 
         let screen = self.navigate_to_internal(AppScreen::Contacts);

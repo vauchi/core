@@ -294,6 +294,25 @@ impl ExchangeEngine {
             .map(|c| c.to_persisted_state())
     }
 
+    /// The contact to persist, with its reciprocity stamped from the resolved
+    /// confirmation outcome. An unconfirmed exchange (`Pending`) is recorded as
+    /// such — not silently `Unknown` — so the reciprocity banner surfaces it and
+    /// later in-person / relay resolution can flip it to `Confirmed` /
+    /// `Unreciprocated` (2026-06-04-exchange-terminal-screens). `None` until the
+    /// session reaches `Complete`.
+    pub fn reciprocity_stamped_contact(&self) -> Option<vauchi_core::contact::Contact> {
+        let session = self.session()?;
+        if let vauchi_core::exchange::ExchangeState::Complete { contact } = session.state() {
+            let mut contact = (**contact).clone();
+            if let Some(outcome) = self.reciprocity_outcome {
+                contact.set_reciprocity(outcome);
+            }
+            Some(contact)
+        } else {
+            None
+        }
+    }
+
     pub fn selected_groups(&self) -> &[String] {
         &self.selected_groups
     }
@@ -1532,6 +1551,74 @@ mod tests {
             engine.step,
             ExchangeStep::Success,
             "Pending reciprocity must land on Success (contact kept), not Failed/stuck-Verifying"
+        );
+    }
+
+    // Symmetry visibility (2026-06-04-exchange-terminal-screens): a Pending
+    // outcome must be RECORDED on the persisted contact, not left Unknown —
+    // otherwise an unconfirmed, possibly one-way contact looks identical to a
+    // confirmed mutual one and the reciprocity banner never fires.
+    // @internal
+    #[test]
+    fn pending_reciprocity_stamps_contact_pending() {
+        let (session, gate) = qr_session_at_complete();
+        let gate_hash = hex::decode(&gate).expect("escrow gate is hex");
+        let mut engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        let _ = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowReady {
+            gate_hash: gate_hash.clone(),
+        });
+        let _ = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowBlobReceived {
+            gate_hash,
+            blob: vec![0xFF; 32],
+        });
+
+        let contact = engine
+            .reciprocity_stamped_contact()
+            .expect("a Complete session yields a contact to persist");
+        // reciprocity(now) applies a passive 7-day Pending→Unreciprocated timer;
+        // query at now=0 (inside the window) to assert the STORED outcome.
+        assert_eq!(
+            contact.reciprocity(0),
+            vauchi_core::exchange::reciprocity::Reciprocity::Pending,
+            "an unconfirmed exchange must be stamped Pending, not left Unknown"
+        );
+    }
+
+    // The confirmed counterpart: a matching peer blob resolves Confirmed, and
+    // the persisted contact must carry it (banner stays clear).
+    // @internal
+    #[test]
+    fn confirmed_reciprocity_stamps_contact_confirmed() {
+        let (session, gate) = qr_session_at_complete();
+        let gate_hash = hex::decode(&gate).expect("escrow gate is hex");
+        let expected_peer_token = *session
+            .expected_their_token()
+            .expect("expected-peer token available at Complete");
+        let mut engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        let _ = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowReady {
+            gate_hash: gate_hash.clone(),
+        });
+        let _ = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowBlobReceived {
+            gate_hash,
+            blob: expected_peer_token.to_vec(),
+        });
+
+        let contact = engine
+            .reciprocity_stamped_contact()
+            .expect("a Complete session yields a contact to persist");
+        let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+        assert_eq!(
+            contact.reciprocity(now),
+            vauchi_core::exchange::reciprocity::Reciprocity::Confirmed,
+            "a confirmed exchange must be stamped Confirmed"
         );
     }
 

@@ -12,9 +12,10 @@
 //! regression gate for the wired scenarios, not a green-no-matter-what
 //! scaffold — and the skipped count is surfaced (see `main`).
 //!
-//! Usage:
-//!   cargo test --test cucumber_tests
-//!   cargo test --test cucumber_tests -- --tags @contact-card
+//! Usage (needs `testing` for the two-party exchange seams; `test-kdf` for
+//! fast per-scenario identity creation):
+//!   cargo test --test cucumber_tests --features testing,test-kdf
+//!   cargo test --test cucumber_tests --features testing,test-kdf -- --tags @contact-card
 
 use cucumber::{World, writer::Stats as _};
 use vauchi_core::{ContactCard, Vauchi};
@@ -41,6 +42,9 @@ pub struct VauchiWorld {
     pub contacts: std::collections::BTreeMap<String, String>,
     /// Reusable core vocabulary: named visibility groups → label id.
     pub groups: std::collections::BTreeMap<String, String>,
+    /// Multi-party vocabulary: named parties (Alice, Bob, …), each a full
+    /// Vauchi instance, so two of them can drive a real exchange.
+    pub parties: std::collections::BTreeMap<String, Vauchi>,
 }
 
 impl std::fmt::Debug for VauchiWorld {
@@ -73,7 +77,15 @@ impl VauchiWorld {
             last_error_message: None,
             contacts: std::collections::BTreeMap::new(),
             groups: std::collections::BTreeMap::new(),
+            parties: std::collections::BTreeMap::new(),
         }
+    }
+
+    /// A named multi-party Vauchi instance (created via `a user "…"`).
+    pub fn party(&self, name: &str) -> &Vauchi {
+        self.parties
+            .get(name)
+            .unwrap_or_else(|| panic!("no party named {name:?}"))
     }
 
     /// Mints a synthetic *exchanged* contact (so `is_exchanged()` holds, as
@@ -179,7 +191,7 @@ fn main() {
     // scenario loses its binding. Bump this when you wire more step
     // definitions; if CI reports a drop, a wired scenario lost its binding —
     // investigate the binding, don't just lower the floor.
-    const MIN_WIRED_SCENARIOS: usize = 39;
+    const MIN_WIRED_SCENARIOS: usize = 40;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

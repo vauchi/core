@@ -212,6 +212,9 @@ required-features = ["testing"]
 [[test]]
 name = "cucumber_tests"
 harness = false
+# Needs the `testing` exchange seams (MockProximityVerifier) for the two-party
+# exchange steps; run with `--features testing,test-kdf`.
+required-features = ["testing"]
 
 [[test]]
 name = "schema_gen"

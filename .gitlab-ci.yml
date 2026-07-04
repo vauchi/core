@@ -604,7 +604,10 @@ test:cucumber:
     # rendering — untestable against core; they belong in the frontend
     # harnesses (Espresso/XCUITest/AT-SPI). Excluded so the core run reflects
     # only core-eligible scenarios.
-    - cargo test --test cucumber_tests -- --tags "not @wip and not @ui"
+    # `testing` exposes the exchange test seams (MockProximityVerifier) the
+    # two-party exchange steps drive; `test-kdf` keeps per-scenario identity
+    # creation fast.
+    - cargo test --test cucumber_tests --features testing,test-kdf -- --tags "not @wip and not @ui"
 
 test:platform:
   extends: [.linux-runner, .validation-platform, .timeout-standard]

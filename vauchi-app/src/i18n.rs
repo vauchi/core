@@ -118,20 +118,38 @@ pub fn get_available_locales() -> Vec<Locale> {
 
 /// Get a localized string by key
 pub fn get_string(locale: Locale, key: &str) -> String {
-    let strings = get_strings_for_locale(locale);
-    if let Some(value) = strings.get(key) {
-        return value.clone();
+    if let Some(value) = lookup_one(locale, key) {
+        return value;
     }
 
     // Fallback to English
-    if locale != Locale::English {
-        let en_strings = get_strings_for_locale(Locale::English);
-        if let Some(value) = en_strings.get(key) {
-            return value.clone();
-        }
+    if locale != Locale::English
+        && let Some(value) = lookup_one(Locale::English, key)
+    {
+        return value;
     }
 
     format!("Missing: {}", key)
+}
+
+/// Single-key lookup — clones only the matched value, never a whole
+/// locale map. A store-loaded locale wins entirely (hit or miss),
+/// matching [`get_strings_for_locale`]'s fallback order; only an
+/// UNLOADED English falls back to the cached bundled set. Screen
+/// builders call this dozens of times per render, so the per-call
+/// full-map clone / full-JSON parse this replaces made engine
+/// proptests time out (M3 S4a, 2026-07-04).
+fn lookup_one(locale: Locale, key: &str) -> Option<String> {
+    if let Ok(lock) = LOCALE_STORE.read()
+        && let Some(store) = lock.as_ref()
+        && let Some(strings) = store.get(locale.code())
+    {
+        return strings.get(key).cloned();
+    }
+    if locale == Locale::English {
+        return bundled_english_cached().get(key).cloned();
+    }
+    None
 }
 
 /// Get a localized string with argument interpolation
@@ -267,7 +285,6 @@ include!(concat!(env!("OUT_DIR"), "/bundled_locale.rs"));
 /// Bundled English strings — parsed from embedded locale JSON at compile time.
 /// The JSON is sourced from the sibling `locales/` repo via build.rs.
 fn bundled_english() -> HashMap<String, String> {
-    // Parse the embedded JSON (this is cached after first call via get_strings_for_locale)
     let raw: HashMap<String, serde_json::Value> =
         serde_json::from_str(BUNDLED_EN_JSON).unwrap_or_default();
 
@@ -275,6 +292,14 @@ fn bundled_english() -> HashMap<String, String> {
         .filter(|(k, _)| k != "_meta")
         .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_owned())))
         .collect()
+}
+
+/// The bundled set parses once — every fallback lookup after that is a
+/// map read. (Its predecessor's "cached after first call" comment was
+/// aspirational: each call re-parsed the full JSON.)
+fn bundled_english_cached() -> &'static HashMap<String, String> {
+    static BUNDLED: std::sync::OnceLock<HashMap<String, String>> = std::sync::OnceLock::new();
+    BUNDLED.get_or_init(bundled_english)
 }
 
 /// Shared test lock: any test that mutates `LOCALE_STORE` (clear, reset, init)

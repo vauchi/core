@@ -35,3 +35,15 @@ pub struct RenderContext {
     /// semantics as `locale`.
     pub theme_id: Option<String>,
 }
+
+impl RenderContext {
+    /// The pushed locale as a [`crate::i18n::Locale`], English when the
+    /// frontend has not pushed one (or pushed an unknown code) — the
+    /// resolution every locale-threaded engine factory arm uses.
+    pub fn resolved_locale(&self) -> crate::i18n::Locale {
+        self.locale
+            .as_deref()
+            .and_then(crate::i18n::Locale::from_code)
+            .unwrap_or_default()
+    }
+}

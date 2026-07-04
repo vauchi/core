@@ -65,13 +65,9 @@ impl AppEngine {
     ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Onboarding => Box::new(
-                OnboardingEngine::new().with_help_icons(true).with_locale(
-                    render_context
-                        .locale
-                        .as_deref()
-                        .and_then(crate::i18n::Locale::from_code)
-                        .unwrap_or_default(),
-                ),
+                OnboardingEngine::new()
+                    .with_help_icons(true)
+                    .with_locale(render_context.resolved_locale()),
             ),
             AppScreen::MyInfo => {
                 // If a preview-as contact is active, build in PreviewAs view mode.
@@ -249,11 +245,7 @@ impl AppEngine {
                         .unwrap_or_else(|_| "Weekly".to_string()),
                     last_backup_display: {
                         let now = vauchi.clock().unix_seconds();
-                        let locale = render_context
-                            .locale
-                            .as_deref()
-                            .and_then(crate::i18n::Locale::from_code)
-                            .unwrap_or_default();
+                        let locale = render_context.resolved_locale();
                         vauchi
                             .load_backup_reminder_state()
                             .ok()
@@ -283,11 +275,7 @@ impl AppEngine {
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(
                 None,
                 vauchi.has_identity(),
-                render_context
-                    .locale
-                    .as_deref()
-                    .and_then(crate::i18n::Locale::from_code)
-                    .unwrap_or_default(),
+                render_context.resolved_locale(),
             )),
             AppScreen::Lock => Box::new(LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)),
             AppScreen::DeviceLinking => {
@@ -334,11 +322,7 @@ impl AppEngine {
                         alert_message,
                         include_location,
                     },
-                    render_context
-                        .locale
-                        .as_deref()
-                        .and_then(crate::i18n::Locale::from_code)
-                        .unwrap_or_default(),
+                    render_context.resolved_locale(),
                 ))
             }
             AppScreen::DecoyContacts => {
@@ -353,13 +337,9 @@ impl AppEngine {
             AppScreen::ChangePassword => Box::new(ChangePasswordEngine::new(
                 vauchi.is_password_enabled().unwrap_or(false),
             )),
-            AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new(
-                render_context
-                    .locale
-                    .as_deref()
-                    .and_then(crate::i18n::Locale::from_code)
-                    .unwrap_or_default(),
-            )),
+            AppScreen::EmergencyShred => {
+                Box::new(EmergencyShredEngine::new(render_context.resolved_locale()))
+            }
             AppScreen::EmergencyBroadcast => {
                 let config = vauchi.load_emergency_config().ok().flatten();
                 Box::new(
@@ -572,11 +552,7 @@ impl AppEngine {
                     GdprEngine::new(
                         deletion_status,
                         "Active".into(),
-                        render_context
-                            .locale
-                            .as_deref()
-                            .and_then(crate::i18n::Locale::from_code)
-                            .unwrap_or_default(),
+                        render_context.resolved_locale(),
                     )
                     .with_deletion_summary(crate::ui::gdpr::DeletionSummary {
                         contact_count,

@@ -364,6 +364,12 @@ impl AppEngine {
             vauchi_core::crypto::SymmetricKey::from_bytes(transport_key),
             now,
         );
+        // NB: reciprocity is intentionally NOT stamped here. Multi-stage derives
+        // confirmation tokens, but its QR channel is not reliably live
+        // post-Finalized for a native ack (unlike BLE's radio), so there is no
+        // in-person resolution path. Stamping Pending without one would decay
+        // every real exchange to Unreciprocated. The Pending stamp + resolution
+        // land together with relay-sync (design P3).
         let contact_id = contact.id().to_string();
         // Build the role-correct Double Ratchet (owned data, so the session
         // borrow ends before the save below). A None splits two ways: no

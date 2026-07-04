@@ -17,6 +17,7 @@ fn make_engine() -> ExchangeEngine {
             last_used_mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
+            locale: vauchi_app::i18n::Locale::English,
         },
         vauchi_core::clock::SystemClock::shared(),
     )
@@ -222,6 +223,7 @@ fn with_session_auto_enables_debug_log() {
         last_used_mode: None,
         card_snapshot: None,
         available_group_data: Vec::new(),
+        locale: vauchi_app::i18n::Locale::English,
     };
 
     let engine =

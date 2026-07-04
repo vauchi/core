@@ -270,6 +270,7 @@ impl AppEngine {
                 transport_readiness,
                 pending_groups,
                 glance_qr,
+                render_context.resolved_locale(),
             ),
             AppScreen::Help => Box::new(HelpEngine::new(help_catalog::default_help_items())),
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(

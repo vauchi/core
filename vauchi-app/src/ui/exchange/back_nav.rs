@@ -86,6 +86,7 @@ impl super::ExchangeEngine {
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
                     self.config.last_used_mode,
+                    self.config.locale,
                 ));
                 self.step = ExchangeStep::ModeSelection;
             }

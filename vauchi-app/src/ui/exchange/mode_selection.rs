@@ -7,6 +7,7 @@
 //!
 //! Wired into `ExchangeEngine` in Phase 1.2.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use vauchi_core::exchange::capability::TransportReadiness;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
@@ -27,6 +28,7 @@ pub struct ModeSelectionEngine {
     readiness: TransportReadiness,
     hero: ExchangeMode,
     expanded: bool,
+    locale: Locale,
 }
 
 /// Result of handling an action in the mode selection engine.
@@ -88,6 +90,7 @@ impl ModeSelectionEngine {
         capabilities: DeviceCapabilities,
         readiness: TransportReadiness,
         last_used: Option<ExchangeMode>,
+        locale: Locale,
     ) -> Self {
         let hero = pick_hero(last_used, &capabilities, &readiness);
         Self {
@@ -95,7 +98,12 @@ impl ModeSelectionEngine {
             readiness,
             hero,
             expanded: false,
+            locale,
         }
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Build the mode selection screen: the hero action, then either the
@@ -121,7 +129,7 @@ impl ModeSelectionEngine {
                 id: "more".into(),
                 items: vec![ActionListItem {
                     id: "show_other_modes".into(),
-                    label: "Other ways to connect".into(),
+                    label: self.t("exchange.picker.other_ways"),
                     icon: Some("more".into()),
                     detail: None,
                     a11y: None,
@@ -132,8 +140,8 @@ impl ModeSelectionEngine {
 
         ScreenModel {
             screen_id: "exchange_mode_selection".into(),
-            title: "Exchange Mode".into(),
-            subtitle: Some("Choose how to exchange contact cards".into()),
+            title: self.t("exchange.picker.title"),
+            subtitle: Some(self.t("exchange.picker.subtitle")),
             components,
             actions: vec![],
             progress: None,
@@ -159,11 +167,12 @@ impl ModeSelectionEngine {
                     mode.serde_name(),
                     requirement_token(*requirement)
                 ),
-                label: mode.display_name().to_string(),
+                label: self.mode_name(mode),
                 icon: Some("lock".into()),
-                detail: Some(format!(
-                    "{} permission needed — tap to grant",
-                    requirement_label(*requirement)
+                detail: Some(get_string_with_args(
+                    self.locale,
+                    "exchange.picker.grant",
+                    &[("requirement", &requirement_label(self.locale, *requirement))],
                 )),
                 a11y: None,
                 info_key: None,
@@ -175,11 +184,18 @@ impl ModeSelectionEngine {
         // runnable modes) gets a leading marker so the suggestion survives
         // without a dedicated badge field on the wire item.
         let base_detail = match &availability {
+            // Availability reasons are core-computed English today —
+            // keying them means a reason enum on the availability type
+            // (S4b-2 of 2026-07-03-core-screens-bypass-i18n).
             ModeAvailability::Degraded { reason } | ModeAvailability::Unavailable { reason } => {
                 reason.clone()
             }
-            _ if is_recommended => format!("Recommended · {}", mode_instruction(mode)),
-            _ => mode_instruction(mode).to_string(),
+            _ if is_recommended => get_string_with_args(
+                self.locale,
+                "exchange.picker.recommended",
+                &[("detail", &self.mode_instruction(mode))],
+            ),
+            _ => self.mode_instruction(mode),
         };
         // Bump/Shake/Magic run unauthenticated BLE today (decorative
         // proximity, no peer verification) — say so on the row until their
@@ -189,18 +205,40 @@ impl ModeSelectionEngine {
             mode,
             ExchangeMode::Bump | ExchangeMode::Shake | ExchangeMode::Magic
         ) {
-            Some(format!("Unauthenticated · {base_detail}"))
+            Some(get_string_with_args(
+                self.locale,
+                "exchange.picker.unauthenticated",
+                &[("detail", &base_detail)],
+            ))
         } else {
             Some(base_detail)
         };
         ActionListItem {
             id: format!("mode:{}", mode.serde_name()),
-            label: mode.display_name().to_string(),
+            label: self.mode_name(mode),
             icon: Some(mode_icon(mode).into()),
             detail,
             a11y: None,
             info_key: None,
         }
+    }
+
+    /// Mode display name via `exchange.mode_name.*` — the canonical
+    /// product feature names ([`ExchangeMode::display_name`] stays for
+    /// logs/CLI, where no locale flows).
+    fn mode_name(&self, mode: ExchangeMode) -> String {
+        get_string(
+            self.locale,
+            &format!("exchange.mode_name.{}", mode.serde_name()),
+        )
+    }
+
+    /// Short "what to do" line via `exchange.mode_instruction.*`.
+    fn mode_instruction(&self, mode: ExchangeMode) -> String {
+        get_string(
+            self.locale,
+            &format!("exchange.mode_instruction.{}", mode.serde_name()),
+        )
     }
 
     /// Handle a user action. Returns `Selected` if a mode was picked.
@@ -269,22 +307,6 @@ fn mode_icon(mode: ExchangeMode) -> &'static str {
 
 /// One-line "what you do" instruction per mode, shown as the row subtitle.
 /// Kept short enough to read on a phone list row.
-fn mode_instruction(mode: ExchangeMode) -> &'static str {
-    match mode {
-        ExchangeMode::Glance => "Point cameras at each other's screen",
-        ExchangeMode::Hover => "Hold the phones close together",
-        ExchangeMode::Bump => "Gently bump the phones together",
-        ExchangeMode::Shake => "Hold together, then shake",
-        ExchangeMode::Magic => "Bring the phones close — it connects itself",
-        ExchangeMode::TapTap => "Tap the phones together twice",
-        ExchangeMode::TapHoverShake => "Tap, hold close, then shake",
-        ExchangeMode::Link => "Send a link to connect remotely",
-        ExchangeMode::Cable => "Connect both with a USB cable",
-        // New core variants must add an instruction before shipping.
-        _ => "",
-    }
-}
-
 /// Parse a mode from its serde name.
 fn parse_mode(name: &str) -> Option<ExchangeMode> {
     match name {
@@ -344,18 +366,15 @@ pub(crate) fn parse_requirement(token: &str) -> Option<DeviceRequirement> {
 }
 
 /// Human-readable requirement name for the grant-affordance detail line.
-fn requirement_label(req: DeviceRequirement) -> &'static str {
-    match req {
-        DeviceRequirement::Camera => "Camera",
-        DeviceRequirement::Ble => "Bluetooth",
-        DeviceRequirement::Nfc => "NFC",
-        DeviceRequirement::Microphone => "Microphone",
-        DeviceRequirement::Speaker => "Speaker",
-        DeviceRequirement::Accelerometer => "Motion",
-        DeviceRequirement::Internet => "Internet",
-        DeviceRequirement::UsbPort => "USB",
-        _ => "Permission",
-    }
+/// Requirement display name via `exchange.requirement.*`, keyed by the
+/// same token the grant-row id carries; unknown tokens (a new core
+/// variant without a key yet) fall back to the generic "Permission".
+fn requirement_label(locale: Locale, req: DeviceRequirement) -> String {
+    let token = match requirement_token(req) {
+        "unknown" => "permission",
+        t => t,
+    };
+    get_string(locale, &format!("exchange.requirement.{token}"))
 }
 
 // INLINE_TEST_REQUIRED: Tests access private SerdeName trait, parse_mode(), and CATEGORY_ORDER
@@ -390,7 +409,12 @@ mod tests {
 
     #[test]
     fn screen_shows_all_nine_modes() {
-        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        let mut engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         engine.expanded = true;
         let screen = engine.screen();
         assert_eq!(screen.screen_id, "exchange_mode_selection");
@@ -412,7 +436,12 @@ mod tests {
     #[test]
     fn screen_is_hero_plus_disclosure() {
         // Collapsed: hero + the single "Other ways to connect" entry.
-        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        let mut engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         let list_ids = |screen: &ScreenModel| -> Vec<String> {
             screen
                 .components
@@ -432,7 +461,12 @@ mod tests {
     // @internal
     #[test]
     fn hero_is_first_in_picker() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        let engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         let screen = engine.screen();
         // First-run hero (no last-used) is Glance — implemented +
         // peer-authenticated (M2 S3, D2.3 user decision 2026-07-04).
@@ -458,6 +492,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             Some(ExchangeMode::Hover),
+            Locale::English,
         );
         let screen = engine.screen();
         let hero_first = screen
@@ -474,7 +509,12 @@ mod tests {
     // @internal
     #[test]
     fn hero_mode_is_marked_in_detail() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        let engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         let screen = engine.screen();
 
         // First-run hero is Glance.
@@ -498,7 +538,12 @@ mod tests {
     // @internal
     #[test]
     fn every_mode_has_a_per_mode_icon() {
-        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        let mut engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         engine.expanded = true;
         let screen = engine.screen();
         for &mode in ExchangeMode::all() {
@@ -512,8 +557,12 @@ mod tests {
 
     #[test]
     fn unavailable_modes_show_reason() {
-        let mut engine =
-            ModeSelectionEngine::new(minimal_caps(), TransportReadiness::default(), None);
+        let mut engine = ModeSelectionEngine::new(
+            minimal_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         engine.expanded = true;
         let screen = engine.screen();
 
@@ -532,7 +581,12 @@ mod tests {
     // @internal
     #[test]
     fn available_modes_show_instruction_detail() {
-        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        let mut engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         engine.expanded = true;
         let screen = engine.screen();
 
@@ -548,7 +602,12 @@ mod tests {
 
     #[test]
     fn selecting_mode_returns_selected() {
-        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        let mut engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         let result = engine.handle_action(&UserAction::ListItemSelected {
             component_id: "category:standard".into(),
             item_id: "mode:hover".into(),
@@ -562,8 +621,12 @@ mod tests {
     #[test]
     fn selecting_unavailable_mode_still_returns_selected() {
         // Availability enforcement is the engine's job, not mode selection's
-        let mut engine =
-            ModeSelectionEngine::new(minimal_caps(), TransportReadiness::default(), None);
+        let mut engine = ModeSelectionEngine::new(
+            minimal_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         let result = engine.handle_action(&UserAction::ListItemSelected {
             component_id: "category:fun".into(),
             item_id: "mode:tap_tap".into(),
@@ -576,7 +639,12 @@ mod tests {
 
     #[test]
     fn unknown_action_returns_screen() {
-        let mut engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        let mut engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         let result = engine.handle_action(&UserAction::ActionPressed {
             action_id: "something".into(),
         });
@@ -588,7 +656,12 @@ mod tests {
 
     #[test]
     fn all_modes_have_unique_ids() {
-        let engine = ModeSelectionEngine::new(full_caps(), TransportReadiness::default(), None);
+        let engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
         let screen = engine.screen();
         let ids: Vec<&str> = screen
             .components
@@ -628,7 +701,7 @@ mod tests {
         // (`grant:glance:camera`), not a selectable `mode:glance`.
         let mut led = TransportReadiness::default();
         led.note_denied(DeviceRequirement::Camera);
-        let mut engine = ModeSelectionEngine::new(full_caps(), led, None);
+        let mut engine = ModeSelectionEngine::new(full_caps(), led, None, Locale::English);
         engine.expanded = true;
         let screen = engine.screen();
 
@@ -660,7 +733,7 @@ mod tests {
         let mut led = TransportReadiness::default();
         led.note_denied(DeviceRequirement::Camera);
         led.note_granted(DeviceRequirement::Camera);
-        let engine = ModeSelectionEngine::new(full_caps(), led, None);
+        let engine = ModeSelectionEngine::new(full_caps(), led, None, Locale::English);
         let screen = engine.screen();
 
         assert!(
@@ -684,7 +757,7 @@ mod tests {
         let mut led = TransportReadiness::default();
         led.note_denied(DeviceRequirement::Camera);
         led.note_denied(DeviceRequirement::Ble);
-        let mut engine = ModeSelectionEngine::new(full_caps(), led, None);
+        let mut engine = ModeSelectionEngine::new(full_caps(), led, None, Locale::English);
         engine.expanded = true;
         let screen = engine.screen();
 

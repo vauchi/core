@@ -166,6 +166,7 @@ fn make_exchange() -> ExchangeEngine {
             last_used_mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
+            locale: vauchi_app::i18n::Locale::English,
         },
         vauchi_core::clock::SystemClock::shared(),
     )

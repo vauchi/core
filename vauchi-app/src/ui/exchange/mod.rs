@@ -87,6 +87,12 @@ pub struct ExchangeConfig {
     #[serde(default)]
     #[cfg_attr(feature = "schema-gen", schemars(skip))]
     pub available_group_data: Vec<vauchi_core::Group>,
+    /// Render locale for every exchange sub-engine's copy (M3 S4b).
+    /// Construction parameter, not wire data — the factory resolves it
+    /// from the frontend-pushed RenderContext (ADR-047 seam).
+    #[serde(skip)]
+    #[cfg_attr(feature = "schema-gen", schemars(skip))]
+    pub locale: crate::i18n::Locale,
 }
 
 /// Engine that drives the QR exchange workflow.
@@ -208,6 +214,7 @@ impl ExchangeEngine {
                 config.device_capabilities.clone(),
                 config.transport_readiness.clone(),
                 config.last_used_mode,
+                config.locale,
             ))
         } else {
             None
@@ -257,6 +264,7 @@ impl ExchangeEngine {
                 config.device_capabilities.clone(),
                 config.transport_readiness.clone(),
                 config.last_used_mode,
+                config.locale,
             ))
         } else {
             None
@@ -465,6 +473,7 @@ impl ExchangeEngine {
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
                     self.config.last_used_mode,
+                    self.config.locale,
                 ));
                 ActionResult::StartBleExchange { mode }
             }
@@ -478,6 +487,7 @@ impl ExchangeEngine {
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
                     self.config.last_used_mode,
+                    self.config.locale,
                 ));
                 ActionResult::StartNfcExchange
             }
@@ -503,6 +513,7 @@ impl ExchangeEngine {
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
                     self.config.last_used_mode,
+                    self.config.locale,
                 ));
                 ActionResult::StartMultiStageExchange { mode }
             }
@@ -516,6 +527,7 @@ impl ExchangeEngine {
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
                     self.config.last_used_mode,
+                    self.config.locale,
                 ));
                 ActionResult::StartDirectTransport
             }
@@ -526,6 +538,7 @@ impl ExchangeEngine {
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
                     self.config.last_used_mode,
+                    self.config.locale,
                 ));
                 self.step = ExchangeStep::ModeSelection;
                 ActionResult::NavigateTo(self.build_screen())
@@ -1063,6 +1076,7 @@ impl WorkflowEngine for ExchangeEngine {
                     self.config.device_capabilities.clone(),
                     self.config.transport_readiness.clone(),
                     self.config.last_used_mode,
+                    self.config.locale,
                 ));
                 self.step = ExchangeStep::ModeSelection;
                 ActionResult::NavigateTo(self.build_screen())
@@ -1196,6 +1210,7 @@ fn build_legacy_success_summary(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::i18n::Locale;
 
     fn config_no_groups() -> ExchangeConfig {
         ExchangeConfig {
@@ -1210,6 +1225,7 @@ mod tests {
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
+            locale: Locale::English,
         }
     }
 
@@ -1231,6 +1247,7 @@ mod tests {
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
+            locale: Locale::English,
         }
     }
 
@@ -1361,6 +1378,7 @@ mod tests {
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
+            locale: Locale::English,
         }
     }
 
@@ -2013,6 +2031,7 @@ mod tests {
             last_used_mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
+            locale: Locale::English,
         }
     }
 

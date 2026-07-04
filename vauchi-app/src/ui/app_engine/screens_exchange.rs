@@ -21,6 +21,7 @@ impl AppEngine {
         transport_readiness: &vauchi_core::exchange::capability::TransportReadiness,
         pending_groups: &[String],
         glance_qr: Option<&str>,
+        locale: crate::i18n::Locale,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Exchange => {
@@ -65,6 +66,7 @@ impl AppEngine {
                     last_used_mode,
                     card_snapshot,
                     available_group_data: all_groups,
+                    locale,
                 };
 
                 // ADR-031: Create a protocol session if identity + card are available.

@@ -344,6 +344,7 @@ mod qr_v3_relay_tests;
 mod ratchet_crash_recovery_tests;
 mod ratchet_error_tests;
 mod rate_limit_handling;
+mod reciprocity_confirm_receive_tests;
 mod reciprocity_sync_tests;
 mod reciprocity_tests;
 mod reciprocity_tokens_tests;

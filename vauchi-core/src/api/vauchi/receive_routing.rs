@@ -118,6 +118,17 @@ pub fn process_received_blobs(
                         Ok(ReceiveOutcome::Alert(a)) => {
                             (true, true, None, Some(contact_id.clone()), Some(a))
                         }
+                        // P3 Slice A: the confirmation's signature is verified in
+                        // `process_single_card_update`. Resolving it to Confirmed
+                        // needs matching the carried token against the contact's
+                        // `expected_their_token`, which today lives only in the
+                        // app-encrypted confirmation state — so the token match +
+                        // `confirm_contact_reciprocity` land with the
+                        // core-accessible token storage (P3 Slice C). Recognized +
+                        // counted here; no card delta, no event yet.
+                        Ok(ReceiveOutcome::ReciprocityConfirm { .. }) => {
+                            (true, true, None, None, None)
+                        }
                         Err(e) => (true, false, Some(reject_category(&e)), None, None),
                     }
                 }

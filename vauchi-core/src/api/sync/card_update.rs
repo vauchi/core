@@ -103,6 +103,12 @@ pub enum ReceiveOutcome {
     CardDelta,
     /// A safety alert was received (no card change).
     Alert(ReceivedAlert),
+    /// A reciprocity confirmation was received (P3 relay-sync, no card change):
+    /// the peer proved — with an Ed25519 signature bound to sender + recipient —
+    /// that it completed and persisted the exchange. Carries the peer's token
+    /// for the app layer to match against the contact's `expected_their_token`
+    /// and resolve reciprocity to `Confirmed`.
+    ReciprocityConfirm { sender_id: String, token: [u8; 32] },
 }
 
 /// Processes a batch of incoming card updates with full security checks.
@@ -150,6 +156,9 @@ pub fn process_card_updates(
             // Alerts are surfaced via events on the receive-blob path, not this
             // batch card-update helper; count as processed, no card name.
             Ok(ReceiveOutcome::Alert(_)) => result.processed += 1,
+            // Reciprocity confirmations are surfaced via the receive-blob path
+            // (like alerts), not this batch card-update helper; count processed.
+            Ok(ReceiveOutcome::ReciprocityConfirm { .. }) => result.processed += 1,
             Err(_) => result.skipped += 1,
         }
     }
@@ -236,6 +245,42 @@ pub fn process_single_card_update(
             timestamp: alert.timestamp(),
             location: alert.location().cloned(),
         }));
+    }
+
+    // 3c. Reciprocity confirmations (P3 relay-sync) route separately too: a 0x03
+    //     payload proves the peer completed + persisted (design P1/P3). Verify
+    //     the sender+recipient Ed25519 signature, advance + save the ratchet,
+    //     and surface the peer's token for the app-layer match against
+    //     `expected_their_token`. No replay-nonce store: the token is
+    //     deterministic and re-confirming is idempotent — a replay can only
+    //     re-assert a true Confirmed, never forge one (the token must still
+    //     match the expected value, checked at the app layer).
+    if let Ok(VersionedPayload::ReciprocityConfirm(confirm)) = VersionedPayload::decode(&plaintext)
+    {
+        let sender_pk = contact
+            .public_key()
+            .ok_or(CardUpdateError::SignatureInvalid)?;
+        if !confirm.verify(sender_pk, identity.signing_public_key()) {
+            return Err(CardUpdateError::SignatureInvalid);
+        }
+        let token = *confirm.token();
+        // Persist the advanced ratchet (decrypt consumed a message). No card,
+        // no nonce store — the token match + Confirmed transition are app-layer.
+        storage.begin_transaction()?;
+        let confirm_txn = storage
+            .ratchets()
+            .save_ratchet_state(sender_id, &ratchet, is_initiator);
+        match confirm_txn {
+            Ok(()) => storage.commit()?,
+            Err(e) => {
+                storage.rollback();
+                return Err(e.into());
+            }
+        }
+        return Ok(ReceiveOutcome::ReciprocityConfirm {
+            sender_id: sender_id.to_string(),
+            token,
+        });
     }
 
     // 4. Handle versioned payload (CEK-wrapped or legacy)

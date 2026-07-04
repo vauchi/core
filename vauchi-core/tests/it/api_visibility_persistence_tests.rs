@@ -41,14 +41,32 @@ fn setup_with_fields() -> (Vauchi, String) {
     (wb, contact_id)
 }
 
+/// Resolves an own-card field label to its generated id. Reads via the id,
+/// not the label, must match how every production path resolves visibility
+/// (`is_field_visible_by_label` → `own_field_id_by_label` → id-keyed rules).
+/// A test that reads by label would pass even when the toggle writes the
+/// wrong key (F1, 2026-06-14 visibility layering).
+fn own_field_id(wb: &Vauchi, label: &str) -> String {
+    wb.own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .find(|f| f.label() == label)
+        .unwrap()
+        .id()
+        .to_string()
+}
+
 // @scenario: navigation.feature - Toggle visibility persists
 #[test]
 fn test_toggle_visibility_persists() {
     let (wb, contact_id) = setup_with_fields();
+    let email_id = own_field_id(&wb, "Work Email");
 
     // Default: all fields visible
     let visible = wb
-        .get_effective_field_visibility(&contact_id, "Work Email")
+        .get_effective_field_visibility(&contact_id, &email_id)
         .unwrap();
     assert!(visible, "Fields should be visible by default");
 
@@ -58,7 +76,7 @@ fn test_toggle_visibility_persists() {
     assert!(!new_state, "Toggle should return new state (hidden)");
 
     let visible_after = wb
-        .get_effective_field_visibility(&contact_id, "Work Email")
+        .get_effective_field_visibility(&contact_id, &email_id)
         .unwrap();
     assert!(!visible_after, "Visibility must persist after toggle");
 }
@@ -67,16 +85,18 @@ fn test_toggle_visibility_persists() {
 #[test]
 fn test_toggle_visibility_per_field() {
     let (wb, contact_id) = setup_with_fields();
+    let email_id = own_field_id(&wb, "Work Email");
+    let phone_id = own_field_id(&wb, "Mobile");
 
     wb.toggle_field_visibility(&contact_id, "Work Email")
         .unwrap();
 
     // Email hidden, phone still visible
     let email_vis = wb
-        .get_effective_field_visibility(&contact_id, "Work Email")
+        .get_effective_field_visibility(&contact_id, &email_id)
         .unwrap();
     let phone_vis = wb
-        .get_effective_field_visibility(&contact_id, "Mobile")
+        .get_effective_field_visibility(&contact_id, &phone_id)
         .unwrap();
     assert!(!email_vis, "Email should be hidden");
     assert!(phone_vis, "Phone should remain visible");
@@ -86,6 +106,7 @@ fn test_toggle_visibility_per_field() {
 #[test]
 fn test_toggle_twice_restores_visibility() {
     let (wb, contact_id) = setup_with_fields();
+    let email_id = own_field_id(&wb, "Work Email");
 
     wb.toggle_field_visibility(&contact_id, "Work Email")
         .unwrap();
@@ -93,9 +114,49 @@ fn test_toggle_twice_restores_visibility() {
         .unwrap();
 
     let visible = wb
-        .get_effective_field_visibility(&contact_id, "Work Email")
+        .get_effective_field_visibility(&contact_id, &email_id)
         .unwrap();
     assert!(visible, "Double toggle should restore visibility");
+}
+
+// A toggle is a per-contact **override** (Layer C): it must win over a
+// group grant and persist when the contact leaves the group — parity with
+// `set_field_private` (2026-06-14 visibility layering, F3). Before the fix
+// the toggle wrote Layer-A `visibility_rules`, which the D3 gate skips for a
+// grouped contact, so the toggle was a no-op here.
+// @internal
+#[test]
+fn test_toggle_hides_grouped_contact_via_override() {
+    let (wb, contact_id) = setup_with_fields();
+    let email_id = own_field_id(&wb, "Work Email");
+
+    let group = wb.create_group("Team").unwrap();
+    wb.set_group_field_visibility(group.id(), &email_id, true)
+        .unwrap();
+    wb.add_contact_to_group(group.id(), &contact_id).unwrap();
+    assert!(
+        wb.get_effective_field_visibility(&contact_id, &email_id)
+            .unwrap(),
+        "the group grant makes the field visible"
+    );
+
+    let now_visible = wb
+        .toggle_field_visibility(&contact_id, "Work Email")
+        .unwrap();
+    assert!(!now_visible, "toggle returns hidden for a grouped contact");
+    assert!(
+        !wb.get_effective_field_visibility(&contact_id, &email_id)
+            .unwrap(),
+        "toggle must hide the field via an override even when a group grants it"
+    );
+
+    wb.remove_contact_from_group(group.id(), &contact_id)
+        .unwrap();
+    assert!(
+        !wb.get_effective_field_visibility(&contact_id, &email_id)
+            .unwrap(),
+        "the override persists when the contact leaves the group"
+    );
 }
 
 // ============================================================

@@ -13,7 +13,10 @@ use zeroize::Zeroize;
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DuressConfig {
     pub enabled: bool,
-    pub alert_contacts: Vec<Item>,
+    /// All of the user's contacts — the pool the recipient picker renders.
+    pub available_contacts: Vec<Item>,
+    /// Ids (subset of `available_contacts`) chosen to receive the duress alert.
+    pub selected_contact_ids: Vec<String>,
     pub alert_message: String,
     pub include_location: bool,
 }
@@ -311,7 +314,7 @@ impl WorkflowEngine for DuressPinEngine {
             crate::ui::DuressPinSetup {
                 enabled: config.enabled,
                 pin: self.pin().to_string(),
-                alert_contact_ids: config.alert_contacts.iter().map(|c| c.id.clone()).collect(),
+                alert_contact_ids: config.selected_contact_ids.clone(),
                 alert_message: config.alert_message.clone(),
                 include_location: config.include_location,
             },

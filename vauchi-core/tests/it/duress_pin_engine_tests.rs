@@ -7,7 +7,8 @@ use vauchi_app::ui::*;
 fn default_config() -> DuressConfig {
     DuressConfig {
         enabled: false,
-        alert_contacts: vec![],
+        available_contacts: vec![],
+        selected_contact_ids: vec![],
         alert_message: String::new(),
         include_location: false,
     }
@@ -16,7 +17,8 @@ fn default_config() -> DuressConfig {
 fn enabled_config() -> DuressConfig {
     DuressConfig {
         enabled: true,
-        alert_contacts: vec![],
+        available_contacts: vec![],
+        selected_contact_ids: vec![],
         alert_message: "Help me".into(),
         include_location: true,
     }

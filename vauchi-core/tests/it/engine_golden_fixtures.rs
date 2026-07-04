@@ -275,7 +275,7 @@ fn contact_edit_preview_fixture_is_fresh() {
 fn sample_duress_config() -> DuressConfig {
     DuressConfig {
         enabled: false,
-        alert_contacts: vec![Item {
+        available_contacts: vec![Item {
             id: "c1".into(),
             name: "Emergency Contact".into(),
             subtitle: None,
@@ -284,6 +284,7 @@ fn sample_duress_config() -> DuressConfig {
             actions: vec![],
             a11y: None,
         }],
+        selected_contact_ids: vec!["c1".into()],
         alert_message: "I may be in danger".into(),
         include_location: true,
     }

@@ -227,7 +227,8 @@ fn duress_pin_output_redacts_pin_in_debug() {
     use vauchi_app::ui::{DuressConfig, DuressPinEngine};
     let engine = DuressPinEngine::new(DuressConfig {
         enabled: true,
-        alert_contacts: vec![],
+        available_contacts: vec![],
+        selected_contact_ids: vec![],
         alert_message: "help".into(),
         include_location: true,
     });

@@ -40,7 +40,8 @@ fn factory() -> DuressPinEngine {
     // config — the alerts step still renders `save` / `back`.
     DuressPinEngine::new(DuressConfig {
         enabled: true,
-        alert_contacts: Vec::new(),
+        available_contacts: Vec::new(),
+        selected_contact_ids: Vec::new(),
         alert_message: String::new(),
         include_location: false,
     })

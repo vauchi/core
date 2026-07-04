@@ -180,7 +180,8 @@ fn make_backup(mode: Option<BackupMode>) -> BackupRecoveryEngine {
 fn make_duress() -> DuressPinEngine {
     DuressPinEngine::new(DuressConfig {
         enabled: false,
-        alert_contacts: vec![],
+        available_contacts: vec![],
+        selected_contact_ids: vec![],
         alert_message: String::new(),
         include_location: false,
     })

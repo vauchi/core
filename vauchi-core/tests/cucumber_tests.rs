@@ -4,14 +4,19 @@
 
 //! Executable Gherkin tests (PI-16).
 //!
-//! Runs `.feature` files from the `features/` repo against vauchi-core's API
-//! via cucumber-rs. Unbound steps show as "pending" (not failing).
+//! Runs `.feature` files from the sibling `features/` repo against
+//! vauchi-core's API via cucumber-rs. Scenarios whose steps are all bound
+//! execute and must pass; scenarios with any unbound step are skipped
+//! (features are authored ahead of their step definitions). A genuine step
+//! failure, parsing error, or hook error fails the process — this is a real
+//! regression gate for the wired scenarios, not a green-no-matter-what
+//! scaffold — and the skipped count is surfaced (see `main`).
 //!
 //! Usage:
 //!   cargo test --test cucumber_tests
 //!   cargo test --test cucumber_tests -- --tags @contact-card
 
-use cucumber::World;
+use cucumber::{World, writer::Stats as _};
 use vauchi_core::{ContactCard, Vauchi};
 
 mod steps;
@@ -67,16 +72,17 @@ impl VauchiWorld {
 }
 
 fn main() {
-    // Run all feature files. Unbound steps show as "skipped" (exit 0).
-    // As more step definitions are added, more scenarios become green.
+    // A wired scenario that fails now fails the process; unbound scenarios are
+    // skipped and reported below. Deferred (needs features-repo coordination +
+    // a pinned features checkout so the count is deterministic): a passing-count
+    // ratchet + `@wip`-tagging to also gate silent skip-*regressions*. See
+    // `problems/2026-07-04-cucumber-backgrounds-fail-silently`.
     //
-    // To run a specific feature:
     //   cargo test --test cucumber_tests -- --tags @contact-card
-    //   cargo test --test cucumber_tests -- --tags @identity
     let features_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../features");
 
-    // In CI, only the core repo is checked out — the sibling features/ repo
-    // is not available. Skip gracefully instead of failing the pipeline.
+    // CI clones the sibling features/ repo before this job; locally it may be
+    // absent until `just setup`. Skip gracefully instead of failing.
     if !std::path::Path::new(features_dir).exists() {
         eprintln!(
             "Skipping cucumber tests: features directory not found at {features_dir}. \
@@ -85,5 +91,30 @@ fn main() {
         return;
     }
 
-    futures::executor::block_on(VauchiWorld::cucumber().with_default_cli().run(features_dir));
+    let writer =
+        futures::executor::block_on(VauchiWorld::cucumber().with_default_cli().run(features_dir));
+
+    let scenarios = writer.scenarios_stats();
+    let executed = scenarios.passed + scenarios.failed;
+    eprintln!(
+        "cucumber coverage: {executed}/{} scenarios executed \
+         ({} passed, {} skipped [unbound steps], {} failed)",
+        scenarios.total(),
+        scenarios.passed,
+        scenarios.skipped,
+        scenarios.failed,
+    );
+
+    // Skipped (unbound) scenarios are tolerated by design; a genuine failure is
+    // a regression in a wired scenario and must fail CI.
+    if writer.execution_has_failed() {
+        eprintln!(
+            "cucumber GATE failed: {} step failure(s), {} parsing error(s), \
+             {} hook error(s) in a wired scenario.",
+            writer.failed_steps(),
+            writer.parsing_errors(),
+            writer.hook_errors(),
+        );
+        std::process::exit(1);
+    }
 }

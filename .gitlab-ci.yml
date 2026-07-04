@@ -600,7 +600,11 @@ test:cucumber:
     - !reference [.self-hosted, before_script]
     - if [ ! -d ../features ]; then git clone --depth=1 https://gitlab.com/vauchi/features.git ../features; else git -C ../features pull --ff-only 2>/dev/null || true; fi
   script:
-    - cargo test --test cucumber_tests -- --tags "not @wip"
+    # @ui features (theming/a11y/navigation/onboarding/…) describe frontend
+    # rendering — untestable against core; they belong in the frontend
+    # harnesses (Espresso/XCUITest/AT-SPI). Excluded so the core run reflects
+    # only core-eligible scenarios.
+    - cargo test --test cucumber_tests -- --tags "not @wip and not @ui"
 
 test:platform:
   extends: [.linux-runner, .validation-platform, .timeout-standard]

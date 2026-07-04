@@ -25,8 +25,12 @@ use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
+use vauchi_core::exchange::reciprocity_tokens::derive_confirmation_tokens;
 use vauchi_core::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
-use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
+use vauchi_core::sync::delta::{
+    CardDelta, CekWrappedPayload, ReciprocityConfirmPayload, VersionedPayload,
+};
 
 /// Add an exchanged contact `peer` to `host`. Returns the contact id and
 /// the shared secret. Sets up Double Ratchet state on both sides so
@@ -721,5 +725,133 @@ fn test_receive_mixed_batch_preserves_order() {
             .iter()
             .any(|f| f.value() == "charlie@mixed.test"),
         "Charlie's card must reflect idx-3 update"
+    );
+}
+
+/// Encrypt a P3 reciprocity confirmation `sender` sends the recipient: a signed
+/// `ReciprocityConfirmPayload` carrying `token`, ratchet-encrypted like a card
+/// update (same wire envelope).
+fn encrypt_reciprocity_confirm(
+    sender: &vauchi_core::Vauchi,
+    recipient_signing_pk: &[u8; 32],
+    recipient_contact_id: &str,
+    token: [u8; 32],
+) -> Vec<u8> {
+    let sender_identity = sender.identity().unwrap();
+    let payload = ReciprocityConfirmPayload::new(token, sender_identity, recipient_signing_pk);
+    let encoded = VersionedPayload::encode_reciprocity(&payload);
+
+    let (mut sender_ratchet, is_init) = sender
+        .storage()
+        .ratchets()
+        .load_ratchet_state(recipient_contact_id)
+        .unwrap()
+        .unwrap();
+    let ratchet_msg = sender_ratchet.encrypt(&encoded).unwrap();
+    sender
+        .storage()
+        .ratchets()
+        .save_ratchet_state(recipient_contact_id, &sender_ratchet, is_init)
+        .unwrap();
+    serde_json::to_vec(&ratchet_msg).unwrap()
+}
+
+/// Mailbox token Bob would post under so Alice attributes the blob to him.
+fn bob_mailbox_token(
+    alice: &vauchi_core::Vauchi,
+    link: &LinkedPeer,
+    alice_pk: &[u8; 32],
+) -> String {
+    token_hex(&compute_mailbox_token(
+        link.shared_secret.as_bytes(),
+        alice_pk,
+        current_day_epoch(alice.storage().clock().unix_seconds()),
+    ))
+}
+
+// CC-03: a valid relay-sync reciprocity confirmation resolves the contact to
+// Confirmed via RelaySync (P3 Slice A end-to-end: verify sig → derive
+// expected_their_token → match → confirm).
+// @scenario: receive_phase :: relay-sync reciprocity confirmation resolves Confirmed
+// @internal
+#[test]
+fn reciprocity_confirm_resolves_contact_to_confirmed() {
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let bob_link = link_contacts(&alice, &bob, "Bob");
+
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+
+    // Bob sends HIS our_token — cross-matches Alice's derived expected_their_token.
+    let (bob_our_token, _) =
+        derive_confirmation_tokens(bob_link.shared_secret.as_bytes(), &bob_pk, &alice_pk);
+
+    let ciphertext =
+        encrypt_reciprocity_confirm(&bob, &alice_pk, &bob_link.host_contact_id, *bob_our_token);
+    let blobs = vec![(
+        "confirm-1".to_string(),
+        bob_mailbox_token(&alice, &bob_link, &alice_pk),
+        ciphertext,
+    )];
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
+
+    let outcomes =
+        process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
+    assert!(
+        outcomes[0].decrypted,
+        "the confirmation must decrypt + verify"
+    );
+
+    let now = alice.storage().clock().unix_seconds();
+    let contact = alice
+        .get_contact(&bob_link.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        contact.reciprocity(now),
+        Reciprocity::Confirmed,
+        "a matching signed confirmation resolves reciprocity to Confirmed"
+    );
+    assert_eq!(
+        contact.confirmation_channel(),
+        Some(ConfirmationChannel::RelaySync),
+        "confirmation channel is recorded as relay sync"
+    );
+}
+
+// CC-14: a confirmation carrying the WRONG token — even with a valid signature
+// (the sender signs whatever token) — must NOT confirm. G1: the relay cannot
+// manufacture a false Confirmed.
+// @scenario: receive_phase :: wrong-token reciprocity confirmation never confirms
+// @internal
+#[test]
+fn reciprocity_confirm_wrong_token_never_confirms() {
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let bob_link = link_contacts(&alice, &bob, "Bob");
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+
+    // A validly-signed confirmation over a bogus token (not Bob's our_token).
+    let ciphertext =
+        encrypt_reciprocity_confirm(&bob, &alice_pk, &bob_link.host_contact_id, [0xFFu8; 32]);
+    let blobs = vec![(
+        "confirm-bad".to_string(),
+        bob_mailbox_token(&alice, &bob_link, &alice_pk),
+        ciphertext,
+    )];
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
+
+    let _ = process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
+
+    let now = alice.storage().clock().unix_seconds();
+    let contact = alice
+        .get_contact(&bob_link.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    assert_ne!(
+        contact.reciprocity(now),
+        Reciprocity::Confirmed,
+        "a wrong-token confirmation must never resolve to Confirmed"
     );
 }

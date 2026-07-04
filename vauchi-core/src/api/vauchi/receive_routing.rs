@@ -118,16 +118,20 @@ pub fn process_received_blobs(
                         Ok(ReceiveOutcome::Alert(a)) => {
                             (true, true, None, Some(contact_id.clone()), Some(a))
                         }
-                        // P3 Slice A: the confirmation's signature is verified in
-                        // `process_single_card_update`. Resolving it to Confirmed
-                        // needs matching the carried token against the contact's
-                        // `expected_their_token`, which today lives only in the
-                        // app-encrypted confirmation state — so the token match +
-                        // `confirm_contact_reciprocity` land with the
-                        // core-accessible token storage (P3 Slice C). Recognized +
-                        // counted here; no card delta, no event yet.
-                        Ok(ReceiveOutcome::ReciprocityConfirm { .. }) => {
-                            (true, true, None, None, None)
+                        // P3: the signature is verified in
+                        // `process_single_card_update`; match the carried token
+                        // against the contact's derived `expected_their_token`
+                        // and, on a match, resolve to Confirmed (RelaySync). A
+                        // mismatch leaves Pending (fail-safe) — a valid signature
+                        // over a wrong token never confirms. On confirm, surface
+                        // it like a card update so the frontend reloads and the
+                        // reciprocity banner clears.
+                        Ok(ReceiveOutcome::ReciprocityConfirm { sender_id, token }) => {
+                            if resolve_reciprocity_confirm(identity, storage, &sender_id, &token) {
+                                (true, true, None, Some(sender_id), None)
+                            } else {
+                                (true, true, None, None, None)
+                            }
                         }
                         Err(e) => (true, false, Some(reject_category(&e)), None, None),
                     }
@@ -144,6 +148,36 @@ pub fn process_received_blobs(
         });
     }
     outcomes
+}
+
+/// P3: resolve a signature-verified reciprocity confirmation. Derives the
+/// contact's `expected_their_token` from its shared key (mode-agnostic — no
+/// stored token) and constant-time-compares it to the peer's carried token. On
+/// a match, records `Confirmed` via `RelaySync` and returns `true`; a mismatch
+/// (or an imported/absent contact) leaves state unchanged — fail-safe Pending —
+/// and returns `false`. A valid signature over a non-matching token never
+/// confirms, so the relay cannot manufacture a false Confirmed (design G1).
+fn resolve_reciprocity_confirm(
+    identity: &crate::identity::Identity,
+    storage: &crate::storage::Storage,
+    sender_id: &str,
+    token: &[u8; 32],
+) -> bool {
+    use subtle::ConstantTimeEq;
+
+    let Ok(Some(mut contact)) = storage.contacts().load_contact(sender_id) else {
+        return false;
+    };
+    let Some((_our, expected)) = contact.derive_reciprocity_tokens(identity.signing_public_key())
+    else {
+        return false;
+    };
+    if !bool::from(token.as_slice().ct_eq(expected.as_slice())) {
+        return false;
+    }
+    contact.set_reciprocity(crate::exchange::reciprocity::Reciprocity::Confirmed);
+    contact.set_confirmation_channel(crate::exchange::reciprocity::ConfirmationChannel::RelaySync);
+    storage.contacts().save_contact(&contact).is_ok()
 }
 
 /// Map applied receive outcomes to `IncomingUpdate` events.

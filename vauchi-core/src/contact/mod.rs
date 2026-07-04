@@ -374,6 +374,28 @@ impl Contact {
         self.kind.exchanged_data().map(|d| &d.shared_key)
     }
 
+    /// Derive this contact's reciprocity confirmation token pair
+    /// `(our_token, expected_their_token)` from the stored exchange secret +
+    /// identities (design P3). Deterministic — the same pair the exchange
+    /// derived, since `shared_key` is the exact session/transport secret used
+    /// then. `None` for imported contacts (no shared key): they have no
+    /// exchange to confirm, so this doubles as the syncability gate — no
+    /// storage or migration needed, the tokens are never persisted.
+    pub fn derive_reciprocity_tokens(
+        &self,
+        our_identity: &[u8; 32],
+    ) -> Option<crate::exchange::reciprocity_tokens::ConfirmationTokenPair> {
+        let shared = self.shared_key()?;
+        let their = self.public_key()?;
+        Some(
+            crate::exchange::reciprocity_tokens::derive_confirmation_tokens(
+                shared.as_bytes(),
+                our_identity,
+                their,
+            ),
+        )
+    }
+
     /// Returns the exchange timestamp, if this is an exchanged contact.
     pub fn exchange_timestamp(&self) -> Option<u64> {
         self.kind.exchanged_data().map(|d| d.exchange_timestamp)

@@ -456,7 +456,12 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 #  Backup factory arms.)
 # (+1 2026-07-05: M3 S5-6 — AvatarEditor + EmergencyBroadcast factory
 #  arms gain `.with_locale(render_context.resolved_locale())`.)
-vauchi-app/src/ui/app_engine/screens.rs 959
+# (+8 2026-07-05: M3 S5-6→S5-9 combined into one MR — the S5-6 feat plus the
+#  FormDialog (S5-7), recovery-help (S5-8), and device-replacement (S5-9)
+#  factory arms each add `.with_locale(...)` resolution. The branches were
+#  cut from different bases, so their independent screens.rs deltas summed
+#  to 967 when stacked; the per-branch baselines did not. 958 → 967.)
+vauchi-app/src/ui/app_engine/screens.rs 967
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

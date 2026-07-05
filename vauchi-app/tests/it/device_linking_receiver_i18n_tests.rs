@@ -83,3 +83,47 @@ fn device_linking_qr_expired_and_link_failed_english_copy_unchanged() {
         "Try Again"
     );
 }
+
+fn failure_detail_of(screen: &vauchi_app::ui::ScreenModel) -> String {
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            vauchi_app::ui::Component::StatusIndicator { detail, .. } => detail.clone(),
+            _ => None,
+        })
+        .expect("link_failed status detail present")
+}
+
+// M5 B2 (2026-07-03-second-device-join-dead-end item 4): the machine's
+// stable failure id maps to a localized sentence; a raw machine id
+// never reaches the screen. CC-03 exactness in both locales.
+// @internal
+#[test]
+fn device_link_failure_id_maps_to_localized_copy() {
+    load_german();
+
+    let mut en = DeviceLinkingEngine::new("qr-data".into());
+    en.transition_to_link_failed("user_denied".into());
+    assert_eq!(
+        failure_detail_of(&en.current_screen()),
+        "The other device declined the link."
+    );
+
+    let mut de = DeviceLinkingEngine::new("qr-data".into()).with_locale(Locale::German);
+    de.transition_to_link_failed("user_denied".into());
+    assert_eq!(
+        failure_detail_of(&de.current_screen()),
+        "Das andere Gerät hat die Verknüpfung abgelehnt."
+    );
+
+    // An unknown / relay reason falls back to the generic sentence, never raw.
+    let mut generic = DeviceLinkingEngine::new("qr-data".into());
+    generic.transition_to_link_failed("relay timeout".into());
+    let generic_detail = failure_detail_of(&generic.current_screen());
+    assert!(
+        !generic_detail.contains("relay timeout"),
+        "raw reason must never render: {generic_detail}"
+    );
+    assert_eq!(generic_detail, "Device linking failed. Please try again.");
+}

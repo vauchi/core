@@ -16,13 +16,6 @@
           "role": "Image"
         }
       }
-    },
-    {
-      "Text": {
-        "id": "join_hint",
-        "content": "To join from another device, use: vauchi device join <qr_data>",
-        "style": "Caption"
-      }
     }
   ],
   "actions": [

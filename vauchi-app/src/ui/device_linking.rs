@@ -374,11 +374,11 @@ impl DeviceLinkingEngine {
                         role: Some(AccessibilityRole::Image),
                     }),
                 },
-                Component::Text {
-                    id: "join_hint".into(),
-                    content: self.t("devices.link.cli_join_hint"),
-                    style: TextStyle::Caption,
-                },
+                // M5 B2: the CLI-syntax join hint ("use: vauchi device
+                // join <qr_data>") was shown on every frontend, phones
+                // included (2026-07-03-second-device-join-dead-end item 2).
+                // Removed — the scan-to-begin a11y hint above is the
+                // GUI-appropriate guidance.
             ],
             actions: vec![ScreenAction {
                 id: CANCEL_ACTION_ID.into(),
@@ -726,7 +726,10 @@ impl DeviceLinkingEngine {
                 id: "link_failed".into(),
                 icon: Some("exclamationmark.triangle".into()),
                 title: self.t("devices.link.linking_failed_status"),
-                detail: Some(message.to_string()),
+                // M5 B2: map the machine's stable failure id to an honest
+                // sentence — never render a raw "user_confirm_timeout" /
+                // "user_denied" (2026-07-03-second-device-join-dead-end item 4).
+                detail: Some(failure_detail(message, self.locale)),
                 status: Status::Failed,
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.linking_failed_a11y")),
@@ -754,6 +757,21 @@ impl DeviceLinkingEngine {
             ..Default::default()
         }
     }
+}
+
+/// Map the device-link machine's stable failure id (the
+/// `DeviceLinkSessionListener::on_failed` reason) to a user-facing
+/// sentence, so a raw machine id never reaches the screen (M5 B2,
+/// mirrors `link_responder::failure_detail`).
+fn failure_detail(reason: &str, locale: Locale) -> String {
+    let key = match reason {
+        "user_denied" => "device_link.failure_user_denied",
+        "user_confirm_timeout" => "device_link.failure_confirm_timeout",
+        "cancelled" => "device_link.failure_cancelled",
+        "qr_expired" => "device_link.failure_qr_expired",
+        _ => "device_link.failure_generic",
+    };
+    get_string(locale, key)
 }
 
 impl WorkflowEngine for DeviceLinkingEngine {

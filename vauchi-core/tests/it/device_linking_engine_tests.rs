@@ -27,7 +27,8 @@ fn link_shows_qr_data() {
     let engine = DeviceLinkingEngine::new("vauchi://link?token=abc123".to_string());
     let screen = engine.current_screen();
 
-    assert_eq!(screen.components.len(), 2);
+    // Just the QR code now — the CLI-syntax join hint was removed (M5 B2).
+    assert_eq!(screen.components.len(), 1);
     match &screen.components[0] {
         Component::QrCode {
             id,

@@ -286,8 +286,10 @@ fn transition_to_link_success_uses_complete_screen() {
 
 // @internal
 #[test]
-fn transition_to_link_failed_renders_message() {
+fn transition_to_link_failed_renders_honest_message_and_retry() {
     let mut e = DeviceLinkingEngine::new("qr-data".into());
+    // A non-canonical / relay reason maps to the generic sentence —
+    // never the raw string (M5 B2).
     e.transition_to_link_failed("relay unreachable".into());
     let screen = e.current_screen();
     assert_eq!(screen.screen_id, "link_failed");
@@ -299,7 +301,11 @@ fn transition_to_link_failed_renders_message() {
             _ => None,
         })
         .expect("status detail present");
-    assert_eq!(detail, "relay unreachable");
+    assert!(
+        !detail.contains("relay unreachable"),
+        "raw reason must never render: {detail}"
+    );
+    assert_eq!(detail, "Device linking failed. Please try again.");
     let ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
     assert_eq!(ids, vec![RETRY_ACTION_ID, CANCEL_ACTION_ID]);
 }

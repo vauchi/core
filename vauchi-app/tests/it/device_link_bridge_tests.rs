@@ -157,12 +157,15 @@ fn completed_bridge_renders_complete_screen() {
     assert_eq!(screen.screen_id, "link_complete");
 }
 
-// @scenario: pair5_device_link_bridge :: on_failed message surfaces in the LinkFailed screen
+// @scenario: pair5_device_link_bridge :: on_failed maps to honest copy in the LinkFailed screen
+// M5 B2: the raw machine failure id never reaches the screen; the
+// stable reason is mapped to a user-facing sentence
+// (2026-07-03-second-device-join-dead-end item 4).
 #[test]
-fn failed_bridge_renders_failed_screen_with_message() {
+fn failed_bridge_renders_honest_failure_copy() {
     let mut engine = engine_on_device_linking();
     let screen = engine
-        .device_link_failed("relay timeout".into())
+        .device_link_failed("user_confirm_timeout".into())
         .expect("on device linking screen");
     assert_eq!(screen.screen_id, "link_failed");
     let detail = screen
@@ -173,7 +176,14 @@ fn failed_bridge_renders_failed_screen_with_message() {
             _ => None,
         })
         .expect("status detail present");
-    assert_eq!(detail, "relay timeout");
+    assert!(
+        !detail.contains("user_confirm_timeout"),
+        "raw failure id must never render: {detail}"
+    );
+    assert!(
+        detail.contains("60 seconds"),
+        "confirm-timeout copy surfaces the 60s window: {detail}"
+    );
 }
 
 // @scenario: pair5_device_link_bridge :: cancel from any device-link step navigates away

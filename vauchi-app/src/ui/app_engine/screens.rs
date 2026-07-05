@@ -353,7 +353,8 @@ impl AppEngine {
                 let config = vauchi.load_emergency_config().ok().flatten();
                 Box::new(
                     EmergencyBroadcastEngine::new(config)
-                        .with_available_contacts(Self::picker_contacts(vauchi)),
+                        .with_available_contacts(Self::picker_contacts(vauchi))
+                        .with_locale(render_context.resolved_locale()),
                 )
             }
             AppScreen::DeliveryStatus => {
@@ -628,10 +629,13 @@ impl AppEngine {
                     .map(|c| c.display_name().to_string())
                     .unwrap_or_default();
                 let has_existing_avatar = card.as_ref().is_some_and(|c| c.avatar().is_some());
-                Box::new(crate::ui::avatar_editor::AvatarEditorEngine::new(
-                    display_name,
-                    has_existing_avatar,
-                ))
+                Box::new(
+                    crate::ui::avatar_editor::AvatarEditorEngine::new(
+                        display_name,
+                        has_existing_avatar,
+                    )
+                    .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::RecoveryClaimReview => {
                 // Default: vouching mode with low confidence placeholder.

@@ -35,7 +35,12 @@
       "id": "configure",
       "label": "Configure",
       "style": "Primary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Configure",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": null,

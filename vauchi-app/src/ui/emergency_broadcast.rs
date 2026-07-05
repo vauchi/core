@@ -11,6 +11,7 @@
 //! [`EmergencyBroadcastEngine::outcome`] and performs the matching
 //! `Vauchi` call (configure / send / delete).
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use vauchi_core::types::EmergencyBroadcastConfig;
 use vauchi_core::{DEFAULT_EMERGENCY_MESSAGE, MAX_TRUSTED_CONTACTS};
@@ -38,6 +39,7 @@ pub struct EmergencyBroadcastEngine {
     include_location: bool,
     pending_disable: bool,
     outcome: Option<EmergencyOutcome>,
+    locale: Locale,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -61,6 +63,7 @@ impl EmergencyBroadcastEngine {
                 include_location: c.include_location,
                 pending_disable: false,
                 outcome: None,
+                locale: Locale::English,
             },
             None => Self {
                 step: EmergencyStep::Overview,
@@ -71,8 +74,20 @@ impl EmergencyBroadcastEngine {
                 include_location: false,
                 pending_disable: false,
                 outcome: None,
+                locale: Locale::English,
             },
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-6).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Inject the contact pool the picker renders. `screens.rs` supplies the
@@ -108,13 +123,11 @@ impl EmergencyBroadcastEngine {
             Component::InfoPanel {
                 id: "emergency_info".into(),
                 icon: Some("warning".into()),
-                title: "Emergency Broadcast".into(),
+                title: self.t("emergency.title"),
                 items: vec![InfoItem {
                     icon: Some("info".into()),
-                    title: "What is an emergency broadcast?".into(),
-                    detail: "Silently alert your trusted contacts that you may be in danger. \
-                             The alert is disguised as a normal card update."
-                        .into(),
+                    title: self.t("emergency.what_is_title"),
+                    detail: self.t("emergency.what_is_detail"),
                 }],
                 a11y: None,
             },
@@ -129,9 +142,9 @@ impl EmergencyBroadcastEngine {
                     .into(),
                 ),
                 title: if self.configured {
-                    "Emergency broadcast configured".into()
+                    self.t("emergency.configured_status")
                 } else {
-                    "Emergency broadcast not set up".into()
+                    self.t("emergency.not_set_up_status")
                 },
                 detail: None,
                 status: if self.configured {
@@ -143,45 +156,45 @@ impl EmergencyBroadcastEngine {
             },
         ];
 
+        let configure_label = if self.configured {
+            self.t("emergency.edit_contacts_button")
+        } else {
+            self.t("emergency.configure_button")
+        };
         let mut actions = vec![ScreenAction {
             id: "configure".into(),
-            label: if self.configured {
-                "Edit Contacts".into()
-            } else {
-                "Configure".into()
-            },
+            label: configure_label.clone(),
             style: ActionStyle::Primary,
             enabled: true,
-            a11y: None,
+            a11y: Some(A11y::labeled(configure_label)),
         }];
 
         if self.configured {
             actions.push(ScreenAction {
                 id: "send".into(),
-                label: "Send Alert".into(),
+                label: self.t("emergency.send_alert_button"),
                 style: ActionStyle::Destructive,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("emergency.send_alert_button"))),
             });
             actions.push(ScreenAction {
                 id: "disable".into(),
-                label: "Disable".into(),
+                label: self.t("resistance.duress.disable_button"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("resistance.duress.disable_button"))),
             });
         }
 
         if self.pending_disable {
             components.push(Component::InlineConfirm {
                 id: "disable".into(),
-                warning: "Disabling emergency broadcast removes your trusted-contact alert list."
-                    .into(),
-                confirm_text: "Disable".into(),
-                cancel_text: "Cancel".into(),
+                warning: self.t("emergency.disable_warning"),
+                confirm_text: self.t("resistance.duress.disable_button"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: Some(A11y {
-                    label: Some("Confirm disable emergency broadcast".into()),
+                    label: Some(self.t("emergency.confirm_disable_a11y")),
                     hint: None,
                     role: Some(AccessibilityRole::Alert),
                 }),
@@ -190,7 +203,7 @@ impl EmergencyBroadcastEngine {
 
         ScreenModel {
             screen_id: "emergency_overview".into(),
-            title: "Emergency Broadcast".into(),
+            title: self.t("emergency.title"),
             subtitle: None,
             components,
             actions,
@@ -202,11 +215,11 @@ impl EmergencyBroadcastEngine {
     fn contact_ids_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "emergency_contacts".into(),
-            title: "Trusted Contacts".into(),
+            title: self.t("emergency.contact_ids_title"),
             subtitle: None,
             components: vec![Component::ToggleList {
                 id: "contact_ids".into(),
-                label: "Trusted Contacts".into(),
+                label: self.t("emergency.contact_ids_title"),
                 items: self
                     .available_contacts
                     .iter()
@@ -215,7 +228,7 @@ impl EmergencyBroadcastEngine {
                         label: c.name.clone(),
                         selected: self.selected_contact_ids.contains(&c.id),
                         subtitle: None,
-                        a11y: None,
+                        a11y: Some(A11y::labeled(c.name.clone())),
                         info_key: None,
                     })
                     .collect(),
@@ -224,17 +237,17 @@ impl EmergencyBroadcastEngine {
             actions: vec![
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.back"))),
                 },
                 ScreenAction {
                     id: "continue".into(),
-                    label: "Continue".into(),
+                    label: self.t("action.continue"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.continue"))),
                 },
             ],
             progress: Some(Progress {
@@ -249,19 +262,19 @@ impl EmergencyBroadcastEngine {
     fn message_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "emergency_message".into(),
-            title: "Alert Message".into(),
+            title: self.t("emergency.message_label"),
             subtitle: None,
             components: vec![
                 Component::TextInput {
                     id: "message".into(),
-                    label: "Alert message".into(),
+                    label: self.t("emergency.alert_message_input_label"),
                     value: self.message.clone(),
-                    placeholder: Some("Message sent to your trusted contacts".into()),
+                    placeholder: Some(self.t("emergency.alert_message_placeholder")),
                     max_length: None,
                     validation_error: None,
                     input_type: InputType::Text,
                     a11y: Some(A11y {
-                        label: Some("Alert message input".into()),
+                        label: Some(self.t("emergency.alert_message_input_a11y")),
                         hint: None,
                         role: Some(AccessibilityRole::TextField),
                     }),
@@ -269,13 +282,13 @@ impl EmergencyBroadcastEngine {
                 },
                 Component::ToggleList {
                     id: "options".into(),
-                    label: "Options".into(),
+                    label: self.t("emergency.options_label"),
                     items: vec![ToggleItem {
                         id: "include_location".into(),
-                        label: "Include Location".into(),
+                        label: self.t("emergency.include_location"),
                         selected: self.include_location,
-                        subtitle: Some("Share your location in the alert".into()),
-                        a11y: None,
+                        subtitle: Some(self.t("emergency.include_location_desc")),
+                        a11y: Some(A11y::labeled(self.t("emergency.include_location"))),
                         info_key: None,
                     }],
                     a11y: None,
@@ -284,17 +297,17 @@ impl EmergencyBroadcastEngine {
             actions: vec![
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.back"))),
                 },
                 ScreenAction {
                     id: "save".into(),
-                    label: "Save".into(),
+                    label: self.t("action.save"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.save"))),
                 },
             ],
             progress: Some(Progress {
@@ -309,18 +322,16 @@ impl EmergencyBroadcastEngine {
     fn confirm_send_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "emergency_confirm_send".into(),
-            title: "Send Emergency Alert?".into(),
+            title: self.t("emergency.confirm_send_title"),
             subtitle: None,
             components: vec![Component::InlineConfirm {
                 id: "send".into(),
-                warning: "This sends a silent alert to all your trusted contacts now. \
-                          Only do this if you may be in danger."
-                    .into(),
-                confirm_text: "Send Alert".into(),
-                cancel_text: "Cancel".into(),
+                warning: self.t("emergency.confirm_send_warning"),
+                confirm_text: self.t("emergency.send_alert_button"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: Some(A11y {
-                    label: Some("Confirm send emergency alert".into()),
+                    label: Some(self.t("emergency.confirm_send_a11y")),
                     hint: None,
                     role: Some(AccessibilityRole::Alert),
                 }),
@@ -415,12 +426,16 @@ impl WorkflowEngine for EmergencyBroadcastEngine {
                 if ids.is_empty() {
                     ActionResult::ValidationError {
                         component_id: "contact_ids".into(),
-                        message: "Add at least one trusted contact".into(),
+                        message: self.t("emergency.min_one_contact_error"),
                     }
                 } else if ids.len() > MAX_TRUSTED_CONTACTS {
                     ActionResult::ValidationError {
                         component_id: "contact_ids".into(),
-                        message: format!("Maximum {MAX_TRUSTED_CONTACTS} trusted contacts"),
+                        message: get_string_with_args(
+                            self.locale,
+                            "emergency.max_contacts_error",
+                            &[("max", &MAX_TRUSTED_CONTACTS.to_string())],
+                        ),
                     }
                 } else {
                     self.step = EmergencyStep::Message;

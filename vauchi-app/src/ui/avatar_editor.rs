@@ -15,6 +15,7 @@ use super::action::{ActionResult, UserAction};
 use super::component::{A11y, AccessibilityRole, ActionListItem, Component};
 use super::engine::WorkflowEngine;
 use super::screen::{ActionStyle, ScreenAction, ScreenModel};
+use crate::i18n::{Locale, get_string};
 
 /// Avatar generation style.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -63,6 +64,7 @@ pub struct AvatarEditorEngine {
     has_existing_avatar: bool,
     /// Set when user chose "Remove" — distinct from cancel (no avatar = intentional clear).
     removed: bool,
+    locale: Locale,
 }
 
 impl AvatarEditorEngine {
@@ -74,7 +76,19 @@ impl AvatarEditorEngine {
             result: None,
             cancelled: false,
             removed: false,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-6).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Returns `true` if the user chose to remove the existing avatar.
@@ -134,52 +148,52 @@ impl AvatarEditorEngine {
         let mut items = vec![
             ActionListItem {
                 id: "source_camera".into(),
-                label: "Camera".into(),
+                label: self.t("exchange.requirement.camera"),
                 icon: Some("camera".into()),
                 detail: None,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("exchange.requirement.camera"))),
                 info_key: None,
             },
             ActionListItem {
                 id: "source_photos".into(),
-                label: "Photos".into(),
+                label: self.t("avatar.source_photos"),
                 icon: Some("photo".into()),
                 detail: None,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("avatar.source_photos"))),
                 info_key: None,
             },
             ActionListItem {
                 id: "source_generate".into(),
-                label: "Generate".into(),
+                label: self.t("avatar.source_generate"),
                 icon: Some("sparkles".into()),
                 detail: None,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("avatar.source_generate"))),
                 info_key: None,
             },
         ];
         if self.has_existing_avatar {
             items.push(ActionListItem {
                 id: "remove_avatar".into(),
-                label: "Remove".into(),
+                label: self.t("avatar.remove"),
                 icon: Some("trash".into()),
                 detail: None,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("avatar.remove"))),
                 info_key: None,
             });
         }
         ScreenModel::new(
             "avatar_editor",
-            "Choose Avatar",
+            self.t("avatar.choose_title"),
             vec![Component::ActionList {
                 id: "sources".into(),
                 items,
             }],
             vec![ScreenAction {
                 id: "cancel".into(),
-                label: "Cancel".into(),
+                label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.cancel"))),
             }],
         )
     }
@@ -187,7 +201,7 @@ impl AvatarEditorEngine {
     fn build_editing_screen(&self, image_data: &[u8], brightness: f32) -> ScreenModel {
         ScreenModel::new(
             "avatar_editor",
-            "Edit Avatar",
+            self.t("avatar.edit_title"),
             vec![
                 Component::AvatarPreview {
                     id: "preview".into(),
@@ -197,37 +211,37 @@ impl AvatarEditorEngine {
                     brightness,
                     editable: false,
                     a11y: Some(A11y {
-                        label: Some("Avatar preview".into()),
+                        label: Some(self.t("avatar.preview_a11y")),
                         hint: None,
                         role: Some(AccessibilityRole::Image),
                     }),
                 },
                 Component::Slider {
                     id: "brightness".into(),
-                    label: "Brightness".into(),
+                    label: self.t("avatar.brightness_label"),
                     value: brightness,
                     min: -0.3,
                     max: 0.3,
                     step: 0.0,
                     min_icon: Some("sun.min".into()),
                     max_icon: Some("sun.max".into()),
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("avatar.brightness_label"))),
                 },
             ],
             vec![
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
                 ScreenAction {
                     id: "save".into(),
-                    label: "Save".into(),
+                    label: self.t("action.save"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.save"))),
                 },
             ],
         )
@@ -247,7 +261,7 @@ impl AvatarEditorEngine {
             brightness: 0.0,
             editable: false,
             a11y: Some(A11y {
-                label: Some("Generated avatar preview".into()),
+                label: Some(self.t("avatar.generated_preview_a11y")),
                 hint: None,
                 role: Some(AccessibilityRole::Image),
             }),
@@ -259,18 +273,18 @@ impl AvatarEditorEngine {
             items: vec![
                 ActionListItem {
                     id: "initials".into(),
-                    label: "Initials".into(),
+                    label: self.t("avatar.style_initials"),
                     icon: Some("textformat".into()),
                     detail: None,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("avatar.style_initials"))),
                     info_key: None,
                 },
                 ActionListItem {
                     id: "mandelbrot".into(),
-                    label: "Mandelbrot".into(),
+                    label: self.t("avatar.style_mandelbrot"),
                     icon: Some("sparkles".into()),
                     detail: None,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("avatar.style_mandelbrot"))),
                     info_key: None,
                 },
             ],
@@ -299,31 +313,36 @@ impl AvatarEditorEngine {
         let mut actions = vec![
             ScreenAction {
                 id: "cancel".into(),
-                label: "Cancel".into(),
+                label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.cancel"))),
             },
             ScreenAction {
                 id: "use".into(),
-                label: "Use".into(),
+                label: self.t("avatar.use_button"),
                 style: ActionStyle::Primary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("avatar.use_button"))),
             },
         ];
 
         if *style == GenerateStyle::Mandelbrot {
             actions.push(ScreenAction {
                 id: "regenerate".into(),
-                label: "Regenerate".into(),
+                label: self.t("avatar.regenerate_button"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("avatar.regenerate_button"))),
             });
         }
 
-        ScreenModel::new("avatar_editor", "Generate Avatar", components, actions)
+        ScreenModel::new(
+            "avatar_editor",
+            self.t("avatar.generate_title"),
+            components,
+            actions,
+        )
     }
 
     fn enter_generating(&mut self, style: GenerateStyle) {
@@ -405,8 +424,8 @@ impl WorkflowEngine for AvatarEditorEngine {
                             ActionResult::Complete
                         }
                         Err(_) => ActionResult::ShowAlert {
-                            title: "Error".into(),
-                            message: "Failed to process avatar image.".into(),
+                            title: self.t("status.error"),
+                            message: self.t("avatar.process_error"),
                         },
                     }
                 } else {
@@ -500,8 +519,8 @@ impl WorkflowEngine for AvatarEditorEngine {
                     Err(_) => {
                         // Invalid image — stay on source picker, show alert
                         return Some(ActionResult::ShowAlert {
-                            title: "Invalid Image".into(),
-                            message: "The selected image could not be processed.".into(),
+                            title: self.t("avatar.invalid_image_title"),
+                            message: self.t("avatar.invalid_image_message"),
                         });
                     }
                 }
@@ -514,8 +533,8 @@ impl WorkflowEngine for AvatarEditorEngine {
             }
             Event::PermissionDenied { ref transport } if transport == "camera" => {
                 Some(ActionResult::ShowAlert {
-                    title: "Camera Access".into(),
-                    message: "Camera permission was denied.".into(),
+                    title: self.t("avatar.camera_access_title"),
+                    message: self.t("avatar.camera_permission_denied"),
                 })
             }
             Event::HardwareUnavailable { .. } => {

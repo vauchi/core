@@ -22,6 +22,7 @@ mod ceremony_wiring_tests;
 mod app_engine_stateful_proptest;
 mod avatar_editor_tests;
 mod avatar_editor_wiring_tests;
+mod avatar_emergency_i18n_tests;
 mod backup_recovery_confirm_replace_tests;
 mod ble_exchange_app_engine_tests;
 mod ble_handshake_machine_tests;

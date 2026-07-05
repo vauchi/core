@@ -9,6 +9,7 @@
 //! - **Flow B** (old device lost): post-restore guidance + social recovery
 //! - **Flow C** (proactive): Settings entry → select mode → delegate to existing flows
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use vauchi_core::{Command, FilePickPurpose};
 
@@ -73,6 +74,7 @@ pub struct DeviceReplacementEngine {
     total_contacts: u32,
     outcome: CompletionOutcome,
     cancelled: bool,
+    locale: Locale,
 }
 
 impl DeviceReplacementEngine {
@@ -101,7 +103,19 @@ impl DeviceReplacementEngine {
             total_contacts: 0,
             outcome: CompletionOutcome::Cancelled,
             cancelled: false,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-9).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Set the QR data for the source device to display.
@@ -186,8 +200,8 @@ impl DeviceReplacementEngine {
     fn build_select_mode(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "replacement_select_mode".into(),
-            title: "Transfer from another device".into(),
-            subtitle: Some("Do you have your old device nearby?".into()),
+            title: self.t("device.transfer_title"),
+            subtitle: Some(self.t("device.transfer_subtitle")),
             components: vec![Component::InfoPanel {
                 id: "mode_info".into(),
                 icon: Some("devices".into()),
@@ -195,19 +209,17 @@ impl DeviceReplacementEngine {
                 items: vec![
                     InfoItem {
                         icon: Some("checkmark".into()),
-                        title: "Yes, I have my old device".into(),
-                        detail: "Transfer all contacts and data via QR code.".into(),
+                        title: self.t("device.have_old_device_title"),
+                        detail: self.t("device.have_old_device_detail"),
                     },
                     InfoItem {
                         icon: Some("xmark".into()),
-                        title: "No, I lost my old device".into(),
-                        detail:
-                            "Restore identity from backup. Contacts will need to be re-established."
-                                .into(),
+                        title: self.t("device.lost_old_device_title"),
+                        detail: self.t("device.lost_old_device_detail"),
                     },
                 ],
                 a11y: Some(A11y {
-                    label: Some("Choose transfer method".into()),
+                    label: Some(self.t("device.mode_choice_a11y")),
                     hint: None,
                     role: Some(AccessibilityRole::Heading),
                 }),
@@ -215,17 +227,17 @@ impl DeviceReplacementEngine {
             actions: vec![
                 ScreenAction {
                     id: "has_old_device".into(),
-                    label: "Transfer via QR".into(),
+                    label: self.t("device.transfer_via_qr_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device.transfer_via_qr_button"))),
                 },
                 ScreenAction {
                     id: "lost_device".into(),
-                    label: "Restore from backup".into(),
+                    label: self.t("device.restore_from_backup_button"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device.restore_from_backup_button"))),
                 },
             ],
             progress: self.progress(),
@@ -237,18 +249,18 @@ impl DeviceReplacementEngine {
         let qr_data = self.qr_data.clone().unwrap_or_default();
         ScreenModel {
             screen_id: "replacement_show_qr".into(),
-            title: "Set Up New Device".into(),
-            subtitle: Some("Scan this QR code on your new device.".into()),
+            title: self.t("device.setup_new_device_title"),
+            subtitle: Some(self.t("device.scan_qr_subtitle")),
             components: vec![
                 Component::QrCode {
                     id: "qr".into(),
                     data: qr_data,
                     mode: QrMode::Display,
-                    label: Some("Scan on new device".into()),
+                    label: Some(self.t("device.scan_on_new_device_label")),
                     scan_quality: None,
                     a11y: Some(A11y {
-                        label: Some("Device transfer QR code".into()),
-                        hint: Some("Scan this code on your new device to begin transfer.".into()),
+                        label: Some(self.t("device.transfer_qr_a11y")),
+                        hint: Some(self.t("device.transfer_qr_hint")),
                         role: Some(AccessibilityRole::Image),
                     }),
                 },
@@ -258,18 +270,18 @@ impl DeviceReplacementEngine {
                     title: "".into(),
                     items: vec![InfoItem {
                         icon: None,
-                        title: "Keep both devices nearby".into(),
-                        detail: "The transfer requires both devices to be in proximity.".into(),
+                        title: self.t("device.keep_nearby_title"),
+                        detail: self.t("device.keep_nearby_detail"),
                     }],
                     a11y: None,
                 },
             ],
             actions: vec![ScreenAction {
                 id: "cancel".into(),
-                label: "Cancel".into(),
+                label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.cancel"))),
             }],
             progress: self.progress(),
             ..Default::default()
@@ -280,7 +292,7 @@ impl DeviceReplacementEngine {
         let code = self.verification_code.as_deref().unwrap_or("------");
         ScreenModel {
             screen_id: "replacement_verify".into(),
-            title: "Verify Device".into(),
+            title: self.t("device.verify_device_title"),
             subtitle: None,
             components: vec![
                 Component::Text {
@@ -291,11 +303,11 @@ impl DeviceReplacementEngine {
                 Component::InfoPanel {
                     id: "verify_info".into(),
                     icon: Some("shield".into()),
-                    title: "Compare verification codes".into(),
+                    title: self.t("device.compare_codes_title"),
                     items: vec![InfoItem {
                         icon: None,
-                        title: "Both devices must show the same code".into(),
-                        detail: "This confirms you are connecting the right devices.".into(),
+                        title: self.t("device.same_code_title"),
+                        detail: self.t("device.same_code_detail"),
                     }],
                     a11y: None,
                 },
@@ -303,17 +315,17 @@ impl DeviceReplacementEngine {
             actions: vec![
                 ScreenAction {
                     id: "confirm".into(),
-                    label: "Codes match".into(),
+                    label: self.t("device.codes_match_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device.codes_match_button"))),
                 },
                 ScreenAction {
                     id: "reject".into(),
-                    label: "Codes don't match".into(),
+                    label: self.t("device.codes_no_match_button"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device.codes_no_match_button"))),
                 },
             ],
             progress: self.progress(),
@@ -323,26 +335,30 @@ impl DeviceReplacementEngine {
 
     fn build_syncing(&self) -> ScreenModel {
         let detail = if self.total_contacts > 0 {
-            Some(format!(
-                "Syncing {}/{} contacts...",
-                self.synced_contacts, self.total_contacts
+            Some(get_string_with_args(
+                self.locale,
+                "device.syncing_contacts_progress",
+                &[
+                    ("synced", &self.synced_contacts.to_string()),
+                    ("total", &self.total_contacts.to_string()),
+                ],
             ))
         } else {
-            Some("Syncing data...".into())
+            Some(self.t("device.syncing_data"))
         };
         ScreenModel {
             screen_id: "replacement_syncing".into(),
-            title: "Transferring".into(),
+            title: self.t("device.transferring_title"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "syncing".into(),
                 icon: None,
-                title: "Transfer in progress".into(),
+                title: self.t("device.transfer_in_progress_title"),
                 detail,
                 status: Status::InProgress,
                 a11y: Some(A11y {
-                    label: Some("Transfer progress".into()),
-                    hint: Some("Data is being transferred to the new device.".into()),
+                    label: Some(self.t("device.transfer_progress_a11y")),
+                    hint: Some(self.t("device.transfer_progress_hint")),
                     role: None,
                 }),
             }],
@@ -354,43 +370,44 @@ impl DeviceReplacementEngine {
 
     fn build_complete(&self) -> ScreenModel {
         let detail = if self.total_contacts > 0 {
-            Some(format!(
-                "{} contacts transferred successfully.",
-                self.synced_contacts
+            Some(get_string_with_args(
+                self.locale,
+                "device.contacts_transferred_detail",
+                &[("count", &self.synced_contacts.to_string())],
             ))
         } else {
-            Some("All data transferred.".into())
+            Some(self.t("device.all_data_transferred"))
         };
         let actions = if self.role == ReplacementRole::Source {
             vec![ScreenAction {
                 id: "decommission".into(),
-                label: "Continue".into(),
+                label: self.t("action.continue"),
                 style: ActionStyle::Primary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.continue"))),
             }]
         } else {
             vec![ScreenAction {
                 id: "done".into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.done"))),
             }]
         };
         ScreenModel {
             screen_id: "replacement_complete".into(),
-            title: "Transfer Complete".into(),
+            title: self.t("device.transfer_complete_title"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "complete".into(),
                 icon: None,
-                title: "Transfer complete".into(),
+                title: self.t("device.transfer_complete_status"),
                 detail,
                 status: Status::Success,
                 a11y: Some(A11y {
-                    label: Some("Transfer complete".into()),
-                    hint: Some("All data has been transferred to the new device.".into()),
+                    label: Some(self.t("device.transfer_complete_status")),
+                    hint: Some(self.t("device.transfer_complete_hint")),
                     role: None,
                 }),
             }],
@@ -403,8 +420,8 @@ impl DeviceReplacementEngine {
     fn build_decommission(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "replacement_decommission".into(),
-            title: "Old Device".into(),
-            subtitle: Some("What would you like to do with this device?".into()),
+            title: self.t("device.old_device_title"),
+            subtitle: Some(self.t("device.old_device_subtitle")),
             components: vec![Component::InfoPanel {
                 id: "decommission_info".into(),
                 icon: Some("warning".into()),
@@ -412,13 +429,13 @@ impl DeviceReplacementEngine {
                 items: vec![
                     InfoItem {
                         icon: Some("trash".into()),
-                        title: "Remove this device".into(),
-                        detail: "Unlink this device from your identity. Choose this if you're giving away or recycling this phone.".into(),
+                        title: self.t("device.remove_device_title"),
+                        detail: self.t("device.remove_device_detail"),
                     },
                     InfoItem {
                         icon: Some("devices".into()),
-                        title: "Keep both devices".into(),
-                        detail: "Both devices stay linked and receive updates.".into(),
+                        title: self.t("device.keep_both_title"),
+                        detail: self.t("device.keep_both_detail"),
                     },
                 ],
                 a11y: None,
@@ -426,17 +443,17 @@ impl DeviceReplacementEngine {
             actions: vec![
                 ScreenAction {
                     id: "remove_old".into(),
-                    label: "Remove this device".into(),
+                    label: self.t("device.remove_device_title"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device.remove_device_title"))),
                 },
                 ScreenAction {
                     id: "keep_both".into(),
-                    label: "Keep both".into(),
+                    label: self.t("device.keep_both_button"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device.keep_both_button"))),
                 },
             ],
             progress: self.progress(),
@@ -448,18 +465,17 @@ impl DeviceReplacementEngine {
     fn build_confirm_decommission(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "replacement_confirm_decommission".into(),
-            title: "Confirm Removal".into(),
+            title: self.t("device.confirm_removal_title"),
             subtitle: None,
             components: vec![Component::InlineConfirm {
                 id: "remove".into(),
-                warning: "This device will be unlinked from your identity. This cannot be undone."
-                    .into(),
-                confirm_text: "Remove this device".into(),
-                cancel_text: "Cancel".into(),
+                warning: self.t("device.remove_device_warning"),
+                confirm_text: self.t("device.remove_device_title"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: Some(A11y {
-                    label: Some("Confirm device removal".into()),
-                    hint: Some("Permanently unlinks this device from your identity.".into()),
+                    label: Some(self.t("device.confirm_removal_a11y")),
+                    hint: Some(self.t("device.confirm_removal_hint")),
                     role: None,
                 }),
             }],
@@ -472,29 +488,26 @@ impl DeviceReplacementEngine {
     fn build_restore_guidance(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "replacement_restore_guidance".into(),
-            title: "Contacts Need Re-Establishing".into(),
-            subtitle: Some(
-                "Your identity is restored, but contacts cannot be recovered from a backup.".into(),
-            ),
+            title: self.t("device.contacts_need_reestablish_title"),
+            subtitle: Some(self.t("device.restore_guidance_subtitle")),
             components: vec![Component::InfoPanel {
                 id: "restore_options".into(),
                 icon: Some("info".into()),
-                title: "How to recover your contacts".into(),
+                title: self.t("device.how_to_recover_contacts_title"),
                 items: vec![
                     InfoItem {
                         icon: Some("people".into()),
-                        title: "Ask a trusted contact to vouch for you".into(),
-                        detail: "Use social recovery to restore contacts through a trusted friend."
-                            .into(),
+                        title: self.t("device.vouch_for_you_title"),
+                        detail: self.t("device.vouch_for_you_detail"),
                     },
                     InfoItem {
                         icon: Some("qrcode".into()),
-                        title: "Meet contacts in person".into(),
-                        detail: "Exchange contact cards again via QR code.".into(),
+                        title: self.t("device.meet_in_person_title"),
+                        detail: self.t("device.meet_in_person_detail"),
                     },
                 ],
                 a11y: Some(A11y {
-                    label: Some("Contact recovery options".into()),
+                    label: Some(self.t("device.contact_recovery_options_a11y")),
                     hint: None,
                     role: Some(AccessibilityRole::Heading),
                 }),
@@ -502,17 +515,17 @@ impl DeviceReplacementEngine {
             actions: vec![
                 ScreenAction {
                     id: "social_recovery".into(),
-                    label: "Social Recovery".into(),
+                    label: self.t("more.social_recovery"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("more.social_recovery"))),
                 },
                 ScreenAction {
                     id: "done".into(),
-                    label: "I'll do this later".into(),
+                    label: self.t("device.do_this_later_button"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device.do_this_later_button"))),
                 },
             ],
             progress: self.progress(),

@@ -618,7 +618,10 @@ impl AppEngine {
                 Box::new(ActivityLogEngine::new(items))
             }
             AppScreen::DeviceReplacement => {
-                Box::new(crate::ui::device_replacement::DeviceReplacementEngine::new_source())
+                Box::new(
+                    crate::ui::device_replacement::DeviceReplacementEngine::new_source()
+                        .with_locale(render_context.resolved_locale()),
+                )
                 // Note: Settings "Set Up New Device" opens as Source (old device side).
                 // Onboarding "Transfer from another device" bypasses this engine entirely
                 // via ActionResult::StartDeviceLink. PostRestore is created by the backup

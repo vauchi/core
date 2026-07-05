@@ -40,6 +40,7 @@ mod device_link_bridge_tests;
 mod device_linking_i18n_tests;
 mod device_linking_receiver_i18n_tests;
 mod device_management_i18n_tests;
+mod device_replacement_i18n_tests;
 mod direct_transport_app_engine_tests;
 mod display_hint_tests;
 mod drain_notifications_tests;

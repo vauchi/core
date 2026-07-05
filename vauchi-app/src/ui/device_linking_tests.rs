@@ -211,31 +211,6 @@ fn confirming_device_screen_shows_name_and_code() {
 
 // @internal
 #[test]
-fn codes_match_advances_to_verifying_proximity_preserving_code() {
-    let mut e = DeviceLinkingEngine::new("qr-data".into());
-    e.transition_to_confirming_device("New iPad".into(), "654321".into(), "deadbeef".into());
-    let result = e.handle_action(UserAction::ActionPressed {
-        action_id: CODES_MATCH_ACTION_ID.into(),
-    });
-    match result {
-        ActionResult::NavigateTo(s) => {
-            assert_eq!(s.screen_id, "link_verifying_proximity");
-            let code = s
-                .components
-                .iter()
-                .find_map(|c| match c {
-                    Component::Text { content, .. } => Some(content.clone()),
-                    _ => None,
-                })
-                .expect("code text present");
-            assert_eq!(code, "654321");
-        }
-        other => panic!("expected NavigateTo, got {other:?}"),
-    }
-}
-
-// @internal
-#[test]
 fn deny_from_confirming_device_emits_device_link_deny() {
     let mut e = DeviceLinkingEngine::new("qr-data".into());
     e.transition_to_confirming_device("New iPad".into(), "654321".into(), "deadbeef".into());
@@ -248,22 +223,21 @@ fn deny_from_confirming_device_emits_device_link_deny() {
     );
 }
 
+// M5 B2b: the redundant proximity screen is gone — "codes match" is the
+// single confirmation, emitting the typed result and advancing to
+// Completing (2026-07-03-second-device-join-dead-end item 5).
 // @internal
 #[test]
-fn confirm_manual_emits_typed_result_with_code_and_advances_step() {
+fn codes_match_emits_confirm_manual_and_advances_to_completing() {
     let mut e = DeviceLinkingEngine::new("qr-data".into());
     e.transition_to_confirming_device("New iPad".into(), "654321".into(), "deadbeef".into());
-    let _ = e.handle_action(UserAction::ActionPressed {
-        action_id: CODES_MATCH_ACTION_ID.into(),
-    });
     let result = e.handle_action(UserAction::ActionPressed {
-        action_id: CONFIRM_MANUAL_ACTION_ID.into(),
+        action_id: CODES_MATCH_ACTION_ID.into(),
     });
     match result {
         ActionResult::DeviceLinkConfirmManual { code } => assert_eq!(code, "654321"),
         other => panic!("expected DeviceLinkConfirmManual, got {other:?}"),
     }
-    // Step still advanced — next render shows the Completing screen.
     assert_eq!(e.current_screen().screen_id, "link_completing");
 }
 

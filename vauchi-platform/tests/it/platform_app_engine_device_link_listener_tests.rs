@@ -147,9 +147,12 @@ fn qr_expired_bridge_routes_to_qr_expired_screen() {
 
 // ── Action interception ───────────────────────────────────────
 
-// @scenario: pair5_device_link_listener :: confirm_manual surfaces DeviceLinkConfirmManual JSON
+// @scenario: pair5_device_link_listener :: codes_match surfaces DeviceLinkConfirmManual JSON
+// M5 B2b: "codes match" is the single confirmation — it emits
+// DeviceLinkConfirmManual directly (the redundant proximity step was
+// collapsed, 2026-07-03-second-device-join-dead-end item 5).
 #[test]
-fn confirm_manual_action_emits_typed_action_result_json() {
+fn codes_match_action_emits_typed_action_result_json() {
     let (engine, _dir) = create_engine_with_identity();
     navigate_to_device_linking_quiescent(&engine);
     engine
@@ -159,12 +162,9 @@ fn confirm_manual_action_emits_typed_action_result_json() {
             "deadbeef".into(),
         )
         .expect("apply request_received");
-    let _ = engine
+    let result_json = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "codes_match"}}"#.into())
         .expect("codes_match");
-    let result_json = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "confirm_manual"}}"#.into())
-        .expect("confirm_manual");
     let parsed: serde_json::Value =
         serde_json::from_str(&result_json).expect("parse action result");
     let confirm = parsed

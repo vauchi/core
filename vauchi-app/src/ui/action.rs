@@ -323,8 +323,9 @@ pub enum ActionResult {
     /// App layer should call `MobileDeviceLinkSession::confirm_manual`
     /// with the given confirmation code and the current unix timestamp.
     ///
-    /// Emitted by `DeviceLinkingEngine` from the `VerifyingProximity`
-    /// step when the user taps the manual-confirm action. Pair 5 of
+    /// Emitted by `DeviceLinkingEngine` from the `ConfirmingDevice` step
+    /// when the user taps "codes match" — the single confirmation since
+    /// M5 B2b collapsed the redundant proximity screen. Pair 5 of
     /// `2026-04-28-pure-humble-ui-retire-native-screens`. Ultrasonic
     /// confirmation flows through ADR-031 hardware events instead.
     DeviceLinkConfirmManual {

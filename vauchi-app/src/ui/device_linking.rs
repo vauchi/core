@@ -38,18 +38,19 @@ enum DeviceLinkStep {
     /// with `peer_connected`.
     VerifyCode,
     /// Receiver-side: a peer connected and we now show the device
-    /// name, the confirmation code, and a hex-encoded challenge that
-    /// the next step (`VerifyingProximity`) will sign.
+    /// name and the confirmation code. The user confirms the codes
+    /// match; that single confirmation completes the link (M5 B2b —
+    /// 2026-07-03-second-device-join-dead-end item 5 collapsed the
+    /// redundant second "verify proximity" screen, since the ultrasonic
+    /// approve flow that would justify it is deferred).
     ConfirmingDevice {
         device_name: String,
         code: String,
-        challenge_hex: String,
-    },
-    /// Receiver-side proximity verification. The user confirms manually
-    /// (ultrasonic-approve flow is deferred — see ADR-031 hardware
-    /// events).
-    VerifyingProximity {
-        code: String,
+        // Dormant until the deferred ultrasonic-approve flow lands and a
+        // proximity step re-consumes it to sign; the handshake already
+        // plumbs it here (ADR-031 hardware events). Kept rather than
+        // torn out of the EngineUpdate/bridge boundary for one release.
+        #[allow(dead_code)]
         challenge_hex: String,
     },
     Syncing,
@@ -77,7 +78,6 @@ pub const REJECT_ACTION_ID: &str = "reject";
 pub const DONE_ACTION_ID: &str = "done";
 pub const CODES_MATCH_ACTION_ID: &str = "codes_match";
 pub const DENY_ACTION_ID: &str = "deny";
-pub const CONFIRM_MANUAL_ACTION_ID: &str = "confirm_manual";
 pub const RETRY_ACTION_ID: &str = "retry";
 
 /// Engine that drives the device linking workflow.
@@ -212,9 +212,7 @@ impl DeviceLinkingEngine {
             DeviceLinkStep::QrPending
             | DeviceLinkStep::ShowQr
             | DeviceLinkStep::WaitingForRequest { .. } => 1,
-            DeviceLinkStep::VerifyCode
-            | DeviceLinkStep::ConfirmingDevice { .. }
-            | DeviceLinkStep::VerifyingProximity { .. } => 2,
+            DeviceLinkStep::VerifyCode | DeviceLinkStep::ConfirmingDevice { .. } => 2,
             DeviceLinkStep::Syncing | DeviceLinkStep::Completing => 3,
             DeviceLinkStep::Complete => 4,
         }
@@ -256,9 +254,6 @@ impl DeviceLinkingEngine {
             DeviceLinkStep::ConfirmingDevice {
                 device_name, code, ..
             } => self.confirming_device_screen(device_name, code),
-            DeviceLinkStep::VerifyingProximity { code, .. } => {
-                self.verifying_proximity_screen(code)
-            }
             DeviceLinkStep::Completing => self.completing_screen(),
             DeviceLinkStep::LinkFailed { message } => self.link_failed_screen(message),
         }
@@ -644,50 +639,6 @@ impl DeviceLinkingEngine {
         }
     }
 
-    fn verifying_proximity_screen(&self, code: &str) -> ScreenModel {
-        ScreenModel {
-            screen_id: "link_verifying_proximity".into(),
-            title: self.t("devices.link.verify_proximity_title"),
-            subtitle: None,
-            components: vec![
-                Component::Text {
-                    id: "code".into(),
-                    content: code.to_string(),
-                    style: TextStyle::Title,
-                },
-                Component::InfoPanel {
-                    id: "proximity_info".into(),
-                    icon: Some("wave.3.right".into()),
-                    title: self.t("devices.link.confirm_device_near"),
-                    items: vec![InfoItem {
-                        icon: None,
-                        title: self.t("devices.link.manual_confirmation"),
-                        detail: self.t("devices.link.tap_confirm_same_code"),
-                    }],
-                    a11y: None,
-                },
-            ],
-            actions: vec![
-                ScreenAction {
-                    id: CONFIRM_MANUAL_ACTION_ID.into(),
-                    label: self.t("platform.button_confirm"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("platform.button_confirm"))),
-                },
-                ScreenAction {
-                    id: CANCEL_ACTION_ID.into(),
-                    label: self.t("action.cancel"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
-                },
-            ],
-            progress: self.progress(),
-            ..Default::default()
-        }
-    }
-
     fn completing_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "link_completing".into(),
@@ -831,21 +782,18 @@ impl WorkflowEngine for DeviceLinkingEngine {
                 self.verification_code = None;
                 ActionResult::NavigateTo(self.build_screen())
             }
-            (
-                DeviceLinkStep::ConfirmingDevice {
-                    code,
-                    challenge_hex,
-                    ..
-                },
-                CODES_MATCH_ACTION_ID,
-            ) => {
+            // M5 B2b: "codes match" is the single confirmation. It moves
+            // straight to the ephemeral Completing state and emits the
+            // typed result so the app engine can call
+            // `MobileDeviceLinkSession::confirm_manual(code, now)` — the
+            // redundant second "verify proximity" screen was collapsed
+            // (2026-07-03-second-device-join-dead-end item 5; the
+            // ultrasonic-approve flow that would justify a distinct
+            // proximity step is deferred).
+            (DeviceLinkStep::ConfirmingDevice { code, .. }, CODES_MATCH_ACTION_ID) => {
                 let code = code.clone();
-                let challenge_hex = challenge_hex.clone();
-                self.step = DeviceLinkStep::VerifyingProximity {
-                    code,
-                    challenge_hex,
-                };
-                ActionResult::NavigateTo(self.build_screen())
+                self.step = DeviceLinkStep::Completing;
+                ActionResult::DeviceLinkConfirmManual { code }
             }
             // `deny` from receiver-side ConfirmingDevice. The app
             // engine intercepts `DeviceLinkDeny` to call
@@ -854,15 +802,6 @@ impl WorkflowEngine for DeviceLinkingEngine {
             // which collapses the sheet.
             (DeviceLinkStep::ConfirmingDevice { .. }, DENY_ACTION_ID) => {
                 ActionResult::DeviceLinkDeny
-            }
-            // `confirm_manual` from VerifyingProximity. Engine moves
-            // to the ephemeral Completing state and emits the typed
-            // result so the app engine can call
-            // `MobileDeviceLinkSession::confirm_manual(code, now)`.
-            (DeviceLinkStep::VerifyingProximity { code, .. }, CONFIRM_MANUAL_ACTION_ID) => {
-                let code = code.clone();
-                self.step = DeviceLinkStep::Completing;
-                ActionResult::DeviceLinkConfirmManual { code }
             }
             (DeviceLinkStep::QrExpired, RETRY_ACTION_ID)
             | (DeviceLinkStep::LinkFailed { .. }, RETRY_ACTION_ID) => {

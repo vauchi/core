@@ -75,41 +75,17 @@ fn request_received_bridge_renders_confirming_device_screen() {
     assert_eq!(screen.subtitle.as_deref(), Some("Device: New iPad"));
 }
 
-// @scenario: pair5_device_link_bridge :: codes_match preserves confirmation code into proximity step
+// @scenario: pair5_device_link_bridge :: codes_match is the single confirmation and emits the typed result
+// M5 B2b: the redundant "verify proximity" screen was collapsed — the
+// single "codes match" confirmation emits DeviceLinkConfirmManual
+// (carrying the code) and advances straight to Completing
+// (2026-07-03-second-device-join-dead-end item 5).
 #[test]
-fn request_received_then_codes_match_advances_to_proximity_with_code() {
+fn codes_match_emits_confirm_manual_and_advances_to_completing() {
     let mut engine = engine_on_device_linking();
     let _ = engine.device_link_request_received("New iPad".into(), "112233".into(), "abcd".into());
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "codes_match".into(),
-    });
-    match result {
-        ActionResult::NavigateTo(s) => {
-            assert_eq!(s.screen_id, "link_verifying_proximity");
-            let code = s
-                .components
-                .iter()
-                .find_map(|c| match c {
-                    vauchi_app::ui::Component::Text { content, .. } => Some(content.clone()),
-                    _ => None,
-                })
-                .expect("code text present");
-            assert_eq!(code, "112233");
-        }
-        other => panic!("expected NavigateTo, got {other:?}"),
-    }
-}
-
-// @scenario: pair5_device_link_bridge :: confirm_manual emits typed action result with code
-#[test]
-fn confirm_manual_emits_typed_result_carrying_code() {
-    let mut engine = engine_on_device_linking();
-    let _ = engine.device_link_request_received("New iPad".into(), "112233".into(), "abcd".into());
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "codes_match".into(),
-    });
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "confirm_manual".into(),
     });
     match result {
         ActionResult::DeviceLinkConfirmManual { code } => assert_eq!(code, "112233"),

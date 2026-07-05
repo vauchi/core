@@ -13,11 +13,11 @@
 //!   `select_offline`, `back_to_transport`, `cancel`).
 //! - `VerifyCode` is only reachable via the bridge mutator
 //!   `peer_connected` — declared via a per-state factory.
-//! - The receiver-side `ConfirmingDevice → VerifyingProximity` cluster
-//!   is only reachable via the bridge mutator
-//!   `transition_to_confirming_device` — declared via a per-state
-//!   factory. `codes_match` then transitions to `VerifyingProximity`
-//!   inside BFS.
+//! - The receiver-side `ConfirmingDevice` cluster is only reachable via
+//!   the bridge mutator `transition_to_confirming_device` — declared via
+//!   a per-state factory. `codes_match` is the single confirmation and
+//!   transitions straight to `Completing` (M5 B2b collapsed the former
+//!   `VerifyingProximity` step).
 //! - The `QrPending`, `WaitingForRequest`, `QrExpired`, `Completing`,
 //!   `LinkSuccess`, and `LinkFailed` clusters each get their own
 //!   factory because the BFS walker can't drive bridge mutators.
@@ -36,7 +36,7 @@ const TRANSPORT_HANDLED: &[&str] = &[
 // both, so the declared set must include cancel.
 const VERIFY_CODE_HANDLED: &[&str] = &["confirm", "reject", "cancel"];
 
-const CONFIRMING_HANDLED: &[&str] = &["codes_match", "deny", "confirm_manual", "cancel"];
+const CONFIRMING_HANDLED: &[&str] = &["codes_match", "deny", "cancel"];
 
 const QR_PENDING_HANDLED: &[&str] = &["cancel"];
 const WAITING_HANDLED: &[&str] = &["cancel"];

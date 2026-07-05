@@ -9,6 +9,7 @@
 //! UI retirement work — see
 //! `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens/`).
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// One row in the field-visibility toggle list. The engine holds these
@@ -34,6 +35,7 @@ pub struct GroupDetailEngine {
     members: Vec<Item>,
     fields: Vec<GroupFieldVisibility>,
     pending_delete: bool,
+    locale: Locale,
 }
 
 impl GroupDetailEngine {
@@ -44,6 +46,7 @@ impl GroupDetailEngine {
             members,
             fields: Vec::new(),
             pending_delete: false,
+            locale: Locale::English,
         }
     }
 
@@ -56,27 +59,38 @@ impl GroupDetailEngine {
         self
     }
 
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-13).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
+    }
+
     fn build_screen(&self) -> ScreenModel {
         let mut components: Vec<Component> = Vec::new();
 
         components.push(Component::InfoPanel {
             id: "group_info".into(),
             icon: Some("group".into()),
-            title: "Group Info".into(),
+            title: self.t("group_detail.group_info_title"),
             items: vec![
                 InfoItem {
                     icon: Some("members".into()),
-                    title: "Members".into(),
+                    title: self.t("group_detail.members_label"),
                     detail: format!("{}", self.members.len()),
                 },
                 InfoItem {
                     icon: Some("eye".into()),
-                    title: "Visible Fields".into(),
+                    title: self.t("group_detail.visible_fields_label"),
                     detail: format!("{}", self.visible_field_count()),
                 },
             ],
             a11y: Some(A11y {
-                label: Some("Group Info".into()),
+                label: Some(self.t("group_detail.group_info_title")),
                 hint: None,
                 role: Some(AccessibilityRole::Heading),
             }),
@@ -85,7 +99,7 @@ impl GroupDetailEngine {
         if !self.fields.is_empty() {
             components.push(Component::ToggleList {
                 id: FIELD_VISIBILITY_COMPONENT_ID.into(),
-                label: "Field Visibility".into(),
+                label: self.t("group_detail.field_visibility_label"),
                 items: self
                     .fields
                     .iter()
@@ -95,11 +109,15 @@ impl GroupDetailEngine {
                         selected: f.is_visible,
                         subtitle: Some(f.value.clone()),
                         a11y: Some(A11y {
-                            label: Some(format!("Visibility for {}", f.label)),
+                            label: Some(get_string_with_args(
+                                self.locale,
+                                "group_detail.visibility_for_a11y",
+                                &[("label", &f.label)],
+                            )),
                             hint: Some(if f.is_visible {
-                                "Visible to this group".into()
+                                self.t("group_detail.visible_to_group_hint")
                             } else {
-                                "Hidden from this group".into()
+                                self.t("group_detail.hidden_from_group_hint")
                             }),
                             role: None,
                         }),
@@ -107,10 +125,8 @@ impl GroupDetailEngine {
                     })
                     .collect(),
                 a11y: Some(A11y {
-                    label: Some("Field Visibility toggles".into()),
-                    hint: Some(
-                        "Toggle which of your fields contacts in this group can see.".into(),
-                    ),
+                    label: Some(self.t("group_detail.field_visibility_toggles_a11y")),
+                    hint: Some(self.t("group_detail.field_visibility_hint")),
                     role: None,
                 }),
             });
@@ -128,12 +144,13 @@ impl GroupDetailEngine {
         if self.pending_delete {
             components.push(Component::InlineConfirm {
                 id: "delete_group".into(),
-                warning: format!(
-                    "This will permanently delete \"{}\". Contacts will not be deleted.",
-                    self.group_name
+                warning: get_string_with_args(
+                    self.locale,
+                    "group_detail.delete_warning",
+                    &[("name", &self.group_name)],
                 ),
-                confirm_text: "Delete Group".into(),
-                cancel_text: "Cancel".into(),
+                confirm_text: self.t("group_detail.delete_group_button"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: None,
             });
@@ -156,7 +173,11 @@ impl GroupDetailEngine {
             .iter()
             .map(|m| ScreenAction {
                 id: format!("preview-as-member:{}", m.id),
-                label: format!("Preview as {}", m.name),
+                label: get_string_with_args(
+                    self.locale,
+                    "group_detail.preview_as",
+                    &[("name", &m.name)],
+                ),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -164,14 +185,14 @@ impl GroupDetailEngine {
             .collect();
         actions.push(ScreenAction {
             id: "rename".into(),
-            label: "Rename".into(),
+            label: self.t("group_detail.rename_button"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: None,
         });
         actions.push(ScreenAction {
             id: "delete_group".into(),
-            label: "Delete Group".into(),
+            label: self.t("group_detail.delete_group_button"),
             style: ActionStyle::Destructive,
             enabled: true,
             a11y: None,

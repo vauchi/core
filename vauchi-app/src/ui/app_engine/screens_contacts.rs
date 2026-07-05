@@ -292,7 +292,11 @@ impl AppEngine {
                         .ok()
                         .flatten()
                         .and_then(|c| c.avatar().map(|a| a.to_vec()));
-                    Box::new(ContactEditEngine::new(editable, vec![]).with_avatar_data(avatar_data))
+                    Box::new(
+                        ContactEditEngine::new(editable, vec![])
+                            .with_avatar_data(avatar_data)
+                            .with_locale(render_context.resolved_locale()),
+                    )
                 }
                 _ => Box::new(
                     ContactNotFoundEngine::new(contact_id.clone())
@@ -347,15 +351,21 @@ impl AppEngine {
                 primary_fields,
                 secondary_name,
                 secondary_fields,
-            } => Box::new(ContactMergeEngine::new(MergePreview {
-                primary_name: primary_name.clone(),
-                primary_fields: primary_fields.clone(),
-                secondary_name: secondary_name.clone(),
-                secondary_fields: secondary_fields.clone(),
-            })),
+            } => Box::new(
+                ContactMergeEngine::new(MergePreview {
+                    primary_name: primary_name.clone(),
+                    primary_fields: primary_fields.clone(),
+                    secondary_name: secondary_name.clone(),
+                    secondary_fields: secondary_fields.clone(),
+                })
+                .with_locale(render_context.resolved_locale()),
+            ),
             AppScreen::ContactLimit => {
                 let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
-                Box::new(ContactLimitEngine::new(contact_count, 0))
+                Box::new(
+                    ContactLimitEngine::new(contact_count, 0)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::VerifyFingerprint { contact_id } => {
                 let contact = vauchi.get_contact(contact_id).ok().flatten();

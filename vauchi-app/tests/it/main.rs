@@ -24,6 +24,7 @@ mod avatar_editor_tests;
 mod avatar_editor_wiring_tests;
 mod avatar_emergency_i18n_tests;
 mod backup_recovery_confirm_replace_tests;
+mod batch2_i18n_tests;
 mod ble_exchange_app_engine_tests;
 mod ble_handshake_machine_tests;
 mod canonical_screen_id_tests;

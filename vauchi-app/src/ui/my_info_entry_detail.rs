@@ -4,6 +4,7 @@
 
 //! Entry detail screen — edit value, modify group visibility, see which contacts can see it.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Info about a contact that can see this entry (for the read-only contact list).
@@ -27,6 +28,7 @@ pub struct MyInfoEntryDetailEngine {
     pub groups: Vec<(String, String, bool)>, // (group_id, group_name, is_visible)
     /// Contacts who can see this field (derived from group membership).
     pub visible_contacts: Vec<EntryContactInfo>,
+    locale: Locale,
 }
 
 impl MyInfoEntryDetailEngine {
@@ -47,6 +49,7 @@ impl MyInfoEntryDetailEngine {
             note,
             groups,
             visible_contacts,
+            locale: Locale::English,
         }
     }
 }
@@ -55,6 +58,17 @@ impl MyInfoEntryDetailEngine {
     /// Rebuild current_screen after external mutation of fields.
     pub fn refresh_screen(&self) -> ScreenModel {
         self.current_screen()
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-13).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 }
 
@@ -116,7 +130,7 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
 
             components.push(Component::ToggleList {
                 id: "group_visibility".into(),
-                label: "Visible to groups".into(),
+                label: self.t("my_info_entry_detail.visible_to_groups_label"),
                 items: toggle_items,
                 a11y: None,
             });
@@ -128,13 +142,17 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
         if self.visible_contacts.is_empty() {
             components.push(Component::Text {
                 id: "no_contacts".into(),
-                content: "No contacts can see this entry.".into(),
+                content: self.t("my_info_entry_detail.no_contacts"),
                 style: TextStyle::Caption,
             });
         } else {
             components.push(Component::Text {
                 id: "contacts_header".into(),
-                content: format!("Visible to {} contacts", self.visible_contacts.len()),
+                content: get_string_with_args(
+                    self.locale,
+                    "my_info_entry_detail.visible_to_count",
+                    &[("count", &self.visible_contacts.len().to_string())],
+                ),
                 style: TextStyle::Subtitle,
             });
 
@@ -145,7 +163,11 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                     id: c.contact_id.clone(),
                     label: c.name.clone(),
                     icon: None,
-                    detail: Some(format!("via {}", c.via_group)),
+                    detail: Some(get_string_with_args(
+                        self.locale,
+                        "my_info_entry_detail.via_group",
+                        &[("group", &c.via_group)],
+                    )),
                     a11y: None,
                     info_key: None,
                 })
@@ -165,14 +187,14 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
             actions: vec![
                 ScreenAction {
                     id: "edit".into(),
-                    label: "Edit".into(),
+                    label: self.t("action.edit"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "delete".into(),
-                    label: "Delete".into(),
+                    label: self.t("action.delete"),
                     style: ActionStyle::Destructive,
                     enabled: true,
                     // Make the button's target explicit to screen
@@ -181,13 +203,12 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                     // field label so VoiceOver says "Delete email,
                     // button" (etc.) rather than just "Delete".
                     a11y: Some(A11y {
-                        label: Some(format!("Delete {}", self.label)),
-                        hint: Some(
-                            "Removes this entry from your contact card. \
-                             Contacts who already have it keep their copy \
-                             until their next sync."
-                                .into(),
-                        ),
+                        label: Some(get_string_with_args(
+                            self.locale,
+                            "my_info_entry_detail.delete_field_a11y",
+                            &[("label", &self.label)],
+                        )),
+                        hint: Some(self.t("my_info_entry_detail.delete_field_hint")),
                         role: None,
                     }),
                 },

@@ -165,7 +165,7 @@ impl AppEngine {
                 )
             }
             AppScreen::MyInfoEntryDetail { field_id } => {
-                Self::create_entry_detail_engine(vauchi, field_id)
+                Self::create_entry_detail_engine(vauchi, field_id, render_context)
             }
             AppScreen::Contacts
             | AppScreen::ContactDetail { .. }
@@ -360,7 +360,11 @@ impl AppEngine {
             AppScreen::DeliveryStatus => {
                 let items = Self::load_delivery_items(vauchi);
                 let retries = Self::load_retry_entries(vauchi);
-                Box::new(DeliveryStatusEngine::new(items).with_retries(retries))
+                Box::new(
+                    DeliveryStatusEngine::new(items)
+                        .with_retries(retries)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::Sync => {
                 let relay_url = vauchi.config().relay.server_url.clone();
@@ -420,7 +424,10 @@ impl AppEngine {
                     })
                     .collect();
                 let group_count = vauchi.list_groups().map(|g| g.len()).unwrap_or(0);
-                Box::new(crate::ui::SocialGraphEngine::new(entries, group_count))
+                Box::new(
+                    crate::ui::SocialGraphEngine::new(entries, group_count)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::TagPromotion { tag_id } => match vauchi.begin_tag_promotion(tag_id) {
                 Ok(draft) => {
@@ -542,7 +549,8 @@ impl AppEngine {
 
                 Box::new(
                     GroupDetailEngine::new(group_id.clone(), group_name, members)
-                        .with_field_visibility(field_visibility),
+                        .with_field_visibility(field_visibility)
+                        .with_locale(render_context.resolved_locale()),
                 )
             }
             AppScreen::Privacy => {
@@ -714,7 +722,11 @@ impl AppEngine {
         })
     }
 
-    fn create_entry_detail_engine(vauchi: &Vauchi, field_id: &str) -> Box<dyn WorkflowEngine> {
+    fn create_entry_detail_engine(
+        vauchi: &Vauchi,
+        field_id: &str,
+        render_context: &crate::ui::RenderContext,
+    ) -> Box<dyn WorkflowEngine> {
         let card = vauchi.own_card().ok().flatten();
         let all_groups = vauchi.list_groups().unwrap_or_default();
 
@@ -724,15 +736,18 @@ impl AppEngine {
 
         let Some(field) = field else {
             // Field not found — return a minimal engine
-            return Box::new(MyInfoEntryDetailEngine::new(
-                field_id.to_string(),
-                "Unknown".into(),
-                "Unknown".into(),
-                "Field not found".into(),
-                None,
-                vec![],
-                vec![],
-            ));
+            return Box::new(
+                MyInfoEntryDetailEngine::new(
+                    field_id.to_string(),
+                    "Unknown".into(),
+                    "Unknown".into(),
+                    "Field not found".into(),
+                    None,
+                    vec![],
+                    vec![],
+                )
+                .with_locale(render_context.resolved_locale()),
+            );
         };
 
         // Build group visibility state
@@ -770,15 +785,18 @@ impl AppEngine {
             }
         }
 
-        Box::new(MyInfoEntryDetailEngine::new(
-            field_id.to_string(),
-            format!("{:?}", field.field_type()),
-            field.label().to_string(),
-            field.value().to_string(),
-            field.note().map(|s| s.to_string()),
-            groups,
-            visible_contacts,
-        ))
+        Box::new(
+            MyInfoEntryDetailEngine::new(
+                field_id.to_string(),
+                format!("{:?}", field.field_type()),
+                field.label().to_string(),
+                field.value().to_string(),
+                field.note().map(|s| s.to_string()),
+                groups,
+                visible_contacts,
+            )
+            .with_locale(render_context.resolved_locale()),
+        )
     }
 
     pub(super) fn load_contact_items(vauchi: &Vauchi) -> Vec<IndexedItem> {

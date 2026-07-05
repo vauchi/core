@@ -8,6 +8,7 @@
 //! See `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens/`
 //! for the architectural context (Pair 1 — DeliveryStatus retirement).
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Action id emitted by the "retry all failed" footer button.
@@ -43,6 +44,7 @@ pub struct RetryEntry {
 pub struct DeliveryStatusEngine {
     items: Vec<DeliveryItem>,
     retries: Vec<RetryEntry>,
+    locale: Locale,
 }
 
 impl DeliveryStatusEngine {
@@ -50,12 +52,24 @@ impl DeliveryStatusEngine {
         Self {
             items,
             retries: Vec::new(),
+            locale: Locale::English,
         }
     }
 
     pub fn with_retries(mut self, retries: Vec<RetryEntry>) -> Self {
         self.retries = retries;
         self
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-13).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     fn build_screen(&self) -> ScreenModel {
@@ -74,14 +88,17 @@ impl DeliveryStatusEngine {
             components.push(Component::InfoPanel {
                 id: "empty".into(),
                 icon: Some("checkmark".into()),
-                title: "All Delivered".into(),
+                title: self.t("delivery_status.all_delivered_title"),
                 items: vec![],
                 a11y: None,
             });
         } else {
             // Section: Recent
             if !recent.is_empty() {
-                components.push(section_header("section_recent", "Recent"));
+                components.push(section_header(
+                    "section_recent",
+                    &self.t("delivery_status.recent_section"),
+                ));
                 for item in &recent {
                     components.push(status_indicator_for(item));
                 }
@@ -93,7 +110,11 @@ impl DeliveryStatusEngine {
                 }
                 components.push(section_header(
                     "section_failed",
-                    &format!("Failed ({})", failed.len()),
+                    &get_string_with_args(
+                        self.locale,
+                        "delivery_status.failed_section",
+                        &[("count", &failed.len().to_string())],
+                    ),
                 ));
                 for item in &failed {
                     components.push(status_indicator_for(item));
@@ -104,9 +125,12 @@ impl DeliveryStatusEngine {
                 if !components.is_empty() {
                     components.push(Component::Divider);
                 }
-                components.push(section_header("section_pending", "Pending Retries"));
+                components.push(section_header(
+                    "section_pending",
+                    &self.t("delivery_status.pending_retries_section"),
+                ));
                 for retry in &self.retries {
-                    components.push(retry_indicator(retry));
+                    components.push(retry_indicator(retry, self.locale));
                 }
             }
         }
@@ -114,7 +138,7 @@ impl DeliveryStatusEngine {
         let actions = if self.items.iter().any(|item| item.retryable) {
             vec![ScreenAction {
                 id: RETRY_ALL_ACTION_ID.into(),
-                label: "Retry Failed".into(),
+                label: self.t("delivery_status.retry_failed_button"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -125,7 +149,7 @@ impl DeliveryStatusEngine {
 
         ScreenModel {
             screen_id: "delivery_status".into(),
-            title: "Delivery Status".into(),
+            title: self.t("delivery_status.title"),
             subtitle: None,
             components,
             actions,
@@ -154,13 +178,21 @@ fn status_indicator_for(item: &DeliveryItem) -> Component {
     }
 }
 
-fn retry_indicator(retry: &RetryEntry) -> Component {
+fn retry_indicator(retry: &RetryEntry, locale: Locale) -> Component {
     let detail = if retry.max_exceeded {
-        Some(format!("Max attempts ({}) exceeded", retry.max_attempts))
+        Some(get_string_with_args(
+            locale,
+            "delivery_status.max_attempts_exceeded",
+            &[("max", &retry.max_attempts.to_string())],
+        ))
     } else {
-        Some(format!(
-            "Attempt {} of {}",
-            retry.attempt, retry.max_attempts
+        Some(get_string_with_args(
+            locale,
+            "delivery_status.attempt_of",
+            &[
+                ("attempt", &retry.attempt.to_string()),
+                ("max", &retry.max_attempts.to_string()),
+            ],
         ))
     };
     Component::StatusIndicator {

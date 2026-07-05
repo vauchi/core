@@ -24,6 +24,7 @@
 //! first because they need re-verification — surfacing them lets the
 //! user see attention-needed contacts at the top of the list.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Display-friendly trust level — mirrors `vauchi_core::contact::TrustLevel`
@@ -50,13 +51,14 @@ impl SocialTrustLevel {
     }
 
     /// Human-readable label for the section header / filter chip.
-    pub fn display_name(self) -> &'static str {
-        match self {
-            Self::Cautious => "Needs Re-verification",
-            Self::Standard => "Not Verified",
-            Self::High => "High Trust",
-            Self::Verified => "Verified",
-        }
+    pub fn display_name(self, locale: Locale) -> String {
+        let key = match self {
+            Self::Cautious => "social_graph.trust_cautious",
+            Self::Standard => "social_graph.trust_standard",
+            Self::High => "social_graph.trust_high",
+            Self::Verified => "contacts.verified",
+        };
+        get_string(locale, key)
     }
 
     /// Stable string id used in `ToggleItem.id` + back in the
@@ -100,6 +102,7 @@ pub struct SocialGraphEngine {
     group_count: usize,
     /// Optional filter — None means "show all trust levels".
     filter: Option<SocialTrustLevel>,
+    locale: Locale,
 }
 
 impl SocialGraphEngine {
@@ -108,12 +111,24 @@ impl SocialGraphEngine {
             contacts,
             group_count,
             filter: None,
+            locale: Locale::English,
         }
     }
 
     /// Returns the active trust-level filter (None = all).
     pub fn filter(&self) -> Option<SocialTrustLevel> {
         self.filter
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-13).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     fn total_count(&self) -> usize {
@@ -159,7 +174,11 @@ impl SocialGraphEngine {
         // even when count is zero, so the user can clear the filter).
         let mut filter_items = vec![ToggleItem {
             id: "all".into(),
-            label: format!("All ({})", self.total_count()),
+            label: get_string_with_args(
+                self.locale,
+                "social_graph.all_filter",
+                &[("count", &self.total_count().to_string())],
+            ),
             selected: self.filter.is_none(),
             subtitle: None,
             a11y: None,
@@ -172,7 +191,14 @@ impl SocialGraphEngine {
             }
             filter_items.push(ToggleItem {
                 id: level.id().into(),
-                label: format!("{} ({})", level.display_name(), count),
+                label: get_string_with_args(
+                    self.locale,
+                    "social_graph.level_filter",
+                    &[
+                        ("level", &level.display_name(self.locale)),
+                        ("count", &count.to_string()),
+                    ],
+                ),
                 selected: self.filter == Some(level),
                 subtitle: None,
                 a11y: None,
@@ -181,7 +207,7 @@ impl SocialGraphEngine {
         }
         components.push(Component::ToggleList {
             id: "trust_filter".into(),
-            label: "Filter".into(),
+            label: self.t("social_graph.filter_label"),
             items: filter_items,
             a11y: None,
         });
@@ -206,7 +232,14 @@ impl SocialGraphEngine {
             }
             components.push(Component::Text {
                 id: format!("section_{}", level.id()),
-                content: format!("{} ({})", level.display_name(), level_contacts.len()),
+                content: get_string_with_args(
+                    self.locale,
+                    "social_graph.level_filter",
+                    &[
+                        ("level", &level.display_name(self.locale)),
+                        ("count", &level_contacts.len().to_string()),
+                    ],
+                ),
                 style: TextStyle::Subtitle,
             });
             components.push(Component::List {
@@ -225,8 +258,8 @@ impl SocialGraphEngine {
             components.push(Component::StatusIndicator {
                 id: "empty".into(),
                 icon: Some("contacts".into()),
-                title: "No contacts yet".into(),
-                detail: Some("Exchange with someone to start building your network.".into()),
+                title: self.t("social_graph.empty_title"),
+                detail: Some(self.t("social_graph.empty_detail")),
                 status: Status::InProgress,
                 a11y: None,
             });
@@ -234,7 +267,7 @@ impl SocialGraphEngine {
 
         ScreenModel {
             screen_id: "social_graph".into(),
-            title: "Contact Network".into(),
+            title: self.t("social_graph.title"),
             subtitle: None,
             components,
             actions: vec![],
@@ -247,36 +280,42 @@ impl SocialGraphEngine {
         Component::InfoPanel {
             id: "network_summary".into(),
             icon: Some("network".into()),
-            title: "Your Network".into(),
+            title: self.t("social_graph.network_summary_title"),
             items: vec![
                 InfoItem {
                     icon: Some("contacts".into()),
-                    title: "Contacts".into(),
+                    title: self.t("nav.contacts"),
                     detail: self.total_count().to_string(),
                 },
                 InfoItem {
                     icon: Some("verified".into()),
-                    title: "Trusted".into(),
+                    title: self.t("social_graph.trusted_label"),
                     detail: format!("{}%", self.verified_percent()),
                 },
                 InfoItem {
                     icon: Some("warning".into()),
-                    title: "Need re-verify".into(),
+                    title: self.t("social_graph.need_reverify_label"),
                     detail: self.count_at(SocialTrustLevel::Cautious).to_string(),
                 },
                 InfoItem {
                     icon: Some("groups".into()),
-                    title: "Groups".into(),
+                    title: self.t("nav.groups"),
                     detail: self.group_count.to_string(),
                 },
             ],
             a11y: Some(A11y {
-                label: Some(format!(
-                    "Network summary: {} contacts, {} percent trusted, {} need re-verification, {} groups",
-                    self.total_count(),
-                    self.verified_percent(),
-                    self.count_at(SocialTrustLevel::Cautious),
-                    self.group_count,
+                label: Some(get_string_with_args(
+                    self.locale,
+                    "social_graph.network_summary_a11y",
+                    &[
+                        ("total", &self.total_count().to_string()),
+                        ("percent", &self.verified_percent().to_string()),
+                        (
+                            "cautious",
+                            &self.count_at(SocialTrustLevel::Cautious).to_string(),
+                        ),
+                        ("groups", &self.group_count.to_string()),
+                    ],
                 )),
                 hint: None,
                 role: None,

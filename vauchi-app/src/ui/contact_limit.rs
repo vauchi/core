@@ -4,6 +4,7 @@
 
 //! Contact limit configuration engine.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Engine for configuring the maximum number of contacts.
@@ -13,6 +14,7 @@ pub struct ContactLimitEngine {
     current_limit: usize,
     editing: bool,
     limit_input: String,
+    locale: Locale,
 }
 
 impl ContactLimitEngine {
@@ -22,18 +24,39 @@ impl ContactLimitEngine {
             current_limit,
             editing: false,
             limit_input: current_limit.to_string(),
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-13).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     fn build_screen(&self) -> ScreenModel {
         let usage = if self.current_limit > 0 {
             let pct = (self.current_count as f64 / self.current_limit as f64) * 100.0;
-            format!(
-                "{} / {} contacts ({:.0}%)",
-                self.current_count, self.current_limit, pct
+            get_string_with_args(
+                self.locale,
+                "contact_limit.usage_with_limit",
+                &[
+                    ("count", &self.current_count.to_string()),
+                    ("limit", &self.current_limit.to_string()),
+                    ("pct", &format!("{pct:.0}")),
+                ],
             )
         } else {
-            format!("{} contacts (no limit)", self.current_count)
+            get_string_with_args(
+                self.locale,
+                "contact_limit.usage_no_limit",
+                &[("count", &self.current_count.to_string())],
+            )
         };
 
         let limit_display = if self.editing {
@@ -45,7 +68,7 @@ impl ContactLimitEngine {
         let components = vec![
             Component::Text {
                 id: "info".into(),
-                content: "Set a maximum number of contacts to manage storage.".into(),
+                content: self.t("contact_limit.info"),
                 style: TextStyle::Body,
             },
             Component::Text {
@@ -55,9 +78,9 @@ impl ContactLimitEngine {
             },
             Component::TextInput {
                 id: "limit_input".into(),
-                label: "Max Contacts".into(),
+                label: self.t("contact_limit.max_contacts_label"),
                 value: limit_display,
-                placeholder: Some("Enter limit".into()),
+                placeholder: Some(self.t("contact_limit.enter_limit_placeholder")),
                 max_length: Some(6),
                 validation_error: None,
                 input_type: InputType::Text,
@@ -70,14 +93,14 @@ impl ContactLimitEngine {
             vec![
                 ScreenAction {
                     id: "save".into(),
-                    label: "Save".into(),
+                    label: self.t("action.save"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "cancel_edit".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -86,7 +109,7 @@ impl ContactLimitEngine {
         } else {
             vec![ScreenAction {
                 id: "edit".into(),
-                label: "Edit Limit".into(),
+                label: self.t("contact_limit.edit_limit_button"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -95,7 +118,7 @@ impl ContactLimitEngine {
 
         ScreenModel {
             screen_id: "contact_limit".into(),
-            title: "Contact Limit".into(),
+            title: self.t("contact_limit.title"),
             subtitle: None,
             components,
             actions,
@@ -126,7 +149,7 @@ impl WorkflowEngine for ContactLimitEngine {
                     } else {
                         ActionResult::ValidationError {
                             component_id: "limit_input".into(),
-                            message: "Please enter a valid number".into(),
+                            message: self.t("contact_limit.invalid_number_error"),
                         }
                     }
                 }

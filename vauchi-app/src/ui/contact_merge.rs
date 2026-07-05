@@ -4,6 +4,7 @@
 
 //! Contact merge preview engine — side-by-side comparison before merging.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Configuration for the merge preview.
@@ -19,11 +20,26 @@ pub struct MergePreview {
 #[derive(Clone, Debug)]
 pub struct ContactMergeEngine {
     preview: MergePreview,
+    locale: Locale,
 }
 
 impl ContactMergeEngine {
     pub fn new(preview: MergePreview) -> Self {
-        Self { preview }
+        Self {
+            preview,
+            locale: Locale::English,
+        }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-13).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     fn build_screen(&self) -> ScreenModel {
@@ -52,49 +68,61 @@ impl ContactMergeEngine {
         let components = vec![
             Component::Text {
                 id: "merge_title".into(),
-                content: format!(
-                    "{} (keep) <- {} (remove)",
-                    self.preview.primary_name, self.preview.secondary_name
+                content: get_string_with_args(
+                    self.locale,
+                    "contact_merge.title_content",
+                    &[
+                        ("primary", &self.preview.primary_name),
+                        ("secondary", &self.preview.secondary_name),
+                    ],
                 ),
                 style: TextStyle::Subtitle,
             },
             Component::InfoPanel {
                 id: "primary_fields".into(),
                 icon: None,
-                title: format!("{} (keep)", self.preview.primary_name),
+                title: get_string_with_args(
+                    self.locale,
+                    "contact_merge.keep_label",
+                    &[("name", &self.preview.primary_name)],
+                ),
                 items: primary_items,
                 a11y: None,
             },
             Component::InfoPanel {
                 id: "secondary_fields".into(),
                 icon: None,
-                title: format!("{} (remove)", self.preview.secondary_name),
+                title: get_string_with_args(
+                    self.locale,
+                    "contact_merge.remove_label",
+                    &[("name", &self.preview.secondary_name)],
+                ),
                 items: secondary_items,
                 a11y: None,
             },
             Component::Text {
                 id: "merge_note".into(),
-                content: "Unique fields from the secondary will be added to the primary. The secondary will be deleted.".into(),
+                content: self.t("contact_merge.note"),
                 style: TextStyle::Body,
             },
         ];
 
         ScreenModel {
             screen_id: "contact_merge".into(),
-            title: "Merge Contacts".into(),
+            title: self.t("contact_merge.title"),
             subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
                     id: "confirm".into(),
-                    label: "Confirm Merge".into(),
+                    label: self.t("contact_merge.confirm_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,

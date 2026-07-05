@@ -7,6 +7,7 @@
 //! No Storage or Vauchi dependency; the caller persists results when
 //! [`ActionResult::Complete`] is returned.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 // ── Public data types ───────────────────────────────────────────────
@@ -42,6 +43,7 @@ pub struct ContactEditEngine {
     selected_preview_group: Option<String>,
     /// Avatar image bytes (WebP) for the Preview component.
     avatar_data: Option<Vec<u8>>,
+    locale: Locale,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -60,6 +62,7 @@ impl ContactEditEngine {
             available_groups,
             selected_preview_group: None,
             avatar_data: None,
+            locale: Locale::English,
         }
     }
 
@@ -67,6 +70,17 @@ impl ContactEditEngine {
     pub fn with_avatar_data(mut self, data: Option<Vec<u8>>) -> Self {
         self.avatar_data = data;
         self
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-13).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Returns a reference to the edited contact data.
@@ -95,8 +109,8 @@ impl ContactEditEngine {
                 label: Some(format!("{}: {}", field.label, field.value)),
                 hint: match visibility {
                     UiFieldVisibility::Shown => None,
-                    UiFieldVisibility::Hidden => Some("This field is hidden from contacts".into()),
-                    UiFieldVisibility::Groups(_) => Some("Visible to specific groups".into()),
+                    UiFieldVisibility::Hidden => Some(self.t("contact_edit.field_hidden_hint")),
+                    UiFieldVisibility::Groups(_) => Some(self.t("contact_edit.field_groups_hint")),
                 },
                 role: None,
             }),
@@ -137,14 +151,14 @@ impl ContactEditEngine {
 
         ScreenModel {
             screen_id: "edit_fields".into(),
-            title: "Edit Contact".into(),
+            title: self.t("contact_edit.edit_contact_title"),
             subtitle: None,
             components: vec![
                 Component::TextInput {
                     id: "display_name".into(),
-                    label: "Display Name".into(),
+                    label: self.t("settings.display_name"),
                     value: self.contact.display_name.clone(),
-                    placeholder: Some("Enter name".into()),
+                    placeholder: Some(self.t("contact_edit.enter_name_placeholder")),
                     max_length: None,
                     validation_error: None,
                     input_type: InputType::Text,
@@ -158,15 +172,15 @@ impl ContactEditEngine {
                     visibility_mode: VisibilityMode::ShowHide,
                     available_groups: self.available_groups.clone(),
                     a11y: Some(A11y {
-                        label: Some("Contact fields".into()),
-                        hint: Some("Toggle field visibility".into()),
+                        label: Some(self.t("fields.a11y_contact_fields")),
+                        hint: Some(self.t("fields.a11y_toggle_hint")),
                         role: None,
                     }),
                 },
             ],
             actions: vec![ScreenAction {
                 id: "continue".into(),
-                label: "Continue".into(),
+                label: self.t("action.continue"),
                 style: ActionStyle::Primary,
                 enabled: name_not_empty,
                 a11y: None,
@@ -181,6 +195,7 @@ impl ContactEditEngine {
     }
 
     fn build_edit_visibility_screen(&self) -> ScreenModel {
+        let toggle_hint = self.t("onboarding.a11y_toggle_hint");
         let toggle_lists: Vec<Component> = self
             .contact
             .fields
@@ -200,9 +215,13 @@ impl ContactEditEngine {
                                 label: Some(format!(
                                     "{}, {}",
                                     group,
-                                    if selected { "selected" } else { "not selected" }
+                                    if selected {
+                                        self.t("onboarding.a11y_selected")
+                                    } else {
+                                        self.t("onboarding.a11y_not_selected")
+                                    }
                                 )),
-                                hint: Some("Double tap to toggle".into()),
+                                hint: Some(toggle_hint.clone()),
                                 role: Some(AccessibilityRole::Toggle),
                             }),
                             info_key: None,
@@ -215,8 +234,12 @@ impl ContactEditEngine {
                     label: field.label.clone(),
                     items,
                     a11y: Some(A11y {
-                        label: Some(format!("{} options", field.label)),
-                        hint: Some("Select items to include".into()),
+                        label: Some(get_string_with_args(
+                            self.locale,
+                            "contact_edit.field_options_a11y",
+                            &[("label", &field.label)],
+                        )),
+                        hint: Some(self.t("contact_detail.select_items_hint")),
                         role: None,
                     }),
                 }
@@ -225,20 +248,20 @@ impl ContactEditEngine {
 
         ScreenModel {
             screen_id: "edit_visibility".into(),
-            title: "Field Visibility".into(),
+            title: self.t("group_detail.field_visibility_label"),
             subtitle: None,
             components: toggle_lists,
             actions: vec![
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "continue".into(),
-                    label: "Preview".into(),
+                    label: self.t("contact_edit.preview_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
@@ -267,7 +290,7 @@ impl ContactEditEngine {
 
         ScreenModel {
             screen_id: "edit_preview".into(),
-            title: "Preview Card".into(),
+            title: self.t("contact_edit.preview_card_title"),
             subtitle: None,
             components: vec![Component::Preview {
                 name: self.contact.display_name.clone(),
@@ -278,22 +301,26 @@ impl ContactEditEngine {
                 selected_variant,
                 visible_fields,
                 a11y: Some(A11y {
-                    label: Some(format!("Card preview: {}", self.contact.display_name)),
-                    hint: Some("Shows how your card appears to others".into()),
+                    label: Some(get_string_with_args(
+                        self.locale,
+                        "contact_edit.card_preview_a11y",
+                        &[("name", &self.contact.display_name)],
+                    )),
+                    hint: Some(self.t("contact_edit.card_preview_hint")),
                     role: None,
                 }),
             }],
             actions: vec![
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "save".into(),
-                    label: "Save Changes".into(),
+                    label: self.t("contact_edit.save_changes_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
@@ -349,7 +376,7 @@ impl WorkflowEngine for ContactEditEngine {
                     if self.contact.display_name.trim().is_empty() {
                         return ActionResult::ValidationError {
                             component_id: "display_name".into(),
-                            message: "Name is required".into(),
+                            message: self.t("contact_edit.name_required_error"),
                         };
                     }
                     self.step = ContactEditStep::EditVisibility;

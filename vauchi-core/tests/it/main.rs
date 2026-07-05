@@ -449,3 +449,4 @@ mod wave2_api_tests;
 mod wire_contact_id_shape_tests;
 mod wire_message_id_shape_tests;
 mod wire_pubkey_shape_tests;
+mod zeroize_contract_tests;

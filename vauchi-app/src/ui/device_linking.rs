@@ -7,6 +7,7 @@
 //! Pair 5 of the Pure Humble UI retirement work
 //! (`_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens/`).
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 
 /// Steps in the device linking flow.
@@ -85,6 +86,7 @@ pub struct DeviceLinkingEngine {
     step: DeviceLinkStep,
     qr_data: String,
     verification_code: Option<String>,
+    locale: Locale,
 }
 
 impl DeviceLinkingEngine {
@@ -100,6 +102,7 @@ impl DeviceLinkingEngine {
             step: DeviceLinkStep::ShowQr,
             qr_data,
             verification_code: None,
+            locale: Locale::English,
         }
     }
 
@@ -111,7 +114,19 @@ impl DeviceLinkingEngine {
             step: DeviceLinkStep::TransportSelection,
             qr_data,
             verification_code: None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S6b-6a).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Signal that a peer device has connected, providing the verification code.
@@ -252,48 +267,48 @@ impl DeviceLinkingEngine {
     fn transport_selection_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "link_transport".into(),
-            title: "Link New Device".into(),
-            subtitle: Some("How would you like to link?".into()),
+            title: self.t("devices.link_new"),
+            subtitle: Some(self.t("devices.link.how_would_you_like")),
             components: vec![Component::InfoPanel {
                 id: "link_transport_info".into(),
                 icon: Some("link".into()),
-                title: "Choose how to connect with your new device.".into(),
+                title: self.t("devices.link.choose_connect"),
                 items: vec![
                     InfoItem {
                         icon: Some("wifi".into()),
-                        title: "Link via Internet".into(),
-                        detail: "Uses the relay server over the network.".into(),
+                        title: self.t("devices.link.via_internet"),
+                        detail: self.t("devices.link.uses_relay"),
                     },
                     InfoItem {
                         icon: Some("qrcode".into()),
-                        title: "Link Offline (multipart QR)".into(),
-                        detail: "Coming soon — shows a stub for now.".into(),
+                        title: self.t("devices.link.offline_multipart"),
+                        detail: self.t("devices.link.coming_soon_stub"),
                     },
                 ],
                 a11y: Some(A11y {
-                    label: Some("Device link transport selection".into()),
-                    hint: Some("Pick a transport to start the device link flow.".into()),
+                    label: Some(self.t("devices.link.transport_a11y_label")),
+                    hint: Some(self.t("devices.link.transport_a11y_hint")),
                     role: Some(AccessibilityRole::Heading),
                 }),
             }],
             actions: vec![
                 ScreenAction {
                     id: TRANSPORT_INTERNET_ACTION_ID.into(),
-                    label: "Link via Internet".into(),
+                    label: self.t("devices.link.via_internet"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: TRANSPORT_OFFLINE_ACTION_ID.into(),
-                    label: "Link Offline".into(),
+                    label: self.t("devices.link.offline_button"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: CANCEL_ACTION_ID.into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -307,30 +322,30 @@ impl DeviceLinkingEngine {
     fn offline_stub_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "link_offline_stub".into(),
-            title: "Offline Linking".into(),
+            title: self.t("devices.link.offline_title"),
             subtitle: None,
             components: vec![Component::InfoPanel {
                 id: "offline_stub".into(),
                 icon: Some("info".into()),
-                title: "Offline linking is not yet available".into(),
+                title: self.t("devices.link.offline_not_available"),
                 items: vec![InfoItem {
                     icon: None,
-                    title: "Use Internet linking for now".into(),
-                    detail: "Multipart-QR offline linking ships in a future release.".into(),
+                    title: self.t("devices.link.use_internet_for_now"),
+                    detail: self.t("devices.link.offline_future_release"),
                 }],
                 a11y: None,
             }],
             actions: vec![
                 ScreenAction {
                     id: BACK_TO_TRANSPORT_ACTION_ID.into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: CANCEL_ACTION_ID.into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -344,31 +359,30 @@ impl DeviceLinkingEngine {
     fn show_qr_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "link_show_qr".into(),
-            title: "Link Device".into(),
+            title: self.t("devices.link_device"),
             subtitle: None,
             components: vec![
                 Component::QrCode {
                     id: "qr".into(),
                     data: self.qr_data.clone(),
                     mode: QrMode::Display,
-                    label: Some("Scan on new device".into()),
+                    label: Some(self.t("devices.link.scan_on_new_device")),
                     scan_quality: None,
                     a11y: Some(A11y {
-                        label: Some("Device link QR code".into()),
-                        hint: Some("Scan this code on your new device to begin linking.".into()),
+                        label: Some(self.t("device_link.a11y_qr")),
+                        hint: Some(self.t("devices.link.scan_to_begin_hint")),
                         role: Some(AccessibilityRole::Image),
                     }),
                 },
                 Component::Text {
                     id: "join_hint".into(),
-                    content: "To join from another device, use: vauchi device join <qr_data>"
-                        .into(),
+                    content: self.t("devices.link.cli_join_hint"),
                     style: TextStyle::Caption,
                 },
             ],
             actions: vec![ScreenAction {
                 id: CANCEL_ACTION_ID.into(),
-                label: "Cancel".into(),
+                label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -382,7 +396,7 @@ impl DeviceLinkingEngine {
         let code = self.verification_code.as_deref().unwrap_or("------");
         ScreenModel {
             screen_id: "link_verify".into(),
-            title: "Verify Device".into(),
+            title: self.t("devices.link.verify_device_title"),
             subtitle: None,
             components: vec![
                 Component::Text {
@@ -393,11 +407,11 @@ impl DeviceLinkingEngine {
                 Component::InfoPanel {
                     id: "verify_info".into(),
                     icon: Some("shield".into()),
-                    title: "Verify this code".into(),
+                    title: self.t("devices.link.verify_this_code"),
                     items: vec![InfoItem {
                         icon: None,
-                        title: "Compare codes".into(),
-                        detail: "Ensure both devices show the same code".into(),
+                        title: self.t("devices.link.compare_codes"),
+                        detail: self.t("devices.link.ensure_same_code"),
                     }],
                     a11y: None,
                 },
@@ -405,14 +419,14 @@ impl DeviceLinkingEngine {
             actions: vec![
                 ScreenAction {
                     id: CONFIRM_ACTION_ID.into(),
-                    label: "Confirm".into(),
+                    label: self.t("platform.button_confirm"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: REJECT_ACTION_ID.into(),
-                    label: "Reject".into(),
+                    label: self.t("device_link.reject"),
                     style: ActionStyle::Destructive,
                     enabled: true,
                     a11y: None,
@@ -426,17 +440,17 @@ impl DeviceLinkingEngine {
     fn syncing_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "link_syncing".into(),
-            title: "Syncing".into(),
+            title: self.t("devices.link.syncing_title"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "syncing".into(),
                 icon: None,
-                title: "Syncing data...".into(),
+                title: self.t("devices.link.syncing_data"),
                 detail: None,
                 status: Status::InProgress,
                 a11y: Some(A11y {
-                    label: Some("Syncing data status".into()),
-                    hint: Some("Data is being synced to the new device.".into()),
+                    label: Some(self.t("devices.link.syncing_data_a11y")),
+                    hint: Some(self.t("devices.link.syncing_data_hint")),
                     role: None,
                 }),
             }],
@@ -449,23 +463,23 @@ impl DeviceLinkingEngine {
     fn complete_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "link_complete".into(),
-            title: "Device Linked".into(),
+            title: self.t("devices.link.device_linked_title"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "complete".into(),
                 icon: None,
-                title: "Device Linked".into(),
+                title: self.t("devices.link.device_linked_title"),
                 detail: None,
                 status: Status::Success,
                 a11y: Some(A11y {
-                    label: Some("Device Linked status".into()),
-                    hint: Some("Your new device has been linked successfully.".into()),
+                    label: Some(self.t("devices.link.device_linked_status_a11y")),
+                    hint: Some(self.t("devices.link.linked_success_hint")),
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: DONE_ACTION_ID.into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -478,23 +492,23 @@ impl DeviceLinkingEngine {
     fn qr_pending_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "link_qr_pending".into(),
-            title: "Link Device".into(),
+            title: self.t("devices.link_device"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "qr_pending".into(),
                 icon: None,
-                title: "Generating link...".into(),
+                title: self.t("devices.generating_link"),
                 detail: None,
                 status: Status::InProgress,
                 a11y: Some(A11y {
-                    label: Some("Generating device link".into()),
-                    hint: Some("Preparing the QR code for the new device.".into()),
+                    label: Some(self.t("devices.link.generating_device_link")),
+                    hint: Some(self.t("devices.link.preparing_qr_hint")),
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: CANCEL_ACTION_ID.into(),
-                label: "Cancel".into(),
+                label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,

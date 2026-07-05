@@ -287,7 +287,9 @@ impl AppEngine {
                     .generate_device_link()
                     .map(|r| r.data_string)
                     .unwrap_or_default();
-                Box::new(DeviceLinkingEngine::new(qr_data))
+                Box::new(
+                    DeviceLinkingEngine::new(qr_data).with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::DeviceManagement => {
                 let devices = vauchi

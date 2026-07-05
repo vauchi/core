@@ -72,80 +72,85 @@ fn latency_summary_empty_log_returns_none() {
     assert!(log.latency_summary().is_none());
 }
 
-// @internal
+// @internal — exact deltas: each segment must be the difference of adjacent
+// milestone timestamps. `push_at` pins a known timeline so the computation
+// itself is verified, not merely that segments are present.
 #[test]
-fn latency_summary_computes_deltas_for_full_qr_flow() {
+fn latency_summary_computes_exact_deltas_for_full_qr_flow() {
     let mut log = ExchangeDebugLog::new();
 
-    // Simulate a full QR exchange timeline by pushing events with known order.
-    // Since we can't control Instant timing in unit tests, we verify the
-    // structure and that deltas are non-negative.
-    log.push(ExchangeDebugEvent::SessionStarted {
-        transport: "qr".to_string(),
-    });
-    log.push(ExchangeDebugEvent::QrGenerated);
-    log.push(ExchangeDebugEvent::QrScanned);
-    log.push(ExchangeDebugEvent::KeyAgreementCompleted);
-    log.push(ExchangeDebugEvent::ExchangeCompleted);
+    log.push_at(
+        0,
+        ExchangeDebugEvent::SessionStarted {
+            transport: "qr".to_string(),
+        },
+    );
+    log.push_at(10, ExchangeDebugEvent::QrGenerated);
+    log.push_at(30, ExchangeDebugEvent::QrScanned);
+    log.push_at(60, ExchangeDebugEvent::KeyAgreementCompleted);
+    log.push_at(100, ExchangeDebugEvent::ExchangeCompleted);
 
-    let summary = log.latency_summary().expect("should have summary");
+    let summary = log.latency_summary().expect("full flow produces a summary");
 
-    assert!(summary.session_to_qr_generated_ms.is_some());
-    assert!(summary.qr_generated_to_scanned_ms.is_some());
-    assert!(summary.qr_scanned_to_key_agreement_ms.is_some());
-    assert!(summary.key_agreement_to_completed_ms.is_some());
-    assert!(summary.total_ms.is_some());
-
-    // Deltas must be non-negative (events pushed in rapid succession)
-    assert!(summary.session_to_qr_generated_ms.unwrap() >= 0);
-    assert!(summary.qr_generated_to_scanned_ms.unwrap() >= 0);
-    assert!(summary.qr_scanned_to_key_agreement_ms.unwrap() >= 0);
-    assert!(summary.key_agreement_to_completed_ms.unwrap() >= 0);
-    assert!(summary.total_ms.unwrap() >= 0);
+    assert_eq!(summary.session_to_qr_generated_ms, Some(10));
+    assert_eq!(summary.qr_generated_to_scanned_ms, Some(20));
+    assert_eq!(summary.qr_scanned_to_key_agreement_ms, Some(30));
+    assert_eq!(summary.key_agreement_to_completed_ms, Some(40));
+    assert_eq!(summary.total_ms, Some(100));
 }
 
-// @internal
+// @internal — a segment is computed only when both its endpoints occurred;
+// missing milestones leave later segments (and the total) as None.
 #[test]
-fn latency_summary_partial_flow_has_none_for_missing_segments() {
+fn latency_summary_partial_flow_computes_present_and_omits_missing() {
     let mut log = ExchangeDebugLog::new();
 
-    // Only session start and QR generated — no scan, no key agreement
-    log.push(ExchangeDebugEvent::SessionStarted {
-        transport: "qr".to_string(),
-    });
-    log.push(ExchangeDebugEvent::QrGenerated);
+    // Only session start and QR generated — no scan, no key agreement.
+    log.push_at(
+        0,
+        ExchangeDebugEvent::SessionStarted {
+            transport: "qr".to_string(),
+        },
+    );
+    log.push_at(15, ExchangeDebugEvent::QrGenerated);
 
-    let summary = log.latency_summary().expect("should have summary");
+    let summary = log.latency_summary().expect("summary from a partial flow");
 
-    assert!(summary.session_to_qr_generated_ms.is_some());
-    assert!(summary.qr_generated_to_scanned_ms.is_none());
-    assert!(summary.qr_scanned_to_key_agreement_ms.is_none());
-    assert!(summary.key_agreement_to_completed_ms.is_none());
-    assert!(summary.total_ms.is_none());
+    assert_eq!(summary.session_to_qr_generated_ms, Some(15));
+    assert_eq!(summary.qr_generated_to_scanned_ms, None);
+    assert_eq!(summary.qr_scanned_to_key_agreement_ms, None);
+    assert_eq!(summary.key_agreement_to_completed_ms, None);
+    assert_eq!(summary.total_ms, None);
 }
 
-// @internal
+// @internal — a failed exchange computes segments up to the failure point
+// and leaves key-agreement/completion (and the total) as None.
 #[test]
-fn latency_summary_failed_exchange_has_no_completion() {
+fn latency_summary_failed_exchange_computes_up_to_failure_only() {
     let mut log = ExchangeDebugLog::new();
 
-    log.push(ExchangeDebugEvent::SessionStarted {
-        transport: "qr".to_string(),
-    });
-    log.push(ExchangeDebugEvent::QrGenerated);
-    log.push(ExchangeDebugEvent::QrScanned);
-    log.push(ExchangeDebugEvent::ExchangeFailed {
-        error: "timeout".to_string(),
-    });
+    log.push_at(
+        0,
+        ExchangeDebugEvent::SessionStarted {
+            transport: "qr".to_string(),
+        },
+    );
+    log.push_at(12, ExchangeDebugEvent::QrGenerated);
+    log.push_at(50, ExchangeDebugEvent::QrScanned);
+    log.push_at(
+        70,
+        ExchangeDebugEvent::ExchangeFailed {
+            error: "timeout".to_string(),
+        },
+    );
 
-    let summary = log.latency_summary().expect("should have summary");
+    let summary = log.latency_summary().expect("summary even on failure");
 
-    assert!(summary.session_to_qr_generated_ms.is_some());
-    assert!(summary.qr_generated_to_scanned_ms.is_some());
-    // No key agreement or completion
-    assert!(summary.qr_scanned_to_key_agreement_ms.is_none());
-    assert!(summary.key_agreement_to_completed_ms.is_none());
-    assert!(summary.total_ms.is_none());
+    assert_eq!(summary.session_to_qr_generated_ms, Some(12));
+    assert_eq!(summary.qr_generated_to_scanned_ms, Some(38));
+    assert_eq!(summary.qr_scanned_to_key_agreement_ms, None);
+    assert_eq!(summary.key_agreement_to_completed_ms, None);
+    assert_eq!(summary.total_ms, None);
 }
 
 // @internal
@@ -171,29 +176,33 @@ fn latency_summary_serializes_to_json() {
     assert!(json.contains("total_ms"));
 }
 
-// @internal
+// @internal — the total (SessionStarted → ExchangeCompleted) must equal the
+// sum of the individual segments, with non-uniform gaps to catch off-by-one
+// segment boundaries.
 #[test]
 fn latency_summary_total_equals_sum_of_segments() {
     let mut log = ExchangeDebugLog::new();
 
-    log.push(ExchangeDebugEvent::SessionStarted {
-        transport: "qr".to_string(),
-    });
-    log.push(ExchangeDebugEvent::QrGenerated);
-    log.push(ExchangeDebugEvent::QrScanned);
-    log.push(ExchangeDebugEvent::KeyAgreementCompleted);
-    log.push(ExchangeDebugEvent::ExchangeCompleted);
+    log.push_at(
+        0,
+        ExchangeDebugEvent::SessionStarted {
+            transport: "qr".to_string(),
+        },
+    );
+    log.push_at(7, ExchangeDebugEvent::QrGenerated);
+    log.push_at(19, ExchangeDebugEvent::QrScanned);
+    log.push_at(44, ExchangeDebugEvent::KeyAgreementCompleted);
+    log.push_at(90, ExchangeDebugEvent::ExchangeCompleted);
 
     let summary = log.latency_summary().unwrap();
 
-    // Total should equal SessionStarted → ExchangeCompleted
-    // which is the sum of all segments
     let segment_sum = summary.session_to_qr_generated_ms.unwrap()
         + summary.qr_generated_to_scanned_ms.unwrap()
         + summary.qr_scanned_to_key_agreement_ms.unwrap()
         + summary.key_agreement_to_completed_ms.unwrap();
 
-    assert_eq!(summary.total_ms.unwrap(), segment_sum);
+    assert_eq!(segment_sum, 90);
+    assert_eq!(summary.total_ms, Some(90));
 }
 
 // ===== Session integration: CommandDispatched fires on emit_command =====

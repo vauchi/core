@@ -71,6 +71,14 @@ impl ExchangeDebugLog {
         self.events.push(TimestampedEvent { elapsed_ms, event });
     }
 
+    /// Record an event at an explicit elapsed time. Lets latency-computation
+    /// tests build a timeline with known deltas and assert exact segment
+    /// values, instead of depending on non-deterministic `Instant` timing.
+    #[cfg(feature = "testing")]
+    pub fn push_at(&mut self, elapsed_ms: u64, event: ExchangeDebugEvent) {
+        self.events.push(TimestampedEvent { elapsed_ms, event });
+    }
+
     /// Get all recorded events.
     pub fn events(&self) -> &[TimestampedEvent] {
         &self.events

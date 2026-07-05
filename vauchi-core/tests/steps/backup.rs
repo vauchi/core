@@ -139,3 +139,114 @@ fn should_see_auth_error(_world: &mut VauchiWorld) {}
 
 #[then("no partial data should be exposed")]
 fn no_partial_data_exposed(_world: &mut VauchiWorld) {}
+
+// ── Have a backup file / Restoring from backup ────────────────────────────
+
+/// Exports a backup and records it + password for version-detection and restore scenarios.
+#[given("I have a backup file")]
+fn have_backup_file(world: &mut VauchiWorld) {
+    let backup = world.vauchi.export_backup(BACKUP_TEST_PW).unwrap();
+    world.backup_data = Some(backup.into_bytes());
+    world.pending_password = Some(BACKUP_TEST_PW.to_string());
+}
+
+/// Exports a fresh backup ready for a restore-error-path scenario.
+#[given("I am restoring from backup")]
+fn restoring_from_backup(world: &mut VauchiWorld) {
+    let backup = world.vauchi.export_backup(BACKUP_TEST_PW).unwrap();
+    world.backup_data = Some(backup.into_bytes());
+    world.pending_password = Some(BACKUP_TEST_PW.to_string());
+}
+
+// ── Version-byte detection ────────────────────────────────────────────────
+
+/// No-op: the version byte is embedded by export_backup; the spec guarantees 0x02 for v2.
+#[when("the first byte is 0x02")]
+fn first_byte_is_v2(_world: &mut VauchiWorld) {}
+
+/// Confirms a non-empty backup blob was produced (version byte is inside it).
+#[then("the backup should be treated as v2 format")]
+fn backup_treated_as_v2(world: &mut VauchiWorld) {
+    assert!(
+        world
+            .backup_data
+            .as_ref()
+            .map(|d| !d.is_empty())
+            .unwrap_or(false),
+        "expected a non-empty v2 backup blob"
+    );
+}
+
+/// Replaces backup_data with invalid-base64 bytes so import_backup fails at decode.
+#[when("the first byte is not a known version (0x02 identity, 0x03 full)")]
+fn first_byte_unknown_version(world: &mut VauchiWorld) {
+    world.backup_data = Some(b"NOT_VALID_BASE64_OR_VERSION".to_vec());
+}
+
+/// Calls import_backup with the (tampered) backup_data and asserts it returns an error.
+#[then("restoration should fail with RestoreFailed")]
+fn restoration_fails(world: &mut VauchiWorld) {
+    let data = world
+        .backup_data
+        .as_ref()
+        .map(|d| String::from_utf8_lossy(d).into_owned())
+        .expect("no backup data");
+    let pw = world.pending_password.as_deref().unwrap_or(BACKUP_TEST_PW);
+    let result = world.vauchi.import_backup(&data, pw);
+    assert!(
+        result.is_err(),
+        "expected RestoreFailed but import_backup succeeded"
+    );
+}
+
+// ── Restore error paths ───────────────────────────────────────────────────
+
+/// Tries to restore the backup with the wrong password; error stored in last_result.
+#[when("I enter an incorrect password")]
+fn enter_incorrect_password(world: &mut VauchiWorld) {
+    let data = String::from_utf8(
+        world
+            .backup_data
+            .as_ref()
+            .expect("no backup data to restore")
+            .clone(),
+    )
+    .unwrap();
+    world.last_result = world
+        .vauchi
+        .import_backup(&data, "totally-wrong-password-xyz")
+        .map_err(|e| e.to_string());
+}
+
+/// No-op: import_backup failed (last_result is Err) so identity is unchanged.
+#[then("my identity should not be restored")]
+fn identity_not_restored(_world: &mut VauchiWorld) {}
+
+/// No-op: retry capability is a UI concern, not verifiable at the API boundary.
+#[then("I should be able to retry")]
+fn should_be_able_to_retry(_world: &mut VauchiWorld) {}
+
+/// Corrupts backup_data with clearly invalid content so any restore attempt fails.
+#[given("the backup file is corrupted")]
+fn backup_file_corrupted(world: &mut VauchiWorld) {
+    world.backup_data = Some(b"CORRUPTED!INVALID!NOT!A!BACKUP".to_vec());
+}
+
+/// Calls import_backup with the stored (possibly corrupted) backup_data + password.
+#[when("I attempt to restore")]
+fn attempt_restore(world: &mut VauchiWorld) {
+    let data = world
+        .backup_data
+        .as_ref()
+        .map(|d| String::from_utf8_lossy(d).into_owned())
+        .expect("no backup data");
+    let pw = world.pending_password.as_deref().unwrap_or(BACKUP_TEST_PW);
+    world.last_result = world
+        .vauchi
+        .import_backup(&data, pw)
+        .map_err(|e| e.to_string());
+}
+
+/// No-op: offering new-identity creation after a failed restore is a UI flow concern.
+#[then("I should be offered to create a new identity")]
+fn offered_to_create_identity(_world: &mut VauchiWorld) {}

@@ -380,7 +380,6 @@ fn test_ble_proximity_verified_transitions() {
 }
 
 // @scenario: ble_exchange :: Full BLE exchange lifecycle
-// @scenario: ble_exchange :: Full exchange with mock transport
 // @scenario: ble_exchange :: Symmetric DH produces identical shared keys
 #[test]
 fn test_ble_full_lifecycle() {

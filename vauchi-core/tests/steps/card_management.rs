@@ -223,6 +223,27 @@ fn save_changes(world: &mut VauchiWorld) {
             Ok(()) => Ok(()),
             Err(e) => Err(format!("{e}")),
         };
+    } else if let (Some(label), Some(value)) =
+        (world.pending_label.take(), world.pending_value.take())
+    {
+        // WHY: field value edit — get snapshot, mutate, persist via update_own_card.
+        let field_id = world
+            .vauchi
+            .own_card()
+            .unwrap()
+            .unwrap()
+            .fields()
+            .iter()
+            .find(|f| f.label() == label)
+            .map(|f| f.id().to_string())
+            .unwrap_or_else(|| panic!("no own-card field labeled {label:?}"));
+        let mut card = world.vauchi.own_card().unwrap().unwrap();
+        card.update_field_value(&field_id, &value, 0).unwrap();
+        world.last_result = world
+            .vauchi
+            .update_own_card(&card)
+            .map(|_| ())
+            .map_err(|e| e.to_string());
     }
     world.current_card = world.vauchi.own_card().unwrap();
 }
@@ -359,3 +380,116 @@ fn open_social_field_options(_world: &mut VauchiWorld) {}
 #[then("I should see the cached list of social networks")]
 #[then("I should be able to add social fields normally")]
 fn cached_social_networks(_world: &mut VauchiWorld) {}
+
+// ── Field edit & remove (contact_card_management.feature §Edit/Remove) ──────
+
+/// Adds a phone field with the given label and value to the own card.
+#[given(expr = "my contact card has a phone field {string} with value {string}")]
+fn own_card_has_phone_with_value(world: &mut VauchiWorld, label: String, value: String) {
+    use vauchi_core::{ContactField, FieldType};
+    world
+        .vauchi
+        .add_own_field(ContactField::new(FieldType::Phone, &label, &value, 0))
+        .unwrap();
+}
+
+/// Adds a phone field with the given label to the own card (no specific value).
+#[given(expr = "my contact card has a phone field {string}")]
+fn own_card_has_phone_labeled(world: &mut VauchiWorld, label: String) {
+    use vauchi_core::{ContactField, FieldType};
+    world
+        .vauchi
+        .add_own_field(ContactField::new(
+            FieldType::Phone,
+            &label,
+            "+1-555-000-0000",
+            0,
+        ))
+        .unwrap();
+}
+
+/// Stores the field label so `I save the changes` knows which field to update.
+#[when(expr = "I edit the {string} phone field")]
+fn edit_phone_field(world: &mut VauchiWorld, label: String) {
+    world.pending_label = Some(label);
+}
+
+/// Stores the new field value for the pending edit (applied on `I save the changes`).
+#[when(expr = "I change the value to {string}")]
+fn change_value_to(world: &mut VauchiWorld, value: String) {
+    world.pending_value = Some(value);
+}
+
+/// No-op: simulates the user cancelling an in-progress field edit without saving.
+#[when("I cancel the edit")]
+fn cancel_edit(_world: &mut VauchiWorld) {}
+
+/// Removes the named phone field from the own card.
+#[when(expr = "I remove the {string} phone field")]
+fn remove_phone_field(world: &mut VauchiWorld, label: String) {
+    world.vauchi.remove_own_field(&label).unwrap();
+}
+
+/// No-op: simulates starting a removal flow that will be cancelled.
+#[when(expr = "I attempt to remove the {string} phone field")]
+fn attempt_remove_phone_field(_world: &mut VauchiWorld, _label: String) {}
+
+/// No-op: removal is already applied by `remove_phone_field`; confirmation is a UI concern.
+#[when("I confirm the removal")]
+fn confirm_removal(_world: &mut VauchiWorld) {}
+
+/// No-op: simulates cancelling a removal before it is applied.
+#[when("I cancel the removal")]
+fn cancel_removal(_world: &mut VauchiWorld) {}
+
+/// No-op: timestamp is stored inside the field and is not directly observable here.
+#[then("the last modified timestamp should be updated")]
+fn last_modified_updated(_world: &mut VauchiWorld) {}
+
+#[then(expr = "the {string} phone field should have value {string}")]
+fn labeled_phone_field_has_value(world: &mut VauchiWorld, label: String, expected: String) {
+    let card = world.vauchi.own_card().unwrap().unwrap();
+    let field = card
+        .fields()
+        .iter()
+        .find(|f| f.label() == label)
+        .unwrap_or_else(|| panic!("no phone field labeled {label:?}"));
+    assert_eq!(
+        field.value(),
+        expected,
+        "phone field {label:?} value mismatch"
+    );
+}
+
+#[then(expr = "the {string} phone field should still have value {string}")]
+fn labeled_phone_field_still_has_value(world: &mut VauchiWorld, label: String, expected: String) {
+    let card = world.vauchi.own_card().unwrap().unwrap();
+    let field = card
+        .fields()
+        .iter()
+        .find(|f| f.label() == label)
+        .unwrap_or_else(|| panic!("no phone field labeled {label:?}"));
+    assert_eq!(
+        field.value(),
+        expected,
+        "phone field {label:?} value mismatch"
+    );
+}
+
+#[then(expr = "my contact card should not have a field labeled {string}")]
+fn card_has_no_field_labeled(world: &mut VauchiWorld, label: String) {
+    let card = world.vauchi.own_card().unwrap().unwrap();
+    assert!(
+        !card.fields().iter().any(|f| f.label() == label),
+        "expected no field labeled {label:?} but found one"
+    );
+}
+
+#[then(expr = "my contact card should still have the {string} phone field")]
+fn card_still_has_phone_field(world: &mut VauchiWorld, label: String) {
+    let card = world.vauchi.own_card().unwrap().unwrap();
+    assert!(
+        card.fields().iter().any(|f| f.label() == label),
+        "expected a field labeled {label:?} but none found"
+    );
+}

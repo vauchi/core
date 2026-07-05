@@ -579,9 +579,10 @@ impl AppEngine {
                 )
             }
             AppScreen::Support => Box::new(SupportEngine::new()),
-            AppScreen::FormDialog { dialog_type } => {
-                Box::new(FormDialogEngine::new(dialog_type.clone()))
-            }
+            AppScreen::FormDialog { dialog_type } => Box::new(
+                FormDialogEngine::new(dialog_type.clone())
+                    .with_locale(render_context.resolved_locale()),
+            ),
             AppScreen::More => Box::new(MoreEngine::new(render_context.resolved_locale())),
             AppScreen::ActivityLog => {
                 use crate::notification_types::ActivityLogEntry;

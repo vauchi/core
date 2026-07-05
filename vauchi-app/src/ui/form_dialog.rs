@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use vauchi_core::contact_card::{CatalogEntry, FieldTypeCatalog};
 use vauchi_core::social::SocialNetworkRegistry;
@@ -69,6 +70,7 @@ pub struct FormDialogEngine {
     /// When true, an InlineConfirm is shown asking the user to confirm discarding
     /// unsaved changes. Set on cancel when form is dirty.
     pending_discard: bool,
+    locale: Locale,
 }
 
 impl FormDialogEngine {
@@ -120,7 +122,19 @@ impl FormDialogEngine {
             selected_groups: Vec::new(),
             cancelled: false,
             pending_discard: false,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-7).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     fn get_value(&self, id: &str) -> &str {
@@ -208,7 +222,11 @@ impl FormDialogEngine {
                 detail: None,
                 a11y: Some(A11y {
                     label: Some(e.display_name.clone()),
-                    hint: Some(format!("Select {} as the field type.", e.display_name)),
+                    hint: Some(get_string_with_args(
+                        self.locale,
+                        "form.field_type_select_hint",
+                        &[("name", &e.display_name)],
+                    )),
                     role: None,
                 }),
                 info_key: None,
@@ -222,15 +240,15 @@ impl FormDialogEngine {
 
         ScreenModel {
             screen_id: "form_add_field".into(),
-            title: "Add to your card".into(),
-            subtitle: Some("Select a type".into()),
+            title: self.t("form.add_to_card_title"),
+            subtitle: Some(self.t("form.select_type_subtitle")),
             components,
             actions: vec![ScreenAction {
                 id: "cancel".into(),
-                label: "Cancel".into(),
+                label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.cancel"))),
             }],
             progress: None,
             ..Default::default()
@@ -266,22 +284,26 @@ impl FormDialogEngine {
                     label: gname.clone(),
                     selected: self.selected_groups.contains(gid),
                     subtitle: None,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(gname.clone())),
                     info_key: None,
                 })
                 .collect();
             components.push(Component::ToggleList {
                 id: "group_visibility".into(),
-                label: "Groups Visibility".into(),
+                label: self.t("form.groups_visibility_label"),
                 items: toggle_items,
                 a11y: None,
             });
         }
 
         let title = if let Some(entry) = catalog_entry {
-            format!("Add {}", entry.display_name)
+            get_string_with_args(
+                self.locale,
+                "form.add_entry_title",
+                &[("name", &entry.display_name)],
+            )
         } else {
-            "Add to your card".into()
+            self.t("form.add_to_card_title")
         };
 
         // Save is gated on a non-empty value — same record §G3. The
@@ -297,28 +319,28 @@ impl FormDialogEngine {
             actions: vec![
                 ScreenAction {
                     id: "submit".into(),
-                    label: "Save".into(),
+                    label: self.t("action.save"),
                     style: ActionStyle::Primary,
                     enabled: save_enabled,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.save"))),
                 },
                 ScreenAction {
                     id: "change_type".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: Some(A11y {
-                        label: Some("Pick a different type".into()),
-                        hint: Some("Return to the type picker — your inputs are kept.".into()),
+                        label: Some(self.t("form.pick_different_type_a11y")),
+                        hint: Some(self.t("form.pick_different_type_hint")),
                         role: None,
                     }),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,
@@ -330,14 +352,14 @@ impl FormDialogEngine {
         vec![
             Component::TextInput {
                 id: "field_value".into(),
-                label: "Value".into(),
+                label: self.t("card.value"),
                 value: self.get_value("field_value").into(),
                 placeholder: Some(placeholder.into()),
                 max_length: Some(200),
                 validation_error: None,
                 input_type,
                 a11y: Some(A11y {
-                    label: Some("Value input".into()),
+                    label: Some(self.t("form.value_input_a11y")),
                     hint: Some(placeholder.into()),
                     role: Some(AccessibilityRole::TextField),
                 }),
@@ -345,30 +367,30 @@ impl FormDialogEngine {
             },
             Component::TextInput {
                 id: "field_label".into(),
-                label: "Display Name (optional)".into(),
+                label: self.t("form.display_name_optional_label"),
                 value: self.get_value("field_label").into(),
-                placeholder: Some("e.g. Work, Personal, Mobile".into()),
+                placeholder: Some(self.t("form.display_name_optional_placeholder")),
                 max_length: Some(50),
                 validation_error: None,
                 input_type: InputType::Text,
                 a11y: Some(A11y {
-                    label: Some("Display Name (optional) input".into()),
-                    hint: Some("e.g. Work, Personal, Mobile".into()),
+                    label: Some(self.t("form.display_name_optional_a11y")),
+                    hint: Some(self.t("form.display_name_optional_placeholder")),
                     role: Some(AccessibilityRole::TextField),
                 }),
                 info_key: None,
             },
             Component::TextInput {
                 id: "field_note".into(),
-                label: "Comment (your eyes only, optional)".into(),
+                label: self.t("form.comment_label"),
                 value: self.get_value("field_note").into(),
-                placeholder: Some("Only visible to you".into()),
+                placeholder: Some(self.t("form.comment_placeholder")),
                 max_length: Some(100),
                 validation_error: None,
                 input_type: InputType::Text,
                 a11y: Some(A11y {
-                    label: Some("Comment (your eyes only, optional) input".into()),
-                    hint: Some("Only visible to you".into()),
+                    label: Some(self.t("form.comment_a11y")),
+                    hint: Some(self.t("form.comment_placeholder")),
                     role: Some(AccessibilityRole::TextField),
                 }),
                 info_key: None,
@@ -384,52 +406,60 @@ impl FormDialogEngine {
             }
             FormDialogType::EditName { .. } => self.build_edit_name_screen(),
             FormDialogType::EditRelayUrl { .. } => self.build_edit_relay_url_screen(),
-            FormDialogType::CreateGroup => {
-                self.build_group_name_screen("form_create_group", "New Group", "Create")
-            }
-            FormDialogType::RenameGroup { .. } => {
-                self.build_group_name_screen("form_rename_group", "Rename Group", "Rename")
-            }
+            FormDialogType::CreateGroup => self.build_group_name_screen(
+                "form_create_group",
+                self.t("form.new_group_title"),
+                self.t("form.create_button"),
+            ),
+            FormDialogType::RenameGroup { .. } => self.build_group_name_screen(
+                "form_rename_group",
+                self.t("form.rename_group_title"),
+                self.t("form.rename_button"),
+            ),
         }
     }
 
     fn build_edit_field_screen(&self, field_label: &str) -> ScreenModel {
         ScreenModel {
             screen_id: "form_edit_field".into(),
-            title: "Edit Field".into(),
+            title: self.t("form.edit_field_title"),
             subtitle: None,
             components: vec![
                 Component::Text {
                     id: "field_info".into(),
-                    content: format!("Editing: {field_label}"),
+                    content: get_string_with_args(
+                        self.locale,
+                        "form.editing_field_content",
+                        &[("label", field_label)],
+                    ),
                     style: TextStyle::Subtitle,
                 },
                 Component::TextInput {
                     id: "field_value".into(),
-                    label: "Value".into(),
+                    label: self.t("card.value"),
                     value: self.get_value("field_value").into(),
-                    placeholder: Some("Enter new value".into()),
+                    placeholder: Some(self.t("form.enter_new_value_placeholder")),
                     max_length: Some(200),
                     validation_error: None,
                     input_type: InputType::Text,
                     a11y: Some(A11y {
-                        label: Some("Value input".into()),
-                        hint: Some("Enter new value".into()),
+                        label: Some(self.t("form.value_input_a11y")),
+                        hint: Some(self.t("form.enter_new_value_placeholder")),
                         role: Some(AccessibilityRole::TextField),
                     }),
                     info_key: None,
                 },
                 Component::TextInput {
                     id: "field_note".into(),
-                    label: "Comment (your eyes only, optional)".into(),
+                    label: self.t("form.comment_label"),
                     value: self.get_value("field_note").into(),
-                    placeholder: Some("Only visible to you".into()),
+                    placeholder: Some(self.t("form.comment_placeholder")),
                     max_length: Some(100),
                     validation_error: None,
                     input_type: InputType::Text,
                     a11y: Some(A11y {
-                        label: Some("Comment (your eyes only, optional) input".into()),
-                        hint: Some("Only visible to you".into()),
+                        label: Some(self.t("form.comment_a11y")),
+                        hint: Some(self.t("form.comment_placeholder")),
                         role: Some(AccessibilityRole::TextField),
                     }),
                     info_key: None,
@@ -438,17 +468,17 @@ impl FormDialogEngine {
             actions: vec![
                 ScreenAction {
                     id: "submit".into(),
-                    label: "Save".into(),
+                    label: self.t("action.save"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.save"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,
@@ -459,19 +489,19 @@ impl FormDialogEngine {
     fn build_edit_name_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "form_edit_name".into(),
-            title: "Edit Display Name".into(),
+            title: self.t("form.edit_display_name_title"),
             subtitle: None,
             components: vec![Component::TextInput {
                 id: "display_name".into(),
-                label: "Display Name".into(),
+                label: self.t("settings.display_name"),
                 value: self.get_value("display_name").into(),
-                placeholder: Some("Your name".into()),
+                placeholder: Some(self.t("form.your_name_placeholder")),
                 max_length: Some(50),
                 validation_error: None,
                 input_type: InputType::Text,
                 a11y: Some(A11y {
-                    label: Some("Display Name input".into()),
-                    hint: Some("Your name".into()),
+                    label: Some(self.t("form.display_name_input_a11y")),
+                    hint: Some(self.t("form.your_name_placeholder")),
                     role: Some(AccessibilityRole::TextField),
                 }),
                 info_key: None,
@@ -479,17 +509,17 @@ impl FormDialogEngine {
             actions: vec![
                 ScreenAction {
                     id: "submit".into(),
-                    label: "Save".into(),
+                    label: self.t("action.save"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.save"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,
@@ -500,19 +530,19 @@ impl FormDialogEngine {
     fn build_edit_relay_url_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "form_edit_relay_url".into(),
-            title: "Edit Relay URL".into(),
+            title: self.t("form.edit_relay_url_title"),
             subtitle: None,
             components: vec![Component::TextInput {
                 id: "relay_url".into(),
-                label: "Relay URL".into(),
+                label: self.t("settings.relay_url"),
                 value: self.get_value("relay_url").into(),
-                placeholder: Some("https://relay.example.com".into()),
+                placeholder: Some(self.t("settings.relay_placeholder")),
                 max_length: Some(200),
                 validation_error: None,
                 input_type: InputType::Text,
                 a11y: Some(A11y {
-                    label: Some("Relay URL input".into()),
-                    hint: Some("https://relay.example.com".into()),
+                    label: Some(self.t("form.relay_url_input_a11y")),
+                    hint: Some(self.t("settings.relay_placeholder")),
                     role: Some(AccessibilityRole::TextField),
                 }),
                 info_key: None,
@@ -520,17 +550,17 @@ impl FormDialogEngine {
             actions: vec![
                 ScreenAction {
                     id: "submit".into(),
-                    label: "Save".into(),
+                    label: self.t("action.save"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.save"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,
@@ -541,25 +571,25 @@ impl FormDialogEngine {
     fn build_group_name_screen(
         &self,
         screen_id: &str,
-        title: &str,
-        submit_label: &str,
+        title: String,
+        submit_label: String,
     ) -> ScreenModel {
         let name = self.get_value("group_name");
         ScreenModel {
             screen_id: screen_id.into(),
-            title: title.into(),
+            title,
             subtitle: None,
             components: vec![Component::TextInput {
                 id: "group_name".into(),
-                label: "Group Name".into(),
+                label: self.t("form.group_name_label"),
                 value: name.into(),
-                placeholder: Some("e.g. Family, Work, Friends".into()),
+                placeholder: Some(self.t("form.group_name_placeholder")),
                 max_length: Some(50),
                 validation_error: None,
                 input_type: InputType::Text,
                 a11y: Some(A11y {
-                    label: Some("Group Name input".into()),
-                    hint: Some("e.g. Family, Work, Friends".into()),
+                    label: Some(self.t("form.group_name_input_a11y")),
+                    hint: Some(self.t("form.group_name_placeholder")),
                     role: Some(AccessibilityRole::TextField),
                 }),
                 info_key: None,
@@ -567,17 +597,17 @@ impl FormDialogEngine {
             actions: vec![
                 ScreenAction {
                     id: "submit".into(),
-                    label: submit_label.into(),
+                    label: submit_label.clone(),
                     style: ActionStyle::Primary,
                     enabled: !name.is_empty(),
-                    a11y: None,
+                    a11y: Some(A11y::labeled(submit_label)),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,
@@ -592,13 +622,13 @@ impl WorkflowEngine for FormDialogEngine {
         if self.pending_discard {
             screen.components.push(Component::InlineConfirm {
                 id: "discard".into(),
-                warning: "You have unsaved changes. Discard?".into(),
-                confirm_text: "Discard".into(),
-                cancel_text: "Keep Editing".into(),
+                warning: self.t("form.discard_warning"),
+                confirm_text: self.t("form.discard_button"),
+                cancel_text: self.t("form.keep_editing_button"),
                 destructive: false,
                 a11y: Some(A11y {
-                    label: Some("Confirm discard changes".into()),
-                    hint: Some("You have unsaved changes. Confirming will discard them.".into()),
+                    label: Some(self.t("form.confirm_discard_a11y")),
+                    hint: Some(self.t("form.confirm_discard_hint")),
                     role: Some(AccessibilityRole::Alert),
                 }),
             });

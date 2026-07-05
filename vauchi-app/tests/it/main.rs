@@ -62,6 +62,7 @@ mod exchange_step_back_tests;
 mod f2_new_4_settings_nav_tests;
 mod file_picker_wiring_tests;
 mod fingerprint_verify_engine_tests;
+mod form_dialog_i18n_tests;
 mod gdpr_i18n_tests;
 mod group_delete_tests;
 mod help_engine_wiring_tests;

@@ -94,5 +94,6 @@ mod settings_render_context_tests;
 mod shred_i18n_tests;
 mod sync_chrome_overlay_tests;
 mod sync_status_engine_tests;
+mod sync_status_i18n_tests;
 mod update_overlay_tests;
 mod wire_humble_keys_tests;

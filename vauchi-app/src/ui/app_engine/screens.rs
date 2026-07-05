@@ -360,7 +360,10 @@ impl AppEngine {
                 let relay_url = vauchi.config().relay.server_url.clone();
                 let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
                 let pending = vauchi.pending_update_count().unwrap_or(0) as usize;
-                Box::new(SyncStatusEngine::new(relay_url, contact_count, pending))
+                Box::new(
+                    SyncStatusEngine::new(relay_url, contact_count, pending)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::Recovery => {
                 let contacts: Vec<Item> = Self::load_contact_items(vauchi)

@@ -4,6 +4,7 @@
 
 //! Sync status engine — shows relay connection state and pending updates.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use vauchi_core::network::ConnectionState;
 
@@ -15,6 +16,7 @@ pub struct SyncStatusEngine {
     pending_updates: usize,
     connection_state: ConnectionState,
     last_action: Option<String>,
+    locale: Locale,
 }
 
 impl SyncStatusEngine {
@@ -26,6 +28,7 @@ impl SyncStatusEngine {
             pending_updates,
             connection_state: ConnectionState::Disconnected,
             last_action: None,
+            locale: Locale::English,
         }
     }
 
@@ -35,20 +38,31 @@ impl SyncStatusEngine {
         self
     }
 
-    fn connection_status_text(&self) -> (&str, Status) {
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S6b-3).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
+    }
+
+    fn connection_status_text(&self) -> (String, Status) {
         match self.connection_state {
-            ConnectionState::Connected => ("Connected", Status::Success),
-            ConnectionState::Connecting => ("Connecting...", Status::InProgress),
+            ConnectionState::Connected => (self.t("sync.connected"), Status::Success),
+            ConnectionState::Connecting => (self.t("sync.connecting"), Status::InProgress),
             ConnectionState::Reconnecting { attempt } => {
-                // Can't use format! in a &str return, so use a fixed message
-                if attempt > 3 {
-                    ("Reconnecting (slow network)...", Status::InProgress)
+                let key = if attempt > 3 {
+                    "sync.reconnecting_slow"
                 } else {
-                    ("Reconnecting...", Status::InProgress)
-                }
+                    "sync.reconnecting"
+                };
+                (self.t(key), Status::InProgress)
             }
-            ConnectionState::Disconnected => ("Offline", Status::Failed),
-            _ => ("Unknown", Status::InProgress),
+            ConnectionState::Disconnected => (self.t("sync.status_offline"), Status::Failed),
+            _ => (self.t("sync.unknown_status"), Status::InProgress),
         }
     }
 
@@ -59,13 +73,13 @@ impl SyncStatusEngine {
         let mut components = vec![Component::StatusIndicator {
             id: "connection_status".into(),
             icon: None,
-            title: format!("Relay: {status_text}"),
+            title: get_string_with_args(
+                self.locale,
+                "sync.relay_status_label",
+                &[("status", &status_text)],
+            ),
             detail: if is_offline {
-                Some(
-                    "Changes will sync automatically when connected. \
-                     Check your internet connection."
-                        .into(),
-                )
+                Some(self.t("sync.offline_detail"))
             } else {
                 None
             },
@@ -76,25 +90,29 @@ impl SyncStatusEngine {
         components.push(Component::InfoPanel {
             id: "sync_info".into(),
             icon: Some("sync".into()),
-            title: "Details".into(),
+            title: self.t("sync.details"),
             items: vec![
                 InfoItem {
                     icon: Some("relay".into()),
-                    title: "Relay".into(),
+                    title: self.t("sync.relay"),
                     detail: self.relay_url.clone(),
                 },
                 InfoItem {
                     icon: Some("contacts".into()),
-                    title: "Contacts".into(),
+                    title: self.t("nav.contacts"),
                     detail: format!("{}", self.contact_count),
                 },
                 InfoItem {
                     icon: Some("pending".into()),
-                    title: "Pending Updates".into(),
+                    title: self.t("sync.pending_updates_title"),
                     detail: if self.pending_updates == 0 {
-                        "All up to date".into()
+                        self.t("sync.all_up_to_date")
                     } else {
-                        format!("{} update(s) waiting to sync", self.pending_updates)
+                        get_string_with_args(
+                            self.locale,
+                            "sync.pending_updates_waiting",
+                            &[("count", &self.pending_updates.to_string())],
+                        )
                     },
                 },
             ],
@@ -103,13 +121,13 @@ impl SyncStatusEngine {
 
         ScreenModel {
             screen_id: "sync_status".into(),
-            title: "Sync".into(),
+            title: self.t("sync.title"),
             subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
                     id: "sync_now".into(),
-                    label: "Sync Now".into(),
+                    label: self.t("sync.sync_now"),
                     style: ActionStyle::Primary,
                     enabled: !is_offline,
                     a11y: None,
@@ -117,9 +135,9 @@ impl SyncStatusEngine {
                 ScreenAction {
                     id: "test_connection".into(),
                     label: if is_offline {
-                        "Retry Connection".into()
+                        self.t("sync.retry_connection")
                     } else {
-                        "Test Connection".into()
+                        self.t("sync.test_connection")
                     },
                     style: ActionStyle::Secondary,
                     enabled: true,

@@ -18,7 +18,6 @@ fn sample_config() -> SettingsConfig {
         language_id: String::new(),
         available_languages: vec![],
         reduce_motion: false,
-        high_contrast: false,
         large_touch: false,
         show_help_icons: true,
         version: String::new(),
@@ -389,7 +388,6 @@ fn settings_accessibility_toggles() {
 
     let screen = engine.current_screen();
     assert!(!find_toggle(&screen, "accessibility", "reduce_motion"));
-    assert!(!find_toggle(&screen, "accessibility", "high_contrast"));
     assert!(!find_toggle(&screen, "accessibility", "large_touch"));
 
     let result = engine.handle_action(UserAction::SettingsToggled {

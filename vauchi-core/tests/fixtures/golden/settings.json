@@ -176,20 +176,6 @@
             }
           },
           {
-            "id": "high_contrast",
-            "label": "High Contrast",
-            "kind": {
-              "Toggle": {
-                "enabled": false
-              }
-            },
-            "a11y": {
-              "label": "High Contrast toggle",
-              "hint": "When enabled, increases color contrast for better visibility",
-              "role": null
-            }
-          },
-          {
             "id": "large_touch",
             "label": "Large Touch Targets",
             "kind": {

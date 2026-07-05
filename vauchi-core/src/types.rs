@@ -292,6 +292,17 @@ pub struct SettingsFlags {
     /// Notify when a new contact is added. Defaults to false.
     #[serde(default)]
     pub contact_added_notifications: bool,
+    /// Reduce/eliminate UI motion (zeroes animation durations). Defaults
+    /// to false. Category-2 accessibility flag — core-owned so the
+    /// accommodation follows the user across devices (ADR-047 Addendum
+    /// 2026-07-05). `#[serde(default)]` for back-compat with flags stored
+    /// before this field existed.
+    #[serde(default)]
+    pub reduce_motion: bool,
+    /// Enlarge touch targets + list-item spacing. Defaults to false.
+    /// Category-2 accessibility flag (see `reduce_motion`).
+    #[serde(default)]
+    pub large_touch: bool,
 }
 
 impl Default for SettingsFlags {
@@ -300,6 +311,8 @@ impl Default for SettingsFlags {
             delivery_receipts_enabled: true,
             suppress_presence: false,
             contact_added_notifications: false,
+            reduce_motion: false,
+            large_touch: false,
         }
     }
 }

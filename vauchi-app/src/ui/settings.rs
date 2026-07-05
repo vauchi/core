@@ -35,8 +35,6 @@ pub struct SettingsConfig {
     #[serde(default)]
     pub reduce_motion: bool,
     #[serde(default)]
-    pub high_contrast: bool,
-    #[serde(default)]
     pub large_touch: bool,
     #[serde(default = "default_true")]
     pub show_help_icons: bool,
@@ -264,23 +262,11 @@ impl SettingsEngine {
                     }),
                     info_key: None,
                 },
-                SettingsItem {
-                    id: "high_contrast".into(),
-                    label: self.t("a11y.high_contrast"),
-                    kind: SettingsItemKind::Toggle {
-                        enabled: self.config.high_contrast,
-                    },
-                    a11y: Some(A11y {
-                        label: Some(get_string_with_args(
-                            self.locale(),
-                            "a11y.toggle_label",
-                            &[("name", &self.t("a11y.high_contrast"))],
-                        )),
-                        hint: Some(self.t("settings.high_contrast_hint")),
-                        role: None,
-                    }),
-                    info_key: None,
-                },
+                // high_contrast deferred to M4 S1b: its effect is theme
+                // colors (frontend-applied via theme_id), so it needs core
+                // effective-theme resolution + per-platform wiring. Removed
+                // here rather than shipped as a persisted-but-inert toggle
+                // (ship-or-delete, design D4.1).
                 SettingsItem {
                     id: "large_touch".into(),
                     label: self.t("settings.large_touch_targets"),
@@ -694,7 +680,6 @@ impl WorkflowEngine for SettingsEngine {
             } if component_id == "accessibility" => {
                 match item_id.as_str() {
                     "reduce_motion" => self.config.reduce_motion = !self.config.reduce_motion,
-                    "high_contrast" => self.config.high_contrast = !self.config.high_contrast,
                     "large_touch" => self.config.large_touch = !self.config.large_touch,
                     _ => {}
                 }

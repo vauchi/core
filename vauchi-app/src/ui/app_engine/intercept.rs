@@ -61,7 +61,10 @@ impl AppEngine {
             component_id,
             item_id,
         } = action
-            && matches!(component_id.as_str(), "privacy" | "notifications")
+            && matches!(
+                component_id.as_str(),
+                "privacy" | "notifications" | "accessibility"
+            )
         {
             let config = self.vauchi.config_mut();
             match item_id.as_str() {
@@ -74,6 +77,14 @@ impl AppEngine {
                 "contact_added" => {
                     config.contact_added_notifications = !config.contact_added_notifications;
                 }
+                // Category-2 accessibility flags (ADR-047 Addendum
+                // 2026-07-05) — core-owned so they follow the user.
+                "reduce_motion" => {
+                    config.reduce_motion = !config.reduce_motion;
+                }
+                "large_touch" => {
+                    config.large_touch = !config.large_touch;
+                }
                 _ => {}
             }
             // Persist the updated flags to durable core Storage so the choice
@@ -85,6 +96,8 @@ impl AppEngine {
                 delivery_receipts_enabled: config.delivery_receipts_enabled,
                 suppress_presence: config.suppress_presence,
                 contact_added_notifications: config.contact_added_notifications,
+                reduce_motion: config.reduce_motion,
+                large_touch: config.large_touch,
             };
             #[allow(clippy::let_underscore_must_use)]
             let _ = self.vauchi.save_settings_flags(&flags);

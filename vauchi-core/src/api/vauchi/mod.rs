@@ -356,6 +356,8 @@ impl Vauchi {
             config.delivery_receipts_enabled = flags.delivery_receipts_enabled;
             config.suppress_presence = flags.suppress_presence;
             config.contact_added_notifications = flags.contact_added_notifications;
+            config.reduce_motion = flags.reduce_motion;
+            config.large_touch = flags.large_touch;
         }
         // Seed the persisted relay URL, but only when the caller left the
         // built-in default — an explicit `with_relay_url` (desktop

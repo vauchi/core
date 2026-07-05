@@ -62,6 +62,15 @@ pub struct VauchiConfig {
     /// Whether to send OS notification when a new contact is added via sync.
     /// Default: false (opt-in).
     pub contact_added_notifications: bool,
+
+    /// Reduce/eliminate UI motion. Category-2 accessibility flag, self-seeded
+    /// from `SettingsFlags` so it follows the user across devices (ADR-047
+    /// Addendum 2026-07-05). Default: false.
+    pub reduce_motion: bool,
+
+    /// Enlarge touch targets + list spacing. Category-2 accessibility flag
+    /// (see `reduce_motion`). Default: false.
+    pub large_touch: bool,
 }
 
 impl Default for VauchiConfig {
@@ -78,6 +87,8 @@ impl Default for VauchiConfig {
             relay_list: None,
             ohttp: OhttpConfig::default(),
             contact_added_notifications: false,
+            reduce_motion: false,
+            large_touch: false,
         }
     }
 }

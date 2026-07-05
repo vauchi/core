@@ -334,7 +334,9 @@ vauchi-core/src/storage/mod.rs 1079
 #  set_render_context; ADR-038 Amendment 2 / token-theme hot-reload 2026-06-14.)
 # (+8 2026-07-01: two Glance OOB state fields on AppEngine — Slice B,
 #  2026-06-10-ble-unauthenticated-peer-identity.)
-vauchi-app/src/ui/app_engine/mod.rs 752
+# (+1 2026-07-05: apply_accessibility_overlay step in current_screen's
+#  overlay chain — M4 S1a.)
+vauchi-app/src/ui/app_engine/mod.rs 753
 # (2026-07-01: Glance orchestration + its INLINE_TEST_REQUIRED test mod —
 #  Slice B. The privacy/binding tests call private build_ble_session_inputs /
 #  pending_exchange_groups so they must stay inline; the pub-API Glance
@@ -471,7 +473,10 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 #  arms (Help, Lock, DecoyContacts, ChangePassword, TagPromotion,
 #  Places, Groups, Support, ActivityLog) each gain `.with_locale(...)`.
 #  Stacked on batch-2's 988. 988 → 1007.)
-vauchi-app/src/ui/app_engine/screens.rs 1007
+# (+4 2026-07-05: M4 S1a — Settings accessibility flags read real config
+#  (reduce_motion/large_touch self-seeded) with an explanatory comment,
+#  replacing the 3 hardcoded `false` literals. 1007 → 1011.)
+vauchi-app/src/ui/app_engine/screens.rs 1011
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

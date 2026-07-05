@@ -64,3 +64,50 @@ fn settings_flags_persist_and_seed_config_on_reopen() {
         );
     }
 }
+
+// M4 S1a (2026-07-03-placebo-accessibility-toggles): accessibility flags
+// are Category-2 core-owned (ADR-047 Addendum 2026-07-05) — they persist
+// in SettingsFlags and self-seed into config so a person's accommodations
+// follow them across every device / restart.
+// @internal
+#[test]
+fn accessibility_flags_persist_and_seed_config_on_reopen() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage_key = SymmetricKey::generate();
+    let db_path = dir.path().join("vauchi.db");
+
+    {
+        let config =
+            VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key.clone());
+        let vauchi = Vauchi::new(config).unwrap();
+
+        let mut flags = vauchi.load_settings_flags().unwrap();
+        assert!(!flags.reduce_motion, "default is false");
+        assert!(!flags.large_touch, "default is false");
+
+        flags.reduce_motion = true;
+        flags.large_touch = true;
+        vauchi.save_settings_flags(&flags).unwrap();
+    }
+
+    {
+        let config = VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key);
+        let vauchi = Vauchi::new(config).unwrap();
+
+        assert!(
+            vauchi.config().reduce_motion,
+            "reduce_motion seeded into config on reopen"
+        );
+        assert!(
+            vauchi.config().large_touch,
+            "large_touch seeded into config on reopen"
+        );
+
+        let flags = vauchi.load_settings_flags().unwrap();
+        assert!(
+            flags.reduce_motion,
+            "persisted reduce_motion survives reopen"
+        );
+        assert!(flags.large_touch, "persisted large_touch survives reopen");
+    }
+}

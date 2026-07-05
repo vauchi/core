@@ -144,6 +144,21 @@ impl AppEngine {
     /// Inserted at the bottom of the existing components so an
     /// active update banner (`apply_update_overlay`) keeps its
     /// top-of-screen position.
+    /// Transform the rendered screen's design tokens per the user's
+    /// Category-2 accessibility flags (M4 S1a; ADR-047 Addendum
+    /// 2026-07-05). Reads live config so a mid-session toggle takes
+    /// effect on the next render; a no-op when both flags are off, which
+    /// keeps golden fixtures on the default tokens.
+    pub(super) fn apply_accessibility_overlay(&self, mut screen: ScreenModel) -> ScreenModel {
+        let config = self.vauchi().config();
+        screen.tokens = crate::theme::apply_accessibility_tokens(
+            screen.tokens,
+            config.reduce_motion,
+            config.large_touch,
+        );
+        screen
+    }
+
     pub(super) fn apply_offline_overlay(&self, mut screen: ScreenModel) -> ScreenModel {
         if self.network_online {
             return screen;

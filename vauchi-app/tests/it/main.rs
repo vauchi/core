@@ -4,6 +4,7 @@
 
 //! Consolidated integration test binary for vauchi-app.
 
+mod accessibility_tokens_tests;
 mod activity_log_engine_tests;
 mod activity_log_writer_tests;
 mod affected_screens_tests;

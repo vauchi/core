@@ -519,6 +519,7 @@ impl WorkflowEngine for AppEngine {
         let screen = self.apply_offline_overlay(screen);
         let screen = self.apply_sync_chrome_overlay(screen);
         let screen = self.apply_demo_contact_overlay(screen);
+        let screen = self.apply_accessibility_overlay(screen);
         self.apply_screen_id_metadata(screen)
     }
 

@@ -81,7 +81,6 @@ fn sample_settings_config() -> SettingsConfig {
         language_id: String::new(),
         available_languages: vec![],
         reduce_motion: false,
-        high_contrast: false,
         large_touch: false,
         show_help_icons: true,
         version: String::new(),

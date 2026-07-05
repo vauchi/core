@@ -226,9 +226,13 @@ impl AppEngine {
                     available_themes,
                     language_id,
                     available_languages,
-                    reduce_motion: false,
-                    high_contrast: false,
-                    large_touch: false,
+                    // Category-2 accessibility flags, self-seeded from
+                    // SettingsFlags so they follow the user (ADR-047 Addendum
+                    // 2026-07-05). high_contrast is deferred to M4 S1b (its
+                    // effect is theme colors, frontend-applied) — removed from
+                    // the screen rather than shipped inert.
+                    reduce_motion: vauchi.config().reduce_motion,
+                    large_touch: vauchi.config().large_touch,
                     show_help_icons: true,
                     // Core/binding semver. Frontends may eventually pass their
                     // own app version + build hash through SettingsConfig —

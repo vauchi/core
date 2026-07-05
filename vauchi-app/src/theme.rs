@@ -515,6 +515,44 @@ pub fn load_design_tokens_from_bytes(data: &[u8]) -> Result<(), ThemeError> {
     Ok(())
 }
 
+/// Apply Category-2 accessibility accommodations to a `DesignTokens`
+/// (M4 S1a, ADR-047 Addendum 2026-07-05). Pure: the caller supplies the
+/// flags from core config at the single render choke point
+/// (`AppEngine::current_screen`).
+///
+/// - `reduce_motion` zeroes every animation duration (still UI).
+/// - `large_touch` scales the touch-target minimum and list-item spacing
+///   by 1.5x via integer `v*3/2` — deterministic so exact-value tests
+///   pin it (44→66, 8→12, 12→18). Motion-only and touch-only are
+///   independent; both compose.
+pub fn apply_accessibility_tokens(
+    mut tokens: DesignTokens,
+    reduce_motion: bool,
+    large_touch: bool,
+) -> DesignTokens {
+    if reduce_motion {
+        tokens.motion.enter_duration_ms = 0;
+        tokens.motion.exit_duration_ms = 0;
+        tokens.motion.emphasis_duration_ms = 0;
+    }
+    if large_touch {
+        let t = &mut tokens.touch_target;
+        t.minimum = scale_up_1_5(t.minimum);
+        let s = &mut tokens.spacing_direction;
+        s.list_item_start = scale_up_1_5(s.list_item_start);
+        s.list_item_end = scale_up_1_5(s.list_item_end);
+        s.list_item_inline_start = scale_up_1_5(s.list_item_inline_start);
+        s.list_item_inline_end = scale_up_1_5(s.list_item_inline_end);
+    }
+    tokens
+}
+
+/// Integer 1.5x — `saturating_mul` guards the (unreachable in practice)
+/// overflow so a hostile token file can't panic the render path.
+fn scale_up_1_5(v: u16) -> u16 {
+    v.saturating_mul(3) / 2
+}
+
 /// The active design tokens: the hot-reloaded set if loaded, else the
 /// bundled `DesignTokens::default()`. Read-clone-release — never holds the
 /// lock across a render; a poisoned lock falls back to the default.

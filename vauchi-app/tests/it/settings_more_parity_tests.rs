@@ -99,7 +99,6 @@ fn sample_settings_config() -> SettingsConfig {
             label: "English".into(),
         }],
         reduce_motion: false,
-        high_contrast: false,
         large_touch: false,
         show_help_icons: true,
         version: "0.0.0-test".into(),

@@ -30,7 +30,12 @@
       "id": "cancel",
       "label": "Cancel",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Cancel",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": {

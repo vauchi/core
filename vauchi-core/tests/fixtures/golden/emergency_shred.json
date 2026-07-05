@@ -35,13 +35,23 @@
       "id": "continue",
       "label": "I Understand",
       "style": "Destructive",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "I Understand",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "cancel",
       "label": "Cancel",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Cancel",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": {

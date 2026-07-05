@@ -86,14 +86,14 @@ impl EmergencyShredEngine {
                     label: self.t("shred.wipe.understand"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("shred.wipe.understand"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
                     label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: Some(Progress {
@@ -118,7 +118,7 @@ impl EmergencyShredEngine {
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Text,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("shred.wipe.type_delete"))),
                 info_key: None,
             }],
             actions: vec![
@@ -127,14 +127,14 @@ impl EmergencyShredEngine {
                     label: self.t("shred.wipe.wipe_all"),
                     style: ActionStyle::Destructive,
                     enabled: self.typed_confirmation == "DELETE",
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("shred.wipe.wipe_all"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
                     label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: Some(Progress {
@@ -187,7 +187,7 @@ impl EmergencyShredEngine {
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.done"))),
             }],
             progress: Some(Progress {
                 current_step: 3,

@@ -168,7 +168,7 @@ impl GdprEngine {
                             label: self.t("privacy.view_data"),
                             icon: Some("data".into()),
                             detail: Some(self.t("privacy.view_data_desc")),
-                            a11y: None,
+                            a11y: Some(A11y::labeled(self.t("privacy.view_data"))),
                             info_key: None,
                         },
                         ActionListItem {
@@ -176,7 +176,7 @@ impl GdprEngine {
                             label: self.t("privacy.manage_consent"),
                             icon: Some("consent".into()),
                             detail: Some(self.t("privacy.manage_consent_desc")),
-                            a11y: None,
+                            a11y: Some(A11y::labeled(self.t("privacy.manage_consent"))),
                             info_key: None,
                         },
                     ],
@@ -188,7 +188,7 @@ impl GdprEngine {
                     label: self.t("privacy.export_data"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("privacy.export_data"))),
                 }];
                 if self.deletion_scheduled {
                     actions.push(ScreenAction {
@@ -196,7 +196,7 @@ impl GdprEngine {
                         label: self.t("privacy.cancel_deletion"),
                         style: ActionStyle::Secondary,
                         enabled: true,
-                        a11y: None,
+                        a11y: Some(A11y::labeled(self.t("privacy.cancel_deletion"))),
                     });
                     if self.deletion_executable {
                         actions.push(ScreenAction {
@@ -204,7 +204,7 @@ impl GdprEngine {
                             label: self.t("privacy.delete_now"),
                             style: ActionStyle::Destructive,
                             enabled: true,
-                            a11y: None,
+                            a11y: Some(A11y::labeled(self.t("privacy.delete_now"))),
                         });
                     }
                 } else {
@@ -213,7 +213,7 @@ impl GdprEngine {
                         label: self.t("privacy.delete_identity"),
                         style: ActionStyle::Destructive,
                         enabled: true,
-                        a11y: None,
+                        a11y: Some(A11y::labeled(self.t("privacy.delete_identity"))),
                     });
                 }
                 actions.push(ScreenAction {
@@ -221,7 +221,7 @@ impl GdprEngine {
                     label: self.t("shred.panic_title"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("shred.panic_title"))),
                 });
                 actions
             },
@@ -302,7 +302,7 @@ impl GdprEngine {
                     label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,
@@ -325,7 +325,7 @@ impl GdprEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.consent.data_processing,
                         },
-                        a11y: None,
+                        a11y: Some(A11y::labeled(self.t("privacy.consent_data_processing"))),
                         info_key: None,
                     },
                     SettingsItem {
@@ -334,7 +334,7 @@ impl GdprEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.consent.contact_sharing,
                         },
-                        a11y: None,
+                        a11y: Some(A11y::labeled(self.t("privacy.consent_contact_sharing"))),
                         info_key: None,
                     },
                     SettingsItem {
@@ -343,7 +343,7 @@ impl GdprEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.consent.recovery_vouching,
                         },
-                        a11y: None,
+                        a11y: Some(A11y::labeled(self.t("privacy.consent_recovery_vouching"))),
                         info_key: None,
                     },
                 ],
@@ -353,7 +353,7 @@ impl GdprEngine {
                 label: self.t("action.back"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.back"))),
             }],
             progress: None,
             ..Default::default()
@@ -382,14 +382,14 @@ impl GdprEngine {
                     label: self.t("privacy.delete_now.confirm"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("privacy.delete_now.confirm"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
                     label: self.t("privacy.delete_now.keep"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("privacy.delete_now.keep"))),
                 },
             ],
             progress: None,
@@ -419,14 +419,14 @@ impl GdprEngine {
                     label: self.t("shred.panic_confirm_button"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("shred.panic_confirm_button"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
                     label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,

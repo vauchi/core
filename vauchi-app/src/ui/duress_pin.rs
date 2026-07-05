@@ -129,16 +129,17 @@ impl DuressPinEngine {
             },
         ];
 
+        let configure_label = if self.config.enabled {
+            self.t("resistance.duress.change_pin")
+        } else {
+            self.t("resistance.duress.set_up_pin")
+        };
         let mut actions = vec![ScreenAction {
             id: "configure".into(),
-            label: if self.config.enabled {
-                self.t("resistance.duress.change_pin")
-            } else {
-                self.t("resistance.duress.set_up_pin")
-            },
+            label: configure_label.clone(),
             style: ActionStyle::Primary,
             enabled: true,
-            a11y: None,
+            a11y: Some(A11y::labeled(configure_label)),
         }];
 
         if self.config.enabled {
@@ -147,7 +148,7 @@ impl DuressPinEngine {
                 label: self.t("resistance.duress.disable_button"),
                 style: ActionStyle::Destructive,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("resistance.duress.disable_button"))),
             });
         }
 
@@ -201,14 +202,14 @@ impl DuressPinEngine {
                     label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.back"))),
                 },
                 ScreenAction {
                     id: "continue".into(),
                     label: self.t("action.continue"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.continue"))),
                 },
             ],
             progress: Some(self.progress()),
@@ -240,14 +241,14 @@ impl DuressPinEngine {
                     label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.back"))),
                 },
                 ScreenAction {
                     id: "continue".into(),
                     label: self.t("action.continue"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.continue"))),
                 },
             ],
             progress: Some(self.progress()),
@@ -273,7 +274,7 @@ impl DuressPinEngine {
                             label: c.name.clone(),
                             selected: self.config.selected_contact_ids.contains(&c.id),
                             subtitle: None,
-                            a11y: None,
+                            a11y: Some(A11y::labeled(c.name.clone())),
                             info_key: None,
                         })
                         .collect(),
@@ -302,7 +303,9 @@ impl DuressPinEngine {
                         label: self.t("resistance.duress.setup.include_location"),
                         selected: self.config.include_location,
                         subtitle: Some(self.t("resistance.duress.include_location_desc")),
-                        a11y: None,
+                        a11y: Some(A11y::labeled(
+                            self.t("resistance.duress.setup.include_location"),
+                        )),
                         info_key: None,
                     }],
                     a11y: None,
@@ -314,7 +317,7 @@ impl DuressPinEngine {
                     label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.back"))),
                 },
                 ScreenAction {
                     id: "save".into(),
@@ -322,7 +325,7 @@ impl DuressPinEngine {
                     style: ActionStyle::Primary,
                     // A duress alert with no recipient reaches nobody — require ≥1.
                     enabled: !self.config.selected_contact_ids.is_empty(),
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.save"))),
                 },
             ],
             progress: Some(self.progress()),

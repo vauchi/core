@@ -33,14 +33,22 @@
             "label": "View My Data",
             "icon": "data",
             "detail": "See what data is stored locally",
-            "a11y": null
+            "a11y": {
+              "label": "View My Data",
+              "hint": null,
+              "role": null
+            }
           },
           {
             "id": "manage_consent",
             "label": "Manage Consent",
             "icon": "consent",
             "detail": "Review and update data consent",
-            "a11y": null
+            "a11y": {
+              "label": "Manage Consent",
+              "hint": null,
+              "role": null
+            }
           }
         ]
       }
@@ -51,19 +59,34 @@
       "id": "export",
       "label": "Export My Data",
       "style": "Primary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Export My Data",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "delete",
       "label": "Delete Identity",
       "style": "Destructive",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Delete Identity",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "panic_shred",
       "label": "Panic Shred",
       "style": "Destructive",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Panic Shred",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": null,

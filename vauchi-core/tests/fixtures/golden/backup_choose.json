@@ -45,13 +45,23 @@
       "id": "create",
       "label": "Create Backup",
       "style": "Primary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Create Backup",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "restore",
       "label": "Restore Backup",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Restore Backup",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": null,

@@ -203,7 +203,7 @@ fn main() {
     // scenario loses its binding. Bump this when you wire more step
     // definitions; if CI reports a drop, a wired scenario lost its binding —
     // investigate the binding, don't just lower the floor.
-    const MIN_WIRED_SCENARIOS: usize = 83;
+    const MIN_WIRED_SCENARIOS: usize = 87;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

@@ -33,9 +33,9 @@ const ONBOARDING_ALL_HANDLED: &[&str] = &[
     // identity_check
     "have_identity",
     "create_new",
-    // link_choice
-    "transfer_device",
-    "link_device",
+    // link_choice (M5 B1: the two indistinguishable device-link buttons
+    // merged into one that routes to device_link_guidance)
+    "add_another_device",
     "restore_backup",
     "back",
     // backup_password_entry — reached only via the file-picker
@@ -150,12 +150,13 @@ fn bfs_pins_remaining_orphans() {
     );
 }
 
-/// Guards the BFS itself: the full flow should reach six distinct
+/// Guards the BFS itself: the full flow should reach seven distinct
 /// screens. If this drops, the BFS regressed or a screen
-/// disappeared silently.
+/// disappeared silently. (M5 B1 added `device_link_guidance`, reached
+/// from `link_choice` via `add_another_device`.)
 // @internal
 #[test]
-fn bfs_reaches_all_six_onboarding_screens() {
+fn bfs_reaches_all_onboarding_screens() {
     use vauchi_app::ui::testing::all_reachable_screens;
     let screens = all_reachable_screens(OnboardingEngine::new);
     let ids: BTreeSet<String> = screens.into_iter().map(|s| s.screen_id).collect();
@@ -164,6 +165,7 @@ fn bfs_reaches_all_six_onboarding_screens() {
         BTreeSet::from([
             "identity_check".to_string(),
             "link_choice".to_string(),
+            "device_link_guidance".to_string(),
             "default_name".to_string(),
             "groups_setup".to_string(),
             "contact_info".to_string(),

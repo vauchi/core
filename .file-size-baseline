@@ -490,6 +490,14 @@ vauchi-app/src/ui/app_engine/routing.rs 630
 #  replacing the 3 hardcoded `false` literals. 1007 → 1011.)
 vauchi-app/src/ui/app_engine/screens.rs 1011
 
+# SPLIT-WARRANTED — crossed the 1000-line hard limit in M5 B1
+# (2026-07-05) when the merged "add another device" onboarding option
+# gained its DeviceLinkGuidance screen builder + handler. Grandfathered
+# here (per screens.rs precedent) to land the user-facing dead-end fix;
+# a `tidy:` follow-up should extract the `build_*` screen builders to a
+# sibling `onboarding_screens.rs`. 982 → 1032.
+vauchi-app/src/ui/onboarding.rs 1032
+
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081
 

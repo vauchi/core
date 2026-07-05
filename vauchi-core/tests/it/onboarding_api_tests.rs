@@ -354,9 +354,12 @@ fn test_identity_check_have_identity_goes_to_link_choice() {
     }
 }
 
-// @scenario: onboarding:link_choice_link_device
+// @scenario: onboarding:link_choice_add_another_device
+// M5 B1: the merged "add another device" option routes to honest guidance
+// instead of the former unrouted StartDeviceLink
+// (2026-07-03-second-device-join-dead-end).
 #[test]
-fn test_link_choice_link_device_returns_start_device_link() {
+fn test_link_choice_add_another_device_navigates_to_guidance() {
     use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
@@ -365,12 +368,14 @@ fn test_link_choice_link_device_returns_start_device_link() {
     });
 
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "link_device".into(),
+        action_id: "add_another_device".into(),
     });
-    assert!(
-        matches!(result, ActionResult::StartDeviceLink),
-        "Expected StartDeviceLink, got {result:?}"
-    );
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "device_link_guidance");
+        }
+        other => panic!("Expected NavigateTo(device_link_guidance), got {other:?}"),
+    }
 }
 
 // @scenario: onboarding:link_choice_restore_backup

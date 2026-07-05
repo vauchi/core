@@ -36,7 +36,10 @@ impl OnboardingStep {
         match self {
             OnboardingStep::IdentityCheck => 0,
             OnboardingStep::LinkChoice => 1,
+            // Side-flows off LinkChoice — reuse its index so the 6-step
+            // progress indicator stays accurate.
             OnboardingStep::BackupPasswordEntry => 1,
+            OnboardingStep::DeviceLinkGuidance => 1,
             OnboardingStep::DefaultName => 2,
             OnboardingStep::GroupsSetup => 3,
             OnboardingStep::ContactInfo => 4,

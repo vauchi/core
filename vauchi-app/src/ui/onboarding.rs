@@ -244,15 +244,14 @@ impl OnboardingEngine {
                 icon: None,
                 title: "".into(),
                 items: vec![
+                    // M5 B1: the former "Transfer" / "Link from another device"
+                    // items were indistinguishable (both emitted an unrouted
+                    // StartDeviceLink). Merged into one honest option that
+                    // routes to DeviceLinkGuidance.
                     InfoItem {
                         icon: Some("devices".into()),
-                        title: self.t("onboarding.restore_transfer_title"),
-                        detail: self.t("onboarding.restore_transfer_desc"),
-                    },
-                    InfoItem {
-                        icon: Some("link".into()),
-                        title: self.t("onboarding.restore_link_title"),
-                        detail: self.t("onboarding.restore_link_desc"),
+                        title: self.t("onboarding.add_another_device"),
+                        detail: self.t("onboarding.add_another_device_desc"),
                     },
                     InfoItem {
                         icon: Some("backup".into()),
@@ -268,18 +267,11 @@ impl OnboardingEngine {
             }],
             actions: vec![
                 ScreenAction {
-                    id: "transfer_device".into(),
-                    label: self.t("onboarding.restore_transfer_title"),
+                    id: "add_another_device".into(),
+                    label: self.t("onboarding.add_another_device"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.restore_transfer_title"))),
-                },
-                ScreenAction {
-                    id: "link_device".into(),
-                    label: self.t("onboarding.restore_link_title"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.restore_link_title"))),
+                    a11y: Some(A11y::labeled(self.t("onboarding.add_another_device"))),
                 },
                 ScreenAction {
                     id: "restore_backup".into(),
@@ -656,31 +648,87 @@ impl OnboardingEngine {
         }
     }
 
+    /// ADR-031 file-picker: core drives the native picker dialog instead of
+    /// returning a chrome hint. `AppEngine::handle_file_picked` (Onboarding
+    /// arm) routes the picked bytes back into this engine via
+    /// `set_pending_backup_bytes`, which transitions the wizard to
+    /// `Step::BackupPasswordEntry`. Phase 2B of
+    /// `2026-05-03-core-file-picker-command`.
+    fn trigger_backup_restore(&self) -> ActionResult {
+        ActionResult::Commands {
+            commands: vec![Command::FilePickFromUser {
+                accepted_mime_types: backup_mime_types(),
+                purpose: FilePickPurpose::ImportBackup,
+            }],
+        }
+    }
+
     fn handle_link_choice(&mut self, action: &UserAction) -> ActionResult {
         match action {
-            UserAction::ActionPressed { action_id } if action_id == "transfer_device" => {
-                ActionResult::StartDeviceLink
-            }
-            UserAction::ActionPressed { action_id } if action_id == "link_device" => {
-                ActionResult::StartDeviceLink
+            // M5 B1: the merged "add another device" option routes to honest
+            // guidance instead of the two former buttons' unrouted
+            // StartDeviceLink (2026-07-03-second-device-join-dead-end).
+            UserAction::ActionPressed { action_id } if action_id == "add_another_device" => {
+                self.navigate_to(Step::DeviceLinkGuidance)
             }
             UserAction::ActionPressed { action_id } if action_id == "restore_backup" => {
-                // ADR-031 file-picker: core drives the native picker
-                // dialog instead of returning a chrome hint.
-                // `AppEngine::handle_file_picked` (Onboarding arm)
-                // routes the picked bytes back into this engine via
-                // `set_pending_backup_bytes`, which transitions the
-                // wizard to `Step::BackupPasswordEntry`. Phase 2B of
-                // `2026-05-03-core-file-picker-command`.
-                ActionResult::Commands {
-                    commands: vec![Command::FilePickFromUser {
-                        accepted_mime_types: backup_mime_types(),
-                        purpose: FilePickPurpose::ImportBackup,
-                    }],
-                }
+                self.trigger_backup_restore()
             }
             UserAction::ActionPressed { action_id } if action_id == "back" => {
                 self.navigate_to(Step::IdentityCheck)
+            }
+            _ => ActionResult::UpdateScreen(self.current_screen()),
+        }
+    }
+
+    fn build_device_link_guidance(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "device_link_guidance".into(),
+            title: self.t("onboarding.device_link_guidance_title"),
+            subtitle: None,
+            components: vec![Component::InfoPanel {
+                id: "device_link_guidance_info".into(),
+                icon: Some("devices".into()),
+                title: self.t("onboarding.device_link_guidance_title"),
+                items: vec![InfoItem {
+                    icon: Some("backup".into()),
+                    title: self.t("onboarding.restore_backup_title"),
+                    detail: self.t("onboarding.device_link_guidance_body"),
+                }],
+                a11y: Some(A11y {
+                    label: Some(self.t("onboarding.device_link_guidance_body")),
+                    hint: None,
+                    role: None,
+                }),
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: "restore_backup".into(),
+                    label: self.t("onboarding.restore_backup_title"),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("onboarding.restore_backup_title"))),
+                },
+                ScreenAction {
+                    id: "back".into(),
+                    label: self.t("action.back"),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("action.back"))),
+                },
+            ],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn handle_device_link_guidance(&mut self, action: &UserAction) -> ActionResult {
+        match action {
+            UserAction::ActionPressed { action_id } if action_id == "restore_backup" => {
+                self.trigger_backup_restore()
+            }
+            UserAction::ActionPressed { action_id } if action_id == "back" => {
+                self.navigate_to(Step::LinkChoice)
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
@@ -958,6 +1006,7 @@ impl WorkflowEngine for OnboardingEngine {
         match self.step {
             Step::IdentityCheck => self.build_identity_check(),
             Step::LinkChoice => self.build_link_choice(),
+            Step::DeviceLinkGuidance => self.build_device_link_guidance(),
             Step::BackupPasswordEntry => self.build_backup_password_entry(),
             Step::DefaultName => self.build_default_name(),
             Step::GroupsSetup => self.build_groups_setup(),
@@ -971,6 +1020,7 @@ impl WorkflowEngine for OnboardingEngine {
         match self.step {
             Step::IdentityCheck => self.handle_identity_check(&action),
             Step::LinkChoice => self.handle_link_choice(&action),
+            Step::DeviceLinkGuidance => self.handle_device_link_guidance(&action),
             Step::BackupPasswordEntry => self.handle_backup_password_entry(&action),
             Step::DefaultName => self.handle_default_name(&action),
             Step::GroupsSetup => self.handle_groups_setup(&action),

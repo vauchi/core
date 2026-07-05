@@ -108,20 +108,89 @@ fn identity_check_have_identity_goes_to_link_choice() {
 
 // ── Pre-gate: LinkChoice ────────────────────────────────────────────
 
+// M5 B1 (2026-07-03-second-device-join-dead-end): the two identical
+// "transfer" / "link from another device" buttons are merged into one
+// "add another device" option that routes to honest guidance — never the
+// unrouted StartDeviceLink it used to emit.
 // @internal
 #[test]
-fn link_choice_link_device_returns_start_device_link() {
+fn link_choice_add_another_device_navigates_to_guidance() {
     let mut engine = OnboardingEngine::new();
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "have_identity".into(),
     });
+
+    // The screen offers exactly one device-link option now.
+    let screen = engine.current_screen();
+    let device_actions: Vec<&str> = screen
+        .actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .filter(|id| {
+            matches!(
+                *id,
+                "add_another_device" | "transfer_device" | "link_device"
+            )
+        })
+        .collect();
+    assert_eq!(device_actions, vec!["add_another_device"]);
+
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "link_device".into(),
+        action_id: "add_another_device".into(),
     });
-    assert!(
-        matches!(result, ActionResult::StartDeviceLink),
-        "Expected StartDeviceLink, got {result:?}"
-    );
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "device_link_guidance");
+        }
+        other => panic!("Expected NavigateTo(device_link_guidance), got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn device_link_guidance_restore_backup_emits_file_pick_command() {
+    use vauchi_core::{Command, FilePickPurpose};
+    let mut engine = OnboardingEngine::new();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "add_another_device".into(),
+    });
+    // The guidance screen points to the working path: restore from backup.
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "restore_backup".into(),
+    });
+    match result {
+        ActionResult::Commands { commands } => match &commands[0] {
+            Command::FilePickFromUser { purpose, .. } => {
+                assert_eq!(*purpose, FilePickPurpose::ImportBackup);
+            }
+            other => panic!("expected FilePickFromUser, got {other:?}"),
+        },
+        other => panic!("expected Commands(FilePickFromUser), got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn device_link_guidance_back_returns_to_link_choice() {
+    let mut engine = OnboardingEngine::new();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "add_another_device".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "back".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "link_choice");
+        }
+        other => panic!("Expected NavigateTo(link_choice), got {other:?}"),
+    }
 }
 
 // @internal

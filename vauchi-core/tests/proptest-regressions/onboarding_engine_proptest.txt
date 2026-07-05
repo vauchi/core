@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc eb18ffb0c923ca867e57a32f81ed587134409ae5fc69043035206392abe26980 # shrinks to actions = [ActionPressed { action_id: "have_identity" }, ActionPressed { action_id: "add_another_device" }]
+cc 3ae71a2d14be39fc6852ba13a9b7e76e878310ac11b8b52eabb05c002dbaa92a # shrinks to actions = [ActionPressed { action_id: "have_identity" }, ActionPressed { action_id: "add_another_device" }]

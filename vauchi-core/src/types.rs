@@ -137,6 +137,12 @@ pub enum OnboardingStep {
     IdentityCheck,
     /// Pre-gate: choose how to restore (link device or import backup)
     LinkChoice,
+    /// Honest guidance for the "add another device" path (M5 B1,
+    /// 2026-07-03-second-device-join-dead-end): the merged device-link
+    /// option routes here instead of an unrouted `StartDeviceLink`. Points
+    /// to the working backup-export→restore path until the live QR-join
+    /// responder (B3) ships.
+    DeviceLinkGuidance,
     /// Default display name entry (renamed from CreateIdentity)
     #[serde(alias = "CreateIdentity", alias = "Welcome", alias = "SkipGate")]
     DefaultName,

@@ -12,6 +12,7 @@ use vauchi_app::ui::*;
 const ALL_SCREEN_IDS: &[&str] = &[
     "identity_check",
     "link_choice",
+    "device_link_guidance",
     "default_name",
     "groups_setup",
     "contact_info",
@@ -26,7 +27,7 @@ fn arb_action_id() -> impl Strategy<Value = String> {
     prop_oneof![
         Just("have_identity".to_string()),
         Just("create_new".to_string()),
-        Just("link_device".to_string()),
+        Just("add_another_device".to_string()),
         Just("restore_backup".to_string()),
         Just("back".to_string()),
         Just("continue".to_string()),
@@ -183,10 +184,10 @@ proptest! {
     ) {
         // Filter out IDs that happen to be real action IDs
         let real_ids = [
-            "have_identity", "create_new", "link_device", "restore_backup",
+            "have_identity", "create_new", "add_another_device", "restore_backup",
             "back", "continue", "skip",
             "exchange", "import_contacts",
-            "start_app", "transfer_device", "submit_display_name",
+            "start_app", "submit_display_name",
             "submit_custom_group", "show_phone", "show_email", "add_social",
         ];
         prop_assume!(!real_ids.contains(&bogus_id.as_str()));
@@ -481,8 +482,12 @@ proptest! {
         }
 
         let screen = engine.current_screen();
-        // Pre-gate screens (identity_check, link_choice) have no progress bar
-        if screen.screen_id == "identity_check" || screen.screen_id == "link_choice" {
+        // Pre-gate screens (identity_check, link_choice, and the
+        // device_link_guidance side-flow off link_choice) have no progress bar
+        if screen.screen_id == "identity_check"
+            || screen.screen_id == "link_choice"
+            || screen.screen_id == "device_link_guidance"
+        {
             prop_assert!(screen.progress.is_none(),
                 "Pre-gate screen {} should have no progress", screen.screen_id);
         } else {

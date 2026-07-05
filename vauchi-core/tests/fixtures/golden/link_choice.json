@@ -12,13 +12,8 @@
         "items": [
           {
             "icon": "devices",
-            "title": "Transfer from another device",
-            "detail": "Move all contacts and data from your old device via QR code."
-          },
-          {
-            "icon": "link",
-            "title": "Link from another device",
-            "detail": "Scan a QR code on your other device to link this one."
+            "title": "Add another device",
+            "detail": "Move your account to a new phone, tablet, or computer"
           },
           {
             "icon": "backup",
@@ -36,23 +31,12 @@
   ],
   "actions": [
     {
-      "id": "transfer_device",
-      "label": "Transfer from another device",
+      "id": "add_another_device",
+      "label": "Add another device",
       "style": "Primary",
       "enabled": true,
       "a11y": {
-        "label": "Transfer from another device",
-        "hint": null,
-        "role": null
-      }
-    },
-    {
-      "id": "link_device",
-      "label": "Link from another device",
-      "style": "Secondary",
-      "enabled": true,
-      "a11y": {
-        "label": "Link from another device",
+        "label": "Add another device",
         "hint": null,
         "role": null
       }

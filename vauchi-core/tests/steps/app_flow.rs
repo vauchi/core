@@ -74,14 +74,21 @@ fn open_app(world: &mut VauchiWorld) {
 #[when(expr = "I navigate to the {word} screen")]
 fn navigate(world: &mut VauchiWorld, screen: String) {
     use vauchi_app::ui::AppScreen;
-    let target = match screen.as_str() {
+    if world.engine.is_none() {
+        let vauchi = std::mem::replace(&mut world.vauchi, Vauchi::in_memory().unwrap());
+        world.engine = Some(AppEngine::new(vauchi));
+    }
+    let target = match screen.to_lowercase().as_str() {
         "contacts" => AppScreen::Contacts,
         "exchange" => AppScreen::Exchange,
         "settings" => AppScreen::Settings,
-        "my-info" => AppScreen::MyInfo,
+        "my-info" | "myinfo" | "my info" => AppScreen::MyInfo,
         "help" => AppScreen::Help,
         "backup" => AppScreen::Backup,
         "sync" => AppScreen::Sync,
+        "lock" => AppScreen::Lock,
+        "device-linking" | "devicelinking" => AppScreen::DeviceLinking,
+        "device-management" | "devicemanagement" => AppScreen::DeviceManagement,
         other => panic!("unknown screen {other:?} (add it to the navigate step)"),
     };
     engine(world).navigate_to(target);

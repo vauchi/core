@@ -25,6 +25,8 @@ pub enum ValidationError {
     ValueTooLong { max: usize },
     #[error("Value cannot be empty")]
     EmptyValue,
+    #[error("Invalid social network username format")]
+    InvalidSocialUsername,
 }
 
 /// Maximum length for field values.
@@ -213,7 +215,8 @@ impl ContactField {
             FieldType::Email => self.validate_email(),
             FieldType::Website => self.validate_website(),
             FieldType::Birthday => self.validate_birthday(),
-            _ => Ok(()), // Social, Address, Custom accept any value
+            FieldType::Social => self.validate_social(),
+            _ => Ok(()), // Address, Custom accept any value
         }
     }
 
@@ -329,6 +332,41 @@ impl ContactField {
             return Err(ValidationError::InvalidEmail);
         }
 
+        Ok(())
+    }
+
+    /// Validates social network usernames when the label identifies a known network.
+    /// Unknown networks accept any non-empty value.
+    fn validate_social(&self) -> Result<(), ValidationError> {
+        let username = self.value.trim_start_matches('@');
+        match self.label.to_lowercase().as_str() {
+            "twitter" | "x" => {
+                // Twitter: max 15 chars, alphanumeric + underscore only (ADR-spec: social-registry)
+                if username.len() > 15
+                    || !username
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+                    || username.is_empty()
+                {
+                    return Err(ValidationError::InvalidSocialUsername);
+                }
+            }
+            "github" | "gh" => {
+                // GitHub: max 39 chars, alphanumeric + hyphens, no leading/trailing/consecutive hyphens
+                if username.is_empty()
+                    || username.len() > 39
+                    || username.starts_with('-')
+                    || username.ends_with('-')
+                    || username.contains("--")
+                    || !username
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-')
+                {
+                    return Err(ValidationError::InvalidSocialUsername);
+                }
+            }
+            _ => {}
+        }
         Ok(())
     }
 }

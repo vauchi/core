@@ -43,18 +43,19 @@ fn settings_screen_id() {
 // @internal
 #[test]
 fn settings_shows_all_groups() {
-    let engine = SettingsEngine::new(sample_config());
-    let screen = engine.current_screen();
-    let groups: Vec<&str> = screen
+    // M6 D6.1: main = everyday-6 + the Advanced nav row. Network,
+    // delivery, and danger moved to the advanced sub-screen.
+    let main_groups: Vec<String> = SettingsEngine::new(sample_config())
+        .current_screen()
         .components
         .iter()
         .filter_map(|c| match c {
-            Component::SettingsGroup { id, .. } => Some(id.as_str()),
+            Component::SettingsGroup { id, .. } => Some(id.clone()),
             _ => None,
         })
         .collect();
     assert_eq!(
-        groups,
+        main_groups,
         vec![
             "profile",
             "privacy",
@@ -63,13 +64,22 @@ fn settings_shows_all_groups() {
             "accessibility",
             "security",
             "backup",
-            "network",
-            "delivery",
             "help",
             "about",
-            "danger"
+            "advanced_nav",
         ]
     );
+
+    let advanced_groups: Vec<String> = SettingsEngine::new_advanced(sample_config())
+        .current_screen()
+        .components
+        .iter()
+        .filter_map(|c| match c {
+            Component::SettingsGroup { id, .. } => Some(id.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(advanced_groups, vec!["network", "delivery", "danger"]);
 }
 
 // @internal
@@ -161,7 +171,9 @@ fn settings_reflects_config_values() {
     let name_detail = find_link_detail(&screen, "profile", "display_name");
     assert_eq!(name_detail.as_deref(), Some("Alice"));
 
-    let relay_detail = find_link_detail(&screen, "network", "relay_url");
+    // M6 D6.1: relay_url lives on the Advanced sub-screen now.
+    let advanced = SettingsEngine::new_advanced(sample_config()).current_screen();
+    let relay_detail = find_link_detail(&advanced, "network", "relay_url");
     assert_eq!(relay_detail.as_deref(), Some("https://relay.vauchi.app"));
 }
 
@@ -170,7 +182,8 @@ fn settings_reflects_config_values() {
 // @internal
 #[test]
 fn settings_emergency_wipe_shows_inline_confirm() {
-    let mut engine = SettingsEngine::new(sample_config());
+    // M6 D6.1: the emergency wipe lives on the Advanced sub-screen.
+    let mut engine = SettingsEngine::new_advanced(sample_config());
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "danger".into(),
         item_id: "emergency_wipe".into(),
@@ -192,8 +205,8 @@ fn settings_emergency_wipe_shows_inline_confirm() {
 // @internal
 #[test]
 fn settings_confirm_emergency_wipe_completes() {
-    let mut engine = SettingsEngine::new(sample_config());
-    // Trigger wipe to enter pending state
+    let mut engine = SettingsEngine::new_advanced(sample_config());
+    // Trigger wipe to enter pending state (advanced sub-screen, M6 D6.1)
     let trigger = engine.handle_action(UserAction::ListItemSelected {
         component_id: "danger".into(),
         item_id: "emergency_wipe".into(),
@@ -215,7 +228,7 @@ fn settings_confirm_emergency_wipe_completes() {
 // @internal
 #[test]
 fn settings_cancel_emergency_wipe_removes_inline_confirm() {
-    let mut engine = SettingsEngine::new(sample_config());
+    let mut engine = SettingsEngine::new_advanced(sample_config());
     let trigger = engine.handle_action(UserAction::ListItemSelected {
         component_id: "danger".into(),
         item_id: "emergency_wipe".into(),
@@ -483,7 +496,8 @@ fn settings_delivery_section() {
     let mut config = sample_config();
     config.pending_updates = 3;
     config.failed_deliveries = 1;
-    let engine = SettingsEngine::new(config);
+    // M6 D6.1: delivery lives on the Advanced sub-screen now.
+    let engine = SettingsEngine::new_advanced(config);
     let screen = engine.current_screen();
 
     let pending = find_value(&screen, "delivery", "pending_updates");

@@ -61,8 +61,20 @@ fn default_true() -> bool {
 }
 
 /// Settings screen engine.
+/// Which Settings surface this engine renders (M6 D6.1). The main list
+/// carries the everyday groups + an "Advanced…" link; the advanced
+/// sub-screen carries the rare/technical groups + emergency wipe, kept
+/// behind deliberate navigation (danger far from the thumb-reachable
+/// bottom).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum SettingsMode {
+    Main,
+    Advanced,
+}
+
 pub struct SettingsEngine {
     config: SettingsConfig,
+    mode: SettingsMode,
     pending_wipe: bool,
 }
 
@@ -70,6 +82,15 @@ impl SettingsEngine {
     pub fn new(config: SettingsConfig) -> Self {
         Self {
             config,
+            mode: SettingsMode::Main,
+            pending_wipe: false,
+        }
+    }
+
+    pub fn new_advanced(config: SettingsConfig) -> Self {
+        Self {
+            config,
+            mode: SettingsMode::Advanced,
             pending_wipe: false,
         }
     }
@@ -623,11 +644,33 @@ impl SettingsEngine {
             }],
         }
     }
-}
 
-impl WorkflowEngine for SettingsEngine {
-    fn current_screen(&self) -> ScreenModel {
-        let mut components = vec![
+    /// The "Advanced…" entry on the main list that navigates to the
+    /// advanced sub-screen (M6 D6.1). Emits `ListItemSelected{advanced}`,
+    /// routed to `AppScreen::SettingsAdvanced` in `intercept.rs`.
+    fn advanced_link(&self) -> Component {
+        Component::SettingsGroup {
+            id: "advanced_nav".into(),
+            label: String::new(),
+            items: vec![SettingsItem {
+                id: "advanced".into(),
+                label: self.t("settings.advanced"),
+                kind: SettingsItemKind::Link { detail: None },
+                a11y: Some(A11y {
+                    label: Some(self.t("settings.advanced")),
+                    hint: Some(self.t("settings.advanced_hint")),
+                    role: None,
+                }),
+                info_key: None,
+            }],
+        }
+    }
+
+    /// The everyday-6 main list + the Advanced link. Network, delivery,
+    /// and the emergency wipe live on the advanced sub-screen instead
+    /// (M6 D6.1 — danger far from the thumb-reachable bottom).
+    fn main_screen(&self) -> ScreenModel {
+        let components = vec![
             self.profile_group(),
             self.privacy_group(),
             self.notifications_group(),
@@ -637,10 +680,28 @@ impl WorkflowEngine for SettingsEngine {
             self.accessibility_group(),
             self.security_group(),
             self.backup_group(),
-            self.network_group(),
-            self.delivery_group(),
             self.help_group(),
             self.about_group(),
+            self.advanced_link(),
+        ];
+        ScreenModel {
+            screen_id: "settings".into(),
+            title: self.t("settings.title"),
+            subtitle: None,
+            components,
+            actions: vec![],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    /// The advanced sub-screen: rare/technical groups + the emergency
+    /// wipe, reached only by deliberate navigation. Back is the generic
+    /// nav-stack pop (parent stamped by the overlay layer).
+    fn advanced_screen(&self) -> ScreenModel {
+        let mut components = vec![
+            self.network_group(),
+            self.delivery_group(),
             self.danger_group(),
         ];
 
@@ -660,13 +721,22 @@ impl WorkflowEngine for SettingsEngine {
         }
 
         ScreenModel {
-            screen_id: "settings".into(),
-            title: self.t("settings.title"),
+            screen_id: "settings_advanced".into(),
+            title: self.t("settings.advanced_title"),
             subtitle: None,
             components,
             actions: vec![],
             progress: None,
             ..Default::default()
+        }
+    }
+}
+
+impl WorkflowEngine for SettingsEngine {
+    fn current_screen(&self) -> ScreenModel {
+        match self.mode {
+            SettingsMode::Main => self.main_screen(),
+            SettingsMode::Advanced => self.advanced_screen(),
         }
     }
 

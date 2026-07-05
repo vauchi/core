@@ -31,6 +31,11 @@ use vauchi_core::api::Vauchi;
 /// Editing this list is a cross-platform shape change — bump the
 /// list intentionally and update both iOS + Android snapshot
 /// expectations in the same MR.
+// M6 D6.1: the everyday-6 main list + the "Advanced…" nav row. Network,
+// delivery, and danger moved to the advanced sub-screen
+// (EXPECTED_ADVANCED_GROUP_IDS). Frontends render SettingsGroups
+// generically (by iterating components, not keyed on group id), so this
+// reorg is pure-core — no per-frontend renderer change.
 const EXPECTED_SETTINGS_GROUP_IDS: &[&str] = &[
     "profile",
     "privacy",
@@ -39,12 +44,12 @@ const EXPECTED_SETTINGS_GROUP_IDS: &[&str] = &[
     "accessibility",
     "security",
     "backup",
-    "network",
-    "delivery",
     "help",
     "about",
-    "danger",
+    "advanced_nav",
 ];
+
+const EXPECTED_ADVANCED_GROUP_IDS: &[&str] = &["network", "delivery", "danger"];
 
 /// The canonical MoreEngine action_ids in render order — the
 /// cumulative iteration across the four sections (primary →
@@ -147,7 +152,8 @@ fn relay_url_renders_as_link_so_renderers_emit_list_item_selected() {
     // `Link` (tappable → `ListItemSelected("relay_url")` → intercept
     // opens `FormDialogType::EditRelayUrl`), carrying the current URL
     // as its detail text.
-    let engine = SettingsEngine::new(sample_settings_config());
+    // M6 D6.1: network lives on the Advanced sub-screen now.
+    let engine = SettingsEngine::new_advanced(sample_settings_config());
     let screen = engine.current_screen();
 
     let network_items = screen
@@ -157,7 +163,7 @@ fn relay_url_renders_as_link_so_renderers_emit_list_item_selected() {
             Component::SettingsGroup { id, items, .. } if id == "network" => Some(items),
             _ => None,
         })
-        .expect("settings screen must emit a network group");
+        .expect("advanced settings screen must emit a network group");
 
     let relay_item = network_items
         .iter()
@@ -201,17 +207,62 @@ fn settings_screen_emits_theme_and_language_dropdowns() {
 // @internal
 #[test]
 fn settings_screen_appearance_and_danger_groups_present() {
-    let engine = SettingsEngine::new(sample_settings_config());
-    let screen = engine.current_screen();
-    let json = serde_json::to_string(&screen).expect("settings screen must serialize");
+    // Appearance stays on the main screen; danger + emergency_wipe moved
+    // to the Advanced sub-screen (M6 D6.1). Both must still exist so the
+    // F-MED-3 cross-platform divergence can't recur — just on the right
+    // surface now.
+    let main_json =
+        serde_json::to_string(&SettingsEngine::new(sample_settings_config()).current_screen())
+            .expect("main settings screen must serialize");
+    assert!(
+        main_json.contains("\"appearance\""),
+        "main Settings JSON missing `appearance`"
+    );
 
-    for required in ["\"appearance\"", "\"danger\"", "\"emergency_wipe\""] {
+    let advanced_json = serde_json::to_string(
+        &SettingsEngine::new_advanced(sample_settings_config()).current_screen(),
+    )
+    .expect("advanced settings screen must serialize");
+    for required in ["\"danger\"", "\"emergency_wipe\""] {
         assert!(
-            json.contains(required),
-            "Settings JSON missing `{required}` — would re-create the F-MED-3 \
-             cross-platform divergence the device-test campaign flagged \
-             on 2026-05-08."
+            advanced_json.contains(required),
+            "advanced Settings JSON missing `{required}`"
         );
+    }
+
+    // The advanced sub-screen carries exactly the rare/technical groups.
+    let advanced_group_ids: Vec<String> = SettingsEngine::new_advanced(sample_settings_config())
+        .current_screen()
+        .components
+        .iter()
+        .filter_map(|c| match c {
+            Component::SettingsGroup { id, .. } => Some(id.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(advanced_group_ids, EXPECTED_ADVANCED_GROUP_IDS);
+}
+
+// M6 D6.1: the "Advanced…" row on the main screen navigates to the
+// advanced sub-screen (network + delivery + emergency wipe).
+// @internal
+#[test]
+fn settings_advanced_link_navigates_to_advanced_subscreen() {
+    let mut vauchi = vauchi_core::api::Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let _ = engine.navigate_to(AppScreen::Settings);
+
+    let result = engine.handle_action(vauchi_app::ui::UserAction::ListItemSelected {
+        component_id: "advanced_nav".into(),
+        item_id: "advanced".into(),
+    });
+    match result {
+        vauchi_app::ui::ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "settings_advanced");
+            assert_eq!(screen.parent_screen_id.as_deref(), Some("settings"));
+        }
+        other => panic!("expected NavigateTo(settings_advanced), got {other:?}"),
     }
 }
 

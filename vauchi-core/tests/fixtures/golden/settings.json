@@ -351,64 +351,6 @@
     },
     {
       "SettingsGroup": {
-        "id": "network",
-        "label": "Network",
-        "items": [
-          {
-            "id": "relay_url",
-            "label": "Relay URL",
-            "kind": {
-              "Link": {
-                "detail": "https://relay.vauchi.app"
-              }
-            },
-            "a11y": {
-              "label": "Relay URL",
-              "hint": "The relay server used for message delivery",
-              "role": null
-            }
-          }
-        ]
-      }
-    },
-    {
-      "SettingsGroup": {
-        "id": "delivery",
-        "label": "Message Delivery",
-        "items": [
-          {
-            "id": "pending_updates",
-            "label": "Pending Updates",
-            "kind": {
-              "Value": {
-                "value": "0"
-              }
-            },
-            "a11y": {
-              "label": "Pending Updates",
-              "hint": "Number of contact updates waiting to be delivered",
-              "role": null
-            }
-          },
-          {
-            "id": "failed_deliveries",
-            "label": "Failed Deliveries",
-            "kind": {
-              "Link": {
-                "detail": "0"
-              }
-            },
-            "a11y": {
-              "label": "Failed Deliveries",
-              "hint": "Number of updates that failed to deliver",
-              "role": null
-            }
-          }
-        ]
-      }
-    },
-    {
-      "SettingsGroup": {
         "id": "help",
         "label": "Help & Support",
         "items": [
@@ -509,20 +451,20 @@
     },
     {
       "SettingsGroup": {
-        "id": "danger",
-        "label": "Danger Zone",
+        "id": "advanced_nav",
+        "label": "",
         "items": [
           {
-            "id": "emergency_wipe",
-            "label": "Emergency Wipe",
+            "id": "advanced",
+            "label": "Advanced",
             "kind": {
-              "Destructive": {
-                "label": "Wipe All Data"
+              "Link": {
+                "detail": null
               }
             },
             "a11y": {
-              "label": "Emergency Wipe",
-              "hint": "Permanently deletes all app data. This action cannot be undone",
+              "label": "Advanced",
+              "hint": "Network, delivery status, and emergency controls",
               "role": null
             }
           }

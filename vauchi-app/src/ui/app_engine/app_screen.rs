@@ -25,6 +25,9 @@ pub enum AppScreen {
     },
     Exchange,
     Settings,
+    /// Settings → Advanced sub-screen (M6 D6.1): network, delivery
+    /// status, and emergency wipe, behind deliberate navigation.
+    SettingsAdvanced,
     Help,
     Backup,
     Lock,
@@ -182,6 +185,7 @@ impl AppScreen {
             Self::ContactVisibility { .. } => "contact_visibility",
             Self::Exchange => "exchange",
             Self::Settings => "settings",
+            Self::SettingsAdvanced => "settings_advanced",
             Self::Help => "help",
             Self::Backup => "backup",
             Self::Lock => "lock",
@@ -292,6 +296,7 @@ impl AppScreen {
             Self::TagPromotion { .. } => Some("tags"),
             Self::RecoveryHelp | Self::RecoveryClaimReview => Some("recovery"),
             Self::DeviceLinking | Self::DeviceReplacement => Some("device_management"),
+            Self::SettingsAdvanced => Some("settings"),
             _ => None,
         }
     }

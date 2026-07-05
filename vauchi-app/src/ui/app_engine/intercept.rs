@@ -230,6 +230,12 @@ impl AppEngine {
                     let screen = self.navigate_to(AppScreen::ChangePassword);
                     return Some(ActionResult::NavigateTo(screen));
                 }
+                // M6 D6.1: the "Advanced…" row opens the buried sub-screen
+                // (network, delivery status, emergency wipe).
+                "advanced" => {
+                    let screen = self.navigate_to(AppScreen::SettingsAdvanced);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
                 _ => {}
             }
         }

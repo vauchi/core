@@ -177,7 +177,7 @@ impl AppEngine {
             | AppScreen::VerifyFingerprint { .. } => {
                 Self::create_contacts_engine(vauchi, screen, render_context)
             }
-            AppScreen::Settings => {
+            AppScreen::Settings | AppScreen::SettingsAdvanced => {
                 let card = vauchi.own_card().ok().flatten();
                 let display_name = card
                     .map(|c| c.display_name().to_string())
@@ -265,7 +265,11 @@ impl AppEngine {
                             .unwrap_or_else(|| "Never".to_string())
                     },
                 };
-                Box::new(SettingsEngine::new(config))
+                if matches!(screen, AppScreen::SettingsAdvanced) {
+                    Box::new(SettingsEngine::new_advanced(config))
+                } else {
+                    Box::new(SettingsEngine::new(config))
+                }
             }
             AppScreen::Exchange
             | AppScreen::DeepLinkConsent { .. }

@@ -54,7 +54,9 @@ fn settings_security_groups_render_german() {
         }
     );
 
-    let Component::SettingsGroup { label, .. } = find_group(&screen.components, "danger") else {
+    // M6 D6.1: danger lives on the Advanced sub-screen now.
+    let advanced = SettingsEngine::new_advanced(config("de")).current_screen();
+    let Component::SettingsGroup { label, .. } = find_group(&advanced.components, "danger") else {
         unreachable!()
     };
     assert_eq!(label, "Gefahrenzone");

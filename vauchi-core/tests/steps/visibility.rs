@@ -771,3 +771,28 @@ fn have_email_marked_shown(world: &mut VauchiWorld) {
     let fid = world.own_field_id("Email");
     world.vauchi.set_own_field_public(&fid).unwrap();
 }
+
+// ── Dave visibility block scenario ────────────────────────────────────────
+
+/// Sets all own-card fields visible to Dave (per-contact Layer C override).
+/// Dave is expected to already be in world.contacts from the scenario Background.
+#[given("Dave can see all my fields")]
+fn dave_can_see_all_fields(world: &mut VauchiWorld) {
+    let dave_id = world.contact_id("Dave");
+    let field_ids: Vec<String> = world
+        .vauchi
+        .own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .map(|f| f.id().to_string())
+        .collect();
+    for fid in field_ids {
+        // Silently no-ops propagation (no ratchet on test contact) — stores the override.
+        world
+            .vauchi
+            .set_field_public_and_repropagate(&dave_id, &fid)
+            .unwrap();
+    }
+}

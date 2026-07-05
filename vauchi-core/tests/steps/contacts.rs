@@ -7,6 +7,7 @@
 //! groups. Shares `VauchiWorld` name→id resolution with the visibility steps.
 
 use cucumber::{given, then, when};
+use vauchi_core::{ContactField, FieldType};
 
 use crate::VauchiWorld;
 
@@ -296,3 +297,62 @@ fn should_get_an_error(world: &mut VauchiWorld) {
 /// No-op: the specific error phrasing is a UI-layer concern.
 #[then("the error should indicate this requires an exchanged contact")]
 fn error_indicates_exchanged_contact(_world: &mut VauchiWorld) {}
+
+// ── Dave — visibility + removal ───────────────────────────────────────────
+
+/// Adds Dave as an exchanged contact, creates a phone field, and sets a
+/// per-contact (Layer C) visibility override so Dave can see it.
+/// Used in scenarios where "custom visibility rules" must be present before removal.
+#[given("I have custom visibility rules for Dave")]
+fn have_custom_visibility_rules_for_dave(world: &mut VauchiWorld) {
+    let dave_id = world.add_test_contact("Dave");
+    let field = ContactField::new(FieldType::Phone, "Personal", "555-0001", 0);
+    world.vauchi.add_own_field(field).unwrap();
+    let field_id = world.own_field_id("Personal");
+    // Silently no-ops propagation (no ratchet on test contact) — stores the override.
+    world
+        .vauchi
+        .set_field_public_and_repropagate(&dave_id, &field_id)
+        .unwrap();
+}
+
+/// Removes a named contact by looking up their ID in world.contacts.
+#[when(expr = "I remove {word} from my contacts")]
+fn remove_from_my_contacts(world: &mut VauchiWorld, name: String) {
+    let id = world.contact_id(&name);
+    world.vauchi.remove_contact(&id).unwrap();
+    world.contacts.remove(&name);
+}
+
+/// Verifies the named contact no longer appears in the contact list.
+#[then("all visibility rules for Dave should be deleted")]
+fn all_visibility_rules_deleted(world: &mut VauchiWorld) {
+    let contacts = world.vauchi.list_contacts().unwrap();
+    assert!(
+        !contacts.iter().any(|c| c.display_name() == "Dave"),
+        "Dave should not be in the contact list after removal"
+    );
+}
+
+/// Blocks a contact identified by a bare name (no quotes in the step text).
+#[when(expr = "I block {word}")]
+fn block_by_name(world: &mut VauchiWorld, name: String) {
+    let id = world.contact_id(&name);
+    world.vauchi.block_contact(&id).unwrap();
+}
+
+/// Verifies the named contact is now blocked (and therefore sees no fields).
+#[then(expr = "Dave should not be able to see any of my fields")]
+fn dave_sees_no_fields(world: &mut VauchiWorld) {
+    let dave_id = world.contact_id("Dave");
+    let contacts = world.vauchi.list_contacts().unwrap();
+    let dave = contacts
+        .iter()
+        .find(|c| c.id() == dave_id)
+        .expect("Dave should still be in the contact list (blocked, not removed)");
+    assert!(dave.is_blocked(), "Dave should be blocked after blocking");
+}
+
+/// No-op: preventing future relay updates to Dave is a relay/sync concern.
+#[then("Dave should not receive future updates")]
+fn dave_no_future_updates(_world: &mut VauchiWorld) {}

@@ -281,7 +281,6 @@ fn on_named_screen(world: &mut VauchiWorld, screen: String) {
         "myinfo" | "my-info" | "my info" => Some(AppScreen::MyInfo),
         "help" => Some(AppScreen::Help),
         "backup" => Some(AppScreen::Backup),
-        "sync" => Some(AppScreen::Sync),
         "lock" => Some(AppScreen::Lock),
         "more" => Some(AppScreen::More),
         _ => None,

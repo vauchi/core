@@ -194,8 +194,12 @@ impl AppEngine {
                     let screen = self.navigate_to(AppScreen::DeviceReplacement);
                     return Some(ActionResult::NavigateTo(screen));
                 }
-                "sync" => {
-                    let screen = self.navigate_to(AppScreen::Sync);
+                // The Sync screen was retired (M4 S2); the chrome sync chip
+                // is the sync surface. The Failed Deliveries settings row now
+                // links into the DeliveryStatus screen (previously an
+                // unreachable orphan — 2026-07-03-sync-surface-placebo).
+                "failed_deliveries" => {
+                    let screen = self.navigate_to(AppScreen::DeliveryStatus);
                     return Some(ActionResult::NavigateTo(screen));
                 }
                 "help_center" => {

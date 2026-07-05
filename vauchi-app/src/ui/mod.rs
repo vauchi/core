@@ -63,8 +63,6 @@ mod screen;
 mod settings;
 mod social_graph;
 mod support;
-#[cfg(feature = "network-rustls")]
-mod sync_status;
 mod tag_promotion;
 mod tags_list;
 #[cfg(any(test, feature = "test-support"))]
@@ -81,7 +79,7 @@ pub use channel::{
     BackupFormSnapshot, ContactDetailUpdate, ContactListUpdate, DeviceLinkUpdate, DuressPinSetup,
     EmergencyBroadcastPlan, EngineOutput, EngineUpdate, FormInput, GdprChoice, LinkExchangeUpdate,
     LinkResponderUpdate, MultiStageUpdate, MyInfoEntryDetailUpdate, OnboardingSnapshot,
-    OnboardingUpdate, PendingBackup, RecoveryHelpUpdate, RecoveryUpdate, SyncChoice,
+    OnboardingUpdate, PendingBackup, RecoveryHelpUpdate, RecoveryUpdate,
 };
 pub use component::{
     A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, IndicatorKind,
@@ -166,8 +164,6 @@ pub use screen::{
 pub use settings::{SettingsConfig, SettingsEngine};
 pub use social_graph::{SocialContactEntry, SocialGraphEngine, SocialTrustLevel};
 pub use support::SupportEngine;
-#[cfg(feature = "network-rustls")]
-pub use sync_status::SyncStatusEngine;
 pub use tag_promotion::{PromotionField, TagPromotionEngine};
 pub use tags_list::{TagSummary, TagsEngine};
 
@@ -208,7 +204,10 @@ pub fn affected_screens(event: &vauchi_core::api::VauchiEvent) -> Vec<&'static s
         VauchiEvent::SyncStateChanged { .. }
         | VauchiEvent::SyncProgress { .. }
         | VauchiEvent::LabelSyncCompleted { .. } => {
-            vec!["sync"]
+            // Sync screen retired (M4 S2); the chrome sync chip reflects
+            // status via `sync_chrome_status`, updated in the sync handler
+            // — not by invalidating a screen. Nothing to invalidate here.
+            vec![]
         }
         VauchiEvent::MessageDelivered { .. }
         | VauchiEvent::MessageFailed { .. }
@@ -219,7 +218,10 @@ pub fn affected_screens(event: &vauchi_core::api::VauchiEvent) -> Vec<&'static s
         VauchiEvent::ConnectionStateChanged { .. }
         | VauchiEvent::RelayHealthChanged { .. }
         | VauchiEvent::RelayFailover { .. } => {
-            vec!["sync"]
+            // Sync screen retired (M4 S2); the chrome sync chip reflects
+            // status via `sync_chrome_status`, updated in the sync handler
+            // — not by invalidating a screen. Nothing to invalidate here.
+            vec![]
         }
         VauchiEvent::IncomingUpdate { .. } => {
             vec!["contacts", "contact_detail"]

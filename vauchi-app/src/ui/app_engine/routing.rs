@@ -334,7 +334,6 @@ impl AppEngine {
             AppScreen::EmergencyBroadcast => self.complete_emergency_broadcast(),
             AppScreen::Privacy => self.complete_privacy(),
             AppScreen::FormDialog { dialog_type } => self.complete_form_dialog(dialog_type),
-            AppScreen::Sync => self.complete_sync(),
             AppScreen::ChangePassword => self.complete_change_password(),
             AppScreen::DuressPin => self.complete_duress_pin(),
             AppScreen::DeviceManagement => self.complete_device_management(),

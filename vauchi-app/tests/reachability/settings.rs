@@ -40,7 +40,6 @@ fn config() -> SettingsConfig {
         show_help_icons: true,
         version: "0.0.0-test".into(),
         build: String::new(),
-        sync_status: String::new(),
         pending_updates: 0,
         failed_deliveries: 0,
         debug_mode: false,

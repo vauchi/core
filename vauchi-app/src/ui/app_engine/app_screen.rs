@@ -37,7 +37,6 @@ pub enum AppScreen {
     EmergencyShred,
     EmergencyBroadcast,
     DeliveryStatus,
-    Sync,
     Recovery,
     /// Helper-side recovery — vouch for a contact who lost their device.
     RecoveryHelp,
@@ -194,7 +193,6 @@ impl AppScreen {
             Self::EmergencyShred => "emergency_shred",
             Self::EmergencyBroadcast => "emergency_broadcast",
             Self::DeliveryStatus => "delivery_status",
-            Self::Sync => "sync",
             Self::Recovery => "recovery",
             Self::RecoveryHelp => "recovery_help",
             Self::SocialGraph => "social_graph",
@@ -249,7 +247,6 @@ impl AppScreen {
             "emergency_shred" => Self::EmergencyShred,
             "emergency_broadcast" => Self::EmergencyBroadcast,
             "delivery_status" => Self::DeliveryStatus,
-            "sync" => Self::Sync,
             "recovery" => Self::Recovery,
             "recovery_help" => Self::RecoveryHelp,
             "social_graph" => Self::SocialGraph,

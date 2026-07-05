@@ -64,14 +64,16 @@ fn own_card_updated_invalidates_my_info() {
 
 // @internal
 #[test]
-fn sync_lifecycle_events_invalidate_sync_only() {
+fn sync_lifecycle_events_invalidate_nothing() {
     // Lifecycle chatter (progress ticks, per-contact state, label-sync
     // completion) does NOT touch contact data — applied changes dispatch
     // their own precise per-item events (5d13a463). Mapping chatter to
-    // "contacts" was the pre-5d13a463 coarse catch-all; with
-    // invalidate_screen now rebuilding the live current engine, keeping
-    // it would wipe in-progress list state (search query, facets) on
-    // every background-sync tick.
+    // "contacts" was the pre-5d13a463 coarse catch-all; keeping it would
+    // wipe in-progress list state (search query, facets) on every
+    // background-sync tick. The standalone Sync screen was retired
+    // (M4 S2); the chrome sync chip reflects status via
+    // `sync_chrome_status`, updated in the sync handler — not by
+    // invalidating a screen. So these events now invalidate nothing.
     let events = [
         VauchiEvent::SyncStateChanged {
             contact_id: "c1".into(),
@@ -89,10 +91,9 @@ fn sync_lifecycle_events_invalidate_sync_only() {
 
     for event in &events {
         let ids = affected_screens(event);
-        assert_eq!(
-            ids,
-            vec!["sync"],
-            "event {event:?} should invalidate only the sync screen"
+        assert!(
+            ids.is_empty(),
+            "event {event:?} should invalidate no screen (Sync screen retired), got {ids:?}"
         );
     }
 }
@@ -131,7 +132,10 @@ fn delivery_events_invalidate_delivery_status() {
 
 // @internal
 #[test]
-fn connection_events_invalidate_sync() {
+fn connection_events_invalidate_nothing() {
+    // Connection/relay-health events drove the retired Sync screen (M4 S2).
+    // The chrome sync chip does not re-render off these events, so they now
+    // invalidate nothing.
     let events = [
         VauchiEvent::ConnectionStateChanged {
             state: ConnectionState::Connected,
@@ -148,7 +152,10 @@ fn connection_events_invalidate_sync() {
 
     for event in &events {
         let ids = affected_screens(event);
-        assert_eq!(ids, vec!["sync"], "event {event:?} should invalidate sync");
+        assert!(
+            ids.is_empty(),
+            "event {event:?} should invalidate no screen (Sync screen retired), got {ids:?}"
+        );
     }
 }
 

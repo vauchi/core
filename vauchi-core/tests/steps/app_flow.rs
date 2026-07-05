@@ -85,7 +85,6 @@ fn navigate(world: &mut VauchiWorld, screen: String) {
         "my-info" | "myinfo" | "my info" => AppScreen::MyInfo,
         "help" => AppScreen::Help,
         "backup" => AppScreen::Backup,
-        "sync" => AppScreen::Sync,
         "lock" => AppScreen::Lock,
         "device-linking" | "devicelinking" => AppScreen::DeviceLinking,
         "device-management" | "devicemanagement" => AppScreen::DeviceManagement,

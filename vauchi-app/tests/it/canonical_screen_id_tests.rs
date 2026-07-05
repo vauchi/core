@@ -41,7 +41,6 @@ fn collapsed_families_report_canonical_screen_id() {
         (AppScreen::Groups, "groups"),
         (AppScreen::Backup, "backup"),
         (AppScreen::DuressPin, "duress_pin"),
-        (AppScreen::Sync, "sync"),
         // Mode-selection root only — sub-states keep their engine ids.
         (AppScreen::Exchange, "exchange"),
     ];

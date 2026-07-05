@@ -33,13 +33,6 @@
             "label": "Account & Devices",
             "items": [
               {
-                "id": "sync",
-                "label": "Sync",
-                "icon": null,
-                "detail": null,
-                "a11y": null
-              },
-              {
                 "id": "device_management",
                 "label": "Linked Devices",
                 "icon": null,

@@ -462,19 +462,27 @@ fn navigate_back_does_not_create_circular_history() {
 
 // ── Wave 6 Phase A: new engine navigation tests ──────────────────────
 
+// M4 S2 (2026-07-03-sync-surface-placebo): the standalone Sync screen was
+// retired (the chrome sync chip is the sync surface). The Settings "Failed
+// Deliveries" row — previously a dead Value counter — now links into the
+// DeliveryStatus retry screen, which had been reachable by nothing.
 // @internal
 #[test]
-fn navigate_to_sync_shows_sync_status() {
+fn failed_deliveries_row_navigates_to_delivery_status() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    let screen = engine.navigate_to(AppScreen::Sync);
-    assert_eq!(screen.screen_id, "sync");
-    assert_eq!(screen.title, "Sync");
-    assert!(
-        screen.actions.iter().any(|a| a.id == "sync_now"),
-        "Sync screen must have sync_now action"
-    );
+    engine.navigate_to(AppScreen::Settings);
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "delivery".into(),
+        item_id: "failed_deliveries".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "delivery_status");
+        }
+        other => panic!("Expected NavigateTo(delivery_status), got {other:?}"),
+    }
 }
 
 // @internal
@@ -553,24 +561,6 @@ fn navigate_to_support_shows_support() {
 }
 
 // ── Wave 6 failure-path tests (CC-11) ────────────────────────────────
-
-// @internal
-#[test]
-fn sync_engine_unknown_action_returns_screen() {
-    let mut vauchi = Vauchi::in_memory().unwrap();
-    vauchi.create_identity("Alice").unwrap();
-    let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::Sync);
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "nonexistent".into(),
-    });
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "sync");
-        }
-        other => panic!("Expected UpdateScreen, got {other:?}"),
-    }
-}
 
 // @internal
 #[test]
@@ -653,7 +643,6 @@ fn cabi_completeness_all_simple_screens_roundtrip_via_screen_id() {
         AppScreen::DuressPin,
         AppScreen::EmergencyShred,
         AppScreen::DeliveryStatus,
-        AppScreen::Sync,
         AppScreen::Recovery,
         AppScreen::Groups,
         AppScreen::Privacy,
@@ -732,7 +721,6 @@ fn more_engine_has_expected_navigation_targets() {
     // file picker per ADR-031).
     let expected: &[&str] = &[
         "activity_log",
-        "sync",
         "device_management",
         "device_replacement",
         "recovery",

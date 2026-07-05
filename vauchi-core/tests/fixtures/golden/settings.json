@@ -377,20 +377,6 @@
         "label": "Message Delivery",
         "items": [
           {
-            "id": "sync",
-            "label": "Sync Status",
-            "kind": {
-              "Link": {
-                "detail": ""
-              }
-            },
-            "a11y": {
-              "label": "Sync Status",
-              "hint": "Opens the sync status detail screen",
-              "role": null
-            }
-          },
-          {
             "id": "pending_updates",
             "label": "Pending Updates",
             "kind": {
@@ -408,8 +394,8 @@
             "id": "failed_deliveries",
             "label": "Failed Deliveries",
             "kind": {
-              "Value": {
-                "value": "0"
+              "Link": {
+                "detail": "0"
               }
             },
             "a11y": {

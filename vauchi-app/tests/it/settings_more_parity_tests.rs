@@ -64,7 +64,6 @@ const EXPECTED_MORE_ACTION_IDS: &[&str] = &[
     "settings",
     "help",
     // secondary
-    "sync",
     "device_management",
     "device_replacement",
     "recovery",
@@ -105,7 +104,6 @@ fn sample_settings_config() -> SettingsConfig {
         show_help_icons: true,
         version: "0.0.0-test".into(),
         build: String::new(),
-        sync_status: String::new(),
         pending_updates: 0,
         failed_deliveries: 0,
         debug_mode: false,

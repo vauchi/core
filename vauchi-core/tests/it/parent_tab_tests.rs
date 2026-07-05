@@ -185,7 +185,6 @@ fn top_level_desktop_sidebar_items_resolve_to_themselves() {
         AppScreen::Support,
         AppScreen::Help,
         AppScreen::ActivityLog,
-        AppScreen::Sync,
         AppScreen::More,
         AppScreen::Onboarding,
     ] {
@@ -215,7 +214,6 @@ fn desktop_parent_ids_match_sidebar_items_set() {
         "support",
         "help",
         "activity_log",
-        "sync",
         "more",
         "onboarding",
     ]
@@ -227,7 +225,6 @@ fn desktop_parent_ids_match_sidebar_items_set() {
             contact_id: cid("c"),
         },
         AppScreen::DuressPin,
-        AppScreen::Sync,
         AppScreen::Settings,
         AppScreen::DeliveryStatus,
     ] {

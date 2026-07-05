@@ -57,7 +57,6 @@ const MORE_SECTIONS: &[MoreSection] = &[
         id: "secondary",
         label_key: "more.section.secondary",
         items: &[
-            ("sync", "nav.sync"),
             ("device_management", "more.device_management"),
             ("device_replacement", "more.device_replacement"),
             // `recovery` opens the Social-Recovery screen — label it for

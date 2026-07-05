@@ -76,7 +76,6 @@ impl AppScreen {
                 | Self::Support
                 | Self::Help
                 | Self::ActivityLog
-                | Self::Sync
                 | Self::More
                 | Self::Onboarding => canonical,
                 // Settings sub-flows — collapse under Settings on
@@ -114,7 +113,6 @@ impl AppScreen {
                 | Self::Support
                 | Self::Help
                 | Self::ActivityLog
-                | Self::Sync
                 | Self::DuressPin
                 | Self::ChangePassword
                 | Self::EmergencyShred
@@ -424,7 +422,6 @@ impl AppEngine {
             AppScreen::Support,
             AppScreen::Help,
             AppScreen::ActivityLog,
-            AppScreen::Sync,
             AppScreen::More,
         ]
         .into_iter()
@@ -464,7 +461,6 @@ impl AppEngine {
             AppScreen::Privacy => ("nav.privacy", "hand.raised", "Privacy"),
             AppScreen::Support => ("nav.support", "bubble.left.and.bubble.right", "Support"),
             AppScreen::ActivityLog => ("nav.activity", "list.bullet.rectangle", "Activity"),
-            AppScreen::Sync => ("nav.sync", "arrow.triangle.2.circlepath", "Sync"),
             _ => ("nav.home", "house", "Home"),
         };
         // `get_string` returns the sentinel "Missing: <key>" when the key

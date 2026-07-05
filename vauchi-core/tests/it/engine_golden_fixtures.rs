@@ -86,7 +86,6 @@ fn sample_settings_config() -> SettingsConfig {
         show_help_icons: true,
         version: String::new(),
         build: String::new(),
-        sync_status: String::new(),
         pending_updates: 0,
         failed_deliveries: 0,
         debug_mode: false,
@@ -379,13 +378,6 @@ fn contact_limit_fixture_is_fresh() {
 
 // @internal
 #[test]
-fn sync_status_fixture_is_fresh() {
-    let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 12, 2);
-    assert_fixture_fresh(&engine.current_screen(), "sync_status.json");
-}
-
-// @internal
-#[test]
 fn archived_contacts_fixture_is_fresh() {
     let engine = ArchivedContactsEngine::new(vec![
         ("c1".into(), "Alice".into()),
@@ -534,10 +526,6 @@ fn regenerate_all_engine_fixtures() {
             ContactLimitEngine::new(150, 150).current_screen(),
         ),
         (
-            "sync_status.json",
-            SyncStatusEngine::new("https://relay.vauchi.app".into(), 12, 2).current_screen(),
-        ),
-        (
             "archived_contacts.json",
             ArchivedContactsEngine::new(vec![
                 ("c1".into(), "Alice".into()),
@@ -556,7 +544,7 @@ fn regenerate_all_engine_fixtures() {
         ),
     ];
 
-    assert_eq!(fixtures.len(), 25, "expected 25 engine fixtures");
+    assert_eq!(fixtures.len(), 24, "expected 24 engine fixtures");
 
     for (filename, screen) in &fixtures {
         let json = screen_to_json(screen);

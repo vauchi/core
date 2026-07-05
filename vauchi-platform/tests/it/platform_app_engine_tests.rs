@@ -277,7 +277,6 @@ fn nav_items_desktop_post_identity_is_broader_than_mobile() {
         "support",
         "help",
         "activity_log",
-        "sync",
     ] {
         assert!(
             sidebar_ids.contains(&expected),

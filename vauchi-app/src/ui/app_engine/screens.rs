@@ -42,7 +42,6 @@ use crate::ui::recovery_claim_review::{
 use crate::ui::recovery_status::RecoveryEngine;
 use crate::ui::settings::{SettingsConfig, SettingsEngine};
 use crate::ui::support::SupportEngine;
-use crate::ui::sync_status::SyncStatusEngine;
 use crate::ui::tag_promotion::{PromotionField, TagPromotionEngine};
 use crate::ui::tags_list::{TagSummary, TagsEngine};
 use vauchi_core::api::Vauchi;
@@ -238,9 +237,13 @@ impl AppEngine {
                     // user-actionable identifier we can ship today).
                     version: env!("CARGO_PKG_VERSION").into(),
                     build: String::new(),
-                    sync_status: String::new(),
-                    pending_updates: 0,
-                    failed_deliveries: 0,
+                    // Real counters (M4 S2 — was hardcoded 0). The Failed
+                    // Deliveries row links into the DeliveryStatus screen.
+                    pending_updates: vauchi.pending_update_count().unwrap_or(0),
+                    failed_deliveries: vauchi
+                        .get_failed_deliveries()
+                        .map(|v| v.len() as u32)
+                        .unwrap_or(0),
                     debug_mode: false,
                     backup_reminder_frequency: vauchi
                         .load_backup_reminder_state()
@@ -372,15 +375,6 @@ impl AppEngine {
                 Box::new(
                     DeliveryStatusEngine::new(items)
                         .with_retries(retries)
-                        .with_locale(render_context.resolved_locale()),
-                )
-            }
-            AppScreen::Sync => {
-                let relay_url = vauchi.config().relay.server_url.clone();
-                let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
-                let pending = vauchi.pending_update_count().unwrap_or(0) as usize;
-                Box::new(
-                    SyncStatusEngine::new(relay_url, contact_count, pending)
                         .with_locale(render_context.resolved_locale()),
                 )
             }

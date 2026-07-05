@@ -23,7 +23,6 @@ fn sample_config() -> SettingsConfig {
         show_help_icons: true,
         version: String::new(),
         build: String::new(),
-        sync_status: String::new(),
         pending_updates: 0,
         failed_deliveries: 0,
         debug_mode: false,
@@ -455,18 +454,18 @@ fn settings_debug_mode_toggle() {
 #[test]
 fn settings_delivery_section() {
     let mut config = sample_config();
-    config.sync_status = "Connected".into();
     config.pending_updates = 3;
     config.failed_deliveries = 1;
     let engine = SettingsEngine::new(config);
     let screen = engine.current_screen();
 
-    let sync = find_link_detail(&screen, "delivery", "sync");
-    assert_eq!(sync.as_deref(), Some("Connected"));
     let pending = find_value(&screen, "delivery", "pending_updates");
     assert_eq!(pending, "3");
-    let failed = find_value(&screen, "delivery", "failed_deliveries");
-    assert_eq!(failed, "1");
+    // Failed Deliveries is a Link into the DeliveryStatus screen (M4 S2 —
+    // the standalone Sync screen + its "Sync Status" row were retired); its
+    // detail carries the live failed count.
+    let failed = find_link_detail(&screen, "delivery", "failed_deliveries");
+    assert_eq!(failed.as_deref(), Some("1"));
 }
 
 // @internal

@@ -45,8 +45,6 @@ pub struct SettingsConfig {
     #[serde(default)]
     pub build: String,
     #[serde(default)]
-    pub sync_status: String,
-    #[serde(default)]
     pub pending_updates: u32,
     #[serde(default)]
     pub failed_deliveries: u32,
@@ -473,19 +471,6 @@ impl SettingsEngine {
             label: self.t("settings.message_delivery"),
             items: vec![
                 SettingsItem {
-                    id: "sync".into(),
-                    label: self.t("settings.sync_status_item"),
-                    kind: SettingsItemKind::Link {
-                        detail: Some(self.config.sync_status.clone()),
-                    },
-                    a11y: Some(A11y {
-                        label: Some(self.t("settings.sync_status_item")),
-                        hint: Some(self.t("settings.sync_status_hint")),
-                        role: None,
-                    }),
-                    info_key: None,
-                },
-                SettingsItem {
                     id: "pending_updates".into(),
                     label: self.t("sync.pending_updates_title"),
                     kind: SettingsItemKind::Value {
@@ -501,8 +486,11 @@ impl SettingsEngine {
                 SettingsItem {
                     id: "failed_deliveries".into(),
                     label: self.t("settings.failed_deliveries"),
-                    kind: SettingsItemKind::Value {
-                        value: self.config.failed_deliveries.to_string(),
+                    // Link into the DeliveryStatus retry screen (M4 S2 — was a
+                    // dead Value counter; the screen was a reachable-by-nothing
+                    // orphan). Detail shows the live failed count.
+                    kind: SettingsItemKind::Link {
+                        detail: Some(self.config.failed_deliveries.to_string()),
                     },
                     a11y: Some(A11y {
                         label: Some(self.t("settings.failed_deliveries")),

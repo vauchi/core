@@ -52,8 +52,6 @@ pub enum EngineOutput {
     /// Per-field show/hide toggles on the contact-visibility screen,
     /// as `(field_id, visible)` pairs.
     ContactVisibility { toggles: Vec<(String, bool)> },
-    /// The sync screen's pressed action.
-    Sync(SyncChoice),
     /// The privacy/GDPR operation the user confirmed.
     Gdpr(GdprChoice),
     /// A form-dialog submission, typed per dialog kind — replaces the
@@ -387,13 +385,6 @@ impl std::fmt::Debug for DuressPinSetup {
     }
 }
 
-/// Action pressed on the sync-status screen.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SyncChoice {
-    SyncNow,
-    TestConnection,
-}
-
 /// Operation confirmed on the privacy/GDPR screen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GdprChoice {
@@ -483,7 +474,6 @@ impl std::fmt::Debug for EngineOutput {
                 .debug_struct("ContactVisibility")
                 .field("toggles", toggles)
                 .finish(),
-            Self::Sync(c) => f.debug_tuple("Sync").field(c).finish(),
             Self::Gdpr(c) => f.debug_tuple("Gdpr").field(c).finish(),
             Self::Form(i) => f.debug_tuple("Form").field(i).finish(),
             Self::ChangePassword { .. } => f

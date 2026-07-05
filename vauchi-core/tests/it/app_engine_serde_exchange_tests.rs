@@ -31,7 +31,6 @@ fn app_screen_serde_roundtrip_simple_variants() {
         AppScreen::DuressPin,
         AppScreen::EmergencyShred,
         AppScreen::DeliveryStatus,
-        AppScreen::Sync,
         AppScreen::Recovery,
         AppScreen::Groups,
         AppScreen::Privacy,

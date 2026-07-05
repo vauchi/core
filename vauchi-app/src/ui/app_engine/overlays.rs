@@ -109,11 +109,7 @@ impl AppEngine {
         // interception runs before this decorator). See the (c) plan.
         if matches!(
             self.screen,
-            AppScreen::Contacts
-                | AppScreen::Groups
-                | AppScreen::DuressPin
-                | AppScreen::Backup
-                | AppScreen::Sync
+            AppScreen::Contacts | AppScreen::Groups | AppScreen::DuressPin | AppScreen::Backup
         ) {
             screen.screen_id = self.screen.screen_id().to_string();
         } else if matches!(self.screen, AppScreen::Exchange)

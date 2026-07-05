@@ -608,3 +608,166 @@ fn open_label_screen(_world: &mut VauchiWorld) {}
 
 #[then("I should be able to create them with one tap")]
 fn can_create_with_one_tap(_world: &mut VauchiWorld) {}
+
+// ── Two-Mode Visibility (visibility_labels.feature §Two-Mode) ──────────────
+// Note: `Given I have a group {string}` and `When I create a group {string}` are
+// already bound in contacts.rs — intentionally absent here to avoid ambiguity.
+// Note: `Then the phone field should be marked as shown` is NOT bound because
+// `delete_group_and_repropagate` does not automatically make group-only fields
+// public; the "Transition from groups to no-group mode" scenario stays skipped.
+
+/// Asserts there are no visibility groups (true for a fresh world).
+#[given("I have no groups")]
+fn have_no_groups(world: &mut VauchiWorld) {
+    let count = world.vauchi.list_groups().unwrap().len();
+    assert_eq!(count, 0, "expected no visibility groups, found {count}");
+}
+
+/// Adds an email field with label "Email" and the given address as the value.
+/// WHY: label "Email" is unique — Background uses "Personal Email" / "Work Email".
+#[given(expr = "I have an email field {string}")]
+fn have_email_field_value(world: &mut VauchiWorld, value: String) {
+    use vauchi_core::{ContactField, FieldType};
+    world
+        .vauchi
+        .add_own_field(ContactField::new(FieldType::Email, "Email", &value, 0))
+        .unwrap();
+}
+
+/// Adds a phone field with label "Phone" and the given number as the value.
+/// WHY: label "Phone" is unique — Background uses "Personal Phone" / "Work Phone".
+#[given(expr = "I have a phone field {string}")]
+fn have_phone_field_value(world: &mut VauchiWorld, value: String) {
+    use vauchi_core::{ContactField, FieldType};
+    world
+        .vauchi
+        .add_own_field(ContactField::new(FieldType::Phone, "Phone", &value, 0))
+        .unwrap();
+}
+
+/// Marks the "Email"-labeled own-card field as publicly visible.
+/// Uses label lookup (not FieldType) to avoid capturing Background fields.
+#[when("I mark the email field as shown")]
+fn mark_email_shown(world: &mut VauchiWorld) {
+    let fid = world.own_field_id("Email");
+    world.vauchi.set_own_field_public(&fid).unwrap();
+}
+
+/// Assigns the "Phone"-labeled own-card field to a named group:
+/// makes it private then grants access to the group.
+#[when(expr = "I assign the phone field to {string}")]
+fn assign_phone_to_group(world: &mut VauchiWorld, group_name: String) {
+    let gid = world.group_id(&group_name);
+    let fid = world.own_field_id("Phone");
+    world.vauchi.set_own_field_private(&fid).unwrap();
+    world
+        .vauchi
+        .set_group_field_visibility(&gid, &fid, true)
+        .unwrap();
+}
+
+/// Deletes a named visibility group and repropagates field visibility changes.
+/// Distinct step text from `I delete the label {string}` in the label-delete tests.
+#[when(expr = "I delete the {string} group")]
+fn delete_group_by_name(world: &mut VauchiWorld, name: String) {
+    let gid = world.group_id(&name);
+    world.vauchi.delete_group_and_repropagate(&gid).unwrap();
+    world.groups.remove(&name);
+}
+
+/// Verifies the "Email"-labeled field is explicitly visible to everyone.
+#[then("all contacts should see the email field")]
+fn all_contacts_see_email(world: &mut VauchiWorld) {
+    let fid = world.own_field_id("Email");
+    let card = world.vauchi.own_card().unwrap().unwrap();
+    assert!(
+        card.field_visibility().is_explicitly_everyone(&fid),
+        "expected \"Email\" field to be visible to everyone"
+    );
+}
+
+/// Adds a test contact to the Family group and verifies they can see the "Phone" field.
+#[then("Family contacts should see the phone field")]
+fn family_contacts_see_phone(world: &mut VauchiWorld) {
+    let gid = world.group_id("Family");
+    let cid = world.add_test_contact("FamilyMember");
+    world.vauchi.add_contact_to_group(&gid, &cid).unwrap();
+    assert!(
+        world
+            .vauchi
+            .is_field_visible_by_label(&cid, "Phone")
+            .unwrap(),
+        "expected FamilyMember to see the \"Phone\" field"
+    );
+}
+
+/// Adds a fresh ungrouped contact and verifies they cannot see the "Phone" field.
+#[then("ungrouped contacts should not see the phone field")]
+fn ungrouped_no_phone(world: &mut VauchiWorld) {
+    let cid = world.add_test_contact("Ungrouped");
+    assert!(
+        !world
+            .vauchi
+            .is_field_visible_by_label(&cid, "Phone")
+            .unwrap_or(false),
+        "expected ungrouped contact NOT to see the \"Phone\" field"
+    );
+}
+
+/// Verifies the "Email"-labeled field remains visible to everyone after a group is created.
+/// WHY: creating a group must NOT retroactively restrict already-public fields (ADR-054).
+#[then("the email field should still be marked as shown on the card")]
+fn email_still_shown(world: &mut VauchiWorld) {
+    let fid = world.own_field_id("Email");
+    let card = world.vauchi.own_card().unwrap().unwrap();
+    assert!(
+        card.field_visibility().is_explicitly_everyone(&fid),
+        "expected \"Email\" field to remain visible to everyone after group creation"
+    );
+}
+
+/// UI concern: core has no "prompt" concept at this layer.
+#[then("I should be prompted to assign shown fields to groups")]
+fn prompted_to_assign(_world: &mut VauchiWorld) {}
+
+/// Complex setup: creates the group, adds a "Phone" field, and assigns it group-only.
+#[given(expr = "I have a group {string} with phone field visible")]
+fn have_group_with_phone_visible(world: &mut VauchiWorld, group_name: String) {
+    use vauchi_core::{ContactField, FieldType};
+    let group = world.vauchi.create_group(&group_name).unwrap();
+    world
+        .groups
+        .insert(group_name.clone(), group.id().to_string());
+    world
+        .vauchi
+        .add_own_field(ContactField::new(
+            FieldType::Phone,
+            "Phone",
+            "+1234567890",
+            0,
+        ))
+        .unwrap();
+    let fid = world.own_field_id("Phone");
+    world.vauchi.set_own_field_private(&fid).unwrap();
+    world
+        .vauchi
+        .set_group_field_visibility(group.id(), &fid, true)
+        .unwrap();
+}
+
+/// Adds an "Email" field and immediately marks it as publicly visible.
+#[given("I have an email field marked as shown")]
+fn have_email_marked_shown(world: &mut VauchiWorld) {
+    use vauchi_core::{ContactField, FieldType};
+    world
+        .vauchi
+        .add_own_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "user@example.com",
+            0,
+        ))
+        .unwrap();
+    let fid = world.own_field_id("Email");
+    world.vauchi.set_own_field_public(&fid).unwrap();
+}

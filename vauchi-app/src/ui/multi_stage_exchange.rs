@@ -39,6 +39,10 @@ use vauchi_core::exchange::{
 use crate::ui::exchange::scan_quality::ScanQualityTracker;
 use crate::ui::*;
 
+#[path = "multi_stage_exchange_camera_gate.rs"]
+mod camera_gate;
+use camera_gate::CameraGate;
+
 // ── Action IDs ─────────────────────────────────────────────────────
 
 /// User dismissed / went back from the exchange screen.
@@ -84,72 +88,6 @@ const COMPONENT_ID_HARDWARE: &str = "hardware_unavailable";
 /// overlay, failure overlay, permission gate) all share the id —
 /// frontends differentiate by inspecting the components list.
 pub const SCREEN_ID: &str = "multi_stage_exchange";
-
-/// Camera reason flags in priority order — permission denied wins
-/// over hardware unavailable (per investigation §3.1: a denied
-/// permission is recoverable while missing hardware is not, but the
-/// user should see the actionable affordance first).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum CameraGate {
-    #[default]
-    Available,
-    /// OS permission was denied; the frontend can re-prompt via
-    /// `GRANT_CAMERA_PERMISSION_ACTION_ID`.
-    PermissionDenied,
-    /// Hardware reported absent or unusable. No re-prompt path.
-    Unavailable,
-}
-
-impl CameraGate {
-    /// Returns the gate that should win when a new transport-level
-    /// signal arrives. Permission-denied beats already-set unavailable
-    /// (more actionable) and vice versa never downgrades from
-    /// `Unavailable` to `PermissionDenied` — once hardware is gone the
-    /// user cannot grant their way out.
-    pub(crate) fn promote(self, incoming: CameraGate) -> CameraGate {
-        match (self, incoming) {
-            (CameraGate::Unavailable, _) => CameraGate::Unavailable,
-            (_, CameraGate::Unavailable) => CameraGate::Unavailable,
-            (_, CameraGate::PermissionDenied) => CameraGate::PermissionDenied,
-            (current, CameraGate::Available) => current,
-        }
-    }
-}
-
-#[cfg(test)]
-mod camera_gate_tests {
-    use super::*;
-
-    // @internal
-    #[test]
-    fn promote_unavailable_is_terminal() {
-        let g = CameraGate::Unavailable.promote(CameraGate::PermissionDenied);
-        assert_eq!(g, CameraGate::Unavailable);
-        let g = CameraGate::Unavailable.promote(CameraGate::Available);
-        assert_eq!(g, CameraGate::Unavailable);
-    }
-
-    // @internal
-    #[test]
-    fn promote_permission_denied_replaces_available() {
-        let g = CameraGate::Available.promote(CameraGate::PermissionDenied);
-        assert_eq!(g, CameraGate::PermissionDenied);
-    }
-
-    // @internal
-    #[test]
-    fn promote_unavailable_overrides_permission_denied() {
-        let g = CameraGate::PermissionDenied.promote(CameraGate::Unavailable);
-        assert_eq!(g, CameraGate::Unavailable);
-    }
-
-    // @internal
-    #[test]
-    fn promote_available_is_no_op_for_existing_gate() {
-        let g = CameraGate::PermissionDenied.promote(CameraGate::Available);
-        assert_eq!(g, CameraGate::PermissionDenied);
-    }
-}
 
 /// Engine for the multi-stage face-to-face exchange screen.
 ///

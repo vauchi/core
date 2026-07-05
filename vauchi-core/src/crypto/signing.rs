@@ -18,6 +18,11 @@ pub struct SigningKeyPair {
     inner: ed25519_dalek::SigningKey,
 }
 
+// Manual marker (not derived): dalek's SigningKey zeroizes itself on
+// drop but does not expose `Zeroize`, so the derive cannot apply. The
+// impl states the wrapper-level guarantee the VRS01 contract asserts.
+impl zeroize::ZeroizeOnDrop for SigningKeyPair {}
+
 impl SigningKeyPair {
     /// Generates a new random Ed25519 keypair.
     ///

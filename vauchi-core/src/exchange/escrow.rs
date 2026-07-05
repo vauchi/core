@@ -39,6 +39,7 @@ pub enum EscrowRole {
 ///
 /// Both parties derive identical `gate_hash` from the same shared secret.
 /// Each party uses their own `our_slot` and the other's `their_slot`.
+#[derive(zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct EscrowKeys {
     /// Gate identifier (hex-encoded SHA-256 of HKDF output).
     pub gate_hash: String,

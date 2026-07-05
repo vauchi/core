@@ -144,6 +144,7 @@ impl ChainKey {
 ///
 /// Message keys are single-use and should be deleted after use
 /// to provide forward secrecy.
+#[derive(zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct MessageKey {
     key: SymmetricKey,
     generation: u32,
@@ -171,7 +172,10 @@ impl MessageKey {
 
     /// Consumes self and returns the underlying symmetric key.
     pub fn into_symmetric_key(self) -> SymmetricKey {
-        self.key
+        // ZeroizeOnDrop puts a Drop impl on MessageKey, so fields can
+        // no longer move out (E0509); the clone is equivalent — both
+        // copies zeroize on their own drop, and `self` zeroizes here.
+        self.key.clone()
     }
 
     /// Creates a MessageKey from raw bytes (for deserialization).

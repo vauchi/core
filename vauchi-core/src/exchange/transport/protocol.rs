@@ -49,8 +49,9 @@ const XCHACHA_NONCE_SIZE: usize = 24;
 const HKDF_INFO: &[u8] = b"vauchi-transport-v3";
 
 /// Shared key derived from X25519 DH + HKDF. Zeroized on drop.
-#[derive(Zeroize)]
-#[zeroize(drop)]
+/// (`ZeroizeOnDrop` derive replaces the legacy `#[zeroize(drop)]`
+/// attr: same generated Drop, plus the marker trait VRS01 asserts.)
+#[derive(Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct SharedKey {
     bytes: [u8; 32],
 }

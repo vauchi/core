@@ -21,6 +21,7 @@ use super::encryption::{EncryptionError, SymmetricKey, decrypt, encrypt};
 ///
 /// Delegates to [`encrypt`]/[`decrypt`] (XChaCha20-Poly1305).
 /// Zeroized on drop via the inner [`SymmetricKey`].
+#[derive(zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct ContentEncryptionKey(SymmetricKey);
 
 impl ContentEncryptionKey {

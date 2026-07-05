@@ -9,19 +9,34 @@
       "id": "start_app",
       "label": "Start using the app",
       "style": "Primary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Start using the app",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "exchange",
       "label": "Exchange cards",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Exchange cards",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "import_contacts",
       "label": "Import existing contacts",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Import existing contacts",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": {

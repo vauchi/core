@@ -39,25 +39,45 @@
       "id": "transfer_device",
       "label": "Transfer from another device",
       "style": "Primary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Transfer from another device",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "link_device",
       "label": "Link from another device",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Link from another device",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "restore_backup",
       "label": "Restore from backup",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Restore from backup",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "back",
       "label": "Back",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Back",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": null,

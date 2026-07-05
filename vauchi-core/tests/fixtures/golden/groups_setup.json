@@ -90,19 +90,34 @@
       "id": "submit_custom_group",
       "label": "Add group",
       "style": "Secondary",
-      "enabled": false
+      "enabled": false,
+      "a11y": {
+        "label": "Add group",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "continue",
       "label": "Continue",
       "style": "Primary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Continue",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "skip",
       "label": "Skip",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Skip",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": {

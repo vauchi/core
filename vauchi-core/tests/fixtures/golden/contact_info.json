@@ -9,31 +9,56 @@
       "id": "show_phone",
       "label": "Add phone number",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Add phone number",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "show_email",
       "label": "Add email address",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Add email address",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "add_social",
       "label": "Add social profile",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Add social profile",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "continue",
       "label": "Continue",
       "style": "Primary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Continue",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "skip",
       "label": "Skip",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Skip",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": {

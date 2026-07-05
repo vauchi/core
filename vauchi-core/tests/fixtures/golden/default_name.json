@@ -33,7 +33,12 @@
       "id": "continue",
       "label": "Continue",
       "style": "Primary",
-      "enabled": false
+      "enabled": false,
+      "a11y": {
+        "label": "Continue",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": {

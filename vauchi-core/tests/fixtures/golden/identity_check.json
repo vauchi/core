@@ -34,13 +34,23 @@
       "id": "create_new",
       "label": "Create new identity",
       "style": "Primary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Create new identity",
+        "hint": null,
+        "role": null
+      }
     },
     {
       "id": "have_identity",
       "label": "I already have an identity",
       "style": "Secondary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "I already have an identity",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": null,

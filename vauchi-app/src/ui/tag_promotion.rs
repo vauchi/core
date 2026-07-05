@@ -12,6 +12,7 @@
 //! and consumes the tag) — resolved by the AppEngine intercept, which reads
 //! [`TagPromotionEngine::tag_id`] + [`TagPromotionEngine::selected_field_ids`].
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// One own-card field in the promotion review, with whether the new group
@@ -37,6 +38,7 @@ pub struct TagPromotionEngine {
     name: String,
     member_count: usize,
     fields: Vec<PromotionField>,
+    locale: Locale,
 }
 
 impl TagPromotionEngine {
@@ -51,7 +53,19 @@ impl TagPromotionEngine {
             name,
             member_count,
             fields,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// The tag being promoted — read by the AppEngine intercept to call
@@ -81,21 +95,33 @@ impl TagPromotionEngine {
         let mut components: Vec<Component> = Vec::new();
 
         let members = if self.member_count == 1 {
-            "1 contact will join the group".to_string()
+            self.t("tag_promotion.members_singular")
         } else {
-            format!("{} contacts will join the group", self.member_count)
+            get_string_with_args(
+                self.locale,
+                "tag_promotion.members_plural",
+                &[("count", &self.member_count.to_string())],
+            )
         };
         components.push(Component::InfoPanel {
             id: "promotion_info".into(),
             icon: Some("group".into()),
-            title: format!("Promote \"{}\" to a group", self.name),
+            title: get_string_with_args(
+                self.locale,
+                "tag_promotion.promote_title",
+                &[("name", &self.name)],
+            ),
             items: vec![InfoItem {
                 icon: Some("members".into()),
-                title: "Members".into(),
+                title: self.t("group_detail.members_label"),
                 detail: members,
             }],
             a11y: Some(A11y {
-                label: Some(format!("Promote tag {} to a group", self.name)),
+                label: Some(get_string_with_args(
+                    self.locale,
+                    "tag_promotion.promote_a11y",
+                    &[("name", &self.name)],
+                )),
                 hint: None,
                 role: Some(AccessibilityRole::Heading),
             }),
@@ -104,7 +130,7 @@ impl TagPromotionEngine {
         if !self.fields.is_empty() {
             components.push(Component::ToggleList {
                 id: PROMOTION_FIELDS_COMPONENT_ID.into(),
-                label: "Fields the group can see".into(),
+                label: self.t("tag_promotion.fields_label"),
                 items: self
                     .fields
                     .iter()
@@ -114,11 +140,15 @@ impl TagPromotionEngine {
                         selected: f.selected,
                         subtitle: Some(f.value.clone()),
                         a11y: Some(A11y {
-                            label: Some(format!("Visibility for {}", f.label)),
+                            label: Some(get_string_with_args(
+                                self.locale,
+                                "group_detail.visibility_for_a11y",
+                                &[("label", &f.label)],
+                            )),
                             hint: Some(if f.selected {
-                                "Visible to the new group".into()
+                                self.t("tag_promotion.visible_to_new_group_hint")
                             } else {
-                                "Hidden from the new group".into()
+                                self.t("tag_promotion.hidden_from_new_group_hint")
                             }),
                             role: None,
                         }),
@@ -126,8 +156,8 @@ impl TagPromotionEngine {
                     })
                     .collect(),
                 a11y: Some(A11y {
-                    label: Some("Field visibility for the new group".into()),
-                    hint: Some("Toggle which of your fields the new group can see.".into()),
+                    label: Some(self.t("tag_promotion.field_visibility_a11y")),
+                    hint: Some(self.t("tag_promotion.field_visibility_hint")),
                     role: None,
                 }),
             });
@@ -135,12 +165,12 @@ impl TagPromotionEngine {
 
         ScreenModel {
             screen_id: "tag_promotion".into(),
-            title: "Promote Tag".into(),
+            title: self.t("tag_promotion.title"),
             subtitle: None,
             components,
             actions: vec![ScreenAction {
                 id: CONFIRM_PROMOTION_ACTION_ID.into(),
-                label: "Create Group".into(),
+                label: self.t("tag_promotion.create_group_button"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,

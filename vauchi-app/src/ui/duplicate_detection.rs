@@ -14,6 +14,7 @@
 //! `merge_contacts` (same-kind) and `soft_delete_imported_contact`
 //! (cross-kind) since core rejects cross-kind merges with `InvalidState`.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// A pair of potentially duplicate contacts.
@@ -61,6 +62,7 @@ pub struct DuplicateDetectionEngine {
     /// `AppEngine` reads this when handling the "merge" action so the
     /// navigation targets the selected pair rather than the first one.
     selected_pair_index: Option<usize>,
+    locale: Locale,
 }
 
 impl DuplicateDetectionEngine {
@@ -68,7 +70,19 @@ impl DuplicateDetectionEngine {
         Self {
             pairs,
             selected_pair_index: None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Returns the index of the user-selected pair (set via `ListItemSelected`).
@@ -85,14 +99,23 @@ impl DuplicateDetectionEngine {
         let components = if self.pairs.is_empty() {
             vec![Component::Text {
                 id: "no_duplicates".into(),
-                content: "No duplicate contacts detected.".into(),
+                content: self.t("duplicate_detection.empty"),
                 style: TextStyle::Body,
             }]
         } else {
+            let header = if self.pairs.len() == 1 {
+                self.t("duplicate_detection.header_singular")
+            } else {
+                get_string_with_args(
+                    self.locale,
+                    "duplicate_detection.header_plural",
+                    &[("count", &self.pairs.len().to_string())],
+                )
+            };
             vec![
                 Component::Text {
                     id: "header".into(),
-                    content: format!("{} potential duplicate(s) found", self.pairs.len()),
+                    content: header,
                     style: TextStyle::Subtitle,
                 },
                 Component::ActionList {
@@ -104,9 +127,17 @@ impl DuplicateDetectionEngine {
                         .map(|(i, pair)| {
                             let pct = (pair.similarity * 100.0) as u8;
                             let detail = if pair.is_cross_kind() {
-                                format!("{pct}% similar — cross-kind")
+                                get_string_with_args(
+                                    self.locale,
+                                    "duplicate_detection.similar_cross_kind",
+                                    &[("pct", &pct.to_string())],
+                                )
                             } else {
-                                format!("{pct}% similar")
+                                get_string_with_args(
+                                    self.locale,
+                                    "duplicate_detection.similar",
+                                    &[("pct", &pct.to_string())],
+                                )
                             };
                             ActionListItem {
                                 id: format!("pair_{i}"),
@@ -129,20 +160,20 @@ impl DuplicateDetectionEngine {
 
         ScreenModel {
             screen_id: "duplicate_detection".into(),
-            title: "Duplicate Detection".into(),
+            title: self.t("duplicate_detection.title"),
             subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
                     id: "merge".into(),
-                    label: "Merge".into(),
+                    label: self.t("duplicate_detection.merge_button"),
                     style: ActionStyle::Primary,
                     enabled: merge_enabled,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "dismiss".into(),
-                    label: "Dismiss".into(),
+                    label: self.t("duplicate_detection.dismiss_button"),
                     style: ActionStyle::Secondary,
                     enabled: merge_enabled,
                     a11y: None,

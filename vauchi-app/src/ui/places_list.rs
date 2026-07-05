@@ -15,6 +15,7 @@
 //! which reads [`PlacesEngine::pending_delete_id`] then applies
 //! [`PlacesEngine::confirm_delete`].
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Summary of a named place for the management list.
@@ -30,6 +31,7 @@ pub struct PlaceSummary {
 pub struct PlacesEngine {
     places: Vec<PlaceSummary>,
     pending_delete: Option<String>,
+    locale: Locale,
 }
 
 impl PlacesEngine {
@@ -37,7 +39,19 @@ impl PlacesEngine {
         Self {
             places,
             pending_delete: None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Id of the place awaiting delete confirmation — read by the AppEngine
@@ -75,7 +89,7 @@ impl PlacesEngine {
                 status: None,
                 actions: vec![ListItemAction {
                     id: "request_delete".into(),
-                    label: "Delete".into(),
+                    label: self.t("action.delete"),
                     kind: ListItemActionKind::Custom,
                     destructive: false,
                 }],
@@ -95,12 +109,13 @@ impl PlacesEngine {
         if let Some(name) = self.pending_name() {
             components.push(Component::InlineConfirm {
                 id: "delete_place".into(),
-                warning: format!(
-                    "Delete the place \"{name}\"? Contacts met there keep their \
-                     coordinates; only the name is removed."
+                warning: get_string_with_args(
+                    self.locale,
+                    "places_list.delete_warning",
+                    &[("name", name)],
                 ),
-                confirm_text: "Delete".into(),
-                cancel_text: "Cancel".into(),
+                confirm_text: self.t("action.delete"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: None,
             });
@@ -108,7 +123,7 @@ impl PlacesEngine {
 
         ScreenModel {
             screen_id: "places".into(),
-            title: "Places".into(),
+            title: self.t("places_list.title"),
             subtitle: None,
             components,
             actions: vec![],

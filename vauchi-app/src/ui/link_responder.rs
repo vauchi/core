@@ -18,6 +18,7 @@
 //! See `_private/docs/problems/2026-04-27-deep-link-responder-flow/`
 //! and `_private/docs/designs/2026-05-25-slice-32l-phase-2-responder-screen-driven-design.md`.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::exchange::link_mode::DeepLinkPayload;
 
@@ -46,6 +47,7 @@ pub struct LinkResponderEngine {
     /// Rich success-screen content, attached by the responder lifecycle
     /// once the sender's card is persisted. `None` → minimal chrome.
     success_summary: Option<crate::ui::exchange::success::ExchangeSuccessSummary>,
+    locale: Locale,
 }
 
 impl LinkResponderEngine {
@@ -58,7 +60,19 @@ impl LinkResponderEngine {
             cancelled: false,
             terminal: None,
             success_summary: None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Attach the rich success summary the completed screen renders. Inert
@@ -108,31 +122,23 @@ impl LinkResponderEngine {
     fn build_waiting_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "link_responder_waiting".into(),
-            title: "Waiting for Response".into(),
-            subtitle: Some("Connecting via the shared link...".into()),
+            title: self.t("link_responder.waiting_title"),
+            subtitle: Some(self.t("link_responder.waiting_subtitle")),
             components: vec![Component::StatusIndicator {
                 id: "waiting_status".into(),
                 icon: None,
-                title: "Waiting...".into(),
-                detail: Some(
-                    "The sender's contact card will appear here once the relay \
-                     has matched both deposits."
-                        .into(),
-                ),
+                title: self.t("link_exchange.waiting_status"),
+                detail: Some(self.t("link_responder.waiting_detail")),
                 status: Status::InProgress,
                 a11y: Some(A11y {
-                    label: Some("Waiting for response".into()),
-                    hint: Some(
-                        "The sender's encrypted card will be retrieved when both \
-                         sides' deposits have matched on the relay"
-                            .into(),
-                    ),
+                    label: Some(self.t("link_responder.waiting_a11y")),
+                    hint: Some(self.t("link_responder.waiting_a11y_hint")),
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: ACTION_CANCEL.into(),
-                label: "Cancel".into(),
+                label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -148,30 +154,30 @@ impl LinkResponderEngine {
         if let Some(summary) = &self.success_summary {
             return crate::ui::exchange::success::build_exchange_success_screen(
                 "link_responder_completed",
-                "Contact Added",
+                self.t("link_exchange.contact_added_title"),
                 ACTION_DONE,
                 summary,
             );
         }
         ScreenModel {
             screen_id: "link_responder_completed".into(),
-            title: "Contact Added".into(),
-            subtitle: Some("The sender's contact card has been saved.".into()),
+            title: self.t("link_exchange.contact_added_title"),
+            subtitle: Some(self.t("link_responder.completed_subtitle")),
             components: vec![Component::StatusIndicator {
                 id: "completed_status".into(),
                 icon: None,
-                title: "Done".into(),
-                detail: Some("You can find the new contact in your contacts list.".into()),
+                title: self.t("action.done"),
+                detail: Some(self.t("link_responder.completed_detail")),
                 status: Status::Success,
                 a11y: Some(A11y {
-                    label: Some("Contact added".into()),
+                    label: Some(self.t("link_responder.completed_a11y")),
                     hint: None,
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -184,23 +190,23 @@ impl LinkResponderEngine {
     fn build_failed_screen(&self, reason: &str) -> ScreenModel {
         ScreenModel {
             screen_id: "link_responder_failed".into(),
-            title: "Link Failed".into(),
-            subtitle: Some("The contact card could not be received.".into()),
+            title: self.t("link_responder.failed_title"),
+            subtitle: Some(self.t("link_responder.failed_subtitle")),
             components: vec![Component::StatusIndicator {
                 id: "failed_status".into(),
                 icon: None,
-                title: "Failed".into(),
-                detail: Some(failure_detail(reason).into()),
+                title: self.t("status.failed"),
+                detail: Some(failure_detail(reason, self.locale)),
                 status: Status::Failed,
                 a11y: Some(A11y {
-                    label: Some("Link failed".into()),
+                    label: Some(self.t("link_responder.failed_a11y")),
                     hint: None,
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -212,16 +218,15 @@ impl LinkResponderEngine {
 }
 
 /// Map the stable `LinkResponder` failure id to a user-facing detail.
-fn failure_detail(reason: &str) -> &'static str {
-    match reason {
-        "polling_timed_out" => {
-            "The other device did not respond in time. Ask them to share the link again."
-        }
-        "deposit_rejected" => "The relay rejected the exchange. Please try sharing the link again.",
-        "decrypt_error" => "The received card could not be decrypted. Please try again.",
-        "cancelled" => "The exchange was cancelled.",
-        _ => "Something went wrong receiving the contact card. Please try again.",
-    }
+fn failure_detail(reason: &str, locale: Locale) -> String {
+    let key = match reason {
+        "polling_timed_out" => "link_responder.failure_timed_out",
+        "deposit_rejected" => "link_responder.failure_rejected",
+        "decrypt_error" => "link_responder.failure_decrypt_error",
+        "cancelled" => "link_responder.failure_cancelled",
+        _ => "link_responder.failure_generic",
+    };
+    get_string(locale, key)
 }
 
 impl WorkflowEngine for LinkResponderEngine {

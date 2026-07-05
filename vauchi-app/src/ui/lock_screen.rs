@@ -4,6 +4,7 @@
 
 //! Lock screen engine — credential entry with attempt tracking.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use zeroize::Zeroize;
 
@@ -16,6 +17,7 @@ pub struct LockScreenEngine {
     entered_pin: String,
     max_attempts: usize,
     attempts: usize,
+    locale: Locale,
 }
 
 impl Drop for LockScreenEngine {
@@ -30,7 +32,15 @@ impl LockScreenEngine {
             entered_pin: String::new(),
             max_attempts,
             attempts: 0,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
     }
 
     /// Record a failed unlock attempt. Returns `true` if max attempts reached (lockout).
@@ -42,11 +52,15 @@ impl LockScreenEngine {
     fn pin_validation_error(&self) -> Option<String> {
         if self.attempts > 0 && self.attempts < self.max_attempts {
             let remaining = self.max_attempts - self.attempts;
-            Some(format!(
-                "{} attempt{} remaining",
-                remaining,
-                if remaining == 1 { "" } else { "s" }
-            ))
+            Some(if remaining == 1 {
+                get_string(self.locale, "lock_screen.attempt_remaining_singular")
+            } else {
+                get_string_with_args(
+                    self.locale,
+                    "lock_screen.attempts_remaining_plural",
+                    &[("remaining", &remaining.to_string())],
+                )
+            })
         } else {
             None
         }
@@ -61,7 +75,7 @@ impl WorkflowEngine for LockScreenEngine {
         // both out (2026-07-03-lock-screen-pin-cap-locks-out-passwords).
         let components = vec![Component::TextInput {
             id: "pin".into(),
-            label: "Password".into(),
+            label: get_string(self.locale, "auth.unlock.field_label"),
             // Echo the entered value: the TUI reconstructs the field from
             // this on every keystroke (no local buffer); masking is the
             // renderer's job via `input_type` (matches `display_name`).
@@ -71,8 +85,8 @@ impl WorkflowEngine for LockScreenEngine {
             validation_error: self.pin_validation_error(),
             input_type: InputType::Password,
             a11y: Some(A11y {
-                label: Some("Password entry".into()),
-                hint: Some("Enter your password to unlock".into()),
+                label: Some(get_string(self.locale, "lock_screen.password_entry_a11y")),
+                hint: Some(get_string(self.locale, "lock_screen.password_hint")),
                 role: None,
             }),
             info_key: None,
@@ -80,7 +94,7 @@ impl WorkflowEngine for LockScreenEngine {
 
         let actions = vec![ScreenAction {
             id: "unlock".into(),
-            label: "Unlock".into(),
+            label: get_string(self.locale, "lock_screen.unlock_button"),
             style: ActionStyle::Primary,
             enabled: !self.entered_pin.is_empty(),
             a11y: None,
@@ -88,7 +102,7 @@ impl WorkflowEngine for LockScreenEngine {
 
         ScreenModel {
             screen_id: "lock_screen".into(),
-            title: "Enter Password".into(),
+            title: get_string(self.locale, "lock_screen.title"),
             subtitle: None,
             components,
             actions,
@@ -130,7 +144,7 @@ impl WorkflowEngine for LockScreenEngine {
                 if self.entered_pin.is_empty() {
                     ActionResult::ValidationError {
                         component_id: "pin".into(),
-                        message: "Please enter your password".into(),
+                        message: get_string(self.locale, "lock_screen.enter_password_error"),
                     }
                 } else {
                     ActionResult::Complete

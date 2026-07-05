@@ -466,8 +466,12 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 # (+18 2026-07-05: M3 S5-13 (batch-2) — 5 factory arms (DeliveryStatus,
 #  SocialGraph, GroupDetail, MyInfoEntryDetail x2) each gain
 #  `.with_locale(...)`, plus create_entry_detail_engine's signature grows
-#  a render_context parameter.)
-vauchi-app/src/ui/app_engine/screens.rs 988
+#  a render_context parameter. 970 → 988.)
+# (+19 2026-07-05: M3 S5-14 (batch-3, final 16 files) — 9 more factory
+#  arms (Help, Lock, DecoyContacts, ChangePassword, TagPromotion,
+#  Places, Groups, Support, ActivityLog) each gain `.with_locale(...)`.
+#  Stacked on batch-2's 988. 988 → 1007.)
+vauchi-app/src/ui/app_engine/screens.rs 1007
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

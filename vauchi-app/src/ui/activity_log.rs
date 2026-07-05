@@ -4,6 +4,7 @@
 
 //! Activity log engine — shows recent activity entries for contacts.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::notification_types::ActivityLogEntry;
 use crate::ui::*;
 
@@ -21,18 +22,29 @@ pub struct ActivityLogItem {
 #[derive(Clone, Debug)]
 pub struct ActivityLogEngine {
     items: Vec<ActivityLogItem>,
+    locale: Locale,
 }
 
 impl ActivityLogEngine {
     pub fn new(items: Vec<ActivityLogItem>) -> Self {
-        Self { items }
+        Self {
+            items,
+            locale: Locale::English,
+        }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
     }
 
     fn build_screen(&self) -> ScreenModel {
         let components = if self.items.is_empty() {
             vec![Component::Text {
                 id: "empty_state".into(),
-                content: "No recent activity. Updates from your contacts and delivery status will appear here.".into(),
+                content: get_string(self.locale, "activity_log.empty_state"),
                 style: TextStyle::Body,
             }]
         } else {
@@ -40,7 +52,8 @@ impl ActivityLogEngine {
                 .items
                 .iter()
                 .map(|item| {
-                    let (label, detail) = format_entry(&item.entry, &item.contact_name);
+                    let (label, detail) =
+                        format_entry(&item.entry, &item.contact_name, self.locale);
                     ActionListItem {
                         id: item.event_key.clone(),
                         label,
@@ -60,7 +73,7 @@ impl ActivityLogEngine {
 
         ScreenModel {
             screen_id: "activity_log".into(),
-            title: "Activity".into(),
+            title: get_string(self.locale, "activity_log.title"),
             subtitle: None,
             components,
             actions: vec![],
@@ -71,7 +84,7 @@ impl ActivityLogEngine {
 }
 
 /// Format an `ActivityLogEntry` into a (label, detail) pair for display.
-fn format_entry(entry: &ActivityLogEntry, name: &str) -> (String, Option<String>) {
+fn format_entry(entry: &ActivityLogEntry, name: &str, locale: Locale) -> (String, Option<String>) {
     match entry {
         ActivityLogEntry::CardUpdateReceived { changed_fields, .. } => {
             let detail = if changed_fields.is_empty() {
@@ -79,27 +92,51 @@ fn format_entry(entry: &ActivityLogEntry, name: &str) -> (String, Option<String>
             } else {
                 Some(changed_fields.join(", "))
             };
-            (format!("{name} updated their card"), detail)
+            (
+                get_string_with_args(
+                    locale,
+                    "activity_log.card_update_received",
+                    &[("name", name)],
+                ),
+                detail,
+            )
         }
-        ActivityLogEntry::CardUpdateDelivered { .. } => (format!("Card delivered to {name}"), None),
-        ActivityLogEntry::CardUpdatePending { .. } => (format!("Card pending: {name}"), None),
-        ActivityLogEntry::CardUpdateFailed { reason, .. } => {
-            (format!("Card failed: {name}"), Some(reason.clone()))
-        }
-        ActivityLogEntry::ContactAdded { .. } => (format!("New contact: {name}"), None),
-        ActivityLogEntry::EmergencyAlertReceived { .. } => {
-            (format!("Emergency alert from {name}"), None)
-        }
-        ActivityLogEntry::DuressAlertReceived { .. } => (format!("Duress alert from {name}"), None),
+        ActivityLogEntry::CardUpdateDelivered { .. } => (
+            get_string_with_args(locale, "activity_log.card_delivered", &[("name", name)]),
+            None,
+        ),
+        ActivityLogEntry::CardUpdatePending { .. } => (
+            get_string_with_args(locale, "activity_log.card_pending", &[("name", name)]),
+            None,
+        ),
+        ActivityLogEntry::CardUpdateFailed { reason, .. } => (
+            get_string_with_args(locale, "activity_log.card_failed", &[("name", name)]),
+            Some(reason.clone()),
+        ),
+        ActivityLogEntry::ContactAdded { .. } => (
+            get_string_with_args(locale, "activity_log.new_contact", &[("name", name)]),
+            None,
+        ),
+        ActivityLogEntry::EmergencyAlertReceived { .. } => (
+            get_string_with_args(locale, "activity_log.emergency_alert", &[("name", name)]),
+            None,
+        ),
+        ActivityLogEntry::DuressAlertReceived { .. } => (
+            get_string_with_args(locale, "activity_log.duress_alert", &[("name", name)]),
+            None,
+        ),
         ActivityLogEntry::OwnCardUpdated { changed_fields } => {
             let detail = if changed_fields.is_empty() {
                 None
             } else {
                 Some(changed_fields.join(", "))
             };
-            ("You updated your card".to_string(), detail)
+            (get_string(locale, "activity_log.own_card_updated"), detail)
         }
-        ActivityLogEntry::ContactRemoved { .. } => (format!("Removed contact: {name}"), None),
+        ActivityLogEntry::ContactRemoved { .. } => (
+            get_string_with_args(locale, "activity_log.contact_removed", &[("name", name)]),
+            None,
+        ),
     }
 }
 

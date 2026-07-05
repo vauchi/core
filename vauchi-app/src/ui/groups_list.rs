@@ -4,6 +4,7 @@
 
 //! Groups engine — displays and manages contact groups with Members/Visibility modes.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Which aspect of groups is being managed.
@@ -38,11 +39,27 @@ pub struct GroupInfo {
 pub struct GroupsEngine {
     groups: Vec<GroupInfo>,
     mode: GroupsMode,
+    locale: Locale,
 }
 
 impl GroupsEngine {
     pub fn new(groups: Vec<GroupInfo>, mode: GroupsMode) -> Self {
-        Self { groups, mode }
+        Self {
+            groups,
+            mode,
+            locale: Locale::English,
+        }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Returns the current mode.
@@ -65,17 +82,25 @@ impl GroupsEngine {
                     GroupsMode::Members => {
                         let n = g.member_count;
                         if n == 1 {
-                            "1 member".into()
+                            self.t("groups_list.member_count_singular")
                         } else {
-                            format!("{n} members")
+                            get_string_with_args(
+                                self.locale,
+                                "groups_list.member_count_plural",
+                                &[("count", &n.to_string())],
+                            )
                         }
                     }
                     GroupsMode::Visibility => {
                         let n = g.visible_field_count;
                         if n == 1 {
-                            "1 visible field".into()
+                            self.t("groups_list.visible_field_count_singular")
                         } else {
-                            format!("{n} visible fields")
+                            get_string_with_args(
+                                self.locale,
+                                "groups_list.visible_field_count_plural",
+                                &[("count", &n.to_string())],
+                            )
                         }
                     }
                 };
@@ -97,7 +122,7 @@ impl GroupsEngine {
 
         ScreenModel {
             screen_id: "groups_list".into(),
-            title: "Groups".into(),
+            title: self.t("nav.groups"),
             subtitle: None,
             components,
             // Only "New Group" is a list-level action. Rename/delete a group
@@ -105,7 +130,7 @@ impl GroupsEngine {
             // unambiguous.
             actions: vec![ScreenAction {
                 id: "new_group".into(),
-                label: "New Group".into(),
+                label: self.t("form.new_group_title"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -118,52 +143,57 @@ impl GroupsEngine {
     fn mode_toggle(&self) -> Component {
         let members_selected = self.mode == GroupsMode::Members;
         let visibility_selected = self.mode == GroupsMode::Visibility;
+        let selected_suffix = self.t("onboarding.a11y_selected");
+        let not_selected_suffix = self.t("onboarding.a11y_not_selected");
+        let toggle_hint = self.t("onboarding.a11y_toggle_hint");
         Component::ToggleList {
             id: "mode_toggle".into(),
-            label: "View Mode".into(),
+            label: self.t("groups_list.view_mode_label"),
             items: vec![
                 ToggleItem {
                     id: "members".into(),
-                    label: "Members".into(),
+                    label: self.t("group_detail.members_label"),
                     selected: members_selected,
-                    subtitle: Some("Which contacts are in each group".into()),
+                    subtitle: Some(self.t("groups_list.members_subtitle")),
                     a11y: Some(A11y {
                         label: Some(format!(
-                            "Members, {}",
+                            "{}, {}",
+                            self.t("group_detail.members_label"),
                             if members_selected {
-                                "selected"
+                                &selected_suffix
                             } else {
-                                "not selected"
+                                &not_selected_suffix
                             }
                         )),
-                        hint: Some("Double tap to toggle".into()),
+                        hint: Some(toggle_hint.clone()),
                         role: Some(AccessibilityRole::Toggle),
                     }),
                     info_key: None,
                 },
                 ToggleItem {
                     id: "visibility".into(),
-                    label: "Visibility".into(),
+                    label: self.t("groups_list.visibility_mode_label"),
                     selected: visibility_selected,
-                    subtitle: Some("Which of your fields each group sees".into()),
+                    subtitle: Some(self.t("groups_list.visibility_subtitle")),
                     a11y: Some(A11y {
                         label: Some(format!(
-                            "Visibility, {}",
+                            "{}, {}",
+                            self.t("groups_list.visibility_mode_label"),
                             if visibility_selected {
-                                "selected"
+                                &selected_suffix
                             } else {
-                                "not selected"
+                                &not_selected_suffix
                             }
                         )),
-                        hint: Some("Double tap to toggle".into()),
+                        hint: Some(toggle_hint),
                         role: Some(AccessibilityRole::Toggle),
                     }),
                     info_key: None,
                 },
             ],
             a11y: Some(A11y {
-                label: Some("View Mode options".into()),
-                hint: Some("Select items to include".into()),
+                label: Some(self.t("groups_list.view_mode_options_a11y")),
+                hint: Some(self.t("contact_detail.select_items_hint")),
                 role: None,
             }),
         }

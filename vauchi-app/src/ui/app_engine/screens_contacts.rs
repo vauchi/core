@@ -266,7 +266,10 @@ impl AppEngine {
                         vec![],
                     ),
                 };
-                Box::new(ContactVisibilityEngine::new(name, fields))
+                Box::new(
+                    ContactVisibilityEngine::new(name, fields)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::ContactEdit { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
@@ -335,7 +338,10 @@ impl AppEngine {
                         }
                     })
                     .collect();
-                Box::new(DuplicateDetectionEngine::new(ui_pairs))
+                Box::new(
+                    DuplicateDetectionEngine::new(ui_pairs)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::ArchivedContacts => {
                 let archived = vauchi
@@ -344,7 +350,10 @@ impl AppEngine {
                     .into_iter()
                     .map(|c| (c.id().to_string(), c.display_name().to_string()))
                     .collect();
-                Box::new(ArchivedContactsEngine::new(archived))
+                Box::new(
+                    ArchivedContactsEngine::new(archived)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::ContactMerge {
                 primary_name,
@@ -378,12 +387,10 @@ impl AppEngine {
                     .as_ref()
                     .map(|c| c.is_fingerprint_verified())
                     .unwrap_or(false);
-                Box::new(FingerprintVerifyEngine::new(
-                    contact_id,
-                    &their_fp,
-                    &our_fp,
-                    is_verified,
-                ))
+                Box::new(
+                    FingerprintVerifyEngine::new(contact_id, &their_fp, &our_fp, is_verified)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             other => unreachable!("non-contacts screen {other:?} routed to contacts factory"),
         }

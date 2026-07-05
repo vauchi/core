@@ -4,6 +4,7 @@
 
 //! Help & FAQ engine — single screen listing help items grouped by category.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 
 /// A single help/FAQ item.
@@ -24,6 +25,7 @@ pub struct HelpItem {
 pub struct HelpEngine {
     items: Vec<HelpItem>,
     search_query: String,
+    locale: Locale,
 }
 
 impl HelpEngine {
@@ -31,7 +33,15 @@ impl HelpEngine {
         Self {
             items,
             search_query: String::new(),
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
     }
 
     /// Returns items filtered by the current search query.
@@ -70,9 +80,9 @@ impl WorkflowEngine for HelpEngine {
 
         let mut components: Vec<Component> = vec![Component::TextInput {
             id: "help_search".into(),
-            label: "Search".into(),
+            label: get_string(self.locale, "help.search_button"),
             value: self.search_query.clone(),
-            placeholder: Some("Search help topics…".into()),
+            placeholder: Some(get_string(self.locale, "help.search_placeholder")),
             max_length: None,
             validation_error: None,
             input_type: InputType::Text,
@@ -102,7 +112,7 @@ impl WorkflowEngine for HelpEngine {
 
         ScreenModel {
             screen_id: "help".into(),
-            title: "Help & FAQ".into(),
+            title: get_string(self.locale, "help.title"),
             subtitle: None,
             components,
             actions: vec![],

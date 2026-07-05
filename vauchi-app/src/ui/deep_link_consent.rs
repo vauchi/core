@@ -24,6 +24,7 @@
 //! `2026-04-27-deep-link-responder-flow`) replaces the grant path
 //! with `ActionResult::NavigateTo(...)` toward the responder cycle.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::exchange::link_mode::DeepLinkPayload;
 
@@ -53,6 +54,7 @@ pub struct DeepLinkConsentEngine {
     payload: DeepLinkPayload,
     decision: ConsentDecision,
     cancelled: bool,
+    locale: Locale,
 }
 
 impl DeepLinkConsentEngine {
@@ -65,7 +67,15 @@ impl DeepLinkConsentEngine {
             payload,
             decision: ConsentDecision::Pending,
             cancelled: false,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
     }
 
     /// The current decision. Public for AppEngine's grant-path
@@ -84,9 +94,7 @@ impl DeepLinkConsentEngine {
     fn build_screen(&self) -> ScreenModel {
         let components = vec![
             Component::Banner {
-                text: "Someone shared an exchange link with you. Only accept if \
-                       you trust the source."
-                    .into(),
+                text: get_string(self.locale, "deep_link_consent.banner_text"),
                 action_label: String::new(),
                 action_id: String::new(),
                 a11y: None,
@@ -97,14 +105,14 @@ impl DeepLinkConsentEngine {
         let actions = vec![
             ScreenAction {
                 id: ACTION_GRANT.into(),
-                label: "Accept Exchange".into(),
+                label: get_string(self.locale, "deep_link_consent.accept_button"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
             },
             ScreenAction {
                 id: ACTION_DENY.into(),
-                label: "Decline".into(),
+                label: get_string(self.locale, "deep_link_consent.decline_button"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -113,7 +121,7 @@ impl DeepLinkConsentEngine {
 
         ScreenModel {
             screen_id: "deep_link_consent".into(),
-            title: "Exchange Request".into(),
+            title: get_string(self.locale, "deep_link_consent.title"),
             subtitle: None,
             components,
             actions,

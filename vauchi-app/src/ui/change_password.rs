@@ -22,6 +22,7 @@
 //! Pure-renderer rule (ADR-021/043): the engine never branches on form
 //! factor and exposes only UI-shaped wire types.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use zeroize::Zeroize;
 
@@ -32,6 +33,7 @@ pub struct ChangePasswordEngine {
     current: String,
     new_pw: String,
     confirm: String,
+    locale: Locale,
 }
 
 impl Drop for ChangePasswordEngine {
@@ -51,7 +53,19 @@ impl ChangePasswordEngine {
             current: String::new(),
             new_pw: String::new(),
             confirm: String::new(),
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Returns the current password the user entered. Empty in setup mode.
@@ -79,7 +93,7 @@ impl ChangePasswordEngine {
 
     fn confirm_validation_error(&self) -> Option<String> {
         if !self.confirm.is_empty() && self.confirm != self.new_pw {
-            Some("New password and confirmation do not match".into())
+            Some(self.t("change_password.confirm_mismatch_error"))
         } else {
             None
         }
@@ -91,7 +105,7 @@ impl ChangePasswordEngine {
             && !self.current.is_empty()
             && self.new_pw == self.current
         {
-            Some("New password must differ from current password".into())
+            Some(self.t("change_password.new_must_differ_error"))
         } else {
             None
         }
@@ -100,15 +114,15 @@ impl ChangePasswordEngine {
     fn current_password_input(&self) -> Component {
         Component::TextInput {
             id: "current_password".into(),
-            label: "Current Password".into(),
+            label: self.t("change_password.current_password_label"),
             value: String::new(),
-            placeholder: Some("Enter your current password".into()),
+            placeholder: Some(self.t("change_password.current_password_placeholder")),
             max_length: Some(128),
             validation_error: None,
             input_type: InputType::Password,
             a11y: Some(A11y {
-                label: Some("Current password".into()),
-                hint: Some("Enter your current app password.".into()),
+                label: Some(self.t("change_password.current_password_a11y")),
+                hint: Some(self.t("change_password.current_password_hint")),
                 role: Some(AccessibilityRole::TextField),
             }),
             info_key: None,
@@ -118,30 +132,30 @@ impl ChangePasswordEngine {
     fn new_password_input(&self) -> Component {
         let (label, placeholder, a11y_label, hint) = if self.password_enabled {
             (
-                "New Password",
-                "Choose a new password",
-                "New password",
-                "Choose a new password — must differ from your current one.",
+                self.t("change_password.new_password_label_change"),
+                self.t("change_password.new_password_placeholder_change"),
+                self.t("change_password.new_password_a11y_change"),
+                self.t("change_password.new_password_hint_change"),
             )
         } else {
             (
-                "Password",
-                "Choose a password",
-                "Password",
-                "Choose a password to lock the app.",
+                self.t("auth.unlock.field_label"),
+                self.t("change_password.new_password_placeholder_setup"),
+                self.t("auth.unlock.field_label"),
+                self.t("change_password.new_password_hint_setup"),
             )
         };
         Component::TextInput {
             id: "new_password".into(),
-            label: label.into(),
+            label,
             value: String::new(),
-            placeholder: Some(placeholder.into()),
+            placeholder: Some(placeholder),
             max_length: Some(128),
             validation_error: self.new_validation_error(),
             input_type: InputType::Password,
             a11y: Some(A11y {
-                label: Some(a11y_label.into()),
-                hint: Some(hint.into()),
+                label: Some(a11y_label),
+                hint: Some(hint),
                 role: Some(AccessibilityRole::TextField),
             }),
             info_key: None,
@@ -151,30 +165,30 @@ impl ChangePasswordEngine {
     fn confirm_password_input(&self) -> Component {
         let (label, placeholder, a11y_label, hint) = if self.password_enabled {
             (
-                "Confirm New Password",
-                "Re-enter the new password",
-                "Confirm new password",
-                "Re-enter the new password to confirm.",
+                self.t("change_password.confirm_password_label_change"),
+                self.t("change_password.confirm_password_placeholder_change"),
+                self.t("change_password.confirm_password_a11y_change"),
+                self.t("change_password.confirm_password_hint_change"),
             )
         } else {
             (
-                "Confirm Password",
-                "Re-enter the password",
-                "Confirm password",
-                "Re-enter the password to confirm.",
+                self.t("change_password.confirm_password_label_setup"),
+                self.t("change_password.confirm_password_placeholder_setup"),
+                self.t("change_password.confirm_password_a11y_setup"),
+                self.t("change_password.confirm_password_hint_setup"),
             )
         };
         Component::TextInput {
             id: "confirm_password".into(),
-            label: label.into(),
+            label,
             value: String::new(),
-            placeholder: Some(placeholder.into()),
+            placeholder: Some(placeholder),
             max_length: Some(128),
             validation_error: self.confirm_validation_error(),
             input_type: InputType::Password,
             a11y: Some(A11y {
-                label: Some(a11y_label.into()),
-                hint: Some(hint.into()),
+                label: Some(a11y_label),
+                hint: Some(hint),
                 role: Some(AccessibilityRole::TextField),
             }),
             info_key: None,
@@ -190,11 +204,11 @@ impl ChangePasswordEngine {
         components.push(self.confirm_password_input());
 
         let (title, subtitle) = if self.password_enabled {
-            ("Change Password".to_string(), None)
+            (self.t("change_password.title_change"), None)
         } else {
             (
-                "Set Password".to_string(),
-                Some("Protect the app with a password.".to_string()),
+                self.t("change_password.title_setup"),
+                Some(self.t("change_password.subtitle_setup")),
             )
         };
 
@@ -206,14 +220,14 @@ impl ChangePasswordEngine {
             actions: vec![
                 ScreenAction {
                     id: "submit".into(),
-                    label: "Save".into(),
+                    label: self.t("action.save"),
                     style: ActionStyle::Primary,
                     enabled: self.submit_enabled(),
                     a11y: None,
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,

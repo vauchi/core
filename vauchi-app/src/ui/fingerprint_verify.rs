@@ -8,6 +8,7 @@
 //! The user confirms they match, marking the contact as verified.
 //! Verified contacts can also be unverified.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 
 /// What action the user took on the fingerprint verification screen.
@@ -30,6 +31,7 @@ pub struct FingerprintVerifyEngine {
     our_fingerprint: String,
     is_verified: bool,
     action: VerifyAction,
+    locale: Locale,
 }
 
 impl FingerprintVerifyEngine {
@@ -45,7 +47,19 @@ impl FingerprintVerifyEngine {
             our_fingerprint: our_fingerprint.to_string(),
             is_verified,
             action: VerifyAction::None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     pub fn contact_id(&self) -> &str {
@@ -58,15 +72,15 @@ impl FingerprintVerifyEngine {
 
     fn build_screen(&self) -> ScreenModel {
         let status_text = if self.is_verified {
-            "Verified — fingerprints have been compared in person."
+            self.t("fingerprint_verify.status_verified")
         } else {
-            "Compare these fingerprints with your contact in person."
+            self.t("fingerprint_verify.status_compare")
         };
 
         let mut components = vec![
             Component::Text {
                 id: "instructions".into(),
-                content: status_text.into(),
+                content: status_text,
                 style: if self.is_verified {
                     TextStyle::Subtitle
                 } else {
@@ -75,7 +89,7 @@ impl FingerprintVerifyEngine {
             },
             Component::Text {
                 id: "their_label".into(),
-                content: "Their fingerprint".into(),
+                content: self.t("fingerprint_verify.their_label"),
                 style: TextStyle::Caption,
             },
             Component::Text {
@@ -85,7 +99,7 @@ impl FingerprintVerifyEngine {
             },
             Component::Text {
                 id: "our_label".into(),
-                content: "Your fingerprint".into(),
+                content: self.t("fingerprint_verify.our_label"),
                 style: TextStyle::Caption,
             },
             Component::Text {
@@ -98,7 +112,7 @@ impl FingerprintVerifyEngine {
         if self.is_verified {
             components.push(Component::Text {
                 id: "verified_badge".into(),
-                content: "Verified".into(),
+                content: self.t("contacts.verified"),
                 style: TextStyle::Subtitle,
             });
         }
@@ -107,7 +121,7 @@ impl FingerprintVerifyEngine {
         if self.is_verified {
             actions.push(ScreenAction {
                 id: "unverify".into(),
-                label: "Remove verification".into(),
+                label: self.t("fingerprint_verify.remove_verification_button"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -115,7 +129,7 @@ impl FingerprintVerifyEngine {
         } else {
             actions.push(ScreenAction {
                 id: "confirm_match".into(),
-                label: "I've verified in person".into(),
+                label: self.t("fingerprint_verify.confirm_match_button"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -126,7 +140,7 @@ impl FingerprintVerifyEngine {
 
         ScreenModel {
             screen_id: "fingerprint_verify".into(),
-            title: "Verify Fingerprint".into(),
+            title: self.t("contact_detail.verify_fingerprint_button"),
             subtitle: None,
             components,
             actions,

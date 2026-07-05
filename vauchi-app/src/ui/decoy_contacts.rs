@@ -8,6 +8,7 @@
 //! stays a humble renderer (Phase 2c of
 //! `2026-05-01-android-humble-ui-deep-retirement`).
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Summary info for a decoy contact.
@@ -23,6 +24,7 @@ pub struct DecoyContactsEngine {
     decoys: Vec<DecoyContactItem>,
     new_decoy_name: String,
     pending_delete_id: Option<String>,
+    locale: Locale,
 }
 
 impl DecoyContactsEngine {
@@ -31,7 +33,19 @@ impl DecoyContactsEngine {
             decoys,
             new_decoy_name: String::new(),
             pending_delete_id: None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     pub fn decoys(&self) -> &[DecoyContactItem] {
@@ -58,14 +72,11 @@ impl DecoyContactsEngine {
         let mut components = vec![Component::InfoPanel {
             id: "decoy_info".into(),
             icon: Some("shield".into()),
-            title: "Decoy Contacts".into(),
+            title: self.t("decoy_contacts.title"),
             items: vec![InfoItem {
                 icon: Some("info".into()),
-                title: "What are decoy contacts?".into(),
-                detail: "Fake contacts shown when your duress PIN is entered. \
-                         Without them, duress mode shows an empty contact list \
-                         — which is suspicious and defeats plausible deniability."
-                    .into(),
+                title: self.t("decoy_contacts.what_are_they_label"),
+                detail: self.t("decoy_contacts.explanation"),
             }],
             a11y: None,
         }];
@@ -73,7 +84,7 @@ impl DecoyContactsEngine {
         if self.decoys.is_empty() {
             components.push(Component::Text {
                 id: "empty_state".into(),
-                content: "No decoy contacts yet. Add a few realistic-looking names below.".into(),
+                content: self.t("decoy_contacts.empty_state"),
                 style: TextStyle::Body,
             });
         } else {
@@ -86,8 +97,12 @@ impl DecoyContactsEngine {
                     icon: Some("person".into()),
                     detail: None,
                     a11y: Some(A11y {
-                        label: Some(format!("Decoy contact: {}", d.display_name)),
-                        hint: Some("Double tap to remove".into()),
+                        label: Some(get_string_with_args(
+                            self.locale,
+                            "decoy_contacts.item_a11y",
+                            &[("name", &d.display_name)],
+                        )),
+                        hint: Some(self.t("decoy_contacts.remove_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -102,10 +117,9 @@ impl DecoyContactsEngine {
         if self.pending_delete_id.is_some() {
             components.push(Component::InlineConfirm {
                 id: "delete_decoy".into(),
-                warning: "Remove this decoy contact? Duress mode will show one fewer fake contact."
-                    .into(),
-                confirm_text: "Remove".into(),
-                cancel_text: "Cancel".into(),
+                warning: self.t("decoy_contacts.remove_warning"),
+                confirm_text: self.t("decoy_contacts.remove_button"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: None,
             });
@@ -113,15 +127,15 @@ impl DecoyContactsEngine {
 
         components.push(Component::TextInput {
             id: "new_decoy_name".into(),
-            label: "New Decoy Name".into(),
+            label: self.t("decoy_contacts.new_name_label"),
             value: self.new_decoy_name.clone(),
-            placeholder: Some("e.g. Alex Müller".into()),
+            placeholder: Some(self.t("decoy_contacts.new_name_placeholder")),
             max_length: Some(64),
             validation_error: None,
             input_type: InputType::Text,
             a11y: Some(A11y {
-                label: Some("New decoy contact name".into()),
-                hint: Some("Enter a realistic-looking name".into()),
+                label: Some(self.t("decoy_contacts.new_name_a11y")),
+                hint: Some(self.t("decoy_contacts.new_name_hint")),
                 role: None,
             }),
             info_key: None,
@@ -132,12 +146,12 @@ impl DecoyContactsEngine {
 
         ScreenModel {
             screen_id: "decoy_contacts".into(),
-            title: "Decoy Contacts".into(),
+            title: self.t("decoy_contacts.title"),
             subtitle: None,
             components,
             actions: vec![ScreenAction {
                 id: "add_decoy".into(),
-                label: "Add Decoy".into(),
+                label: self.t("decoy_contacts.add_button"),
                 style: ActionStyle::Primary,
                 enabled: add_enabled,
                 a11y: None,

@@ -114,10 +114,10 @@ impl AppEngine {
                 Box::new(engine)
             }
             AppScreen::DeepLinkConsent { payload } => {
-                Box::new(crate::ui::DeepLinkConsentEngine::new(payload.clone()))
+                Box::new(crate::ui::DeepLinkConsentEngine::new(payload.clone()).with_locale(locale))
             }
             AppScreen::DeepLinkResponder { payload } => {
-                Box::new(crate::ui::LinkResponderEngine::new(payload.clone()))
+                Box::new(crate::ui::LinkResponderEngine::new(payload.clone()).with_locale(locale))
             }
             AppScreen::LinkExchange => {
                 Box::new(crate::ui::LinkExchangeEngine::new().with_locale(locale))

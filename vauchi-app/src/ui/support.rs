@@ -4,11 +4,14 @@
 
 //! Support engine — links to support and sponsor the project.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 
 /// Engine that displays support and sponsorship information.
 #[derive(Clone, Debug)]
-pub struct SupportEngine;
+pub struct SupportEngine {
+    locale: Locale,
+}
 
 impl Default for SupportEngine {
     fn default() -> Self {
@@ -18,27 +21,40 @@ impl Default for SupportEngine {
 
 impl SupportEngine {
     pub fn new() -> Self {
-        Self
+        Self {
+            locale: Locale::English,
+        }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-14).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     fn build_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "support".into(),
-            title: "Support Vauchi".into(),
+            title: self.t("support.title"),
             subtitle: None,
             components: vec![Component::InfoPanel {
                 id: "support_info".into(),
                 icon: Some("heart".into()),
-                title: "Support the Project".into(),
+                title: self.t("support.info_title"),
                 items: vec![
                     InfoItem {
                         icon: Some("github".into()),
-                        title: "GitHub Sponsors".into(),
+                        title: self.t("support.github_sponsors_label"),
                         detail: "https://github.com/sponsors/vauchi".into(),
                     },
                     InfoItem {
                         icon: Some("liberapay".into()),
-                        title: "Liberapay".into(),
+                        title: self.t("support.liberapay_label"),
                         detail: "https://liberapay.com/vauchi".into(),
                     },
                 ],
@@ -47,14 +63,14 @@ impl SupportEngine {
             actions: vec![
                 ScreenAction {
                     id: "open_github_sponsors".into(),
-                    label: "GitHub Sponsors".into(),
+                    label: self.t("support.github_sponsors_label"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "open_liberapay".into(),
-                    label: "Liberapay".into(),
+                    label: self.t("support.liberapay_label"),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,

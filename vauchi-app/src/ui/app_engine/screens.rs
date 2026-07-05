@@ -275,13 +275,19 @@ impl AppEngine {
                 glance_qr,
                 render_context.resolved_locale(),
             ),
-            AppScreen::Help => Box::new(HelpEngine::new(help_catalog::default_help_items())),
+            AppScreen::Help => Box::new(
+                HelpEngine::new(help_catalog::default_help_items())
+                    .with_locale(render_context.resolved_locale()),
+            ),
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(
                 None,
                 vauchi.has_identity(),
                 render_context.resolved_locale(),
             )),
-            AppScreen::Lock => Box::new(LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)),
+            AppScreen::Lock => Box::new(
+                LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)
+                    .with_locale(render_context.resolved_locale()),
+            ),
             AppScreen::DeviceLinking => {
                 let qr_data = vauchi
                     .generate_device_link()
@@ -341,11 +347,14 @@ impl AppEngine {
                     .into_iter()
                     .map(|(id, display_name, _card)| DecoyContactItem { id, display_name })
                     .collect();
-                Box::new(DecoyContactsEngine::new(decoys))
+                Box::new(
+                    DecoyContactsEngine::new(decoys).with_locale(render_context.resolved_locale()),
+                )
             }
-            AppScreen::ChangePassword => Box::new(ChangePasswordEngine::new(
-                vauchi.is_password_enabled().unwrap_or(false),
-            )),
+            AppScreen::ChangePassword => Box::new(
+                ChangePasswordEngine::new(vauchi.is_password_enabled().unwrap_or(false))
+                    .with_locale(render_context.resolved_locale()),
+            ),
             AppScreen::EmergencyShred => {
                 Box::new(EmergencyShredEngine::new(render_context.resolved_locale()))
             }
@@ -444,12 +453,15 @@ impl AppEngine {
                             .collect(),
                         _ => Vec::new(),
                     };
-                    Box::new(TagPromotionEngine::new(
-                        draft.tag_id,
-                        draft.name,
-                        draft.contact_ids.len(),
-                        fields,
-                    ))
+                    Box::new(
+                        TagPromotionEngine::new(
+                            draft.tag_id,
+                            draft.name,
+                            draft.contact_ids.len(),
+                            fields,
+                        )
+                        .with_locale(render_context.resolved_locale()),
+                    )
                 }
                 // Tag vanished between navigation and build — fall back to the
                 // generic not-found screen (keeps a Back affordance).
@@ -468,7 +480,7 @@ impl AppEngine {
                         name: p.name,
                     })
                     .collect();
-                Box::new(PlacesEngine::new(places))
+                Box::new(PlacesEngine::new(places).with_locale(render_context.resolved_locale()))
             }
             AppScreen::Tags => {
                 let tags: Vec<TagSummary> = vauchi
@@ -501,7 +513,10 @@ impl AppEngine {
                         }
                     })
                     .collect();
-                Box::new(GroupsEngine::new(group_infos, GroupsMode::Members))
+                Box::new(
+                    GroupsEngine::new(group_infos, GroupsMode::Members)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::GroupDetail { group_id } => {
                 let group = vauchi.get_group(group_id).ok();
@@ -590,7 +605,9 @@ impl AppEngine {
                     .with_deletion_executable(executable),
                 )
             }
-            AppScreen::Support => Box::new(SupportEngine::new()),
+            AppScreen::Support => {
+                Box::new(SupportEngine::new().with_locale(render_context.resolved_locale()))
+            }
             AppScreen::FormDialog { dialog_type } => Box::new(
                 FormDialogEngine::new(dialog_type.clone())
                     .with_locale(render_context.resolved_locale()),
@@ -626,7 +643,9 @@ impl AppEngine {
                         })
                     })
                     .collect();
-                Box::new(ActivityLogEngine::new(items))
+                Box::new(
+                    ActivityLogEngine::new(items).with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::DeviceReplacement => {
                 Box::new(

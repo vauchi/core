@@ -68,7 +68,7 @@ fn support_unknown_action_returns_update_screen() {
 // @internal
 #[test]
 fn support_default_creates_engine() {
-    let engine = SupportEngine;
+    let engine = SupportEngine::default();
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "support");
     assert_eq!(screen.title, "Support Vauchi");

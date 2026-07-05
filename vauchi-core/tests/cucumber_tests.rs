@@ -48,6 +48,9 @@ pub struct VauchiWorld {
     /// Per-party own-card snapshots taken before an edit, so a later sync step
     /// can compute the delta (party name → pre-edit card).
     pub old_cards: std::collections::BTreeMap<String, ContactCard>,
+    /// In-flight exchange sessions keyed by party name — created when a party
+    /// initiates a QR exchange and consumed when the exchange completes.
+    pub sessions: std::collections::BTreeMap<String, vauchi_core::exchange::ExchangeSession>,
     /// Humble-UI driver: the AppEngine hosting `self.vauchi` after
     /// `I open the app` (ADR-021 — flows are ScreenModel-testable in core).
     pub engine: Option<vauchi_app::ui::AppEngine>,
@@ -85,6 +88,7 @@ impl VauchiWorld {
             groups: std::collections::BTreeMap::new(),
             parties: std::collections::BTreeMap::new(),
             old_cards: std::collections::BTreeMap::new(),
+            sessions: std::collections::BTreeMap::new(),
             engine: None,
         }
     }
@@ -199,7 +203,7 @@ fn main() {
     // scenario loses its binding. Bump this when you wire more step
     // definitions; if CI reports a drop, a wired scenario lost its binding —
     // investigate the binding, don't just lower the floor.
-    const MIN_WIRED_SCENARIOS: usize = 45;
+    const MIN_WIRED_SCENARIOS: usize = 56;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

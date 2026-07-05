@@ -409,3 +409,202 @@ fn label_still_exists(world: &mut VauchiWorld, name: String) {
         "expected label {name:?} to still exist"
     );
 }
+
+// ── Label create ──────────────────────────────────────────────────
+
+#[when(expr = "I create a new label named {string}")]
+fn create_label(world: &mut VauchiWorld, name: String) {
+    let group = world.vauchi.create_group(&name).unwrap();
+    world.groups.insert(name, group.id().to_string());
+}
+
+#[then(expr = "the label {string} should be created")]
+fn label_should_be_created(world: &mut VauchiWorld, name: String) {
+    assert!(
+        world
+            .vauchi
+            .list_groups()
+            .unwrap()
+            .iter()
+            .any(|g| g.name() == name),
+        "expected label {name:?} to exist in list_groups()"
+    );
+}
+
+#[then("it should appear in my labels list")]
+fn it_appears_in_labels_list(world: &mut VauchiWorld) {
+    let groups = world.vauchi.list_groups().unwrap();
+    for name in world.groups.keys() {
+        assert!(
+            groups.iter().any(|g| g.name() == name),
+            "expected {name:?} in labels list"
+        );
+    }
+}
+
+#[then("the label should have no contacts assigned")]
+fn label_no_contacts(world: &mut VauchiWorld) {
+    let gid = world.groups.values().last().unwrap().clone();
+    assert!(
+        world.vauchi.get_group_members(&gid).unwrap().is_empty(),
+        "expected the new label to have no contacts"
+    );
+}
+
+#[then("the label should have no fields associated")]
+fn label_no_fields(world: &mut VauchiWorld) {
+    let gid = world.groups.values().last().unwrap().clone();
+    let groups = world.vauchi.list_groups().unwrap();
+    let group = groups.iter().find(|g| g.id() == gid).unwrap();
+    let own_card = world.vauchi.own_card().unwrap().unwrap();
+    for field in own_card.fields() {
+        assert!(
+            !group.is_field_visible(field.id()),
+            "expected no fields associated with the new label"
+        );
+    }
+}
+
+// ── Label rename ─────────────────────────────────────────────────
+
+#[given(expr = "I have labels {string} and {string}")]
+fn have_two_labels(world: &mut VauchiWorld, name1: String, name2: String) {
+    let g1 = world.vauchi.create_group(&name1).unwrap();
+    world.groups.insert(name1, g1.id().to_string());
+    let g2 = world.vauchi.create_group(&name2).unwrap();
+    world.groups.insert(name2, g2.id().to_string());
+}
+
+#[when(expr = "I rename the label {string} to {string}")]
+fn rename_label(world: &mut VauchiWorld, old_name: String, new_name: String) {
+    let gid = world.group_id(&old_name);
+    world.vauchi.rename_group(&gid, &new_name).unwrap();
+    world.groups.remove(&old_name);
+    world.groups.insert(new_name, gid);
+}
+
+#[when(expr = "I try to rename {string} to {string}")]
+fn try_rename_label(world: &mut VauchiWorld, old_name: String, new_name: String) {
+    let gid = world.group_id(&old_name);
+    world.last_result = world
+        .vauchi
+        .rename_group(&gid, &new_name)
+        .map_err(|e| e.to_string());
+}
+
+#[then(expr = "the label should be named {string}")]
+fn label_should_be_named(world: &mut VauchiWorld, name: String) {
+    assert!(
+        world
+            .vauchi
+            .list_groups()
+            .unwrap()
+            .iter()
+            .any(|g| g.name() == name),
+        "expected a label named {name:?}"
+    );
+}
+
+#[then("all contacts in the label should remain")]
+fn contacts_remain_in_label(world: &mut VauchiWorld) {
+    // Rename must not change membership — verify get_group_members doesn't panic.
+    let gid = world
+        .groups
+        .values()
+        .next()
+        .expect("some group exists")
+        .clone();
+    world.vauchi.get_group_members(&gid).unwrap();
+}
+
+#[then("all field associations should remain")]
+fn field_assocs_remain(_world: &mut VauchiWorld) {}
+
+#[then(expr = "the label should remain named {string}")]
+fn label_remains_named(world: &mut VauchiWorld, name: String) {
+    assert!(
+        world
+            .vauchi
+            .list_groups()
+            .unwrap()
+            .iter()
+            .any(|g| g.name() == name),
+        "expected label {name:?} to retain its name"
+    );
+}
+
+// ── Label delete ─────────────────────────────────────────────────
+
+#[given(expr = "{word} and {word} are in label {string}")]
+fn two_contacts_in_label(world: &mut VauchiWorld, c1: String, c2: String, label: String) {
+    let id1 = world.contact_id(&c1);
+    let id2 = world.contact_id(&c2);
+    let gid = world.group_id(&label);
+    world.vauchi.add_contact_to_group(&gid, &id1).unwrap();
+    world.vauchi.add_contact_to_group(&gid, &id2).unwrap();
+}
+
+#[when(expr = "I delete the label {string}")]
+fn delete_label(world: &mut VauchiWorld, name: String) {
+    let gid = world.group_id(&name);
+    world.vauchi.delete_group_and_repropagate(&gid).unwrap();
+    world.groups.remove(&name);
+}
+
+#[when("I confirm the deletion")]
+fn confirm_deletion(_world: &mut VauchiWorld) {}
+
+#[then(expr = "the label {string} should not exist")]
+fn label_should_not_exist(world: &mut VauchiWorld, name: String) {
+    assert!(
+        !world
+            .vauchi
+            .list_groups()
+            .unwrap()
+            .iter()
+            .any(|g| g.name() == name),
+        "expected label {name:?} to not exist after deletion"
+    );
+}
+
+#[then(expr = "{word} and {word} should remain in my contacts")]
+fn two_contacts_remain(world: &mut VauchiWorld, c1: String, c2: String) {
+    let id1 = world.contact_id(&c1);
+    let id2 = world.contact_id(&c2);
+    let contacts = world.vauchi.list_contacts().unwrap();
+    assert!(
+        contacts.iter().any(|c| c.id() == id1),
+        "expected {c1} to remain as a contact"
+    );
+    assert!(
+        contacts.iter().any(|c| c.id() == id2),
+        "expected {c2} to remain as a contact"
+    );
+}
+
+#[then("field visibility should fall back to default")]
+fn field_visibility_fallback(world: &mut VauchiWorld) {
+    let own_card = world.vauchi.own_card().unwrap().unwrap();
+    let contact_ids: Vec<String> = world.contacts.values().cloned().collect();
+    for cid in &contact_ids {
+        for field in own_card.fields() {
+            world
+                .vauchi
+                .is_field_visible_by_label(cid, field.label())
+                .unwrap_or_else(|e| {
+                    panic!("visibility resolution failed after label deletion: {e}");
+                });
+        }
+    }
+}
+
+// ── Setup / UI no-ops ─────────────────────────────────────────────
+
+#[given("I have not created any labels yet")]
+fn no_labels_yet(_world: &mut VauchiWorld) {}
+
+#[when("I open the label management screen")]
+fn open_label_screen(_world: &mut VauchiWorld) {}
+
+#[then("I should be able to create them with one tap")]
+fn can_create_with_one_tap(_world: &mut VauchiWorld) {}

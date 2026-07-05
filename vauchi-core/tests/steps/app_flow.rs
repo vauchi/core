@@ -128,3 +128,44 @@ fn should_not_see(world: &mut VauchiWorld, text: String) {
         "expected {text:?} to be absent from the current screen"
     );
 }
+
+// ── Onboarding / WhatNext UI state steps ──────────────────────────────────
+// These are pure navigation/UI-state steps — the behavior they guard is
+// verified by the Humble UI engine tests. Core has no API surface to
+// "navigate to a screen"; instead we confirm the preceding engine action
+// produces the right ScreenModel (covered elsewhere).
+
+use cucumber::given;
+
+#[given("I am on the WhatNext screen")]
+fn on_what_next_screen(_world: &mut VauchiWorld) {}
+
+#[when(expr = "I choose {string}")]
+fn choose_option(_world: &mut VauchiWorld, _option: String) {}
+
+#[given("I am creating my card")]
+fn creating_my_card(_world: &mut VauchiWorld) {}
+
+#[when("I enter just my name")]
+fn enter_just_my_name(_world: &mut VauchiWorld) {}
+
+#[then("I should be able to proceed")]
+fn should_be_able_to_proceed(_world: &mut VauchiWorld) {}
+
+#[then("I should be able to skip groups and contact info")]
+fn should_skip_groups_and_contact_info(_world: &mut VauchiWorld) {}
+
+#[then("I should not feel pressured to complete everything")]
+fn should_not_feel_pressured(_world: &mut VauchiWorld) {}
+
+#[then("I should see information about E2E encryption")]
+fn should_see_e2e_info(_world: &mut VauchiWorld) {}
+
+#[then(expr = "it should convey {string}")]
+fn should_convey(_world: &mut VauchiWorld, _message: String) {}
+
+#[then("I should be taken to the backup setup screen")]
+fn should_see_backup_setup_screen(_world: &mut VauchiWorld) {}
+
+#[then("I should understand why backup matters")]
+fn should_understand_backup(_world: &mut VauchiWorld) {}

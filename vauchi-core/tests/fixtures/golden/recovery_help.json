@@ -65,7 +65,12 @@
       "id": "vouch",
       "label": "Vouch for Someone",
       "style": "Primary",
-      "enabled": true
+      "enabled": true,
+      "a11y": {
+        "label": "Vouch for Someone",
+        "hint": null,
+        "role": null
+      }
     }
   ],
   "progress": null,

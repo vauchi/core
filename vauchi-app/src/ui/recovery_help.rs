@@ -14,6 +14,7 @@
 //! state to know what to do, then writes the result back via
 //! `set_parsed_claim` / `set_voucher_data` and advances the step.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::recovery::RECOVERY_CLAIM_MIN_INPUT_LEN;
 
@@ -58,6 +59,7 @@ pub struct RecoveryHelpEngine {
     /// Generated voucher payload (base64), populated by the AppEngine
     /// intercept after voucher creation.
     voucher_data: Option<String>,
+    locale: Locale,
 }
 
 impl Default for RecoveryHelpEngine {
@@ -74,7 +76,19 @@ impl RecoveryHelpEngine {
             claim_error: None,
             parsed_claim: None,
             voucher_data: None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-8).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Returns the current claim input value (set by user via `TextChanged`).
@@ -137,56 +151,46 @@ impl RecoveryHelpEngine {
             Component::InfoPanel {
                 id: "help_intro".into(),
                 icon: Some("recovery".into()),
-                title: "Help a Contact Recover".into(),
+                title: self.t("recovery.help_contact_recover"),
                 items: vec![InfoItem {
                     icon: None,
                     title: String::new(),
-                    detail: "If a contact lost their device, you can vouch \
-                             for their identity to help them recover."
-                        .into(),
+                    detail: self.t("recovery.help_intro_detail"),
                 }],
                 a11y: None,
             },
             Component::StatusIndicator {
                 id: "verify_warning".into(),
                 icon: Some("warning".into()),
-                title: "Verify in person".into(),
-                detail: Some(
-                    "Only vouch for someone you can verify IN PERSON. \
-                     This prevents identity theft."
-                        .into(),
-                ),
+                title: self.t("recovery.verify_in_person_title"),
+                detail: Some(self.t("recovery.vouch_warning")),
                 status: Status::Warning,
                 a11y: None,
             },
             Component::InfoPanel {
                 id: "help_steps".into(),
                 icon: None,
-                title: "How to Vouch".into(),
+                title: self.t("recovery.how_to_vouch"),
                 items: vec![
                     InfoItem {
                         icon: None,
-                        title: "1. Verify Identity".into(),
-                        detail: "Meet your contact in person. Verify they \
-                                 are who they claim to be."
-                            .into(),
+                        title: format!("1. {}", self.t("recovery.vouch_step1_title")),
+                        detail: self.t("recovery.vouch_step1_desc"),
                     },
                     InfoItem {
                         icon: None,
-                        title: "2. Get Their Claim".into(),
-                        detail: "They share their recovery claim data with you.".into(),
+                        title: format!("2. {}", self.t("recovery.vouch_step2_title")),
+                        detail: self.t("recovery.vouch_step2_desc_alt"),
                     },
                     InfoItem {
                         icon: None,
-                        title: "3. Create Voucher".into(),
-                        detail: "Sign a voucher confirming their identity.".into(),
+                        title: format!("3. {}", self.t("recovery.vouch_step3_title")),
+                        detail: self.t("recovery.vouch_step3_desc"),
                     },
                     InfoItem {
                         icon: None,
-                        title: "4. Share Voucher".into(),
-                        detail: "Give them the voucher data to add to their \
-                                 recovery proof."
-                            .into(),
+                        title: format!("4. {}", self.t("recovery.vouch_step4_title")),
+                        detail: self.t("recovery.vouch_step4_desc"),
                     },
                 ],
                 a11y: None,
@@ -195,15 +199,15 @@ impl RecoveryHelpEngine {
 
         ScreenModel {
             screen_id: "recovery_help".into(),
-            title: "Help Others".into(),
+            title: self.t("recovery.tab_help_others"),
             subtitle: None,
             components,
             actions: vec![ScreenAction {
                 id: "vouch".into(),
-                label: "Vouch for Someone".into(),
+                label: self.t("recovery.vouch_for_someone"),
                 style: ActionStyle::Primary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("recovery.vouch_for_someone"))),
             }],
             progress: None,
             ..Default::default()
@@ -214,21 +218,18 @@ impl RecoveryHelpEngine {
         let components = vec![
             Component::Text {
                 id: "paste_instructions".into(),
-                content: "Paste the recovery claim data your contact shared \
-                          with you. Verify their identity in person before \
-                          continuing."
-                    .into(),
+                content: self.t("recovery.paste_instructions"),
                 style: TextStyle::Body,
             },
             Component::TextInput {
                 id: "claim_data".into(),
-                label: "Claim Data (base64)".into(),
+                label: self.t("recovery.claim_data_label"),
                 value: self.claim_input.clone(),
-                placeholder: Some("Paste claim data here".into()),
+                placeholder: Some(self.t("recovery.paste_claim_placeholder")),
                 max_length: None,
                 validation_error: self.claim_error.clone(),
                 input_type: InputType::Text,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("recovery.claim_data_label"))),
                 info_key: None,
             },
         ];
@@ -242,23 +243,23 @@ impl RecoveryHelpEngine {
 
         ScreenModel {
             screen_id: "recovery_help".into(),
-            title: "Vouch for Recovery".into(),
+            title: self.t("recovery.vouch_for_recovery"),
             subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
                     id: "verify_claim".into(),
-                    label: "Verify Claim".into(),
+                    label: self.t("recovery.verify_button"),
                     style: ActionStyle::Primary,
                     enabled: verify_enabled,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.verify_button"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,
@@ -279,16 +280,16 @@ impl RecoveryHelpEngine {
         let mut components = vec![Component::InfoPanel {
             id: "claim_details".into(),
             icon: Some("recovery".into()),
-            title: "Claim Details".into(),
+            title: self.t("recovery.claim_details_title"),
             items: vec![
                 InfoItem {
                     icon: None,
-                    title: "Old ID".into(),
+                    title: self.t("recovery.old_id_label"),
                     detail: format!("{old_prefix}…"),
                 },
                 InfoItem {
                     icon: None,
-                    title: "New ID".into(),
+                    title: self.t("recovery.new_id_label"),
                     detail: format!("{new_prefix}…"),
                 },
             ],
@@ -299,12 +300,8 @@ impl RecoveryHelpEngine {
             components.push(Component::StatusIndicator {
                 id: "expired_warning".into(),
                 icon: Some("warning".into()),
-                title: "Claim has expired".into(),
-                detail: Some(
-                    "This recovery claim is no longer valid. Ask your \
-                     contact to create a new one."
-                        .into(),
-                ),
+                title: self.t("recovery.claim_expired_title"),
+                detail: Some(self.t("recovery.claim_expired_detail")),
                 status: Status::Failed,
                 a11y: None,
             });
@@ -312,12 +309,8 @@ impl RecoveryHelpEngine {
             components.push(Component::StatusIndicator {
                 id: "verify_reminder".into(),
                 icon: Some("warning".into()),
-                title: "Verify in person".into(),
-                detail: Some(
-                    "Verify this person's identity IN PERSON before \
-                     vouching!"
-                        .into(),
-                ),
+                title: self.t("recovery.verify_in_person_title"),
+                detail: Some(self.t("recovery.verify_in_person_warning")),
                 status: Status::Warning,
                 a11y: None,
             });
@@ -325,23 +318,23 @@ impl RecoveryHelpEngine {
 
         ScreenModel {
             screen_id: "recovery_help".into(),
-            title: "Confirm Voucher".into(),
+            title: self.t("recovery.confirm_voucher"),
             subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
                     id: "create_voucher".into(),
-                    label: "Create Voucher".into(),
+                    label: self.t("recovery.create_voucher_button"),
                     style: ActionStyle::Primary,
                     enabled: !is_expired,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.create_voucher_button"))),
                 },
                 ScreenAction {
                     id: "back".into(),
-                    label: "Back".into(),
+                    label: self.t("action.back"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.back"))),
                 },
             ],
             progress: None,
@@ -357,14 +350,14 @@ impl RecoveryHelpEngine {
 
         ScreenModel {
             screen_id: "recovery_help".into(),
-            title: "Voucher Created".into(),
+            title: self.t("recovery.voucher_created_title"),
             subtitle: None,
             components: vec![
                 Component::StatusIndicator {
                     id: "voucher_ready".into(),
                     icon: Some("checkmark.circle.fill".into()),
-                    title: "Voucher created".into(),
-                    detail: Some("Give this voucher to your contact.".into()),
+                    title: self.t("recovery.voucher_created_status"),
+                    detail: Some(self.t("recovery.give_voucher_detail")),
                     status: Status::Success,
                     a11y: None,
                 },
@@ -377,17 +370,17 @@ impl RecoveryHelpEngine {
             actions: vec![
                 ScreenAction {
                     id: "copy_voucher".into(),
-                    label: "Copy Voucher Data".into(),
+                    label: self.t("recovery.copy_voucher_data"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.copy_voucher_data"))),
                 },
                 ScreenAction {
                     id: "done".into(),
-                    label: "Done".into(),
+                    label: self.t("action.done"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.done"))),
                 },
             ],
             progress: None,

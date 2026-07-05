@@ -385,9 +385,10 @@ impl AppEngine {
                 engine.set_linked_device_count(device_count);
                 Box::new(engine)
             }
-            AppScreen::RecoveryHelp => {
-                Box::new(crate::ui::recovery_help::RecoveryHelpEngine::new())
-            }
+            AppScreen::RecoveryHelp => Box::new(
+                crate::ui::recovery_help::RecoveryHelpEngine::new()
+                    .with_locale(render_context.resolved_locale()),
+            ),
             AppScreen::SocialGraph => {
                 use crate::ui::social_graph::{SocialContactEntry, SocialTrustLevel};
                 use vauchi_core::contact::TrustLevel;

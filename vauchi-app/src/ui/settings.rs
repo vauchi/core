@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 /// Configuration values displayed and toggled on the settings screen.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct SettingsConfig {
     pub display_name: String,
     pub delivery_receipts_enabled: bool,
@@ -746,8 +746,11 @@ impl WorkflowEngine for SettingsEngine {
                 ref component_id,
                 ref item_id,
             } if component_id == "about" && item_id == "what_is_vauchi" => {
-                let title = get_string(Locale::English, "about.what_is_vauchi.title");
-                let body = get_string(Locale::English, "about.what_is_vauchi.body");
+                // The frontend-pushed language id ("de"/"en"/"follow_system");
+                // unknown/follow_system falls back to English (M3 S6a).
+                let locale = Locale::from_code(&self.config.language_id).unwrap_or_default();
+                let title = get_string(locale, "about.what_is_vauchi.title");
+                let body = get_string(locale, "about.what_is_vauchi.body");
                 ActionResult::ShowInfoOverlay { title, body }
             }
             UserAction::ListItemSelected { ref item_id, .. } if item_id == "emergency_wipe" => {

@@ -4,7 +4,7 @@
 
 //! MyInfo screen engine — shows user's own card, entries, and visibility controls.
 
-use crate::i18n::Locale;
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::relative_time::format_relative_time;
 use crate::ui::contact_detail::SharedInfoView;
 use crate::ui::*;
@@ -73,6 +73,7 @@ pub struct MyInfoEngine {
     /// Wall-clock unix seconds at render time, used to compute the
     /// `last_sync_seconds` relative-time caption.
     now_seconds: u64,
+    locale: Locale,
 }
 
 impl MyInfoEngine {
@@ -88,7 +89,15 @@ impl MyInfoEngine {
             pending_updates: 0,
             last_sync_seconds: None,
             now_seconds: 0,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S6a).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
     }
 
     /// Set the user's display name and own card fields.
@@ -150,9 +159,13 @@ impl MyInfoEngine {
         let mut out = Vec::new();
         if self.pending_updates > 0 {
             let label = if self.pending_updates == 1 {
-                "1 pending update".to_string()
+                get_string(self.locale, "sync.pending_updates_one")
             } else {
-                format!("{} pending updates", self.pending_updates)
+                get_string_with_args(
+                    self.locale,
+                    "sync.pending_updates",
+                    &[("count", &self.pending_updates.to_string())],
+                )
             };
             out.push(Component::Text {
                 id: "pending_updates_caption".into(),
@@ -161,10 +174,14 @@ impl MyInfoEngine {
             });
         }
         if let Some(then) = self.last_sync_seconds {
-            let relative = format_relative_time(self.now_seconds, then, Locale::English);
+            let relative = format_relative_time(self.now_seconds, then, self.locale);
             out.push(Component::Text {
                 id: "last_sync_caption".into(),
-                content: format!("Last synced {relative}"),
+                content: get_string_with_args(
+                    self.locale,
+                    "sync.last_synced",
+                    &[("time", &relative)],
+                ),
                 style: TextStyle::Caption,
             });
         }

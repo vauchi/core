@@ -154,6 +154,7 @@ impl AppEngine {
                 let now_seconds = vauchi.clock().unix_seconds();
                 Box::new(
                     MyInfoEngine::new(progress)
+                        .with_locale(render_context.resolved_locale())
                         .with_own_card(display_name, own_fields)
                         .with_groups(group_tabs)
                         .with_exchange_prompt(!has_contacts)

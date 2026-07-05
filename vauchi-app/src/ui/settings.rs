@@ -4,7 +4,7 @@
 
 //! Settings screen engine — displays app settings grouped by category.
 
-use crate::i18n::{Locale, get_string};
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use serde::{Deserialize, Serialize};
 
@@ -247,47 +247,55 @@ impl SettingsEngine {
     fn accessibility_group(&self) -> Component {
         Component::SettingsGroup {
             id: "accessibility".into(),
-            label: "Accessibility".into(),
+            label: self.t("settings.accessibility"),
             items: vec![
                 SettingsItem {
                     id: "reduce_motion".into(),
-                    label: "Reduce Motion".into(),
+                    label: self.t("a11y.reduce_motion"),
                     kind: SettingsItemKind::Toggle {
                         enabled: self.config.reduce_motion,
                     },
                     a11y: Some(A11y {
-                        label: Some("Reduce Motion toggle".into()),
-                        hint: Some("When enabled, minimizes animations and motion effects".into()),
+                        label: Some(get_string_with_args(
+                            self.locale(),
+                            "a11y.toggle_label",
+                            &[("name", &self.t("a11y.reduce_motion"))],
+                        )),
+                        hint: Some(self.t("settings.reduce_motion_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "high_contrast".into(),
-                    label: "High Contrast".into(),
+                    label: self.t("a11y.high_contrast"),
                     kind: SettingsItemKind::Toggle {
                         enabled: self.config.high_contrast,
                     },
                     a11y: Some(A11y {
-                        label: Some("High Contrast toggle".into()),
-                        hint: Some(
-                            "When enabled, increases color contrast for better visibility".into(),
-                        ),
+                        label: Some(get_string_with_args(
+                            self.locale(),
+                            "a11y.toggle_label",
+                            &[("name", &self.t("a11y.high_contrast"))],
+                        )),
+                        hint: Some(self.t("settings.high_contrast_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "large_touch".into(),
-                    label: "Large Touch Targets".into(),
+                    label: self.t("settings.large_touch_targets"),
                     kind: SettingsItemKind::Toggle {
                         enabled: self.config.large_touch,
                     },
                     a11y: Some(A11y {
-                        label: Some("Large Touch Targets toggle".into()),
-                        hint: Some(
-                            "When enabled, increases the size of interactive elements".into(),
-                        ),
+                        label: Some(get_string_with_args(
+                            self.locale(),
+                            "a11y.toggle_label",
+                            &[("name", &self.t("settings.large_touch_targets"))],
+                        )),
+                        hint: Some(self.t("settings.large_touch_targets_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -300,43 +308,47 @@ impl SettingsEngine {
         let show_help = self.config.show_help_icons;
         Component::SettingsGroup {
             id: "security".into(),
-            label: "Security".into(),
+            label: self.t("settings.security"),
             items: vec![
                 SettingsItem {
                     id: "change_password".into(),
-                    label: "Change Password".into(),
+                    label: self.t("settings.change_password"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("Change Password".into()),
-                        hint: Some("Opens the password change screen".into()),
+                        label: Some(self.t("settings.change_password")),
+                        hint: Some(self.t("settings.change_password_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "devices".into(),
-                    label: "Devices".into(),
+                    label: self.t("devices.count"),
                     kind: SettingsItemKind::Link {
                         detail: Some(if self.config.device_count == 1 {
-                            "1 device".into()
+                            self.t("settings.device_count_one")
                         } else {
-                            format!("{} devices", self.config.device_count)
+                            get_string_with_args(
+                                self.locale(),
+                                "settings.device_count",
+                                &[("count", &self.config.device_count.to_string())],
+                            )
                         }),
                     },
                     a11y: Some(A11y {
-                        label: Some("Devices".into()),
-                        hint: Some("Opens the list of linked devices".into()),
+                        label: Some(self.t("devices.count")),
+                        hint: Some(self.t("settings.devices_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "duress_pin".into(),
-                    label: "Duress PIN".into(),
+                    label: self.t("info.duress_pin.title"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("Duress PIN".into()),
-                        hint: Some("Opens the duress PIN configuration screen".into()),
+                        label: Some(self.t("info.duress_pin.title")),
+                        hint: Some(self.t("settings.duress_pin_hint")),
                         role: None,
                     }),
                     info_key: if show_help {
@@ -347,11 +359,11 @@ impl SettingsEngine {
                 },
                 SettingsItem {
                     id: "decoy_contacts".into(),
-                    label: "Decoy Contacts".into(),
+                    label: self.t("resistance.duress.decoy_contacts"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("Decoy Contacts".into()),
-                        hint: Some("Opens the decoy contact list shown in duress mode".into()),
+                        label: Some(self.t("resistance.duress.decoy_contacts")),
+                        hint: Some(self.t("settings.decoy_contacts_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -363,49 +375,49 @@ impl SettingsEngine {
     fn backup_group(&self) -> Component {
         Component::SettingsGroup {
             id: "backup".into(),
-            label: "Backup & Recovery".into(),
+            label: self.t("backup.wizard.title"),
             items: vec![
                 SettingsItem {
                     id: "backup_export".into(),
-                    label: "Create Backup".into(),
+                    label: self.t("backup.wizard.create"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("Create Backup".into()),
-                        hint: Some("Opens the backup export screen".into()),
+                        label: Some(self.t("backup.wizard.create")),
+                        hint: Some(self.t("settings.backup_export_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "backup_import".into(),
-                    label: "Restore Backup".into(),
+                    label: self.t("backup.wizard.restore"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("Restore Backup".into()),
-                        hint: Some("Opens the backup restore screen".into()),
+                        label: Some(self.t("backup.wizard.restore")),
+                        hint: Some(self.t("settings.backup_import_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "setup_new_device".into(),
-                    label: "Set Up New Device".into(),
+                    label: self.t("settings.setup_new_device"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("Set Up New Device".into()),
-                        hint: Some("Transfer your contacts to a new device via QR code".into()),
+                        label: Some(self.t("settings.setup_new_device")),
+                        hint: Some(self.t("settings.setup_new_device_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "last_backup".into(),
-                    label: "Last backup".into(),
+                    label: self.t("settings.last_backup"),
                     kind: SettingsItemKind::Value {
                         value: self.config.last_backup_display.clone(),
                     },
                     a11y: Some(A11y {
-                        label: Some("Last backup date".into()),
+                        label: Some(self.t("settings.last_backup_a11y")),
                         hint: None,
                         role: None,
                     }),
@@ -413,7 +425,7 @@ impl SettingsEngine {
                 },
                 SettingsItem {
                     id: "backup_reminders".into(),
-                    label: "Backup reminders".into(),
+                    label: self.t("settings.backup_reminders"),
                     // Link (not Value): same orphan class as display_name —
                     // Value is non-tappable, so the frequency-cycle handler was
                     // unreachable. Link emits ListItemSelected{backup_reminders}.
@@ -421,8 +433,8 @@ impl SettingsEngine {
                         detail: Some(self.config.backup_reminder_frequency.clone()),
                     },
                     a11y: Some(A11y {
-                        label: Some("Backup reminder frequency".into()),
-                        hint: Some("Tap to change frequency".into()),
+                        label: Some(self.t("settings.backup_reminders_a11y")),
+                        hint: Some(self.t("settings.backup_reminders_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -434,10 +446,10 @@ impl SettingsEngine {
     fn network_group(&self) -> Component {
         Component::SettingsGroup {
             id: "network".into(),
-            label: "Network".into(),
+            label: self.t("settings.network"),
             items: vec![SettingsItem {
                 id: "relay_url".into(),
-                label: "Relay URL".into(),
+                label: self.t("settings.relay_url"),
                 // Link, not Value: renderers wire taps (→ ListItemSelected
                 // → EditRelayUrl dialog) only on Link rows; as a Value row
                 // the editor was unreachable on mobile (device regression
@@ -446,8 +458,8 @@ impl SettingsEngine {
                     detail: Some(self.config.relay_url.clone()),
                 },
                 a11y: Some(A11y {
-                    label: Some("Relay URL".into()),
-                    hint: Some("The relay server used for message delivery".into()),
+                    label: Some(self.t("settings.relay_url")),
+                    hint: Some(self.t("settings.relay_url_hint")),
                     role: None,
                 }),
                 info_key: None,
@@ -458,43 +470,43 @@ impl SettingsEngine {
     fn delivery_group(&self) -> Component {
         Component::SettingsGroup {
             id: "delivery".into(),
-            label: "Message Delivery".into(),
+            label: self.t("settings.message_delivery"),
             items: vec![
                 SettingsItem {
                     id: "sync".into(),
-                    label: "Sync Status".into(),
+                    label: self.t("settings.sync_status_item"),
                     kind: SettingsItemKind::Link {
                         detail: Some(self.config.sync_status.clone()),
                     },
                     a11y: Some(A11y {
-                        label: Some("Sync Status".into()),
-                        hint: Some("Opens the sync status detail screen".into()),
+                        label: Some(self.t("settings.sync_status_item")),
+                        hint: Some(self.t("settings.sync_status_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "pending_updates".into(),
-                    label: "Pending Updates".into(),
+                    label: self.t("sync.pending_updates_title"),
                     kind: SettingsItemKind::Value {
                         value: self.config.pending_updates.to_string(),
                     },
                     a11y: Some(A11y {
-                        label: Some("Pending Updates".into()),
-                        hint: Some("Number of contact updates waiting to be delivered".into()),
+                        label: Some(self.t("sync.pending_updates_title")),
+                        hint: Some(self.t("settings.pending_updates_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "failed_deliveries".into(),
-                    label: "Failed Deliveries".into(),
+                    label: self.t("settings.failed_deliveries"),
                     kind: SettingsItemKind::Value {
                         value: self.config.failed_deliveries.to_string(),
                     },
                     a11y: Some(A11y {
-                        label: Some("Failed Deliveries".into()),
-                        hint: Some("Number of updates that failed to deliver".into()),
+                        label: Some(self.t("settings.failed_deliveries")),
+                        hint: Some(self.t("settings.failed_deliveries_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -506,37 +518,37 @@ impl SettingsEngine {
     fn help_group(&self) -> Component {
         Component::SettingsGroup {
             id: "help".into(),
-            label: "Help & Support".into(),
+            label: self.t("settings.help_support"),
             items: vec![
                 SettingsItem {
                     id: "help_center".into(),
-                    label: "Help Center".into(),
+                    label: self.t("settings.help_center"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("Help Center".into()),
-                        hint: Some("Opens the help center".into()),
+                        label: Some(self.t("settings.help_center")),
+                        hint: Some(self.t("settings.help_center_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "funding".into(),
-                    label: "Support Development".into(),
+                    label: self.t("settings.funding"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("Support Development".into()),
-                        hint: Some("Opens the funding and support page".into()),
+                        label: Some(self.t("settings.funding")),
+                        hint: Some(self.t("settings.funding_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "privacy_policy".into(),
-                    label: "Privacy Policy".into(),
+                    label: self.t("help.privacy_policy"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("Privacy Policy".into()),
-                        hint: Some("Opens the privacy policy".into()),
+                        label: Some(self.t("help.privacy_policy")),
+                        hint: Some(self.t("settings.privacy_policy_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -548,22 +560,22 @@ impl SettingsEngine {
     fn about_group(&self) -> Component {
         Component::SettingsGroup {
             id: "about".into(),
-            label: "About".into(),
+            label: self.t("settings.about"),
             items: vec![
                 SettingsItem {
                     id: "what_is_vauchi".into(),
-                    label: "What is Vauchi?".into(),
+                    label: self.t("about.what_is_vauchi.title"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("What is Vauchi?".into()),
-                        hint: Some("Learn what Vauchi is and how it works".into()),
+                        label: Some(self.t("about.what_is_vauchi.title")),
+                        hint: Some(self.t("settings.what_is_vauchi_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "version".into(),
-                    label: "Version".into(),
+                    label: self.t("settings.version"),
                     kind: SettingsItemKind::Value {
                         value: if self.config.build.is_empty() {
                             self.config.version.clone()
@@ -572,21 +584,25 @@ impl SettingsEngine {
                         },
                     },
                     a11y: Some(A11y {
-                        label: Some("Version".into()),
-                        hint: Some("The current app version and build number".into()),
+                        label: Some(self.t("settings.version")),
+                        hint: Some(self.t("settings.version_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "debug_mode".into(),
-                    label: "Debug Mode".into(),
+                    label: self.t("settings.debug_mode"),
                     kind: SettingsItemKind::Toggle {
                         enabled: self.config.debug_mode,
                     },
                     a11y: Some(A11y {
-                        label: Some("Debug Mode toggle".into()),
-                        hint: Some("When enabled, shows developer diagnostic information".into()),
+                        label: Some(get_string_with_args(
+                            self.locale(),
+                            "a11y.toggle_label",
+                            &[("name", &self.t("settings.debug_mode"))],
+                        )),
+                        hint: Some(self.t("settings.debug_mode_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -598,18 +614,16 @@ impl SettingsEngine {
     fn danger_group(&self) -> Component {
         Component::SettingsGroup {
             id: "danger".into(),
-            label: "Danger Zone".into(),
+            label: self.t("settings.danger_zone"),
             items: vec![SettingsItem {
                 id: "emergency_wipe".into(),
-                label: "Emergency Wipe".into(),
+                label: self.t("emergency.wipe_button"),
                 kind: SettingsItemKind::Destructive {
-                    label: "Wipe All Data".into(),
+                    label: self.t("shred.wipe.wipe_all"),
                 },
                 a11y: Some(A11y {
-                    label: Some("Emergency Wipe".into()),
-                    hint: Some(
-                        "Permanently deletes all app data. This action cannot be undone".into(),
-                    ),
+                    label: Some(self.t("emergency.wipe_button")),
+                    hint: Some(self.t("settings.emergency_wipe_hint")),
                     role: None,
                 }),
                 info_key: None,
@@ -640,14 +654,13 @@ impl WorkflowEngine for SettingsEngine {
         if self.pending_wipe {
             components.push(Component::InlineConfirm {
                 id: "emergency_wipe".into(),
-                warning: "This will permanently delete all data. This action cannot be undone."
-                    .into(),
-                confirm_text: "Wipe All Data".into(),
-                cancel_text: "Cancel".into(),
+                warning: self.t("settings.emergency_wipe_confirm_warning"),
+                confirm_text: self.t("shred.wipe.wipe_all"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: Some(A11y {
-                    label: Some("Confirm emergency data wipe".into()),
-                    hint: Some("This action is irreversible and will destroy all data".into()),
+                    label: Some(self.t("settings.emergency_wipe_confirm_a11y")),
+                    hint: Some(self.t("settings.emergency_wipe_confirm_hint")),
                     role: None,
                 }),
             });
@@ -655,7 +668,7 @@ impl WorkflowEngine for SettingsEngine {
 
         ScreenModel {
             screen_id: "settings".into(),
-            title: "Settings".into(),
+            title: self.t("settings.title"),
             subtitle: None,
             components,
             actions: vec![],

@@ -13,6 +13,7 @@
 //! - Medium: some mutual contacts → warning, suggest verifying.
 //! - Low: no mutual contacts → risky, require out-of-band verification.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Whether the user is vouching or reviewing a completed proof.
@@ -75,6 +76,7 @@ pub struct RecoveryClaimReviewEngine {
     context: ClaimContext,
     step: ReviewStep,
     cancelled: bool,
+    locale: Locale,
 }
 
 impl RecoveryClaimReviewEngine {
@@ -84,7 +86,19 @@ impl RecoveryClaimReviewEngine {
             context,
             step: ReviewStep::Review,
             cancelled: false,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-3).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     fn build_screen(&self) -> ScreenModel {
@@ -102,25 +116,25 @@ impl RecoveryClaimReviewEngine {
             Confidence::High => (
                 Status::Success,
                 "checkmark.shield",
-                format!(
-                    "{} mutual contacts vouched. This looks safe.",
-                    self.context.mutual_voucher_count
+                get_string_with_args(
+                    self.locale,
+                    "recovery.confidence_high_detail",
+                    &[("count", &self.context.mutual_voucher_count.to_string())],
                 ),
             ),
             Confidence::Medium => (
                 Status::Warning,
                 "exclamationmark.triangle",
-                format!(
-                    "{} mutual contact(s) vouched. Consider verifying before proceeding.",
-                    self.context.mutual_voucher_count
+                get_string_with_args(
+                    self.locale,
+                    "recovery.confidence_medium_detail",
+                    &[("count", &self.context.mutual_voucher_count.to_string())],
                 ),
             ),
             Confidence::Low => (
                 Status::Pending,
                 "questionmark.circle",
-                "No mutual contacts vouched. Verify this person's identity through \
-                 another channel before proceeding."
-                    .into(),
+                self.t("recovery.confidence_low_detail"),
             ),
         };
 
@@ -128,12 +142,16 @@ impl RecoveryClaimReviewEngine {
 
         ScreenModel {
             screen_id: "recovery_claim_review".into(),
-            title: format!("Recovery: {}", self.context.contact_name),
+            title: get_string_with_args(
+                self.locale,
+                "recovery.review_title",
+                &[("name", &self.context.contact_name)],
+            ),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "confidence".into(),
                 icon: Some(status_icon.into()),
-                title: "Verification Confidence".into(),
+                title: self.t("recovery.verification_confidence"),
                 detail: Some(detail),
                 status,
                 a11y: None,
@@ -158,33 +176,33 @@ impl RecoveryClaimReviewEngine {
             ReviewMode::Vouching => {
                 actions.push(ScreenAction {
                     id: "vouch".into(),
-                    label: "Vouch".into(),
+                    label: self.t("recovery.vouch_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.vouch_button"))),
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
-                    label: "Reject".into(),
+                    label: self.t("device_link.reject"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device_link.reject"))),
                 });
             }
             ReviewMode::Acceptance => {
                 actions.push(ScreenAction {
                     id: "accept".into(),
-                    label: "Accept".into(),
+                    label: self.t("recovery.accept_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.accept_button"))),
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
-                    label: "Reject".into(),
+                    label: self.t("device_link.reject"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device_link.reject"))),
                 });
             }
         }
@@ -197,47 +215,47 @@ impl RecoveryClaimReviewEngine {
             ReviewMode::Vouching => {
                 actions.push(ScreenAction {
                     id: "vouch".into(),
-                    label: "Vouch".into(),
+                    label: self.t("recovery.vouch_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.vouch_button"))),
                 });
                 actions.push(ScreenAction {
                     id: "remind".into(),
-                    label: "Remind Me Later".into(),
+                    label: self.t("recovery.remind_later_button"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.remind_later_button"))),
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
-                    label: "Reject".into(),
+                    label: self.t("device_link.reject"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device_link.reject"))),
                 });
             }
             ReviewMode::Acceptance => {
                 actions.push(ScreenAction {
                     id: "accept".into(),
-                    label: "Accept".into(),
+                    label: self.t("recovery.accept_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.accept_button"))),
                 });
                 actions.push(ScreenAction {
                     id: "remind".into(),
-                    label: "Remind Me Later".into(),
+                    label: self.t("recovery.remind_later_button"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.remind_later_button"))),
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
-                    label: "Reject".into(),
+                    label: self.t("device_link.reject"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device_link.reject"))),
                 });
             }
         }
@@ -250,47 +268,47 @@ impl RecoveryClaimReviewEngine {
             ReviewMode::Vouching => {
                 actions.push(ScreenAction {
                     id: "verify_other".into(),
-                    label: "Verify Another Way".into(),
+                    label: self.t("recovery.verify_another_way_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.verify_another_way_button"))),
                 });
                 actions.push(ScreenAction {
                     id: "vouch".into(),
-                    label: "Vouch Anyway".into(),
+                    label: self.t("recovery.vouch_anyway_button"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.vouch_anyway_button"))),
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
-                    label: "Reject".into(),
+                    label: self.t("device_link.reject"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device_link.reject"))),
                 });
             }
             ReviewMode::Acceptance => {
                 actions.push(ScreenAction {
                     id: "verify_other".into(),
-                    label: "Verify Another Way".into(),
+                    label: self.t("recovery.verify_another_way_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.verify_another_way_button"))),
                 });
                 actions.push(ScreenAction {
                     id: "accept_anyway".into(),
-                    label: "Accept Anyway".into(),
+                    label: self.t("recovery.accept_anyway_button"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.accept_anyway_button"))),
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
-                    label: "Reject".into(),
+                    label: self.t("device_link.reject"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("device_link.reject"))),
                 });
             }
         }
@@ -300,12 +318,12 @@ impl RecoveryClaimReviewEngine {
     fn build_verify_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "recovery_claim_review".into(),
-            title: "Verify Identity".into(),
-            subtitle: Some("Compare this fingerprint with the contact via phone or text".into()),
+            title: self.t("recovery.vouch_step1_title"),
+            subtitle: Some(self.t("recovery.verify_screen_subtitle")),
             components: vec![
                 Component::Text {
                     id: "fingerprint_label".into(),
-                    content: "Old identity fingerprint:".into(),
+                    content: self.t("recovery.old_fingerprint_label"),
                     style: TextStyle::Caption,
                 },
                 Component::Text {
@@ -315,18 +333,16 @@ impl RecoveryClaimReviewEngine {
                 },
                 Component::Text {
                     id: "instructions".into(),
-                    content: "Ask the person to read their old fingerprint aloud \
-                              over a phone call. If it matches, you can safely vouch."
-                        .into(),
+                    content: self.t("recovery.verify_call_instruction"),
                     style: TextStyle::Body,
                 },
             ],
             actions: vec![ScreenAction {
                 id: "back".into(),
-                label: "Back".into(),
+                label: self.t("action.back"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.back"))),
             }],
             progress: None,
             ..Default::default()
@@ -336,35 +352,34 @@ impl RecoveryClaimReviewEngine {
     fn build_confirm_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "recovery_claim_review".into(),
-            title: "Confirm Acceptance".into(),
+            title: self.t("recovery.confirm_acceptance_title"),
             subtitle: None,
             components: vec![Component::InlineConfirm {
                 id: "risky_accept".into(),
-                warning: format!(
-                    "No mutual contacts have vouched for {}. \
-                     Accepting without verification is risky — \
-                     this could be an impersonation attempt.",
-                    self.context.contact_name
+                warning: get_string_with_args(
+                    self.locale,
+                    "recovery.risky_accept_warning",
+                    &[("name", &self.context.contact_name)],
                 ),
-                confirm_text: "Accept Anyway".into(),
-                cancel_text: "Cancel".into(),
+                confirm_text: self.t("recovery.accept_anyway_button"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: None,
             }],
             actions: vec![
                 ScreenAction {
                     id: "confirm_accept".into(),
-                    label: "Accept Anyway".into(),
+                    label: self.t("recovery.accept_anyway_button"),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.accept_anyway_button"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,
@@ -375,30 +390,29 @@ impl RecoveryClaimReviewEngine {
     fn build_voucher_qr_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "recovery_claim_review".into(),
-            title: "Voucher Created".into(),
-            subtitle: Some(
-                "Show this QR code to the recovering contact so they can scan it".into(),
-            ),
+            title: self.t("recovery.voucher_created_title"),
+            subtitle: Some(self.t("recovery.voucher_created_subtitle")),
             components: vec![
                 Component::QrCode {
                     id: "voucher_qr".into(),
                     data: "voucher-placeholder".into(),
                     mode: QrMode::Display,
-                    label: Some("Recovery voucher".into()),
+                    label: Some(self.t("recovery.voucher_qr_label")),
                     scan_quality: None,
                     a11y: Some(A11y {
-                        label: Some("Recovery voucher QR code".into()),
-                        hint: Some("The recovering contact scans this to add your voucher".into()),
+                        label: Some(self.t("recovery.voucher_qr_a11y_label")),
+                        hint: Some(self.t("recovery.voucher_qr_a11y_hint")),
                         role: None,
                     }),
                 },
                 Component::StatusIndicator {
                     id: "voucher_status".into(),
                     icon: Some("checkmark.circle.fill".into()),
-                    title: "Voucher Signed".into(),
-                    detail: Some(format!(
-                        "You vouched for {}'s recovery.",
-                        self.context.contact_name
+                    title: self.t("recovery.voucher_signed_title"),
+                    detail: Some(get_string_with_args(
+                        self.locale,
+                        "recovery.voucher_signed_detail",
+                        &[("name", &self.context.contact_name)],
                     )),
                     status: Status::Success,
                     a11y: None,
@@ -406,10 +420,10 @@ impl RecoveryClaimReviewEngine {
             ],
             actions: vec![ScreenAction {
                 id: "done".into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.done"))),
             }],
             progress: None,
             ..Default::default()
@@ -419,7 +433,7 @@ impl RecoveryClaimReviewEngine {
     fn build_done_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "recovery_claim_review".into(),
-            title: "Done".into(),
+            title: self.t("action.done"),
             subtitle: None,
             components: vec![],
             actions: vec![],

@@ -637,16 +637,19 @@ impl AppEngine {
                 // Default: vouching mode with low confidence placeholder.
                 // In production, AppEngine populates context from the scanned
                 // claim data before navigating here.
-                Box::new(RecoveryClaimReviewEngine::new(
-                    ReviewMode::Vouching,
-                    ClaimContext {
-                        contact_name: "Unknown".into(),
-                        old_pk_fingerprint: String::new(),
-                        mutual_voucher_count: 0,
-                        threshold: 3,
-                        confidence: Confidence::Low,
-                    },
-                ))
+                Box::new(
+                    RecoveryClaimReviewEngine::new(
+                        ReviewMode::Vouching,
+                        ClaimContext {
+                            contact_name: "Unknown".into(),
+                            old_pk_fingerprint: String::new(),
+                            mutual_voucher_count: 0,
+                            threshold: 3,
+                            confidence: Confidence::Low,
+                        },
+                    )
+                    .with_locale(render_context.resolved_locale()),
+                )
             }
         }
     }

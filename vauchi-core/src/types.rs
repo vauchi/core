@@ -281,7 +281,12 @@ fn default_true() -> bool {
 /// instance (mobile PAE engine, `open_vauchi()` transients, desktop)
 /// reads a consistent value that survives restart. Defaults mirror
 /// `VauchiConfig`'s defaults (settings-toggle-not-persisting P1).
+///
+/// `#[non_exhaustive]` so adding a flag is a non-breaking change (mirrors
+/// `VauchiConfig`): out-of-crate code builds it via `From<&VauchiConfig>`
+/// or `default()` + field assignment, never a struct literal.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub struct SettingsFlags {
     /// Send read/delivery receipts. Defaults to true.
     #[serde(default = "default_true")]

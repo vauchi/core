@@ -95,14 +95,7 @@ impl AppEngine {
             // (settings-toggle-not-persisting P2). Best-effort, like the
             // backup-reminder arm below: a failed save leaves the previous
             // durable value, the in-memory toggle still reflects in-session.
-            let flags = vauchi_core::types::SettingsFlags {
-                delivery_receipts_enabled: config.delivery_receipts_enabled,
-                suppress_presence: config.suppress_presence,
-                contact_added_notifications: config.contact_added_notifications,
-                card_update_notifications: config.card_update_notifications,
-                reduce_motion: config.reduce_motion,
-                large_touch: config.large_touch,
-            };
+            let flags = vauchi_core::types::SettingsFlags::from(&*config);
             #[allow(clippy::let_underscore_must_use)]
             let _ = self.vauchi.save_settings_flags(&flags);
         }

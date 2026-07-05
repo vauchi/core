@@ -724,6 +724,25 @@
         "Destructive"
       ]
     },
+    "AnimationToken": {
+      "description": "Animation intent for [`Command::Celebrate`]. Closed enum — platforms map to a native one-beat animation, respecting reduce-motion.",
+      "oneOf": [
+        {
+          "description": "The two cards meet — the exchange-success beat (~600 ms, then still).",
+          "type": "string",
+          "enum": [
+            "cards_meet"
+          ]
+        },
+        {
+          "description": "No animation.",
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        }
+      ]
+    },
     "BiometricUnlockOutcome": {
       "description": "Outcome of [`crate::api::Vauchi::biometric_unlock_check`].\n\nReturned after a successful platform biometric authentication (LAContext on iOS, BiometricPrompt on Android). The variant tells the frontend which screen to render next:\n\n- `Unlocked`: biometric proves the real user; transition to the post-auth screen. - `PromptForDuressPin`: a duress PIN is configured, so the user must enter the PIN — that PIN check determines `Normal` vs `Duress` mode via [`crate::api::Vauchi::authenticate`].\n\nThe dispatcher is constant-time: the wall-clock duration of the containing call is at least [`crate::api::BIOMETRIC_UNLOCK_MIN_DURATION`] regardless of which outcome is returned, so an observer cannot infer whether duress is configured by timing the unlock animation.",
       "oneOf": [
@@ -1455,6 +1474,35 @@
                   "type": "integer",
                   "format": "uint32",
                   "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Render the exchange-success ceremony: a celebratory haptic + sound + animation (`designs/2026-06-06-exchange-ceremony-design.md`). The tokens are closed intent enums looked up against a static per-platform table (Wire-Humble kind rule) — core never sends assets or frequencies. Frontends skip any axis they can't render; the others still play. Emitted exactly once per validated exchange success, never on failure, and byte-identical regardless of auth mode (ADR-032 duress parity).",
+          "type": "object",
+          "required": [
+            "Celebrate"
+          ],
+          "properties": {
+            "Celebrate": {
+              "type": "object",
+              "required": [
+                "animation",
+                "haptic",
+                "sound"
+              ],
+              "properties": {
+                "animation": {
+                  "$ref": "#/definitions/AnimationToken"
+                },
+                "haptic": {
+                  "$ref": "#/definitions/HapticPattern"
+                },
+                "sound": {
+                  "$ref": "#/definitions/SoundToken"
                 }
               }
             }
@@ -2842,6 +2890,32 @@
         }
       }
     },
+    "HapticPattern": {
+      "description": "Haptic intent for [`Command::Celebrate`]. Closed enum — platforms map to native patterns (e.g. `UINotificationFeedbackGenerator.success`).",
+      "oneOf": [
+        {
+          "description": "The platform's \"success\" notification haptic.",
+          "type": "string",
+          "enum": [
+            "success"
+          ]
+        },
+        {
+          "description": "A single light tap.",
+          "type": "string",
+          "enum": [
+            "light"
+          ]
+        },
+        {
+          "description": "No haptic.",
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        }
+      ]
+    },
     "IndicatorKind": {
       "description": "Semantic kind for `Component::Indicator` — the four-state color category each frontend maps to its theme palette.\n\nDistinct from `Status` (used by `Component::StatusIndicator` for in-progress screen-body operations). `IndicatorKind` is for ongoing-state chrome and uses presentation-shaped categories (semantic color roles), not domain-shaped lifecycle states.",
       "oneOf": [
@@ -3079,6 +3153,13 @@
           "type": "string",
           "enum": [
             "ContactAdded"
+          ]
+        },
+        {
+          "description": "A contact updated their card. The product's core heartbeat (\"Anna updated her number\"). Default **on** (M4 S3, 2026-07-03-notifications-never-authorized).",
+          "type": "string",
+          "enum": [
+            "CardUpdate"
           ]
         }
       ]
@@ -3600,6 +3681,25 @@
             }
           },
           "additionalProperties": false
+        }
+      ]
+    },
+    "SoundToken": {
+      "description": "Sound intent for [`Command::Celebrate`]. Closed enum — platforms map to a bundled asset; respecting the ringer is the frontend's call.",
+      "oneOf": [
+        {
+          "description": "The short exchange chime (\"clinking glasses\").",
+          "type": "string",
+          "enum": [
+            "exchange_chime"
+          ]
+        },
+        {
+          "description": "No sound.",
+          "type": "string",
+          "enum": [
+            "none"
+          ]
         }
       ]
     },

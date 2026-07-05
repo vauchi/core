@@ -269,7 +269,7 @@ fn settings_screen_about_version_renders_non_empty_semver() {
 // @internal
 #[test]
 fn more_screen_emits_full_action_set_in_stable_order() {
-    let engine = MoreEngine::new();
+    let engine = MoreEngine::new(vauchi_app::i18n::Locale::English);
     let screen = engine.current_screen();
 
     assert_eq!(screen.screen_id, "more");
@@ -310,7 +310,7 @@ fn more_screen_emits_full_action_set_in_stable_order() {
 // @internal
 #[test]
 fn more_section_headers_are_semantic_and_backup_recovery_disambiguated() {
-    let engine = MoreEngine::new();
+    let engine = MoreEngine::new(vauchi_app::i18n::Locale::English);
     let screen = engine.current_screen();
     let sections = screen
         .components

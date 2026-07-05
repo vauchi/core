@@ -16,7 +16,7 @@ use vauchi_app::ui::{MoreEngine, WorkflowEngine};
 // @internal
 #[test]
 fn more_screen_is_reachable() {
-    let engine = MoreEngine::new();
+    let engine = MoreEngine::new(vauchi_app::i18n::Locale::English);
     assert_eq!(engine.current_screen().screen_id, "more");
     assert_reachability(&engine, &[]);
 }

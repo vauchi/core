@@ -570,7 +570,7 @@ impl AppEngine {
             AppScreen::FormDialog { dialog_type } => {
                 Box::new(FormDialogEngine::new(dialog_type.clone()))
             }
-            AppScreen::More => Box::new(MoreEngine::new()),
+            AppScreen::More => Box::new(MoreEngine::new(render_context.resolved_locale())),
             AppScreen::ActivityLog => {
                 use crate::notification_types::ActivityLogEntry;
                 let now = vauchi.clock().unix_seconds();

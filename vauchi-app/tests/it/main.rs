@@ -64,6 +64,7 @@ mod humble_surface_contract_tests;
 mod inline_confirm_action_id_tests;
 mod last_pins_i18n_tests;
 mod link_exchange_tests;
+mod more_i18n_tests;
 mod multi_stage_deadline_tests;
 mod multi_stage_machine_proptest;
 mod nfc_exchange_app_engine_tests;

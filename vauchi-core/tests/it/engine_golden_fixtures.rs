@@ -336,7 +336,7 @@ fn emergency_broadcast_overview_fixture_is_fresh() {
 // @internal
 #[test]
 fn more_fixture_is_fresh() {
-    let engine = MoreEngine::new();
+    let engine = MoreEngine::new(vauchi_app::i18n::Locale::English);
     assert_fixture_fresh(&engine.current_screen(), "more.json");
 }
 
@@ -512,7 +512,10 @@ fn regenerate_all_engine_fixtures() {
             EmergencyBroadcastEngine::new(None).current_screen(),
         ),
         // Phase 4: single-screen nav/setup engines
-        ("more.json", MoreEngine::new().current_screen()),
+        (
+            "more.json",
+            MoreEngine::new(vauchi_app::i18n::Locale::English).current_screen(),
+        ),
         ("support.json", SupportEngine::new().current_screen()),
         (
             "recovery_help.json",

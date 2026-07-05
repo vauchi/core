@@ -14,6 +14,7 @@
 //! so the unified renderer adoption (G1 of
 //! `2026-05-02-ios-humble-ui-deep-retirement`) is a like-for-like swap.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::{Command, FilePickPurpose};
 
@@ -25,11 +26,12 @@ pub(crate) const IMPORT_CONTACTS_ACTION_ID: &str = "import_contacts";
 
 /// Section in the More menu. Each section has a stable `id` (used by
 /// the cross-platform contract pinned in
-/// `tests/it/settings_more_parity_tests.rs`) and a `label` shown as
-/// the section header on frontends that surface it.
+/// `tests/it/settings_more_parity_tests.rs`) and a `label_key` — a
+/// locale key resolved at render time, shown as the section header on
+/// frontends that surface it (M3 S6b-1).
 struct MoreSection {
     id: &'static str,
-    label: &'static str,
+    label_key: &'static str,
     items: &'static [(&'static str, &'static str)],
 }
 
@@ -48,39 +50,39 @@ struct MoreSection {
 const MORE_SECTIONS: &[MoreSection] = &[
     MoreSection {
         id: "primary",
-        label: "App",
-        items: &[("settings", "Settings"), ("help", "Help")],
+        label_key: "more.section.primary",
+        items: &[("settings", "nav.settings"), ("help", "nav.help")],
     },
     MoreSection {
         id: "secondary",
-        label: "Account & Devices",
+        label_key: "more.section.secondary",
         items: &[
-            ("sync", "Sync"),
-            ("device_management", "Linked Devices"),
-            ("device_replacement", "Replace Device"),
+            ("sync", "nav.sync"),
+            ("device_management", "more.device_management"),
+            ("device_replacement", "more.device_replacement"),
             // `recovery` opens the Social-Recovery screen — label it for
             // what it is, not "Backup & Recovery", which collided with the
             // adjacent file-`backup` entry and read as a duplicate.
-            ("recovery", "Social Recovery"),
-            ("backup", "Backup"),
+            ("recovery", "more.social_recovery"),
+            ("backup", "nav.backup"),
         ],
     },
     MoreSection {
         id: "data",
-        label: "Data",
+        label_key: "more.section.data",
         items: &[
-            ("tags", "Tags"),
-            ("places", "Places"),
-            ("archived_contacts", "Archived Contacts"),
-            ("contact_duplicates", "Merge Contacts"),
-            (IMPORT_CONTACTS_ACTION_ID, "Import Contacts"),
-            ("activity_log", "Activity"),
+            ("tags", "more.tags"),
+            ("places", "more.places"),
+            ("archived_contacts", "more.archived_contacts"),
+            ("contact_duplicates", "more.contact_duplicates"),
+            (IMPORT_CONTACTS_ACTION_ID, "more.import_contacts"),
+            ("activity_log", "nav.activity"),
         ],
     },
     MoreSection {
         id: "legal",
-        label: "Legal",
-        items: &[("privacy", "Privacy")],
+        label_key: "more.section.legal",
+        items: &[("privacy", "nav.privacy")],
     },
 ];
 
@@ -107,17 +109,19 @@ fn vcf_mime_types() -> Vec<String> {
 
 /// Engine that renders a list of navigation targets for the "More" tab.
 #[derive(Clone, Debug)]
-pub struct MoreEngine;
+pub struct MoreEngine {
+    locale: Locale,
+}
 
 impl Default for MoreEngine {
     fn default() -> Self {
-        Self::new()
+        Self::new(Locale::English)
     }
 }
 
 impl MoreEngine {
-    pub fn new() -> Self {
-        Self
+    pub fn new(locale: Locale) -> Self {
+        Self { locale }
     }
 }
 
@@ -127,13 +131,13 @@ impl WorkflowEngine for MoreEngine {
             .iter()
             .map(|sec| Section {
                 id: sec.id.into(),
-                label: sec.label.into(),
+                label: get_string(self.locale, sec.label_key),
                 items: sec
                     .items
                     .iter()
-                    .map(|(id, label)| ActionListItem {
+                    .map(|(id, label_key)| ActionListItem {
                         id: (*id).into(),
-                        label: (*label).into(),
+                        label: get_string(self.locale, label_key),
                         icon: None,
                         detail: None,
                         a11y: None,
@@ -145,7 +149,7 @@ impl WorkflowEngine for MoreEngine {
 
         ScreenModel {
             screen_id: "more".into(),
-            title: "More".into(),
+            title: get_string(self.locale, "nav.more"),
             subtitle: None,
             components: vec![Component::SectionedActionList {
                 id: "more_menu".into(),
@@ -202,13 +206,13 @@ mod tests {
             entry.is_some(),
             "import_contacts entry missing from MORE_SECTIONS"
         );
-        assert_eq!(entry.unwrap().1, "Import Contacts");
+        assert_eq!(entry.unwrap().1, "more.import_contacts");
     }
 
     // @internal
     #[test]
     fn import_contacts_action_emits_file_pick_command() {
-        let mut engine = MoreEngine::new();
+        let mut engine = MoreEngine::new(Locale::English);
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: IMPORT_CONTACTS_ACTION_ID.into(),
         });
@@ -241,7 +245,7 @@ mod tests {
         // must route the same as ActionPressed — both map to the
         // same affordance on every frontend. Walker emits
         // ListItemSelected { component_id: <list id>, item_id: <item id> }.
-        let mut engine = MoreEngine::new();
+        let mut engine = MoreEngine::new(Locale::English);
         let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "more_menu".into(),
             item_id: IMPORT_CONTACTS_ACTION_ID.into(),
@@ -259,7 +263,7 @@ mod tests {
         // Regression guard: only `import_contacts` should special-case;
         // every other entry must still emit `OpenContact` so the
         // existing routing.rs MoreScreen mapping continues to work.
-        let mut engine = MoreEngine::new();
+        let mut engine = MoreEngine::new(Locale::English);
         for (id, _label) in iter_all_items() {
             if *id == IMPORT_CONTACTS_ACTION_ID {
                 continue;
@@ -279,7 +283,7 @@ mod tests {
     // @internal
     #[test]
     fn current_screen_emits_sectioned_action_list_with_import_contacts() {
-        let engine = MoreEngine::new();
+        let engine = MoreEngine::new(Locale::English);
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, "more");
         let sections = screen
@@ -308,7 +312,7 @@ mod tests {
         // four section ids in declaration order + assert no section
         // ships empty — an empty section is a UX bug (renders an
         // orphan header).
-        let engine = MoreEngine::new();
+        let engine = MoreEngine::new(Locale::English);
         let screen = engine.current_screen();
         let sections = screen
             .components

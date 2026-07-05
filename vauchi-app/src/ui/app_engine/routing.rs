@@ -182,7 +182,16 @@ impl AppEngine {
 
         // Delegate to the engine via the WorkflowEngine trait (ADR-031).
         // ExchangeEngine handles session-aware events; other engines return None.
-        if let Some(result) = self.engine.handle_hardware_event(event) {
+        let engine_result = self.engine.handle_hardware_event(event);
+
+        // Persist-at-Complete (legacy QR): the moment the session reaches
+        // Complete — which the event just processed may have triggered — save
+        // the received contact + ratchet before Done, so a crash or a Pending
+        // reciprocity outcome no longer strands a completed exchange
+        // (2026-06-04-exchange-terminal-screens).
+        self.persist_legacy_exchange_at_complete();
+
+        if let Some(result) = engine_result {
             // Navigation and command results take priority over informational
             // toasts — the engine handled the event with a state transition
             // (e.g., camera denied → ManualEntry). Toasts are only used when
@@ -202,6 +211,34 @@ impl AppEngine {
         }
 
         None
+    }
+
+    /// Persist-at-Complete for the legacy QR path: if the active engine is an
+    /// `ExchangeEngine` whose session has reached `Complete`, persist the
+    /// received contact now (before Done). Best-effort — a storage error leaves
+    /// the `legacy_exchange_persisted` guard unset so `complete_exchange` (Done)
+    /// retries and surfaces the alert. Idempotent: the guard also makes this a
+    /// no-op once persisted, so repeated events on a `Complete` session don't
+    /// re-save the ratchet (`2026-06-04-exchange-terminal-screens`).
+    fn persist_legacy_exchange_at_complete(&mut self) {
+        if !matches!(self.screen, AppScreen::Exchange) || self.legacy_exchange_persisted.is_some() {
+            return;
+        }
+        let at_complete = self
+            .engine
+            .as_any()
+            .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
+            .and_then(|ex| ex.session())
+            .is_some_and(|s| {
+                matches!(
+                    s.state(),
+                    vauchi_core::exchange::ExchangeState::Complete { .. }
+                )
+            });
+        if at_complete {
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.persist_legacy_exchange_contact();
+        }
     }
 
     /// Advance the animated QR to its next frame (~10fps timer from the frontend).

@@ -30,6 +30,12 @@ mod link_responder;
 mod multi_stage_exchange;
 mod navigation;
 mod overlays;
+// INLINE_TEST_REQUIRED: persist_at_complete_tests injects a legacy
+// `ExchangeEngine` into the private `engine`/`screen` AppEngine fields to
+// exercise the persist-at-Complete hook — crate-internal, cannot live in
+// a `tests/` directory.
+#[cfg(test)]
+mod persist_at_complete_tests;
 mod result_routing;
 mod routing;
 mod screens;
@@ -141,6 +147,12 @@ pub struct AppEngine {
     /// Recorded via `Vauchi::set_exchange_location`; a location denial /
     /// unavailability clears it.
     pending_location_contact: Option<String>,
+    /// Contact id already persisted by the legacy-QR persist-at-Complete hook
+    /// (`app_engine/routing.rs`). Guards against a second save on Done —
+    /// re-saving the exchange ratchet would reset Double Ratchet state
+    /// (`2026-06-04-exchange-terminal-screens`). Reset when a fresh exchange
+    /// engine is built (`screens_exchange::rebuild_exchange_engine`).
+    legacy_exchange_persisted: Option<String>,
     /// Engine-owned link-mode responder machine (slice 32l Phase 2), live
     /// only on `AppScreen::DeepLinkResponder`. See `app_engine/link_responder.rs`.
     link_responder: Option<vauchi_core::exchange::link_responder::LinkResponderSession>,
@@ -365,6 +377,7 @@ impl AppEngine {
             sync_chrome_status: SyncChromeStatus::Idle,
             pending_commands: std::collections::VecDeque::new(),
             pending_location_contact: None,
+            legacy_exchange_persisted: None,
             link_responder: None,
             link_responder_x3dh: None,
             link_initiator: None,

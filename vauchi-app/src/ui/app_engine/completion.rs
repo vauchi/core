@@ -143,17 +143,47 @@ impl AppEngine {
         }
     }
 
-    /// Exchange complete: persist contact + init ratchet + assign groups.
+    /// Exchange complete (Done): ensure the contact is persisted, then
+    /// navigate to Contacts. Persistence is idempotent — if the
+    /// persist-at-Complete hook (`routing.rs`) already saved this exchange,
+    /// the guard makes this a no-op and we only navigate.
     pub(super) fn complete_exchange(&mut self) -> ActionResult {
-        // ADR-031: Extract exchange result BEFORE navigate_to_internal
-        // replaces the engine (navigation.rs:34 does std::mem::replace).
+        if let Err(alert) = self.persist_legacy_exchange_contact() {
+            return *alert;
+        }
+        let screen = self.navigate_to_internal(AppScreen::Contacts);
+        ActionResult::NavigateTo(screen)
+    }
+
+    /// Persist the legacy-QR exchange result exactly once: upsert the
+    /// reciprocity-stamped contact, initialize its Double Ratchet, assign the
+    /// selected groups, snapshot the revocation baseline, and request the
+    /// capture-at-exchange location. Post-exchange reciprocity resolution is
+    /// handled by the stateless delta-sync tier
+    /// (`queue_reciprocity_confirmations` / `resolve_reciprocity_confirm`), not
+    /// from persisted escrow state, so nothing is saved for that here.
+    ///
+    /// Called both by the persist-at-Complete hook (the moment the session
+    /// reaches `Complete`, `routing.rs`) and by `complete_exchange` (Done). The
+    /// `legacy_exchange_persisted` guard makes the second call a no-op —
+    /// re-saving the ratchet would reset Double Ratchet state
+    /// (`2026-06-04-exchange-terminal-screens`). Returns `Err(ActionResult)`
+    /// carrying a user-facing alert when a required storage write fails; `Ok(())`
+    /// on success or when there is nothing to persist (already saved, or the
+    /// active engine is not a QR `ExchangeEngine` at `Complete`).
+    pub(super) fn persist_legacy_exchange_contact(&mut self) -> Result<(), Box<ActionResult>> {
+        if self.legacy_exchange_persisted.is_some() {
+            return Ok(());
+        }
+
+        // Extract the owned result from the live engine before touching storage.
         let exchange_data = self
             .engine
             .as_any()
             .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
             .and_then(|ex| {
                 let groups = ex.selected_groups().to_vec();
-                // QR path: the contact to persist carries its reciprocity outcome
+                // The contact to persist carries its reciprocity outcome
                 // (Confirmed/Pending) stamped by the engine, so an unconfirmed
                 // exchange surfaces via the banner rather than looking mutual.
                 // Build the ratchet from the session (owns the correct role +
@@ -164,54 +194,53 @@ impl AppEngine {
                 Some((contact, ratchet, groups))
             });
 
-        let screen = self.navigate_to_internal(AppScreen::Contacts);
+        let Some((contact, ratchet, groups)) = exchange_data else {
+            return Ok(());
+        };
 
-        // Persist exchange result: upsert contact + init ratchet + assign groups
-        if let Some((contact, ratchet, groups)) = exchange_data {
-            let contact_id = contact.id().to_string();
-            if let Err(e) = self.vauchi.update_contact(&contact) {
-                return ActionResult::ShowAlert {
-                    title: "Exchange Error".into(),
-                    message: format!("Failed to save contact: {e}"),
-                };
-            }
-            match ratchet {
-                Ok((ratchet, is_initiator)) => {
-                    if let Err(e) =
-                        self.vauchi
-                            .save_exchange_ratchet(&contact_id, &ratchet, is_initiator)
-                    {
-                        return ActionResult::ShowAlert {
-                            title: "Exchange Error".into(),
-                            message: format!("Failed to initialize encryption: {e}"),
-                        };
-                    }
-                }
-                Err(e) => {
-                    return ActionResult::ShowAlert {
+        let contact_id = contact.id().to_string();
+        if let Err(e) = self.vauchi.update_contact(&contact) {
+            return Err(Box::new(ActionResult::ShowAlert {
+                title: "Exchange Error".into(),
+                message: format!("Failed to save contact: {e}"),
+            }));
+        }
+        match ratchet {
+            Ok((ratchet, is_initiator)) => {
+                if let Err(e) =
+                    self.vauchi
+                        .save_exchange_ratchet(&contact_id, &ratchet, is_initiator)
+                {
+                    return Err(Box::new(ActionResult::ShowAlert {
                         title: "Exchange Error".into(),
                         message: format!("Failed to initialize encryption: {e}"),
-                    };
+                    }));
                 }
             }
-            for group_id in &groups {
-                // best-effort: group assignment after exchange;
-                // failures don't block the exchange itself
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = self.vauchi.add_contact_to_group(group_id, &contact_id);
+            Err(e) => {
+                return Err(Box::new(ActionResult::ShowAlert {
+                    title: "Exchange Error".into(),
+                    message: format!("Failed to initialize encryption: {e}"),
+                }));
             }
-            // Snapshot the revocation baseline
-            // (2026-06-08-card-revocation-not-propagated). Best-effort.
-            #[allow(clippy::let_underscore_must_use)]
-            let _ = self.vauchi.initialize_sent_baseline(&contact_id);
-            // Capture-at-exchange (ADR-051): QR is an in-person mode, so
-            // record where this contact was met — same seam as multi-stage
-            // and BLE. The Event::LocationResult reply is consumed in
-            // handle_hardware_event.
-            self.request_exchange_location(contact_id.clone());
         }
+        for group_id in &groups {
+            // best-effort: group assignment after exchange;
+            // failures don't block the exchange itself
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.vauchi.add_contact_to_group(group_id, &contact_id);
+        }
+        // Snapshot the revocation baseline
+        // (2026-06-08-card-revocation-not-propagated). Best-effort.
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.vauchi.initialize_sent_baseline(&contact_id);
+        // Capture-at-exchange (ADR-051): QR is an in-person mode, so record
+        // where this contact was met — same seam as multi-stage and BLE. The
+        // Event::LocationResult reply is consumed in handle_hardware_event.
+        self.request_exchange_location(contact_id.clone());
 
-        ActionResult::NavigateTo(screen)
+        self.legacy_exchange_persisted = Some(contact_id);
+        Ok(())
     }
 
     /// Multi-stage exchange complete: route Done → Contacts, Cancel → Exchange.

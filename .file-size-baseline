@@ -338,7 +338,10 @@ vauchi-core/src/storage/mod.rs 1079
 #  overlay chain — M4 S1a.)
 # (+5 2026-07-05: M4 S3 — locale threaded into both NotificationEmitter
 #  callers + card_update_enabled pref field. Stacked on S1a. 753 → 758.)
-vauchi-app/src/ui/app_engine/mod.rs 758
+# (+13 2026-07-05: legacy_exchange_persisted persist-once guard field +
+#  its persist_at_complete_tests INLINE_TEST_REQUIRED mod decl —
+#  2026-06-04-exchange-terminal-screens persist-at-Complete. 758 → 771.)
+vauchi-app/src/ui/app_engine/mod.rs 771
 # (2026-07-01: Glance orchestration + its INLINE_TEST_REQUIRED test mod —
 #  Slice B. The privacy/binding tests call private build_ble_session_inputs /
 #  pending_exchange_groups so they must stay inline; the pub-API Glance
@@ -407,7 +410,11 @@ vauchi-app/src/ui/app_engine/ble_handshake.rs 1080
 # (-259 2026-06-06: moved route_result + its arm helpers to
 #  app_engine/result_routing.rs (Tier 2 of the complexity sweep); the
 #  Start* arms now share one start_exchange_to helper.)
-vauchi-app/src/ui/app_engine/routing.rs 596
+# (+35 2026-07-05: persist_legacy_exchange_at_complete hook + helper —
+#  the legacy-QR persist-at-Complete gate (screen + Complete-state check)
+#  drives completion.rs::persist_legacy_exchange_contact.
+#  2026-06-04-exchange-terminal-screens.)
+vauchi-app/src/ui/app_engine/routing.rs 630
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)

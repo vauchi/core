@@ -196,6 +196,15 @@ impl AppEngine {
         // Swap in the new engine, get the old one back
         let mut old_engine = std::mem::replace(&mut self.engine, new_engine);
 
+        // Entering the Exchange screen afresh starts a new legacy-QR exchange:
+        // clear the persist-at-Complete guard so the next completion persists.
+        // Sub-steps (mode → group → field preview) stay under `Exchange`, so
+        // this only fires on a genuine (re)entry, never mid-flow
+        // (2026-06-04-exchange-terminal-screens).
+        if old_screen != screen && matches!(screen, AppScreen::Exchange) {
+            self.legacy_exchange_persisted = None;
+        }
+
         // Phase 2b: drive screen-presentation lifecycle hooks. The
         // outgoing engine emits its exit `Command`s (e.g. restore
         // brightness), then the incoming engine emits its entry

@@ -63,7 +63,8 @@ impl AppEngine {
         } = action
             && matches!(
                 component_id.as_str(),
-                "privacy" | "notifications" | "accessibility"
+                // M6 S1b merged privacy+notifications into one group id.
+                "privacy_notifications" | "accessibility"
             )
         {
             let config = self.vauchi.config_mut();
@@ -105,7 +106,7 @@ impl AppEngine {
             component_id,
             item_id,
         } = action
-            && component_id == "backup"
+            && component_id == "security_backup"
             && item_id == "backup_reminders"
             && let Ok(mut state) = self.vauchi.load_backup_reminder_state()
         {

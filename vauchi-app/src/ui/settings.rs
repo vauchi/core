@@ -666,22 +666,68 @@ impl SettingsEngine {
         }
     }
 
+    /// Merge two `SettingsGroup`s into one under a new id + label, keeping
+    /// their items in order (M6 S1b toward the everyday-6 IA). Combining
+    /// the existing builders avoids transcribing items; the toggle
+    /// handlers match the merged component_id.
+    fn merged_group(
+        &self,
+        id: &str,
+        label_key: &str,
+        first: Component,
+        second: Component,
+    ) -> Component {
+        let items = |c: Component| match c {
+            Component::SettingsGroup { items, .. } => items,
+            _ => unreachable!("group builder must return a SettingsGroup"),
+        };
+        Component::SettingsGroup {
+            id: id.into(),
+            label: self.t(label_key),
+            items: items(first).into_iter().chain(items(second)).collect(),
+        }
+    }
+
+    fn privacy_notifications_group(&self) -> Component {
+        self.merged_group(
+            "privacy_notifications",
+            "settings.privacy_notifications_group",
+            self.privacy_group(),
+            self.notifications_group(),
+        )
+    }
+
+    fn security_backup_group(&self) -> Component {
+        self.merged_group(
+            "security_backup",
+            "settings.security_backup_group",
+            self.security_group(),
+            self.backup_group(),
+        )
+    }
+
+    fn help_about_group(&self) -> Component {
+        self.merged_group(
+            "help_about",
+            "settings.help_about_group",
+            self.help_group(),
+            self.about_group(),
+        )
+    }
+
     /// The everyday-6 main list + the Advanced link. Network, delivery,
     /// and the emergency wipe live on the advanced sub-screen instead
     /// (M6 D6.1 — danger far from the thumb-reachable bottom).
     fn main_screen(&self) -> ScreenModel {
         let components = vec![
             self.profile_group(),
-            self.privacy_group(),
-            self.notifications_group(),
+            self.privacy_notifications_group(),
             self.appearance_group(),
             self.theme_dropdown(),
             self.language_dropdown(),
             self.accessibility_group(),
-            self.security_group(),
-            self.backup_group(),
-            self.help_group(),
-            self.about_group(),
+            self.security_backup_group(),
+            self.help_about_group(),
             self.advanced_link(),
         ];
         ScreenModel {
@@ -745,28 +791,28 @@ impl WorkflowEngine for SettingsEngine {
             UserAction::SettingsToggled {
                 ref component_id,
                 ref item_id,
-            } if component_id == "privacy" && item_id == "delivery_receipts" => {
+            } if component_id == "privacy_notifications" && item_id == "delivery_receipts" => {
                 self.config.delivery_receipts_enabled = !self.config.delivery_receipts_enabled;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::SettingsToggled {
                 ref component_id,
                 ref item_id,
-            } if component_id == "privacy" && item_id == "suppress_presence" => {
+            } if component_id == "privacy_notifications" && item_id == "suppress_presence" => {
                 self.config.suppress_presence = !self.config.suppress_presence;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::SettingsToggled {
                 ref component_id,
                 ref item_id,
-            } if component_id == "notifications" && item_id == "contact_added" => {
+            } if component_id == "privacy_notifications" && item_id == "contact_added" => {
                 self.config.contact_added_notifications = !self.config.contact_added_notifications;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::SettingsToggled {
                 ref component_id,
                 ref item_id,
-            } if component_id == "notifications" && item_id == "card_update" => {
+            } if component_id == "privacy_notifications" && item_id == "card_update" => {
                 self.config.card_update_notifications = !self.config.card_update_notifications;
                 ActionResult::UpdateScreen(self.current_screen())
             }
@@ -791,14 +837,14 @@ impl WorkflowEngine for SettingsEngine {
             UserAction::SettingsToggled {
                 ref component_id,
                 ref item_id,
-            } if component_id == "about" && item_id == "debug_mode" => {
+            } if component_id == "help_about" && item_id == "debug_mode" => {
                 self.config.debug_mode = !self.config.debug_mode;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected {
                 ref component_id,
                 ref item_id,
-            } if component_id == "backup" && item_id == "backup_reminders" => {
+            } if component_id == "security_backup" && item_id == "backup_reminders" => {
                 let current = vauchi_core::types::ReminderFrequency::from_label(
                     &self.config.backup_reminder_frequency,
                 );
@@ -830,7 +876,7 @@ impl WorkflowEngine for SettingsEngine {
             UserAction::ListItemSelected {
                 ref component_id,
                 ref item_id,
-            } if component_id == "about" && item_id == "what_is_vauchi" => {
+            } if component_id == "help_about" && item_id == "what_is_vauchi" => {
                 let title = self.t("about.what_is_vauchi.title");
                 let body = self.t("about.what_is_vauchi.body");
                 ActionResult::ShowInfoOverlay { title, body }

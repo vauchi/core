@@ -42,8 +42,8 @@
     },
     {
       "SettingsGroup": {
-        "id": "privacy",
-        "label": "Privacy",
+        "id": "privacy_notifications",
+        "label": "Privacy & Notifications",
         "items": [
           {
             "id": "delivery_receipts",
@@ -72,15 +72,7 @@
               "hint": "When enabled, hides your online status from contacts",
               "role": null
             }
-          }
-        ]
-      }
-    },
-    {
-      "SettingsGroup": {
-        "id": "notifications",
-        "label": "Notifications",
-        "items": [
+          },
           {
             "id": "card_update",
             "label": "Card Updates",
@@ -208,8 +200,8 @@
     },
     {
       "SettingsGroup": {
-        "id": "security",
-        "label": "Security",
+        "id": "security_backup",
+        "label": "Security & Backup",
         "items": [
           {
             "id": "change_password",
@@ -267,15 +259,7 @@
               "hint": "Opens the decoy contact list shown in duress mode",
               "role": null
             }
-          }
-        ]
-      }
-    },
-    {
-      "SettingsGroup": {
-        "id": "backup",
-        "label": "Backup & Recovery",
-        "items": [
+          },
           {
             "id": "backup_export",
             "label": "Create Backup",
@@ -351,8 +335,8 @@
     },
     {
       "SettingsGroup": {
-        "id": "help",
-        "label": "Help & Support",
+        "id": "help_about",
+        "label": "Help & About",
         "items": [
           {
             "id": "help_center",
@@ -395,15 +379,7 @@
               "hint": "Opens the privacy policy",
               "role": null
             }
-          }
-        ]
-      }
-    },
-    {
-      "SettingsGroup": {
-        "id": "about",
-        "label": "About",
-        "items": [
+          },
           {
             "id": "what_is_vauchi",
             "label": "What is Vauchi?",

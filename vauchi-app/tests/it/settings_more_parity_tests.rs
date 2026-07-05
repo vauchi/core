@@ -38,14 +38,11 @@ use vauchi_core::api::Vauchi;
 // reorg is pure-core — no per-frontend renderer change.
 const EXPECTED_SETTINGS_GROUP_IDS: &[&str] = &[
     "profile",
-    "privacy",
-    "notifications",
+    "privacy_notifications",
     "appearance",
     "accessibility",
-    "security",
-    "backup",
-    "help",
-    "about",
+    "security_backup",
+    "help_about",
     "advanced_nav",
 ];
 
@@ -434,14 +431,15 @@ fn backup_reminders_renders_as_link_so_renderers_emit_list_item_selected() {
     let engine = SettingsEngine::new(sample_settings_config());
     let screen = engine.current_screen();
 
+    // M6 S1b: backup items live in the merged security_backup group.
     let backup_items = screen
         .components
         .iter()
         .find_map(|c| match c {
-            Component::SettingsGroup { id, items, .. } if id == "backup" => Some(items),
+            Component::SettingsGroup { id, items, .. } if id == "security_backup" => Some(items),
             _ => None,
         })
-        .expect("settings screen must emit a backup group");
+        .expect("settings screen must emit a security_backup group");
 
     let item = backup_items
         .iter()

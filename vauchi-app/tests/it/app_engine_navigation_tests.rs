@@ -125,7 +125,7 @@ fn contact_added_toggle_updates_vauchi_config() {
     );
 
     let _ = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "notifications".into(),
+        component_id: "privacy_notifications".into(),
         item_id: "contact_added".into(),
     });
 
@@ -145,7 +145,7 @@ fn settings_toggle_persists_to_settings_flags() {
     engine.navigate_to(AppScreen::Settings);
 
     let _ = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "privacy".into(),
+        component_id: "privacy_notifications".into(),
         item_id: "suppress_presence".into(),
     });
     let flags = engine.vauchi().load_settings_flags().unwrap();
@@ -155,7 +155,7 @@ fn settings_toggle_persists_to_settings_flags() {
     );
 
     let _ = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "notifications".into(),
+        component_id: "privacy_notifications".into(),
         item_id: "contact_added".into(),
     });
     let flags = engine.vauchi().load_settings_flags().unwrap();

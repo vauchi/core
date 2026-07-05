@@ -24,18 +24,18 @@ fn settings_toggle_persists_after_navigate_away_and_back() {
 
     let screen = engine.navigate_to(AppScreen::Settings);
     assert!(
-        find_settings_toggle(&screen, "privacy", "delivery_receipts"),
+        find_settings_toggle(&screen, "privacy_notifications", "delivery_receipts"),
         "delivery_receipts should default to enabled"
     );
 
     let result = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "privacy".into(),
+        component_id: "privacy_notifications".into(),
         item_id: "delivery_receipts".into(),
     });
     match &result {
         ActionResult::UpdateScreen(s) => {
             assert!(
-                !find_settings_toggle(s, "privacy", "delivery_receipts"),
+                !find_settings_toggle(s, "privacy_notifications", "delivery_receipts"),
                 "delivery_receipts should be disabled after toggle"
             );
         }
@@ -50,7 +50,7 @@ fn settings_toggle_persists_after_navigate_away_and_back() {
     // Navigate back to Settings — toggle should still be off
     let restored = engine.navigate_to(AppScreen::Settings);
     assert!(
-        !find_settings_toggle(&restored, "privacy", "delivery_receipts"),
+        !find_settings_toggle(&restored, "privacy_notifications", "delivery_receipts"),
         "delivery_receipts toggle should persist after navigating away and back (even with cache invalidated)"
     );
 }
@@ -64,13 +64,13 @@ fn settings_toggle_suppress_presence_persists() {
 
     let screen = engine.navigate_to(AppScreen::Settings);
     assert!(
-        !find_settings_toggle(&screen, "privacy", "suppress_presence"),
+        !find_settings_toggle(&screen, "privacy_notifications", "suppress_presence"),
         "suppress_presence should default to disabled"
     );
 
     // Intermediate step: toggle on — persistence asserted after navigate-away-and-back
     let _ = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "privacy".into(),
+        component_id: "privacy_notifications".into(),
         item_id: "suppress_presence".into(),
     });
 
@@ -80,7 +80,7 @@ fn settings_toggle_suppress_presence_persists() {
     // Navigate back — should still be on
     let restored = engine.navigate_to(AppScreen::Settings);
     assert!(
-        find_settings_toggle(&restored, "privacy", "suppress_presence"),
+        find_settings_toggle(&restored, "privacy_notifications", "suppress_presence"),
         "suppress_presence toggle should persist after navigating away and back"
     );
 }
@@ -233,7 +233,7 @@ fn settings_change_password_navigates_to_change_password_screen() {
 
     engine.navigate_to(AppScreen::Settings);
     let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "security".into(),
+        component_id: "security_backup".into(),
         item_id: "change_password".into(),
     });
     let ActionResult::NavigateTo(screen) = result else {

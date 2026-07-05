@@ -66,7 +66,7 @@ fn settings_about_overlay_renders_german() {
     };
     let mut engine = SettingsEngine::new(config);
     let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "about".into(),
+        component_id: "help_about".into(),
         item_id: "what_is_vauchi".into(),
     });
     let ActionResult::ShowInfoOverlay { title, .. } = result else {
@@ -91,7 +91,7 @@ fn last_pins_english_copy_unchanged() {
 
     let mut engine = SettingsEngine::new(SettingsConfig::default());
     let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "about".into(),
+        component_id: "help_about".into(),
         item_id: "what_is_vauchi".into(),
     });
     let ActionResult::ShowInfoOverlay { title, .. } = result else {

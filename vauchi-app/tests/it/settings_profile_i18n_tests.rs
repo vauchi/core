@@ -46,10 +46,13 @@ fn settings_profile_groups_render_german() {
     assert_eq!(label, "Profil");
     assert_eq!(items[1].label, "Profil bearbeiten");
 
-    let Component::SettingsGroup { label, .. } = find_group(&screen.components, "privacy") else {
+    // M6 S1b: privacy merged with notifications.
+    let Component::SettingsGroup { label, .. } =
+        find_group(&screen.components, "privacy_notifications")
+    else {
         unreachable!()
     };
-    assert_eq!(label, "Datenschutz");
+    assert_eq!(label, "Datenschutz & Benachrichtigungen");
 
     let theme = screen
         .components

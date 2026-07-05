@@ -41,11 +41,13 @@ fn settings_security_groups_render_german() {
     let screen = engine.current_screen();
     assert_eq!(screen.title, "Einstellungen");
 
-    let Component::SettingsGroup { label, items, .. } = find_group(&screen.components, "security")
+    // M6 S1b: security merged with backup.
+    let Component::SettingsGroup { label, items, .. } =
+        find_group(&screen.components, "security_backup")
     else {
         unreachable!()
     };
-    assert_eq!(label, "Sicherheit");
+    assert_eq!(label, "Sicherheit & Backup");
     let devices_item = items.iter().find(|i| i.id == "devices").unwrap();
     assert_eq!(
         devices_item.kind,
@@ -70,11 +72,12 @@ fn settings_security_groups_english_copy_unchanged() {
     let screen = engine.current_screen();
     assert_eq!(screen.title, "Settings");
 
-    let Component::SettingsGroup { label, items, .. } = find_group(&screen.components, "security")
+    let Component::SettingsGroup { label, items, .. } =
+        find_group(&screen.components, "security_backup")
     else {
         unreachable!()
     };
-    assert_eq!(label, "Security");
+    assert_eq!(label, "Security & Backup");
     let devices_item = items.iter().find(|i| i.id == "devices").unwrap();
     assert_eq!(
         devices_item.kind,

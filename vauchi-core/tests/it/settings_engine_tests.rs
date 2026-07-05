@@ -54,18 +54,16 @@ fn settings_shows_all_groups() {
             _ => None,
         })
         .collect();
+    // M6 S1b: everyday toggle-groups merged toward the 6.
     assert_eq!(
         main_groups,
         vec![
             "profile",
-            "privacy",
-            "notifications",
+            "privacy_notifications",
             "appearance",
             "accessibility",
-            "security",
-            "backup",
-            "help",
-            "about",
+            "security_backup",
+            "help_about",
             "advanced_nav",
         ]
     );
@@ -89,16 +87,16 @@ fn settings_toggle_delivery_receipts() {
     let mut engine = SettingsEngine::new(sample_config());
 
     let screen = engine.current_screen();
-    let receipts_enabled = find_toggle(&screen, "privacy", "delivery_receipts");
+    let receipts_enabled = find_toggle(&screen, "privacy_notifications", "delivery_receipts");
     assert!(receipts_enabled, "delivery_receipts should start enabled");
 
     let result = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "privacy".into(),
+        component_id: "privacy_notifications".into(),
         item_id: "delivery_receipts".into(),
     });
     match result {
         ActionResult::UpdateScreen(screen) => {
-            let toggled = find_toggle(&screen, "privacy", "delivery_receipts");
+            let toggled = find_toggle(&screen, "privacy_notifications", "delivery_receipts");
             assert!(
                 !toggled,
                 "delivery_receipts should be disabled after toggle"
@@ -117,18 +115,18 @@ fn settings_toggle_card_update_notifications() {
 
     let screen = engine.current_screen();
     assert!(
-        find_toggle(&screen, "notifications", "card_update"),
+        find_toggle(&screen, "privacy_notifications", "card_update"),
         "card_update toggle present + enabled (default-on)"
     );
 
     let result = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "notifications".into(),
+        component_id: "privacy_notifications".into(),
         item_id: "card_update".into(),
     });
     match result {
         ActionResult::UpdateScreen(screen) => {
             assert!(
-                !find_toggle(&screen, "notifications", "card_update"),
+                !find_toggle(&screen, "privacy_notifications", "card_update"),
                 "card_update disabled after toggle"
             );
         }
@@ -143,16 +141,16 @@ fn settings_toggle_suppress_presence() {
     let mut engine = SettingsEngine::new(sample_config());
 
     let screen = engine.current_screen();
-    let suppress = find_toggle(&screen, "privacy", "suppress_presence");
+    let suppress = find_toggle(&screen, "privacy_notifications", "suppress_presence");
     assert!(!suppress, "suppress_presence should start disabled");
 
     let result = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "privacy".into(),
+        component_id: "privacy_notifications".into(),
         item_id: "suppress_presence".into(),
     });
     match result {
         ActionResult::UpdateScreen(screen) => {
-            let toggled = find_toggle(&screen, "privacy", "suppress_presence");
+            let toggled = find_toggle(&screen, "privacy_notifications", "suppress_presence");
             assert!(toggled, "suppress_presence should be enabled after toggle");
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
@@ -256,7 +254,7 @@ fn settings_device_count_in_detail() {
     let engine = SettingsEngine::new(sample_config());
     let screen = engine.current_screen();
 
-    let detail = find_link_detail(&screen, "security", "devices");
+    let detail = find_link_detail(&screen, "security_backup", "devices");
     assert_eq!(detail.as_deref(), Some("3 devices"));
 }
 
@@ -268,7 +266,7 @@ fn settings_single_device_no_plural() {
     config.device_count = 1;
     let engine = SettingsEngine::new(config);
     let screen = engine.current_screen();
-    let detail = find_link_detail(&screen, "security", "devices");
+    let detail = find_link_detail(&screen, "security_backup", "devices");
     assert_eq!(detail.as_deref(), Some("1 device"));
 }
 
@@ -451,7 +449,7 @@ fn settings_about_shows_version() {
     config.build = "42".into();
     let engine = SettingsEngine::new(config);
     let screen = engine.current_screen();
-    let version = find_value(&screen, "about", "version");
+    let version = find_value(&screen, "help_about", "version");
     assert_eq!(version, "0.19.0 (42)");
 }
 
@@ -464,7 +462,7 @@ fn settings_about_version_without_build() {
     config.build = String::new();
     let engine = SettingsEngine::new(config);
     let screen = engine.current_screen();
-    let version = find_value(&screen, "about", "version");
+    let version = find_value(&screen, "help_about", "version");
     assert_eq!(version, "0.19.0");
 }
 
@@ -475,18 +473,18 @@ fn settings_debug_mode_toggle() {
     let mut engine = SettingsEngine::new(sample_config());
     assert!(!find_toggle(
         &engine.current_screen(),
-        "about",
+        "help_about",
         "debug_mode"
     ));
 
     let result = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "about".into(),
+        component_id: "help_about".into(),
         item_id: "debug_mode".into(),
     });
     let ActionResult::UpdateScreen(screen) = result else {
         panic!()
     };
-    assert!(find_toggle(&screen, "about", "debug_mode"));
+    assert!(find_toggle(&screen, "help_about", "debug_mode"));
 }
 
 // @internal
@@ -513,21 +511,32 @@ fn settings_delivery_section() {
 // @internal
 #[test]
 fn settings_backup_section_has_links() {
+    // M6 S1b: backup items now live in the merged security_backup group
+    // (after the security items). Look them up by id, not absolute index.
     let engine = SettingsEngine::new(sample_config());
     let screen = engine.current_screen();
-    let items = find_settings_group(&screen, "backup");
-    assert_eq!(items.len(), 5);
-    assert!(matches!(items[0].kind, SettingsItemKind::Link { .. }));
-    assert!(matches!(items[1].kind, SettingsItemKind::Link { .. }));
-    assert!(matches!(items[2].kind, SettingsItemKind::Link { .. }));
-    assert_eq!(items[2].id, "setup_new_device");
-    assert!(matches!(items[3].kind, SettingsItemKind::Value { .. }));
-    assert_eq!(items[3].id, "last_backup");
+    let items = find_settings_group(&screen, "security_backup");
+    let by_id = |id: &str| {
+        items
+            .iter()
+            .find(|i| i.id == id)
+            .unwrap_or_else(|| panic!("security_backup group missing `{id}`"))
+    };
+    assert!(matches!(
+        by_id("setup_new_device").kind,
+        SettingsItemKind::Link { .. }
+    ));
+    // last_backup stays a Value: display-only, no handler.
+    assert!(matches!(
+        by_id("last_backup").kind,
+        SettingsItemKind::Value { .. }
+    ));
     // backup_reminders is a Link (tappable, cycles frequency) — it was a Value
     // that orphaned its handler (2026-04-06-display-name-rename-fails sibling).
-    // last_backup above stays a Value: display-only, no handler.
-    assert!(matches!(items[4].kind, SettingsItemKind::Link { .. }));
-    assert_eq!(items[4].id, "backup_reminders");
+    assert!(matches!(
+        by_id("backup_reminders").kind,
+        SettingsItemKind::Link { .. }
+    ));
 }
 
 // @internal
@@ -616,7 +625,7 @@ fn settings_duress_pin_has_info_key_when_help_icons_enabled() {
     config.show_help_icons = true;
     let engine = SettingsEngine::new(config);
     let screen = engine.current_screen();
-    let items = find_settings_group(&screen, "security");
+    let items = find_settings_group(&screen, "security_backup");
     let duress = items
         .iter()
         .find(|i| i.id == "duress_pin")
@@ -635,7 +644,7 @@ fn settings_duress_pin_has_no_info_key_when_help_icons_disabled() {
     config.show_help_icons = false;
     let engine = SettingsEngine::new(config);
     let screen = engine.current_screen();
-    let items = find_settings_group(&screen, "security");
+    let items = find_settings_group(&screen, "security_backup");
     let duress = items
         .iter()
         .find(|i| i.id == "duress_pin")
@@ -671,7 +680,7 @@ fn settings_other_items_have_no_info_key() {
 fn settings_about_has_what_is_vauchi_item() {
     let engine = SettingsEngine::new(sample_config());
     let screen = engine.current_screen();
-    let items = find_settings_group(&screen, "about");
+    let items = find_settings_group(&screen, "help_about");
     let item = items.iter().find(|i| i.id == "what_is_vauchi");
     assert!(
         item.is_some(),
@@ -687,7 +696,7 @@ fn settings_about_has_what_is_vauchi_item() {
 fn settings_select_what_is_vauchi_returns_show_info_overlay() {
     let mut engine = SettingsEngine::new(sample_config());
     let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "about".into(),
+        component_id: "help_about".into(),
         item_id: "what_is_vauchi".into(),
     });
     match result {

@@ -336,7 +336,9 @@ vauchi-core/src/storage/mod.rs 1079
 #  2026-06-10-ble-unauthenticated-peer-identity.)
 # (+1 2026-07-05: apply_accessibility_overlay step in current_screen's
 #  overlay chain — M4 S1a.)
-vauchi-app/src/ui/app_engine/mod.rs 753
+# (+5 2026-07-05: M4 S3 — locale threaded into both NotificationEmitter
+#  callers + card_update_enabled pref field. Stacked on S1a. 753 → 758.)
+vauchi-app/src/ui/app_engine/mod.rs 758
 # (2026-07-01: Glance orchestration + its INLINE_TEST_REQUIRED test mod —
 #  Slice B. The privacy/binding tests call private build_ble_session_inputs /
 #  pending_exchange_groups so they must stay inline; the pub-API Glance

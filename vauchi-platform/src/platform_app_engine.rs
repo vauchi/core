@@ -853,6 +853,7 @@ impl PlatformAppEngine {
                     CoreNotificationCategory::ContactAdded => {
                         MobileNotificationCategory::ContactAdded
                     }
+                    CoreNotificationCategory::CardUpdate => MobileNotificationCategory::CardUpdate,
                 },
                 title: n.title,
                 body: n.body,

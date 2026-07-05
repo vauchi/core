@@ -458,7 +458,8 @@ impl AppEngine {
         }
 
         let prefs = NotificationPreferences::default();
-        NotificationEmitter::evaluate(&new_entries, &prefs, |contact_id| {
+        let locale = self.render_context.resolved_locale();
+        NotificationEmitter::evaluate(&new_entries, &prefs, locale, |contact_id| {
             self.vauchi
                 .get_contact(contact_id)
                 .ok()
@@ -668,7 +669,11 @@ impl AppEngine {
 
         let prefs = NotificationPreferences {
             contact_added_enabled: self.vauchi.config().contact_added_notifications,
+            // Default-on card-update heartbeat (M4 S3). A persisted toggle +
+            // per-contact mute are follow-ups (S3a2 / Tier-1).
+            card_update_enabled: true,
         };
+        let locale = self.render_context.resolved_locale();
 
         // Resolve contact names for body text
         let name_resolver = |contact_id: &str| {
@@ -682,7 +687,7 @@ impl AppEngine {
                 .unwrap_or_else(|| "Unknown contact".to_string())
         };
 
-        NotificationEmitter::evaluate(&entries, &prefs, name_resolver)
+        NotificationEmitter::evaluate(&entries, &prefs, locale, name_resolver)
     }
 
     /// Convert `ValidationError` into `UpdateScreen` with the error injected

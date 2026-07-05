@@ -94,7 +94,10 @@ proptest! {
         count in 0usize..20,
         pref_on in any::<bool>(),
     ) {
-        let prefs = NotificationPreferences { contact_added_enabled: pref_on };
+        let prefs = NotificationPreferences {
+            contact_added_enabled: pref_on,
+            card_update_enabled: pref_on,
+        };
         let entries: Vec<(String, ActivityLogEntry)> = (0..count)
             .map(|i| {
                 (format!("contact_added:c{i}"), ActivityLogEntry::ContactAdded {
@@ -105,7 +108,7 @@ proptest! {
             .collect();
 
         let notifications = NotificationEmitter::evaluate(
-            &entries, &prefs, |_| "Test".into()
+            &entries, &prefs, vauchi_app::i18n::Locale::English, |_| "Test".into()
         );
         prop_assert!(notifications.len() <= entries.len());
     }

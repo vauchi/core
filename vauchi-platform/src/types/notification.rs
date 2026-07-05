@@ -12,6 +12,8 @@ pub enum MobileNotificationCategory {
     /// from `EmergencyAlert` so the frontend can convey the coercion context.
     DuressAlert,
     ContactAdded,
+    /// A contact updated their card (M4 S3). Default-on heartbeat.
+    CardUpdate,
 }
 
 /// A pending OS notification for the frontend to render.

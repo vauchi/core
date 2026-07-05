@@ -20,14 +20,38 @@ pub enum NotificationCategory {
     DuressAlert,
     /// Opt-in, off by default.
     ContactAdded,
+    /// A contact updated their card. The product's core heartbeat
+    /// ("Anna updated her number"). Default **on** (M4 S3,
+    /// 2026-07-03-notifications-never-authorized).
+    CardUpdate,
 }
 
 /// User preferences for OS notifications.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 pub struct NotificationPreferences {
     /// Whether contact-added notifications are enabled. Default: false.
+    #[serde(default)]
     pub contact_added_enabled: bool,
+    /// Whether card-update notifications are enabled. Default: **true** —
+    /// this is the app's reason to exist; the placebo bug was that no such
+    /// notification existed at all (M4 S3). A per-contact mute is a planned
+    /// follow-up (needs per-contact preference storage).
+    #[serde(default = "default_true")]
+    pub card_update_enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for NotificationPreferences {
+    fn default() -> Self {
+        Self {
+            contact_added_enabled: false,
+            card_update_enabled: true,
+        }
+    }
 }
 
 /// An OS notification for the frontend to render.

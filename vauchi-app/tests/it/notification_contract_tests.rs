@@ -51,10 +51,12 @@ fn notification_preferences_roundtrip() {
     for enabled in [true, false] {
         let prefs = NotificationPreferences {
             contact_added_enabled: enabled,
+            card_update_enabled: enabled,
         };
         let json = serde_json::to_string(&prefs).unwrap();
         let decoded: NotificationPreferences = serde_json::from_str(&json).unwrap();
         assert_eq!(prefs.contact_added_enabled, decoded.contact_added_enabled);
+        assert_eq!(prefs.card_update_enabled, decoded.card_update_enabled);
     }
 }
 

@@ -302,7 +302,10 @@ impl AppEngine {
                         is_active: d.is_active,
                     })
                     .collect();
-                Box::new(DeviceManagementEngine::new(devices))
+                Box::new(
+                    DeviceManagementEngine::new(devices)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::DuressPin => {
                 // Load ALL contacts as the picker pool (even with no stored

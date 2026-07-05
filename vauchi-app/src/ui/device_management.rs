@@ -7,6 +7,7 @@
 //! Replaces the TUI-local revoke overlay with a core-driven `InlineConfirm`
 //! component per ADR-022 (irrevocable actions require InlineConfirm).
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Summary info for a linked device (mirrors `vauchi-core::api::DeviceInfo`).
@@ -26,6 +27,7 @@ pub struct DeviceManagementEngine {
     pending_revoke_index: Option<u32>,
     /// Set after the user confirms revocation. Read by app engine in `handle_completion`.
     confirmed_revoke_index: Option<u32>,
+    locale: Locale,
 }
 
 impl DeviceManagementEngine {
@@ -34,7 +36,19 @@ impl DeviceManagementEngine {
             devices,
             pending_revoke_index: None,
             confirmed_revoke_index: None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S6b-4).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Returns the device index that the user confirmed for revocation.
@@ -50,11 +64,15 @@ impl DeviceManagementEngine {
             .iter()
             .map(|d| {
                 let detail = if d.is_current {
-                    Some("This device".into())
+                    Some(self.t("devices.this_device"))
                 } else if !d.is_active {
-                    Some("Revoked".into())
+                    Some(self.t("devices.revoked_detail"))
                 } else {
-                    Some(format!("ID: {}", d.public_key_prefix))
+                    Some(get_string_with_args(
+                        self.locale,
+                        "devices.id_prefix_detail",
+                        &[("id", &d.public_key_prefix)],
+                    ))
                 };
                 ActionListItem {
                     id: format!("device:{}", d.device_index),
@@ -68,11 +86,11 @@ impl DeviceManagementEngine {
                     a11y: Some(A11y {
                         label: Some(d.device_name.clone()),
                         hint: if d.is_current {
-                            Some("This is your current device.".into())
+                            Some(self.t("devices.hint_current"))
                         } else if !d.is_active {
-                            Some("This device has been revoked.".into())
+                            Some(self.t("devices.hint_revoked"))
                         } else {
-                            Some("Tap to revoke this device.".into())
+                            Some(self.t("devices.hint_tap_to_revoke"))
                         },
                         role: None,
                     }),
@@ -95,19 +113,21 @@ impl DeviceManagementEngine {
                 .unwrap_or("device");
             components.push(Component::InlineConfirm {
                 id: format!("revoke_device:{}", index),
-                warning: format!(
-                    "Revoke '{}'? This device will lose access and must be re-linked.",
-                    name
+                warning: get_string_with_args(
+                    self.locale,
+                    "devices.revoke_confirm_warning",
+                    &[("name", name)],
                 ),
-                confirm_text: "Revoke".into(),
-                cancel_text: "Cancel".into(),
+                confirm_text: self.t("action.revoke"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: Some(A11y {
-                    label: Some(format!("Confirm revoke {}", name)),
-                    hint: Some(
-                        "This device will lose access and must be re-linked to use Vauchi again."
-                            .into(),
-                    ),
+                    label: Some(get_string_with_args(
+                        self.locale,
+                        "devices.confirm_revoke_a11y",
+                        &[("name", name)],
+                    )),
+                    hint: Some(self.t("devices.revoke_confirm_hint")),
                     role: Some(AccessibilityRole::Alert),
                 }),
             });
@@ -117,20 +137,20 @@ impl DeviceManagementEngine {
 
         ScreenModel {
             screen_id: "device_management".into(),
-            title: "Devices".into(),
+            title: self.t("devices.count"),
             subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
                     id: "link_device".into(),
-                    label: "Link New Device".into(),
+                    label: self.t("devices.link_new"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "revoke_device".into(),
-                    label: "Revoke Device".into(),
+                    label: self.t("devices.revoke_button"),
                     style: ActionStyle::Secondary,
                     enabled: can_revoke,
                     a11y: None,
@@ -174,13 +194,13 @@ impl WorkflowEngine for DeviceManagementEngine {
                     if let Some(device) = self.devices.iter().find(|d| d.device_index == idx) {
                         if device.is_current {
                             return ActionResult::ShowToast {
-                                message: "Cannot revoke the current device".into(),
+                                message: self.t("devices.cannot_revoke_current"),
                                 undo_action_id: None,
                             };
                         }
                         if !device.is_active {
                             return ActionResult::ShowToast {
-                                message: "Device is already revoked".into(),
+                                message: self.t("devices.already_revoked_toast"),
                                 undo_action_id: None,
                             };
                         }

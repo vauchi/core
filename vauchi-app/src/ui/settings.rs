@@ -76,14 +76,22 @@ impl SettingsEngine {
         }
     }
 
+    fn locale(&self) -> Locale {
+        Locale::from_code(&self.config.language_id).unwrap_or_default()
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale(), key)
+    }
+
     fn profile_group(&self) -> Component {
         Component::SettingsGroup {
             id: "profile".into(),
-            label: "Profile".into(),
+            label: self.t("settings.profile_group"),
             items: vec![
                 SettingsItem {
                     id: "display_name".into(),
-                    label: "Display Name".into(),
+                    label: self.t("settings.display_name"),
                     // Link (not Value): Value rows are non-tappable in every
                     // Humble UI renderer, which orphaned the rename handler
                     // (2026-04-06-display-name-rename-fails). Link emits
@@ -92,19 +100,19 @@ impl SettingsEngine {
                         detail: Some(self.config.display_name.clone()),
                     },
                     a11y: Some(A11y {
-                        label: Some("Display Name".into()),
-                        hint: Some("Your visible name shown to contacts".into()),
+                        label: Some(self.t("settings.display_name")),
+                        hint: Some(self.t("settings.display_name_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "edit_profile".into(),
-                    label: "Edit Profile".into(),
+                    label: self.t("settings.edit_profile"),
                     kind: SettingsItemKind::Link { detail: None },
                     a11y: Some(A11y {
-                        label: Some("Edit Profile".into()),
-                        hint: Some("Opens the profile editor".into()),
+                        label: Some(self.t("settings.edit_profile")),
+                        hint: Some(self.t("settings.edit_profile_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -116,33 +124,30 @@ impl SettingsEngine {
     fn privacy_group(&self) -> Component {
         Component::SettingsGroup {
             id: "privacy".into(),
-            label: "Privacy".into(),
+            label: self.t("settings.privacy"),
             items: vec![
                 SettingsItem {
                     id: "delivery_receipts".into(),
-                    label: "Delivery Receipts".into(),
+                    label: self.t("settings.delivery_receipts"),
                     kind: SettingsItemKind::Toggle {
                         enabled: self.config.delivery_receipts_enabled,
                     },
                     a11y: Some(A11y {
-                        label: Some("Delivery Receipts toggle".into()),
-                        hint: Some(
-                            "When enabled, notifies senders when their messages are delivered"
-                                .into(),
-                        ),
+                        label: Some(self.t("settings.delivery_receipts_a11y")),
+                        hint: Some(self.t("settings.delivery_receipts_hint")),
                         role: None,
                     }),
                     info_key: None,
                 },
                 SettingsItem {
                     id: "suppress_presence".into(),
-                    label: "Suppress Presence".into(),
+                    label: self.t("settings.suppress_presence"),
                     kind: SettingsItemKind::Toggle {
                         enabled: self.config.suppress_presence,
                     },
                     a11y: Some(A11y {
-                        label: Some("Suppress Presence toggle".into()),
-                        hint: Some("When enabled, hides your online status from contacts".into()),
+                        label: Some(self.t("settings.suppress_presence_a11y")),
+                        hint: Some(self.t("settings.suppress_presence_hint")),
                         role: None,
                     }),
                     info_key: None,
@@ -154,18 +159,16 @@ impl SettingsEngine {
     fn notifications_group(&self) -> Component {
         Component::SettingsGroup {
             id: "notifications".into(),
-            label: "Notifications".into(),
+            label: self.t("settings.notifications_group"),
             items: vec![SettingsItem {
                 id: "contact_added".into(),
-                label: "New Contact Added".into(),
+                label: self.t("settings.contact_added"),
                 kind: SettingsItemKind::Toggle {
                     enabled: self.config.contact_added_notifications,
                 },
                 a11y: Some(A11y {
-                    label: Some("New Contact Added toggle".into()),
-                    hint: Some(
-                        "When enabled, sends a notification when a new contact is added".into(),
-                    ),
+                    label: Some(self.t("settings.contact_added_a11y")),
+                    hint: Some(self.t("settings.contact_added_hint")),
                     role: None,
                 }),
                 info_key: None,
@@ -176,16 +179,16 @@ impl SettingsEngine {
     fn appearance_group(&self) -> Component {
         Component::SettingsGroup {
             id: "appearance".into(),
-            label: "Appearance".into(),
+            label: self.t("settings.appearance"),
             items: vec![SettingsItem {
                 id: "show_help_icons".into(),
-                label: "Show help icons".into(),
+                label: self.t("settings.show_help_icons"),
                 kind: SettingsItemKind::Toggle {
                     enabled: self.config.show_help_icons,
                 },
                 a11y: Some(A11y {
                     label: None,
-                    hint: Some("Toggle contextual help icons on form fields".into()),
+                    hint: Some(self.t("settings.show_help_icons_hint")),
                     role: None,
                 }),
                 info_key: None,
@@ -202,19 +205,19 @@ impl SettingsEngine {
         // component_id matching the dropdown id.
         Component::Dropdown {
             id: "theme".into(),
-            label: "Theme".into(),
+            label: self.t("settings.theme"),
             selected: Some(self.config.theme_id.clone()),
             options: {
                 let mut opts = vec![DropdownOption {
                     id: "follow_system".into(),
-                    label: "System".into(),
+                    label: self.t("theme.system"),
                 }];
                 opts.extend(self.config.available_themes.iter().cloned());
                 opts
             },
             a11y: Some(A11y {
-                label: Some("Theme".into()),
-                hint: Some("Pick the color theme of the app".into()),
+                label: Some(self.t("settings.theme")),
+                hint: Some(self.t("settings.theme_hint")),
                 role: None,
             }),
         }
@@ -223,19 +226,19 @@ impl SettingsEngine {
     fn language_dropdown(&self) -> Component {
         Component::Dropdown {
             id: "language".into(),
-            label: "Language".into(),
+            label: self.t("settings.language"),
             selected: Some(self.config.language_id.clone()),
             options: {
                 let mut opts = vec![DropdownOption {
                     id: "follow_system".into(),
-                    label: "System".into(),
+                    label: self.t("theme.system"),
                 }];
                 opts.extend(self.config.available_languages.iter().cloned());
                 opts
             },
             a11y: Some(A11y {
-                label: Some("Language".into()),
-                hint: Some("Pick the display language of the app".into()),
+                label: Some(self.t("settings.language")),
+                hint: Some(self.t("settings.language_hint")),
                 role: None,
             }),
         }
@@ -746,11 +749,8 @@ impl WorkflowEngine for SettingsEngine {
                 ref component_id,
                 ref item_id,
             } if component_id == "about" && item_id == "what_is_vauchi" => {
-                // The frontend-pushed language id ("de"/"en"/"follow_system");
-                // unknown/follow_system falls back to English (M3 S6a).
-                let locale = Locale::from_code(&self.config.language_id).unwrap_or_default();
-                let title = get_string(locale, "about.what_is_vauchi.title");
-                let body = get_string(locale, "about.what_is_vauchi.body");
+                let title = self.t("about.what_is_vauchi.title");
+                let body = self.t("about.what_is_vauchi.body");
                 ActionResult::ShowInfoOverlay { title, body }
             }
             UserAction::ListItemSelected { ref item_id, .. } if item_id == "emergency_wipe" => {

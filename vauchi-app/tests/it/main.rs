@@ -91,6 +91,7 @@ mod onboarding_i18n_tests;
 mod reciprocity_confirmer_tests;
 mod render_context_tests;
 mod settings_more_parity_tests;
+mod settings_profile_i18n_tests;
 mod settings_render_context_tests;
 mod shred_i18n_tests;
 mod sync_chrome_overlay_tests;

@@ -16,6 +16,7 @@
 //! which reads [`TagsEngine::pending_delete_id`] and then applies
 //! [`TagsEngine::confirm_delete`].
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Summary of a tag for the management list.
@@ -33,6 +34,7 @@ pub struct TagsEngine {
     tags: Vec<TagSummary>,
     /// Id of the tag pending a delete confirmation, if any.
     pending_delete: Option<String>,
+    locale: Locale,
 }
 
 impl TagsEngine {
@@ -40,7 +42,19 @@ impl TagsEngine {
         Self {
             tags,
             pending_delete: None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-15).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Id of the tag awaiting delete confirmation — read by the AppEngine
@@ -73,9 +87,13 @@ impl TagsEngine {
             .iter()
             .map(|t| {
                 let detail = if t.member_count == 1 {
-                    "1 contact".to_string()
+                    self.t("tags_list.member_count_singular")
                 } else {
-                    format!("{} contacts", t.member_count)
+                    get_string_with_args(
+                        self.locale,
+                        "tags_list.member_count_plural",
+                        &[("count", &t.member_count.to_string())],
+                    )
                 };
                 Item {
                     id: t.id.clone(),
@@ -86,13 +104,13 @@ impl TagsEngine {
                     actions: vec![
                         ListItemAction {
                             id: "promote".into(),
-                            label: "Promote to Group".into(),
+                            label: self.t("tags_list.promote_button"),
                             kind: ListItemActionKind::Custom,
                             destructive: false,
                         },
                         ListItemAction {
                             id: "request_delete".into(),
-                            label: "Delete".into(),
+                            label: self.t("action.delete"),
                             kind: ListItemActionKind::Custom,
                             destructive: false,
                         },
@@ -114,12 +132,13 @@ impl TagsEngine {
         if let Some(name) = self.pending_name() {
             components.push(Component::InlineConfirm {
                 id: "delete_tag".into(),
-                warning: format!(
-                    "Delete the tag \"{name}\"? It is removed from every contact. \
-                     This cannot be undone."
+                warning: get_string_with_args(
+                    self.locale,
+                    "tags_list.delete_warning",
+                    &[("name", name)],
                 ),
-                confirm_text: "Delete".into(),
-                cancel_text: "Cancel".into(),
+                confirm_text: self.t("action.delete"),
+                cancel_text: self.t("action.cancel"),
                 destructive: true,
                 a11y: None,
             });
@@ -127,7 +146,7 @@ impl TagsEngine {
 
         ScreenModel {
             screen_id: "tags".into(),
-            title: "Tags".into(),
+            title: self.t("more.tags"),
             subtitle: None,
             components,
             actions: vec![],

@@ -493,7 +493,7 @@ impl AppEngine {
                         member_count: t.contact_ids.len(),
                     })
                     .collect();
-                Box::new(TagsEngine::new(tags))
+                Box::new(TagsEngine::new(tags).with_locale(render_context.resolved_locale()))
             }
             AppScreen::Groups => {
                 let all_groups = vauchi.list_groups().unwrap_or_default();

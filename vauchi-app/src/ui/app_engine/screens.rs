@@ -379,7 +379,8 @@ impl AppEngine {
                     .list_devices()
                     .map(|d| d.len().saturating_sub(1))
                     .unwrap_or(0);
-                let mut engine = RecoveryEngine::new(contacts, 3);
+                let mut engine =
+                    RecoveryEngine::new(contacts, 3).with_locale(render_context.resolved_locale());
                 engine.set_linked_device_count(device_count);
                 Box::new(engine)
             }

@@ -8,6 +8,7 @@
 //! The recovering user shows a claim QR, collects voucher scans from
 //! guardians, and submits the proof when the threshold is met.
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
 /// Steps in the outgoing recovery workflow.
@@ -67,6 +68,7 @@ pub struct RecoveryEngine {
     /// Generated claim payload (base64), populated by the AppEngine
     /// intercept after `Vauchi::create_recovery_claim_hex_b64` succeeds.
     generated_claim_b64: Option<String>,
+    locale: Locale,
 }
 
 impl RecoveryEngine {
@@ -81,7 +83,19 @@ impl RecoveryEngine {
             old_key_input: String::new(),
             old_key_error: None,
             generated_claim_b64: None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-2).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Returns the user-entered old public key hex (set via `TextChanged`).
@@ -169,36 +183,34 @@ impl RecoveryEngine {
             Component::InfoPanel {
                 id: "intro".into(),
                 icon: Some("recovery".into()),
-                title: "Lost Your Device?".into(),
+                title: self.t("recovery.lost_device_title"),
                 items: vec![InfoItem {
                     icon: None,
                     title: String::new(),
-                    detail: "You can recover your contact relationships through \
-                             social vouching."
-                        .into(),
+                    detail: self.t("recovery.lost_device_description"),
                 }],
                 a11y: None,
             },
             Component::InfoPanel {
                 id: "settings".into(),
                 icon: None,
-                title: "Recovery Settings".into(),
+                title: self.t("recovery.settings_title"),
                 items: vec![
                     InfoItem {
                         icon: None,
-                        title: "Required vouchers".into(),
+                        title: self.t("recovery.required_vouchers_label"),
                         detail: threshold.to_string(),
                     },
                     InfoItem {
                         icon: None,
-                        title: "Claim expiry".into(),
+                        title: self.t("recovery.claim_expiry_label"),
                         // 7 days matches RecoveryClaim::is_expired logic
                         // (claim is valid for 7 days from creation).
-                        detail: "7 days".into(),
+                        detail: self.t("recovery.claim_expiry_days"),
                     },
                     InfoItem {
                         icon: None,
-                        title: "Trusted contacts".into(),
+                        title: self.t("recovery.trusted_contacts_label"),
                         detail: trusted_detail,
                     },
                 ],
@@ -210,11 +222,11 @@ impl RecoveryEngine {
             components.push(Component::StatusIndicator {
                 id: "low_trusted_warning".into(),
                 icon: Some("warning".into()),
-                title: "Not enough trusted contacts".into(),
-                detail: Some(format!(
-                    "Mark {} more contact(s) as trusted for recovery before \
-                     starting the recovery process.",
-                    threshold.saturating_sub(trusted)
+                title: self.t("recovery.not_enough_trusted"),
+                detail: Some(get_string_with_args(
+                    self.locale,
+                    "recovery.mark_more_trusted",
+                    &[("count", &threshold.saturating_sub(trusted).to_string())],
                 )),
                 status: Status::Warning,
                 a11y: None,
@@ -225,15 +237,15 @@ impl RecoveryEngine {
 
         ScreenModel {
             screen_id: "recovery_status".into(),
-            title: "Social Recovery".into(),
+            title: self.t("more.social_recovery"),
             subtitle: None,
             components,
             actions: vec![ScreenAction {
                 id: "start_recovery_process".into(),
-                label: "Start Recovery Process".into(),
+                label: self.t("recovery.start_process"),
                 style: ActionStyle::Primary,
                 enabled: quorum_met,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("recovery.start_process"))),
             }],
             progress: None,
             ..Default::default()
@@ -244,33 +256,27 @@ impl RecoveryEngine {
         Component::InfoPanel {
             id: "how_it_works".into(),
             icon: None,
-            title: "How it works".into(),
+            title: self.t("recovery.how_it_works_title"),
             items: vec![
                 InfoItem {
                     icon: None,
-                    title: "1. Create New Identity".into(),
-                    detail: "First, create a new identity on your new device.".into(),
+                    title: format!("1. {}", self.t("recovery.step1_title")),
+                    detail: self.t("recovery.step1_desc"),
                 },
                 InfoItem {
                     icon: None,
-                    title: "2. Generate Recovery Claim".into(),
-                    detail: "Create a claim using your OLD public key from your \
-                             lost identity."
-                        .into(),
+                    title: format!("2. {}", self.t("recovery.step2_title")),
+                    detail: self.t("recovery.step2_desc"),
                 },
                 InfoItem {
                     icon: None,
-                    title: "3. Collect Vouchers".into(),
-                    detail: "Meet with trusted contacts in person. Have them vouch \
-                             for your recovery."
-                        .into(),
+                    title: format!("3. {}", self.t("recovery.step3_title")),
+                    detail: self.t("recovery.step3_desc_original"),
                 },
                 InfoItem {
                     icon: None,
-                    title: "4. Share Recovery Proof".into(),
-                    detail: "Once you have enough vouchers, share your recovery \
-                             proof with all contacts."
-                        .into(),
+                    title: format!("4. {}", self.t("recovery.step4_title")),
+                    detail: self.t("recovery.step4_desc"),
                 },
             ],
             a11y: None,
@@ -281,20 +287,18 @@ impl RecoveryEngine {
         let components = vec![
             Component::Text {
                 id: "instructions".into(),
-                content: "Enter your OLD public key (from backup or previous \
-                          device). The key is a 64-character hex string."
-                    .into(),
+                content: self.t("recovery.enter_old_key_full_instruction"),
                 style: TextStyle::Body,
             },
             Component::TextInput {
                 id: "old_public_key".into(),
-                label: "Old Public Key (hex)".into(),
+                label: self.t("recovery.old_public_key"),
                 value: self.old_key_input.clone(),
-                placeholder: Some("64 hex characters".into()),
+                placeholder: Some(self.t("recovery.hex_placeholder_short")),
                 max_length: Some(64),
                 validation_error: self.old_key_error.clone(),
                 input_type: InputType::Text,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("recovery.old_public_key"))),
                 info_key: None,
             },
         ];
@@ -306,23 +310,23 @@ impl RecoveryEngine {
 
         ScreenModel {
             screen_id: "recovery_status".into(),
-            title: "Create Recovery Claim".into(),
+            title: self.t("recovery.create_claim_title"),
             subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
                     id: "create_claim".into(),
-                    label: "Create Claim".into(),
+                    label: self.t("recovery.create_claim_button"),
                     style: ActionStyle::Primary,
                     enabled: create_enabled,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.create_claim_button"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,
@@ -338,18 +342,14 @@ impl RecoveryEngine {
 
         ScreenModel {
             screen_id: "recovery_status".into(),
-            title: "Recovery Claim Created".into(),
+            title: self.t("recovery.claim_created_title"),
             subtitle: None,
             components: vec![
                 Component::StatusIndicator {
                     id: "claim_ready".into(),
                     icon: Some("checkmark.circle.fill".into()),
-                    title: "Share with trusted contacts".into(),
-                    detail: Some(
-                        "Give this claim to each of your trusted contacts so \
-                         they can vouch for your recovery."
-                            .into(),
-                    ),
+                    title: self.t("recovery.share_with_trusted_title"),
+                    detail: Some(self.t("recovery.give_claim_instruction")),
                     status: Status::Success,
                     a11y: None,
                 },
@@ -362,17 +362,17 @@ impl RecoveryEngine {
             actions: vec![
                 ScreenAction {
                     id: "copy_claim".into(),
-                    label: "Copy Claim Data".into(),
+                    label: self.t("recovery.copy_claim_data"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.copy_claim_data"))),
                 },
                 ScreenAction {
                     id: "done".into(),
-                    label: "Done".into(),
+                    label: self.t("action.done"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.done"))),
                 },
             ],
             progress: None,
@@ -392,12 +392,11 @@ impl RecoveryEngine {
             components.push(Component::StatusIndicator {
                 id: "multi_device_hint".into(),
                 icon: Some("link".into()),
-                title: "Linked Devices Available".into(),
-                detail: Some(format!(
-                    "You have {} other linked device(s). If you lost one device \
-                     but still have another, revoke the lost device from \
-                     Device Management instead of using recovery.",
-                    self.linked_device_count
+                title: self.t("recovery.linked_devices_available"),
+                detail: Some(get_string_with_args(
+                    self.locale,
+                    "recovery.linked_devices_hint",
+                    &[("count", &self.linked_device_count.to_string())],
                 )),
                 status: Status::Success,
                 a11y: None,
@@ -407,17 +406,28 @@ impl RecoveryEngine {
         components.push(Component::InfoPanel {
             id: "quorum_info".into(),
             icon: Some("recovery".into()),
-            title: "Quorum Status".into(),
+            title: self.t("recovery.quorum_status_title"),
             items: vec![
                 InfoItem {
                     icon: None,
-                    title: "Trusted Contacts".into(),
-                    detail: format!("{current} of {}", self.quorum_threshold),
+                    title: self.t("resistance.emergency.trusted_contacts"),
+                    detail: get_string_with_args(
+                        self.locale,
+                        "recovery.contacts_of_threshold",
+                        &[
+                            ("current", &current.to_string()),
+                            ("threshold", &self.quorum_threshold.to_string()),
+                        ],
+                    ),
                 },
                 InfoItem {
                     icon: None,
-                    title: "Quorum Met".into(),
-                    detail: if quorum_met { "Yes" } else { "No" }.into(),
+                    title: self.t("recovery.quorum_met_label"),
+                    detail: if quorum_met {
+                        self.t("generic.yes")
+                    } else {
+                        self.t("generic.no")
+                    },
                 },
             ],
             a11y: None,
@@ -434,23 +444,23 @@ impl RecoveryEngine {
 
         ScreenModel {
             screen_id: "recovery_status".into(),
-            title: "Social Recovery".into(),
+            title: self.t("more.social_recovery"),
             subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
                     id: "start_recovery".into(),
-                    label: "Start Recovery".into(),
+                    label: self.t("recovery.start_recovery_short"),
                     style: ActionStyle::Primary,
                     enabled: quorum_met,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.start_recovery_short"))),
                 },
                 ScreenAction {
                     id: "check_status".into(),
-                    label: "Check Status".into(),
+                    label: self.t("recovery.check_status_button"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.check_status_button"))),
                 },
             ],
             progress: None,
@@ -463,41 +473,41 @@ impl RecoveryEngine {
 
         ScreenModel {
             screen_id: "recovery_status".into(),
-            title: "Recovery Claim".into(),
-            subtitle: Some("Show this QR code to your trusted contacts".into()),
+            title: self.t("recovery.claim_label"),
+            subtitle: Some(self.t("recovery.show_qr_subtitle")),
             components: vec![
                 Component::QrCode {
                     id: "claim_qr".into(),
                     data: qr_data,
                     mode: QrMode::Display,
-                    label: Some("Recovery claim — scan to vouch".into()),
+                    label: Some(self.t("recovery.claim_qr_label")),
                     scan_quality: None,
                     a11y: Some(A11y {
-                        label: Some("Recovery claim QR code".into()),
-                        hint: Some("Show this to trusted contacts so they can vouch for you".into()),
+                        label: Some(self.t("recovery.claim_qr_a11y_label")),
+                        hint: Some(self.t("recovery.claim_qr_a11y_hint")),
                         role: None,
                     }),
                 },
                 Component::Text {
                     id: "claim_instructions".into(),
-                    content: "Meet each trusted contact in person. They scan this code to create a voucher for you.".into(),
+                    content: self.t("recovery.claim_meet_instruction"),
                     style: TextStyle::Body,
                 },
             ],
             actions: vec![
                 ScreenAction {
                     id: "wait_for_voucher".into(),
-                    label: "Collect Vouchers".into(),
+                    label: self.t("recovery.step3_title"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.step3_title"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,
@@ -519,14 +529,22 @@ impl RecoveryEngine {
         let mut components: Vec<Component> = vec![Component::StatusIndicator {
             id: "voucher_progress".into(),
             icon: Some("recovery".into()),
-            title: "Voucher Collection".into(),
-            detail: Some(format!("{count} of {threshold} vouchers collected")),
+            title: self.t("recovery.voucher_collection_title"),
+            detail: Some(get_string_with_args(
+                self.locale,
+                "recovery.vouchers_collected_count",
+                &[
+                    ("count", &count.to_string()),
+                    ("threshold", &threshold.to_string()),
+                ],
+            )),
             status,
             a11y: None,
         }];
 
         // Show collected voucher names
         if !self.collected_vouchers.is_empty() {
+            let vouched_label = self.t("recovery.vouched_label");
             let items: Vec<ActionListItem> = self
                 .collected_vouchers
                 .iter()
@@ -535,8 +553,8 @@ impl RecoveryEngine {
                     id: format!("voucher_{i}"),
                     label: v.guardian_name.clone(),
                     icon: Some("checkmark.circle".into()),
-                    detail: Some("Vouched".into()),
-                    a11y: None,
+                    detail: Some(vouched_label.clone()),
+                    a11y: Some(A11y::labeled(v.guardian_name.clone())),
                     info_key: None,
                 })
                 .collect();
@@ -548,29 +566,36 @@ impl RecoveryEngine {
 
         ScreenModel {
             screen_id: "recovery_status".into(),
-            title: "Collecting Vouchers".into(),
+            title: self.t("recovery.collecting_vouchers_title"),
             subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
                     id: "submit_proof".into(),
-                    label: "Submit Proof".into(),
+                    label: self.t("recovery.submit_proof_button"),
                     style: ActionStyle::Primary,
                     enabled: met,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("recovery.submit_proof_button"))),
                 },
                 ScreenAction {
                     id: "cancel".into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: Some(Progress {
                 current_step: count as u8,
                 total_steps: threshold as u8,
-                label: Some(format!("{count}/{threshold} vouchers")),
+                label: Some(get_string_with_args(
+                    self.locale,
+                    "recovery.vouchers_progress_label",
+                    &[
+                        ("count", &count.to_string()),
+                        ("threshold", &threshold.to_string()),
+                    ],
+                )),
             }),
             ..Default::default()
         }
@@ -579,43 +604,34 @@ impl RecoveryEngine {
     fn build_complete_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "recovery_status".into(),
-            title: "Recovery Complete".into(),
+            title: self.t("recovery.complete_title"),
             subtitle: None,
             components: vec![
                 Component::StatusIndicator {
                     id: "recovery_complete".into(),
                     icon: Some("checkmark.circle.fill".into()),
-                    title: "Recovery Proof Submitted".into(),
-                    detail: Some(
-                        "Your contacts will be notified. They can accept \
-                         your new identity to restore your contact relationships."
-                            .into(),
-                    ),
+                    title: self.t("recovery.proof_submitted_title"),
+                    detail: Some(self.t("recovery.proof_submitted_detail")),
                     status: Status::Success,
                     a11y: None,
                 },
                 Component::Text {
                     id: "what_is_recovered".into(),
-                    content: "What is recovered: contact relationships \
-                              and the ability to communicate with your contacts."
-                        .into(),
+                    content: self.t("recovery.what_is_recovered"),
                     style: TextStyle::Body,
                 },
                 Component::Text {
                     id: "what_is_not_recovered".into(),
-                    content: "NOT recovered: message history, device-specific \
-                              settings, and trust levels. Your contacts will \
-                              re-send their cards once they accept your recovery."
-                        .into(),
+                    content: self.t("recovery.what_is_not_recovered"),
                     style: TextStyle::Caption,
                 },
             ],
             actions: vec![ScreenAction {
                 id: "done".into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.done"))),
             }],
             progress: None,
             ..Default::default()
@@ -719,8 +735,8 @@ impl WorkflowEngine for RecoveryEngine {
                 if action_id == "check_status" =>
             {
                 ActionResult::ShowAlert {
-                    title: "Recovery Status".into(),
-                    message: "No active recovery claims.".into(),
+                    title: self.t("recovery.status"),
+                    message: self.t("recovery.no_active_claims_alert"),
                 }
             }
 

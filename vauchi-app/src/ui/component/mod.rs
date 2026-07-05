@@ -348,6 +348,19 @@ pub struct A11y {
     pub role: Option<AccessibilityRole>,
 }
 
+impl A11y {
+    /// Label-only a11y — the common case where a component's visible
+    /// text also serves as its screen-reader label, with no separate
+    /// hint or role (M3 S5).
+    pub fn labeled(label: String) -> Self {
+        Self {
+            label: Some(label),
+            hint: None,
+            role: None,
+        }
+    }
+}
+
 /// Text rendering style.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

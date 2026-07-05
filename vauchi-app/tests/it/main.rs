@@ -90,6 +90,7 @@ mod notification_emitter_tests;
 mod notification_proptest;
 mod onboarding_i18n_tests;
 mod reciprocity_confirmer_tests;
+mod recovery_status_i18n_tests;
 mod render_context_tests;
 mod settings_more_parity_tests;
 mod settings_profile_i18n_tests;

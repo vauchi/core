@@ -555,11 +555,45 @@ impl ExchangeEngine {
         }
     }
 
-    /// Build a FieldPreviewConfig from the current state.
-    ///
-    /// Uses own_name as display name (group override would come from
-    /// storage, which this engine doesn't have access to yet — deferred
-    /// to Phase 2 full integration when AppEngine passes group data).
+    /// Candidate display names for the current selection: the base
+    /// name (id [`field_preview::DEFAULT_NAME_OPTION_ID`]) plus one
+    /// deduplicated entry per selected group carrying a
+    /// `display_name_override` (M2 S7 Record E). Dedup is by label
+    /// text — two groups sharing the same override collapse to one
+    /// option. Order: base name first, then overrides in
+    /// `selected_groups` order.
+    fn build_name_options(&self) -> Vec<DropdownOption> {
+        let mut options = vec![DropdownOption {
+            id: field_preview::DEFAULT_NAME_OPTION_ID.into(),
+            label: self.config.own_name.clone(),
+        }];
+        for group_id in &self.selected_groups {
+            let Some(group) = self
+                .config
+                .available_group_data
+                .iter()
+                .find(|g| g.id() == group_id)
+            else {
+                continue;
+            };
+            let Some(name_override) = group.display_name_override() else {
+                continue;
+            };
+            if options.iter().any(|o| o.label == name_override) {
+                continue;
+            }
+            options.push(DropdownOption {
+                id: group_id.clone(),
+                label: name_override.to_string(),
+            });
+        }
+        options
+    }
+
+    /// Build a FieldPreviewConfig from the current state. Display name
+    /// defaults to the base name (id `"default"`) — no silent
+    /// precedence rules; the user explicitly picks a group override
+    /// via the picker (M2 S7 Record E) if one is offered.
     fn build_field_preview_config(&self) -> FieldPreviewConfig {
         use vauchi_core::contact_card::ContactCard;
         // Build a preview card from config data
@@ -583,7 +617,34 @@ impl ExchangeEngine {
             card,
             display_name: self.config.own_name.clone(),
             visible_field_ids,
+            name_options: self.build_name_options(),
+            selected_name_id: field_preview::DEFAULT_NAME_OPTION_ID.into(),
         }
+    }
+
+    /// Materialize the card to send: the frozen snapshot (or a bare
+    /// card as fallback), with the user's chosen display name applied
+    /// (M2 S7 Record E — defaults to the base name, so this is a
+    /// no-op until the user picks a group override).
+    fn resolve_outgoing_card(&self) -> vauchi_core::contact_card::ContactCard {
+        let mut card = self
+            .config
+            .card_snapshot
+            .as_ref()
+            .map(|s| s.card().clone())
+            .unwrap_or_else(|| vauchi_core::contact_card::ContactCard::new(&self.config.own_name));
+        if let Some(ref fp) = self.field_preview
+            && fp.display_name != card.display_name()
+        {
+            // name_options entries are sourced from own_name (already a
+            // valid card display name) or a group's display_name_override
+            // (validated when the user set it); a rejection here would
+            // indicate a stale option surviving a since-invalidated
+            // override, not a user-facing input error — falling back to
+            // the pre-existing card name is the safe default.
+            card.set_display_name(&fp.display_name).ok();
+        }
+        card
     }
 
     fn build_screen(&self) -> ScreenModel {
@@ -814,6 +875,10 @@ impl WorkflowEngine for ExchangeEngine {
     }
 
     fn handle_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
+        // Computed ahead of the `session` mutable borrow below (which lives
+        // for the rest of the function) — resolve_outgoing_card() needs an
+        // immutable &self the borrow checker can't otherwise interleave.
+        let our_card = self.resolve_outgoing_card();
         // No session — handle QR scan via legacy TextChanged path
         let session = match self.session.as_mut() {
             Some(s) => s,
@@ -864,17 +929,7 @@ impl WorkflowEngine for ExchangeEngine {
                     })
                 })
                 .and_then(|()| session.apply(ExchangeEvent::PerformKeyAgreement))
-                .and_then(|()| {
-                    let our_card = self
-                        .config
-                        .card_snapshot
-                        .as_ref()
-                        .map(|s| s.card().clone())
-                        .unwrap_or_else(|| {
-                            vauchi_core::contact_card::ContactCard::new(&self.config.own_name)
-                        });
-                    session.apply(ExchangeEvent::CompleteExchange(our_card))
-                })
+                .and_then(|()| session.apply(ExchangeEvent::CompleteExchange(our_card)))
             {
                 self.failure_detail = Some(e.user_message().to_string());
                 self.step = ExchangeStep::Failed;
@@ -1103,6 +1158,18 @@ impl WorkflowEngine for ExchangeEngine {
                             self.step = ExchangeStep::GroupSelection;
                             return ActionResult::NavigateTo(self.build_screen());
                         }
+                        FieldPreviewResult::NameSelected(option_id) => {
+                            if let Some(ref mut fp) = self.field_preview
+                                && let Some(name) = fp
+                                    .name_options
+                                    .iter()
+                                    .find(|o| o.id == option_id)
+                                    .map(|o| o.label.clone())
+                            {
+                                fp.display_name = name;
+                                fp.selected_name_id = option_id;
+                            }
+                        }
                     }
                 }
                 ActionResult::UpdateScreen(self.build_screen())
@@ -1296,6 +1363,8 @@ mod tests {
             card: mine,
             display_name: "Alice".into(),
             visible_field_ids: Some(HashSet::from([phone_id])),
+            name_options: vec![],
+            selected_name_id: field_preview::DEFAULT_NAME_OPTION_ID.into(),
         };
 
         let summary = build_legacy_success_summary(&contact, Some(&preview));
@@ -2580,5 +2649,176 @@ mod tests {
             ),
             "grouped Glance + skip must hand off to BLE (G3), got {result:?}"
         );
+    }
+
+    // ── Name picker (M2 S7 Record E) ─────────────────────────────
+
+    fn group_with_override(id: &str, name: &str, name_override: &str) -> vauchi_core::Group {
+        vauchi_core::Group::from_storage(
+            id.into(),
+            name.into(),
+            Default::default(),
+            Default::default(),
+            Some(name_override.into()),
+            None,
+            None,
+            0,
+            0,
+        )
+    }
+
+    // @internal
+    #[test]
+    fn build_name_options_has_only_base_name_without_overrides() {
+        let mut config = config_with_groups();
+        config.available_group_data = vec![vauchi_core::Group::new("Family", 0)];
+        let engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        let options = engine.build_name_options();
+        assert_eq!(options.len(), 1);
+        assert_eq!(options[0].id, field_preview::DEFAULT_NAME_OPTION_ID);
+        assert_eq!(options[0].label, "Alice");
+    }
+
+    // @internal
+    #[test]
+    fn build_name_options_adds_selected_groups_overrides() {
+        let mut config = config_with_groups();
+        config.available_group_data = vec![
+            group_with_override("g1", "Family", "Dr. Alice"),
+            group_with_override("g2", "Friends", "Ally"),
+        ];
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        engine.selected_groups = vec!["g1".into(), "g2".into()];
+
+        let options = engine.build_name_options();
+        assert_eq!(
+            options,
+            vec![
+                DropdownOption {
+                    id: field_preview::DEFAULT_NAME_OPTION_ID.into(),
+                    label: "Alice".into(),
+                },
+                DropdownOption {
+                    id: "g1".into(),
+                    label: "Dr. Alice".into(),
+                },
+                DropdownOption {
+                    id: "g2".into(),
+                    label: "Ally".into(),
+                },
+            ]
+        );
+    }
+
+    // @internal
+    #[test]
+    fn build_name_options_dedupes_identical_overrides() {
+        let mut config = config_with_groups();
+        config.available_group_data = vec![
+            group_with_override("g1", "Family", "Dr. Alice"),
+            group_with_override("g2", "Friends", "Dr. Alice"),
+        ];
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        engine.selected_groups = vec!["g1".into(), "g2".into()];
+
+        let options = engine.build_name_options();
+        assert_eq!(
+            options.len(),
+            2,
+            "two groups sharing one override label must collapse to a single option"
+        );
+        assert_eq!(
+            options[1].id, "g1",
+            "the first group to offer the label wins the id"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn build_field_preview_config_defaults_selection_to_base_name() {
+        let mut config = config_with_groups();
+        config.available_group_data = vec![group_with_override("g1", "Family", "Dr. Alice")];
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        engine.selected_groups = vec!["g1".into()];
+
+        let fp = engine.build_field_preview_config();
+        assert_eq!(fp.name_options.len(), 2);
+        assert_eq!(fp.selected_name_id, field_preview::DEFAULT_NAME_OPTION_ID);
+        assert_eq!(
+            fp.display_name, "Alice",
+            "no silent precedence — the base name is the initial pick"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn name_picker_selection_updates_field_preview_display_name() {
+        let mut config = config_with_groups();
+        config.available_group_data = vec![group_with_override("g1", "Family", "Dr. Alice")];
+        config.mode = Some(ExchangeMode::Glance);
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        engine.selected_groups = vec!["g1".into()];
+        engine.field_preview = Some(engine.build_field_preview_config());
+        engine.step = ExchangeStep::FieldPreview;
+
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: field_preview::NAME_PICKER_COMPONENT_ID.into(),
+            item_id: "g1".into(),
+        });
+
+        let fp = engine.field_preview.as_ref().unwrap();
+        assert_eq!(fp.display_name, "Dr. Alice");
+        assert_eq!(fp.selected_name_id, "g1");
+    }
+
+    // @internal
+    #[test]
+    fn name_picker_selection_with_unknown_option_id_is_a_no_op() {
+        let mut config = config_with_groups();
+        config.available_group_data = vec![group_with_override("g1", "Family", "Dr. Alice")];
+        config.mode = Some(ExchangeMode::Glance);
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        engine.selected_groups = vec!["g1".into()];
+        engine.field_preview = Some(engine.build_field_preview_config());
+        engine.step = ExchangeStep::FieldPreview;
+
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: field_preview::NAME_PICKER_COMPONENT_ID.into(),
+            item_id: "does_not_exist".into(),
+        });
+
+        let fp = engine.field_preview.as_ref().unwrap();
+        assert_eq!(
+            fp.display_name, "Alice",
+            "an unrecognised option id must not corrupt the current selection"
+        );
+        assert_eq!(fp.selected_name_id, field_preview::DEFAULT_NAME_OPTION_ID);
+    }
+
+    // @internal
+    #[test]
+    fn resolve_outgoing_card_uses_base_name_by_default() {
+        let config = config_no_groups();
+        let engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        let card = engine.resolve_outgoing_card();
+        assert_eq!(card.display_name(), "Alice");
+    }
+
+    // @internal
+    #[test]
+    fn resolve_outgoing_card_applies_the_chosen_override() {
+        let mut config = config_with_groups();
+        config.available_group_data = vec![group_with_override("g1", "Family", "Dr. Alice")];
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        engine.selected_groups = vec!["g1".into()];
+        engine.field_preview = Some(engine.build_field_preview_config());
+        engine.step = ExchangeStep::FieldPreview;
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: field_preview::NAME_PICKER_COMPONENT_ID.into(),
+            item_id: "g1".into(),
+        });
+
+        let card = engine.resolve_outgoing_card();
+        assert_eq!(card.display_name(), "Dr. Alice");
     }
 }

@@ -13,16 +13,36 @@ use std::collections::HashSet;
 use crate::ui::*;
 use vauchi_core::contact_card::ContactCard;
 
+/// Component id of the display-name picker (M2 S7 Record E). Rendered
+/// in place of the static name `Text` only when `name_options` has
+/// more than one candidate.
+pub(super) const NAME_PICKER_COMPONENT_ID: &str = "preview_name_picker";
+/// Option id for the base (card-default) display name — always the
+/// first `name_options` entry and the initial `selected_name_id`.
+pub(super) const DEFAULT_NAME_OPTION_ID: &str = "default";
+
 /// Configuration for the field preview screen.
 pub(super) struct FieldPreviewConfig {
     /// The full card to preview.
     pub card: ContactCard,
-    /// Display name to show (group override or card default).
+    /// Display name to show (group override or card default). Mirrors
+    /// whichever `name_options` entry `selected_name_id` currently
+    /// points at.
     pub display_name: String,
     /// Field IDs to share. `None` = share all (no group filter);
     /// `Some(set)` = share exactly `set` (an empty set shares nothing —
     /// default-closed, so a group exposing no fields shares none).
     pub visible_field_ids: Option<HashSet<String>>,
+    /// Candidate display names for this exchange: the base name
+    /// (id `"default"`) plus one deduplicated entry per selected
+    /// group carrying a `display_name_override` (M2 S7 Record E). A
+    /// picker only renders when this has more than one entry — no
+    /// silent precedence rules; the base name is always the initial
+    /// pick.
+    pub name_options: Vec<DropdownOption>,
+    /// The `name_options` entry currently selected. Always `"default"`
+    /// until the user picks a different option.
+    pub selected_name_id: String,
 }
 
 /// Result of handling an action in the field preview engine.
@@ -31,6 +51,10 @@ pub(super) enum FieldPreviewResult {
     StartExchange,
     /// User pressed "Change groups" — go back to group selection.
     ChangeGroups,
+    /// User picked a `name_options` entry on the display-name picker
+    /// (M2 S7 Record E). Carries the chosen option id — the caller
+    /// looks up the matching label to apply.
+    NameSelected(String),
 }
 
 /// Build a field preview screen from the config.
@@ -76,16 +100,28 @@ pub(super) fn build_field_preview_screen(
         })
         .collect();
 
+    let name_component = if config.name_options.len() > 1 {
+        Component::Dropdown {
+            id: NAME_PICKER_COMPONENT_ID.into(),
+            label: t("exchange.preview.name_picker_label"),
+            selected: Some(config.selected_name_id.clone()),
+            options: config.name_options.clone(),
+            a11y: None,
+        }
+    } else {
+        Component::Text {
+            id: "preview_name".into(),
+            content: config.display_name.clone(),
+            style: TextStyle::Title,
+        }
+    };
+
     ScreenModel {
         screen_id: "exchange_field_preview".into(),
         title: t("exchange.preview.title"),
         subtitle: None,
         components: vec![
-            Component::Text {
-                id: "preview_name".into(),
-                content: config.display_name.clone(),
-                style: TextStyle::Title,
-            },
+            name_component,
             Component::FieldList {
                 id: "preview_fields".into(),
                 fields,
@@ -120,14 +156,20 @@ pub(super) fn build_field_preview_screen(
 
 /// Handle a user action on the field preview screen.
 pub(super) fn handle_field_preview_action(action: &UserAction) -> Option<FieldPreviewResult> {
-    if let UserAction::ActionPressed { action_id } = action {
-        match action_id.as_str() {
-            "start_exchange" => return Some(FieldPreviewResult::StartExchange),
-            "change_groups" => return Some(FieldPreviewResult::ChangeGroups),
-            _ => {}
+    match action {
+        UserAction::ActionPressed { action_id } => match action_id.as_str() {
+            "start_exchange" => Some(FieldPreviewResult::StartExchange),
+            "change_groups" => Some(FieldPreviewResult::ChangeGroups),
+            _ => None,
+        },
+        UserAction::ListItemSelected {
+            component_id,
+            item_id,
+        } if component_id == NAME_PICKER_COMPONENT_ID => {
+            Some(FieldPreviewResult::NameSelected(item_id.clone()))
         }
+        _ => None,
     }
-    None
 }
 
 // INLINE_TEST_REQUIRED: Tests access private FieldPreviewConfig, FieldPreviewResult, and builder functions
@@ -155,12 +197,19 @@ mod tests {
         card
     }
 
+    fn no_name_choice() -> (Vec<DropdownOption>, String) {
+        (vec![], DEFAULT_NAME_OPTION_ID.into())
+    }
+
     #[test]
     fn preview_shows_all_fields_when_no_visibility_filter() {
+        let (name_options, selected_name_id) = no_name_choice();
         let config = FieldPreviewConfig {
             card: sample_card(),
             display_name: "Alice".into(),
             visible_field_ids: None,
+            name_options,
+            selected_name_id,
         };
         let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
         assert_eq!(screen.screen_id, "exchange_field_preview");
@@ -179,10 +228,13 @@ mod tests {
     fn preview_dims_excluded_fields() {
         let card = sample_card();
         let email_id = card.fields()[0].id().to_string();
+        let (name_options, selected_name_id) = no_name_choice();
         let config = FieldPreviewConfig {
             card,
             display_name: "Alice".into(),
             visible_field_ids: Some(HashSet::from([email_id.clone()])),
+            name_options,
+            selected_name_id,
         };
         let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
 
@@ -204,10 +256,13 @@ mod tests {
 
     #[test]
     fn preview_shows_display_name_override() {
+        let (name_options, selected_name_id) = no_name_choice();
         let config = FieldPreviewConfig {
             card: sample_card(),
             display_name: "Dr. Egloff".into(),
             visible_field_ids: None,
+            name_options,
+            selected_name_id,
         };
         let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
 
@@ -244,10 +299,13 @@ mod tests {
 
     #[test]
     fn preview_has_both_actions() {
+        let (name_options, selected_name_id) = no_name_choice();
         let config = FieldPreviewConfig {
             card: sample_card(),
             display_name: "Alice".into(),
             visible_field_ids: None,
+            name_options,
+            selected_name_id,
         };
         let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
         assert_eq!(screen.actions.len(), 2);
@@ -259,10 +317,13 @@ mod tests {
     fn preview_with_populated_card_shows_field_values() {
         let card = sample_card();
         let email_value = card.fields()[0].value().to_string();
+        let (name_options, selected_name_id) = no_name_choice();
         let config = FieldPreviewConfig {
             card,
             display_name: "Alice".into(),
             visible_field_ids: None,
+            name_options,
+            selected_name_id,
         };
         let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
         let fields = extract_fields(&screen);
@@ -271,6 +332,101 @@ mod tests {
             fields[0].value, email_value,
             "Field value should be preserved"
         );
+    }
+
+    // ── Name picker (M2 S7 Record E) ─────────────────────────────
+
+    // @internal
+    #[test]
+    fn single_name_option_renders_static_text_not_dropdown() {
+        let config = FieldPreviewConfig {
+            card: sample_card(),
+            display_name: "Alice".into(),
+            visible_field_ids: None,
+            name_options: vec![DropdownOption {
+                id: DEFAULT_NAME_OPTION_ID.into(),
+                label: "Alice".into(),
+            }],
+            selected_name_id: DEFAULT_NAME_OPTION_ID.into(),
+        };
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
+        assert!(
+            !screen
+                .components
+                .iter()
+                .any(|c| matches!(c, Component::Dropdown { .. })),
+            "a single candidate name must not show a picker"
+        );
+        let name = screen.components.iter().find_map(|c| match c {
+            Component::Text { content, .. } => Some(content.as_str()),
+            _ => None,
+        });
+        assert_eq!(name, Some("Alice"));
+    }
+
+    // @internal
+    #[test]
+    fn multiple_name_options_render_dropdown_defaulting_to_base_name() {
+        let name_options = vec![
+            DropdownOption {
+                id: DEFAULT_NAME_OPTION_ID.into(),
+                label: "Alice".into(),
+            },
+            DropdownOption {
+                id: "g1".into(),
+                label: "Dr. Alice".into(),
+            },
+        ];
+        let config = FieldPreviewConfig {
+            card: sample_card(),
+            display_name: "Alice".into(),
+            visible_field_ids: None,
+            name_options: name_options.clone(),
+            selected_name_id: DEFAULT_NAME_OPTION_ID.into(),
+        };
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
+        let dropdown = screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::Dropdown {
+                    id,
+                    selected,
+                    options,
+                    ..
+                } if id == NAME_PICKER_COMPONENT_ID => Some((selected.clone(), options.clone())),
+                _ => None,
+            })
+            .expect("multiple name candidates must render the picker");
+        assert_eq!(dropdown.0, Some(DEFAULT_NAME_OPTION_ID.to_string()));
+        assert_eq!(dropdown.1, name_options);
+        assert!(
+            !screen
+                .components
+                .iter()
+                .any(|c| matches!(c, Component::Text { id, .. } if id == "preview_name")),
+            "the picker replaces the static name Text, not adds alongside it"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn name_picker_selection_returns_name_selected() {
+        let result = handle_field_preview_action(&UserAction::ListItemSelected {
+            component_id: NAME_PICKER_COMPONENT_ID.into(),
+            item_id: "g1".into(),
+        });
+        assert!(matches!(result, Some(FieldPreviewResult::NameSelected(id)) if id == "g1"));
+    }
+
+    // @internal
+    #[test]
+    fn list_item_selected_on_other_component_returns_none() {
+        let result = handle_field_preview_action(&UserAction::ListItemSelected {
+            component_id: "some_other_dropdown".into(),
+            item_id: "x".into(),
+        });
+        assert!(result.is_none());
     }
 
     fn extract_fields(screen: &ScreenModel) -> &[Field] {

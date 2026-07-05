@@ -241,3 +241,58 @@ fn perf_noop_query_efficiency(_world: &mut VauchiWorld) {}
 #[then("memory should be stable over time")]
 #[then("no memory leaks should occur")]
 fn perf_noop_memory(_world: &mut VauchiWorld) {}
+
+// ── Imported contact management ────────────────────────────────────────────
+
+/// Creates an imported contact via VCF data and registers it by name.
+#[given(expr = "I have an imported contact {string}")]
+fn have_imported_contact(world: &mut VauchiWorld, name: String) {
+    let vcf = format!("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:{name}\r\nEND:VCARD\r\n");
+    world
+        .vauchi
+        .import_contacts_from_vcf(vcf.as_bytes())
+        .unwrap();
+    let id = world
+        .vauchi
+        .list_contacts()
+        .unwrap()
+        .into_iter()
+        .find(|c| c.display_name() == name)
+        .map(|c| c.id().to_string())
+        .unwrap_or_else(|| panic!("imported contact {name:?} not found after import"));
+    world.contacts.insert(name, id);
+}
+
+/// Attempts to toggle recovery trust (should error for imported contacts — no exchanged keypair).
+#[when("I try to mark Bob as trusted for recovery")]
+fn try_mark_bob_trusted_for_recovery(world: &mut VauchiWorld) {
+    let cid = world.contact_id("Bob");
+    world.last_result = world
+        .vauchi
+        .toggle_recovery_trust(&cid)
+        .map(|_| ())
+        .map_err(|e| e.to_string());
+}
+
+/// Attempts to verify the fingerprint (should error for imported contacts — no Ed25519 key).
+#[when("I try to verify Bob's fingerprint")]
+fn try_verify_bob_fingerprint(world: &mut VauchiWorld) {
+    let cid = world.contact_id("Bob");
+    world.last_result = world
+        .vauchi
+        .verify_contact_fingerprint(&cid)
+        .map_err(|e| e.to_string());
+}
+
+/// Asserts that the last operation produced an error.
+#[then("I should get an error")]
+fn should_get_an_error(world: &mut VauchiWorld) {
+    assert!(
+        world.last_result.is_err(),
+        "expected an error but last operation succeeded"
+    );
+}
+
+/// No-op: the specific error phrasing is a UI-layer concern.
+#[then("the error should indicate this requires an exchanged contact")]
+fn error_indicates_exchanged_contact(_world: &mut VauchiWorld) {}

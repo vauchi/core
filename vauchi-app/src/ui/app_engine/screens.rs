@@ -175,7 +175,9 @@ impl AppEngine {
             | AppScreen::ArchivedContacts
             | AppScreen::ContactMerge { .. }
             | AppScreen::ContactLimit
-            | AppScreen::VerifyFingerprint { .. } => Self::create_contacts_engine(vauchi, screen),
+            | AppScreen::VerifyFingerprint { .. } => {
+                Self::create_contacts_engine(vauchi, screen, render_context)
+            }
             AppScreen::Settings => {
                 let card = vauchi.own_card().ok().flatten();
                 let display_name = card

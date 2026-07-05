@@ -31,6 +31,7 @@ mod contact_detail_engine_tests;
 mod contact_detail_intercepts_tests;
 mod contact_detail_place_tests;
 mod contact_list_faceted_tests;
+mod contact_list_i18n_tests;
 mod contact_list_intercepts_tests;
 mod contact_merge_engine_tests;
 mod deep_link_consent_engine_tests;

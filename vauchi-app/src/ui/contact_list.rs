@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 
 /// An `Item` paired with its engine-internal search index.
@@ -69,6 +70,7 @@ pub struct ContactListEngine {
     /// its end; reset to the top whenever the filtered set itself changes
     /// (search, facets, group filter).
     window_offset: usize,
+    locale: Locale,
 }
 
 impl ContactListEngine {
@@ -84,6 +86,7 @@ impl ContactListEngine {
             facet_place: false,
             faceted_ids: None,
             window_offset: 0,
+            locale: Locale::English,
         }
     }
 
@@ -104,7 +107,19 @@ impl ContactListEngine {
             facet_place: false,
             faceted_ids: None,
             window_offset: 0,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S6b-2).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// True if any annotation facet is enabled.
@@ -148,32 +163,44 @@ impl ContactListEngine {
     }
 
     fn search_facets_toggle(&self) -> Component {
-        let item = |id: &str, label: &str, selected: bool| ToggleItem {
-            id: id.into(),
-            label: label.into(),
-            selected,
-            subtitle: None,
-            a11y: Some(A11y {
-                label: Some(format!(
-                    "Search {label}, {}",
-                    if selected { "on" } else { "off" }
-                )),
-                hint: Some("Double tap to toggle".into()),
-                role: Some(AccessibilityRole::Toggle),
-            }),
-            info_key: None,
+        let item = |id: &str, label: String, selected: bool| {
+            let state_key = if selected {
+                "contacts.facet_state_on"
+            } else {
+                "contacts.facet_state_off"
+            };
+            ToggleItem {
+                id: id.into(),
+                label: label.clone(),
+                selected,
+                subtitle: None,
+                a11y: Some(A11y {
+                    label: Some(crate::i18n::get_string_with_args(
+                        self.locale,
+                        "contacts.facet_a11y_label",
+                        &[("label", &label), ("state", &self.t(state_key))],
+                    )),
+                    hint: Some(self.t("contacts.also_search_toggle_hint")),
+                    role: Some(AccessibilityRole::Toggle),
+                }),
+                info_key: None,
+            }
         };
         Component::ToggleList {
             id: "search_facets".into(),
-            label: "Also search".into(),
+            label: self.t("contacts.also_search"),
             items: vec![
-                item("tags", "Tags", self.facet_tags),
-                item("comment", "Notes", self.facet_comment),
-                item("place", "Places", self.facet_place),
+                item("tags", self.t("more.tags"), self.facet_tags),
+                item(
+                    "comment",
+                    self.t("contacts.facet_notes"),
+                    self.facet_comment,
+                ),
+                item("place", self.t("more.places"), self.facet_place),
             ],
             a11y: Some(A11y {
-                label: Some("Also search in".into()),
-                hint: Some("Choose which annotations the search matches.".into()),
+                label: Some(self.t("contacts.also_search_in")),
+                hint: Some(self.t("contacts.also_search_hint")),
                 role: None,
             }),
         }
@@ -243,7 +270,7 @@ impl WorkflowEngine for ContactListEngine {
     fn current_screen(&self) -> ScreenModel {
         let mut actions = vec![ScreenAction {
             id: "add_contact".into(),
-            label: "Add Contact".into(),
+            label: self.t("contacts.add_contact_button"),
             style: ActionStyle::Primary,
             enabled: true,
             a11y: None,
@@ -268,7 +295,7 @@ impl WorkflowEngine for ContactListEngine {
         if self.group_filter.is_some() {
             actions.push(ScreenAction {
                 id: "filter_group_clear".into(),
-                label: "All Contacts".into(),
+                label: self.t("contacts.all_contacts"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -282,11 +309,11 @@ impl WorkflowEngine for ContactListEngine {
             vec![Component::InfoPanel {
                 id: "empty_state".into(),
                 icon: Some("people".into()),
-                title: "No contacts yet".into(),
+                title: self.t("contacts.empty_title"),
                 items: vec![InfoItem {
                     icon: Some("exchange".into()),
-                    title: "Exchange cards in person".into(),
-                    detail: "Meet someone nearby and share your contact card securely.".into(),
+                    title: self.t("contacts.empty_exchange_title"),
+                    detail: self.t("contacts.empty_exchange_detail"),
                 }],
                 a11y: None,
             }]
@@ -319,7 +346,7 @@ impl WorkflowEngine for ContactListEngine {
         // Archived contacts link
         actions.push(ScreenAction {
             id: "view_archived".into(),
-            label: "Archived Contacts".into(),
+            label: self.t("contacts.archived_title"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: None,
@@ -328,7 +355,7 @@ impl WorkflowEngine for ContactListEngine {
         // Find duplicates action
         actions.push(ScreenAction {
             id: "find_duplicates".into(),
-            label: "Find Duplicates".into(),
+            label: self.t("contacts.find_duplicates"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: None,
@@ -340,7 +367,7 @@ impl WorkflowEngine for ContactListEngine {
                 0,
                 ScreenAction {
                     id: "go_exchange".into(),
-                    label: "Exchange Now".into(),
+                    label: self.t("contacts.exchange_now"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
@@ -350,7 +377,7 @@ impl WorkflowEngine for ContactListEngine {
 
         ScreenModel {
             screen_id: "contact_list".into(),
-            title: "Contacts".into(),
+            title: self.t("contacts.title"),
             subtitle: None,
             components,
             actions,

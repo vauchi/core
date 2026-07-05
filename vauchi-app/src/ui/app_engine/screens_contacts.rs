@@ -27,13 +27,17 @@ impl AppEngine {
     pub(super) fn create_contacts_engine(
         vauchi: &Vauchi,
         screen: &AppScreen,
+        render_context: &crate::ui::RenderContext,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Contacts => {
                 let contacts = Self::load_contact_items(vauchi);
                 let all_groups = vauchi.list_groups().unwrap_or_default();
                 if all_groups.is_empty() {
-                    Box::new(ContactListEngine::new(contacts))
+                    Box::new(
+                        ContactListEngine::new(contacts)
+                            .with_locale(render_context.resolved_locale()),
+                    )
                 } else {
                     let groups: Vec<(String, String)> = all_groups
                         .iter()
@@ -48,11 +52,10 @@ impl AppEngine {
                             .collect();
                         memberships.insert(g.id().to_string(), member_ids);
                     }
-                    Box::new(ContactListEngine::with_groups(
-                        contacts,
-                        groups,
-                        memberships,
-                    ))
+                    Box::new(
+                        ContactListEngine::with_groups(contacts, groups, memberships)
+                            .with_locale(render_context.resolved_locale()),
+                    )
                 }
             }
             AppScreen::ContactDetail { contact_id } => match vauchi.get_contact(contact_id) {

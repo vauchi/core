@@ -336,9 +336,13 @@ impl ContactField {
     }
 
     /// Validates social network usernames when the label identifies a known network.
-    /// Unknown networks accept any non-empty value.
+    /// URL-formatted values (http/https) are accepted as-is; unknown networks accept any non-empty value.
     fn validate_social(&self) -> Result<(), ValidationError> {
-        let username = self.value.trim_start_matches('@');
+        let v = self.value.as_str();
+        if v.starts_with("http://") || v.starts_with("https://") {
+            return Ok(());
+        }
+        let username = v.trim_start_matches('@');
         match self.label.to_lowercase().as_str() {
             "twitter" | "x" => {
                 // Twitter: max 15 chars, alphanumeric + underscore only (ADR-spec: social-registry)

@@ -209,7 +209,8 @@ impl AppEngine {
                         crate::ui::MultiStageExchangeEngine::new_tap_hover_shake()
                     }
                     _ => crate::ui::MultiStageExchangeEngine::new_glance(),
-                };
+                }
+                .with_locale(locale);
                 Box::new(engine)
             }
             other => unreachable!("non-exchange screen {other:?} routed to exchange factory"),

@@ -73,6 +73,7 @@ mod last_pins_i18n_tests;
 mod link_exchange_tests;
 mod more_i18n_tests;
 mod multi_stage_deadline_tests;
+mod multi_stage_exchange_i18n_tests;
 mod multi_stage_machine_proptest;
 mod nfc_exchange_app_engine_tests;
 mod places_tests;

@@ -36,6 +36,7 @@ use vauchi_core::exchange::{
     AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
 };
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::exchange::scan_quality::ScanQualityTracker;
 use crate::ui::*;
 
@@ -140,6 +141,7 @@ pub struct MultiStageExchangeEngine {
     /// state machine for non-Hover sessions even before the Phase
     /// 1.E mode-dispatcher flips to per-mode constructors).
     is_hover_mode: bool,
+    locale: Locale,
 }
 
 impl MultiStageExchangeEngine {
@@ -162,7 +164,19 @@ impl MultiStageExchangeEngine {
             audio_proximity: AudioProximityState::Pending,
             accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: false,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-10).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Construct an engine wired for the Hover flow (bilateral QR
@@ -190,6 +204,7 @@ impl MultiStageExchangeEngine {
             audio_proximity: AudioProximityState::Pending,
             accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: true,
+            locale: Locale::English,
         }
     }
 
@@ -213,6 +228,7 @@ impl MultiStageExchangeEngine {
             audio_proximity: AudioProximityState::Pending,
             accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: true,
+            locale: Locale::English,
         }
     }
 
@@ -338,7 +354,7 @@ impl MultiStageExchangeEngine {
     // ── Internal helpers ───────────────────────────────────────────
 
     fn build_screen(&self) -> ScreenModel {
-        let title = "Exchange".to_string();
+        let title = self.t("exchange.title");
 
         // Permission/hardware gate trumps protocol-state chrome — the
         // user cannot make progress without the camera.
@@ -349,27 +365,25 @@ impl MultiStageExchangeEngine {
                 vec![Component::StatusIndicator {
                     id: COMPONENT_ID_PERMISSION.into(),
                     icon: Some("camera.slash".into()),
-                    title: "Camera Required".into(),
-                    detail: Some(
-                        "Tap Grant Permission to allow camera access for the exchange.".into(),
-                    ),
+                    title: self.t("multi_stage.camera_required_title"),
+                    detail: Some(self.t("multi_stage.camera_required_detail")),
                     status: Status::Warning,
                     a11y: None,
                 }],
                 vec![
                     ScreenAction {
                         id: GRANT_CAMERA_PERMISSION_ACTION_ID.into(),
-                        label: "Grant Permission".into(),
+                        label: self.t("exchange.grant_permission"),
                         style: ActionStyle::Primary,
                         enabled: true,
-                        a11y: None,
+                        a11y: Some(A11y::labeled(self.t("exchange.grant_permission"))),
                     },
                     ScreenAction {
                         id: CANCEL_ACTION_ID.into(),
-                        label: "Cancel".into(),
+                        label: self.t("action.cancel"),
                         style: ActionStyle::Secondary,
                         enabled: true,
-                        a11y: None,
+                        a11y: Some(A11y::labeled(self.t("action.cancel"))),
                     },
                 ],
             );
@@ -381,17 +395,17 @@ impl MultiStageExchangeEngine {
                 vec![Component::StatusIndicator {
                     id: COMPONENT_ID_HARDWARE.into(),
                     icon: Some("camera.slash".into()),
-                    title: "Camera Unavailable".into(),
-                    detail: Some("This device cannot scan QR codes for exchange.".into()),
+                    title: self.t("multi_stage.camera_unavailable_title"),
+                    detail: Some(self.t("multi_stage.camera_unavailable_detail")),
                     status: Status::Failed,
                     a11y: None,
                 }],
                 vec![ScreenAction {
                     id: CANCEL_ACTION_ID.into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 }],
             );
         }
@@ -451,7 +465,7 @@ impl MultiStageExchangeEngine {
                 id: COMPONENT_ID_OWN_QR.into(),
                 data: data.clone(),
                 mode: QrMode::Display,
-                label: Some("Keep screens facing each other until the other phone finishes".into()),
+                label: Some(self.t("multi_stage.qr_broadcast_label")),
                 scan_quality: None,
                 a11y: None,
             });
@@ -459,7 +473,7 @@ impl MultiStageExchangeEngine {
         components.push(Component::StatusIndicator {
             id: COMPONENT_ID_STATUS.into(),
             icon: Some("checkmark.circle".into()),
-            title: "Exchange Complete".into(),
+            title: self.t("exchange.terminal.complete"),
             detail: None,
             status: Status::Success,
             a11y: None,
@@ -467,8 +481,14 @@ impl MultiStageExchangeEngine {
         let detail = self
             .peer_name
             .as_ref()
-            .map(|name| format!("Exchanged with {name}"))
-            .unwrap_or_else(|| "Exchange complete.".into());
+            .map(|name| {
+                get_string_with_args(
+                    self.locale,
+                    "multi_stage.exchanged_with_detail",
+                    &[("name", name)],
+                )
+            })
+            .unwrap_or_else(|| self.t("multi_stage.exchange_complete_detail"));
         components.push(Component::Text {
             id: COMPONENT_ID_PEER_NAME.into(),
             content: detail,
@@ -481,10 +501,10 @@ impl MultiStageExchangeEngine {
             components,
             vec![ScreenAction {
                 id: DONE_ACTION_ID.into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.done"))),
             }],
         );
         screen.layout = ScreenLayout::Fixed;
@@ -514,7 +534,7 @@ impl MultiStageExchangeEngine {
                 // the QR caption lets the non-scrolling layout fit the
                 // full-width QR + camera + buttons on a compact screen — there
                 // is no separate status row to push them off-screen.
-                label: Some(own_qr_label(&self.state)),
+                label: Some(own_qr_label(&self.state, self.locale)),
                 scan_quality: None,
                 a11y: None,
             });
@@ -530,31 +550,32 @@ impl MultiStageExchangeEngine {
             id: COMPONENT_ID_PEER_SCAN.into(),
             data: String::new(),
             mode: QrMode::Scan,
-            label: Some("Scan their code".into()),
+            label: Some(self.t("exchange.ble.glance_scan")),
             scan_quality: Some(self.scan_quality_tracker.quality()),
             a11y: None,
+        };
+        let switch_camera_label = if self.use_front_camera {
+            self.t("multi_stage.use_rear_camera_button")
+        } else {
+            self.t("multi_stage.use_front_camera_button")
         };
         let buttons = Component::ActionList {
             id: EXCHANGE_ACTIONS_ID.into(),
             items: vec![
                 ActionListItem {
                     id: SWITCH_CAMERA_ACTION_ID.into(),
-                    label: if self.use_front_camera {
-                        "Use Rear Camera".into()
-                    } else {
-                        "Use Front Camera".into()
-                    },
+                    label: switch_camera_label.clone(),
                     icon: None,
                     detail: None,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(switch_camera_label)),
                     info_key: None,
                 },
                 ActionListItem {
                     id: CANCEL_ACTION_ID.into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     icon: None,
                     detail: None,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                     info_key: None,
                 },
             ],
@@ -584,8 +605,14 @@ impl MultiStageExchangeEngine {
         let detail = self
             .peer_name
             .as_ref()
-            .map(|name| format!("Exchanged with {name}"))
-            .unwrap_or_else(|| "Exchange complete.".into());
+            .map(|name| {
+                get_string_with_args(
+                    self.locale,
+                    "multi_stage.exchanged_with_detail",
+                    &[("name", name)],
+                )
+            })
+            .unwrap_or_else(|| self.t("multi_stage.exchange_complete_detail"));
 
         ScreenModel::new(
             SCREEN_ID,
@@ -594,7 +621,7 @@ impl MultiStageExchangeEngine {
                 Component::StatusIndicator {
                     id: COMPONENT_ID_STATUS.into(),
                     icon: Some("checkmark.circle".into()),
-                    title: "Exchange Complete".into(),
+                    title: self.t("exchange.terminal.complete"),
                     detail: None,
                     status: Status::Success,
                     a11y: None,
@@ -607,10 +634,10 @@ impl MultiStageExchangeEngine {
             ],
             vec![ScreenAction {
                 id: DONE_ACTION_ID.into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.done"))),
             }],
         )
     }
@@ -622,7 +649,7 @@ impl MultiStageExchangeEngine {
             vec![Component::StatusIndicator {
                 id: COMPONENT_ID_STATUS.into(),
                 icon: Some("xmark.circle".into()),
-                title: "Exchange Failed".into(),
+                title: self.t("exchange.terminal.failed_status"),
                 detail: Some(reason.to_string()),
                 status: Status::Failed,
                 a11y: None,
@@ -630,17 +657,17 @@ impl MultiStageExchangeEngine {
             vec![
                 ScreenAction {
                     id: RETRY_ACTION_ID.into(),
-                    label: "Retry".into(),
+                    label: self.t("action.retry"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.retry"))),
                 },
                 ScreenAction {
                     id: CANCEL_ACTION_ID.into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
         )
@@ -659,27 +686,25 @@ impl MultiStageExchangeEngine {
             vec![Component::StatusIndicator {
                 id: COMPONENT_ID_STATUS.into(),
                 icon: Some("move.3d".into()),
-                title: "Couldn't confirm the shake".into(),
-                detail: Some(
-                    "Shake both phones together at the same time and try again.".to_string(),
-                ),
+                title: self.t("multi_stage.shake_not_confirmed_title"),
+                detail: Some(self.t("multi_stage.shake_not_confirmed_detail")),
                 status: Status::Failed,
                 a11y: None,
             }],
             vec![
                 ScreenAction {
                     id: RETRY_ACTION_ID.into(),
-                    label: "Retry".into(),
+                    label: self.t("action.retry"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.retry"))),
                 },
                 ScreenAction {
                     id: CANCEL_ACTION_ID.into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
         )
@@ -707,25 +732,25 @@ impl MultiStageExchangeEngine {
             vec![Component::StatusIndicator {
                 id: COMPONENT_ID_STATUS.into(),
                 icon: Some("dot.radiowaves.left.and.right".into()),
-                title: "Couldn't confirm devices are close".into(),
-                detail: Some("Hold the phones closer together and try again.".to_string()),
+                title: self.t("multi_stage.proximity_not_confirmed_title"),
+                detail: Some(self.t("multi_stage.proximity_not_confirmed_detail")),
                 status: Status::Failed,
                 a11y: None,
             }],
             vec![
                 ScreenAction {
                     id: RETRY_ACTION_ID.into(),
-                    label: "Retry".into(),
+                    label: self.t("action.retry"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.retry"))),
                 },
                 ScreenAction {
                     id: CANCEL_ACTION_ID.into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
         )
@@ -743,30 +768,39 @@ impl MultiStageExchangeEngine {
 ///
 /// Proximity (audio/accel) narration is intentionally not surfaced here —
 /// the caption stays short enough to sit under the QR.
-pub(crate) fn own_qr_label(state: &ProtocolState) -> String {
+pub(crate) fn own_qr_label(state: &ProtocolState, locale: Locale) -> String {
     match state {
-        ProtocolState::Idle | ProtocolState::Advertising => "Show this".to_string(),
-        ProtocolState::Discovered => "Connecting…".to_string(),
+        ProtocolState::Idle | ProtocolState::Advertising => {
+            get_string(locale, "multi_stage.own_qr_show_this")
+        }
+        ProtocolState::Discovered => get_string(locale, "multi_stage.own_qr_connecting"),
         ProtocolState::Transferring {
             chunks_sent,
             chunks_total,
             ..
         } => {
             if *chunks_total > 0 {
-                format!("Transferring {chunks_sent}/{chunks_total}")
+                get_string_with_args(
+                    locale,
+                    "multi_stage.own_qr_transferring_progress",
+                    &[
+                        ("sent", &chunks_sent.to_string()),
+                        ("total", &chunks_total.to_string()),
+                    ],
+                )
             } else {
-                "Transferring…".to_string()
+                get_string(locale, "multi_stage.own_qr_transferring_ellipsis")
             }
         }
-        ProtocolState::Verifying => "Verifying…".to_string(),
-        ProtocolState::Confirming => "Confirming…".to_string(),
+        ProtocolState::Verifying => get_string(locale, "multi_stage.own_qr_verifying"),
+        ProtocolState::Confirming => get_string(locale, "multi_stage.own_qr_confirming"),
         ProtocolState::Complete | ProtocolState::RetryReady | ProtocolState::Finalized => {
-            "Almost done".to_string()
+            get_string(locale, "multi_stage.own_qr_almost_done")
         }
-        ProtocolState::Failed(_) => "Exchange failed".to_string(),
+        ProtocolState::Failed(_) => get_string(locale, "exchange.failed_title"),
         // ProtocolState is #[non_exhaustive]; future variants surface a
         // generic caption until they get dedicated copy.
-        _ => "Working…".to_string(),
+        _ => get_string(locale, "multi_stage.own_qr_working"),
     }
 }
 

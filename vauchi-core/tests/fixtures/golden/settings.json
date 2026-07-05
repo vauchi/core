@@ -82,6 +82,20 @@
         "label": "Notifications",
         "items": [
           {
+            "id": "card_update",
+            "label": "Card Updates",
+            "kind": {
+              "Toggle": {
+                "enabled": true
+              }
+            },
+            "a11y": {
+              "label": "Card update notifications",
+              "hint": "Notify me when a contact updates their card",
+              "role": null
+            }
+          },
+          {
             "id": "contact_added",
             "label": "New Contact Added",
             "kind": {

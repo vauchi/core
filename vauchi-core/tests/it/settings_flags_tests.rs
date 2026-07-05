@@ -111,3 +111,47 @@ fn accessibility_flags_persist_and_seed_config_on_reopen() {
         assert!(flags.large_touch, "persisted large_touch survives reopen");
     }
 }
+
+// M4 S3a2 (2026-07-03-notifications-never-authorized): the card-update
+// notification is default-ON (the product's core heartbeat), and turning
+// it off persists + follows the user across devices/restart.
+// @internal
+#[test]
+fn card_update_notification_defaults_on_and_toggle_off_persists() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage_key = SymmetricKey::generate();
+    let db_path = dir.path().join("vauchi.db");
+
+    {
+        let config =
+            VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key.clone());
+        let vauchi = Vauchi::new(config).unwrap();
+
+        // Default-on: both the freshly-seeded config and the flags read true.
+        assert!(
+            vauchi.config().card_update_notifications,
+            "card-update notifications default ON"
+        );
+        let mut flags = vauchi.load_settings_flags().unwrap();
+        assert!(flags.card_update_notifications, "flags default ON");
+
+        flags.card_update_notifications = false;
+        vauchi.save_settings_flags(&flags).unwrap();
+    }
+
+    {
+        let config = VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key);
+        let vauchi = Vauchi::new(config).unwrap();
+        assert!(
+            !vauchi.config().card_update_notifications,
+            "the off choice seeded into config on reopen"
+        );
+        assert!(
+            !vauchi
+                .load_settings_flags()
+                .unwrap()
+                .card_update_notifications,
+            "the off choice survives restart"
+        );
+    }
+}

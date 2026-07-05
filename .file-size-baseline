@@ -341,7 +341,10 @@ vauchi-core/src/storage/mod.rs 1079
 # (+13 2026-07-05: legacy_exchange_persisted persist-once guard field +
 #  its persist_at_complete_tests INLINE_TEST_REQUIRED mod decl —
 #  2026-06-04-exchange-terminal-screens persist-at-Complete. 758 → 771.)
-vauchi-app/src/ui/app_engine/mod.rs 771
+# (+1 2026-07-05: M4 S3a2 — card_update_enabled reads the persisted config
+#  toggle instead of a hardcoded true. Stacked on the persist-once bump.
+#  771 → 772.)
+vauchi-app/src/ui/app_engine/mod.rs 772
 # (2026-07-01: Glance orchestration + its INLINE_TEST_REQUIRED test mod —
 #  Slice B. The privacy/binding tests call private build_ble_session_inputs /
 #  pending_exchange_groups so they must stay inline; the pub-API Glance

@@ -63,6 +63,11 @@ pub struct VauchiConfig {
     /// Default: false (opt-in).
     pub contact_added_notifications: bool,
 
+    /// Whether to send an OS notification when a contact updates their card —
+    /// the product's core heartbeat. Default: **true** (M4 S3). Self-seeded
+    /// from `SettingsFlags` so it follows the user across devices.
+    pub card_update_notifications: bool,
+
     /// Reduce/eliminate UI motion. Category-2 accessibility flag, self-seeded
     /// from `SettingsFlags` so it follows the user across devices (ADR-047
     /// Addendum 2026-07-05). Default: false.
@@ -87,6 +92,7 @@ impl Default for VauchiConfig {
             relay_list: None,
             ohttp: OhttpConfig::default(),
             contact_added_notifications: false,
+            card_update_notifications: true,
             reduce_motion: false,
             large_touch: false,
         }

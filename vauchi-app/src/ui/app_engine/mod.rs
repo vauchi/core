@@ -682,9 +682,10 @@ impl AppEngine {
 
         let prefs = NotificationPreferences {
             contact_added_enabled: self.vauchi.config().contact_added_notifications,
-            // Default-on card-update heartbeat (M4 S3). A persisted toggle +
-            // per-contact mute are follow-ups (S3a2 / Tier-1).
-            card_update_enabled: true,
+            // Default-on card-update heartbeat (M4 S3), now honoring the
+            // persisted Settings toggle (S3a2). Per-contact mute is a Tier-1
+            // follow-up.
+            card_update_enabled: self.vauchi.config().card_update_notifications,
         };
         let locale = self.render_context.resolved_locale();
 

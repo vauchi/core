@@ -10,6 +10,7 @@ fn sample_config() -> SettingsConfig {
         delivery_receipts_enabled: true,
         suppress_presence: false,
         contact_added_notifications: false,
+        card_update_notifications: true,
         relay_url: "https://relay.vauchi.app".into(),
         device_count: 3,
         password_set: true,
@@ -91,6 +92,34 @@ fn settings_toggle_delivery_receipts() {
             assert!(
                 !toggled,
                 "delivery_receipts should be disabled after toggle"
+            );
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+}
+
+// M4 S3a2: the card-update notification heartbeat has a real, default-on
+// Settings toggle (previously no such notification existed at all).
+// @internal
+#[test]
+fn settings_toggle_card_update_notifications() {
+    let mut engine = SettingsEngine::new(sample_config());
+
+    let screen = engine.current_screen();
+    assert!(
+        find_toggle(&screen, "notifications", "card_update"),
+        "card_update toggle present + enabled (default-on)"
+    );
+
+    let result = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "notifications".into(),
+        item_id: "card_update".into(),
+    });
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert!(
+                !find_toggle(&screen, "notifications", "card_update"),
+                "card_update disabled after toggle"
             );
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),

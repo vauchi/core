@@ -73,6 +73,7 @@ fn sample_settings_config() -> SettingsConfig {
         delivery_receipts_enabled: true,
         suppress_presence: false,
         contact_added_notifications: false,
+        card_update_notifications: true,
         relay_url: "https://relay.vauchi.app".into(),
         device_count: 2,
         password_set: true,

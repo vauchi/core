@@ -17,6 +17,8 @@ pub struct SettingsConfig {
     pub suppress_presence: bool,
     #[serde(default)]
     pub contact_added_notifications: bool,
+    #[serde(default = "default_true")]
+    pub card_update_notifications: bool,
     pub relay_url: String,
     pub device_count: usize,
     pub password_set: bool,
@@ -156,19 +158,36 @@ impl SettingsEngine {
         Component::SettingsGroup {
             id: "notifications".into(),
             label: self.t("settings.notifications_group"),
-            items: vec![SettingsItem {
-                id: "contact_added".into(),
-                label: self.t("settings.contact_added"),
-                kind: SettingsItemKind::Toggle {
-                    enabled: self.config.contact_added_notifications,
+            items: vec![
+                // The card-update heartbeat (M4 S3). Default-on; this is the
+                // toggle that makes the notification honestly disable-able.
+                SettingsItem {
+                    id: "card_update".into(),
+                    label: self.t("settings.card_updates"),
+                    kind: SettingsItemKind::Toggle {
+                        enabled: self.config.card_update_notifications,
+                    },
+                    a11y: Some(A11y {
+                        label: Some(self.t("settings.card_updates_a11y")),
+                        hint: Some(self.t("settings.card_updates_hint")),
+                        role: None,
+                    }),
+                    info_key: None,
                 },
-                a11y: Some(A11y {
-                    label: Some(self.t("settings.contact_added_a11y")),
-                    hint: Some(self.t("settings.contact_added_hint")),
-                    role: None,
-                }),
-                info_key: None,
-            }],
+                SettingsItem {
+                    id: "contact_added".into(),
+                    label: self.t("settings.contact_added"),
+                    kind: SettingsItemKind::Toggle {
+                        enabled: self.config.contact_added_notifications,
+                    },
+                    a11y: Some(A11y {
+                        label: Some(self.t("settings.contact_added_a11y")),
+                        hint: Some(self.t("settings.contact_added_hint")),
+                        role: None,
+                    }),
+                    info_key: None,
+                },
+            ],
         }
     }
 
@@ -672,6 +691,13 @@ impl WorkflowEngine for SettingsEngine {
                 ref item_id,
             } if component_id == "notifications" && item_id == "contact_added" => {
                 self.config.contact_added_notifications = !self.config.contact_added_notifications;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::SettingsToggled {
+                ref component_id,
+                ref item_id,
+            } if component_id == "notifications" && item_id == "card_update" => {
+                self.config.card_update_notifications = !self.config.card_update_notifications;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::SettingsToggled {

@@ -22,6 +22,7 @@
 //!
 //! See `_private/docs/problems/2026-05-11-link-exchange-engine-graduation/`.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::Command;
 use vauchi_core::Event;
@@ -74,6 +75,7 @@ pub struct LinkExchangeEngine {
     /// persisted. When `None` the success screen falls back to minimal
     /// completion chrome.
     success_summary: Option<crate::ui::exchange::success::ExchangeSuccessSummary>,
+    locale: Locale,
 }
 
 impl Default for LinkExchangeEngine {
@@ -93,7 +95,19 @@ impl LinkExchangeEngine {
             share_url: String::new(),
             cancelled: false,
             success_summary: None,
+            locale: Locale::English,
         }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-11).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Attach the rich success summary the terminal screen renders. Inert
@@ -169,8 +183,8 @@ impl LinkExchangeEngine {
     fn build_share_url_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "exchange_share_url".into(),
-            title: "Share Link".into(),
-            subtitle: Some("Send this link to exchange contacts".into()),
+            title: self.t("link_exchange.share_link_title"),
+            subtitle: Some(self.t("link_exchange.share_link_subtitle")),
             components: vec![Component::Text {
                 id: "link_url".into(),
                 content: self.share_url.clone(),
@@ -179,17 +193,17 @@ impl LinkExchangeEngine {
             actions: vec![
                 ScreenAction {
                     id: ACTION_SHARE.into(),
-                    label: "Share".into(),
+                    label: self.t("action.share"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.share"))),
                 },
                 ScreenAction {
                     id: ACTION_CANCEL.into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             ..Default::default()
@@ -199,28 +213,26 @@ impl LinkExchangeEngine {
     fn build_waiting_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "exchange_link_waiting".into(),
-            title: "Waiting for Response".into(),
-            subtitle: Some("The link has been shared. Waiting for the other person...".into()),
+            title: self.t("link_exchange.waiting_title"),
+            subtitle: Some(self.t("link_exchange.waiting_subtitle")),
             components: vec![Component::StatusIndicator {
                 id: "waiting_status".into(),
                 icon: None,
-                title: "Waiting...".into(),
-                detail: Some("They need to open the link to complete the exchange.".into()),
+                title: self.t("link_exchange.waiting_status"),
+                detail: Some(self.t("link_exchange.waiting_detail")),
                 status: Status::InProgress,
                 a11y: Some(A11y {
-                    label: Some("Waiting for response".into()),
-                    hint: Some(
-                        "The other person needs to open the link to complete the exchange".into(),
-                    ),
+                    label: Some(self.t("link_exchange.waiting_a11y")),
+                    hint: Some(self.t("link_exchange.waiting_a11y_hint")),
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: ACTION_CANCEL.into(),
-                label: "Cancel".into(),
+                label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.cancel"))),
             }],
             ..Default::default()
         }
@@ -229,17 +241,17 @@ impl LinkExchangeEngine {
     fn build_retrieving_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "exchange_link_retrieving".into(),
-            title: "Completing Exchange".into(),
+            title: self.t("link_exchange.completing_title"),
             subtitle: None,
             components: vec![Component::StatusIndicator {
                 id: "retrieving_status".into(),
                 icon: None,
-                title: "Retrieving contact...".into(),
+                title: self.t("link_exchange.retrieving_status"),
                 detail: None,
                 status: Status::InProgress,
                 a11y: Some(A11y {
-                    label: Some("Retrieving contact".into()),
-                    hint: Some("Fetching and decrypting the contact card".into()),
+                    label: Some(self.t("link_exchange.retrieving_a11y")),
+                    hint: Some(self.t("link_exchange.retrieving_a11y_hint")),
                     role: None,
                 }),
             }],
@@ -255,33 +267,33 @@ impl LinkExchangeEngine {
         if let Some(summary) = &self.success_summary {
             return crate::ui::exchange::success::build_exchange_success_screen(
                 "exchange_link_success",
-                "Contact Added",
+                self.t("link_exchange.contact_added_title"),
                 ACTION_DONE,
                 summary,
             );
         }
         ScreenModel {
             screen_id: "exchange_link_success".into(),
-            title: "Contact Added".into(),
-            subtitle: Some("The other person's contact card has been saved.".into()),
+            title: self.t("link_exchange.contact_added_title"),
+            subtitle: Some(self.t("link_exchange.contact_added_subtitle")),
             components: vec![Component::StatusIndicator {
                 id: "success_status".into(),
                 icon: None,
-                title: "Done".into(),
-                detail: Some("You can find the new contact in your contacts list.".into()),
+                title: self.t("link_exchange.success_status"),
+                detail: Some(self.t("link_exchange.success_detail")),
                 status: Status::Success,
                 a11y: Some(A11y {
-                    label: Some("Contact added".into()),
+                    label: Some(self.t("link_exchange.contact_added_a11y")),
                     hint: None,
                     role: None,
                 }),
             }],
             actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
-                label: "Done".into(),
+                label: self.t("action.done"),
                 style: ActionStyle::Primary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.done"))),
             }],
             ..Default::default()
         }
@@ -290,16 +302,16 @@ impl LinkExchangeEngine {
     fn build_failed_screen(&self, reason: &str) -> ScreenModel {
         ScreenModel {
             screen_id: "exchange_link_failed".into(),
-            title: "Link Failed".into(),
-            subtitle: Some("The contact exchange could not be completed.".into()),
+            title: self.t("link_exchange.link_failed_title"),
+            subtitle: Some(self.t("link_exchange.link_failed_subtitle")),
             components: vec![Component::StatusIndicator {
                 id: "failed_status".into(),
                 icon: None,
-                title: "Failed".into(),
-                detail: Some(failure_detail(reason).into()),
+                title: self.t("exchange.terminal.failed"),
+                detail: Some(failure_detail(reason, self.locale)),
                 status: Status::Failed,
                 a11y: Some(A11y {
-                    label: Some("Link failed".into()),
+                    label: Some(self.t("link_exchange.link_failed_a11y")),
                     hint: None,
                     role: None,
                 }),
@@ -307,17 +319,17 @@ impl LinkExchangeEngine {
             actions: vec![
                 ScreenAction {
                     id: ACTION_RETRY.into(),
-                    label: "Try Again".into(),
+                    label: self.t("action.try_again"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.try_again"))),
                 },
                 ScreenAction {
                     id: ACTION_CANCEL.into(),
-                    label: "Cancel".into(),
+                    label: self.t("action.cancel"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: None,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             ..Default::default()
@@ -326,17 +338,16 @@ impl LinkExchangeEngine {
 }
 
 /// Map the stable `LinkInitiator` failure id to a user-facing detail.
-fn failure_detail(reason: &str) -> &'static str {
-    match reason {
-        "polling_timed_out" => {
-            "The other device did not respond in time. Share the link again to retry."
-        }
-        "handshake_failed" => "The secure handshake failed. Please share a fresh link.",
-        "deposit_rejected" => "The relay rejected the exchange. Please try sharing the link again.",
-        "decrypt_error" => "The received card could not be decrypted. Please try again.",
-        "cancelled" => "The exchange was cancelled.",
-        _ => "Something went wrong completing the exchange. Please try again.",
-    }
+fn failure_detail(reason: &str, locale: Locale) -> String {
+    let key = match reason {
+        "polling_timed_out" => "link_exchange.reason_polling_timed_out",
+        "handshake_failed" => "link_exchange.reason_handshake_failed",
+        "deposit_rejected" => "link_exchange.reason_deposit_rejected",
+        "decrypt_error" => "link_exchange.reason_decrypt_error",
+        "cancelled" => "link_exchange.reason_cancelled",
+        _ => "link_exchange.reason_generic",
+    };
+    get_string(locale, key)
 }
 
 impl WorkflowEngine for LinkExchangeEngine {

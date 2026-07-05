@@ -119,7 +119,9 @@ impl AppEngine {
             AppScreen::DeepLinkResponder { payload } => {
                 Box::new(crate::ui::LinkResponderEngine::new(payload.clone()))
             }
-            AppScreen::LinkExchange => Box::new(crate::ui::LinkExchangeEngine::new()),
+            AppScreen::LinkExchange => {
+                Box::new(crate::ui::LinkExchangeEngine::new().with_locale(locale))
+            }
             AppScreen::BleExchange { mode } => {
                 // Role-tiebreak token: this device's stable signing public
                 // key. The engine advertises it; on discovery each peer

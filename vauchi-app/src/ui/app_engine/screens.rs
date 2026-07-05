@@ -446,7 +446,10 @@ impl AppEngine {
                 }
                 // Tag vanished between navigation and build — fall back to the
                 // generic not-found screen (keeps a Back affordance).
-                Err(_) => Box::new(ContactNotFoundEngine::new(tag_id.clone())),
+                Err(_) => Box::new(
+                    ContactNotFoundEngine::new(tag_id.clone())
+                        .with_locale(render_context.resolved_locale()),
+                ),
             },
             AppScreen::Places => {
                 let places: Vec<PlaceSummary> = vauchi

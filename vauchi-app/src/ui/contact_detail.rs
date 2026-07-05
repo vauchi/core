@@ -7,6 +7,7 @@
 
 use std::collections::HashMap;
 
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 // `footer_action_id` is re-exported from `crate::ui` under the renamed
 // alias `contact_detail_footer_action_id`, so the glob above does not bind
@@ -111,6 +112,7 @@ pub struct ContactDetailEngine {
     /// Transient name suggestions for `place_input`, from the named-place
     /// vocabulary, computed by the AppEngine intercept.
     place_suggestions: Vec<String>,
+    locale: Locale,
 }
 
 impl ContactDetailEngine {
@@ -141,6 +143,7 @@ impl ContactDetailEngine {
             exchange_place: None,
             place_input: String::new(),
             place_suggestions: Vec::new(),
+            locale: Locale::English,
         }
     }
 
@@ -176,6 +179,7 @@ impl ContactDetailEngine {
             exchange_place: None,
             place_input: String::new(),
             place_suggestions: Vec::new(),
+            locale: Locale::English,
         }
     }
 
@@ -183,6 +187,17 @@ impl ContactDetailEngine {
     pub fn with_delivery_summary(mut self, summary: DeliverySummary) -> Self {
         self.delivery_summary = Some(summary);
         self
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-12).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 
     /// Attach per-field notes loaded from storage.
@@ -368,9 +383,11 @@ impl ContactDetailEngine {
 
         let title = match self.view_mode {
             ContactViewMode::TheirInfo => self.contact.name.clone(),
-            ContactViewMode::MyInfoForThem => {
-                format!("Shared with {}", self.contact.name)
-            }
+            ContactViewMode::MyInfoForThem => get_string_with_args(
+                self.locale,
+                "contact_detail.shared_with_title",
+                &[("name", &self.contact.name)],
+            ),
         };
 
         ScreenModel {
@@ -387,52 +404,55 @@ impl ContactDetailEngine {
     fn perspective_toggle(&self) -> Component {
         let their_info_selected = self.view_mode == ContactViewMode::TheirInfo;
         let my_info_selected = self.view_mode == ContactViewMode::MyInfoForThem;
+        let toggle_hint = self.t("onboarding.a11y_toggle_hint");
+        let their_info_label = self.t("contact_detail.their_info_label");
+        let my_info_for_them_label = self.t("contact_detail.my_info_for_them_label");
         Component::ToggleList {
             id: "view_mode".into(),
-            label: "Perspective".into(),
+            label: self.t("contact_detail.perspective_label"),
             items: vec![
                 ToggleItem {
                     id: "their_info".into(),
-                    label: "Their Info".into(),
+                    label: their_info_label.clone(),
                     selected: their_info_selected,
-                    subtitle: Some("What they share with me".into()),
+                    subtitle: Some(self.t("contact_detail.their_info_subtitle")),
                     a11y: Some(A11y {
                         label: Some(format!(
-                            "Their Info, {}",
+                            "{their_info_label}, {}",
                             if their_info_selected {
-                                "selected"
+                                self.t("onboarding.a11y_selected")
                             } else {
-                                "not selected"
+                                self.t("onboarding.a11y_not_selected")
                             }
                         )),
-                        hint: Some("Double tap to toggle".into()),
+                        hint: Some(toggle_hint.clone()),
                         role: Some(AccessibilityRole::Toggle),
                     }),
                     info_key: None,
                 },
                 ToggleItem {
                     id: "my_info_for_them".into(),
-                    label: "My Info for Them".into(),
+                    label: my_info_for_them_label.clone(),
                     selected: my_info_selected,
-                    subtitle: Some("What I share with them".into()),
+                    subtitle: Some(self.t("contact_detail.my_info_for_them_subtitle")),
                     a11y: Some(A11y {
                         label: Some(format!(
-                            "My Info for Them, {}",
+                            "{my_info_for_them_label}, {}",
                             if my_info_selected {
-                                "selected"
+                                self.t("onboarding.a11y_selected")
                             } else {
-                                "not selected"
+                                self.t("onboarding.a11y_not_selected")
                             }
                         )),
-                        hint: Some("Double tap to toggle".into()),
+                        hint: Some(toggle_hint),
                         role: Some(AccessibilityRole::Toggle),
                     }),
                     info_key: None,
                 },
             ],
             a11y: Some(A11y {
-                label: Some("Perspective options".into()),
-                hint: Some("Select items to include".into()),
+                label: Some(self.t("contact_detail.perspective_options_a11y")),
+                hint: Some(self.t("contact_detail.select_items_hint")),
                 role: None,
             }),
         }
@@ -449,7 +469,11 @@ impl ContactDetailEngine {
             brightness: 0.0,
             editable: false,
             a11y: Some(A11y {
-                label: Some(format!("{}'s avatar", self.contact.name)),
+                label: Some(get_string_with_args(
+                    self.locale,
+                    "contact_detail.avatar_a11y",
+                    &[("name", &self.contact.name)],
+                )),
                 hint: None,
                 role: Some(AccessibilityRole::Image),
             }),
@@ -459,13 +483,13 @@ impl ContactDetailEngine {
         // Private note about the contact — only visible to me, never shared
         components.push(Component::EditableText {
             id: "personal_note".into(),
-            label: "Private note".into(),
+            label: self.t("contact_detail.private_note_label"),
             value: self.personal_note.clone(),
             editing: false,
             validation_error: None,
             a11y: Some(A11y {
-                label: Some("Personal note, editable".into()),
-                hint: Some("Double tap to edit".into()),
+                label: Some(self.t("contact_detail.personal_note_a11y")),
+                hint: Some(self.t("contact_detail.double_tap_to_edit_hint")),
                 role: Some(AccessibilityRole::TextField),
             }),
             info_key: None,
@@ -485,18 +509,16 @@ impl ContactDetailEngine {
         // Trust & permissions group (local-only, never shared with the contact)
         components.push(Component::SettingsGroup {
             id: "trust_permissions".into(),
-            label: "Trust & Permissions".into(),
+            label: self.t("contact_detail.trust_permissions_label"),
             items: vec![SettingsItem {
                 id: "proposal_trusted".into(),
-                label: "Can propose contacts".into(),
+                label: self.t("contact_detail.can_propose_contacts_label"),
                 kind: SettingsItemKind::Toggle {
                     enabled: self.proposal_trusted,
                 },
                 a11y: Some(A11y {
-                    label: Some("Can propose contacts toggle".into()),
-                    hint: Some(
-                        "Allow this contact to suggest other people you should connect with".into(),
-                    ),
+                    label: Some(self.t("contact_detail.can_propose_contacts_a11y")),
+                    hint: Some(self.t("contact_detail.can_propose_contacts_hint")),
                     role: None,
                 }),
                 info_key: None,
@@ -506,19 +528,16 @@ impl ContactDetailEngine {
         // (Pair 3 ContactDetail engine extension, 2026-04-28).
         components.push(Component::SettingsGroup {
             id: "recovery_permissions".into(),
-            label: "Recovery".into(),
+            label: self.t("contact_detail.recovery_label"),
             items: vec![SettingsItem {
                 id: "recovery_trusted".into(),
-                label: "Trust for recovery".into(),
+                label: self.t("contact_detail.trust_for_recovery_label"),
                 kind: SettingsItemKind::Toggle {
                     enabled: self.is_recovery_trusted,
                 },
                 a11y: Some(A11y {
-                    label: Some("Trust for recovery toggle".into()),
-                    hint: Some(
-                        "Allow this contact to help you recover access if you lose your device"
-                            .into(),
-                    ),
+                    label: Some(self.t("contact_detail.trust_for_recovery_a11y")),
+                    hint: Some(self.t("contact_detail.trust_for_recovery_hint")),
                     role: None,
                 }),
                 info_key: None,
@@ -534,41 +553,41 @@ impl ContactDetailEngine {
         // Build contact_info items — always show initials, add trust level if set
         let mut contact_info_items = vec![InfoItem {
             icon: None,
-            title: "Initials".into(),
+            title: self.t("contact_detail.initials_label"),
             detail: self.contact.avatar_initials.clone(),
         }];
         if !self.trust_level.is_empty() {
             contact_info_items.push(InfoItem {
                 icon: None,
-                title: "Trust".into(),
+                title: self.t("contact_detail.trust_label"),
                 detail: self.trust_level.clone(),
             });
         }
         if show_verified_badge(self.is_verified) {
             contact_info_items.push(InfoItem {
                 icon: Some("checkmark.seal".into()),
-                title: "Verified".into(),
-                detail: "Yes".into(),
+                title: self.t("contacts.verified"),
+                detail: self.t("generic.yes"),
             });
         }
         if show_recovery_trusted_indicator(self.is_recovery_trusted) {
             contact_info_items.push(InfoItem {
                 icon: Some("shield".into()),
-                title: "Recovery Trusted".into(),
-                detail: "Yes".into(),
+                title: self.t("contact_detail.recovery_trusted_label"),
+                detail: self.t("generic.yes"),
             });
         }
         if !self.fingerprint.is_empty() {
             contact_info_items.push(InfoItem {
                 icon: None,
-                title: "Fingerprint".into(),
+                title: self.t("contact_detail.fingerprint_label"),
                 detail: self.fingerprint.clone(),
             });
         }
         if !self.reciprocity_status.is_empty() {
             contact_info_items.push(InfoItem {
                 icon: None,
-                title: "Exchange status".into(),
+                title: self.t("contact_detail.exchange_status_label"),
                 detail: self.reciprocity_status.clone(),
             });
         }
@@ -589,6 +608,7 @@ impl ContactDetailEngine {
         let mut components = Vec::new();
         // Their fields — read-only, no visibility column.
         // Each field is followed by an inline-editable private note.
+        let contact_fields_a11y = self.t("fields.a11y_contact_fields");
         for field in &self.fields {
             components.push(Component::FieldList {
                 id: format!("field_{}", field.id),
@@ -596,7 +616,7 @@ impl ContactDetailEngine {
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_groups: vec![],
                 a11y: Some(A11y {
-                    label: Some("Contact fields".into()),
+                    label: Some(contact_fields_a11y.clone()),
                     hint: None,
                     role: None,
                 }),
@@ -604,13 +624,13 @@ impl ContactDetailEngine {
             let note_value = self.field_notes.get(&field.id).cloned().unwrap_or_default();
             components.push(Component::EditableText {
                 id: format!("field_note:{}", field.id),
-                label: "Private note for this field".into(),
+                label: self.t("contact_detail.private_field_note_label"),
                 value: note_value,
                 editing: false,
                 validation_error: None,
                 a11y: Some(A11y {
-                    label: Some("Private field note, editable".into()),
-                    hint: Some("Double tap to edit".into()),
+                    label: Some(self.t("contact_detail.private_field_note_a11y")),
+                    hint: Some(self.t("contact_detail.double_tap_to_edit_hint")),
                     role: Some(AccessibilityRole::TextField),
                 }),
                 info_key: None,
@@ -625,26 +645,26 @@ impl ContactDetailEngine {
         if summary.failed == 0 && summary.pending == 0 {
             items.push(InfoItem {
                 icon: None,
-                title: "Status".into(),
-                detail: "All delivered".into(),
+                title: self.t("contacts.status"),
+                detail: self.t("contact_detail.all_delivered_detail"),
             });
         } else {
             items.push(InfoItem {
                 icon: None,
-                title: "Delivered".into(),
+                title: self.t("delivery.status_delivered"),
                 detail: summary.delivered.to_string(),
             });
             if summary.pending > 0 {
                 items.push(InfoItem {
                     icon: None,
-                    title: "Pending".into(),
+                    title: self.t("delivery.pending_tab"),
                     detail: summary.pending.to_string(),
                 });
             }
             if summary.failed > 0 {
                 items.push(InfoItem {
                     icon: None,
-                    title: "Failed".into(),
+                    title: self.t("delivery.status_failed"),
                     detail: summary.failed.to_string(),
                 });
             }
@@ -652,10 +672,10 @@ impl ContactDetailEngine {
         Some(Component::InfoPanel {
             id: "delivery_status".into(),
             icon: None,
-            title: "Update Delivery".into(),
+            title: self.t("contact_detail.update_delivery_title"),
             items,
             a11y: Some(A11y {
-                label: Some("Update Delivery".into()),
+                label: Some(self.t("contact_detail.update_delivery_title")),
                 hint: None,
                 role: Some(AccessibilityRole::Heading),
             }),
@@ -668,14 +688,14 @@ impl ContactDetailEngine {
             components.push(Component::InfoPanel {
                 id: "shared_name_info".into(),
                 icon: None,
-                title: "They see me as".into(),
+                title: self.t("contact_detail.they_see_me_as_title"),
                 items: vec![InfoItem {
                     icon: None,
-                    title: "Display Name".into(),
+                    title: self.t("settings.display_name"),
                     detail: shared.shared_display_name.clone(),
                 }],
                 a11y: Some(A11y {
-                    label: Some("They see me as".into()),
+                    label: Some(self.t("contact_detail.they_see_me_as_title")),
                     hint: None,
                     role: Some(AccessibilityRole::Heading),
                 }),
@@ -687,8 +707,8 @@ impl ContactDetailEngine {
                 visibility_mode: VisibilityMode::PerGroup,
                 available_groups: shared.visible_groups.clone(),
                 a11y: Some(A11y {
-                    label: Some("Contact fields".into()),
-                    hint: Some("Manage group visibility".into()),
+                    label: Some(self.t("fields.a11y_contact_fields")),
+                    hint: Some(self.t("contact_detail.manage_group_visibility_hint")),
                     role: None,
                 }),
             });
@@ -699,16 +719,17 @@ impl ContactDetailEngine {
     fn delete_confirm(&self) -> Component {
         Component::InlineConfirm {
             id: "delete_contact".into(),
-            warning: format!(
-                "Permanently delete \"{}\"? This cannot be undone.",
-                self.contact.name
+            warning: get_string_with_args(
+                self.locale,
+                "contact_detail.delete_confirm_warning",
+                &[("name", &self.contact.name)],
             ),
-            confirm_text: "Delete".into(),
-            cancel_text: "Cancel".into(),
+            confirm_text: self.t("action.delete"),
+            cancel_text: self.t("action.cancel"),
             destructive: true,
             a11y: Some(A11y {
-                label: Some("Confirm contact deletion".into()),
-                hint: Some("This will permanently delete the contact and cannot be undone".into()),
+                label: Some(self.t("contact_detail.confirm_deletion_a11y")),
+                hint: Some(self.t("contact_detail.confirm_deletion_hint")),
                 role: Some(AccessibilityRole::Alert),
             }),
         }
@@ -716,47 +737,51 @@ impl ContactDetailEngine {
 
     fn build_actions(&self) -> Vec<ScreenAction> {
         let mut actions: Vec<ScreenAction> = Vec::new();
+        let edit_label = self.t("action.edit");
         actions.push(ScreenAction {
             id: "edit".into(),
-            label: "Edit".into(),
+            label: edit_label.clone(),
             style: ActionStyle::Primary,
             enabled: true,
-            a11y: None,
+            a11y: Some(A11y::labeled(edit_label)),
         });
         if verify_button_visible(self.is_verified, self.trust_level_enum) {
+            let verify_label = self.t("contact_detail.verify_fingerprint_button");
             actions.push(ScreenAction {
                 id: "verify_fingerprint".into(),
-                label: "Verify Fingerprint".into(),
+                label: verify_label.clone(),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(verify_label)),
             });
         }
+        let toggle_hidden_label = if self.is_hidden {
+            self.t("contact_detail.unhide_button")
+        } else {
+            self.t("contact_detail.hide_button")
+        };
         actions.push(ScreenAction {
             id: "toggle_hidden".into(),
-            label: if self.is_hidden {
-                "Unhide contact".into()
-            } else {
-                "Hide contact".into()
-            },
+            label: toggle_hidden_label.clone(),
             style: ActionStyle::Secondary,
             enabled: true,
-            a11y: None,
+            a11y: Some(A11y::labeled(toggle_hidden_label)),
         });
+        let footer_label = if self.is_imported {
+            self.t("contact_detail.delete_contact_button")
+        } else {
+            self.t("contact_detail.archive_contact_button")
+        };
         actions.push(ScreenAction {
             id: footer_action_id(self.is_imported).into(),
-            label: if self.is_imported {
-                "Delete Contact".into()
-            } else {
-                "Archive Contact".into()
-            },
+            label: footer_label.clone(),
             style: if self.is_imported {
                 ActionStyle::Destructive
             } else {
                 ActionStyle::Secondary
             },
             enabled: true,
-            a11y: None,
+            a11y: Some(A11y::labeled(footer_label)),
         });
         // Back is the frontend's job now: every frontend renders a
         // core-driven back affordance from `can_go_back` (2026-06-05-
@@ -863,11 +888,26 @@ impl WorkflowEngine for ContactDetailEngine {
 #[derive(Clone, Debug)]
 pub struct ContactNotFoundEngine {
     contact_id: String,
+    locale: Locale,
 }
 
 impl ContactNotFoundEngine {
     pub fn new(contact_id: String) -> Self {
-        Self { contact_id }
+        Self {
+            contact_id,
+            locale: Locale::English,
+        }
+    }
+
+    /// Set the render locale (defaults to English) — threaded from the
+    /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-12).
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
     }
 }
 
@@ -875,29 +915,33 @@ impl WorkflowEngine for ContactNotFoundEngine {
     fn current_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "contact_not_found".into(),
-            title: "Contact Not Found".into(),
+            title: self.t("contact_detail.not_found_title"),
             subtitle: None,
             components: vec![Component::InfoPanel {
                 id: "not_found".into(),
                 icon: None,
-                title: "Not Found".into(),
+                title: self.t("contact_detail.not_found_status"),
                 items: vec![InfoItem {
                     icon: None,
-                    title: "Error".into(),
-                    detail: format!("Contact '{}' was not found.", self.contact_id),
+                    title: self.t("status.error"),
+                    detail: get_string_with_args(
+                        self.locale,
+                        "contact_detail.not_found_detail",
+                        &[("id", &self.contact_id)],
+                    ),
                 }],
                 a11y: Some(A11y {
-                    label: Some("Not Found".into()),
+                    label: Some(self.t("contact_detail.not_found_status")),
                     hint: None,
                     role: Some(AccessibilityRole::Heading),
                 }),
             }],
             actions: vec![ScreenAction {
                 id: "back".into(),
-                label: "Back".into(),
+                label: self.t("action.back"),
                 style: ActionStyle::Secondary,
                 enabled: true,
-                a11y: None,
+                a11y: Some(A11y::labeled(self.t("action.back"))),
             }],
             progress: None,
             ..Default::default()

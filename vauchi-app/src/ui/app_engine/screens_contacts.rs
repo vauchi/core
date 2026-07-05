@@ -211,7 +211,8 @@ impl AppEngine {
                             .with_imported(is_imported)
                             .with_verification(is_verified, trust_level_enum)
                             .with_fingerprint(fingerprint)
-                            .with_recovery_trusted(is_recovery_trusted);
+                            .with_recovery_trusted(is_recovery_trusted)
+                            .with_locale(render_context.resolved_locale());
                         if let Some(summary) = delivery_summary
                             && summary.total > 0
                         {
@@ -236,7 +237,10 @@ impl AppEngine {
                         ))),
                     }
                 }
-                _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
+                _ => Box::new(
+                    ContactNotFoundEngine::new(contact_id.clone())
+                        .with_locale(render_context.resolved_locale()),
+                ),
             },
             AppScreen::ContactVisibility { contact_id } => {
                 let (name, fields) = match vauchi.get_contact(contact_id) {
@@ -290,7 +294,10 @@ impl AppEngine {
                         .and_then(|c| c.avatar().map(|a| a.to_vec()));
                     Box::new(ContactEditEngine::new(editable, vec![]).with_avatar_data(avatar_data))
                 }
-                _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
+                _ => Box::new(
+                    ContactNotFoundEngine::new(contact_id.clone())
+                        .with_locale(render_context.resolved_locale()),
+                ),
             },
             AppScreen::ContactDuplicates => {
                 let pairs = vauchi.find_duplicates().unwrap_or_default();

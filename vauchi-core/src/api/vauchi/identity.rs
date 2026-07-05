@@ -340,6 +340,80 @@ impl Vauchi {
         Ok(())
     }
 
+    /// Adopt a decrypted device-link response onto this fresh instance,
+    /// becoming a new device of an existing identity (M5 B3 join engine).
+    ///
+    /// Mirrors [`Self::import_full_backup`]: fresh-instance guard, build
+    /// the identity from the shared master seed, persist it + the device
+    /// registry, then apply the full sync payload (own card, contacts,
+    /// tags, …) if the linking device sent one. The caller (the join
+    /// responder machine) owns the ephemeral responder that decrypted the
+    /// response, so this takes the already-decrypted
+    /// [`crate::exchange::DeviceLinkResponse`], not the QR + ciphertext.
+    pub fn adopt_device_link_response(
+        &mut self,
+        response: &crate::exchange::DeviceLinkResponse,
+        device_name: String,
+    ) -> VauchiResult<()> {
+        if self.identity.is_some() {
+            return Err(VauchiError::AlreadyInitialized);
+        }
+
+        let now = self.clock.unix_seconds();
+        let device_index = response.device_index();
+        let identity = Identity::from_device_link(
+            *response.master_seed(),
+            response.display_name().to_string(),
+            device_index,
+            device_name.clone(),
+            now,
+        );
+
+        // Same plaintext storage format as `create_identity`; the DB
+        // encrypts at rest (ADR-015).
+        self.storage
+            .identity()
+            .save_identity(&identity.to_storage_bytes(), identity.display_name())?;
+
+        // Persist the registry from the linking device so sync can address
+        // the peer devices.
+        self.storage
+            .device()
+            .save_device_registry(response.registry())?;
+
+        if response.sync_payload_json().is_empty() {
+            // No sync payload — seed a default own card from the display name.
+            let card = ContactCard::new(identity.display_name());
+            self.storage.contacts().save_own_card(&card)?;
+        } else {
+            let payload: crate::sync::DeviceSyncPayload =
+                serde_json::from_str(response.sync_payload_json()).map_err(|e| {
+                    VauchiError::Configuration(format!(
+                        "Device-link sync payload parse failed: {e}"
+                    ))
+                })?;
+            // DeviceInfo isn't Clone; reconstruct this device's info with the
+            // same derivation `from_device_link` used above (deterministic).
+            let current_device = crate::identity::DeviceInfo::derive(
+                response.master_seed(),
+                device_index,
+                device_name,
+                now,
+            );
+            let mut orchestrator = crate::api::sync::DeviceSyncOrchestrator::new(
+                &self.storage,
+                current_device,
+                response.registry().clone(),
+            );
+            orchestrator.apply_full_sync(payload).map_err(|e| {
+                VauchiError::Configuration(format!("Device-link sync apply failed: {e}"))
+            })?;
+        }
+
+        self.identity = Some(identity);
+        Ok(())
+    }
+
     /// Returns the current identity, if set.
     pub fn identity(&self) -> Option<&Identity> {
         self.identity.as_ref()

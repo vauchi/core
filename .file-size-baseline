@@ -463,7 +463,11 @@ vauchi-app/src/ui/app_engine/routing.rs 596
 #  to 967 when stacked; the per-branch baselines did not. 958 → 967.)
 # (+3 2026-07-05: M3 S5-12 — the ContactNotFoundEngine factory arm gains
 #  `.with_locale(render_context.resolved_locale())`.)
-vauchi-app/src/ui/app_engine/screens.rs 970
+# (+18 2026-07-05: M3 S5-13 (batch-2) — 5 factory arms (DeliveryStatus,
+#  SocialGraph, GroupDetail, MyInfoEntryDetail x2) each gain
+#  `.with_locale(...)`, plus create_entry_detail_engine's signature grows
+#  a render_context parameter.)
+vauchi-app/src/ui/app_engine/screens.rs 988
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

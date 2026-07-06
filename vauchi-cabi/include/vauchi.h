@@ -230,6 +230,23 @@ char *vauchi_app_handle_action(struct VauchiApp *handle, const char *action_json
 char *vauchi_app_navigate_to(struct VauchiApp *handle, const char *screen_name);
 
 /**
+ * Open a device-link join invitation on a fresh device.
+ *
+ * `invitation_url` is the raw invitation string (e.g.
+ * `vauchi://device-link?qr=...&code=...`). On success, navigates to the
+ * device-link join screen and returns it as JSON. On failure returns
+ * `{"error":"..."}` (invalid URL or this device already has an identity).
+ * Returns null if `handle` or `invitation_url` is null.
+ *
+ * The caller must free the returned string with `vauchi_string_free`.
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ * `invitation_url` must be a valid null-terminated C string, or null.
+ */
+char *vauchi_app_open_device_link_invitation(struct VauchiApp *handle, const char *invitation_url);
+
+/**
  * Navigate back one step. Returns the resulting screen as JSON.
  *
  * Pops the engine's `AppScreen` nav history, or rewinds one in-engine

@@ -359,6 +359,53 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
         }
     }
 }
+
+/// Open a device-link join invitation on a fresh device.
+///
+/// `invitation_url` is the raw invitation string (e.g.
+/// `vauchi://device-link?qr=...&code=...`). On success, navigates to the
+/// device-link join screen and returns it as JSON. On failure returns
+/// `{"error":"..."}` (invalid URL or this device already has an identity).
+/// Returns null if `handle` or `invitation_url` is null.
+///
+/// The caller must free the returned string with `vauchi_string_free`.
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+/// `invitation_url` must be a valid null-terminated C string, or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_open_device_link_invitation(
+    handle: *mut VauchiApp,
+    invitation_url: *const c_char,
+) -> *mut c_char {
+    // SAFETY: handle is checked non-null; invitation_url read via from_c_str which checks null and requires NUL-terminated string.
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
+            }
+            let url = match from_c_str(invitation_url) {
+                Some(s) => s,
+                None => return to_c_string(r#"{"error":"null invitation URL"}"#),
+            };
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(mut engine) => match engine.open_device_link_invitation(&url) {
+                    Ok(screen) => serde_json::to_string(&screen).map_or_else(
+                        |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                        |j| to_c_string(&j),
+                    ),
+                    Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                },
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
+        }
+    }
+}
+
 /// Navigate back one step. Returns the resulting screen as JSON.
 ///
 /// Pops the engine's `AppScreen` nav history, or rewinds one in-engine

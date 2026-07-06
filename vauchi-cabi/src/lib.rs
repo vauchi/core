@@ -654,6 +654,81 @@ mod tests {
 
     // @internal
     #[test]
+    fn app_open_device_link_invitation_navigates_to_join_screen() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = vauchi_app_create();
+            let invitation =
+                CString::new("vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI").unwrap();
+            let json_ptr = vauchi_app_open_device_link_invitation(handle, invitation.as_ptr());
+            assert!(!json_ptr.is_null(), "invitation should return a screen");
+            let json = CStr::from_ptr(json_ptr).to_str().unwrap();
+            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
+            assert_eq!(
+                screen["screen_id"], "device_link_join",
+                "invitation should navigate to device_link_join, got: {json}"
+            );
+            vauchi_string_free(json_ptr);
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn app_open_device_link_invitation_null_handle_returns_null() {
+        // SAFETY: Calling FFI with null handle.
+        unsafe {
+            let invitation =
+                CString::new("vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI").unwrap();
+            let json_ptr =
+                vauchi_app_open_device_link_invitation(std::ptr::null_mut(), invitation.as_ptr());
+            assert!(json_ptr.is_null(), "null handle should return null");
+        }
+    }
+
+    // @internal
+    #[test]
+    fn app_open_device_link_invitation_null_url_returns_error() {
+        // SAFETY: Calling FFI with null invitation URL.
+        unsafe {
+            let handle = vauchi_app_create();
+            let json_ptr = vauchi_app_open_device_link_invitation(handle, std::ptr::null());
+            assert!(!json_ptr.is_null(), "null URL should return error JSON");
+            let json = CStr::from_ptr(json_ptr).to_str().unwrap();
+            assert!(
+                json.contains("error"),
+                "null URL should return error JSON, got: {json}"
+            );
+            vauchi_string_free(json_ptr);
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn app_open_device_link_invitation_with_identity_returns_error() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = create_app_with_identity();
+            let invitation =
+                CString::new("vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI").unwrap();
+            let json_ptr = vauchi_app_open_device_link_invitation(handle, invitation.as_ptr());
+            assert!(
+                !json_ptr.is_null(),
+                "existing identity should return error JSON"
+            );
+            let json = CStr::from_ptr(json_ptr).to_str().unwrap();
+            assert!(
+                json.contains("error"),
+                "existing identity should return error JSON, got: {json}"
+            );
+            vauchi_string_free(json_ptr);
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
     fn app_navigate_back_returns_a_screen() {
         // After navigating into a sub-screen, navigate_back returns a valid
         // ScreenModel (the prior screen) — the C-ABI path desktop frontends

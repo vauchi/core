@@ -236,7 +236,7 @@ pub unsafe extern "C" fn vauchi_app_current_screen(handle: *mut VauchiApp) -> *m
 ///
 /// # Safety
 /// `app` must be a valid pointer created by `vauchi_app_create*`.
-/// The caller must free the returned string via `vauchi_free_string`.
+/// The caller must free the returned string via `vauchi_string_free`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_poll_notifications(app: *mut VauchiApp) -> *mut c_char {
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

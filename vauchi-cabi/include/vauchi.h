@@ -196,7 +196,7 @@ char *vauchi_app_current_screen(struct VauchiApp *handle);
  *
  * # Safety
  * `app` must be a valid pointer created by `vauchi_app_create*`.
- * The caller must free the returned string via `vauchi_free_string`.
+ * The caller must free the returned string via `vauchi_string_free`.
  */
 char *vauchi_app_poll_notifications(struct VauchiApp *app);
 

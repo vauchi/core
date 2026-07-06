@@ -40,6 +40,12 @@ pub struct ContentFetcher {
 impl ContentFetcher {
     /// Create a new content fetcher from config
     pub fn new(config: &ContentConfig) -> Result<Self, FetchError> {
+        // reqwest is built without a bundled rustls provider so that
+        // vauchi-core's aws_lc_rs provider is reused. Install it before
+        // building the client to avoid "No provider set" at request time.
+        #[cfg(feature = "network-rustls")]
+        vauchi_core::network::ensure_rustls_provider_installed();
+
         let mut builder = Client::builder()
             .timeout(config.timeout)
             .user_agent(format!(

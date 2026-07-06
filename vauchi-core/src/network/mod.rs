@@ -151,3 +151,16 @@ pub use delivery::{
     CleanupResult, ConnectivityDiagnostics, ConnectivityReport, DeliveryAckStatus, DeliveryService,
     KeyRotationDetector, KeyRotationError, OfflineManager, RetryScheduler, RetryTickResult,
 };
+
+/// Ensure a rustls crypto provider is installed globally.
+///
+/// `vauchi-app` compiles reqwest with `rustls-tls-webpki-roots-no-provider`
+/// so that `vauchi-core`'s existing `aws_lc_rs` provider is reused instead
+/// of pulling in `ring`. Calling this before constructing a reqwest `Client`
+/// prevents the "No provider set" panic on the first HTTPS request.
+#[cfg(feature = "network-rustls")]
+pub fn ensure_rustls_provider_installed() {
+    // Installing a provider is idempotent; drop the result so a prior
+    // installation does not trip clippy::let_underscore_must_use.
+    drop(rustls::crypto::aws_lc_rs::default_provider().install_default());
+}

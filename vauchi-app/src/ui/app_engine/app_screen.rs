@@ -94,6 +94,13 @@ pub enum AppScreen {
     DeepLinkResponder {
         payload: vauchi_core::exchange::link_mode::DeepLinkPayload,
     },
+    /// Device-link join flow for a fresh device that has received a
+    /// `DeviceLinkJoinInvitation` (QR scan, deep link, or pasted URL).
+    /// Core parses the invitation, owns the responder machine, and
+    /// navigates through name entry → confirmation code → adoption.
+    DeviceLinkJoin {
+        invitation_url: String,
+    },
     /// Multi-stage face-to-face exchange.
     ///
     /// Renders the simultaneous bilateral QR + camera flow that
@@ -221,6 +228,7 @@ impl AppScreen {
             Self::RecoveryClaimReview => "recovery_claim_review",
             Self::DeepLinkConsent { .. } => "deep_link_consent",
             Self::DeepLinkResponder { .. } => "deep_link_responder",
+            Self::DeviceLinkJoin { .. } => "device_link_join",
             Self::MultiStageExchange { .. } => "multi_stage_exchange",
             Self::LinkExchange => "link_exchange",
             Self::BleExchange { .. } => "ble_exchange",

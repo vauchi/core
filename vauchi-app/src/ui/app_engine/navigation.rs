@@ -56,8 +56,10 @@ impl AppScreen {
             Self::DeviceLinking | Self::DeviceReplacement => Self::DeviceManagement,
             Self::FormDialog { .. } => return None,
             Self::Lock => return None,
-            // Deep-link consent + responder are modal-shaped — no parent tab.
-            Self::DeepLinkConsent { .. } | Self::DeepLinkResponder { .. } => return None,
+            // Deep-link consent + responder + device-link join are modal-shaped — no parent tab.
+            Self::DeepLinkConsent { .. }
+            | Self::DeepLinkResponder { .. }
+            | Self::DeviceLinkJoin { .. } => return None,
             other => other.clone(),
         };
 
@@ -228,6 +230,10 @@ impl AppEngine {
             // initiator machine on entry / exit of the DeviceLinking screen.
             #[cfg(all(feature = "network-http", feature = "storage"))]
             self.sync_device_link_lifecycle(&old_screen, &screen);
+            // M5 B3 Slice 3: tear down the engine-owned device-link join
+            // (responder) machine on exit of the DeviceLinkJoin screen.
+            #[cfg(all(feature = "network-http", feature = "storage"))]
+            self.sync_device_link_responder_lifecycle(&old_screen, &screen);
             // Slice 32m T1.2b: build / drop the engine-owned multi-stage
             // machine on entry / exit of the MultiStageExchange screen.
             // T1.2c removes the parallel cycle-thread bridge in
@@ -321,6 +327,7 @@ impl AppEngine {
                 | AppScreen::FormDialog { .. }
                 | AppScreen::DeepLinkConsent { .. }
                 | AppScreen::DeepLinkResponder { .. }
+                | AppScreen::DeviceLinkJoin { .. }
                 | AppScreen::DirectTransport
                 | AppScreen::BleExchange { .. }
                 | AppScreen::NfcExchange

@@ -46,6 +46,24 @@ impl AppEngine {
                 self.persist_exchange_defaults(ExchangeMode::Link, self.current_exchange_groups());
                 ActionResult::NavigateTo(self.navigate_to(AppScreen::LinkExchange))
             }
+            // M5 B3 Slice 3: start the device-link join (responder) machine
+            // when the user confirms the device name on the join screen.
+            // The responder requires the network-http + storage features;
+            // without them the join screen exists but cannot post a request.
+            ActionResult::DeviceLinkJoinStart { device_name } => {
+                #[cfg(all(feature = "network-http", feature = "storage"))]
+                {
+                    self.route_device_link_join_start(device_name)
+                }
+                #[cfg(not(all(feature = "network-http", feature = "storage")))]
+                {
+                    let _ = device_name;
+                    ActionResult::ShowAlert {
+                        title: "Device Link Unavailable".into(),
+                        message: "This build does not support device-link join.".into(),
+                    }
+                }
+            }
             ActionResult::StartBleExchange { mode } => {
                 self.start_exchange_to(AppScreen::BleExchange { mode }, mode)
             }

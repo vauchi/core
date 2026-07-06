@@ -126,9 +126,19 @@ impl AppEngine {
             InitiatorEvent::QrReady {
                 qr_data,
                 expires_at_unix,
-            } => self
-                .device_link_qr_ready(qr_data, expires_at_unix)
-                .is_some(),
+            } => {
+                // Prefer the full join invitation URL for the QR payload.
+                // The bare qr_data is retained as a fallback only if the
+                // machine has not yet produced an invitation.
+                let invitation_url = self
+                    .device_link_initiator
+                    .as_ref()
+                    .and_then(|holder| holder.machine.join_invitation())
+                    .map(|invitation| invitation.to_url())
+                    .unwrap_or(qr_data);
+                self.device_link_qr_ready(invitation_url, expires_at_unix)
+                    .is_some()
+            }
             InitiatorEvent::ConfirmationRequired {
                 device_name,
                 confirmation_code,

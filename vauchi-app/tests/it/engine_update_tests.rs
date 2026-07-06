@@ -56,7 +56,7 @@ fn device_link_consumes_transitions_and_rejects_foreign() {
     let mut engine = DeviceLinkingEngine::new(String::new());
     assert!(
         engine.apply_update(EngineUpdate::DeviceLink(DeviceLinkUpdate::QrReady {
-            qr_data: "QRDATA".into(),
+            invitation_url: "QRDATA".into(),
             expires_at: 1_700_000_000,
         }))
     );

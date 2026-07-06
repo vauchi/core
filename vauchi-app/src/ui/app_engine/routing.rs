@@ -149,6 +149,24 @@ impl AppEngine {
             return Some(result);
         }
 
+        // M5 B3 Slice 3: auto-route a scanned device-link invitation URL to
+        // the join screen on a fresh device. Frontends just forward the raw
+        // QR data string; core decides whether it is an invitation.
+        if let Event::QrScanned { data } = &event
+            && !self.vauchi.has_identity()
+            && data.starts_with("vauchi://device-link")
+        {
+            match self.open_device_link_invitation(data) {
+                Ok(screen) => return Some(ActionResult::NavigateTo(screen)),
+                Err(message) => {
+                    return Some(ActionResult::ShowAlert {
+                        title: "Invalid Device Link".into(),
+                        message,
+                    });
+                }
+            }
+        }
+
         if !matches!(
             self.screen,
             AppScreen::Exchange
@@ -604,6 +622,25 @@ impl AppEngine {
                 }
             }
         }
+    }
+}
+
+impl AppEngine {
+    /// Ingest a raw device-link invitation URL and navigate to the join
+    /// screen. Called from deep-link handlers and QR-scan ingestion.
+    ///
+    /// Returns the rendered join screen, or an error if the URL is not a
+    /// supported invitation or if this device already has an identity (join
+    /// is only for fresh installs).
+    pub fn open_device_link_invitation(&mut self, url: &str) -> Result<ScreenModel, String> {
+        if self.vauchi.has_identity() {
+            return Err("This device already has an identity.".into());
+        }
+        let _invitation = vauchi_core::exchange::DeviceLinkJoinInvitation::parse_url(url)
+            .map_err(|e| format!("invalid invitation: {e}"))?;
+        Ok(self.navigate_to(AppScreen::DeviceLinkJoin {
+            invitation_url: url.to_string(),
+        }))
     }
 }
 

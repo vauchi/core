@@ -123,6 +123,7 @@ pub enum EngineOutput {
 pub enum EngineUpdate {
     MultiStage(MultiStageUpdate),
     DeviceLink(DeviceLinkUpdate),
+    DeviceLinkJoin(DeviceLinkJoinUpdate),
     LinkResponder(LinkResponderUpdate),
     LinkExchange(LinkExchangeUpdate),
     /// Flip the BLE exchange chrome to its terminal Success screen. Carries
@@ -160,7 +161,10 @@ pub enum MultiStageUpdate {
 pub enum DeviceLinkUpdate {
     QrPending,
     QrReady {
-        qr_data: String,
+        /// Data to encode in the QR code. For device-link join this is the
+        /// `DeviceLinkJoinInvitation` URL; for legacy flows it may still be
+        /// the bare QR data until all callers migrate.
+        invitation_url: String,
         expires_at: u64,
     },
     QrExpired,
@@ -170,6 +174,22 @@ pub enum DeviceLinkUpdate {
         challenge_hex: String,
     },
     Completed,
+    Failed(String),
+}
+
+/// Cycle-thread bridge updates for the device-link join (responder) engine.
+pub enum DeviceLinkJoinUpdate {
+    /// The user confirmed/edited the device name; move from name entry to
+    /// posting the request on the relay.
+    NameAccepted,
+    /// The join request has been posted to the relay. The confirmation code
+    /// must match the one shown on the initiator device.
+    RequestPosted { confirmation_code: String },
+    /// The initiator posted the encrypted response; core will adopt it next.
+    ResponseReady,
+    /// The response was adopted and the identity persisted.
+    Completed,
+    /// Terminal failure (stable reason id).
     Failed(String),
 }
 
@@ -270,6 +290,13 @@ impl EngineUpdate {
                 DeviceLinkUpdate::RequestReceived { .. } => "DeviceLink::RequestReceived",
                 DeviceLinkUpdate::Completed => "DeviceLink::Completed",
                 DeviceLinkUpdate::Failed(_) => "DeviceLink::Failed",
+            },
+            Self::DeviceLinkJoin(u) => match u {
+                DeviceLinkJoinUpdate::NameAccepted => "DeviceLinkJoin::NameAccepted",
+                DeviceLinkJoinUpdate::RequestPosted { .. } => "DeviceLinkJoin::RequestPosted",
+                DeviceLinkJoinUpdate::ResponseReady => "DeviceLinkJoin::ResponseReady",
+                DeviceLinkJoinUpdate::Completed => "DeviceLinkJoin::Completed",
+                DeviceLinkJoinUpdate::Failed(_) => "DeviceLinkJoin::Failed",
             },
             Self::LinkResponder(u) => match u {
                 LinkResponderUpdate::Completed(_) => "LinkResponder::Completed",

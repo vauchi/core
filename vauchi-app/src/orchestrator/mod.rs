@@ -16,6 +16,9 @@ pub mod device_link_relay;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 pub mod device_link_machine;
 
+#[cfg(all(feature = "network-http", feature = "storage"))]
+pub mod device_link_responder_machine;
+
 /// Multi-stage face-to-face exchange machine (slice 32m Phase 1).
 /// In-person, BLE-less — no network-http feature required.
 pub mod multi_stage_machine;

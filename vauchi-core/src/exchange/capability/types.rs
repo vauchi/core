@@ -59,6 +59,11 @@ pub struct DeviceCapabilities {
     /// Device has a USB port capable of data transfer (for Cable exchange).
     #[serde(default)]
     pub has_usb_port: bool,
+
+    /// Human-readable device model name reported by the platform, used as the
+    /// default name when joining an existing identity from this device.
+    #[serde(default)]
+    pub device_name: Option<String>,
 }
 
 /// Type of biometric hardware available on the device.

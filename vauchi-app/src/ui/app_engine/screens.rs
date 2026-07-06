@@ -309,6 +309,16 @@ impl AppEngine {
                     DeviceLinkingEngine::new(qr_data).with_locale(render_context.resolved_locale()),
                 )
             }
+            AppScreen::DeviceLinkJoin { .. } => {
+                let default_name = device_capabilities
+                    .device_name
+                    .clone()
+                    .unwrap_or_else(|| "New Device".to_string());
+                Box::new(
+                    crate::ui::device_link_join::DeviceLinkJoinEngine::new(default_name)
+                        .with_locale(render_context.resolved_locale()),
+                )
+            }
             AppScreen::DeviceManagement => {
                 let devices = vauchi
                     .list_devices()

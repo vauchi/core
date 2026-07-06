@@ -84,7 +84,10 @@ pub const RETRY_ACTION_ID: &str = "retry";
 #[derive(Clone, Debug)]
 pub struct DeviceLinkingEngine {
     step: DeviceLinkStep,
-    qr_data: String,
+    /// Data to encode in the QR code. For the join-capable flow this is the
+    /// `DeviceLinkJoinInvitation` URL; legacy tests may still pass bare
+    /// QR data here.
+    invitation_url: String,
     verification_code: Option<String>,
     locale: Locale,
 }
@@ -97,22 +100,22 @@ impl DeviceLinkingEngine {
     /// the transport picker and goes straight to the relay (Internet)
     /// flow. iOS / macOS use [`Self::with_transport_selection`] to keep
     /// their two-stage UX (transport picker → QR display).
-    pub fn new(qr_data: String) -> Self {
+    pub fn new(invitation_url: String) -> Self {
         Self {
             step: DeviceLinkStep::ShowQr,
-            qr_data,
+            invitation_url,
             verification_code: None,
             locale: Locale::English,
         }
     }
 
     /// Creates a new engine starting at the transport-selection step.
-    /// The QR data is captured up-front but only revealed after the
+    /// The QR payload is captured up-front but only revealed after the
     /// user picks the Internet transport.
-    pub fn with_transport_selection(qr_data: String) -> Self {
+    pub fn with_transport_selection(invitation_url: String) -> Self {
         Self {
             step: DeviceLinkStep::TransportSelection,
-            qr_data,
+            invitation_url,
             verification_code: None,
             locale: Locale::English,
         }
@@ -155,8 +158,8 @@ impl DeviceLinkingEngine {
     /// Receiver-side bridge: the QR is ready and the engine is waiting
     /// for a peer to scan it. `expires_at` is unix-seconds; the frontend
     /// uses it to render a countdown (5-min window per ADR-035).
-    pub fn transition_to_waiting_for_request(&mut self, qr_data: String, expires_at: u64) {
-        self.qr_data = qr_data;
+    pub fn transition_to_waiting_for_request(&mut self, invitation_url: String, expires_at: u64) {
+        self.invitation_url = invitation_url;
         self.step = DeviceLinkStep::WaitingForRequest { expires_at };
     }
 
@@ -359,7 +362,7 @@ impl DeviceLinkingEngine {
             components: vec![
                 Component::QrCode {
                     id: "qr".into(),
-                    data: self.qr_data.clone(),
+                    data: self.invitation_url.clone(),
                     mode: QrMode::Display,
                     label: Some(self.t("devices.link.scan_on_new_device")),
                     scan_quality: None,
@@ -521,7 +524,7 @@ impl DeviceLinkingEngine {
             components: vec![
                 Component::QrCode {
                     id: "qr".into(),
-                    data: self.qr_data.clone(),
+                    data: self.invitation_url.clone(),
                     mode: QrMode::Display,
                     label: Some(self.t("devices.link.scan_on_new_device")),
                     scan_quality: None,
@@ -734,9 +737,9 @@ impl WorkflowEngine for DeviceLinkingEngine {
         match update {
             U::QrPending => self.transition_to_qr_pending(),
             U::QrReady {
-                qr_data,
+                invitation_url,
                 expires_at,
-            } => self.transition_to_waiting_for_request(qr_data, expires_at),
+            } => self.transition_to_waiting_for_request(invitation_url, expires_at),
             U::QrExpired => self.transition_to_qr_expired(),
             U::RequestReceived {
                 device_name,

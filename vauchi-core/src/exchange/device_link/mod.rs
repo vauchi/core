@@ -9,6 +9,7 @@
 //! scans it and receives the encrypted master seed to derive identical keys.
 
 mod initiator;
+mod invitation;
 mod qr;
 mod request;
 mod responder;
@@ -16,6 +17,7 @@ mod response;
 mod types;
 
 pub use initiator::{DeviceLinkInitiator, DeviceLinkInitiatorRestored};
+pub use invitation::{DeviceLinkJoinInvitation, JoinInvitationError};
 pub use qr::DeviceLinkQR;
 pub use request::DeviceLinkRequest;
 pub use responder::DeviceLinkResponder;

@@ -42,7 +42,9 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::exchange::{DeviceLinkInitiator, DeviceLinkRequest, ProximityProof};
+use vauchi_core::exchange::{
+    DeviceLinkInitiator, DeviceLinkJoinInvitation, DeviceLinkRequest, ProximityProof,
+};
 use vauchi_core::storage::Storage;
 
 use super::device_link_relay::{ClaimPayload, DeviceLinkBroker};
@@ -162,6 +164,24 @@ impl DeviceLinkInitiatorMachine {
             State::Failed => InitiatorPhase::Failed,
             State::Cancelled => InitiatorPhase::Cancelled,
         }
+    }
+
+    /// Build a [`DeviceLinkJoinInvitation`] for the current session.
+    ///
+    /// Available once the offer has been posted and the relay returned the
+    /// rendezvous code (i.e., state is `AwaitingClaim`). Before that the
+    /// broker code is not yet known. The invitation URL is what a joining
+    /// device scans or receives to start its responder machine.
+    pub fn join_invitation(&self) -> Option<DeviceLinkJoinInvitation> {
+        let broker_code = match &self.state {
+            State::AwaitingClaim { broker_code } => broker_code.clone(),
+            _ => return None,
+        };
+        Some(DeviceLinkJoinInvitation {
+            qr_data: self.initiator.qr().to_data_string(),
+            broker_code,
+            relay_url: None,
+        })
     }
 
     /// One non-blocking relay step. In `CreatingOffer`: post the offer
@@ -550,6 +570,32 @@ mod tests {
         );
         assert_eq!(m.phase(), InitiatorPhase::AwaitingClaim);
         assert_eq!(*broker.calls.borrow(), vec!["offer"]);
+    }
+
+    // @internal
+    #[test]
+    fn join_invitation_available_after_first_advance() {
+        let initiator = build_initiator("Alice", 0x11);
+        let expected_qr = initiator.qr().to_data_string();
+        let broker = FakeBroker::new("BROKER123");
+        let mut m = machine(initiator);
+
+        assert!(
+            m.join_invitation().is_none(),
+            "invitation unavailable before offer"
+        );
+        let _ = m.advance(&broker, NOW);
+
+        let invitation = m
+            .join_invitation()
+            .expect("invitation available after offer is posted");
+        assert_eq!(invitation.qr_data, expected_qr);
+        assert_eq!(invitation.broker_code, "BROKER123");
+        assert!(invitation.relay_url.is_none());
+
+        let parsed_url = DeviceLinkJoinInvitation::parse_url(&invitation.to_url())
+            .expect("round-trips through URL");
+        assert_eq!(parsed_url, invitation);
     }
 
     // @internal

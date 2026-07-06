@@ -16,6 +16,8 @@ mod completion_forms;
 mod device_link;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_initiator;
+#[cfg(all(feature = "network-http", feature = "storage"))]
+mod device_link_responder;
 mod dispatch;
 mod help_catalog;
 // INLINE_TEST_REQUIRED: factory_filter_tests drives the `pub(super)`
@@ -168,6 +170,11 @@ pub struct AppEngine {
     /// only on `AppScreen::DeviceLinking`. See `app_engine/device_link_initiator.rs`.
     #[cfg(all(feature = "network-http", feature = "storage"))]
     device_link_initiator: Option<device_link_initiator::DeviceLinkInitiatorHolder>,
+    /// Engine-owned device-link **join** (responder) machine (M5 B3 Slice 3),
+    /// live only on `AppScreen::DeviceLinkJoin`. See
+    /// `app_engine/device_link_responder.rs`.
+    #[cfg(all(feature = "network-http", feature = "storage"))]
+    device_link_responder: Option<device_link_responder::DeviceLinkResponderHolder>,
     /// Engine-owned multi-stage exchange machine (slice 32m T1.2b), live
     /// only on `AppScreen::MultiStageExchange`. See
     /// `app_engine/multi_stage_exchange.rs`. Replaces the
@@ -384,6 +391,8 @@ impl AppEngine {
             link_initiator_x3dh: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_initiator: None,
+            #[cfg(all(feature = "network-http", feature = "storage"))]
+            device_link_responder: None,
             multi_stage_session: None,
             ble_handshake_session: None,
             glance_display_nonce: None,
@@ -630,9 +639,12 @@ impl AppEngine {
     pub fn poll_notifications(&mut self) -> Vec<PendingNotification> {
         self.drain_events_to_log();
 
-        // Slice 32l T3.1b: advance the device-link machine one relay step (no-op when idle).
+        // Slice 32l T3.1b: advance the device-link initiator one relay step (no-op when idle).
         #[cfg(all(feature = "network-http", feature = "storage"))]
         self.advance_device_link_session();
+        // M5 B3 Slice 3: advance the device-link join (responder) one relay step.
+        #[cfg(all(feature = "network-http", feature = "storage"))]
+        self.advance_device_link_responder_session();
         // ADR-049: advance the link-mode responder one relay step
         // (no-op off the DeepLinkResponder screen / with no live machine).
         #[cfg(all(feature = "network-http", feature = "storage"))]

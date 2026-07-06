@@ -207,6 +207,13 @@ pub enum ActionResult {
     },
     /// All data has been wiped — frontend should reset to initial state.
     WipeComplete,
+    /// App layer should start the device-link join (responder) machine with
+    /// the given device name. Emitted by `DeviceLinkJoinEngine` when the user
+    /// confirms the name. Core builds the responder, posts the request on the
+    /// next poll tick, and advances through confirmation → adoption.
+    DeviceLinkJoinStart {
+        device_name: String,
+    },
     /// Frontend should perform hardware actions for the exchange protocol (ADR-031).
     /// Each command maps to a platform-specific operation (QR display, BLE scan, etc.).
     /// Unsupported commands should be answered with `Event::HardwareUnavailable`.

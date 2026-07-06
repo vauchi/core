@@ -28,6 +28,7 @@ mod contact_visibility;
 mod decoy_contacts;
 mod deep_link_consent;
 pub mod delivery;
+mod device_link_join;
 mod device_linking;
 mod device_management;
 mod device_replacement;
@@ -76,10 +77,11 @@ pub use avatar_editor::AvatarEditorEngine;
 pub use backup_recovery::{BackupLevel, BackupMode, BackupRecoveryEngine};
 pub use change_password::ChangePasswordEngine;
 pub use channel::{
-    BackupFormSnapshot, ContactDetailUpdate, ContactListUpdate, DeviceLinkUpdate, DuressPinSetup,
-    EmergencyBroadcastPlan, EngineOutput, EngineUpdate, FormInput, GdprChoice, LinkExchangeUpdate,
-    LinkResponderUpdate, MultiStageUpdate, MyInfoEntryDetailUpdate, OnboardingSnapshot,
-    OnboardingUpdate, PendingBackup, RecoveryHelpUpdate, RecoveryUpdate,
+    BackupFormSnapshot, ContactDetailUpdate, ContactListUpdate, DeviceLinkJoinUpdate,
+    DeviceLinkUpdate, DuressPinSetup, EmergencyBroadcastPlan, EngineOutput, EngineUpdate,
+    FormInput, GdprChoice, LinkExchangeUpdate, LinkResponderUpdate, MultiStageUpdate,
+    MyInfoEntryDetailUpdate, OnboardingSnapshot, OnboardingUpdate, PendingBackup,
+    RecoveryHelpUpdate, RecoveryUpdate,
 };
 pub use component::{
     A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, IndicatorKind,
@@ -106,6 +108,7 @@ pub use deep_link_consent::{
     DeepLinkConsentEngine,
 };
 pub use delivery::{DeliveryItem, DeliveryStatusEngine};
+pub use device_link_join::DeviceLinkJoinEngine;
 pub use device_linking::DeviceLinkingEngine;
 pub use device_management::{DeviceListItem, DeviceManagementEngine};
 pub use device_replacement::{CompletionOutcome, DeviceReplacementEngine, ReplacementRole};

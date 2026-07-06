@@ -31,14 +31,16 @@ impl AppEngine {
     /// Cycle-thread bridge for `DeviceLinkSessionListener::on_qr_ready`
     /// — the QR is ready and the session is now waiting for a peer
     /// scan. `expires_at` is unix-seconds (ADR-035 5-minute window).
+    /// `invitation_url` is the full `DeviceLinkJoinInvitation` URL to
+    /// encode in the QR code.
     pub fn device_link_qr_ready(
         &mut self,
-        qr_data: String,
+        invitation_url: String,
         expires_at: u64,
     ) -> Option<ScreenModel> {
         self.engine
             .apply_update(EngineUpdate::DeviceLink(DeviceLinkUpdate::QrReady {
-                qr_data,
+                invitation_url,
                 expires_at,
             }))
             .then(|| self.engine.current_screen())

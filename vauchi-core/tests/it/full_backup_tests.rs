@@ -45,6 +45,35 @@ fn make_imported(name: &str, source: ImportSource) -> Contact {
     Contact::from_import(card, source, Some(format!("uid-{name}")), 0)
 }
 
+fn make_avatar_png(width: u32, height: u32) -> Vec<u8> {
+    use image::{ImageBuffer, Rgb};
+    let img = ImageBuffer::from_fn(width, height, |x, y| {
+        let v = ((x.wrapping_add(y)) % 256) as u8;
+        Rgb([v, v, v])
+    });
+    let mut buf = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
+    buf.into_inner()
+}
+
+fn make_contact_with_avatar(name: &str) -> Contact {
+    let mut pk = [0u8; 32];
+    for (i, &b) in name.as_bytes().iter().enumerate() {
+        pk[i % 32] ^= b;
+    }
+    pk[31] ^= 0xAB;
+
+    let mut card = ContactCard::new(name);
+    // A 256×256 PNG with a gradient normalizes to a small WebP.  The exact
+    // size is not important for these tests; we only need non-trivial binary
+    // data in the avatar field to exercise base64 + compression.
+    let png = make_avatar_png(256, 256);
+    card.set_avatar(png).unwrap();
+
+    let key = SymmetricKey::generate();
+    Contact::from_exchange(pk, card, key, 0)
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 /// Round-trip with identity only (no contacts, no own card, no labels).
@@ -69,6 +98,51 @@ fn v3_roundtrip_identity_only() {
     assert!(envelope.sections.contacts.is_empty());
     assert!(envelope.sections.own_card.is_none());
     assert!(envelope.sections.labels.is_empty());
+}
+
+/// Avatar survives the round-trip and is stored as base64 in the backup JSON.
+// @internal
+#[test]
+fn v3_roundtrip_with_avatar() {
+    let id_data = test_identity_data();
+    let contact = make_contact_with_avatar("AvatarContact");
+
+    let blob = export_full_backup(&id_data, &[contact.clone()], None, &[], PASSWORD, 0).unwrap();
+    let envelope = import_full_backup(&blob, PASSWORD).unwrap();
+
+    let restored = restore_contacts_from_envelope(&envelope).unwrap();
+    assert_eq!(restored.len(), 1);
+    assert!(
+        restored[0].card().avatar().is_some(),
+        "avatar must survive round-trip"
+    );
+}
+
+/// Compressed v3 backup with avatars stays well under the PO target.
+/// 50 contacts with normalized WebP avatars.  Base64 + zlib keeps the
+/// encrypted backup small enough that scaling to 300–500 contacts remains
+/// inside the 14–24 MB target.
+// @internal
+#[test]
+fn v3_backup_size_with_avatars_under_target() {
+    let id_data = test_identity_data();
+    let contacts: Vec<Contact> = (0..50)
+        .map(|i| make_contact_with_avatar(&format!("Contact-{i:03}")))
+        .collect();
+
+    let blob = export_full_backup(&id_data, &contacts, None, &[], PASSWORD, 0).unwrap();
+
+    // Sanity-check round-trip.
+    let envelope = import_full_backup(&blob, PASSWORD).unwrap();
+    assert_eq!(envelope.sections.contacts.len(), 50);
+
+    // The PO target is ≤ 24 MB for 300–500 contacts.  50 contacts must be a
+    // small fraction of that; use a 1 MB ceiling as a regression ratchet.
+    assert!(
+        blob.len() <= 1024 * 1024,
+        "encrypted backup must be ≤ 1 MB for 50 contacts with avatars, got {} bytes",
+        blob.len()
+    );
 }
 
 /// Round-trip with mixed contacts (exchanged + imported).

@@ -10,11 +10,19 @@
 //! version_byte (0x03) || salt (16 bytes) || ciphertext (XChaCha20-Poly1305)
 //! ```
 //!
-//! The ciphertext encrypts a JSON `FullBackupEnvelope`. The encryption key is
-//! derived via Argon2id followed by HKDF with domain separation `b"vauchi-backup-v3"`,
-//! ensuring v3 backup keys are independent of v1/v2 keys even with the same password+salt.
+//! The ciphertext encrypts a zlib-compressed JSON `FullBackupEnvelope`.
+//! Backward compatibility: ciphertexts produced before this change (uncompressed
+//! JSON) are still accepted because JSON objects start with `{` (0x7B) and never
+//! with the zlib magic byte `0x78`.
+//!
+//! The encryption key is derived via Argon2id followed by HKDF with domain
+//! separation `b"vauchi-backup-v3"`, ensuring v3 backup keys are independent of
+//! v1/v2 keys even with the same password+salt.
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use flate2::Compression;
+use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -53,12 +61,43 @@ pub struct FullBackupEnvelope {
     pub sections: BackupSections,
 }
 
+/// Serde adapter that routes `Option<ContactCard>` through [`BackupContactCard`]
+/// so the avatar is serialized as base64 in backups while the public type
+/// remains `Option<ContactCard>`.
+mod backup_contact_card {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use crate::backup::contact_backup::BackupContactCard;
+    use crate::contact_card::ContactCard;
+
+    pub fn serialize<S: Serializer>(
+        card: &Option<ContactCard>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match card {
+            None => serializer.serialize_none(),
+            Some(c) => BackupContactCard::from(c).serialize(serializer),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<ContactCard>, D::Error> {
+        let backup: Option<BackupContactCard> = Option::deserialize(deserializer)?;
+        Ok(backup.map(Into::into))
+    }
+}
+
 /// All data sections inside a full backup.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BackupSections {
     pub identity: IdentitySection,
     pub contacts: Vec<serde_json::Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "backup_contact_card"
+    )]
     pub own_card: Option<ContactCard>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<LabelSection>,
@@ -96,6 +135,34 @@ fn derive_v3_key(password: &str, salt: &[u8; 16]) -> Result<SymmetricKey, Backup
     let key = SymmetricKey::try_from_bytes(key_bytes).map_err(|_| BackupError::KeyDerivation)?;
     key_bytes.zeroize();
     Ok(key)
+}
+
+/// zlib magic byte: every zlib header starts with 0x78.
+const ZLIB_MAGIC: u8 = 0x78;
+
+/// Compresses plaintext with zlib. Best compression is acceptable because
+/// backup creation is not latency-critical.
+fn compress_backup(plaintext: &[u8]) -> Result<Vec<u8>, BackupError> {
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::best());
+    std::io::Write::write_all(&mut encoder, plaintext)
+        .map_err(|e| BackupError::Serialization(format!("compression failed: {e}")))?;
+    encoder
+        .finish()
+        .map_err(|e| BackupError::Serialization(format!("compression failed: {e}")))
+}
+
+/// Decompresses zlib-compressed plaintext. Falls back to returning the input
+/// unchanged if it does not start with the zlib magic byte, preserving
+/// compatibility with pre-compression v3 backups.
+fn decompress_backup(data: &[u8]) -> Result<Vec<u8>, BackupError> {
+    if data.is_empty() || data[0] != ZLIB_MAGIC {
+        return Ok(data.to_vec());
+    }
+    let mut decoder = ZlibDecoder::new(data);
+    let mut out = Vec::with_capacity(data.len() * 4);
+    std::io::Read::read_to_end(&mut decoder, &mut out)
+        .map_err(|e| BackupError::Deserialization(format!("decompression failed: {e}")))?;
+    Ok(out)
 }
 
 /// Exports a full v3 backup containing identity, contacts, own card, and labels.
@@ -151,13 +218,14 @@ pub fn export_full_backup(
     let plaintext = Zeroizing::new(
         serde_json::to_vec(&envelope).map_err(|e| BackupError::Serialization(e.to_string()))?,
     );
+    let compressed = compress_backup(&plaintext)?;
 
     let salt: [u8; 16] = random_bytes();
 
     let key = derive_v3_key(password, &salt)?;
 
     let ciphertext =
-        encrypt(&key, &plaintext).map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
+        encrypt(&key, &compressed).map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
 
     // Assemble output: version || salt || ciphertext
     let mut out = Vec::with_capacity(1 + 16 + ciphertext.len());
@@ -188,8 +256,9 @@ pub fn import_full_backup(data: &[u8], password: &str) -> Result<FullBackupEnvel
 
     let key = derive_v3_key(password, &salt)?;
 
-    let plaintext =
+    let decrypted =
         Zeroizing::new(decrypt(&key, ciphertext).map_err(|_| BackupError::DecryptionFailed)?);
+    let plaintext = decompress_backup(&decrypted)?;
 
     let envelope: FullBackupEnvelope = serde_json::from_slice(&plaintext)
         .map_err(|e| BackupError::Deserialization(e.to_string()))?;

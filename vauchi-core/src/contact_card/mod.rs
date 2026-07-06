@@ -178,6 +178,34 @@ impl ContactCard {
         }
     }
 
+    /// Reconstructs a card from backup fields without re-normalizing.
+    ///
+    /// Used by the backup restore path so that serialized values round-trip
+    /// exactly. The caller is responsible for ensuring the avatar is already
+    /// normalized WebP (ADR-042).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn from_backup_parts(
+        schema_version: u32,
+        id: String,
+        display_name: String,
+        fields: Vec<ContactField>,
+        avatar: Option<Vec<u8>>,
+        nickname: Option<String>,
+        bio: Option<String>,
+        field_visibility: VisibilityRules,
+    ) -> Self {
+        ContactCard {
+            schema_version,
+            id,
+            display_name,
+            fields,
+            avatar,
+            nickname,
+            bio,
+            field_visibility,
+        }
+    }
+
     /// Returns the schema version of this card's serialized format.
     /// 0 = legacy (pre-versioning), 1 = first versioned format.
     pub fn schema_version(&self) -> u32 {

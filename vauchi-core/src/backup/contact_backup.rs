@@ -23,6 +23,7 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::contact::{Contact, ImportSource};
 use crate::contact_card::ContactCard;
 use crate::crypto::{decrypt, derive_key_argon2id, encrypt, random_bytes};
+use crate::types::VisibilityRules;
 
 /// Backup format version byte for contact backups.
 pub(crate) const CONTACT_BACKUP_VERSION: u8 = 0x01;
@@ -94,10 +95,120 @@ pub(crate) enum ContactBackupKind {
     },
 }
 
+/// Backup-specific representation of a [`ContactCard`] with base64 avatar.
+///
+/// The default `ContactCard` serialization emits `avatar` as a JSON array of
+/// integers, which inflates binary data by ~3–4x. This struct serializes the
+/// avatar as a base64 string in the backup path while remaining deserializable
+/// from both the new base64 string and the legacy JSON byte array.
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct BackupContactCard {
+    schema_version: u32,
+    id: String,
+    display_name: String,
+    fields: Vec<crate::contact_card::ContactField>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "base64_option"
+    )]
+    avatar: Option<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    nickname: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bio: Option<String>,
+    #[serde(default, skip_serializing_if = "VisibilityRules::is_empty")]
+    field_visibility: VisibilityRules,
+}
+
+impl From<&ContactCard> for BackupContactCard {
+    fn from(card: &ContactCard) -> Self {
+        BackupContactCard {
+            schema_version: card.schema_version(),
+            id: card.id().to_string(),
+            display_name: card.display_name().to_string(),
+            fields: card.fields().to_vec(),
+            avatar: card.avatar().map(|a| a.to_vec()),
+            nickname: card.nickname().map(|n| n.to_string()),
+            bio: card.bio().map(|b| b.to_string()),
+            field_visibility: card.field_visibility().clone(),
+        }
+    }
+}
+
+impl From<BackupContactCard> for ContactCard {
+    fn from(card: BackupContactCard) -> Self {
+        ContactCard::from_backup_parts(
+            card.schema_version,
+            card.id,
+            card.display_name,
+            card.fields,
+            card.avatar,
+            card.nickname,
+            card.bio,
+            card.field_visibility,
+        )
+    }
+}
+
+/// Base64 (de)serializer for `Option<Vec<u8>>` that also accepts the legacy
+/// JSON byte-array representation for backward compatibility.
+mod base64_option {
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+    use serde::{Deserialize, Deserializer, Serializer};
+    use serde_json::Value;
+
+    pub fn serialize<S: Serializer>(
+        value: &Option<Vec<u8>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match value {
+            None => serializer.serialize_none(),
+            Some(bytes) => serializer.serialize_some(&BASE64.encode(bytes)),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<Vec<u8>>, D::Error> {
+        let value = Option::<Value>::deserialize(deserializer)?;
+        match value {
+            None => Ok(None),
+            Some(Value::String(s)) => BASE64
+                .decode(&s)
+                .map(Some)
+                .map_err(serde::de::Error::custom),
+            Some(Value::Array(arr)) => {
+                let mut bytes = Vec::with_capacity(arr.len());
+                for v in arr {
+                    let b = match v {
+                        Value::Number(n) => {
+                            n.as_u64().and_then(|u| u.try_into().ok()).ok_or_else(|| {
+                                serde::de::Error::custom("avatar byte array contains non-integer")
+                            })?
+                        }
+                        _ => {
+                            return Err(serde::de::Error::custom(
+                                "avatar byte array contains non-integer",
+                            ));
+                        }
+                    };
+                    bytes.push(b);
+                }
+                Ok(Some(bytes))
+            }
+            Some(_) => Err(serde::de::Error::custom(
+                "avatar must be a base64 string or byte array",
+            )),
+        }
+    }
+}
+
 impl ContactBackupEntry {
     /// Creates a backup entry from a `Contact`.
     pub(crate) fn from_contact(contact: &Contact) -> Result<Self, BackupError> {
-        let card_json = serde_json::to_string(contact.card())
+        let backup_card = BackupContactCard::from(contact.card());
+        let card_json = serde_json::to_string(&backup_card)
             .map_err(|e| BackupError::Serialization(e.to_string()))?;
 
         let kind = match contact.kind() {
@@ -137,8 +248,9 @@ impl ContactBackupEntry {
 
     /// Reconstructs a `Contact` from this backup entry.
     pub(crate) fn to_contact(&self) -> Result<Contact, BackupError> {
-        let card: ContactCard = serde_json::from_str(&self.card_json)
+        let backup_card: BackupContactCard = serde_json::from_str(&self.card_json)
             .map_err(|e| BackupError::Deserialization(e.to_string()))?;
+        let card: ContactCard = backup_card.into();
 
         match &self.kind {
             ContactBackupKind::Exchanged {
@@ -278,4 +390,52 @@ fn import_v1(data: &[u8], password: &str) -> Result<Vec<Contact>, BackupError> {
         .map_err(|e| BackupError::Deserialization(e.to_string()))?;
 
     entries.iter().map(ContactBackupEntry::to_contact).collect()
+}
+
+// INLINE_TEST_REQUIRED: tests exercise the private base64_option (de)serializer
+// and BackupContactCard struct; they belong next to the code they verify.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_backup_card(avatar: Option<Vec<u8>>) -> BackupContactCard {
+        BackupContactCard {
+            schema_version: 1,
+            id: "abc".to_string(),
+            display_name: "Test".to_string(),
+            fields: Vec::new(),
+            avatar,
+            nickname: None,
+            bio: None,
+            field_visibility: VisibilityRules::new(),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn backup_contact_card_serializes_avatar_as_base64() {
+        let avatar = vec![0u8, 1, 2, 255, 254, 128];
+        let backup = sample_backup_card(Some(avatar));
+        let json = serde_json::to_string(&backup).unwrap();
+        assert!(
+            json.contains("\"avatar\":\"AAEC//6A\""),
+            "avatar must be base64-encoded in backup JSON: {json}"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn backup_contact_card_deserializes_base64_avatar() {
+        let json = r#"{"schema_version":1,"id":"abc","display_name":"Test","fields":[],"avatar":"AAEC//6A"}"#;
+        let backup: BackupContactCard = serde_json::from_str(json).unwrap();
+        assert_eq!(backup.avatar, Some(vec![0u8, 1, 2, 255, 254, 128]));
+    }
+
+    // @internal
+    #[test]
+    fn backup_contact_card_deserializes_legacy_byte_array_avatar() {
+        let json = r#"{"schema_version":1,"id":"abc","display_name":"Test","fields":[],"avatar":[0,1,2,255,254,128]}"#;
+        let backup: BackupContactCard = serde_json::from_str(json).unwrap();
+        assert_eq!(backup.avatar, Some(vec![0u8, 1, 2, 255, 254, 128]));
+    }
 }

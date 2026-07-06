@@ -349,13 +349,15 @@ mod tests {
     use vauchi_core::exchange::ProximityProof;
     use vauchi_core::network::NetworkError;
 
+    type CompleteQueue = Arc<Mutex<VecDeque<Result<Option<String>, NetworkError>>>>;
+
     /// Scriptable broker fake for AppEngine-level join tests. Uses `Arc<Mutex>`
     /// so the type is `Send` and cloneable, matching the boxed broker bound and
     /// letting the test read deposited claims after the broker is boxed.
     #[derive(Clone)]
     struct FakeBroker {
         claims: Arc<Mutex<Vec<(String, String)>>>,
-        complete_queue: Arc<Mutex<VecDeque<Result<Option<String>, NetworkError>>>>,
+        complete_queue: CompleteQueue,
     }
 
     impl FakeBroker {

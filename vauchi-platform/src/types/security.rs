@@ -108,6 +108,7 @@ impl From<&vauchi_core::storage::DeletionState> for MobileDeletionInfo {
                 scheduled_at,
                 execute_at,
             } => {
+                // TODO(PFC): SystemTime::now() inside From impl — see 2026-07-06-core-pfc-violations C2
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs())

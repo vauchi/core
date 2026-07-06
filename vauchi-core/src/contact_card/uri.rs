@@ -13,6 +13,7 @@ use super::{ContactField, FieldType};
 use crate::social::SocialNetworkRegistry;
 
 /// Default social network registry (loaded once, shared across calls).
+// TODO(PFC): global LazyLock registry — see 2026-07-06-core-pfc-violations C12
 static DEFAULT_REGISTRY: LazyLock<SocialNetworkRegistry> =
     LazyLock::new(SocialNetworkRegistry::with_defaults);
 

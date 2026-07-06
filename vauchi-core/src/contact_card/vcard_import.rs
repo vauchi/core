@@ -348,6 +348,7 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<Stri
         // import: keep the contact, drop only the avatar — but surface
         // the kind of failure so operators can see corrupt-payload rates.
         // PII-safe: ContactCardError variants do not include image bytes.
+        // TODO(PFC): logging inside importer — see 2026-07-06-core-pfc-violations C9
         tracing::warn!(
             error = %e,
             "vcard import: dropping avatar that failed normalization (ADR-042)"
@@ -364,6 +365,7 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<Stri
             // Validation(InvalidPhone|InvalidEmail|InvalidUrl|
             // ValueTooLong|EmptyValue)) carry no field value or label;
             // field_type is metadata (Phone/Email/Social/...).
+            // TODO(PFC): logging inside importer — see 2026-07-06-core-pfc-violations C9
             tracing::warn!(
                 error = %e,
                 field_type = ?field_type,

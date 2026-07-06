@@ -49,6 +49,7 @@ impl ContactStore<'_> {
     ///
     /// Legacy contacts (no CEK) use storage-key encryption with plaintext
     /// display_name (existing behavior).
+    // TODO(PFC): 193-line save_contact with 15-element tuple — see 2026-07-06-core-pfc-violations C11
     pub fn save_contact(&self, contact: &Contact) -> Result<(), StorageError> {
         let card_json = serde_json::to_vec(contact.card())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;

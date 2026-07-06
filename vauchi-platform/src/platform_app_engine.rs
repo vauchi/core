@@ -98,6 +98,7 @@ pub struct PlatformAppEngine {
     /// Pair 4 multi-stage bridge listener (running on the session's
     /// cycle thread) can hold a clone and mutate the active engine
     /// without requiring `Arc<Self>` plumbing through every entry point.
+    // TODO(PFC): Arc<Mutex<AppEngine>> global mutable singleton — see 2026-07-06-core-pfc-violations C10
     pub(crate) engine: Arc<Mutex<AppEngine>>,
     /// Active event listener handler ID, used to unregister on replacement.
     event_handler_id: Mutex<Option<HandlerId>>,

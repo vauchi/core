@@ -215,6 +215,7 @@ impl ProximityVerifier for MockProximityVerifier {
 /// comparing fingerprints displayed on both screens).
 pub struct ManualConfirmationVerifier {
     /// Whether the user confirmed proximity
+    // TODO(PFC): Mutex hidden state in verifier — see 2026-07-06-core-pfc-violations C3
     confirmed: std::sync::Mutex<bool>,
 }
 

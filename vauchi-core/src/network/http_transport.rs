@@ -774,6 +774,7 @@ impl HttpTransport {
     }
 
     /// Extract version policy from response headers and store it.
+    // TODO(PFC): parsing mutates transport state — see 2026-07-06-core-pfc-violations C4
     fn extract_version_policy(&self, resp: &ureq::http::Response<ureq::Body>) {
         let min = resp
             .headers()

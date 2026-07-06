@@ -121,6 +121,7 @@ pub fn import_vcard(vcard: &str, now: u64) -> Result<ContactCard, VCardError> {
             // the failing field — surface validation failures so operators
             // see corrupt-payload rates from imports. PII-safe:
             // ContactCardError variants carry no field value or label.
+            // TODO(PFC): logging inside parser — see 2026-07-06-core-pfc-violations C9
             tracing::warn!(
                 error = %e,
                 field_type = ?field_type_owned,

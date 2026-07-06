@@ -372,7 +372,7 @@ impl SyncStore<'_> {
 
         let now = self.now_secs();
 
-        let checkpoint_id = uuid::Uuid::new_v4().to_string();
+        let checkpoint_id = uuid::Uuid::new_v4().to_string(); // TODO(PFC): ambient UUID despite self.rng — see 2026-07-06-core-pfc-violations C5
 
         self.conn.execute(
             "INSERT OR REPLACE INTO sync_checkpoints

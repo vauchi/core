@@ -143,6 +143,7 @@ impl PlatformAppEngine {
                 if entry.is_none() {
                     return Ok(DomainCommandResult::Bool { value: false });
                 }
+                // TODO(PFC): SystemTime::now() in PAE dispatch — see 2026-07-06-core-pfc-violations C8
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs())
@@ -197,6 +198,7 @@ impl PlatformAppEngine {
                 })
             }
             DomainCommand::GetDueRetries => {
+                // TODO(PFC): SystemTime::now() in PAE dispatch — see 2026-07-06-core-pfc-violations C8
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs())

@@ -54,6 +54,7 @@ impl Group {
     /// (via `Vauchi::create_group`); tests pass any fixed value.
     pub fn new(name: &str, now: u64) -> Self {
         Group {
+            // TODO(PFC): ambient UUID in domain constructor — see 2026-07-06-core-pfc-violations C1
             id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),
             contacts: HashSet::new(),

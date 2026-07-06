@@ -107,6 +107,7 @@ impl PlatformAppEngine {
                 let status = match state {
                     vauchi_core::storage::DeletionState::None => MShred::None,
                     vauchi_core::storage::DeletionState::Scheduled { execute_at, .. } => {
+                        // TODO(PFC): SystemTime::now() in PAE dispatch — see 2026-07-06-core-pfc-violations C8
                         let now = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .map(|d| d.as_secs())

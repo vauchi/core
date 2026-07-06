@@ -362,6 +362,7 @@ impl RelayHealth {
         }
         let half = max_ms / 2;
         // Non-crypto RNG: cooldown jitter for thundering herd prevention
+        // TODO(PFC): ambient RNG for jitter — see 2026-07-06-core-pfc-violations C6
         let jittered = half + (rand::Rng::gen_range(&mut crate::rng::non_crypto_rng(), 0..=half));
         Duration::from_millis(jittered)
     }

@@ -882,6 +882,7 @@ impl ExchangeSession {
     /// 3. Emits response commands based on the new state
     ///
     /// After calling this, use `drain_commands()` to get outgoing commands.
+    // TODO(PFC): giant catch-all match — see 2026-07-06-core-pfc-violations C15
     pub fn apply_hardware_event(&mut self, event: Event) -> Result<(), ExchangeError> {
         match event {
             Event::QrScanned { data } => {
@@ -1301,7 +1302,8 @@ impl ExchangeSession {
                 value,
                 self.clock.unix_seconds(),
             )) {
-                tracing::warn!(
+                // TODO(PFC): logging inside session logic — see 2026-07-06-core-pfc-violations C9
+tracing::warn!(
                     error = %e,
                     "ble exchange: dropping peer field that failed validation"
                 );
@@ -1317,7 +1319,8 @@ impl ExchangeSession {
             // — but log so we see corrupt-payload rates from peers.
             // PII-safe: ContactCardError variants do not include the
             // avatar bytes or any peer identifier.
-            tracing::warn!(
+            // TODO(PFC): logging inside session logic — see 2026-07-06-core-pfc-violations C9
+tracing::warn!(
                 error = %e,
                 "ble exchange: dropping peer avatar that failed normalization (ADR-042)"
             );

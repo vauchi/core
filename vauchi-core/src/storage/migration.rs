@@ -264,6 +264,7 @@ fn encrypt_and_verify(
 ///
 /// This is the single source of truth for the database schema.
 /// New migrations are appended to the end of this list.
+// TODO(PFC): 299-line migrations list — see 2026-07-06-core-pfc-violations C16
 pub fn all_migrations() -> Vec<Migration> {
     vec![
         Migration {

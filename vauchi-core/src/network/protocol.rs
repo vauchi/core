@@ -73,6 +73,7 @@ pub fn read_frame_length(header: &[u8; FRAME_HEADER_SIZE]) -> usize {
 pub fn create_envelope(payload: MessagePayload, now: u64) -> MessageEnvelope {
     MessageEnvelope {
         version: PROTOCOL_VERSION,
+        // TODO(PFC): ambient UUID despite now parameter — see 2026-07-06-core-pfc-violations C13
         message_id: uuid::Uuid::new_v4().to_string().into(),
         timestamp: now,
         payload,

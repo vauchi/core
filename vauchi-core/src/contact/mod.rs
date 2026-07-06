@@ -267,6 +267,7 @@ impl Contact {
         original_uid: Option<String>,
         now: u64,
     ) -> Self {
+        // TODO(PFC): ambient UUID in domain constructor — see 2026-07-06-core-pfc-violations C1
         let id = uuid::Uuid::new_v4().to_string();
         let display_name = card.display_name().to_string();
         let imported_at = now;

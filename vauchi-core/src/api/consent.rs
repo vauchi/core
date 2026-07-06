@@ -36,7 +36,7 @@ impl<'a> ConsentManager<'a> {
 
     /// Grants consent for a specific type.
     pub fn grant(&self, consent_type: ConsentType) -> Result<(), crate::storage::StorageError> {
-        let id = uuid::Uuid::new_v4().to_string();
+        let id = uuid::Uuid::new_v4().to_string(); // TODO(PFC): ambient UUID in ConsentManager — see 2026-07-06-core-pfc-violations C1
         let now = self.storage.clock().unix_seconds();
 
         self.storage
@@ -46,7 +46,7 @@ impl<'a> ConsentManager<'a> {
 
     /// Revokes consent for a specific type.
     pub fn revoke(&self, consent_type: ConsentType) -> Result<(), crate::storage::StorageError> {
-        let id = uuid::Uuid::new_v4().to_string();
+        let id = uuid::Uuid::new_v4().to_string(); // TODO(PFC): ambient UUID in ConsentManager — see 2026-07-06-core-pfc-violations C1
         let now = self.storage.clock().unix_seconds();
 
         self.storage
@@ -65,7 +65,7 @@ impl<'a> ConsentManager<'a> {
         consent_type: ConsentType,
         policy_version: &str,
     ) -> Result<(), crate::storage::StorageError> {
-        let id = uuid::Uuid::new_v4().to_string();
+        let id = uuid::Uuid::new_v4().to_string(); // TODO(PFC): ambient UUID in ConsentManager — see 2026-07-06-core-pfc-violations C1
         let now = self.storage.clock().unix_seconds();
 
         self.storage.consent().execute_consent_upsert_with_version(

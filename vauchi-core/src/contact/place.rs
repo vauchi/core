@@ -65,6 +65,7 @@ impl Place {
     /// Creates a new named place at the given coordinates.
     pub fn new(name: &str, latitude: f64, longitude: f64, now: u64) -> Self {
         Self {
+            // TODO(PFC): ambient UUID in domain constructor — see 2026-07-06-core-pfc-violations C1
             id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),
             latitude,

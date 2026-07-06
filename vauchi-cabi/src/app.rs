@@ -720,6 +720,7 @@ struct EventCallbackHandler {
 }
 
 // SAFETY: caller of vauchi_app_set_event_callback guarantees thread-safety
+// TODO(PFC): unsafe impl Send/Sync — see 2026-07-06-core-pfc-violations C14
 unsafe impl Send for EventCallbackHandler {}
 // SAFETY: caller of vauchi_app_set_event_callback guarantees thread-safety
 unsafe impl Sync for EventCallbackHandler {}

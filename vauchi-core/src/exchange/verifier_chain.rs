@@ -52,6 +52,7 @@ pub struct VerifierChain {
     entries: Vec<ChainEntry>,
     /// Result from the most recent `verify_proximity_two_way` call.
     /// Single Mutex ensures log + confidence are atomically consistent.
+    // TODO(PFC): Mutex hidden state in verifier — see 2026-07-06-core-pfc-violations C3
     last_result: Mutex<Option<VerificationResult>>,
     /// Optional callback for real-time event emission during verification.
     event_callback: Option<EventCallback>,

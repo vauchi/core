@@ -231,6 +231,7 @@ impl ContactStore<'_> {
                 .and_then(|s| match serde_json::from_str(&s) {
                     Ok(m) => Some(m),
                     Err(e) => {
+                        // TODO(PFC): logging inside loader — see 2026-07-06-core-pfc-violations C9
                         tracing::warn!(
                             target: "vauchi.storage.contact_row",
                             contact_id = %row.id,
@@ -248,6 +249,7 @@ impl ContactStore<'_> {
             match serde_json::from_value::<Reciprocity>(serde_json::Value::String(s)) {
                 Ok(r) => Some(r),
                 Err(e) => {
+                    // TODO(PFC): logging inside loader — see 2026-07-06-core-pfc-violations C9
                     tracing::warn!(
                         target: "vauchi.storage.contact_row",
                         contact_id = %row.id,
@@ -265,6 +267,7 @@ impl ContactStore<'_> {
             match serde_json::from_value::<ConfirmationChannel>(serde_json::Value::String(s)) {
                 Ok(c) => Some(c),
                 Err(e) => {
+                    // TODO(PFC): logging inside loader — see 2026-07-06-core-pfc-violations C9
                     tracing::warn!(
                         target: "vauchi.storage.contact_row",
                         contact_id = %row.id,

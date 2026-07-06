@@ -143,6 +143,7 @@ impl Vauchi {
     /// floor (audit item
     /// `2026-04-28-lifecycle-session-residue-umbrella` P2-B).
     pub fn biometric_unlock_check(&mut self) -> VauchiResult<BiometricUnlockOutcome> {
+        // TODO(PFC): Instant::now() in biometric check — see 2026-07-06-core-pfc-violations C7
         let start = Instant::now();
         let outcome = self.biometric_unlock_decision()?;
         pad_to_minimum(self.sleeper.as_ref(), start, BIOMETRIC_UNLOCK_MIN_DURATION);
@@ -399,6 +400,7 @@ impl Vauchi {
 /// pass `SystemSleeper` — the real wall-clock suspension required by
 /// the constant-time invariant in
 /// [`BIOMETRIC_UNLOCK_MIN_DURATION`]'s docs.
+// TODO(PFC): Instant::now() in biometric check — see 2026-07-06-core-pfc-violations C7
 fn pad_to_minimum(sleeper: &dyn Sleeper, start: Instant, floor: Duration) {
     let elapsed = start.elapsed();
     if elapsed < floor {

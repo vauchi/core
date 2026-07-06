@@ -120,7 +120,7 @@ impl<'a> SyncManager<'a> {
 
         let now = self.storage.clock().unix_seconds();
 
-        let update_id = Uuid::new_v4().to_string();
+        let update_id = Uuid::new_v4().to_string(); // TODO(PFC): ambient UUID despite self.rng — see 2026-07-06-core-pfc-violations C5
 
         let update = PendingUpdate {
             id: update_id.clone(),
@@ -149,7 +149,7 @@ impl<'a> SyncManager<'a> {
 
         let now = self.storage.clock().unix_seconds();
 
-        let update_id = Uuid::new_v4().to_string();
+        let update_id = Uuid::new_v4().to_string(); // TODO(PFC): ambient UUID despite self.rng — see 2026-07-06-core-pfc-violations C5
 
         let update = PendingUpdate {
             id: update_id.clone(),

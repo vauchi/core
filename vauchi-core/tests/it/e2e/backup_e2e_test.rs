@@ -101,12 +101,13 @@ fn test_multi_device_linking_happy_path() {
     // Step 2: Export backup for device linking
     let identity_a = device_a.identity().unwrap();
     let backup = identity_a
-        .export_backup("LinkingPassword123!")
+        .export_backup("Linking-Backup-Key-2024!")
         .expect("Backup should succeed");
 
     // Step 3: Import on Device B (simulate new device)
     let _device_b: Vauchi = Vauchi::in_memory().unwrap();
-    let restored_identity = Identity::import_backup(&backup, "LinkingPassword123!", 0).unwrap();
+    let restored_identity =
+        Identity::import_backup(&backup, "Linking-Backup-Key-2024!", 0).unwrap();
     assert_eq!(restored_identity.public_id(), device_a_public_id);
 
     // Step 4: Verify both devices share same identity

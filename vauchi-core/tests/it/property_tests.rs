@@ -401,7 +401,7 @@ proptest! {
     fn prop_identity_backup_restore(
         name in display_name_strategy()
     ) {
-        let password = "SecurePassword123!";
+        let password = "SecureP@ssw0rd123!";
         let original = Identity::create(&name, 0);
 
         let backup = original.export_backup(password).unwrap();

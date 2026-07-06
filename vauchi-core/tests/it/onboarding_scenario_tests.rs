@@ -4,7 +4,7 @@
 
 //! SP-21 Onboarding Scenario Tests (M14)
 //!
-//! Tests for the 6-step onboarding flow scenarios.
+//! Tests for the 5-step onboarding flow scenarios.
 //! Core-verifiable scenarios get full tests; UI-only scenarios
 //! get guard-rail tests verifying the core API surface they need.
 //!
@@ -23,12 +23,12 @@ fn test_go_back_preserves_data() {
     let mut progress = OnboardingProgress::new(0);
     assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
 
-    progress.advance(0); // → LinkChoice
     progress.advance(0); // → DefaultName
-    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
+    progress.advance(0); // → GroupsSetup
+    assert_eq!(progress.current_step(), OnboardingStep::GroupsSetup);
 
     let prev = progress.current_step().previous();
-    assert_eq!(prev, Some(OnboardingStep::LinkChoice));
+    assert_eq!(prev, Some(OnboardingStep::DefaultName));
 
     // Completed steps should be preserved (not lost on back)
     assert!(progress.completion_percentage() > 0);
@@ -68,9 +68,9 @@ fn test_every_step_except_first_has_previous() {
 #[test]
 fn test_onboarding_progress_survives_serialization() {
     let mut progress = OnboardingProgress::new(0);
-    progress.advance(0); // IdentityCheck → LinkChoice
-    progress.advance(0); // LinkChoice → DefaultName
-    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
+    progress.advance(0); // IdentityCheck → DefaultName
+    progress.advance(0); // DefaultName → GroupsSetup
+    assert_eq!(progress.current_step(), OnboardingStep::GroupsSetup);
 
     // Serialize (simulates app close)
     let json = progress.to_json().expect("serialize should succeed");
@@ -80,7 +80,7 @@ fn test_onboarding_progress_survives_serialization() {
 
     assert_eq!(
         restored.current_step(),
-        OnboardingStep::DefaultName,
+        OnboardingStep::GroupsSetup,
         "resume should land on the same step"
     );
     assert_eq!(

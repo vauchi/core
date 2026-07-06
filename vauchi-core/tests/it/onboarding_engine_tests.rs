@@ -53,7 +53,7 @@ fn starts_at_identity_check() {
 
 // @internal
 #[test]
-fn identity_check_has_info_panel_and_two_actions() {
+fn identity_check_has_info_panel_and_three_actions() {
     let engine = OnboardingEngine::new();
     let screen = engine.current_screen();
 
@@ -64,11 +64,13 @@ fn identity_check_has_info_panel_and_two_actions() {
             .any(|c| matches!(c, Component::InfoPanel { .. })),
         "IdentityCheck should have an InfoPanel"
     );
-    assert_eq!(screen.actions.len(), 2);
+    assert_eq!(screen.actions.len(), 3);
     assert_eq!(screen.actions[0].id, "create_new");
     assert!(matches!(screen.actions[0].style, ActionStyle::Primary));
-    assert_eq!(screen.actions[1].id, "have_identity");
+    assert_eq!(screen.actions[1].id, "link_device");
     assert!(matches!(screen.actions[1].style, ActionStyle::Secondary));
+    assert_eq!(screen.actions[2].id, "load_backup");
+    assert!(matches!(screen.actions[2].style, ActionStyle::Secondary));
 }
 
 // @internal
@@ -89,120 +91,39 @@ fn identity_check_create_new_goes_to_default_name() {
 
 // @internal
 #[test]
-fn identity_check_have_identity_goes_to_link_choice() {
+// @internal
+#[test]
+fn identity_check_link_device_emits_qr_scan_command() {
+    use vauchi_core::Command;
     let mut engine = OnboardingEngine::new();
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
+        action_id: "link_device".into(),
     });
     match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "link_choice");
+        ActionResult::Commands { commands } => {
+            assert_eq!(commands.len(), 1);
+            assert!(
+                matches!(commands[0], Command::QrRequestScan),
+                "link_device should request QR scan"
+            );
+            let screen = engine.current_screen();
+            assert_eq!(screen.screen_id, "device_link_instructions");
             assert!(
                 screen.progress.is_none(),
                 "Pre-gate screens have no progress bar"
             );
         }
-        other => panic!("Expected NavigateTo link_choice, got {other:?}"),
-    }
-}
-
-// ── Pre-gate: LinkChoice ────────────────────────────────────────────
-
-// M5 B1 (2026-07-03-second-device-join-dead-end): the two identical
-// "transfer" / "link from another device" buttons are merged into one
-// "add another device" option that routes to honest guidance — never the
-// unrouted StartDeviceLink it used to emit.
-// @internal
-#[test]
-fn link_choice_add_another_device_navigates_to_guidance() {
-    let mut engine = OnboardingEngine::new();
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
-
-    // The screen offers exactly one device-link option now.
-    let screen = engine.current_screen();
-    let device_actions: Vec<&str> = screen
-        .actions
-        .iter()
-        .map(|a| a.id.as_str())
-        .filter(|id| {
-            matches!(
-                *id,
-                "add_another_device" | "transfer_device" | "link_device"
-            )
-        })
-        .collect();
-    assert_eq!(device_actions, vec!["add_another_device"]);
-
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "add_another_device".into(),
-    });
-    match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "device_link_guidance");
-        }
-        other => panic!("Expected NavigateTo(device_link_guidance), got {other:?}"),
+        other => panic!("Expected Commands, got {other:?}"),
     }
 }
 
 // @internal
 #[test]
-fn device_link_guidance_restore_backup_emits_file_pick_command() {
+fn identity_check_load_backup_emits_file_pick_command() {
     use vauchi_core::{Command, FilePickPurpose};
     let mut engine = OnboardingEngine::new();
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "add_another_device".into(),
-    });
-    // The guidance screen points to the working path: restore from backup.
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "restore_backup".into(),
-    });
-    match result {
-        ActionResult::Commands { commands } => match &commands[0] {
-            Command::FilePickFromUser { purpose, .. } => {
-                assert_eq!(*purpose, FilePickPurpose::ImportBackup);
-            }
-            other => panic!("expected FilePickFromUser, got {other:?}"),
-        },
-        other => panic!("expected Commands(FilePickFromUser), got {other:?}"),
-    }
-}
-
-// @internal
-#[test]
-fn device_link_guidance_back_returns_to_link_choice() {
-    let mut engine = OnboardingEngine::new();
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "add_another_device".into(),
-    });
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "back".into(),
-    });
-    match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "link_choice");
-        }
-        other => panic!("Expected NavigateTo(link_choice), got {other:?}"),
-    }
-}
-
-// @internal
-#[test]
-fn link_choice_restore_backup_emits_file_pick_command() {
-    use vauchi_core::{Command, FilePickPurpose};
-    let mut engine = OnboardingEngine::new();
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "restore_backup".into(),
+        action_id: "load_backup".into(),
     });
     match result {
         ActionResult::Commands { commands } => {
@@ -218,12 +139,37 @@ fn link_choice_restore_backup_emits_file_pick_command() {
     }
 }
 
+// ── Pre-gate: DeviceLinkInstructions ────────────────────────────────
+
 // @internal
 #[test]
-fn link_choice_back_returns_to_identity_check() {
+fn device_link_instructions_scan_re_emits_qr_request() {
+    use vauchi_core::Command;
     let mut engine = OnboardingEngine::new();
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
+        action_id: "link_device".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "scan_qr".into(),
+    });
+    match result {
+        ActionResult::Commands { commands } => {
+            assert_eq!(commands.len(), 1);
+            assert!(
+                matches!(commands[0], Command::QrRequestScan),
+                "scan_qr should request QR scan"
+            );
+        }
+        other => panic!("Expected Commands, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn device_link_instructions_back_returns_to_identity_check() {
+    let mut engine = OnboardingEngine::new();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "link_device".into(),
     });
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "back".into(),
@@ -232,12 +178,10 @@ fn link_choice_back_returns_to_identity_check() {
         ActionResult::NavigateTo(screen) => {
             assert_eq!(screen.screen_id, "identity_check");
         }
-        other => panic!("Expected NavigateTo identity_check, got {other:?}"),
+        other => panic!("Expected NavigateTo(identity_check), got {other:?}"),
     }
 }
 
-// @internal
-#[test]
 fn identity_check_unknown_action_returns_update_screen() {
     let mut engine = OnboardingEngine::new();
     let result = engine.handle_action(UserAction::ActionPressed {

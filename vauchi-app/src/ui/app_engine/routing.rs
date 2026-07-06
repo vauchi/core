@@ -421,13 +421,13 @@ impl AppEngine {
     /// card, contacts, and labels.
     ///
     /// On success, navigate to MainScreen (MyInfo). On failure
-    /// (corrupt bytes, wrong password, IO), return to LinkChoice with
+    /// (corrupt bytes, wrong password, IO), return to IdentityCheck with
     /// a `ShowAlert` so the user can retry.
     fn execute_backup_restore(&mut self, bytes: Vec<u8>, password: String) -> ActionResult {
         let backup_hex = match std::str::from_utf8(&bytes) {
             Ok(s) => s.trim().to_string(),
             Err(_) => {
-                self.reset_onboarding_to_link_choice();
+                self.reset_onboarding_to_identity_check();
                 return ActionResult::ShowAlert {
                     title: "Restore failed".into(),
                     message: "The selected file does not look like a Vauchi backup.".into(),
@@ -442,7 +442,7 @@ impl AppEngine {
                 ActionResult::NavigateTo(screen)
             }
             Err(e) => {
-                self.reset_onboarding_to_link_choice();
+                self.reset_onboarding_to_identity_check();
                 ActionResult::ShowAlert {
                     title: "Restore failed".into(),
                     message: format!("{e}"),
@@ -451,16 +451,16 @@ impl AppEngine {
         }
     }
 
-    /// Helper: rewind the OnboardingEngine to LinkChoice so the user
+    /// Helper: rewind the OnboardingEngine to IdentityCheck so the user
     /// can retry restore after a failure. Called only from
     /// `execute_backup_restore`'s error paths.
-    fn reset_onboarding_to_link_choice(&mut self) {
+    fn reset_onboarding_to_identity_check(&mut self) {
         // best-effort: navigation reset is advisory; if the engine
         // can't transition the screen will rebuild fresh
         let _ = self
             .engine
             .apply_update(crate::ui::EngineUpdate::Onboarding(
-                crate::ui::OnboardingUpdate::ResetToLinkChoice,
+                crate::ui::OnboardingUpdate::ResetToIdentityCheck,
             ));
     }
 

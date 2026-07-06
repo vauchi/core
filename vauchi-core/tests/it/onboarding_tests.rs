@@ -28,24 +28,22 @@ use vauchi_core::types::{OnboardingProgress, OnboardingStep};
 #[test]
 fn test_step_ordering_matches_wizard_flow() {
     let all = OnboardingStep::all();
-    assert_eq!(all.len(), 6, "There should be 6 onboarding steps");
+    assert_eq!(all.len(), 5, "There should be 5 onboarding steps");
     assert_eq!(all[0], OnboardingStep::IdentityCheck);
-    assert_eq!(all[1], OnboardingStep::LinkChoice);
-    assert_eq!(all[2], OnboardingStep::DefaultName);
-    assert_eq!(all[3], OnboardingStep::GroupsSetup);
-    assert_eq!(all[4], OnboardingStep::ContactInfo);
-    assert_eq!(all[5], OnboardingStep::WhatNext);
+    assert_eq!(all[1], OnboardingStep::DefaultName);
+    assert_eq!(all[2], OnboardingStep::GroupsSetup);
+    assert_eq!(all[3], OnboardingStep::ContactInfo);
+    assert_eq!(all[4], OnboardingStep::WhatNext);
 }
 
 // @scenario: onboarding:step_index
 #[test]
 fn test_step_index_is_zero_based() {
     assert_eq!(OnboardingStep::IdentityCheck.index(), 0);
-    assert_eq!(OnboardingStep::LinkChoice.index(), 1);
-    assert_eq!(OnboardingStep::DefaultName.index(), 2);
-    assert_eq!(OnboardingStep::GroupsSetup.index(), 3);
-    assert_eq!(OnboardingStep::ContactInfo.index(), 4);
-    assert_eq!(OnboardingStep::WhatNext.index(), 5);
+    assert_eq!(OnboardingStep::DefaultName.index(), 1);
+    assert_eq!(OnboardingStep::GroupsSetup.index(), 2);
+    assert_eq!(OnboardingStep::ContactInfo.index(), 3);
+    assert_eq!(OnboardingStep::WhatNext.index(), 4);
 }
 
 // @scenario: onboarding:step_navigation
@@ -54,13 +52,12 @@ fn test_step_next_and_previous() {
     assert_eq!(OnboardingStep::IdentityCheck.previous(), None);
     assert_eq!(
         OnboardingStep::IdentityCheck.next(),
-        Some(OnboardingStep::LinkChoice)
+        Some(OnboardingStep::DefaultName)
     );
 
-    // DefaultName.previous() = LinkChoice
     assert_eq!(
         OnboardingStep::DefaultName.previous(),
-        Some(OnboardingStep::LinkChoice)
+        Some(OnboardingStep::IdentityCheck)
     );
     assert_eq!(
         OnboardingStep::DefaultName.next(),
@@ -136,22 +133,13 @@ fn test_new_progress_starts_at_identity_check() {
 fn test_advance_through_all_steps() {
     let mut progress = OnboardingProgress::new(0);
 
-    // Advance from IdentityCheck to LinkChoice
-    let step = progress.advance(0);
-    assert_eq!(step, OnboardingStep::LinkChoice);
-    assert!(
-        progress
-            .completed_steps
-            .contains(&OnboardingStep::IdentityCheck)
-    );
-
-    // Advance from LinkChoice to DefaultName
+    // Advance from IdentityCheck to DefaultName
     let step = progress.advance(0);
     assert_eq!(step, OnboardingStep::DefaultName);
     assert!(
         progress
             .completed_steps
-            .contains(&OnboardingStep::LinkChoice)
+            .contains(&OnboardingStep::IdentityCheck)
     );
 
     // Advance from DefaultName to GroupsSetup
@@ -183,7 +171,7 @@ fn test_advance_through_all_steps() {
         "completed_at should be set"
     );
 
-    assert_eq!(progress.completed_steps.len(), 6);
+    assert_eq!(progress.completed_steps.len(), 5);
 }
 
 // @scenario: onboarding:skip_step (#24)
@@ -194,8 +182,8 @@ fn test_skip_step_does_not_mark_completed() {
     let step = progress.skip_step(0);
     assert_eq!(
         step,
-        OnboardingStep::LinkChoice,
-        "Should advance to LinkChoice"
+        OnboardingStep::DefaultName,
+        "Should advance to DefaultName"
     );
     assert!(
         !progress
@@ -210,21 +198,20 @@ fn test_skip_step_does_not_mark_completed() {
 fn test_completion_percentage() {
     let mut progress = OnboardingProgress::new(0);
 
-    // 0 completed out of 6 total = 0%
+    // 0 completed out of 5 total = 0%
     assert_eq!(progress.completion_percentage(), 0);
 
-    // Complete 1 step: 1/6 = 16%
-    progress.advance(0); // IdentityCheck -> LinkChoice, IdentityCheck completed
-    assert_eq!(progress.completion_percentage(), 16);
+    // Complete 1 step: 1/5 = 20%
+    progress.advance(0); // IdentityCheck -> DefaultName, IdentityCheck completed
+    assert_eq!(progress.completion_percentage(), 20);
 
-    progress.advance(0); // LinkChoice -> DefaultName
     progress.advance(0); // DefaultName -> GroupsSetup
     progress.advance(0); // GroupsSetup -> ContactInfo
     progress.advance(0); // ContactInfo -> WhatNext
-    assert_eq!(progress.completion_percentage(), 83); // 5/6
+    assert_eq!(progress.completion_percentage(), 80); // 4/5
 
     progress.advance(0);
-    assert_eq!(progress.completion_percentage(), 100); // 6/6
+    assert_eq!(progress.completion_percentage(), 100); // 5/5
 }
 
 // @scenario: onboarding:idempotent_advance_at_final (#26)
@@ -232,7 +219,7 @@ fn test_completion_percentage() {
 fn test_idempotent_advance_at_final_step() {
     let mut progress = OnboardingProgress::new(0);
 
-    for _ in 0..6 {
+    for _ in 0..5 {
         progress.advance(0);
     }
 
@@ -310,7 +297,7 @@ fn test_serde_backward_compat_aliases() {
 fn test_serde_backward_compat_old_json_without_identity_check() {
     // Users who started onboarding before IdentityCheck was added have
     // persisted JSON with "current_step": "Welcome". This now maps to
-    // DefaultName after the 6-step flow change.
+    // DefaultName after the 5-step flow change.
     let old_json = r#"{"current_step":"Welcome","completed_steps":[],"started_at":1000,"completed_at":null,"skipped_backup":false}"#;
     let progress = OnboardingProgress::from_json(old_json).expect("Old JSON should deserialize");
     assert_eq!(
@@ -325,9 +312,9 @@ fn test_serde_backward_compat_old_json_without_identity_check() {
 #[test]
 fn test_json_serialization_roundtrip() {
     let mut progress = OnboardingProgress::new(0);
-    progress.advance(0); // IdentityCheck -> LinkChoice
-    progress.advance(0); // LinkChoice -> DefaultName
-    progress.skip_step(0); // Skip DefaultName -> GroupsSetup
+    progress.advance(0); // IdentityCheck -> DefaultName
+    progress.advance(0); // DefaultName -> GroupsSetup
+    progress.skip_step(0); // Skip GroupsSetup -> ContactInfo
 
     let json = progress.to_json().expect("Serialization should succeed");
     let restored = OnboardingProgress::from_json(&json).expect("Deserialization should succeed");
@@ -349,7 +336,7 @@ fn test_json_roundtrip_preserves_option_timestamps() {
     assert_eq!(restored.started_at, progress.started_at);
 
     // Complete and verify completed_at is preserved
-    for _ in 0..6 {
+    for _ in 0..5 {
         progress.advance(0);
     }
     progress.completed_at.expect("expected Some");
@@ -385,20 +372,24 @@ fn test_storage_save_load_roundtrip() {
     let storage = vauchi_core::Storage::in_memory(vauchi_core::SymmetricKey::generate()).unwrap();
 
     let mut progress = OnboardingProgress::new(0);
-    progress.advance(0); // IdentityCheck -> LinkChoice
-    progress.advance(0); // LinkChoice -> DefaultName
+    progress.advance(0); // IdentityCheck -> DefaultName
+    progress.advance(0); // DefaultName -> GroupsSetup
 
     storage.ux().save_onboarding_progress(&progress).unwrap();
     let loaded = storage.ux().load_onboarding_progress().unwrap().unwrap();
 
-    assert_eq!(loaded.current_step(), OnboardingStep::DefaultName);
+    assert_eq!(loaded.current_step(), OnboardingStep::GroupsSetup);
     assert_eq!(loaded.completed_steps.len(), 2);
     assert!(
         loaded
             .completed_steps
             .contains(&OnboardingStep::IdentityCheck)
     );
-    assert!(loaded.completed_steps.contains(&OnboardingStep::LinkChoice));
+    assert!(
+        loaded
+            .completed_steps
+            .contains(&OnboardingStep::DefaultName)
+    );
 }
 
 // @scenario: onboarding:storage_load_empty
@@ -423,7 +414,7 @@ fn test_storage_load_or_create() {
     storage.ux().save_onboarding_progress(&progress).unwrap();
 
     let loaded = storage.ux().load_or_create_onboarding_progress().unwrap();
-    assert_eq!(loaded.current_step(), OnboardingStep::LinkChoice);
+    assert_eq!(loaded.current_step(), OnboardingStep::DefaultName);
 }
 
 // @scenario: onboarding:storage_overwrite
@@ -442,7 +433,7 @@ fn test_storage_overwrite_replaces_previous() {
     let loaded = storage.ux().load_onboarding_progress().unwrap().unwrap();
     assert_eq!(
         loaded.current_step(),
-        OnboardingStep::GroupsSetup,
+        OnboardingStep::ContactInfo,
         "Should have the latest saved state"
     );
 }
@@ -556,22 +547,21 @@ fn test_display_name_suggestions_unicode() {
 // @scenario: onboarding:completion_percentage_table
 #[rstest]
 #[case(0, 0)]
-#[case(1, 16)]
-#[case(2, 33)]
-#[case(3, 50)]
-#[case(4, 66)]
-#[case(5, 83)]
-#[case(6, 100)]
+#[case(1, 20)]
+#[case(2, 40)]
+#[case(3, 60)]
+#[case(4, 80)]
+#[case(5, 100)]
 fn test_completion_percentage_exact_per_completed_step(
     #[case] completed: usize,
     #[case] expected_pct: u8,
 ) {
     // Pinning the percentage at every completed-count value eliminates
     // surviving arithmetic mutations on `(completed * 100) / total`:
-    // - `* with +`: 1+100=101/6=16 (matches at 1 only) → fails at 5/6
-    // - `* with /`: 1/100/6=0 → fails at any non-zero
-    // - `/ with %`: 100%6=4 → fails at 1
-    // - `/ with *`: 100*6=600 → clamps to 100 at any non-zero → fails
+    // - `* with +`: 1+100=101/5=20 (matches at 1 only) → fails at 4/5
+    // - `* with /`: 1/100/5=0 → fails at any non-zero
+    // - `/ with %`: 100%5=0 → fails at 1
+    // - `/ with *`: 100*5=500 → clamps to 100 at any non-zero → fails
     // - `100 with 0/1`: 0/total or 1/total → fails everywhere
     let mut progress = OnboardingProgress::new(0);
     for _ in 0..completed {
@@ -582,29 +572,29 @@ fn test_completion_percentage_exact_per_completed_step(
 
 // @scenario: onboarding:total_steps_constant
 #[test]
-fn test_total_steps_is_six() {
+fn test_total_steps_is_five() {
     // Pin OnboardingStep::total() so mutations to `with 0`/`with 1` and
     // `Vec::leak(Vec::new())` for `all()` are caught.
-    assert_eq!(OnboardingStep::total(), 6);
-    assert_eq!(OnboardingStep::all().len(), 6);
+    assert_eq!(OnboardingStep::total(), 5);
+    assert_eq!(OnboardingStep::all().len(), 5);
 }
 
 // @scenario: onboarding:step_index_per_variant
 #[rstest]
 #[case(OnboardingStep::IdentityCheck, 0)]
-#[case(OnboardingStep::LinkChoice, 1)]
-#[case(OnboardingStep::DefaultName, 2)]
-#[case(OnboardingStep::GroupsSetup, 3)]
-#[case(OnboardingStep::ContactInfo, 4)]
-#[case(OnboardingStep::WhatNext, 5)]
+#[case(OnboardingStep::DeviceLinkInstructions, 0)]
+#[case(OnboardingStep::BackupPasswordEntry, 0)]
+#[case(OnboardingStep::DefaultName, 1)]
+#[case(OnboardingStep::GroupsSetup, 2)]
+#[case(OnboardingStep::ContactInfo, 3)]
+#[case(OnboardingStep::WhatNext, 4)]
 fn test_step_index_per_variant(#[case] step: OnboardingStep, #[case] expected_idx: usize) {
     assert_eq!(step.index(), expected_idx);
 }
 
 // @scenario: onboarding:step_next_per_variant
 #[rstest]
-#[case(OnboardingStep::IdentityCheck, Some(OnboardingStep::LinkChoice))]
-#[case(OnboardingStep::LinkChoice, Some(OnboardingStep::DefaultName))]
+#[case(OnboardingStep::IdentityCheck, Some(OnboardingStep::DefaultName))]
 #[case(OnboardingStep::DefaultName, Some(OnboardingStep::GroupsSetup))]
 #[case(OnboardingStep::GroupsSetup, Some(OnboardingStep::ContactInfo))]
 #[case(OnboardingStep::ContactInfo, Some(OnboardingStep::WhatNext))]
@@ -622,8 +612,7 @@ fn test_step_next_per_variant(
 // @scenario: onboarding:step_previous_per_variant
 #[rstest]
 #[case(OnboardingStep::IdentityCheck, None)]
-#[case(OnboardingStep::LinkChoice, Some(OnboardingStep::IdentityCheck))]
-#[case(OnboardingStep::DefaultName, Some(OnboardingStep::LinkChoice))]
+#[case(OnboardingStep::DefaultName, Some(OnboardingStep::IdentityCheck))]
 #[case(OnboardingStep::GroupsSetup, Some(OnboardingStep::DefaultName))]
 #[case(OnboardingStep::ContactInfo, Some(OnboardingStep::GroupsSetup))]
 #[case(OnboardingStep::WhatNext, Some(OnboardingStep::ContactInfo))]
@@ -645,7 +634,7 @@ fn test_advance_does_not_set_completed_at_before_final_step() {
     // This adds the converse pin: completed_at must STAY None until the
     // final advance.
     let mut progress = OnboardingProgress::new(0);
-    for _ in 0..5 {
+    for _ in 0..4 {
         progress.advance(0);
     }
     assert_eq!(progress.current_step(), OnboardingStep::WhatNext);
@@ -664,7 +653,7 @@ fn test_skip_does_not_mark_completed_steps() {
     let mut progress = OnboardingProgress::new(0);
     progress.skip_step(0);
     progress.skip_step(0);
-    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
+    assert_eq!(progress.current_step(), OnboardingStep::GroupsSetup);
     assert!(progress.completed_steps.is_empty());
 }
 

@@ -77,9 +77,10 @@ fn onboarding_english_copy_unchanged() {
     assert_eq!(welcome.title, "Welcome to Vauchi");
     assert_eq!(action_label(&welcome, "create_new"), "Create new identity");
     assert_eq!(
-        action_label(&welcome, "have_identity"),
-        "I already have an identity"
+        action_label(&welcome, "link_device"),
+        "Link from another device"
     );
+    assert_eq!(action_label(&welcome, "load_backup"), "Restore from backup");
 
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),

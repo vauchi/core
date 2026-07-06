@@ -47,7 +47,7 @@ fn assert_fixture_fresh(screen: &ScreenModel, filename: &str) {
     }
 }
 
-/// Walk through all 6 screens, collecting each ScreenModel.
+/// Walk through all 6 onboarding screens, collecting each ScreenModel.
 /// Returns `(screen_id, ScreenModel)` pairs in order.
 fn walk_all_screens() -> Vec<(String, ScreenModel)> {
     let mut engine = OnboardingEngine::new();
@@ -57,17 +57,15 @@ fn walk_all_screens() -> Vec<(String, ScreenModel)> {
     let screen = engine.current_screen();
     screens.push(("identity_check".to_string(), screen));
 
-    // Navigate: IdentityCheck -> LinkChoice (via "have_identity")
+    // 2. DeviceLinkInstructions (side-flow reached via "link_device")
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
+        action_id: "link_device".into(),
     });
-    assert!(matches!(result, ActionResult::NavigateTo(_)));
-
-    // 2. LinkChoice
+    assert!(matches!(result, ActionResult::Commands { .. }));
     let screen = engine.current_screen();
-    screens.push(("link_choice".to_string(), screen));
+    screens.push(("device_link_instructions".to_string(), screen));
 
-    // Navigate: LinkChoice -> IdentityCheck (via "back"), then IdentityCheck -> DefaultName (via "create_new")
+    // Navigate back, then IdentityCheck -> DefaultName (via "create_new")
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "back".into(),
     });
@@ -129,10 +127,10 @@ fn identity_check_fixture_is_fresh() {
 
 // @internal
 #[test]
-fn link_choice_fixture_is_fresh() {
+fn device_link_instructions_fixture_is_fresh() {
     let screens = walk_all_screens();
     let (_, screen) = &screens[1];
-    assert_fixture_fresh(screen, "link_choice.json");
+    assert_fixture_fresh(screen, "device_link_instructions.json");
 }
 
 // @internal

@@ -251,11 +251,8 @@ fn make_backup(password: &str, name: &str) -> Vec<u8> {
 fn restore_backup_emits_file_pick_for_backup() {
     let mut engine = fresh_engine();
     let _ = engine.navigate_to(AppScreen::Onboarding);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "restore_backup".into(),
+        action_id: "load_backup".into(),
     });
     match result {
         ActionResult::Commands { commands } => {
@@ -277,10 +274,7 @@ fn file_picked_on_onboarding_transitions_to_backup_password_entry() {
     let mut engine = fresh_engine();
     let _ = engine.navigate_to(AppScreen::Onboarding);
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "restore_backup".into(),
+        action_id: "load_backup".into(),
     });
 
     let result = engine.handle_hardware_event(Event::FilePickedFromUser {
@@ -302,10 +296,7 @@ fn submit_valid_password_imports_backup_and_navigates_to_main() {
     let mut engine = fresh_engine();
     let _ = engine.navigate_to(AppScreen::Onboarding);
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "restore_backup".into(),
+        action_id: "load_backup".into(),
     });
     let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: make_backup("correct horse battery staple", "Bob"),
@@ -338,10 +329,7 @@ fn submit_wrong_password_returns_alert_and_clears_state() {
     let mut engine = fresh_engine();
     let _ = engine.navigate_to(AppScreen::Onboarding);
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "restore_backup".into(),
+        action_id: "load_backup".into(),
     });
     let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: make_backup("correct horse battery staple", "Eve"),
@@ -373,10 +361,7 @@ fn submit_empty_password_surfaces_validation_error_in_component() {
     let mut engine = fresh_engine();
     let _ = engine.navigate_to(AppScreen::Onboarding);
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "restore_backup".into(),
+        action_id: "load_backup".into(),
     });
     let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: make_backup("correct horse battery staple", "Eve"),
@@ -420,26 +405,23 @@ fn back_from_password_entry_clears_pending_state() {
     let mut engine = fresh_engine();
     let _ = engine.navigate_to(AppScreen::Onboarding);
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "restore_backup".into(),
+        action_id: "load_backup".into(),
     });
     let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: make_backup("correct horse battery staple", "Eve"),
         filename: "eve-backup.txt".into(),
     });
 
-    // Tap "back" — should land on link_choice.
+    // Tap "back" — should land on identity_check.
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "back".into(),
     });
 
     match result {
         ActionResult::NavigateTo(screen) | ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "link_choice");
+            assert_eq!(screen.screen_id, "identity_check");
         }
-        other => panic!("expected NavigateTo(link_choice), got {other:?}"),
+        other => panic!("expected NavigateTo(identity_check), got {other:?}"),
     }
 }
 

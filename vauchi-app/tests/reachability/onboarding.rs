@@ -19,11 +19,11 @@ use vauchi_app::ui::testing::{assert_reachability, check_reachability, check_sta
 use vauchi_app::ui::{OnboardingEngine, WorkflowEngine};
 
 /// Action ids `handle_identity_check` consumes
-/// (`core/vauchi-app/src/ui/onboarding.rs:512`).
-const IDENTITY_CHECK_HANDLED: &[&str] = &["have_identity", "create_new"];
+/// (`core/vauchi-app/src/ui/onboarding.rs:644`).
+const IDENTITY_CHECK_HANDLED: &[&str] = &["create_new", "link_device", "load_backup"];
 
 /// Union of action ids reachable from `OnboardingEngine`'s
-/// rendered screens. Most are consumed by one of the six
+/// rendered screens. Most are consumed by one of the
 /// `handle_*` arms in `core/vauchi-app/src/ui/onboarding.rs`;
 /// a few are intercepted at the `AppEngine` layer BEFORE they
 /// reach `OnboardingEngine::handle_action` — those are still
@@ -31,12 +31,11 @@ const IDENTITY_CHECK_HANDLED: &[&str] = &["have_identity", "create_new"];
 /// so the Layer 1 reachability diff doesn't false-positive.
 const ONBOARDING_ALL_HANDLED: &[&str] = &[
     // identity_check
-    "have_identity",
     "create_new",
-    // link_choice (M5 B1: the two indistinguishable device-link buttons
-    // merged into one that routes to device_link_guidance)
-    "add_another_device",
-    "restore_backup",
+    "link_device",
+    "load_backup",
+    // device_link_instructions
+    "scan_qr",
     "back",
     // backup_password_entry — reached only via the file-picker
     // hardware-event path (`AppEngine::handle_file_picked` calls
@@ -83,15 +82,16 @@ fn initial_screen_affordance_set_matches_plan() {
 }
 
 /// BFS reachability check against the full handler set today
-/// reports three documented orphans on the main onboarding flow.
+/// reports two documented orphans on the main onboarding flow.
 /// Pinning them here so any fix that lands without updating this
 /// test fails loudly.
 ///
 /// The screen set that the BFS currently reaches is:
-/// `identity_check` (entry), `default_name` (via `create_new`),
+/// `identity_check` (entry),
+/// `device_link_instructions` (via `link_device`),
+/// `default_name` (via `create_new`),
 /// `groups_setup` (via `continue` on default_name with
-/// a non-empty name), `contact_info`, `what_next`, and
-/// `link_choice` (via `have_identity`). Six screens.
+/// a non-empty name), `contact_info`, and `what_next`. Six screens.
 ///
 /// Two remaining orphans:
 /// - `submit_display_name` — handler arm at
@@ -150,10 +150,9 @@ fn bfs_pins_remaining_orphans() {
     );
 }
 
-/// Guards the BFS itself: the full flow should reach seven distinct
+/// Guards the BFS itself: the full flow should reach six distinct
 /// screens. If this drops, the BFS regressed or a screen
-/// disappeared silently. (M5 B1 added `device_link_guidance`, reached
-/// from `link_choice` via `add_another_device`.)
+/// disappeared silently.
 // @internal
 #[test]
 fn bfs_reaches_all_onboarding_screens() {
@@ -164,8 +163,7 @@ fn bfs_reaches_all_onboarding_screens() {
         ids,
         BTreeSet::from([
             "identity_check".to_string(),
-            "link_choice".to_string(),
-            "device_link_guidance".to_string(),
+            "device_link_instructions".to_string(),
             "default_name".to_string(),
             "groups_setup".to_string(),
             "contact_info".to_string(),

@@ -143,10 +143,10 @@ fn test_api_get_and_advance_onboarding() {
     assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
 
     let progress = vauchi.advance_onboarding().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::LinkChoice);
+    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
 
     let progress = vauchi.get_onboarding_progress().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::LinkChoice);
+    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
 }
 
 // @scenario: onboarding:api_skip (#24)
@@ -155,7 +155,7 @@ fn test_api_skip_onboarding_step() {
     let vauchi = create_test_vauchi();
 
     let progress = vauchi.skip_onboarding_step().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::LinkChoice);
+    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
 
     assert!(
         !progress
@@ -190,7 +190,7 @@ fn test_api_is_onboarding_complete() {
         "Should not be complete initially"
     );
 
-    for _ in 0..6 {
+    for _ in 0..5 {
         vauchi.advance_onboarding().unwrap();
     }
 
@@ -208,9 +208,9 @@ fn test_api_completion_percentage() {
     assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 0);
 
     vauchi.advance_onboarding().unwrap();
-    assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 16); // 1/6
+    assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 20); // 1/5
 
-    for _ in 0..5 {
+    for _ in 0..4 {
         vauchi.advance_onboarding().unwrap();
     }
     assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 100);
@@ -229,7 +229,7 @@ fn test_api_current_onboarding_step() {
     vauchi.advance_onboarding().unwrap();
     assert_eq!(
         vauchi.current_onboarding_step().unwrap(),
-        OnboardingStep::LinkChoice
+        OnboardingStep::DefaultName
     );
 }
 
@@ -269,8 +269,7 @@ fn test_create_suggested_groups_skips_duplicates() {
 fn test_skip_step_at_what_next_marks_complete() {
     let mut vauchi = create_test_vauchi();
 
-    // Advance to DefaultName (IdentityCheck -> LinkChoice -> DefaultName)
-    vauchi.advance_onboarding().unwrap();
+    // Advance to DefaultName (IdentityCheck -> DefaultName)
     vauchi.advance_onboarding().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
@@ -333,63 +332,62 @@ fn test_identity_check_create_new_goes_to_default_name() {
     }
 }
 
-// @scenario: onboarding:identity_check_have_identity
+// @scenario: onboarding:identity_check_link_device
 #[test]
-fn test_identity_check_have_identity_goes_to_link_choice() {
+fn test_identity_check_link_device_emits_qr_scan_command() {
     use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
+        action_id: "link_device".into(),
     });
     match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "link_choice");
+        ActionResult::Commands { commands } => {
+            assert_eq!(commands.len(), 1);
+            assert!(
+                matches!(commands[0], vauchi_core::Command::QrRequestScan),
+                "link_device should request QR scan"
+            );
+            let screen = engine.current_screen();
+            assert_eq!(screen.screen_id, "device_link_instructions");
             assert!(
                 screen.progress.is_none(),
-                "LinkChoice should have no progress indicator"
+                "DeviceLinkInstructions should have no progress indicator"
             );
         }
-        other => panic!("Expected NavigateTo, got {other:?}"),
+        other => panic!("Expected Commands, got {other:?}"),
     }
 }
 
-// @scenario: onboarding:link_choice_add_another_device
-// M5 B1: the merged "add another device" option routes to honest guidance
-// instead of the former unrouted StartDeviceLink
-// (2026-07-03-second-device-join-dead-end).
+// @scenario: onboarding:device_link_instructions_back
 #[test]
-fn test_link_choice_add_another_device_navigates_to_guidance() {
+fn test_device_link_instructions_back_returns_to_identity_check() {
     use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
+        action_id: "link_device".into(),
     });
 
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "add_another_device".into(),
+        action_id: "back".into(),
     });
     match result {
         ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "device_link_guidance");
+            assert_eq!(screen.screen_id, "identity_check");
         }
-        other => panic!("Expected NavigateTo(device_link_guidance), got {other:?}"),
+        other => panic!("Expected NavigateTo(identity_check), got {other:?}"),
     }
 }
 
-// @scenario: onboarding:link_choice_restore_backup
+// @scenario: onboarding:identity_check_load_backup
 #[test]
-fn test_link_choice_restore_backup_returns_start_backup_import() {
+fn test_identity_check_load_backup_returns_start_backup_import() {
     use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
-    });
-
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "restore_backup".into(),
+        action_id: "load_backup".into(),
     });
     use vauchi_core::{Command, FilePickPurpose};
     match result {
@@ -406,24 +404,28 @@ fn test_link_choice_restore_backup_returns_start_backup_import() {
     }
 }
 
-// @scenario: onboarding:link_choice_back
+// @scenario: onboarding:device_link_instructions_scan
 #[test]
-fn test_link_choice_back_returns_to_identity_check() {
+fn test_device_link_instructions_scan_re_emits_qr_request() {
     use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
+        action_id: "link_device".into(),
     });
 
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "back".into(),
+        action_id: "scan_qr".into(),
     });
     match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "identity_check");
+        ActionResult::Commands { commands } => {
+            assert_eq!(commands.len(), 1);
+            assert!(
+                matches!(commands[0], vauchi_core::Command::QrRequestScan),
+                "scan_qr should request QR scan"
+            );
         }
-        other => panic!("Expected NavigateTo, got {other:?}"),
+        other => panic!("Expected Commands, got {other:?}"),
     }
 }
 
@@ -442,14 +444,14 @@ fn test_identity_check_unknown_action_returns_update_screen() {
     );
 }
 
-// @scenario: onboarding:link_choice_unknown_action
+// @scenario: onboarding:device_link_instructions_unknown_action
 #[test]
-fn test_link_choice_unknown_action_returns_update_screen() {
+fn test_device_link_instructions_unknown_action_returns_update_screen() {
     use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "have_identity".into(),
+        action_id: "link_device".into(),
     });
 
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -466,10 +468,7 @@ fn test_link_choice_unknown_action_returns_update_screen() {
 fn test_full_onboarding_flow() {
     let mut vauchi = create_test_vauchi();
 
-    // IdentityCheck → LinkChoice
-    vauchi.advance_onboarding().unwrap();
-
-    // LinkChoice → DefaultName
+    // IdentityCheck → DefaultName
     vauchi.advance_onboarding().unwrap();
 
     // DefaultName → GroupsSetup (create identity first)
@@ -520,8 +519,8 @@ fn test_full_onboarding_flow() {
 
     assert_eq!(
         vauchi.onboarding_completion_percentage().unwrap(),
-        83,
-        "Should be 83% (5/6 steps completed) before final advance"
+        80,
+        "Should be 80% (4/5 steps completed) before final advance"
     );
 
     // Final advance: WhatNext → complete
@@ -539,7 +538,7 @@ fn test_full_onboarding_flow() {
     let progress = vauchi.get_onboarding_progress().unwrap();
     assert_eq!(
         progress.completed_steps.len(),
-        6,
-        "All 6 steps should be completed"
+        5,
+        "All 5 steps should be completed"
     );
 }

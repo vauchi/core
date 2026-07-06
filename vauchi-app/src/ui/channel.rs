@@ -255,8 +255,8 @@ pub enum OnboardingUpdate {
     /// Consume the pending backup after the hub read it off the
     /// snapshot — re-submitting without re-picking stays impossible.
     ClearPendingBackup,
-    /// Rewind to LinkChoice after a failed restore.
-    ResetToLinkChoice,
+    /// Rewind to IdentityCheck after a failed restore.
+    ResetToIdentityCheck,
     /// Buffer a field added via the form dialog mid-onboarding.
     PushField(super::onboarding::FieldSetup),
 }
@@ -343,7 +343,7 @@ impl EngineUpdate {
             Self::Onboarding(u) => match u {
                 OnboardingUpdate::PendingBackupBytes(_) => "Onboarding::PendingBackupBytes",
                 OnboardingUpdate::ClearPendingBackup => "Onboarding::ClearPendingBackup",
-                OnboardingUpdate::ResetToLinkChoice => "Onboarding::ResetToLinkChoice",
+                OnboardingUpdate::ResetToIdentityCheck => "Onboarding::ResetToIdentityCheck",
                 OnboardingUpdate::PushField(_) => "Onboarding::PushField",
             },
             Self::ConfirmPendingDelete => "ConfirmPendingDelete",

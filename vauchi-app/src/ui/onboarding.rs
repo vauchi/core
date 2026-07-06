@@ -222,11 +222,18 @@ impl OnboardingEngine {
                     a11y: Some(A11y::labeled(self.t("onboarding.create_identity"))),
                 },
                 ScreenAction {
-                    id: "have_identity".into(),
-                    label: self.t("onboarding.have_identity"),
+                    id: "link_device".into(),
+                    label: self.t("onboarding.restore_link_title"),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.have_identity"))),
+                    a11y: Some(A11y::labeled(self.t("onboarding.restore_link_title"))),
+                },
+                ScreenAction {
+                    id: "load_backup".into(),
+                    label: self.t("onboarding.restore_backup_title"),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("onboarding.restore_backup_title"))),
                 },
             ],
             progress: None,
@@ -234,51 +241,49 @@ impl OnboardingEngine {
         }
     }
 
-    fn build_link_choice(&self) -> ScreenModel {
+    /// Pre-gate instruction screen for the "link this device" path.
+    ///
+    /// The user reaches this from `IdentityCheck` by tapping "Link this
+    /// device". Core is humble: the screen only explains how to get the
+    /// invitation (open the link from the other device or scan its QR code)
+    /// and offers a scan button that emits `Command::QrRequestScan`. The
+    /// actual invitation ingestion happens via the existing `LinkOpened`
+    /// deep-link path and the `Event::QrScanned` hardware-event path in
+    /// `AppEngine`, both of which route to `AppScreen::DeviceLinkJoin`.
+    fn build_device_link_instructions(&self) -> ScreenModel {
         ScreenModel {
-            screen_id: "link_choice".into(),
-            title: self.t("onboarding.restore_title"),
-            subtitle: Some(self.t("onboarding.restore_subtitle")),
+            screen_id: "device_link_instructions".into(),
+            title: self.t("onboarding.link_device_instructions_title"),
+            subtitle: Some(self.t("onboarding.link_device_instructions_subtitle")),
             components: vec![Component::InfoPanel {
-                id: "link_choice_info".into(),
-                icon: None,
+                id: "device_link_instructions_info".into(),
+                icon: Some("devices".into()),
                 title: "".into(),
                 items: vec![
-                    // M5 B1: the former "Transfer" / "Link from another device"
-                    // items were indistinguishable (both emitted an unrouted
-                    // StartDeviceLink). Merged into one honest option that
-                    // routes to DeviceLinkGuidance.
                     InfoItem {
-                        icon: Some("devices".into()),
-                        title: self.t("onboarding.add_another_device"),
-                        detail: self.t("onboarding.add_another_device_desc"),
+                        icon: Some("qr".into()),
+                        title: self.t("onboarding.link_device_instructions_scan"),
+                        detail: self.t("onboarding.link_device_instructions_scan_desc"),
                     },
                     InfoItem {
-                        icon: Some("backup".into()),
-                        title: self.t("onboarding.restore_backup_title"),
-                        detail: self.t("onboarding.restore_backup_desc"),
+                        icon: Some("link".into()),
+                        title: self.t("onboarding.link_device_instructions_link"),
+                        detail: self.t("onboarding.link_device_instructions_link_desc"),
                     },
                 ],
                 a11y: Some(A11y {
-                    label: Some(self.t("onboarding.restore_title")),
+                    label: Some(self.t("onboarding.link_device_instructions_title")),
                     hint: None,
                     role: Some(AccessibilityRole::Heading),
                 }),
             }],
             actions: vec![
                 ScreenAction {
-                    id: "add_another_device".into(),
-                    label: self.t("onboarding.add_another_device"),
+                    id: "scan_qr".into(),
+                    label: self.t("qr.scan_button"),
                     style: ActionStyle::Primary,
                     enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.add_another_device"))),
-                },
-                ScreenAction {
-                    id: "restore_backup".into(),
-                    label: self.t("onboarding.restore_backup_title"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.restore_backup_title"))),
+                    a11y: Some(A11y::labeled(self.t("qr.scan_button"))),
                 },
                 ScreenAction {
                     id: "back".into(),
@@ -295,7 +300,7 @@ impl OnboardingEngine {
 
     /// Password-entry screen for the backup-restore flow (ADR-031,
     /// Phase 2B of `2026-05-03-core-file-picker-command`). Reached from
-    /// `LinkChoice` after the user picks a file via
+    /// `IdentityCheck` after the user picks a file via
     /// `Command::FilePickFromUser{purpose:ImportBackup}`.
     fn build_backup_password_entry(&self) -> ScreenModel {
         let password_filled = !self.pending_backup_password.is_empty();
@@ -638,11 +643,21 @@ impl OnboardingEngine {
 
     fn handle_identity_check(&mut self, action: &UserAction) -> ActionResult {
         match action {
-            UserAction::ActionPressed { action_id } if action_id == "have_identity" => {
-                self.navigate_to(Step::LinkChoice)
-            }
             UserAction::ActionPressed { action_id } if action_id == "create_new" => {
                 self.navigate_to(Step::DefaultName)
+            }
+            UserAction::ActionPressed { action_id } if action_id == "link_device" => {
+                // Transition to the instruction screen and immediately ask
+                // the frontend to open the QR scanner. The actual invitation
+                // is ingested through the existing `LinkOpened` deep-link or
+                // `Event::QrScanned` hardware path in `AppEngine`.
+                self.step = Step::DeviceLinkInstructions;
+                ActionResult::Commands {
+                    commands: vec![Command::QrRequestScan],
+                }
+            }
+            UserAction::ActionPressed { action_id } if action_id == "load_backup" => {
+                self.trigger_backup_restore()
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
@@ -663,72 +678,15 @@ impl OnboardingEngine {
         }
     }
 
-    fn handle_link_choice(&mut self, action: &UserAction) -> ActionResult {
+    fn handle_device_link_instructions(&mut self, action: &UserAction) -> ActionResult {
         match action {
-            // M5 B1: the merged "add another device" option routes to honest
-            // guidance instead of the two former buttons' unrouted
-            // StartDeviceLink (2026-07-03-second-device-join-dead-end).
-            UserAction::ActionPressed { action_id } if action_id == "add_another_device" => {
-                self.navigate_to(Step::DeviceLinkGuidance)
-            }
-            UserAction::ActionPressed { action_id } if action_id == "restore_backup" => {
-                self.trigger_backup_restore()
+            UserAction::ActionPressed { action_id } if action_id == "scan_qr" => {
+                ActionResult::Commands {
+                    commands: vec![Command::QrRequestScan],
+                }
             }
             UserAction::ActionPressed { action_id } if action_id == "back" => {
                 self.navigate_to(Step::IdentityCheck)
-            }
-            _ => ActionResult::UpdateScreen(self.current_screen()),
-        }
-    }
-
-    fn build_device_link_guidance(&self) -> ScreenModel {
-        ScreenModel {
-            screen_id: "device_link_guidance".into(),
-            title: self.t("onboarding.device_link_guidance_title"),
-            subtitle: None,
-            components: vec![Component::InfoPanel {
-                id: "device_link_guidance_info".into(),
-                icon: Some("devices".into()),
-                title: self.t("onboarding.device_link_guidance_title"),
-                items: vec![InfoItem {
-                    icon: Some("backup".into()),
-                    title: self.t("onboarding.restore_backup_title"),
-                    detail: self.t("onboarding.device_link_guidance_body"),
-                }],
-                a11y: Some(A11y {
-                    label: Some(self.t("onboarding.device_link_guidance_body")),
-                    hint: None,
-                    role: None,
-                }),
-            }],
-            actions: vec![
-                ScreenAction {
-                    id: "restore_backup".into(),
-                    label: self.t("onboarding.restore_backup_title"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.restore_backup_title"))),
-                },
-                ScreenAction {
-                    id: "back".into(),
-                    label: self.t("action.back"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.back"))),
-                },
-            ],
-            progress: None,
-            ..Default::default()
-        }
-    }
-
-    fn handle_device_link_guidance(&mut self, action: &UserAction) -> ActionResult {
-        match action {
-            UserAction::ActionPressed { action_id } if action_id == "restore_backup" => {
-                self.trigger_backup_restore()
-            }
-            UserAction::ActionPressed { action_id } if action_id == "back" => {
-                self.navigate_to(Step::LinkChoice)
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
@@ -741,7 +699,7 @@ impl OnboardingEngine {
     /// - `submit_backup_password` returns `ActionResult::Complete` —
     ///   the AppEngine completion path detects the step and calls
     ///   `Vauchi::import_full_backup(hex(bytes), password)`.
-    /// - `back` clears pending bytes + password and returns to LinkChoice.
+    /// - `back` clears pending bytes + password and returns to IdentityCheck.
     fn handle_backup_password_entry(&mut self, action: &UserAction) -> ActionResult {
         match action {
             UserAction::TextChanged {
@@ -765,7 +723,7 @@ impl OnboardingEngine {
             UserAction::ActionPressed { action_id } if action_id == "back" => {
                 self.pending_backup_bytes = None;
                 self.pending_backup_password.clear();
-                self.navigate_to(Step::LinkChoice)
+                self.navigate_to(Step::IdentityCheck)
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
@@ -989,9 +947,9 @@ impl WorkflowEngine for OnboardingEngine {
             U::ClearPendingBackup => {
                 let _ = self.take_pending_backup();
             }
-            U::ResetToLinkChoice => {
+            U::ResetToIdentityCheck => {
                 // Re-emitting "back" from BackupPasswordEntry clears
-                // pending bytes + password and routes to LinkChoice.
+                // pending bytes + password and routes to IdentityCheck.
                 #[allow(clippy::let_underscore_must_use)]
                 let _ = self.handle_action(UserAction::ActionPressed {
                     action_id: "back".into(),
@@ -1005,8 +963,7 @@ impl WorkflowEngine for OnboardingEngine {
     fn current_screen(&self) -> ScreenModel {
         match self.step {
             Step::IdentityCheck => self.build_identity_check(),
-            Step::LinkChoice => self.build_link_choice(),
-            Step::DeviceLinkGuidance => self.build_device_link_guidance(),
+            Step::DeviceLinkInstructions => self.build_device_link_instructions(),
             Step::BackupPasswordEntry => self.build_backup_password_entry(),
             Step::DefaultName => self.build_default_name(),
             Step::GroupsSetup => self.build_groups_setup(),
@@ -1019,8 +976,7 @@ impl WorkflowEngine for OnboardingEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match self.step {
             Step::IdentityCheck => self.handle_identity_check(&action),
-            Step::LinkChoice => self.handle_link_choice(&action),
-            Step::DeviceLinkGuidance => self.handle_device_link_guidance(&action),
+            Step::DeviceLinkInstructions => self.handle_device_link_instructions(&action),
             Step::BackupPasswordEntry => self.handle_backup_password_entry(&action),
             Step::DefaultName => self.handle_default_name(&action),
             Step::GroupsSetup => self.handle_groups_setup(&action),

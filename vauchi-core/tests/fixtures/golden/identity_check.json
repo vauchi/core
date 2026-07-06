@@ -42,12 +42,23 @@
       }
     },
     {
-      "id": "have_identity",
-      "label": "I already have an identity",
+      "id": "link_device",
+      "label": "Link from another device",
       "style": "Secondary",
       "enabled": true,
       "a11y": {
-        "label": "I already have an identity",
+        "label": "Link from another device",
+        "hint": null,
+        "role": null
+      }
+    },
+    {
+      "id": "load_backup",
+      "label": "Restore from backup",
+      "style": "Secondary",
+      "enabled": true,
+      "a11y": {
+        "label": "Restore from backup",
         "hint": null,
         "role": null
       }

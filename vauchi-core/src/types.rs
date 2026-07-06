@@ -135,14 +135,10 @@ impl EmergencyBroadcastConfig {
 pub enum OnboardingStep {
     /// Pre-gate: does the user already have an identity?
     IdentityCheck,
-    /// Pre-gate: choose how to restore (link device or import backup)
-    LinkChoice,
-    /// Honest guidance for the "add another device" path (M5 B1,
-    /// 2026-07-03-second-device-join-dead-end): the merged device-link
-    /// option routes here instead of an unrouted `StartDeviceLink`. Points
-    /// to the working backup-export→restore path until the live QR-join
-    /// responder (B3) ships.
-    DeviceLinkGuidance,
+    /// Pre-gate: instructions for linking this fresh device to an existing
+    /// identity (scan the QR code or open the invitation link from the
+    /// other device). Reached from `IdentityCheck` via `link_device`.
+    DeviceLinkInstructions,
     /// Default display name entry (renamed from CreateIdentity)
     #[serde(alias = "CreateIdentity", alias = "Welcome", alias = "SkipGate")]
     DefaultName,

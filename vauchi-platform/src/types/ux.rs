@@ -172,8 +172,8 @@ pub struct MobileDemoContactState {
 pub enum MobileOnboardingStep {
     /// Identity check gate
     IdentityCheck,
-    /// Link choice (device link or backup import)
-    LinkChoice,
+    /// Instructions for linking this device to an existing identity
+    DeviceLinkInstructions,
     /// Default display name entry
     DefaultName,
     /// Groups setup: create contact groups
@@ -188,7 +188,9 @@ impl From<vauchi_core::OnboardingStep> for MobileOnboardingStep {
     fn from(step: vauchi_core::OnboardingStep) -> Self {
         match step {
             vauchi_core::OnboardingStep::IdentityCheck => MobileOnboardingStep::IdentityCheck,
-            vauchi_core::OnboardingStep::LinkChoice => MobileOnboardingStep::LinkChoice,
+            vauchi_core::OnboardingStep::DeviceLinkInstructions => {
+                MobileOnboardingStep::DeviceLinkInstructions
+            }
             vauchi_core::OnboardingStep::DefaultName => MobileOnboardingStep::DefaultName,
             vauchi_core::OnboardingStep::GroupsSetup => MobileOnboardingStep::GroupsSetup,
             vauchi_core::OnboardingStep::ContactInfo => MobileOnboardingStep::ContactInfo,
@@ -202,7 +204,9 @@ impl From<MobileOnboardingStep> for vauchi_core::OnboardingStep {
     fn from(step: MobileOnboardingStep) -> Self {
         match step {
             MobileOnboardingStep::IdentityCheck => vauchi_core::OnboardingStep::IdentityCheck,
-            MobileOnboardingStep::LinkChoice => vauchi_core::OnboardingStep::LinkChoice,
+            MobileOnboardingStep::DeviceLinkInstructions => {
+                vauchi_core::OnboardingStep::DeviceLinkInstructions
+            }
             MobileOnboardingStep::DefaultName => vauchi_core::OnboardingStep::DefaultName,
             MobileOnboardingStep::GroupsSetup => vauchi_core::OnboardingStep::GroupsSetup,
             MobileOnboardingStep::ContactInfo => vauchi_core::OnboardingStep::ContactInfo,

@@ -15,11 +15,14 @@ use crate::text::normalize_text;
 use crate::types::{OnboardingProgress, OnboardingStep};
 
 impl OnboardingStep {
-    /// Returns all steps in order.
+    /// Returns all steps in the main "create new identity" flow, in order.
+    ///
+    /// Side-flows (`DeviceLinkInstructions`, `BackupPasswordEntry`) are
+    /// intentionally excluded — they branch from `IdentityCheck` and do
+    /// not advance the main progress indicator.
     pub fn all() -> &'static [OnboardingStep] {
         &[
             OnboardingStep::IdentityCheck,
-            OnboardingStep::LinkChoice,
             OnboardingStep::DefaultName,
             OnboardingStep::GroupsSetup,
             OnboardingStep::ContactInfo,
@@ -27,23 +30,22 @@ impl OnboardingStep {
         ]
     }
 
-    /// Returns the zero-based index of this step in the wizard.
+    /// Returns the zero-based index of this step in the main flow.
     ///
-    /// `BackupPasswordEntry` is a side-flow off `LinkChoice` (entered when
-    /// the user picks `restore_backup`); reuses LinkChoice's index so the
-    /// 6-step wizard progress indicator stays accurate.
+    /// Side-flows off `IdentityCheck` (`DeviceLinkInstructions`,
+    /// `BackupPasswordEntry`) reuse `IdentityCheck`'s index so the progress
+    /// indicator stays accurate for the create-identity path.
     pub fn index(&self) -> usize {
         match self {
             OnboardingStep::IdentityCheck => 0,
-            OnboardingStep::LinkChoice => 1,
-            // Side-flows off LinkChoice — reuse its index so the 6-step
+            // Side-flows off IdentityCheck — reuse its index so the 5-step
             // progress indicator stays accurate.
-            OnboardingStep::BackupPasswordEntry => 1,
-            OnboardingStep::DeviceLinkGuidance => 1,
-            OnboardingStep::DefaultName => 2,
-            OnboardingStep::GroupsSetup => 3,
-            OnboardingStep::ContactInfo => 4,
-            OnboardingStep::WhatNext => 5,
+            OnboardingStep::DeviceLinkInstructions => 0,
+            OnboardingStep::BackupPasswordEntry => 0,
+            OnboardingStep::DefaultName => 1,
+            OnboardingStep::GroupsSetup => 2,
+            OnboardingStep::ContactInfo => 3,
+            OnboardingStep::WhatNext => 4,
         }
     }
 

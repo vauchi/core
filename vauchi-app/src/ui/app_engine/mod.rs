@@ -557,6 +557,12 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
+        // Device-link join invitation from deep link/QR/messaging.
+        // See `dispatch::intercept_device_link_invitation`.
+        if let Some(result) = self.intercept_device_link_invitation(&action) {
+            return result;
+        }
+
         // Mode-picker grant affordance (`grant:<mode>:<requirement>`): re-learn
         // a denied OS permission and re-render the picker. See
         // `screens_exchange::intercept_grant_permission`.

@@ -62,6 +62,13 @@ pub enum UserAction {
         component_id: String,
         item_id: String,
     },
+    /// A device-link join invitation arrived from a deep link, QR scan, or
+    /// messaging share. Core parses the URI, validates eligibility, and
+    /// navigates to the join screen. Per ADR-021: frontends forward the raw
+    /// URI and never construct navigation targets.
+    OpenDeviceLinkInvitation {
+        uri: String,
+    },
     /// User invoked a per-row action (swipe, long-press, or overflow
     /// menu). `action_id` matches the id on the
     /// [`crate::ui::ListItemAction`] the engine produced for that row.

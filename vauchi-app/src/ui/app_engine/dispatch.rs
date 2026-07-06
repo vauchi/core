@@ -124,6 +124,26 @@ impl AppEngine {
         None
     }
 
+    /// Device-link join invitation from a deep link, QR scan, or messaging
+    /// share. Core parses the URI, validates that this device is eligible to
+    /// join (no existing identity), and navigates to the join screen. The
+    /// frontend only forwards the raw URI string; core owns the decision.
+    pub(super) fn intercept_device_link_invitation(
+        &mut self,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        if let UserAction::OpenDeviceLinkInvitation { uri } = action {
+            return Some(match self.open_device_link_invitation(uri) {
+                Ok(screen) => ActionResult::NavigateTo(screen),
+                Err(message) => ActionResult::ShowAlert {
+                    title: "Invalid Device Link".into(),
+                    message,
+                },
+            });
+        }
+        None
+    }
+
     /// Per-screen interception for the detail screens that first need a
     /// cloned id out of the current `AppScreen` (MyInfo entry detail and
     /// contact detail). Delegates to the fine-grained `intercept_*` methods.

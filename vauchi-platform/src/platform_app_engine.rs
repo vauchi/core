@@ -642,42 +642,6 @@ impl PlatformAppEngine {
         screen_to_json(&model)
     }
 
-    /// Handle an incoming `vauchi://device-link?...` device-link invitation.
-    ///
-    /// On a successful parse on a fresh device (no identity yet), navigates
-    /// to `AppScreen::DeviceLinkJoin` and returns the rendered screen model
-    /// as JSON. Frontends render the result and forward user actions via the
-    /// existing `handle_action_json` path.
-    ///
-    /// On failure, returns a typed `MobileError::InvalidInput` with `field`
-    /// set to one of:
-    /// - `"device_link_invitation"` — the URI is not a supported invitation
-    /// - `"device_link_identity"` — this device already has an identity
-    ///
-    /// Per ADR-021 (Humble UI): frontends only forward the raw URI string.
-    /// Core decides whether the URL is a valid invitation and whether the
-    /// device is eligible to join.
-    pub fn handle_device_link_invitation(&self, uri: String) -> Result<String, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        engine.open_device_link_invitation(&uri).map_err(|err| {
-            if err.starts_with("This device already has an identity") {
-                MobileError::InvalidInput {
-                    field: "device_link_identity".into(),
-                    detail: err,
-                }
-            } else {
-                MobileError::InvalidInput {
-                    field: "device_link_invitation".into(),
-                    detail: err,
-                }
-            }
-        })?;
-        let model = engine.current_screen();
-        screen_to_json(&model)
-    }
-
     /// Returns the canonical screen-id of the parent tab the active
     /// screen belongs to under the given layout, or `None` for
     /// transient overlays (Lock, FormDialog).

@@ -9,10 +9,15 @@
 //!
 //! The exchange runs core's pure-I/O `ExchangeSession` (no hardware,
 //! `MockProximityVerifier`), mirroring `exchange_real_x3dh_card_update_tests`.
+//!
+//! A `FakeMonotonicClock` is injected into every session so the 60-second
+//! `SESSION_TIMEOUT` cannot flake when the CI runner is paused or migrated
+//! between session creation and key agreement.
 
 use cucumber::{given, then, when};
 use vauchi_core::clock::SystemClock;
 use vauchi_core::exchange::{ExchangeError, ExchangeEvent, ExchangeSession, MockProximityVerifier};
+use vauchi_core::monotonic::FakeMonotonicClock;
 use vauchi_core::{Identity, Vauchi};
 
 use crate::VauchiWorld;
@@ -42,13 +47,15 @@ fn qr_exchange(a: &Vauchi, b: &Vauchi) {
         a_card.clone(),
         MockProximityVerifier::success(),
         SystemClock::shared(),
-    );
+    )
+    .with_monotonic(FakeMonotonicClock::new().shared());
     let mut b_s = ExchangeSession::new_qr(
         owned_identity_copy(b),
         b_card.clone(),
         MockProximityVerifier::success(),
         SystemClock::shared(),
-    );
+    )
+    .with_monotonic(FakeMonotonicClock::new().shared());
 
     a_s.apply(ExchangeEvent::StartQR).unwrap();
     b_s.apply(ExchangeEvent::StartQR).unwrap();
@@ -196,7 +203,8 @@ fn make_session(v: &Vauchi) -> ExchangeSession {
         v.own_card().unwrap().unwrap(),
         MockProximityVerifier::success(),
         SystemClock::shared(),
-    );
+    )
+    .with_monotonic(FakeMonotonicClock::new().shared());
     session.apply(ExchangeEvent::StartQR).unwrap();
     session
 }

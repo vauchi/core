@@ -255,7 +255,6 @@ impl PlatformAppEngine {
 #[cfg(feature = "content-updates")]
 impl PlatformAppEngine {
     fn check_content_updates_impl_engine(&self) -> crate::content::MobileUpdateStatus {
-        use crate::content::MobileUpdateStatus;
         use vauchi_app::content::{ContentConfig, ContentManager};
 
         let config = ContentConfig {
@@ -271,7 +270,7 @@ impl PlatformAppEngine {
         let manager = match ContentManager::new(config, vauchi_core::clock::SystemClock::shared()) {
             Ok(m) => m,
             Err(e) => {
-                return MobileUpdateStatus::CheckFailed {
+                return crate::content::MobileUpdateStatus::CheckFailed {
                     error: e.to_string(),
                 };
             }
@@ -280,7 +279,7 @@ impl PlatformAppEngine {
         let rt: tokio::runtime::Runtime = match tokio::runtime::Runtime::new() {
             Ok(rt) => rt,
             Err(e) => {
-                return MobileUpdateStatus::CheckFailed {
+                return crate::content::MobileUpdateStatus::CheckFailed {
                     error: e.to_string(),
                 };
             }
@@ -290,7 +289,6 @@ impl PlatformAppEngine {
     }
 
     fn apply_content_updates_impl_engine(&self) -> crate::content::MobileApplyResult {
-        use crate::content::{MobileApplyFailure, MobileApplyResult, MobileContentType};
         use vauchi_app::content::{ContentConfig, ContentManager};
 
         let config = ContentConfig {
@@ -306,7 +304,7 @@ impl PlatformAppEngine {
         let manager = match ContentManager::new(config, vauchi_core::clock::SystemClock::shared()) {
             Ok(m) => m,
             Err(e) => {
-                return MobileApplyResult::Error {
+                return crate::content::MobileApplyResult::Error {
                     error: e.to_string(),
                 };
             }
@@ -315,7 +313,7 @@ impl PlatformAppEngine {
         let rt: tokio::runtime::Runtime = match tokio::runtime::Runtime::new() {
             Ok(rt) => rt,
             Err(e) => {
-                return MobileApplyResult::Error {
+                return crate::content::MobileApplyResult::Error {
                     error: e.to_string(),
                 };
             }
@@ -323,26 +321,8 @@ impl PlatformAppEngine {
 
         rt.block_on(async {
             match manager.apply_updates().await {
-                Ok(result) => match result {
-                    vauchi_app::content::ApplyResult::NoUpdates => MobileApplyResult::NoUpdates,
-                    vauchi_app::content::ApplyResult::Disabled => MobileApplyResult::Disabled,
-                    vauchi_app::content::ApplyResult::Applied { applied, failed } => {
-                        MobileApplyResult::Applied {
-                            applied: applied.into_iter().map(MobileContentType::from).collect(),
-                            failed: failed
-                                .into_iter()
-                                .map(|(ct, err)| MobileApplyFailure {
-                                    content_type: MobileContentType::from(ct),
-                                    error: err,
-                                })
-                                .collect(),
-                        }
-                    }
-                    _ => MobileApplyResult::Error {
-                        error: "unknown apply result".to_string(),
-                    },
-                },
-                Err(e) => MobileApplyResult::Error {
+                Ok(result) => result.into(),
+                Err(e) => crate::content::MobileApplyResult::Error {
                     error: e.to_string(),
                 },
             }

@@ -42,10 +42,7 @@ mod types;
 mod validation;
 
 // Re-export public types
-pub use content::{
-    MobileApplyFailure, MobileApplyResult, MobileContentConfig, MobileContentType,
-    MobileUpdateStatus,
-};
+pub use content::MobileContentCycleOutcome;
 // Production QR surface — always available.
 // - generate_qr_bitmap: own-card QR display on Android/iOS
 // - MobileQrBitmap, MobileQrEccLevel: params/return types for generation

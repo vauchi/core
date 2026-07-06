@@ -2,76 +2,33 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Mobile bindings for content update system.
+//! Content-update cycle internals.
 //!
-//! Provides UniFFI-compatible types and methods for checking and applying
-//! remote content updates (networks, locales, themes).
+//! Only `MobileContentCycleOutcome` is exported over UniFFI; it is the
+//! presentation-only result of `DomainCommand::RunContentUpdateCycle`.
+//! The intermediate status/result mirrors in this module are internal
+//! helpers that add an error variant to the core apply result so the
+//! cycle can distinguish "apply errored" from "apply skipped".
 
-#[cfg(feature = "content-updates")]
-use std::path::PathBuf;
+use vauchi_app::content::{ApplyResult, ContentType, UpdateStatus};
 
-#[cfg(feature = "content-updates")]
-use vauchi_app::content::{ContentConfig, UpdateStatus};
-
-/// Content type for mobile platforms.
-#[derive(Debug, Clone, uniffi::Enum)]
-pub enum MobileContentType {
-    /// Social network definitions
-    Networks,
-    /// Localization strings
-    Locales,
-    /// UI themes
-    Themes,
-    /// Help content
-    Help,
-}
-
-impl From<MobileContentType> for vauchi_app::content::ContentType {
-    fn from(ct: MobileContentType) -> Self {
-        match ct {
-            MobileContentType::Networks => vauchi_app::content::ContentType::Networks,
-            MobileContentType::Locales => vauchi_app::content::ContentType::Locales,
-            MobileContentType::Themes => vauchi_app::content::ContentType::Themes,
-            MobileContentType::Help => vauchi_app::content::ContentType::Help,
-        }
-    }
-}
-
-impl From<vauchi_app::content::ContentType> for MobileContentType {
-    fn from(ct: vauchi_app::content::ContentType) -> Self {
-        match ct {
-            vauchi_app::content::ContentType::Networks => MobileContentType::Networks,
-            vauchi_app::content::ContentType::Locales => MobileContentType::Locales,
-            vauchi_app::content::ContentType::Themes => MobileContentType::Themes,
-            vauchi_app::content::ContentType::Help => MobileContentType::Help,
-            _ => MobileContentType::Help,
-        }
-    }
-}
-
-/// Result of checking for content updates.
-#[derive(Debug, Clone, uniffi::Enum)]
-pub enum MobileUpdateStatus {
-    /// Content is up to date
+/// Internal check-status mirror.
+#[derive(Debug, Clone)]
+pub(crate) enum MobileUpdateStatus {
     UpToDate,
-    /// Updates are available for the specified content types
-    UpdatesAvailable { types: Vec<MobileContentType> },
-    /// Update check failed
+    UpdatesAvailable { types: Vec<ContentType> },
     CheckFailed { error: String },
-    /// Remote updates are disabled
     Disabled,
 }
 
-#[cfg(feature = "content-updates")]
 impl From<UpdateStatus> for MobileUpdateStatus {
     fn from(status: UpdateStatus) -> Self {
         match status {
             UpdateStatus::UpToDate => MobileUpdateStatus::UpToDate,
-            UpdateStatus::UpdatesAvailable(types) => MobileUpdateStatus::UpdatesAvailable {
-                types: types.into_iter().map(MobileContentType::from).collect(),
-            },
+            UpdateStatus::UpdatesAvailable(types) => MobileUpdateStatus::UpdatesAvailable { types },
             UpdateStatus::CheckFailed(err) => MobileUpdateStatus::CheckFailed { error: err },
             UpdateStatus::Disabled => MobileUpdateStatus::Disabled,
+            // Non-exhaustive guard: unknown status is treated as a check failure.
             _ => MobileUpdateStatus::CheckFailed {
                 error: "unknown update status".to_string(),
             },
@@ -79,31 +36,36 @@ impl From<UpdateStatus> for MobileUpdateStatus {
     }
 }
 
-/// Result of applying content updates.
-#[derive(Debug, Clone, uniffi::Enum)]
-pub enum MobileApplyResult {
-    /// No updates were available
+/// Internal apply-result mirror. Adds an `Error` variant so that a
+/// failure to even start applying (e.g. runtime creation error) can be
+/// mapped to a retryable cycle outcome.
+#[derive(Debug, Clone)]
+pub(crate) enum MobileApplyResult {
     NoUpdates,
-    /// Updates were applied (some may have failed)
     Applied {
-        /// Content types that were successfully updated
-        applied: Vec<MobileContentType>,
-        /// Content types that failed with error messages
-        failed: Vec<MobileApplyFailure>,
+        applied: Vec<ContentType>,
+        failed: Vec<(ContentType, String)>,
     },
-    /// Remote updates are disabled
     Disabled,
-    /// Apply failed completely
-    Error { error: String },
+    Error {
+        error: String,
+    },
 }
 
-/// A failed content update.
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct MobileApplyFailure {
-    /// The content type that failed
-    pub content_type: MobileContentType,
-    /// The error message
-    pub error: String,
+impl From<ApplyResult> for MobileApplyResult {
+    fn from(result: ApplyResult) -> Self {
+        match result {
+            ApplyResult::NoUpdates => MobileApplyResult::NoUpdates,
+            ApplyResult::Disabled => MobileApplyResult::Disabled,
+            ApplyResult::Applied { applied, failed } => {
+                MobileApplyResult::Applied { applied, failed }
+            }
+            // Non-exhaustive guard: unknown result is treated as an error.
+            _ => MobileApplyResult::Error {
+                error: "unknown apply result".to_string(),
+            },
+        }
+    }
 }
 
 /// Presentation-only outcome of `DomainCommand::RunContentUpdateCycle`.
@@ -138,6 +100,7 @@ pub(crate) fn content_cycle_outcome(
         retryable_failure: false,
         refresh_appearance: false,
     };
+
     match status {
         MobileUpdateStatus::UpToDate | MobileUpdateStatus::Disabled => noop,
         MobileUpdateStatus::CheckFailed { .. } => MobileContentCycleOutcome {
@@ -148,9 +111,7 @@ pub(crate) fn content_cycle_outcome(
             Some(MobileApplyResult::Applied { applied, failed }) => MobileContentCycleOutcome {
                 applied: !applied.is_empty(),
                 retryable_failure: !failed.is_empty(),
-                refresh_appearance: applied
-                    .iter()
-                    .any(|t| matches!(t, MobileContentType::Themes)),
+                refresh_appearance: applied.iter().any(|t| matches!(t, ContentType::Themes)),
             },
             // NoUpdates: benign check→apply race, data already current.
             // Disabled: ContentManager deactivated internally even with
@@ -164,49 +125,8 @@ pub(crate) fn content_cycle_outcome(
     }
 }
 
-/// Configuration for content updates.
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct MobileContentConfig {
-    /// Whether remote updates are enabled
-    pub remote_updates_enabled: bool,
-    /// Content server URL
-    pub content_url: String,
-    /// Optional SOCKS5 proxy URL (e.g., for SOCKS5 proxy)
-    pub proxy_url: Option<String>,
-}
-
-impl Default for MobileContentConfig {
-    fn default() -> Self {
-        Self {
-            remote_updates_enabled: true,
-            content_url: "https://cdn.vauchi.app/v1".to_string(),
-            proxy_url: None,
-        }
-    }
-}
-
-#[cfg(feature = "content-updates")]
-impl MobileContentConfig {
-    /// Converts this mobile content configuration into a core `ContentConfig` for the content update system.
-    pub fn to_core_config(&self, storage_path: PathBuf) -> ContentConfig {
-        let mut config = ContentConfig {
-            storage_path,
-            content_url: self.content_url.clone(),
-            remote_updates_enabled: self.remote_updates_enabled,
-            proxy_url: self.proxy_url.clone(),
-            ..Default::default()
-        };
-
-        // Increase timeout for proxy
-        if self.proxy_url.is_some() {
-            config.timeout = std::time::Duration::from_secs(60);
-        }
-
-        config
-    }
-}
-
-// INLINE_TEST_REQUIRED: content_cycle_outcome is pub(crate), cannot be tested from external tests/
+// INLINE_TEST_REQUIRED: content_cycle_outcome is pub(crate); its mapping
+// logic is exercised here against the internal status/result helpers.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250,10 +170,10 @@ mod tests {
     #[test]
     fn cycle_outcome_applied_themes_requests_appearance_refresh() {
         let status = MobileUpdateStatus::UpdatesAvailable {
-            types: vec![MobileContentType::Themes, MobileContentType::Networks],
+            types: vec![ContentType::Themes, ContentType::Networks],
         };
         let apply = MobileApplyResult::Applied {
-            applied: vec![MobileContentType::Themes, MobileContentType::Networks],
+            applied: vec![ContentType::Themes, ContentType::Networks],
             failed: vec![],
         };
         assert_eq!(
@@ -266,10 +186,10 @@ mod tests {
     #[test]
     fn cycle_outcome_applied_without_themes_skips_appearance_refresh() {
         let status = MobileUpdateStatus::UpdatesAvailable {
-            types: vec![MobileContentType::Locales],
+            types: vec![ContentType::Locales],
         };
         let apply = MobileApplyResult::Applied {
-            applied: vec![MobileContentType::Locales],
+            applied: vec![ContentType::Locales],
             failed: vec![],
         };
         assert_eq!(
@@ -282,14 +202,11 @@ mod tests {
     #[test]
     fn cycle_outcome_partial_failure_is_applied_and_retryable() {
         let status = MobileUpdateStatus::UpdatesAvailable {
-            types: vec![MobileContentType::Locales, MobileContentType::Help],
+            types: vec![ContentType::Locales, ContentType::Help],
         };
         let apply = MobileApplyResult::Applied {
-            applied: vec![MobileContentType::Locales],
-            failed: vec![MobileApplyFailure {
-                content_type: MobileContentType::Help,
-                error: "404".into(),
-            }],
+            applied: vec![ContentType::Locales],
+            failed: vec![(ContentType::Help, "404".into())],
         };
         assert_eq!(
             content_cycle_outcome(&status, Some(&apply)),
@@ -301,7 +218,7 @@ mod tests {
     #[test]
     fn cycle_outcome_apply_error_and_missing_apply_are_retryable() {
         let status = MobileUpdateStatus::UpdatesAvailable {
-            types: vec![MobileContentType::Networks],
+            types: vec![ContentType::Networks],
         };
         assert_eq!(
             content_cycle_outcome(
@@ -322,7 +239,7 @@ mod tests {
     #[test]
     fn cycle_outcome_apply_noop_variants_are_noop() {
         let status = MobileUpdateStatus::UpdatesAvailable {
-            types: vec![MobileContentType::Networks],
+            types: vec![ContentType::Networks],
         };
         assert_eq!(
             content_cycle_outcome(&status, Some(&MobileApplyResult::NoUpdates)),

@@ -383,7 +383,7 @@ impl ContactField {
     /// ```
     /// use vauchi_core::contact_card::{ContactField, FieldType, ContactAction};
     ///
-    /// let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
+    /// let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
     /// let actions = field.to_secondary_actions();
     /// assert!(actions.contains(&ContactAction::Call("+1-555-123-4567".to_string())));
     /// assert!(actions.contains(&ContactAction::SendSms("+1-555-123-4567".to_string())));

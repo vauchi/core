@@ -654,19 +654,24 @@ mod tests {
 
     // @internal
     #[test]
-    fn app_open_device_link_invitation_navigates_to_join_screen() {
+    fn app_link_opened_device_link_navigates_to_join_screen() {
         // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create();
-            let invitation =
-                CString::new("vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI").unwrap();
-            let json_ptr = vauchi_app_open_device_link_invitation(handle, invitation.as_ptr());
-            assert!(!json_ptr.is_null(), "invitation should return a screen");
+            let action = CString::new(
+                r#"{"LinkOpened":{"uri":"vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI"}}"#,
+            )
+            .unwrap();
+            let json_ptr = vauchi_app_handle_action(handle, action.as_ptr());
+            assert!(
+                !json_ptr.is_null(),
+                "LinkOpened should return an action result"
+            );
             let json = CStr::from_ptr(json_ptr).to_str().unwrap();
-            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
+            let result: serde_json::Value = serde_json::from_str(json).unwrap();
             assert_eq!(
-                screen["screen_id"], "device_link_join",
-                "invitation should navigate to device_link_join, got: {json}"
+                result["NavigateTo"]["screen_id"], "device_link_join",
+                "device-link URI should navigate to device_link_join, got: {json}"
             );
             vauchi_string_free(json_ptr);
             vauchi_app_destroy(handle);
@@ -675,29 +680,33 @@ mod tests {
 
     // @internal
     #[test]
-    fn app_open_device_link_invitation_null_handle_returns_null() {
+    fn app_link_opened_null_handle_returns_null() {
         // SAFETY: Calling FFI with null handle.
         unsafe {
-            let invitation =
-                CString::new("vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI").unwrap();
-            let json_ptr =
-                vauchi_app_open_device_link_invitation(std::ptr::null_mut(), invitation.as_ptr());
+            let action = CString::new(
+                r#"{"LinkOpened":{"uri":"vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI"}}"#,
+            )
+            .unwrap();
+            let json_ptr = vauchi_app_handle_action(std::ptr::null_mut(), action.as_ptr());
             assert!(json_ptr.is_null(), "null handle should return null");
         }
     }
 
     // @internal
     #[test]
-    fn app_open_device_link_invitation_null_url_returns_error() {
-        // SAFETY: Calling FFI with null invitation URL.
+    fn app_link_opened_null_uri_returns_error() {
+        // SAFETY: Calling FFI with a null action JSON string.
         unsafe {
             let handle = vauchi_app_create();
-            let json_ptr = vauchi_app_open_device_link_invitation(handle, std::ptr::null());
-            assert!(!json_ptr.is_null(), "null URL should return error JSON");
+            let json_ptr = vauchi_app_handle_action(handle, std::ptr::null());
+            assert!(
+                !json_ptr.is_null(),
+                "null action JSON should return error JSON"
+            );
             let json = CStr::from_ptr(json_ptr).to_str().unwrap();
             assert!(
                 json.contains("error"),
-                "null URL should return error JSON, got: {json}"
+                "null action JSON should return error JSON, got: {json}"
             );
             vauchi_string_free(json_ptr);
             vauchi_app_destroy(handle);
@@ -706,21 +715,24 @@ mod tests {
 
     // @internal
     #[test]
-    fn app_open_device_link_invitation_with_identity_returns_error() {
+    fn app_link_opened_device_link_with_identity_returns_alert() {
         // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = create_app_with_identity();
-            let invitation =
-                CString::new("vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI").unwrap();
-            let json_ptr = vauchi_app_open_device_link_invitation(handle, invitation.as_ptr());
+            let action = CString::new(
+                r#"{"LinkOpened":{"uri":"vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI"}}"#,
+            )
+            .unwrap();
+            let json_ptr = vauchi_app_handle_action(handle, action.as_ptr());
             assert!(
                 !json_ptr.is_null(),
-                "existing identity should return error JSON"
+                "existing identity should return an action result"
             );
             let json = CStr::from_ptr(json_ptr).to_str().unwrap();
+            let result: serde_json::Value = serde_json::from_str(json).unwrap();
             assert!(
-                json.contains("error"),
-                "existing identity should return error JSON, got: {json}"
+                result.get("ShowAlert").is_some(),
+                "existing identity should surface a ShowAlert, got: {json}"
             );
             vauchi_string_free(json_ptr);
             vauchi_app_destroy(handle);

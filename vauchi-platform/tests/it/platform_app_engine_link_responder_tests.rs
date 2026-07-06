@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Platform-level entry into the engine-owned link-mode responder
-//! (ADR-049). Onboarding → `handle_deep_link_uri` → grant must navigate to
-//! `link_responder_waiting`, and — now that core drives the relay escrow
-//! round-trip itself (`AppEngine::advance_link_responder_session`), since
-//! no frontend ever executed the `RelayEscrow*` commands — the grant
+//! (ADR-049). Onboarding → `UserAction::LinkOpened { uri }` → grant must
+//! navigate to `link_responder_waiting`, and — now that core drives the
+//! relay escrow round-trip itself (`AppEngine::advance_link_responder_session`),
+//! since no frontend ever executed the `RelayEscrow*` commands — the grant
 //! envelope must carry **no** escrow commands.
 //!
 //! The full deposit → gate-poll → ready → retrieve → terminal behaviour is
@@ -70,9 +70,10 @@ fn current_screen_id(engine: &PlatformAppEngine) -> String {
 fn grant_navigates_to_responder_with_no_frontend_escrow_commands() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
+    let link_url = fresh_link_url();
     engine
-        .handle_deep_link_uri(fresh_link_url())
-        .expect("deep link routes to consent");
+        .handle_action_json(format!(r#"{{"LinkOpened":{{"uri":"{link_url}"}}}}"#))
+        .expect("LinkOpened routes exchange URI to consent");
     assert_eq!(current_screen_id(&engine), "deep_link_consent",);
 
     let grant_json = engine

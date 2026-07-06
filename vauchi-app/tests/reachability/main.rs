@@ -25,6 +25,7 @@ mod contact_visibility;
 mod decoy_contacts;
 mod deep_link_consent;
 mod delivery_status;
+mod device_link_join;
 mod device_linking;
 mod device_management;
 mod device_replacement;

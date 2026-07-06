@@ -8,7 +8,7 @@
 //! Asserts that every `pub fn` inside an `impl PlatformAppEngine { … }`
 //! block in `core/vauchi-platform/src/**` either:
 //!
-//!   (a) appears in `HUMBLE_ALLOWLIST` — the 23-method genuine binding
+//!   (a) appears in `HUMBLE_ALLOWLIST` — the 22-method genuine binding
 //!       surface every frontend renders against, or
 //!   (b) is one of the `SURPLUS_RATCHET_CEILING` known-legacy methods
 //!       still pending retirement in Phase 3 of the program.
@@ -45,7 +45,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The 25-method Humble surface — the binding surface every frontend
+/// The 22-method Humble surface — the binding surface every frontend
 /// is allowed to depend on per ADR-021 / ADR-043. Source of truth for
 /// Phase 0 / Task 0.2 of the pure-functional-core program plan.
 ///
@@ -61,7 +61,6 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "dispatch_domain_command",
     "handle_action_json",
     "handle_app_backgrounded",
-    "handle_deep_link_uri",
     "handle_hardware_event",
     "has_identity",
     "invalidate_all",
@@ -265,15 +264,22 @@ fn humble_allowlist_size_matches_plan() {
     // engine peers `tab_info()` / `sidebar_items()` stay — `nav_items`
     // dispatches to them and the cabi exports serve desktop frontends.
     // See `2026-06-08-pae-allowlist-further-shrink`.
+    //
+    // `handle_deep_link_uri` retirement (M5 B3, 23 -> 22): deep-link
+    // routing absorbed into `handle_action_json` via
+    // `UserAction::LinkOpened { uri }`. Core parses `vauchi://exchange`,
+    // `vauchi://device-link`, and future hosts; frontends no longer call
+    // a dedicated URI entry point. The engine peer
+    // `AppEngine::intercept_link_opened` stays — called from
+    // `handle_action` — so no new binding surface is added.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        23,
-        "Humble allow-list size drifted from the 23 expected after \
-         contracting the `tab_info` + `sidebar_items` wrappers into \
-         `nav_items` (ADR-023 Amendment 1, contract phase). \
-         Edits to this list require an ADR amendment (ADR-021/043 \
-         for the Humble engine framing — incl. Amendment 3 for the \
-         linchpin promotions — or ADR-048's G1-G5 gates for \
+        22,
+        "Humble allow-list size drifted from the 22 expected after \
+         retiring `handle_deep_link_uri` into `UserAction::LinkOpened` \
+         (M5 B3). Edits to this list require an ADR amendment \
+         (ADR-021/043 for the Humble engine framing — incl. Amendment 3 \
+         for the linchpin promotions — or ADR-048's G1-G5 gates for \
          retirements)."
     );
 }

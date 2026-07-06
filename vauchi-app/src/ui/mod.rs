@@ -108,7 +108,10 @@ pub use deep_link_consent::{
     DeepLinkConsentEngine,
 };
 pub use delivery::{DeliveryItem, DeliveryStatusEngine};
-pub use device_link_join::DeviceLinkJoinEngine;
+pub use device_link_join::{
+    CANCEL_ACTION_ID as DEVICE_LINK_CANCEL_ACTION_ID, DeviceLinkJoinEngine,
+    JOIN_ACTION_ID as DEVICE_LINK_JOIN_ACTION_ID,
+};
 pub use device_linking::DeviceLinkingEngine;
 pub use device_management::{DeviceListItem, DeviceManagementEngine};
 pub use device_replacement::{CompletionOutcome, DeviceReplacementEngine, ReplacementRole};

@@ -124,15 +124,24 @@ impl AppEngine {
         None
     }
 
-    /// Device-link join invitation from a deep link, QR scan, or messaging
-    /// share. Core parses the URI, validates that this device is eligible to
-    /// join (no existing identity), and navigates to the join screen. The
-    /// frontend only forwards the raw URI string; core owns the decision.
-    pub(super) fn intercept_device_link_invitation(
-        &mut self,
-        action: &UserAction,
-    ) -> Option<ActionResult> {
-        if let UserAction::OpenDeviceLinkInvitation { uri } = action {
+    /// A `vauchi://...` link was opened. Core parses the URI and routes to
+    /// the correct flow: exchange consent for `vauchi://exchange`, device-link
+    /// join for `vauchi://device-link`, or an error for anything else. The
+    /// frontend only forwards the raw URI string; core owns all interpretation.
+    pub(super) fn intercept_link_opened(&mut self, action: &UserAction) -> Option<ActionResult> {
+        let UserAction::LinkOpened { uri } = action else {
+            return None;
+        };
+
+        // 1. Exchange deep link → consent screen.
+        if let Ok(payload) = vauchi_core::exchange::link_mode::parse_exchange_deep_link(uri) {
+            return Some(ActionResult::NavigateTo(
+                self.navigate_to(AppScreen::DeepLinkConsent { payload }),
+            ));
+        }
+
+        // 2. Device-link join invitation → join screen (fresh device only).
+        if uri.starts_with("vauchi://device-link") {
             return Some(match self.open_device_link_invitation(uri) {
                 Ok(screen) => ActionResult::NavigateTo(screen),
                 Err(message) => ActionResult::ShowAlert {
@@ -141,7 +150,13 @@ impl AppEngine {
                 },
             });
         }
-        None
+
+        // 3. Unknown vauchi link (or non-vauchi scheme that the OS somehow
+        //    delivered). Surface a single, core-owned error.
+        Some(ActionResult::ShowAlert {
+            title: "Invalid Link".into(),
+            message: "This link cannot be opened in Vauchi.".into(),
+        })
     }
 
     /// Per-screen interception for the detail screens that first need a

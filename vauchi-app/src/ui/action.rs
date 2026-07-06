@@ -62,11 +62,12 @@ pub enum UserAction {
         component_id: String,
         item_id: String,
     },
-    /// A device-link join invitation arrived from a deep link, QR scan, or
-    /// messaging share. Core parses the URI, validates eligibility, and
-    /// navigates to the join screen. Per ADR-021: frontends forward the raw
-    /// URI and never construct navigation targets.
-    OpenDeviceLinkInvitation {
+    /// A `vauchi://...` link was opened by the OS, share sheet, or messaging
+    /// app. Core parses the URI, validates eligibility, and navigates to the
+    /// appropriate screen (exchange consent, device-link join, etc.). Per
+    /// ADR-021: frontends forward the raw URI and never construct navigation
+    /// targets or decide which flow it belongs to.
+    LinkOpened {
         uri: String,
     },
     /// User invoked a per-row action (swipe, long-press, or overflow

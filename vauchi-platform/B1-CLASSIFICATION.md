@@ -86,7 +86,8 @@ for these.**
   `nav_items` added — ADR-023 Am1 expand, merges `tab_info` + `sidebar_items`)
 - `handle_action_json`, `handle_hardware_event`, `advance_qr_frame_json`,
   `form_has_data`
-- `handle_deep_link_uri`
+- Deep links are no longer a separate binding; they are forwarded as
+  `UserAction::LinkOpened { uri }` via `handle_action_json`
 - `invalidate_all`, `invalidate_screen_json`
 - `set_network_online`,
   `periodic_sync_tick`, `periodic_sync_interval_seconds`,

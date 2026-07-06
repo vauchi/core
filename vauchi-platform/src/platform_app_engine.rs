@@ -593,55 +593,6 @@ impl PlatformAppEngine {
         Ok(engine.can_go_back())
     }
 
-    /// Handle an incoming `vauchi://exchange?...` deep link URI.
-    ///
-    /// On a successful parse, navigates to the consent gate (the new
-    /// `AppScreen::DeepLinkConsent`) and returns the rendered screen
-    /// model as JSON. Frontends render the result and forward
-    /// `UserAction::ActionPressed { action_id: "grant" | "deny" }` via
-    /// the existing `handle_action_json` path.
-    ///
-    /// On parse failure, returns a typed `MobileError::InvalidInput`
-    /// with `field` set to one of:
-    /// - `"deep_link_scheme"` — URI scheme is not `vauchi`
-    /// - `"deep_link_host"` — URI host is not `exchange`
-    /// - `"deep_link_format"` — URI uses the legacy path-component
-    ///   form, or query parameters are missing/malformed
-    ///
-    /// Per ADR-021 (Humble UI): the consent decision is policy and
-    /// lives in core; frontends only forward the raw URI string and
-    /// render the returned screen. Phase 1 of
-    /// `2026-04-25-deeplink-consent-orchestrator`.
-    pub fn handle_deep_link_uri(&self, uri: String) -> Result<String, MobileError> {
-        use vauchi_core::exchange::link_mode::{DeepLinkParseError, parse_exchange_deep_link};
-
-        let payload = parse_exchange_deep_link(&uri).map_err(|err| match err {
-            DeepLinkParseError::InvalidScheme => MobileError::InvalidInput {
-                field: "deep_link_scheme".into(),
-                detail: "URI scheme must be vauchi://".into(),
-            },
-            DeepLinkParseError::InvalidHost => MobileError::InvalidInput {
-                field: "deep_link_host".into(),
-                detail: "URI host must be exchange".into(),
-            },
-            DeepLinkParseError::LegacyPathForm => MobileError::InvalidInput {
-                field: "deep_link_format".into(),
-                detail: "deep link uses an old path-based format; ask the sender for a fresh link"
-                    .into(),
-            },
-            DeepLinkParseError::MalformedQuery => MobileError::InvalidInput {
-                field: "deep_link_format".into(),
-                detail: "deep link query parameters are missing or malformed".into(),
-            },
-        })?;
-
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let model = engine.navigate_to(vauchi_app::ui::AppScreen::DeepLinkConsent { payload });
-        screen_to_json(&model)
-    }
-
     /// Returns the canonical screen-id of the parent tab the active
     /// screen belongs to under the given layout, or `None` for
     /// transient overlays (Lock, FormDialog).

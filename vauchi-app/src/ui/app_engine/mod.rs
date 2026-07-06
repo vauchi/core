@@ -557,9 +557,9 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
-        // Device-link join invitation from deep link/QR/messaging.
-        // See `dispatch::intercept_device_link_invitation`.
-        if let Some(result) = self.intercept_device_link_invitation(&action) {
+        // OS/share-sheet/messaging link opened.
+        // See `dispatch::intercept_link_opened`.
+        if let Some(result) = self.intercept_link_opened(&action) {
             return result;
         }
 

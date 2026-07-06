@@ -420,9 +420,9 @@ vauchi-app/src/ui/app_engine/ble_handshake.rs 1080
 #  the legacy-QR persist-at-Complete gate (screen + Complete-state check)
 #  drives completion.rs::persist_legacy_exchange_contact.
 #  2026-06-04-exchange-terminal-screens.)
-# (+37 2026-07-06: M5 B3 open_device_link_invitation + invalid-invitation
-#  alert routing; core parses the invitation and navigates to the join
-#  screen.)
+# (+37 2026-07-06: M5 B3 intercept_link_opened routing for
+#  UserAction::LinkOpened { uri }; core parses vauchi://exchange and
+#  vauchi://device-link URIs and navigates to the consent or join screen.)
 vauchi-app/src/ui/app_engine/routing.rs 667
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to

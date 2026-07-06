@@ -27,3 +27,6 @@ tempfile = "3"
 
 [build-dependencies]
 cbindgen = "0.29"
+
+[package.metadata.cargo-machete]
+ignored = ["cbindgen"]  # Build dependency used in build.rs

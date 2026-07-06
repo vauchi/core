@@ -191,6 +191,7 @@ fn deny_action_completes_consent_gate() {
     );
 }
 
+// @internal
 #[test]
 fn valid_device_link_uri_navigates_to_join_screen() {
     let (engine, _dir) = create_engine();

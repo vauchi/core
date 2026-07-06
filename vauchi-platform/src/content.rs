@@ -7,17 +7,18 @@
 //! Only `MobileContentCycleOutcome` is exported over UniFFI; it is the
 //! presentation-only result of `DomainCommand::RunContentUpdateCycle`.
 //! The intermediate status/result mirrors in this module are internal
-//! helpers that add an error variant to the core apply result so the
-//! cycle can distinguish "apply errored" from "apply skipped".
+//! discriminants that let the cycle distinguish "apply errored" from
+//! "apply skipped". Payloads are intentionally not stored here because
+//! the frontend-facing outcome only needs the shape of the result.
 
 use vauchi_app::content::{ApplyResult, ContentType, UpdateStatus};
 
-/// Internal check-status mirror.
+/// Internal check-status discriminant.
 #[derive(Debug, Clone)]
 pub(crate) enum MobileUpdateStatus {
     UpToDate,
-    UpdatesAvailable { types: Vec<ContentType> },
-    CheckFailed { error: String },
+    UpdatesAvailable,
+    CheckFailed,
     Disabled,
 }
 
@@ -25,18 +26,16 @@ impl From<UpdateStatus> for MobileUpdateStatus {
     fn from(status: UpdateStatus) -> Self {
         match status {
             UpdateStatus::UpToDate => MobileUpdateStatus::UpToDate,
-            UpdateStatus::UpdatesAvailable(types) => MobileUpdateStatus::UpdatesAvailable { types },
-            UpdateStatus::CheckFailed(err) => MobileUpdateStatus::CheckFailed { error: err },
+            UpdateStatus::UpdatesAvailable(_) => MobileUpdateStatus::UpdatesAvailable,
+            UpdateStatus::CheckFailed(_) => MobileUpdateStatus::CheckFailed,
             UpdateStatus::Disabled => MobileUpdateStatus::Disabled,
             // Non-exhaustive guard: unknown status is treated as a check failure.
-            _ => MobileUpdateStatus::CheckFailed {
-                error: "unknown update status".to_string(),
-            },
+            _ => MobileUpdateStatus::CheckFailed,
         }
     }
 }
 
-/// Internal apply-result mirror. Adds an `Error` variant so that a
+/// Internal apply-result discriminant. Adds an `Error` variant so that a
 /// failure to even start applying (e.g. runtime creation error) can be
 /// mapped to a retryable cycle outcome.
 #[derive(Debug, Clone)]
@@ -47,9 +46,7 @@ pub(crate) enum MobileApplyResult {
         failed: Vec<(ContentType, String)>,
     },
     Disabled,
-    Error {
-        error: String,
-    },
+    Error,
 }
 
 impl From<ApplyResult> for MobileApplyResult {
@@ -61,9 +58,7 @@ impl From<ApplyResult> for MobileApplyResult {
                 MobileApplyResult::Applied { applied, failed }
             }
             // Non-exhaustive guard: unknown result is treated as an error.
-            _ => MobileApplyResult::Error {
-                error: "unknown apply result".to_string(),
-            },
+            _ => MobileApplyResult::Error,
         }
     }
 }
@@ -103,11 +98,11 @@ pub(crate) fn content_cycle_outcome(
 
     match status {
         MobileUpdateStatus::UpToDate | MobileUpdateStatus::Disabled => noop,
-        MobileUpdateStatus::CheckFailed { .. } => MobileContentCycleOutcome {
+        MobileUpdateStatus::CheckFailed => MobileContentCycleOutcome {
             retryable_failure: true,
             ..noop
         },
-        MobileUpdateStatus::UpdatesAvailable { .. } => match apply {
+        MobileUpdateStatus::UpdatesAvailable => match apply {
             Some(MobileApplyResult::Applied { applied, failed }) => MobileContentCycleOutcome {
                 applied: !applied.is_empty(),
                 retryable_failure: !failed.is_empty(),
@@ -117,7 +112,7 @@ pub(crate) fn content_cycle_outcome(
             // Disabled: ContentManager deactivated internally even with
             // the compile-time feature on — retrying won't help.
             Some(MobileApplyResult::NoUpdates) | Some(MobileApplyResult::Disabled) => noop,
-            Some(MobileApplyResult::Error { .. }) | None => MobileContentCycleOutcome {
+            Some(MobileApplyResult::Error) | None => MobileContentCycleOutcome {
                 retryable_failure: true,
                 ..noop
             },
@@ -156,12 +151,7 @@ mod tests {
     #[test]
     fn cycle_outcome_check_failure_is_retryable() {
         assert_eq!(
-            content_cycle_outcome(
-                &MobileUpdateStatus::CheckFailed {
-                    error: "timeout".into()
-                },
-                None
-            ),
+            content_cycle_outcome(&MobileUpdateStatus::CheckFailed, None),
             outcome(false, true, false)
         );
     }
@@ -169,15 +159,12 @@ mod tests {
     // @internal
     #[test]
     fn cycle_outcome_applied_themes_requests_appearance_refresh() {
-        let status = MobileUpdateStatus::UpdatesAvailable {
-            types: vec![ContentType::Themes, ContentType::Networks],
-        };
         let apply = MobileApplyResult::Applied {
             applied: vec![ContentType::Themes, ContentType::Networks],
             failed: vec![],
         };
         assert_eq!(
-            content_cycle_outcome(&status, Some(&apply)),
+            content_cycle_outcome(&MobileUpdateStatus::UpdatesAvailable, Some(&apply)),
             outcome(true, false, true)
         );
     }
@@ -185,15 +172,12 @@ mod tests {
     // @internal
     #[test]
     fn cycle_outcome_applied_without_themes_skips_appearance_refresh() {
-        let status = MobileUpdateStatus::UpdatesAvailable {
-            types: vec![ContentType::Locales],
-        };
         let apply = MobileApplyResult::Applied {
             applied: vec![ContentType::Locales],
             failed: vec![],
         };
         assert_eq!(
-            content_cycle_outcome(&status, Some(&apply)),
+            content_cycle_outcome(&MobileUpdateStatus::UpdatesAvailable, Some(&apply)),
             outcome(true, false, false)
         );
     }
@@ -201,15 +185,12 @@ mod tests {
     // @internal
     #[test]
     fn cycle_outcome_partial_failure_is_applied_and_retryable() {
-        let status = MobileUpdateStatus::UpdatesAvailable {
-            types: vec![ContentType::Locales, ContentType::Help],
-        };
         let apply = MobileApplyResult::Applied {
             applied: vec![ContentType::Locales],
             failed: vec![(ContentType::Help, "404".into())],
         };
         assert_eq!(
-            content_cycle_outcome(&status, Some(&apply)),
+            content_cycle_outcome(&MobileUpdateStatus::UpdatesAvailable, Some(&apply)),
             outcome(true, true, false)
         );
     }
@@ -217,20 +198,15 @@ mod tests {
     // @internal
     #[test]
     fn cycle_outcome_apply_error_and_missing_apply_are_retryable() {
-        let status = MobileUpdateStatus::UpdatesAvailable {
-            types: vec![ContentType::Networks],
-        };
         assert_eq!(
             content_cycle_outcome(
-                &status,
-                Some(&MobileApplyResult::Error {
-                    error: "disk full".into()
-                })
+                &MobileUpdateStatus::UpdatesAvailable,
+                Some(&MobileApplyResult::Error)
             ),
             outcome(false, true, false)
         );
         assert_eq!(
-            content_cycle_outcome(&status, None),
+            content_cycle_outcome(&MobileUpdateStatus::UpdatesAvailable, None),
             outcome(false, true, false)
         );
     }
@@ -238,15 +214,18 @@ mod tests {
     // @internal
     #[test]
     fn cycle_outcome_apply_noop_variants_are_noop() {
-        let status = MobileUpdateStatus::UpdatesAvailable {
-            types: vec![ContentType::Networks],
-        };
         assert_eq!(
-            content_cycle_outcome(&status, Some(&MobileApplyResult::NoUpdates)),
+            content_cycle_outcome(
+                &MobileUpdateStatus::UpdatesAvailable,
+                Some(&MobileApplyResult::NoUpdates)
+            ),
             outcome(false, false, false)
         );
         assert_eq!(
-            content_cycle_outcome(&status, Some(&MobileApplyResult::Disabled)),
+            content_cycle_outcome(
+                &MobileUpdateStatus::UpdatesAvailable,
+                Some(&MobileApplyResult::Disabled)
+            ),
             outcome(false, false, false)
         );
     }

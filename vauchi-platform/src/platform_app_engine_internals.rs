@@ -193,11 +193,8 @@ impl PlatformAppEngine {
         &self,
     ) -> crate::content::MobileContentCycleOutcome {
         let status = self.check_content_updates_dispatch();
-        let apply = matches!(
-            status,
-            crate::content::MobileUpdateStatus::UpdatesAvailable { .. }
-        )
-        .then(|| self.apply_content_updates_dispatch());
+        let apply = matches!(status, crate::content::MobileUpdateStatus::UpdatesAvailable)
+            .then(|| self.apply_content_updates_dispatch());
         crate::content::content_cycle_outcome(&status, apply.as_ref())
     }
 
@@ -269,19 +266,15 @@ impl PlatformAppEngine {
 
         let manager = match ContentManager::new(config, vauchi_core::clock::SystemClock::shared()) {
             Ok(m) => m,
-            Err(e) => {
-                return crate::content::MobileUpdateStatus::CheckFailed {
-                    error: e.to_string(),
-                };
+            Err(_) => {
+                return crate::content::MobileUpdateStatus::CheckFailed;
             }
         };
 
         let rt: tokio::runtime::Runtime = match tokio::runtime::Runtime::new() {
             Ok(rt) => rt,
-            Err(e) => {
-                return crate::content::MobileUpdateStatus::CheckFailed {
-                    error: e.to_string(),
-                };
+            Err(_) => {
+                return crate::content::MobileUpdateStatus::CheckFailed;
             }
         };
 
@@ -303,28 +296,22 @@ impl PlatformAppEngine {
 
         let manager = match ContentManager::new(config, vauchi_core::clock::SystemClock::shared()) {
             Ok(m) => m,
-            Err(e) => {
-                return crate::content::MobileApplyResult::Error {
-                    error: e.to_string(),
-                };
+            Err(_) => {
+                return crate::content::MobileApplyResult::Error;
             }
         };
 
         let rt: tokio::runtime::Runtime = match tokio::runtime::Runtime::new() {
             Ok(rt) => rt,
-            Err(e) => {
-                return crate::content::MobileApplyResult::Error {
-                    error: e.to_string(),
-                };
+            Err(_) => {
+                return crate::content::MobileApplyResult::Error;
             }
         };
 
         rt.block_on(async {
             match manager.apply_updates().await {
                 Ok(result) => result.into(),
-                Err(e) => crate::content::MobileApplyResult::Error {
-                    error: e.to_string(),
-                },
+                Err(_) => crate::content::MobileApplyResult::Error,
             }
         })
     }

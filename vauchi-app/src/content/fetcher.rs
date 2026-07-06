@@ -21,7 +21,7 @@ use super::integrity::IntegrityError;
 use super::types::ContentManifest;
 
 #[cfg(feature = "content-updates")]
-use reqwest::Client;
+use ureq::Agent;
 
 #[cfg(not(feature = "content-updates"))]
 use super::config::ContentConfig;
@@ -29,7 +29,7 @@ use super::config::ContentConfig;
 /// Fetches content from remote server
 #[cfg(feature = "content-updates")]
 pub struct ContentFetcher {
-    client: Client,
+    agent: Agent,
     base_url: String,
     max_content_size: u64,
     /// Publisher key for manifest signature verification (Tracker #145).
@@ -40,14 +40,11 @@ pub struct ContentFetcher {
 impl ContentFetcher {
     /// Create a new content fetcher from config
     pub fn new(config: &ContentConfig) -> Result<Self, FetchError> {
-        // reqwest is built without a bundled rustls provider so that
-        // vauchi-core's aws_lc_rs provider is reused. Install it before
-        // building the client to avoid "No provider set" at request time.
-        #[cfg(feature = "network-rustls")]
-        vauchi_core::network::ensure_rustls_provider_installed();
-
-        let mut builder = Client::builder()
-            .timeout(config.timeout)
+        let timeout = config.timeout;
+        let mut builder = ureq::Agent::config_builder()
+            .timeout_global(Some(timeout))
+            .http_status_as_error(false)
+            .max_redirects(0)
             .user_agent(format!(
                 "Vauchi/{}",
                 option_env!("CARGO_PKG_VERSION").unwrap_or("0.1.0")
@@ -55,11 +52,15 @@ impl ContentFetcher {
 
         // Support proxy if configured
         if let Some(proxy_url) = &config.proxy_url {
-            builder = builder.proxy(reqwest::Proxy::all(proxy_url)?);
+            let proxy = ureq::Proxy::new(proxy_url)
+                .map_err(|e| FetchError::NetworkError(format!("invalid proxy URL: {e}")))?;
+            builder = builder.proxy(Some(proxy));
         }
 
+        let agent = builder.build().new_agent();
+
         Ok(Self {
-            client: builder.build()?,
+            agent,
             base_url: config.content_url.clone(),
             max_content_size: config.max_content_size,
             publisher_public_key: config.publisher_public_key.clone(),
@@ -69,13 +70,28 @@ impl ContentFetcher {
     /// Fetch manifest from remote
     pub async fn fetch_manifest(&self) -> Result<ContentManifest, FetchError> {
         let url = format!("{}/manifest.json", self.base_url);
-        let response = self.client.get(&url).send().await?;
+        let agent = self.agent.clone();
 
-        if !response.status().is_success() {
-            return Err(FetchError::HttpError(response.status().as_u16()));
-        }
+        let body = tokio::task::spawn_blocking(move || {
+            let response = agent
+                .get(&url)
+                .call()
+                .map_err(|e| FetchError::NetworkError(e.to_string()))?;
 
-        let manifest: ContentManifest = response.json().await?;
+            let status = response.status().as_u16();
+            if !(200..300).contains(&status) {
+                return Err(FetchError::HttpError(status));
+            }
+
+            response
+                .into_body()
+                .read_to_string()
+                .map_err(|e| FetchError::NetworkError(e.to_string()))
+        })
+        .await
+        .map_err(|e| FetchError::NetworkError(e.to_string()))??;
+
+        let manifest: ContentManifest = serde_json::from_str(&body)?;
 
         // Verify manifest signature if publisher key is configured (Tracker #145)
         if let Some(ref pub_key) = self.publisher_public_key {
@@ -96,50 +112,73 @@ impl ContentFetcher {
         expected_checksum: &str,
     ) -> Result<Vec<u8>, FetchError> {
         let url = format!("{}/{}", self.base_url, path);
-        let mut response = self.client.get(&url).send().await?;
+        let max_content_size = self.max_content_size;
+        let agent = self.agent.clone();
+        let expected_checksum = expected_checksum.to_owned();
 
-        if !response.status().is_success() {
-            return Err(FetchError::HttpError(response.status().as_u16()));
-        }
+        tokio::task::spawn_blocking(move || {
+            let response = agent
+                .get(&url)
+                .call()
+                .map_err(|e| FetchError::NetworkError(e.to_string()))?;
 
-        // Check content length before downloading
-        if let Some(len) = response.content_length()
-            && len > self.max_content_size
-        {
-            return Err(FetchError::TooLarge {
-                size: len,
-                max: self.max_content_size,
-            });
-        }
+            let status = response.status().as_u16();
+            if !(200..300).contains(&status) {
+                return Err(FetchError::HttpError(status));
+            }
 
-        // Stream-verify: download in chunks with incremental SHA-256 hash (#146)
-        let mut hasher = sha2::Sha256::new();
-        let mut data = Vec::new();
-        let mut total: u64 = 0;
-
-        while let Some(chunk) = response.chunk().await? {
-            total += chunk.len() as u64;
-            if total > self.max_content_size {
+            // Check content length before downloading
+            if let Some(len) = response
+                .headers()
+                .get("Content-Length")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<u64>().ok())
+                && len > max_content_size
+            {
                 return Err(FetchError::TooLarge {
-                    size: total,
-                    max: self.max_content_size,
+                    size: len,
+                    max: max_content_size,
                 });
             }
-            hasher.update(&chunk);
-            data.extend_from_slice(&chunk);
-        }
 
-        // Verify checksum against expected
-        let expected_hex = expected_checksum
-            .strip_prefix("sha256:")
-            .ok_or(super::integrity::IntegrityError::InvalidFormat)?;
-        let digest = sha2::Digest::finalize(hasher);
-        let computed_hex = hex::encode(&digest[..]);
-        if computed_hex != expected_hex {
-            return Err(super::integrity::IntegrityError::ChecksumMismatch.into());
-        }
+            // Stream-verify: download in chunks with incremental SHA-256 hash (#146)
+            let mut hasher = sha2::Sha256::new();
+            let mut data = Vec::new();
+            let mut total: u64 = 0;
+            let mut reader = response.into_body().into_reader();
+            let mut chunk = [0u8; 8192];
 
-        Ok(data)
+            loop {
+                let n = std::io::Read::read(&mut reader, &mut chunk)
+                    .map_err(|e| FetchError::NetworkError(e.to_string()))?;
+                if n == 0 {
+                    break;
+                }
+                total += n as u64;
+                if total > max_content_size {
+                    return Err(FetchError::TooLarge {
+                        size: total,
+                        max: max_content_size,
+                    });
+                }
+                hasher.update(&chunk[..n]);
+                data.extend_from_slice(&chunk[..n]);
+            }
+
+            // Verify checksum against expected
+            let expected_hex = expected_checksum
+                .strip_prefix("sha256:")
+                .ok_or(super::integrity::IntegrityError::InvalidFormat)?;
+            let digest = sha2::Digest::finalize(hasher);
+            let computed_hex = hex::encode(&digest[..]);
+            if computed_hex != expected_hex {
+                return Err(super::integrity::IntegrityError::ChecksumMismatch.into());
+            }
+
+            Ok(data)
+        })
+        .await
+        .map_err(|e| FetchError::NetworkError(e.to_string()))?
     }
 
     /// Get the base URL
@@ -173,7 +212,7 @@ pub enum FetchError {
     /// Network/request error
     #[cfg(feature = "content-updates")]
     #[error("Network error: {0}")]
-    NetworkError(#[from] reqwest::Error),
+    NetworkError(String),
 
     /// Content too large
     #[error("Content too large: {size} bytes (max {max})")]

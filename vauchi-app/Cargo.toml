@@ -33,15 +33,15 @@ base64 = "0.22"
 # JSON Schema generation (optional, behind schema-gen feature)
 schemars = { version = "0.8", optional = true }
 
-# Remote content (optional)
-# Use no-provider variant to avoid pulling in ring — aws-lc-rs comes from vauchi-core's rustls
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots-no-provider", "json", "socks"], optional = true }
+# Remote content (optional). ureq matches vauchi-core's sync HTTP stack;
+# the async content-updates surface uses spawn_blocking.
+ureq = { version = "3", default-features = false, features = ["json", "rustls-no-provider", "rustls-webpki-roots", "gzip"], optional = true }
 tokio = { version = "1.0", features = ["rt"], optional = true }
 
 [features]
 default = ["storage", "network-rustls", "content-updates"]
 storage = ["vauchi-core/storage"]
-content-updates = ["reqwest", "tokio"]
+content-updates = ["ureq", "tokio"]
 network-rustls = ["vauchi-core/network-rustls", "storage"]
 network-http = ["vauchi-core/network-http"]
 network = ["network-rustls", "network-http", "storage"]

@@ -124,9 +124,6 @@ schemars = { version = "0.8", optional = true }
 # Unicode NFC normalization for cross-platform string consistency
 unicode-normalization = "0.1.25"
 
-# Password strength estimation
-zxcvbn = "3"
-
 # Shared relay/client protocol types
 vauchi-protocol.workspace = true
 
@@ -230,6 +227,9 @@ harness = false
 [[bench]]
 name = "performance_regression"
 harness = false
+
+[package.metadata.cargo-machete]
+ignored = ["getrandom"]  # Target-specific wasm32 dependency (getrandom/js feature)
 
 # ADR-055: inherit the workspace lint policy.
 [lints]

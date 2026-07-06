@@ -240,7 +240,7 @@ fn fingerprint_readable(world: &mut VauchiWorld) {
 
 // ── Password strength ─────────────────────────────────────────
 // WHY: `password_strength_indicator` and `backup_creation_should_be` are intentionally
-// NOT bound. Core uses MIN_REQUIRED_SCORE = Score::Three (Strong), so passwords that
+// NOT bound. Core uses MIN_REQUIRED_SCORE = 3 (Strong), so passwords that
 // the feature marks "medium, allowed" (e.g. "MyP@ssw0rd") return Err(WeakPassword) from
 // validate_password — contradicting the expected "allowed" outcome. Until the feature and
 // core threshold are reconciled, these 4 outline rows stay skipped rather than failing.

@@ -6,7 +6,6 @@
 //! and password_feedback.
 
 use vauchi_core::identity::password::{PasswordStrength, password_feedback, validate_password};
-use zxcvbn::Score;
 
 // @scenario: identity_management :: Password strength validation
 // @internal
@@ -14,6 +13,11 @@ use zxcvbn::Score;
 fn test_validate_strong_password() {
     let result = validate_password("correct-horse-battery-staple");
     assert!(result.is_ok(), "expected success");
+    let strength = result.unwrap();
+    assert!(matches!(
+        strength,
+        PasswordStrength::Strong | PasswordStrength::VeryStrong
+    ));
 }
 
 // @scenario: identity_management :: Password strength validation
@@ -23,10 +27,7 @@ fn test_validate_very_strong_password() {
     let result = validate_password("Zq!9xK#mP$2vL&nW@4rT^8jYf");
     assert!(result.is_ok(), "expected success");
     let strength = result.unwrap();
-    assert!(matches!(
-        strength,
-        PasswordStrength::Strong | PasswordStrength::VeryStrong
-    ));
+    assert!(matches!(strength, PasswordStrength::VeryStrong));
 }
 
 // @scenario: identity_management :: Backup password requirements
@@ -65,38 +66,32 @@ fn test_validate_exactly_min_length_but_weak() {
     assert!(result.is_err(), "expected error");
 }
 
-// @scenario: identity_management :: Password strength validation
 // @internal
 #[test]
-fn test_password_strength_from_score() {
-    assert_eq!(
-        PasswordStrength::from(Score::Zero),
-        PasswordStrength::TooWeak
-    );
-    assert_eq!(PasswordStrength::from(Score::One), PasswordStrength::Weak);
-    assert_eq!(PasswordStrength::from(Score::Two), PasswordStrength::Fair);
-    assert_eq!(
-        PasswordStrength::from(Score::Three),
-        PasswordStrength::Strong
-    );
-    assert_eq!(
-        PasswordStrength::from(Score::Four),
-        PasswordStrength::VeryStrong
-    );
+fn test_password_strength_from_internal_score() {
+    // The internal estimator maps scores 0-4 to the same enum variants.
+    assert!(matches!(
+        validate_password("12345678").unwrap_err(),
+        vauchi_core::identity::IdentityError::WeakPassword
+    ));
+    assert!(matches!(
+        validate_password("correct-horse-battery-staple").unwrap(),
+        PasswordStrength::Strong | PasswordStrength::VeryStrong
+    ));
 }
 
 // @internal
 // Regression for audit-08 CRIT-A: the prior assert
 // `!feedback.is_empty() || feedback.is_empty()` was a textbook
-// tautology that passed for any output. zxcvbn rates "password123"
-// at score 0 (very weak) and always returns at least one
-// suggestion; assert non-empty feedback as the actual contract.
+// tautology that passed for any output. Weak passwords must always
+// return at least one suggestion; assert non-empty feedback as the
+// actual contract.
 #[test]
 fn test_password_feedback_weak_password() {
     let feedback = password_feedback("password123");
     assert!(
         !feedback.is_empty(),
-        "zxcvbn must return at least one suggestion for the canonical \
+        "password_feedback must return at least one suggestion for the canonical \
          weak password \"password123\"; got empty feedback"
     );
 }

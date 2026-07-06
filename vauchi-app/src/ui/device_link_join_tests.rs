@@ -15,6 +15,7 @@ fn screen_id(engine: &DeviceLinkJoinEngine) -> String {
     engine.current_screen().screen_id
 }
 
+// @internal
 #[test]
 fn new_starts_at_enter_name() {
     let engine = engine();
@@ -29,6 +30,7 @@ fn new_starts_at_enter_name() {
     assert!(actions.contains(&CANCEL_ACTION_ID.to_string()));
 }
 
+// @internal
 #[test]
 fn text_changed_updates_name_and_join_enable_state() {
     let mut engine = engine();
@@ -60,6 +62,7 @@ fn text_changed_updates_name_and_join_enable_state() {
     assert_eq!(engine.device_name(), "Alice's Phone");
 }
 
+// @internal
 #[test]
 fn join_action_with_empty_name_returns_validation_error() {
     let mut engine = DeviceLinkJoinEngine::new("".to_string());
@@ -72,6 +75,7 @@ fn join_action_with_empty_name_returns_validation_error() {
     );
 }
 
+// @internal
 #[test]
 fn join_action_moves_to_posting_request_and_emits_start() {
     let mut engine = engine();
@@ -85,6 +89,7 @@ fn join_action_moves_to_posting_request_and_emits_start() {
     );
 }
 
+// @internal
 #[test]
 fn updates_move_through_steps() {
     let mut engine = engine();
@@ -126,6 +131,7 @@ fn updates_move_through_steps() {
     assert_eq!(screen_id(&engine), "device_link_join_complete");
 }
 
+// @internal
 #[test]
 fn failed_update_renders_failed_screen_with_retry() {
     let mut engine = engine();
@@ -149,6 +155,7 @@ fn failed_update_renders_failed_screen_with_retry() {
     assert!(actions.contains(&CANCEL_ACTION_ID.to_string()));
 }
 
+// @internal
 #[test]
 fn retry_returns_to_enter_name() {
     let mut engine = engine();
@@ -166,6 +173,7 @@ fn retry_returns_to_enter_name() {
     assert!(matches!(result, crate::ui::ActionResult::UpdateScreen(_)));
 }
 
+// @internal
 #[test]
 fn cancel_emits_complete() {
     let mut engine = engine();
@@ -175,6 +183,7 @@ fn cancel_emits_complete() {
     assert!(matches!(result, crate::ui::ActionResult::Complete));
 }
 
+// @internal
 #[test]
 fn foreign_update_is_rejected() {
     let mut engine = engine();

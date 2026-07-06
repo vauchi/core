@@ -217,6 +217,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn roundtrip_url() {
         let inv = sample_invitation();
@@ -225,6 +226,7 @@ mod tests {
         assert_eq!(parsed, inv);
     }
 
+    // @internal
     #[test]
     fn roundtrip_with_relay_url() {
         let inv = DeviceLinkJoinInvitation {
@@ -237,6 +239,7 @@ mod tests {
         assert_eq!(parsed, inv);
     }
 
+    // @internal
     #[test]
     fn accepts_slash_after_host() {
         // d2hhdGV2ZXI is base64 for "whatever"; QlJPS0VSNDI for "BROKER42".
@@ -246,6 +249,7 @@ mod tests {
         assert_eq!(parsed.broker_code, "BROKER42");
     }
 
+    // @internal
     #[test]
     fn accepts_future_web_link_fragment() {
         let url = "https://vauchi.app/dl#qr=d2hhdGV2ZXI&code=QlJPS0VSNDI";
@@ -254,12 +258,14 @@ mod tests {
         assert_eq!(parsed.broker_code, "BROKER42");
     }
 
+    // @internal
     #[test]
     fn rejects_unsupported_scheme() {
         let result = DeviceLinkJoinInvitation::parse_url("https://evil.com/dl#qr=x&code=y");
         assert!(matches!(result, Err(JoinInvitationError::UnsupportedUrl)));
     }
 
+    // @internal
     #[test]
     fn rejects_missing_qr() {
         let result = DeviceLinkJoinInvitation::parse_url("vauchi://device-link?code=QlJPS0VSNDI");
@@ -269,6 +275,7 @@ mod tests {
         ));
     }
 
+    // @internal
     #[test]
     fn rejects_missing_code() {
         let result = DeviceLinkJoinInvitation::parse_url("vauchi://device-link?qr=d2hhdGV2ZXI");
@@ -278,6 +285,7 @@ mod tests {
         ));
     }
 
+    // @internal
     #[test]
     fn rejects_invalid_base64() {
         let result = DeviceLinkJoinInvitation::parse_url(
@@ -289,6 +297,7 @@ mod tests {
         ));
     }
 
+    // @internal
     #[test]
     fn ignores_unknown_query_parameters() {
         // Unknown keys are skipped, even if their values are not valid base64.
@@ -298,6 +307,7 @@ mod tests {
         assert_eq!(parsed.broker_code, "BROKER42");
     }
 
+    // @internal
     #[test]
     fn accepts_percent_encoded_values() {
         // Percent-encode one base64url character ('Z' -> %5A) to verify
@@ -308,6 +318,7 @@ mod tests {
         assert_eq!(parsed.broker_code, "BROKER42");
     }
 
+    // @internal
     #[test]
     fn accepts_percent_encoded_utf8_in_relay_url() {
         // The relay URL is base64-encoded (ASCII) in the invitation, but a

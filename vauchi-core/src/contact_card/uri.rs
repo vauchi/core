@@ -359,7 +359,13 @@ impl ContactField {
                 }
             }
             FieldType::Email => ContactAction::SendEmail(value.to_string()),
-            FieldType::Website => ContactAction::OpenUrl(value.to_string()),
+            FieldType::Website => {
+                if let Some(uri) = self.to_uri() {
+                    ContactAction::OpenUrl(uri)
+                } else {
+                    ContactAction::CopyToClipboard
+                }
+            }
             FieldType::Social => {
                 if let Some(uri) = self.to_uri() {
                     ContactAction::OpenUrl(uri)
@@ -496,6 +502,10 @@ impl ContactField {
     }
 
     /// Heuristic check for email-like values.
+    ///
+    /// Mirrors `is_valid_email`: the local part and domain must be non-empty,
+    /// but a TLD is not required (intranet addresses like `user@localhost`
+    /// are accepted).
     fn looks_like_email(&self, value: &str) -> bool {
         if !value.contains('@') {
             return false;
@@ -509,7 +519,7 @@ impl ContactField {
         let local = parts[0];
         let domain = parts[1];
 
-        !local.is_empty() && !domain.is_empty() && domain.contains('.')
+        !local.is_empty() && !domain.is_empty()
     }
 
     /// Heuristic check for phone-like values.
@@ -521,7 +531,13 @@ impl ContactField {
         }
 
         let valid_chars = value.chars().filter(|c| {
-            c.is_ascii_digit() || *c == ' ' || *c == '-' || *c == '(' || *c == ')' || *c == '+'
+            c.is_ascii_digit()
+                || *c == ' '
+                || *c == '-'
+                || *c == '('
+                || *c == ')'
+                || *c == '+'
+                || *c == '.'
         });
 
         // At least 80% of characters should be phone-valid
@@ -541,12 +557,14 @@ impl ContactField {
 mod tests {
     use super::*;
 
+    // @internal
     #[test]
     fn test_url_encode_basic() {
         assert_eq!(url_encode("hello world"), "hello+world");
         assert_eq!(url_encode("test@example"), "test%40example");
     }
 
+    // @internal
     #[test]
     fn test_is_allowed_scheme() {
         assert!(is_allowed_scheme("tel"));
@@ -554,12 +572,14 @@ mod tests {
         assert!(!is_allowed_scheme("javascript"));
     }
 
+    // @internal
     #[test]
     fn test_normalize_social_username() {
         assert_eq!(normalize_social_username("@bobsmith"), "bobsmith");
         assert_eq!(normalize_social_username("bobsmith"), "bobsmith");
     }
 
+    // @internal
     #[test]
     fn test_is_safe_url_allowed_schemes() {
         assert!(is_safe_url("https://example.com"));
@@ -602,6 +622,34 @@ mod tests {
         assert!(is_blocked_scheme("data"));
         assert!(!is_blocked_scheme("https"));
         assert!(!is_blocked_scheme("tel"));
+    }
+
+    // @internal
+    #[test]
+    fn test_detect_value_type_accepts_intranet_email() {
+        let field = ContactField::new(FieldType::Custom, "Local", "user@localhost", 0);
+        assert_eq!(field.detect_value_type(), Some(FieldType::Email));
+    }
+
+    // @internal
+    #[test]
+    fn test_detect_value_type_accepts_phone_with_dots() {
+        let field = ContactField::new(FieldType::Custom, "Work", "555.123.4567", 0);
+        assert_eq!(field.detect_value_type(), Some(FieldType::Phone));
+    }
+
+    // @scenario: contact_actions :: Website primary action uses safe URI
+    // @internal
+    #[test]
+    fn test_website_to_action_uses_normalized_uri() {
+        let plain = ContactField::new(FieldType::Website, "Site", "example.com", 0);
+        assert_eq!(
+            plain.to_action(),
+            ContactAction::OpenUrl("https://example.com".to_string())
+        );
+
+        let blocked = ContactField::new(FieldType::Website, "Bad", "javascript:alert(1)", 0);
+        assert_eq!(blocked.to_action(), ContactAction::CopyToClipboard);
     }
 
     // @scenario: security:Relay URL validation

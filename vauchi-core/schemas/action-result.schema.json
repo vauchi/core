@@ -303,6 +303,27 @@
       ]
     },
     {
+      "description": "App layer should start the device-link join (responder) machine with the given device name. Emitted by `DeviceLinkJoinEngine` when the user confirms the name. Core builds the responder, posts the request on the next poll tick, and advances through confirmation → adoption.",
+      "type": "object",
+      "required": [
+        "DeviceLinkJoinStart"
+      ],
+      "properties": {
+        "DeviceLinkJoinStart": {
+          "type": "object",
+          "required": [
+            "device_name"
+          ],
+          "properties": {
+            "device_name": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "Frontend should perform hardware actions for the exchange protocol (ADR-031). Each command maps to a platform-specific operation (QR display, BLE scan, etc.). Unsupported commands should be answered with `Event::HardwareUnavailable`.",
       "type": "object",
       "required": [

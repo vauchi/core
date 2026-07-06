@@ -198,6 +198,27 @@
       "additionalProperties": false
     },
     {
+      "description": "A `vauchi://...` link was opened by the OS, share sheet, or messaging app. Core parses the URI, validates eligibility, and navigates to the appropriate screen (exchange consent, device-link join, etc.). Per ADR-021: frontends forward the raw URI and never construct navigation targets or decide which flow it belongs to.",
+      "type": "object",
+      "required": [
+        "LinkOpened"
+      ],
+      "properties": {
+        "LinkOpened": {
+          "type": "object",
+          "required": [
+            "uri"
+          ],
+          "properties": {
+            "uri": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "User invoked a per-row action (swipe, long-press, or overflow menu). `action_id` matches the id on the [`crate::ui::ListItemAction`] the engine produced for that row.",
       "type": "object",
       "required": [

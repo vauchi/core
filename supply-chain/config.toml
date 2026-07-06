@@ -211,23 +211,11 @@ version = "0.3.0"
 criteria = "safe-to-run"
 
 [[exemptions.darling]]
-version = "0.20.11"
-criteria = "safe-to-deploy"
-
-[[exemptions.darling]]
 version = "0.23.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.darling_core]]
-version = "0.20.11"
-criteria = "safe-to-deploy"
-
-[[exemptions.darling_core]]
 version = "0.23.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.darling_macro]]
-version = "0.20.11"
 criteria = "safe-to-deploy"
 
 [[exemptions.darling_macro]]
@@ -248,18 +236,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.der]]
 version = "0.8.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.derive_builder]]
-version = "0.20.2"
-criteria = "safe-to-deploy"
-
-[[exemptions.derive_builder_core]]
-version = "0.20.2"
-criteria = "safe-to-deploy"
-
-[[exemptions.derive_builder_macro]]
-version = "0.20.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.displaydoc]]
@@ -284,10 +260,6 @@ criteria = "safe-to-run"
 
 [[exemptions.fancy-regex]]
 version = "0.17.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.fancy-regex]]
-version = "0.18.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.fast_image_resize]]
@@ -414,10 +386,6 @@ criteria = "safe-to-deploy"
 version = "2.3.0"
 criteria = "safe-to-run"
 
-[[exemptions.hyper-rustls]]
-version = "0.27.9"
-criteria = "safe-to-deploy"
-
 [[exemptions.iana-time-zone]]
 version = "0.1.65"
 criteria = "safe-to-deploy"
@@ -440,7 +408,7 @@ criteria = "safe-to-deploy"
 
 [[exemptions.ipnet]]
 version = "2.12.0"
-criteria = "safe-to-deploy"
+criteria = "safe-to-run"
 
 [[exemptions.itertools]]
 version = "0.12.1"
@@ -794,10 +762,6 @@ criteria = "safe-to-deploy"
 version = "2.17.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.serde_urlencoded]]
-version = "0.7.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.serde_with]]
 version = "3.20.0"
 criteria = "safe-to-deploy"
@@ -836,7 +800,7 @@ criteria = "safe-to-deploy"
 
 [[exemptions.sync_wrapper]]
 version = "1.0.2"
-criteria = "safe-to-deploy"
+criteria = "safe-to-run"
 
 [[exemptions.synthez]]
 version = "0.3.1"
@@ -866,17 +830,9 @@ criteria = "safe-to-deploy"
 version = "1.11.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.tokio-rustls]]
-version = "0.26.4"
-criteria = "safe-to-deploy"
-
 [[exemptions.tower-layer]]
 version = "0.3.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.tower-service]]
-version = "0.3.3"
-criteria = "safe-to-deploy"
+criteria = "safe-to-run"
 
 [[exemptions.tracing]]
 version = "0.1.44"
@@ -1012,8 +968,4 @@ criteria = "safe-to-deploy"
 
 [[exemptions.zune-jpeg]]
 version = "0.5.15"
-criteria = "safe-to-deploy"
-
-[[exemptions.zxcvbn]]
-version = "3.1.1"
 criteria = "safe-to-deploy"

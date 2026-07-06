@@ -344,7 +344,10 @@ vauchi-core/src/storage/mod.rs 1079
 # (+1 2026-07-05: M4 S3a2 — card_update_enabled reads the persisted config
 #  toggle instead of a hardcoded true. Stacked on the persist-once bump.
 #  771 → 772.)
-vauchi-app/src/ui/app_engine/mod.rs 772
+# (+18 2026-07-06: M5 B3 device-link join scaffolding —
+#  device_link_responder field + initializer + advance call in
+#  poll_notifications + OpenDeviceLinkInvitation intercept wiring.)
+vauchi-app/src/ui/app_engine/mod.rs 790
 # (2026-07-01: Glance orchestration + its INLINE_TEST_REQUIRED test mod —
 #  Slice B. The privacy/binding tests call private build_ble_session_inputs /
 #  pending_exchange_groups so they must stay inline; the pub-API Glance
@@ -417,7 +420,10 @@ vauchi-app/src/ui/app_engine/ble_handshake.rs 1080
 #  the legacy-QR persist-at-Complete gate (screen + Complete-state check)
 #  drives completion.rs::persist_legacy_exchange_contact.
 #  2026-06-04-exchange-terminal-screens.)
-vauchi-app/src/ui/app_engine/routing.rs 630
+# (+37 2026-07-06: M5 B3 open_device_link_invitation + invalid-invitation
+#  alert routing; core parses the invitation and navigates to the join
+#  screen.)
+vauchi-app/src/ui/app_engine/routing.rs 667
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)
@@ -488,7 +494,9 @@ vauchi-app/src/ui/app_engine/routing.rs 630
 # (+4 2026-07-05: M4 S1a — Settings accessibility flags read real config
 #  (reduce_motion/large_touch self-seeded) with an explanatory comment,
 #  replacing the 3 hardcoded `false` literals. 1007 → 1011.)
-vauchi-app/src/ui/app_engine/screens.rs 1011
+# (+9 2026-07-06: M5 B3 DeviceLinkJoin engine factory arm — humble
+#  renderer gets the join screen from core.)
+vauchi-app/src/ui/app_engine/screens.rs 1020
 
 # SPLIT-WARRANTED — crossed the 1000-line hard limit in M5 B1
 # (2026-07-05) when the merged "add another device" onboarding option

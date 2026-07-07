@@ -101,8 +101,7 @@ pub trait PlatformAppEngineTestHelpers {
     fn cancel_device_link_session_for_test(&self);
 
     /// Test-only: navigate to `screen_json` (an `AppScreen` JSON) and
-    /// return the screen envelope, driving `after_screen_transition` so
-    /// session-lifecycle side effects fire. Replaces the retired public
+    /// return the screen envelope. Replaces the retired public
     /// `navigate_to_json` binding (ADR-043 Am4): the production surface no
     /// longer lets frontends construct domain targets, but device-link
     /// listener tests still need a forward-nav seam to land on
@@ -137,7 +136,7 @@ pub trait PlatformAppEngineTestHelpers {
 
 impl PlatformAppEngineTestHelpers for PlatformAppEngine {
     fn save_test_contact(&self, contact: &vauchi_core::Contact) -> Result<(), MobileError> {
-        let engine = self.engine().lock().map_err(|e| MobileError::Other {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("engine lock poisoned: {e}"),
         })?;
         engine
@@ -154,7 +153,7 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         &self,
         record: &vauchi_core::storage::DeliveryRecord,
     ) -> Result<(), MobileError> {
-        let engine = self.engine().lock().map_err(|e| MobileError::Other {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("engine lock poisoned: {e}"),
         })?;
         engine
@@ -173,7 +172,7 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         confirmation_code: String,
         challenge_hex: String,
     ) -> Result<(), MobileError> {
-        let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
         let _ = engine.device_link_request_received(device_name, confirmation_code, challenge_hex);
@@ -181,7 +180,7 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
     }
 
     fn apply_device_link_qr_expired_for_test(&self) -> Result<(), MobileError> {
-        let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
         let _ = engine.device_link_qr_expired();
@@ -189,14 +188,14 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
     }
 
     fn device_link_session_is_active_for_test(&self) -> bool {
-        self.engine()
+        self.engine
             .lock()
             .map(|e| e.device_link_initiator_active())
             .unwrap_or(false)
     }
 
     fn cancel_device_link_session_for_test(&self) {
-        if let Ok(mut e) = self.engine().lock() {
+        if let Ok(mut e) = self.engine.lock() {
             e.cancel_device_link_session();
         }
     }
@@ -204,23 +203,14 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
     fn navigate_to_json_for_test(&self, screen_json: String) -> Result<String, MobileError> {
         use crate::json_helpers::{app_screen_from_json, screen_envelope_to_json};
         let screen = app_screen_from_json(&screen_json)?;
-        let pre_screen = self
-            .engine()
-            .lock()
-            .map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?
-            .current_app_screen()
-            .clone();
         let (model, pending_commands) = {
-            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
             })?;
             let model = engine.navigate_to(screen);
             let cmds = engine.drain_pending_commands();
             (model, cmds)
         };
-        self.after_screen_transition(pre_screen)?;
         screen_envelope_to_json(&model, &pending_commands)
     }
 
@@ -230,7 +220,7 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         shared_secret: &vauchi_core::crypto::SymmetricKey,
         their_dh_public: [u8; 32],
     ) -> Result<(), MobileError> {
-        let engine = self.engine().lock().map_err(|e| MobileError::Other {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("engine lock poisoned: {e}"),
         })?;
         engine
@@ -242,7 +232,7 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
     }
 
     fn test_pending_update_count(&self, contact_id: String) -> Result<usize, MobileError> {
-        let engine = self.engine().lock().map_err(|e| MobileError::Other {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("engine lock poisoned: {e}"),
         })?;
         let pending = engine
@@ -261,7 +251,7 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         contact_id: String,
         field_id: String,
     ) -> Result<bool, MobileError> {
-        let engine = self.engine().lock().map_err(|e| MobileError::Other {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("engine lock poisoned: {e}"),
         })?;
         engine

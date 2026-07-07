@@ -94,12 +94,12 @@ pub(crate) type DirectListenerSlot = Arc<Mutex<Option<Arc<Box<dyn PlatformEventL
 /// ```
 #[derive(uniffi::Object)]
 pub struct PlatformAppEngine {
-    /// Wrapped in `Arc<Mutex<…>>` rather than plain `Mutex<…>` so the
-    /// Pair 4 multi-stage bridge listener (running on the session's
-    /// cycle thread) can hold a clone and mutate the active engine
-    /// without requiring `Arc<Self>` plumbing through every entry point.
-    // TODO(PFC): Arc<Mutex<AppEngine>> global mutable singleton — see 2026-07-06-core-pfc-violations C10
-    pub(crate) engine: Arc<Mutex<AppEngine>>,
+    /// Held in `Mutex` because every UniFFI-exported method takes `&self`
+    /// but many mutate engine state (navigation, screen invalidation,
+    /// session lifecycle). The `Mutex` serializes these mutations on the
+    /// frontend thread. There is no background thread access — the
+    /// cycle-thread bridge was retired in Slice 32m.
+    pub(crate) engine: Mutex<AppEngine>,
     /// Active event listener handler ID, used to unregister on replacement.
     event_handler_id: Mutex<Option<HandlerId>>,
     /// Direct handle to the active `PlatformEventListener`. The
@@ -165,7 +165,7 @@ impl PlatformAppEngine {
         })?;
 
         Ok(Arc::new(Self {
-            engine: Arc::new(Mutex::new(AppEngine::new(vauchi))),
+            engine: Mutex::new(AppEngine::new(vauchi)),
             event_handler_id: Mutex::new(None),
             direct_listener: Arc::new(Mutex::new(None)),
             storage_path,
@@ -361,7 +361,6 @@ impl PlatformAppEngine {
             let cmds = engine.drain_pending_commands();
             (result, cmds)
         };
-        self.after_screen_transition(pre_screen)?;
         action_result_envelope_to_json(&result, &pending_commands)
     }
 
@@ -561,14 +560,6 @@ impl PlatformAppEngine {
     /// `commands` carries any screen-presentation `Command`s emitted by
     /// the lifecycle hooks of the outgoing + incoming engines (Phase 2b).
     pub fn navigate_back_json(&self) -> Result<String, MobileError> {
-        let pre_screen = self
-            .engine
-            .lock()
-            .map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?
-            .current_app_screen()
-            .clone();
         let (model, pending_commands) = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
@@ -577,7 +568,6 @@ impl PlatformAppEngine {
             let cmds = engine.drain_pending_commands();
             (model, cmds)
         };
-        self.after_screen_transition(pre_screen)?;
         screen_envelope_to_json(&model, &pending_commands)
     }
 

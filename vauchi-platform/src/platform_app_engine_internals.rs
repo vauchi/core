@@ -9,7 +9,6 @@
 //! `platform_app_engine.rs`.
 
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 
 use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::Vauchi;
@@ -212,34 +211,18 @@ impl PlatformAppEngine {
         }
     }
 
-    /// Detect transitions in/out of session-bound screens
-    /// (`MultiStageExchange`, `DeviceLinking`) and manage the
-    /// corresponding session lifecycle. Called after every operation
-    /// that mutates the active screen.
-    pub(crate) fn after_screen_transition(&self, pre: AppScreen) -> Result<(), MobileError> {
-        let post = self
-            .engine
+    /// Fire `on_screens_invalidated` on the direct listener, if any.
+    /// Used by paths whose state change produces no `ActionResult` for
+    /// the frontend to render (machine-held protocol advances).
+    pub(crate) fn fire_screens_invalidated(&self, screen_ids: Vec<String>) {
+        let listener = self
+            .direct_listener
             .lock()
-            .map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?
-            .current_app_screen()
-            .clone();
-        // T1.2c: the AppEngine-owned machine handles its own
-        // lifecycle via `sync_multi_stage_lifecycle` (called from
-        // `navigate_to_internal`). The cycle-thread bridge is dead;
-        // this method becomes a no-op for multi-stage. The
-        // platform-side `ensure_multi_stage_session` /
-        // `cancel_multi_stage_session` remain on `self` for the test
-        // helpers (T3.1 deletes them).
-        let _ = (pre, post);
-        Ok(())
-    }
-
-    /// Internal accessor: `engine` Mutex. Used by the Pair 5
-    /// device-link wiring in `platform_app_engine_device_link.rs`.
-    pub(crate) fn engine(&self) -> &Arc<Mutex<AppEngine>> {
-        &self.engine
+            .ok()
+            .and_then(|guard| guard.clone());
+        if let Some(listener) = listener {
+            listener.on_screens_invalidated(screen_ids);
+        }
     }
 }
 
@@ -314,21 +297,5 @@ impl PlatformAppEngine {
                 Err(_) => crate::content::MobileApplyResult::Error,
             }
         })
-    }
-}
-
-impl PlatformAppEngine {
-    /// Fire `on_screens_invalidated` on the direct listener, if any.
-    /// Used by paths whose state change produces no `ActionResult` for
-    /// the frontend to render (machine-held protocol advances).
-    pub(crate) fn fire_screens_invalidated(&self, screen_ids: Vec<String>) {
-        let listener = self
-            .direct_listener
-            .lock()
-            .ok()
-            .and_then(|guard| guard.clone());
-        if let Some(listener) = listener {
-            listener.on_screens_invalidated(screen_ids);
-        }
     }
 }

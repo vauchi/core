@@ -157,6 +157,7 @@ fn test_relay_multiple_in_flight() {
 fn test_sync_manager_queue_for_relay() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let mut old_card = ContactCard::new("Alice");
     old_card
@@ -179,10 +180,10 @@ fn test_sync_manager_queue_for_relay() {
         .unwrap();
 
     let update1 = sync_manager
-        .queue_card_update("contact-1", &old_card, &new_card)
+        .queue_card_update(&rng, "contact-1", &old_card, &new_card)
         .unwrap();
     let update2 = sync_manager
-        .queue_card_update("contact-2", &old_card, &new_card)
+        .queue_card_update(&rng, "contact-2", &old_card, &new_card)
         .unwrap();
 
     assert!(!update1.is_empty());
@@ -201,12 +202,13 @@ fn test_sync_manager_queue_for_relay() {
 fn test_sync_manager_mark_delivered() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let old_card = ContactCard::new("Test");
     let new_card = ContactCard::new("Test Updated");
 
     let update_id = sync_manager
-        .queue_card_update("contact-1", &old_card, &new_card)
+        .queue_card_update(&rng, "contact-1", &old_card, &new_card)
         .unwrap();
 
     let pending = sync_manager.get_pending("contact-1").unwrap();
@@ -227,6 +229,7 @@ fn test_sync_manager_mark_delivered() {
 fn test_sync_state_pending_count() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let card1 = ContactCard::new("V1");
     let card2 = ContactCard::new("V2");
@@ -234,10 +237,10 @@ fn test_sync_state_pending_count() {
 
     // Queue 3 updates for same contact
     sync_manager
-        .queue_card_update("contact-1", &card1, &card2)
+        .queue_card_update(&rng, "contact-1", &card1, &card2)
         .unwrap();
     sync_manager
-        .queue_card_update("contact-1", &card2, &card3)
+        .queue_card_update(&rng, "contact-1", &card2, &card3)
         .unwrap();
 
     let state = sync_manager.get_sync_state("contact-1").unwrap();

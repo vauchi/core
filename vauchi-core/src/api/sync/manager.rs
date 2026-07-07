@@ -10,9 +10,9 @@
 use std::collections::HashMap;
 
 use thiserror::Error;
-use uuid::Uuid;
 
 use crate::contact_card::ContactCard;
+use crate::rng::{SecureRng, SecureRngExt};
 use crate::storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 use crate::sync::SyncState;
 use crate::sync::delta::CardDelta;
@@ -95,6 +95,7 @@ impl<'a> SyncManager<'a> {
     /// coalesced into a single update.
     pub fn queue_card_update(
         &mut self,
+        rng: &dyn SecureRng,
         contact_id: &str,
         old_card: &ContactCard,
         new_card: &ContactCard,
@@ -120,7 +121,7 @@ impl<'a> SyncManager<'a> {
 
         let now = self.storage.clock().unix_seconds();
 
-        let update_id = Uuid::new_v4().to_string(); // TODO(PFC): ambient UUID despite self.rng — see 2026-07-06-core-pfc-violations C5
+        let update_id = rng.uuid_v4();
 
         let update = PendingUpdate {
             id: update_id.clone(),
@@ -141,6 +142,7 @@ impl<'a> SyncManager<'a> {
     /// Queues a visibility change update for a contact.
     pub fn queue_visibility_change(
         &self,
+        rng: &dyn SecureRng,
         contact_id: &str,
         visible_fields: Vec<String>,
     ) -> Result<String, SyncError> {
@@ -149,7 +151,7 @@ impl<'a> SyncManager<'a> {
 
         let now = self.storage.clock().unix_seconds();
 
-        let update_id = Uuid::new_v4().to_string(); // TODO(PFC): ambient UUID despite self.rng — see 2026-07-06-core-pfc-violations C5
+        let update_id = rng.uuid_v4();
 
         let update = PendingUpdate {
             id: update_id.clone(),
@@ -298,7 +300,11 @@ impl<'a> SyncManager<'a> {
     ///
     /// This reduces network traffic by combining multiple small updates
     /// into one larger update before transmission.
-    pub fn coalesce_updates(&self, contact_id: &str) -> Result<Option<String>, SyncError> {
+    pub fn coalesce_updates(
+        &self,
+        rng: &dyn SecureRng,
+        contact_id: &str,
+    ) -> Result<Option<String>, SyncError> {
         let pending = self.storage.pending().get_pending_updates(contact_id)?;
 
         let card_updates: Vec<_> = pending
@@ -341,7 +347,7 @@ impl<'a> SyncManager<'a> {
         let payload = serde_json::to_vec(&merged_delta)
             .map_err(|e| SyncError::Serialization(e.to_string()))?;
 
-        let merged_id = Uuid::new_v4().to_string();
+        let merged_id = rng.uuid_v4();
         let merged_update = PendingUpdate {
             id: merged_id.clone(),
             contact_id: contact_id.to_string(),

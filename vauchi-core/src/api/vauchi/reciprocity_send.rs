@@ -17,6 +17,8 @@
 //!
 //! [`ReciprocityConfirmPayload`]: crate::sync::delta::ReciprocityConfirmPayload
 
+use crate::rng::SecureRngExt;
+
 use super::super::error::{VauchiError, VauchiResult};
 use super::Vauchi;
 
@@ -84,8 +86,7 @@ impl Vauchi {
                 .save_ratchet_state(&contact_id, &ratchet, is_initiator)?;
 
             let update = PendingUpdate {
-                // TODO(PFC): ambient UUID despite self.rng — see 2026-07-06-core-pfc-violations C5
-                id: uuid::Uuid::new_v4().to_string(),
+                id: self.rng.uuid_v4(),
                 contact_id: contact_id.clone(),
                 // Indistinguishable from a card update on the wire (ADR-032),
                 // like the safety-alert send path.

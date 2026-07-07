@@ -12,6 +12,7 @@ use crate::ImportSource;
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::contact_card::vcard_import::import_vcf;
+use crate::rng::SecureRngExt;
 
 use super::super::error::{VauchiError, VauchiResult};
 use super::Vauchi;
@@ -127,7 +128,7 @@ impl Vauchi {
                 continue;
             }
 
-            let id = uuid::Uuid::new_v4().to_string();
+            let id = self.rng.uuid_v4();
             let contact = Contact::from_import(id, card, ImportSource::VcardFile, uid, 0);
             match self.storage.contacts().save_contact(&contact) {
                 Ok(_) => {
@@ -180,7 +181,7 @@ impl Vauchi {
             )));
         }
         let now = self.clock.unix_seconds();
-        let id = uuid::Uuid::new_v4().to_string();
+        let id = self.rng.uuid_v4();
         let contact = Contact::from_import(id, card, ImportSource::LinkExchange, Some(uid), now);
         self.storage.contacts().save_contact(&contact)?;
         Ok(contact.id().to_string())

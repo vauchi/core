@@ -40,6 +40,7 @@ fn first_field_id(card: &ContactCard) -> String {
 fn test_rapid_edits_coalesce_into_single_sync_payload() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let contact_id = "test-contact-001";
     let mut current_card = base_card();
@@ -52,7 +53,7 @@ fn test_rapid_edits_coalesce_into_single_sync_payload() {
             .update_field_value(&field_id, &format!("updated{}@example.com", i), 0)
             .unwrap();
 
-        let _ = sync_manager.queue_card_update(contact_id, &current_card, &new_card);
+        let _ = sync_manager.queue_card_update(&rng, contact_id, &current_card, &new_card);
         current_card = new_card;
     }
 
@@ -62,7 +63,7 @@ fn test_rapid_edits_coalesce_into_single_sync_payload() {
         "Should have multiple pending updates before coalescing"
     );
 
-    let result = sync_manager.coalesce_updates(contact_id).unwrap();
+    let result = sync_manager.coalesce_updates(&rng, contact_id).unwrap();
     assert!(
         result.is_some(),
         "Coalescing should produce a merged update"
@@ -85,6 +86,7 @@ fn test_rapid_edits_coalesce_into_single_sync_payload() {
 fn test_coalesce_preserves_final_state() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let contact_id = "test-contact-002";
     let original_card = base_card();
@@ -96,7 +98,7 @@ fn test_coalesce_preserves_final_state() {
         .update_field_value(&field_id, "v1@example.com", 0)
         .unwrap();
     sync_manager
-        .queue_card_update(contact_id, &original_card, &card_v1)
+        .queue_card_update(&rng, contact_id, &original_card, &card_v1)
         .unwrap();
 
     // Edit 2: change email again
@@ -105,10 +107,10 @@ fn test_coalesce_preserves_final_state() {
         .update_field_value(&field_id, "final@example.com", 0)
         .unwrap();
     sync_manager
-        .queue_card_update(contact_id, &card_v1, &card_v2)
+        .queue_card_update(&rng, contact_id, &card_v1, &card_v2)
         .unwrap();
 
-    let result = sync_manager.coalesce_updates(contact_id).unwrap();
+    let result = sync_manager.coalesce_updates(&rng, contact_id).unwrap();
     result.expect("expected Some");
 
     let pending = sync_manager.get_pending(contact_id).unwrap();
@@ -130,6 +132,7 @@ fn test_coalesce_preserves_final_state() {
 fn test_coalesce_skips_when_single_update() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let contact_id = "test-contact-003";
     let original_card = base_card();
@@ -141,10 +144,10 @@ fn test_coalesce_skips_when_single_update() {
         .unwrap();
 
     sync_manager
-        .queue_card_update(contact_id, &original_card, &new_card)
+        .queue_card_update(&rng, contact_id, &original_card, &new_card)
         .unwrap();
 
-    let result = sync_manager.coalesce_updates(contact_id).unwrap();
+    let result = sync_manager.coalesce_updates(&rng, contact_id).unwrap();
     assert!(result.is_none(), "Single update should not need coalescing");
 }
 
@@ -181,6 +184,7 @@ fn test_batch_encryption_50_contacts() {
 fn test_batch_sync_multiple_contacts_pending() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let original_card = base_card();
     let field_id = first_field_id(&original_card);
@@ -194,7 +198,7 @@ fn test_batch_sync_multiple_contacts_pending() {
     for i in 0..20 {
         let contact_id = format!("contact-{:03}", i);
         sync_manager
-            .queue_card_update(&contact_id, &original_card, &new_card)
+            .queue_card_update(&rng, &contact_id, &original_card, &new_card)
             .unwrap();
     }
 
@@ -211,6 +215,7 @@ fn test_batch_sync_multiple_contacts_pending() {
 fn test_coalesce_does_not_affect_other_update_types() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let contact_id = "test-contact-004";
     let original_card = base_card();
@@ -222,7 +227,7 @@ fn test_coalesce_does_not_affect_other_update_types() {
         .update_field_value(&field_id, "v1@example.com", 0)
         .unwrap();
     sync_manager
-        .queue_card_update(contact_id, &original_card, &card_v1)
+        .queue_card_update(&rng, contact_id, &original_card, &card_v1)
         .unwrap();
 
     let mut card_v2 = card_v1.clone();
@@ -230,12 +235,12 @@ fn test_coalesce_does_not_affect_other_update_types() {
         .update_field_value(&field_id, "v2@example.com", 0)
         .unwrap();
     sync_manager
-        .queue_card_update(contact_id, &card_v1, &card_v2)
+        .queue_card_update(&rng, contact_id, &card_v1, &card_v2)
         .unwrap();
 
     // Queue a visibility change (different type)
     sync_manager
-        .queue_visibility_change(contact_id, vec!["email".to_string()])
+        .queue_visibility_change(&rng, contact_id, vec!["email".to_string()])
         .unwrap();
 
     let before = sync_manager.get_pending(contact_id).unwrap();
@@ -245,7 +250,7 @@ fn test_coalesce_does_not_affect_other_update_types() {
         .count();
     assert_eq!(visibility_before, 1);
 
-    sync_manager.coalesce_updates(contact_id).unwrap();
+    sync_manager.coalesce_updates(&rng, contact_id).unwrap();
 
     let after = sync_manager.get_pending(contact_id).unwrap();
     let visibility_after = after

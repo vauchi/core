@@ -641,8 +641,7 @@ impl Vauchi {
         let now = self.clock.unix_seconds();
 
         let update = PendingUpdate {
-            // TODO(PFC): ambient UUID despite self.rng — see 2026-07-06-core-pfc-violations C5
-            id: uuid::Uuid::new_v4().to_string(),
+            id: self.rng.uuid_v4(),
             contact_id: contact_id.to_string(),
             update_type: "card_delta".to_string(),
             payload: encrypted,

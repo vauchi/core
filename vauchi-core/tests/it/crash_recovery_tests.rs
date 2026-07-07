@@ -210,7 +210,7 @@ fn test_batch_checkpoint_save_and_load() {
 
     storage
         .sync()
-        .save_batch_checkpoint(batch_id, 50, 25, "{\"state\":\"mid\"}")
+        .save_batch_checkpoint(batch_id, batch_id, 50, 25, "{\"state\":\"mid\"}")
         .unwrap();
 
     let loaded = storage.sync().load_batch_checkpoint(batch_id).unwrap();
@@ -230,7 +230,7 @@ fn test_batch_checkpoint_update_progress() {
 
     storage
         .sync()
-        .save_batch_checkpoint(batch_id, 100, 10, "{\"step\":1}")
+        .save_batch_checkpoint(batch_id, batch_id, 100, 10, "{\"step\":1}")
         .unwrap();
 
     storage
@@ -256,7 +256,7 @@ fn test_batch_checkpoint_clear() {
 
     storage
         .sync()
-        .save_batch_checkpoint(batch_id, 50, 50, "{\"done\":true}")
+        .save_batch_checkpoint(batch_id, batch_id, 50, 50, "{\"done\":true}")
         .unwrap();
 
     storage.sync().clear_batch_checkpoint(batch_id).unwrap();
@@ -275,7 +275,7 @@ fn test_batch_checkpoint_crash_resume_scenario() {
     // Step 1: Start batch, checkpoint at 25
     storage
         .sync()
-        .save_batch_checkpoint(batch_id, items.len(), 25, "{\"last_item\":24}")
+        .save_batch_checkpoint(batch_id, batch_id, items.len(), 25, "{\"last_item\":24}")
         .unwrap();
 
     // Step 2: Simulate crash (nothing else happens)
@@ -318,11 +318,11 @@ fn test_batch_checkpoint_no_orphans() {
 
     storage
         .sync()
-        .save_batch_checkpoint("b1", 50, 25, "{}")
+        .save_batch_checkpoint("b1", "b1", 50, 25, "{}")
         .unwrap();
     storage
         .sync()
-        .save_batch_checkpoint("b2", 100, 50, "{}")
+        .save_batch_checkpoint("b2", "b2", 100, 50, "{}")
         .unwrap();
 
     storage.sync().clear_batch_checkpoint("b1").unwrap();

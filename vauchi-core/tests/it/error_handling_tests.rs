@@ -24,6 +24,7 @@ use vauchi_core::{
 fn test_sync_state_pending_on_undelivered() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let mut old_card = ContactCard::new("Test");
     old_card
@@ -47,7 +48,7 @@ fn test_sync_state_pending_on_undelivered() {
 
     // Queue update but don't mark as delivered
     let _update_id = sync_manager
-        .queue_card_update("contact-1", &old_card, &new_card)
+        .queue_card_update(&rng, "contact-1", &old_card, &new_card)
         .unwrap();
 
     let state = sync_manager.get_sync_state("contact-1").unwrap();
@@ -104,16 +105,17 @@ fn test_relay_disconnect_clears_state() {
 fn test_multiple_pending_updates_queued() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let card1 = ContactCard::new("Version 1");
     let card2 = ContactCard::new("Version 2");
     let card3 = ContactCard::new("Version 3");
 
     sync_manager
-        .queue_card_update("contact-1", &card1, &card2)
+        .queue_card_update(&rng, "contact-1", &card1, &card2)
         .unwrap();
     sync_manager
-        .queue_card_update("contact-1", &card2, &card3)
+        .queue_card_update(&rng, "contact-1", &card2, &card3)
         .unwrap();
 
     let pending = sync_manager.get_pending("contact-1").unwrap();

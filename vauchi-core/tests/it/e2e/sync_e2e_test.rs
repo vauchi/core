@@ -137,6 +137,7 @@ fn test_sync_update_propagation_happy_path() {
 fn test_sync_manager_queue_happy_path() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let mut old_card = ContactCard::new("Alice");
     old_card
@@ -161,7 +162,7 @@ fn test_sync_manager_queue_happy_path() {
     // Queue update for offline contact
     let contact_id = "bob-123";
     let update_id = sync_manager
-        .queue_card_update(contact_id, &old_card, &new_card)
+        .queue_card_update(&rng, contact_id, &old_card, &new_card)
         .unwrap();
     assert!(!update_id.as_str().is_empty());
 

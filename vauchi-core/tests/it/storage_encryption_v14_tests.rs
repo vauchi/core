@@ -567,7 +567,7 @@ fn test_sync_checkpoint_encrypted_roundtrip() {
 
     storage
         .sync()
-        .save_batch_checkpoint("batch-1", 10, 5, r#"{"step":"half"}"#)
+        .save_batch_checkpoint("batch-1", "batch-1", 10, 5, r#"{"step":"half"}"#)
         .unwrap();
 
     let loaded = storage
@@ -587,7 +587,7 @@ fn test_sync_checkpoint_stored_encrypted() {
 
     storage
         .sync()
-        .save_batch_checkpoint("batch-1", 10, 5, r#"{"step":"half"}"#)
+        .save_batch_checkpoint("batch-1", "batch-1", 10, 5, r#"{"step":"half"}"#)
         .unwrap();
 
     let db_path = dir.path().join("vauchi.db");

@@ -20,6 +20,7 @@ fn create_test_storage() -> Storage {
 fn test_sync_queue_card_update() {
     let storage = create_test_storage();
     let mut manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -38,7 +39,7 @@ fn test_sync_queue_card_update() {
     ));
 
     let update_id = manager
-        .queue_card_update("contact-1", &old_card, &new_card)
+        .queue_card_update(&rng, "contact-1", &old_card, &new_card)
         .unwrap();
     assert!(!update_id.is_empty());
 
@@ -52,10 +53,11 @@ fn test_sync_queue_card_update() {
 fn test_sync_no_changes() {
     let storage = create_test_storage();
     let mut manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let card = ContactCard::new("Alice");
 
-    let result = manager.queue_card_update("contact-1", &card, &card);
+    let result = manager.queue_card_update(&rng, "contact-1", &card, &card);
     assert!(matches!(result, Err(SyncError::NoChanges)));
 }
 
@@ -64,9 +66,14 @@ fn test_sync_no_changes() {
 fn test_sync_queue_visibility_change() {
     let storage = create_test_storage();
     let manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let update_id = manager
-        .queue_visibility_change("contact-1", vec!["email".to_string(), "phone".to_string()])
+        .queue_visibility_change(
+            &rng,
+            "contact-1",
+            vec!["email".to_string(), "phone".to_string()],
+        )
         .unwrap();
 
     assert!(!update_id.is_empty());
@@ -81,6 +88,7 @@ fn test_sync_queue_visibility_change() {
 fn test_sync_mark_delivered() {
     let storage = create_test_storage();
     let mut manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -99,7 +107,7 @@ fn test_sync_mark_delivered() {
     ));
 
     let update_id = manager
-        .queue_card_update("contact-1", &old_card, &new_card)
+        .queue_card_update(&rng, "contact-1", &old_card, &new_card)
         .unwrap();
 
     assert_eq!(manager.get_pending("contact-1").unwrap().len(), 1);
@@ -114,6 +122,7 @@ fn test_sync_mark_delivered() {
 fn test_sync_mark_failed_with_backoff() {
     let storage = create_test_storage();
     let mut manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -132,7 +141,7 @@ fn test_sync_mark_failed_with_backoff() {
     ));
 
     let update_id = manager
-        .queue_card_update("contact-1", &old_card, &new_card)
+        .queue_card_update(&rng, "contact-1", &old_card, &new_card)
         .unwrap();
 
     manager
@@ -148,6 +157,7 @@ fn test_sync_mark_failed_with_backoff() {
 fn test_sync_state_pending() {
     let storage = create_test_storage();
     let mut manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -166,7 +176,7 @@ fn test_sync_state_pending() {
     ));
 
     manager
-        .queue_card_update("contact-1", &old_card, &new_card)
+        .queue_card_update(&rng, "contact-1", &old_card, &new_card)
         .unwrap();
 
     let state = manager.get_sync_state("contact-1").unwrap();
@@ -194,6 +204,7 @@ fn test_sync_state_synced() {
 fn test_sync_state_failed() {
     let storage = create_test_storage();
     let mut manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -212,7 +223,7 @@ fn test_sync_state_failed() {
     ));
 
     let update_id = manager
-        .queue_card_update("contact-1", &old_card, &new_card)
+        .queue_card_update(&rng, "contact-1", &old_card, &new_card)
         .unwrap();
     manager.mark_failed(&update_id, "Network error", 0).unwrap();
 
@@ -225,6 +236,7 @@ fn test_sync_state_failed() {
 fn test_sync_coalesce_updates() {
     let storage = create_test_storage();
     let mut manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let card1 = ContactCard::new("Alice");
     let mut card2 = ContactCard::new("Alice");
@@ -249,15 +261,15 @@ fn test_sync_coalesce_updates() {
     ));
 
     manager
-        .queue_card_update("contact-1", &card1, &card2)
+        .queue_card_update(&rng, "contact-1", &card1, &card2)
         .unwrap();
     manager
-        .queue_card_update("contact-1", &card2, &card3)
+        .queue_card_update(&rng, "contact-1", &card2, &card3)
         .unwrap();
 
     assert_eq!(manager.get_pending("contact-1").unwrap().len(), 2);
 
-    let merged_id = manager.coalesce_updates("contact-1").unwrap();
+    let merged_id = manager.coalesce_updates(&rng, "contact-1").unwrap();
     merged_id.expect("expected Some");
 
     assert_eq!(manager.get_pending("contact-1").unwrap().len(), 1);
@@ -268,6 +280,7 @@ fn test_sync_coalesce_updates() {
 fn test_sync_status_multiple_contacts() {
     let storage = create_test_storage();
     let mut manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let card1 = ContactCard::new("Alice");
     let mut card2 = ContactCard::new("Alice");
@@ -279,10 +292,10 @@ fn test_sync_status_multiple_contacts() {
     ));
 
     manager
-        .queue_card_update("contact-1", &card1, &card2)
+        .queue_card_update(&rng, "contact-1", &card1, &card2)
         .unwrap();
     manager
-        .queue_card_update("contact-2", &card1, &card2)
+        .queue_card_update(&rng, "contact-2", &card1, &card2)
         .unwrap();
 
     let status = manager.sync_status().unwrap();
@@ -298,6 +311,7 @@ fn test_sync_status_multiple_contacts() {
 fn test_sync_state_tracks_last_sync_timestamp() {
     let storage = create_test_storage();
     let mut manager = SyncManager::new(&storage);
+    let rng = vauchi_core::rng::OsSecureRng::new();
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -322,7 +336,7 @@ fn test_sync_state_tracks_last_sync_timestamp() {
 
     // Queue and deliver an update
     let update_id = manager
-        .queue_card_update("contact-1", &old_card, &new_card)
+        .queue_card_update(&rng, "contact-1", &old_card, &new_card)
         .unwrap();
     manager.mark_delivered(&update_id).unwrap();
 

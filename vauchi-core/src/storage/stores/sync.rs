@@ -360,8 +360,11 @@ impl SyncStore<'_> {
     ///
     /// Tracks progress of a multi-item sync batch so it can be resumed
     /// after an interruption. Uses the batch_id as the logical grouping key.
+    /// `checkpoint_id` is caller-supplied (production callers generate a UUID;
+    /// tests pass a deterministic value).
     pub fn save_batch_checkpoint(
         &self,
+        checkpoint_id: &str,
         batch_id: &str,
         total_items: usize,
         processed_items: usize,
@@ -371,8 +374,6 @@ impl SyncStore<'_> {
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = self.now_secs();
-
-        let checkpoint_id = uuid::Uuid::new_v4().to_string(); // TODO(PFC): ambient UUID despite self.rng — see 2026-07-06-core-pfc-violations C5
 
         self.conn.execute(
             "INSERT OR REPLACE INTO sync_checkpoints

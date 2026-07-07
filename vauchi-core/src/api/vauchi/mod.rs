@@ -68,7 +68,6 @@ use crate::sleeper::{Sleeper, SystemSleeper};
 use crate::storage::{SecureStorage, Storage};
 
 use super::config::VauchiConfig;
-use super::duress::DuressAlert;
 use super::error::{VauchiError, VauchiResult};
 use super::events::EventDispatcher;
 
@@ -223,13 +222,6 @@ pub struct Vauchi {
     /// monotonic time deterministically. Diagnostic perf-timers are
     /// exempt (see `crate::monotonic` module docs).
     monotonic: Arc<dyn MonotonicClock>,
-    /// In-memory queue of duress alerts waiting to be sent.
-    ///
-    /// Populated when `authenticate()` detects a duress PIN. Alerts are
-    /// drained by the sync system and sent as card updates to trusted
-    /// contacts, indistinguishable from normal sync traffic.
-    duress_alerts: Vec<DuressAlert>,
-
     /// Cached OHTTP key (loaded from Storage on connect).
     #[cfg(feature = "network-http")]
     ohttp_key: Option<crate::network::OhttpClient>,
@@ -387,7 +379,6 @@ impl Vauchi {
             events,
             secure_storage,
             auth_mode: AuthMode::Unauthenticated,
-            duress_alerts: Vec::new(),
             clock,
             rng,
             sleeper,
@@ -588,7 +579,6 @@ impl Vauchi {
             events,
             secure_storage: None,
             auth_mode: AuthMode::Unauthenticated,
-            duress_alerts: Vec::new(),
             clock,
             rng,
             sleeper: SystemSleeper::shared(),

@@ -15,7 +15,9 @@ use crate::common;
 
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::storage::Storage;
-use vauchi_core::{AppPasswordConfig, AuthMode, AuthResult, BiometricUnlockOutcome, VauchiError};
+use vauchi_core::{
+    AppPasswordConfig, AuthMode, AuthResult, BiometricUnlockOutcome, Contact, VauchiError,
+};
 
 use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange};
 
@@ -1032,9 +1034,32 @@ fn test_queue_duress_alert_on_duress_authenticate() {
     wb.setup_duress_password("duress-999")
         .expect("setup duress should succeed");
 
+    // Create a trusted contact with a ratchet so the alert can be queued.
+    let trusted_contact = Contact::from_exchange(
+        *wb.identity().unwrap().signing_public_key(),
+        ContactCard::new("Trusted Friend"),
+        vauchi_core::crypto::SymmetricKey::generate(),
+        0,
+    );
+    let trusted_id = trusted_contact.id().to_string();
+    wb.add_contact(trusted_contact).unwrap();
+    let (ratchet, is_initiator) = {
+        let dh = vauchi_core::exchange::X3DHKeyPair::generate();
+        let r = vauchi_core::crypto::ratchet::DoubleRatchetState::initialize_initiator(
+            &vauchi_core::crypto::SymmetricKey::generate(),
+            *dh.public_key(),
+        )
+        .unwrap();
+        (r, true)
+    };
+    wb.storage()
+        .ratchets()
+        .save_ratchet_state(&trusted_id, &ratchet, is_initiator)
+        .unwrap();
+
     // Configure duress settings with trusted contacts
     let settings = vauchi_core::types::DuressSettings {
-        alert_contact_ids: vec!["trusted-contact-1".to_string()],
+        alert_contact_ids: vec![trusted_id.clone()],
         alert_message: "I'm in danger".to_string(),
         include_location: false,
     };
@@ -1045,11 +1070,19 @@ fn test_queue_duress_alert_on_duress_authenticate() {
     let mode = wb.authenticate("duress-999").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
-    let alerts = wb.pending_duress_alerts();
+    // Verify the alert was queued as a storage-backed PendingUpdate
+    // (indistinguishable from a card delta on the wire, per ADR-032).
+    let pending = wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .expect("load pending");
     assert!(
-        !alerts.is_empty(),
-        "duress authentication should queue at least one alert"
+        !pending.is_empty(),
+        "duress authentication should queue at least one pending update"
     );
+    assert_eq!(pending[0].update_type, "card_delta");
+    assert_eq!(pending[0].contact_id, trusted_id);
 }
 
 // @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
@@ -1068,10 +1101,15 @@ fn test_queue_duress_alert_without_settings_is_noop() {
     let mode = wb.authenticate("duress-999").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
-    let alerts = wb.pending_duress_alerts();
+    // Verify no pending updates were queued (no settings = no recipients).
+    let pending = wb
+        .storage()
+        .pending()
+        .count_all_pending_updates()
+        .expect("count pending");
     assert!(
-        alerts.is_empty(),
-        "duress authentication without settings should not queue alerts"
+        pending == 0,
+        "duress authentication without settings should not queue pending updates"
     );
 }
 
@@ -1085,35 +1123,58 @@ fn test_duress_alert_contains_timestamp_and_device_id() {
     wb.setup_duress_password("duress-999")
         .expect("setup duress should succeed");
 
+    // Create a trusted contact with a ratchet so the alert can be queued.
+    let trusted_contact = Contact::from_exchange(
+        *wb.identity().unwrap().signing_public_key(),
+        ContactCard::new("Trusted Friend"),
+        vauchi_core::crypto::SymmetricKey::generate(),
+        0,
+    );
+    let trusted_id = trusted_contact.id().to_string();
+    wb.add_contact(trusted_contact).unwrap();
+    let (ratchet, is_initiator) = {
+        let dh = vauchi_core::exchange::X3DHKeyPair::generate();
+        let r = vauchi_core::crypto::ratchet::DoubleRatchetState::initialize_initiator(
+            &vauchi_core::crypto::SymmetricKey::generate(),
+            *dh.public_key(),
+        )
+        .unwrap();
+        (r, true)
+    };
+    wb.storage()
+        .ratchets()
+        .save_ratchet_state(&trusted_id, &ratchet, is_initiator)
+        .unwrap();
+
     let settings = vauchi_core::types::DuressSettings {
-        alert_contact_ids: vec!["trusted-1".to_string()],
+        alert_contact_ids: vec![trusted_id.clone()],
         alert_message: "Help".to_string(),
         include_location: false,
     };
     wb.save_duress_settings(&settings)
         .expect("save settings should succeed");
 
-    wb.authenticate("duress-999").expect("auth should succeed");
+    let before = wb.clock().unix_seconds();
+    let mode = wb.authenticate("duress-999").expect("auth should succeed");
+    assert_eq!(mode, AuthMode::Duress);
 
-    let alerts = wb.pending_duress_alerts();
-    assert!(!alerts.is_empty());
+    // Verify the alert was queued as a storage-backed PendingUpdate.
+    let pending = wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .expect("load pending");
+    assert!(!pending.is_empty(), "should have queued a duress alert");
 
-    let alert = &alerts[0];
+    let update = &pending[0];
     assert!(
-        alert.timestamp > 0,
-        "alert should have a non-zero timestamp"
+        update.created_at >= before,
+        "pending update should have a timestamp >= auth time"
     );
-    assert!(
-        !alert.device_id.is_empty(),
-        "alert should have a non-empty device_id"
-    );
-    assert!(
-        matches!(
-            alert.alert_type,
-            vauchi_core::api::duress::DuressAlertType::Unlock
-        ),
-        "alert type should be Unlock"
-    );
+    assert_eq!(update.update_type, "card_delta");
+    assert_eq!(update.contact_id, trusted_id);
+    // Payload is encrypted ratchet traffic — verify it is non-empty.
+    assert!(!update.payload.is_empty(), "payload should not be empty");
 }
 
 // =============================================================================
@@ -1138,16 +1199,39 @@ fn test_full_duress_flow_setup_to_alert() {
     wb.add_decoy_contact("decoy-1", "Fake Friend", &decoy_card)
         .expect("add decoy should succeed");
 
-    // 4. Configure duress alert settings
+    // 4. Create a trusted contact with a ratchet so the alert can be queued.
+    let trusted_contact = Contact::from_exchange(
+        *wb.identity().unwrap().signing_public_key(),
+        ContactCard::new("Trusted Friend"),
+        vauchi_core::crypto::SymmetricKey::generate(),
+        0,
+    );
+    let trusted_id = trusted_contact.id().to_string();
+    wb.add_contact(trusted_contact).unwrap();
+    let (ratchet, is_initiator) = {
+        let dh = vauchi_core::exchange::X3DHKeyPair::generate();
+        let r = vauchi_core::crypto::ratchet::DoubleRatchetState::initialize_initiator(
+            &vauchi_core::crypto::SymmetricKey::generate(),
+            *dh.public_key(),
+        )
+        .unwrap();
+        (r, true)
+    };
+    wb.storage()
+        .ratchets()
+        .save_ratchet_state(&trusted_id, &ratchet, is_initiator)
+        .unwrap();
+
+    // 5. Configure duress alert settings
     let settings = vauchi_core::types::DuressSettings {
-        alert_contact_ids: vec!["trusted-contact-1".to_string()],
+        alert_contact_ids: vec![trusted_id.clone()],
         alert_message: "Emergency - duress unlock".to_string(),
         include_location: true,
     };
     wb.save_duress_settings(&settings)
         .expect("save duress settings should succeed");
 
-    // 5. Verify everything is configured
+    // 6. Verify everything is configured
     assert!(wb.is_password_enabled().expect("check should succeed"));
     assert!(wb.is_duress_enabled().expect("check should succeed"));
     let loaded_settings = wb
@@ -1156,16 +1240,21 @@ fn test_full_duress_flow_setup_to_alert() {
         .expect("should have settings");
     assert_eq!(loaded_settings.alert_contact_ids.len(), 1);
 
-    // 6. Authenticate with duress PIN — triggers full flow
+    // 7. Authenticate with duress PIN — triggers full flow
     let mode = wb.authenticate("duress-999").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
-    // 7. Verify duress mode shows decoy contacts
+    // 8a. Verify duress mode shows decoy contacts
     let contacts = wb.list_contacts().expect("list should succeed");
     assert_eq!(contacts.len(), 1, "should show decoy contacts only");
     assert_eq!(contacts[0].display_name(), "Fake Friend");
-
-    // 8. Verify alert was queued
-    let alerts = wb.pending_duress_alerts();
-    assert!(!alerts.is_empty(), "should have queued a duress alert");
+    // 8b. Verify alert was queued as a storage-backed PendingUpdate.
+    let pending = wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .expect("load pending");
+    assert!(!pending.is_empty(), "should have queued a duress alert");
+    assert_eq!(pending[0].update_type, "card_delta");
+    assert_eq!(pending[0].contact_id, trusted_id);
 }

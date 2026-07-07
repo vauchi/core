@@ -7,7 +7,6 @@
 use std::time::{Duration, Instant};
 
 use super::super::app_password::{AppPasswordConfig, AuthResult};
-use super::super::duress::{DuressAlert, DuressAlertType};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventCallback, VauchiEvent};
 use super::{AuthMode, BiometricUnlockOutcome, Vauchi};
@@ -331,42 +330,20 @@ impl Vauchi {
         Ok(())
     }
 
-    /// Returns a reference to the pending duress alerts queue.
-    ///
-    /// Alerts are queued when `authenticate()` detects a duress PIN.
-    /// The sync system should drain this queue and send alerts as
-    /// card updates to trusted contacts.
-    pub fn pending_duress_alerts(&self) -> &[DuressAlert] {
-        &self.duress_alerts
-    }
-
     /// Queues a duress alert for sending to trusted contacts.
     ///
     /// Called internally by `authenticate()` when the duress PIN is entered.
     /// If no duress settings are configured, this is a no-op.
     ///
-    /// The alert is stored in an in-memory queue. When the sync system
-    /// connects, it drains this queue and sends alerts as card updates
-    /// (indistinguishable from normal sync traffic).
+    /// The alert is queued as a `card_delta` [`PendingUpdate`] in the storage-
+    /// backed pending queue, which the normal `sync()` send phase consumes
+    /// via [`SyncController`] — indistinguishable from normal sync traffic
+    /// (ADR-032). Best-effort: a send/queue failure must NEVER block the duress
+    /// unlock (the user must still reach the decoy UI). There is no observable
+    /// network activity here, so the timing does not betray duress to an observer.
     pub(super) fn queue_duress_alert(&mut self) -> VauchiResult<()> {
         let settings = self.storage.duress().load_duress_settings()?;
         if let Some(settings) = settings {
-            let now = self.clock.unix_seconds();
-            let device_id = self.device_id_string();
-
-            // Local record that a duress unlock occurred.
-            self.duress_alerts.push(DuressAlert {
-                timestamp: now,
-                device_id,
-                alert_type: DuressAlertType::Unlock,
-            });
-
-            // Send the disguised duress alert to the configured recipients.
-            // Best-effort: a send/queue failure must NEVER block the duress
-            // unlock (the user must still reach the decoy UI). There is no
-            // observable network activity here — alerts are queued locally and
-            // delivered on the next sync, indistinguishable from card updates
-            // (ADR-032), so the timing does not betray duress to an observer.
             let recipients = settings.alert_contact_ids.clone();
             let message = settings.alert_message.clone();
             // Result deliberately ignored (best-effort — see above).
@@ -383,8 +360,8 @@ impl Vauchi {
     /// Returns a string identifier for this device.
     ///
     /// Uses the identity's public ID if available, otherwise falls
-    /// back to a placeholder. Used in duress alerts to identify the
-    /// originating device.
+    /// back to a placeholder.
+    #[allow(dead_code)]
     pub(super) fn device_id_string(&self) -> String {
         self.identity
             .as_ref()

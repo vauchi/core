@@ -651,3 +651,11 @@ vauchi-platform/tests/it/platform_app_engine_domain_command_tests.rs 3372
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)
+a
+
+# EXEMPT — Duress PIN test bundle: cohesive TDD tests for password KDF,
+# duress authentication, decoy contacts, and alert delivery. The tests share
+# create_vauchi_with_identity helpers and build on each other; splitting would
+# duplicate setup code. Line count increased by proper contact+ratchet setup
+# for verifying the real storage-backed alert delivery path (dead vector fix).
+vauchi-core/tests/it/duress_pin_tests.rs 1260

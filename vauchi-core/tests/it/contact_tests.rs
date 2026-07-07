@@ -536,6 +536,7 @@ fn test_acquired_at_returns_exchange_time_for_exchanged() {
 fn test_acquired_at_returns_import_time_for_imported() {
     let card = ContactCard::new("Imported User");
     let contact = Contact::from_import(
+        "contact-imported-user".to_string(),
         card,
         vauchi_core::contact::ImportSource::Manual,
         None,

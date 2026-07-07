@@ -91,7 +91,11 @@ fn test_get_consent_status_includes_policy_version_when_granted_with_version() {
     // Use the consent manager directly with a policy version
     let manager = ConsentManager::new(wb.storage());
     manager
-        .grant_with_version(ConsentType::DataProcessing, "v2.1")
+        .grant_with_version(
+            "consent-data-processing".to_string(),
+            ConsentType::DataProcessing,
+            "v2.1",
+        )
         .unwrap();
 
     let status = wb.get_consent_status(ConsentType::DataProcessing).unwrap();

@@ -38,7 +38,13 @@ fn engine_ready() -> AppEngine {
 /// Adds a contact and returns the id the picker will present it under.
 fn add_contact(engine: &AppEngine, name: &str) -> String {
     let before = contact_ids(engine);
-    let contact = Contact::from_import(ContactCard::new(name), ImportSource::VcardFile, None, 0);
+    let contact = Contact::from_import(
+        format!("contact-{name}"),
+        ContactCard::new(name),
+        ImportSource::VcardFile,
+        None,
+        0,
+    );
     engine.vauchi().add_contact(contact).unwrap();
     contact_ids(engine)
         .into_iter()

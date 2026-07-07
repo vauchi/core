@@ -24,7 +24,13 @@ fn exchanged_contact(name: &str) -> Contact {
 }
 
 fn imported_contact(name: &str) -> Contact {
-    Contact::from_import(ContactCard::new(name), ImportSource::Manual, None, 0)
+    Contact::from_import(
+        format!("contact-{name}"),
+        ContactCard::new(name),
+        ImportSource::Manual,
+        None,
+        0,
+    )
 }
 
 // ============================================================

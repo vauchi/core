@@ -35,15 +35,14 @@ pub struct Tag {
 }
 
 impl Tag {
-    /// Creates a new tag with the given name.
+    /// Creates a tag with the given id and name.
     ///
-    /// The ID is a freshly generated UUID v4; `contact_ids` starts empty.
-    /// `now` is the Unix-epoch timestamp stamped into `created_at`;
-    /// production callers pass `storage.clock().unix_seconds()`.
-    pub fn new(name: &str, now: u64) -> Self {
+    /// `id` is caller-supplied (production callers generate a UUID v4;
+    /// tests pass a deterministic value). `contact_ids` starts empty.
+    /// `now` is the Unix-epoch timestamp stamped into `created_at`.
+    pub fn new(id: String, name: &str, now: u64) -> Self {
         Self {
-            // TODO(PFC): ambient UUID in domain constructor — see 2026-07-06-core-pfc-violations C1
-            id: uuid::Uuid::new_v4().to_string(),
+            id,
             name: name.to_string(),
             contact_ids: HashSet::new(),
             created_at: now,

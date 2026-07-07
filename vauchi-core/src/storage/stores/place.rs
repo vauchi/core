@@ -45,7 +45,8 @@ impl PlaceStore<'_> {
         latitude: f64,
         longitude: f64,
     ) -> Result<Place, StorageError> {
-        let place = Place::new(name, latitude, longitude, self.clock.unix_seconds());
+        let id = uuid::Uuid::new_v4().to_string();
+        let place = Place::new(id, name, latitude, longitude, self.clock.unix_seconds());
         self.write_place(&place)?;
         Ok(place)
     }

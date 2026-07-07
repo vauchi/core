@@ -62,11 +62,13 @@ pub struct ExchangeLocation {
 }
 
 impl Place {
-    /// Creates a new named place at the given coordinates.
-    pub fn new(name: &str, latitude: f64, longitude: f64, now: u64) -> Self {
+    /// Creates a named place with the given id and coordinates.
+    ///
+    /// `id` is caller-supplied (production callers generate a UUID v4;
+    /// tests pass a deterministic value).
+    pub fn new(id: String, name: &str, latitude: f64, longitude: f64, now: u64) -> Self {
         Self {
-            // TODO(PFC): ambient UUID in domain constructor — see 2026-07-06-core-pfc-violations C1
-            id: uuid::Uuid::new_v4().to_string(),
+            id,
             name: name.to_string(),
             latitude,
             longitude,

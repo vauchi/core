@@ -24,8 +24,11 @@ fn new_vauchi_with_identity() -> Vauchi {
 }
 
 fn add_imported(vauchi: &Vauchi, name: &str) -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(1);
     let card = ContactCard::new(name);
-    let contact = Contact::from_import(card, ImportSource::VcardFile, None, 0);
+    let contact_id = format!("contact-{}-{name}", COUNTER.fetch_add(1, Ordering::Relaxed));
+    let contact = Contact::from_import(contact_id, card, ImportSource::VcardFile, None, 0);
     let id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
     id

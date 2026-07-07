@@ -45,17 +45,14 @@ pub struct Group {
 }
 
 impl Group {
-    /// Creates a new label with the given name.
+    /// Creates a label with the given id and name.
     ///
-    /// `now` is the Unix-epoch timestamp stamped into both
-    /// `created_at` and `modified_at`. Production callers source
-    /// it from `storage.clock().unix_seconds()` (via
-    /// `Storage::create_group`) or `self.clock.unix_seconds()`
-    /// (via `Vauchi::create_group`); tests pass any fixed value.
-    pub fn new(name: &str, now: u64) -> Self {
+    /// `id` is caller-supplied (production callers generate a UUID v4;
+    /// tests pass a deterministic value). `now` is stamped into both
+    /// `created_at` and `modified_at`.
+    pub fn new(id: String, name: &str, now: u64) -> Self {
         Group {
-            // TODO(PFC): ambient UUID in domain constructor — see 2026-07-06-core-pfc-violations C1
-            id: uuid::Uuid::new_v4().to_string(),
+            id,
             name: name.to_string(),
             contacts: HashSet::new(),
             visible_fields: HashSet::new(),
@@ -325,7 +322,7 @@ mod tests {
 
     #[test]
     fn test_label_display_name_override() {
-        let mut label = Group::new("Family", 0);
+        let mut label = Group::new("group-family".to_string(), "Family", 0);
 
         assert_eq!(label.display_name_override(), None);
 
@@ -342,7 +339,7 @@ mod tests {
 
     #[test]
     fn test_label_display_name_override_validation() {
-        let mut label = Group::new("Friends", 0);
+        let mut label = Group::new("group-friends".to_string(), "Friends", 0);
 
         let result = label.set_display_name_override(Some(""), 0);
         assert!(matches!(result, Err(GroupError::InvalidName(_))));
@@ -368,7 +365,7 @@ mod tests {
 
     #[test]
     fn test_label_resolve_display_name() {
-        let mut label = Group::new("Business", 0);
+        let mut label = Group::new("group-business".to_string(), "Business", 0);
 
         assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
 
@@ -386,7 +383,7 @@ mod tests {
     // @internal
     #[test]
     fn test_label_bio_override() {
-        let mut label = Group::new("Family", 0);
+        let mut label = Group::new("group-family-2".to_string(), "Family", 0);
 
         assert_eq!(label.bio_override(), None);
 
@@ -404,7 +401,7 @@ mod tests {
     // @internal
     #[test]
     fn test_label_bio_override_validation() {
-        let mut label = Group::new("Friends", 0);
+        let mut label = Group::new("group-friends-2".to_string(), "Friends", 0);
 
         // Empty / whitespace clears (mirrors ContactCard::set_bio), not an error.
         label.set_bio_override(Some(""), 0).expect("empty clears");
@@ -433,7 +430,7 @@ mod tests {
     // @internal
     #[test]
     fn test_label_resolve_bio() {
-        let mut label = Group::new("Business", 0);
+        let mut label = Group::new("group-business-2".to_string(), "Business", 0);
 
         assert_eq!(label.resolve_bio(Some("default bio")), Some("default bio"));
         assert_eq!(label.resolve_bio(None), None);
@@ -452,7 +449,7 @@ mod tests {
     // @internal
     #[test]
     fn test_label_avatar_override() {
-        let mut label = Group::new("Family", 0);
+        let mut label = Group::new("group-family-3".to_string(), "Family", 0);
         assert_eq!(label.avatar_override(), None);
 
         let png = encode_test_png();
@@ -473,7 +470,7 @@ mod tests {
     // @internal
     #[test]
     fn test_label_avatar_override_rejects_invalid() {
-        let mut label = Group::new("Friends", 0);
+        let mut label = Group::new("group-friends-3".to_string(), "Friends", 0);
 
         let result = label.set_avatar_override(Some(&[]), 0);
         assert!(matches!(result, Err(GroupError::InvalidAvatar(_))));
@@ -487,7 +484,7 @@ mod tests {
     // @internal
     #[test]
     fn test_label_resolve_avatar() {
-        let mut label = Group::new("Business", 0);
+        let mut label = Group::new("group-business-3".to_string(), "Business", 0);
         let default_avatar = vec![1u8, 2, 3];
 
         assert_eq!(
@@ -510,7 +507,7 @@ mod tests {
     // @internal
     #[test]
     fn test_label_bio_override_caps_by_chars_not_bytes() {
-        let mut label = Group::new("Family", 0);
+        let mut label = Group::new("group-family-4".to_string(), "Family", 0);
         let cap = crate::contact_card::MAX_BIO_LENGTH;
 
         // 'ä' (U+00E4) is NFC-stable and 2 bytes: `cap` of them is within the
@@ -546,7 +543,7 @@ mod tests {
     fn test_labels_are_local() {
         // Labels exist only in GroupManager, not in Contact
         // This test verifies the design doesn't leak labels to contacts
-        let label = Group::new("Secret Name", 0);
+        let label = Group::new("group-secret-name".to_string(), "Secret Name", 0);
 
         // The label name is never serialized in a way that would be sent to contacts
         // Label data should only be synced to the user's own devices

@@ -259,16 +259,17 @@ impl Contact {
 
     /// Creates a contact from imported data (no crypto keys).
     ///
-    /// The ID is a UUID v4 (not derived from a public key, since imported
-    /// contacts have no keys). The display name comes from the contact card.
+    /// `id` is caller-supplied (production callers generate a UUID v4;
+    /// tests pass a deterministic value). Imported contacts have no public
+    /// keys, so the id is not derived from one. The display name comes from
+    /// the contact card.
     pub fn from_import(
+        id: String,
         card: ContactCard,
         source: ImportSource,
         original_uid: Option<String>,
         now: u64,
     ) -> Self {
-        // TODO(PFC): ambient UUID in domain constructor — see 2026-07-06-core-pfc-violations C1
-        let id = uuid::Uuid::new_v4().to_string();
         let display_name = card.display_name().to_string();
         let imported_at = now;
 

@@ -372,7 +372,13 @@ fn test_new_sync_item_timestamps() {
 
 fn create_imported_test_contact() -> Contact {
     let card = ContactCard::new("Imported José");
-    Contact::from_import(card, vauchi_core::contact::ImportSource::VcardFile, None, 0)
+    Contact::from_import(
+        "contact-imported-jose".to_string(),
+        card,
+        vauchi_core::contact::ImportSource::VcardFile,
+        None,
+        0,
+    )
 }
 
 /// DeviceSyncPayload::new() with a mix of exchanged and imported contacts

@@ -40,7 +40,8 @@ impl Storage {
 impl TagStore<'_> {
     /// Creates and persists a new tag with the given name.
     pub fn create_tag(&self, name: &str) -> Result<Tag, StorageError> {
-        let tag = Tag::new(name, self.clock.unix_seconds());
+        let id = uuid::Uuid::new_v4().to_string();
+        let tag = Tag::new(id, name, self.clock.unix_seconds());
         let name_encrypted = crate::crypto::encrypt(self.key, name.as_bytes())
             .map_err(|e| StorageError::Encryption(format!("Encrypt tag name: {e}")))?;
         let contact_ids_json = serde_json::to_string(&Vec::<String>::new())

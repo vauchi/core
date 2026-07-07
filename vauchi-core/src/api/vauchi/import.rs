@@ -127,7 +127,8 @@ impl Vauchi {
                 continue;
             }
 
-            let contact = Contact::from_import(card, ImportSource::VcardFile, uid, 0);
+            let id = uuid::Uuid::new_v4().to_string();
+            let contact = Contact::from_import(id, card, ImportSource::VcardFile, uid, 0);
             match self.storage.contacts().save_contact(&contact) {
                 Ok(_) => {
                     imported += 1;
@@ -179,7 +180,8 @@ impl Vauchi {
             )));
         }
         let now = self.clock.unix_seconds();
-        let contact = Contact::from_import(card, ImportSource::LinkExchange, Some(uid), now);
+        let id = uuid::Uuid::new_v4().to_string();
+        let contact = Contact::from_import(id, card, ImportSource::LinkExchange, Some(uid), now);
         self.storage.contacts().save_contact(&contact)?;
         Ok(contact.id().to_string())
     }

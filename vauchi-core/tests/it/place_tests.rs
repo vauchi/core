@@ -177,7 +177,13 @@ fn place_survives_storage_rekey() {
 #[test]
 fn save_place_preserves_id_for_sync() {
     let storage = open_storage();
-    let original = Place::new("Synced Spot", ANCHOR_LAT, ANCHOR_LON, 42);
+    let original = Place::new(
+        "place-synced-spot".to_string(),
+        "Synced Spot",
+        ANCHOR_LAT,
+        ANCHOR_LON,
+        42,
+    );
 
     storage.places().save_place(&original).unwrap();
     let loaded = storage.places().get_place(&original.id).unwrap().unwrap();
@@ -190,7 +196,13 @@ fn save_place_preserves_id_for_sync() {
 // @internal
 #[test]
 fn is_near_includes_radius_boundary_and_excludes_beyond() {
-    let place = Place::new("The Anchor Bar", ANCHOR_LAT, ANCHOR_LON, 0);
+    let place = Place::new(
+        "place-anchor-bar".to_string(),
+        "The Anchor Bar",
+        ANCHOR_LAT,
+        ANCHOR_LON,
+        0,
+    );
 
     // The place's own coordinates sit at distance 0, which is within any
     // positive radius. This pins the `<=` in `distance_m(..) <= radius_m`:

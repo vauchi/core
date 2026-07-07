@@ -203,7 +203,7 @@ fn test_list_device_sync_states_encrypted() {
 fn test_visibility_label_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
 
-    let label = Group::new("Close Friends", 0);
+    let label = Group::new("group-close-friends".to_string(), "Close Friends", 0);
     storage.labels().save_group(&label).unwrap();
 
     let loaded = storage.labels().load_group(label.id()).unwrap();
@@ -216,7 +216,7 @@ fn test_visibility_label_encrypted_roundtrip() {
 fn test_visibility_label_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
 
-    let label = Group::new("Work Colleagues", 0);
+    let label = Group::new("group-work-colleagues".to_string(), "Work Colleagues", 0);
     storage.labels().save_group(&label).unwrap();
 
     let db_path = dir.path().join("vauchi.db");
@@ -250,8 +250,8 @@ fn test_visibility_label_stored_as_encrypted_blob() {
 fn test_load_all_labels_encrypted() {
     let (_dir, storage) = open_storage();
 
-    let label1 = Group::new("Group A", 0);
-    let label2 = Group::new("Group B", 0);
+    let label1 = Group::new("group-group-a".to_string(), "Group A", 0);
+    let label2 = Group::new("group-group-b".to_string(), "Group B", 0);
 
     storage.labels().save_group(&label1).unwrap();
     storage.labels().save_group(&label2).unwrap();
@@ -428,7 +428,7 @@ fn test_rekey_preserves_device_sync_state() {
 fn test_rekey_preserves_visibility_labels() {
     let (_dir, mut storage) = open_storage();
 
-    let label = Group::new("Rekey Group", 0);
+    let label = Group::new("group-rekey-group".to_string(), "Rekey Group", 0);
     storage.labels().save_group(&label).unwrap();
 
     let new_key = SymmetricKey::generate();

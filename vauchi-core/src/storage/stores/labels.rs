@@ -484,7 +484,8 @@ impl LabelStore<'_> {
             )));
         }
 
-        let label = Group::new(name, self.clock.unix_seconds());
+        let id = uuid::Uuid::new_v4().to_string();
+        let label = Group::new(id, name, self.clock.unix_seconds());
         self.save_group(&label)?;
 
         Ok(label)
@@ -636,7 +637,7 @@ mod tests {
     fn test_save_and_load_label() {
         let storage = test_storage();
 
-        let mut label = Group::new("Family", 0);
+        let mut label = Group::new("group-family".to_string(), "Family", 0);
         label.add_contact("alice-id", 0);
         label.add_contact("bob-id", 0);
         label.add_visible_field("phone", 0);
@@ -657,9 +658,9 @@ mod tests {
     fn test_load_all_labels() {
         let storage = test_storage();
 
-        let label1 = Group::new("Family", 0);
-        let label2 = Group::new("Friends", 0);
-        let label3 = Group::new("Work", 0);
+        let label1 = Group::new("group-family-2".to_string(), "Family", 0);
+        let label2 = Group::new("group-friends".to_string(), "Friends", 0);
+        let label3 = Group::new("group-work".to_string(), "Work", 0);
 
         storage.labels().save_group(&label1).unwrap();
         storage.labels().save_group(&label2).unwrap();
@@ -677,7 +678,7 @@ mod tests {
     fn test_delete_label() {
         let storage = test_storage();
 
-        let label = Group::new("Temporary", 0);
+        let label = Group::new("group-temporary".to_string(), "Temporary", 0);
         storage.labels().save_group(&label).unwrap();
 
         storage.labels().delete_group(label.id()).unwrap();
@@ -876,7 +877,7 @@ mod tests {
     fn test_save_and_load_label_with_display_name_override() {
         let storage = test_storage();
 
-        let mut label = Group::new("Professional", 0);
+        let mut label = Group::new("group-professional".to_string(), "Professional", 0);
         label.add_contact("alice-id", 0);
         label.add_visible_field("work-email", 0);
         label
@@ -897,7 +898,7 @@ mod tests {
     fn test_save_and_load_label_without_display_name_override() {
         let storage = test_storage();
 
-        let label = Group::new("Friends", 0);
+        let label = Group::new("group-friends-2".to_string(), "Friends", 0);
         storage.labels().save_group(&label).unwrap();
 
         let loaded = storage.labels().load_group(label.id()).unwrap();
@@ -908,10 +909,10 @@ mod tests {
     fn test_load_all_labels_preserves_display_name_override() {
         let storage = test_storage();
 
-        let mut label1 = Group::new("Family", 0);
+        let mut label1 = Group::new("group-family-3".to_string(), "Family", 0);
         label1.set_display_name_override(Some("Matt"), 0).unwrap();
 
-        let label2 = Group::new("Work", 0);
+        let label2 = Group::new("group-work-2".to_string(), "Work", 0);
 
         storage.labels().save_group(&label1).unwrap();
         storage.labels().save_group(&label2).unwrap();
@@ -930,7 +931,7 @@ mod tests {
     fn test_display_name_override_roundtrip_update() {
         let storage = test_storage();
 
-        let mut label = Group::new("Colleagues", 0);
+        let mut label = Group::new("group-colleagues".to_string(), "Colleagues", 0);
         label
             .set_display_name_override(Some("Dr. Egloff"), 0)
             .unwrap();

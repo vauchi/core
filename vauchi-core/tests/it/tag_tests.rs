@@ -22,7 +22,11 @@ fn open_storage() -> Storage {
 // @internal
 #[test]
 fn new_tag_has_name_empty_membership_and_stamped_time() {
-    let tag = Tag::new("climbing-gym", 1_700_000_000);
+    let tag = Tag::new(
+        "tag-climbing-gym".to_string(),
+        "climbing-gym",
+        1_700_000_000,
+    );
 
     assert_eq!(tag.name, "climbing-gym");
     assert!(
@@ -30,24 +34,24 @@ fn new_tag_has_name_empty_membership_and_stamped_time() {
         "new tag starts with no contacts"
     );
     assert_eq!(tag.created_at, 1_700_000_000);
-    assert!(!tag.id.is_empty(), "tag must have a generated id");
+    assert_eq!(tag.id, "tag-climbing-gym", "tag id must be caller-supplied");
 }
 
 // @scenario: contact-annotations.feature - Create a new tag on a contact
 // @internal
 #[test]
 fn two_tags_get_distinct_ids() {
-    let a = Tag::new("work", 0);
-    let b = Tag::new("work", 0);
+    let a = Tag::new("tag-work-a".to_string(), "work", 0);
+    let b = Tag::new("tag-work-b".to_string(), "work", 0);
 
-    assert_ne!(a.id, b.id, "each Tag::new must generate a fresh UUID");
+    assert_ne!(a.id, b.id, "distinct caller-supplied ids remain distinct");
 }
 
 // @scenario: contact-annotations.feature - Create a new tag on a contact
 // @internal
 #[test]
 fn add_contact_is_idempotent_and_reports_newness() {
-    let mut tag = Tag::new("berlin-trip", 0);
+    let mut tag = Tag::new("tag-berlin-trip".to_string(), "berlin-trip", 0);
 
     assert!(tag.add_contact("c1"), "first add reports newly added");
     assert!(
@@ -63,7 +67,7 @@ fn add_contact_is_idempotent_and_reports_newness() {
 // @internal
 #[test]
 fn remove_contact_reports_presence() {
-    let mut tag = Tag::new("berlin-trip", 0);
+    let mut tag = Tag::new("tag-berlin-trip-2".to_string(), "berlin-trip", 0);
     tag.add_contact("c1");
 
     assert!(
@@ -243,7 +247,7 @@ proptest! {
         name in name_strategy(),
         members in prop::collection::vec("[a-z0-9]{1,12}", 0..8),
     ) {
-        let mut tag = Tag::new(&name, 123);
+        let mut tag = Tag::new(format!("tag-{name}"), &name, 123);
         for m in &members {
             tag.add_contact(m);
         }

@@ -39,7 +39,8 @@ fn add_exchanged(wb: &Vauchi, name: &str, pk_byte: u8) -> String {
 /// Add an imported contact and return its ID.
 fn add_imported(wb: &Vauchi, name: &str) -> String {
     let card = ContactCard::new(name);
-    let contact = Contact::from_import(card, ImportSource::VcardFile, None, 0);
+    let contact_id = format!("contact-{name}");
+    let contact = Contact::from_import(contact_id, card, ImportSource::VcardFile, None, 0);
     let id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
     id

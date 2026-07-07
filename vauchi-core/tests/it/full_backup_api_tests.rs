@@ -47,6 +47,7 @@ fn setup_vauchi_with_data() -> Vauchi {
 
     let card_dave = ContactCard::new("Dave");
     let dave = Contact::from_import(
+        "contact-dave".to_string(),
         card_dave,
         ImportSource::VcardFile,
         Some("uid-dave".into()),

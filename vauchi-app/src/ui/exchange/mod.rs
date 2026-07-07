@@ -1339,8 +1339,13 @@ mod tests {
             0,
         ))
         .unwrap();
-        let contact =
-            vauchi_core::Contact::from_import(peer, vauchi_core::ImportSource::VcardFile, None, 0);
+        let contact = vauchi_core::Contact::from_import(
+            "peer-contact-id".to_string(),
+            peer,
+            vauchi_core::ImportSource::VcardFile,
+            None,
+            0,
+        );
 
         // Our confirmed preview (what we shared) — only the phone field visible.
         let mut mine = ContactCard::new("Alice");
@@ -2671,7 +2676,11 @@ mod tests {
     #[test]
     fn build_name_options_has_only_base_name_without_overrides() {
         let mut config = config_with_groups();
-        config.available_group_data = vec![vauchi_core::Group::new("Family", 0)];
+        config.available_group_data = vec![vauchi_core::Group::new(
+            "family-group-id".to_string(),
+            "Family",
+            0,
+        )];
         let engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
         let options = engine.build_name_options();
         assert_eq!(options.len(), 1);

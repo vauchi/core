@@ -19,7 +19,9 @@ use vauchi_core::sync::{ImportedContactSyncData, SyncItem};
 
 fn make_imported(name: &str) -> Contact {
     let card = ContactCard::new(name);
+    let contact_id = format!("contact-{name}");
     Contact::from_import(
+        contact_id,
         card,
         ImportSource::VcardFile,
         Some(format!("uid-{}", name)),

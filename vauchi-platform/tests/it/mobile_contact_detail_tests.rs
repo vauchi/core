@@ -74,8 +74,14 @@ fn add_exchanged(engine: &PlatformAppEngine, name: &str, pk_seed: u8) -> String 
 
 fn add_imported(engine: &PlatformAppEngine, name: &str) -> String {
     let card = vauchi_core::contact_card::ContactCard::new(name);
-    let contact =
-        vauchi_core::Contact::from_import(card, vauchi_core::ImportSource::VcardFile, None, 0);
+    let contact_id = format!("contact-{name}");
+    let contact = vauchi_core::Contact::from_import(
+        contact_id,
+        card,
+        vauchi_core::ImportSource::VcardFile,
+        None,
+        0,
+    );
     let id = contact.id().to_string();
     engine.save_test_contact(&contact).unwrap();
     id

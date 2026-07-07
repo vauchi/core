@@ -79,6 +79,18 @@ pub trait SecureRng: Send + Sync {
 /// keeps the ergonomic `rng.shuffle(...)` callsite while preserving
 /// `&dyn SecureRng` as the canonical parameter shape.
 pub trait SecureRngExt: SecureRng {
+    /// Returns a UUID v4 string. Replaces `uuid::Uuid::new_v4()` for
+    /// callsites that need a fresh identifier and already hold an
+    /// explicit randomness seam.
+    fn uuid_v4(&self) -> String {
+        let mut bytes = [0u8; 16];
+        self.fill_bytes(&mut bytes);
+        // Set the version (4) and variant (RFC 4122) bits.
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        uuid::Uuid::from_bytes(bytes).to_string()
+    }
+
     /// Fisher-Yates in-place shuffle. Replaces
     /// `rand::seq::SliceRandom::shuffle` for callsites that took
     /// `thread_rng` for permutation work.

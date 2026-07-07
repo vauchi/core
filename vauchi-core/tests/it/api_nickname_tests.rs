@@ -27,7 +27,13 @@ fn setup_with_imported_contact() -> (Vauchi, String) {
     wb.create_identity("Alice").unwrap();
 
     let card = ContactCard::new("Charlie");
-    let contact = Contact::from_import(card, ImportSource::VcardFile, None, 0);
+    let contact = Contact::from_import(
+        "contact-charlie".to_string(),
+        card,
+        ImportSource::VcardFile,
+        None,
+        0,
+    );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 

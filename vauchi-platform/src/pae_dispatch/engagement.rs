@@ -6,6 +6,7 @@
 //! split out of `platform_app_engine.rs` (pure code motion).
 
 use vauchi_app::ui::{AppEngine, AppScreen};
+use vauchi_core::rng::SecureRngExt;
 
 use crate::domain_command::{DomainCommand, DomainCommandResult};
 use crate::error::MobileError;
@@ -21,8 +22,9 @@ impl PlatformAppEngine {
             DomainCommand::GrantConsent { consent_type } => {
                 let storage = engine.vauchi().storage();
                 let manager = vauchi_core::api::ConsentManager::new(storage);
+                let id = engine.vauchi().rng().uuid_v4();
                 manager
-                    .grant(vauchi_core::api::ConsentType::from(consent_type))
+                    .grant(id, vauchi_core::api::ConsentType::from(consent_type))
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
                     })?;
@@ -33,8 +35,9 @@ impl PlatformAppEngine {
             DomainCommand::RevokeConsent { consent_type } => {
                 let storage = engine.vauchi().storage();
                 let manager = vauchi_core::api::ConsentManager::new(storage);
+                let id = engine.vauchi().rng().uuid_v4();
                 manager
-                    .revoke(vauchi_core::api::ConsentType::from(consent_type))
+                    .revoke(id, vauchi_core::api::ConsentType::from(consent_type))
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
                     })?;

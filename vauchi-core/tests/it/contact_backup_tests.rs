@@ -30,7 +30,8 @@ fn make_exchanged(name: &str) -> Contact {
 
 fn make_imported(name: &str, source: ImportSource) -> Contact {
     let card = ContactCard::new(name);
-    Contact::from_import(card, source, Some(format!("uid-{}", name)), 0)
+    let contact_id = format!("contact-{name}");
+    Contact::from_import(contact_id, card, source, Some(format!("uid-{}", name)), 0)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

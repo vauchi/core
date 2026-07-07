@@ -130,7 +130,13 @@ fn hard_delete_clears_all_relationship_scoped_side_tables() {
 #[test]
 fn hard_delete_imported_contact_cleans_its_rows_and_no_ops_exchange_only_tables() {
     let storage = open_storage();
-    let contact = Contact::from_import(ContactCard::new("Bob"), ImportSource::VcardFile, None, 0);
+    let contact = Contact::from_import(
+        "contact-bob".to_string(),
+        ContactCard::new("Bob"),
+        ImportSource::VcardFile,
+        None,
+        0,
+    );
     let id = contact.id().to_string();
     storage.contacts().save_contact(&contact).unwrap();
 

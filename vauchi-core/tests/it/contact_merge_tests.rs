@@ -25,7 +25,8 @@ fn make_imported_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Cont
         card.add_field(ContactField::new(ft.clone(), label, value, 0))
             .unwrap();
     }
-    Contact::from_import(card, ImportSource::VcardFile, None, 0)
+    let contact_id = format!("contact-{name}");
+    Contact::from_import(contact_id, card, ImportSource::VcardFile, None, 0)
 }
 
 // @internal

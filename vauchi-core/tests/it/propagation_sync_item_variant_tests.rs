@@ -111,6 +111,7 @@ fn apply_sync_imported_contact_removed_deletes_contact() {
     // to remove. Use a UUID-style id matching the imported-contact convention.
     let imported_card = ContactCard::new("Charlie");
     let imported_contact = Contact::from_import(
+        "contact-charlie".to_string(),
         imported_card,
         vauchi_core::contact::ImportSource::Manual,
         None,
@@ -343,8 +344,13 @@ fn apply_sync_visibility_changed_writes_per_contact_override() {
 fn apply_sync_imported_contact_add_update_remove_roundtrip() {
     let wb = make_vauchi();
     let card = ContactCard::new("Dora");
-    let imported_contact =
-        Contact::from_import(card, vauchi_core::contact::ImportSource::Manual, None, 0);
+    let imported_contact = Contact::from_import(
+        "contact-dora".to_string(),
+        card,
+        vauchi_core::contact::ImportSource::Manual,
+        None,
+        0,
+    );
     let imported_id = imported_contact.id().to_string();
     let sync_data = ImportedContactSyncData::from_contact(&imported_contact).unwrap();
 
@@ -623,7 +629,13 @@ fn apply_sync_contact_archived_then_unarchived_dispatch_matching_events() {
 fn apply_sync_imported_contact_added_dispatches_contact_added_event() {
     let wb = make_vauchi();
     let card = ContactCard::new("Dora");
-    let imported = Contact::from_import(card, vauchi_core::contact::ImportSource::Manual, None, 0);
+    let imported = Contact::from_import(
+        "contact-dora".to_string(),
+        card,
+        vauchi_core::contact::ImportSource::Manual,
+        None,
+        0,
+    );
     let imported_id = imported.id().to_string();
     let sync_data = ImportedContactSyncData::from_contact(&imported).unwrap();
     let events = capture_events(&wb);

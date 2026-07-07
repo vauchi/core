@@ -70,9 +70,10 @@ impl GroupManager {
     }
 
     /// Creates a new group.
-    /// Creates a new group. `now` is stamped into `created_at` /
-    /// `modified_at`; production callers pass
-    /// `vauchi.clock().unix_seconds()`, tests pass any fixed value.
+    ///
+    /// `now` is stamped into `created_at` / `modified_at`; production callers
+    /// pass `vauchi.clock().unix_seconds()`, tests pass any fixed value. The
+    /// group id is generated at this coordinator boundary.
     pub fn create_group(&mut self, name: &str, now: u64) -> Result<&Group, GroupError> {
         let name = name.trim();
         if name.is_empty() {
@@ -92,7 +93,8 @@ impl GroupManager {
             return Err(GroupError::MaxLabelsReached);
         }
 
-        let group = Group::new(name, now);
+        let id = uuid::Uuid::new_v4().to_string();
+        let group = Group::new(id, name, now);
         let id = group.id().to_string();
         self.groups.insert(id.clone(), group);
 

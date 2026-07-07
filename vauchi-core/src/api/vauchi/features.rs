@@ -10,6 +10,7 @@ use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::demo_contact::{DemoContactCard, DemoTip, generate_demo_contact_card};
 use crate::network::MultiRelayConfig;
+use crate::rng::SecureRngExt;
 use crate::types::{AhaMomentType, DemoContactState};
 
 use super::super::consent::{ConsentManager, ConsentRecord, ConsentType};
@@ -255,13 +256,15 @@ impl Vauchi {
     /// Grants consent for a specific type.
     pub fn grant_consent(&self, consent_type: ConsentType) -> VauchiResult<()> {
         let manager = ConsentManager::new(&self.storage);
-        manager.grant(consent_type).map_err(VauchiError::from)
+        let id = self.rng.uuid_v4();
+        manager.grant(id, consent_type).map_err(VauchiError::from)
     }
 
     /// Revokes consent for a specific type.
     pub fn revoke_consent(&self, consent_type: ConsentType) -> VauchiResult<()> {
         let manager = ConsentManager::new(&self.storage);
-        manager.revoke(consent_type).map_err(VauchiError::from)
+        let id = self.rng.uuid_v4();
+        manager.revoke(id, consent_type).map_err(VauchiError::from)
     }
 
     /// Checks whether consent is currently granted for a type.

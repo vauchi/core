@@ -22,7 +22,13 @@ fn engine_with_identity() -> AppEngine {
 }
 
 fn add_contact_named(engine: &AppEngine, name: &str) {
-    let contact = Contact::from_import(ContactCard::new(name), ImportSource::VcardFile, None, 0);
+    let contact = Contact::from_import(
+        format!("contact-{name}"),
+        ContactCard::new(name),
+        ImportSource::VcardFile,
+        None,
+        0,
+    );
     engine.vauchi().add_contact(contact).unwrap();
 }
 

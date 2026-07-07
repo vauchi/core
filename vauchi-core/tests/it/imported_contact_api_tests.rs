@@ -23,7 +23,8 @@ fn new_vauchi() -> Vauchi {
 /// Creates an imported contact, saves it via the API, and returns its ID.
 fn add_imported(wb: &Vauchi, name: &str) -> String {
     let card = ContactCard::new(name);
-    let contact = Contact::from_import(card, ImportSource::VcardFile, None, 0);
+    let contact_id = format!("contact-{name}");
+    let contact = Contact::from_import(contact_id, card, ImportSource::VcardFile, None, 0);
     let id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
     id

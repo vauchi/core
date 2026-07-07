@@ -543,8 +543,9 @@ fn test_default_column_values() {
 fn run_migrations_up_to(conn: &Connection, key: &SymmetricKey, up_to_version: u32) {
     let migrations = all_migrations();
     let subset: Vec<_> = migrations
-        .into_iter()
+        .iter()
         .filter(|m| m.version <= up_to_version)
+        .copied()
         .collect();
     MigrationRunner::run(conn, key, &subset, None, 0).unwrap();
 }

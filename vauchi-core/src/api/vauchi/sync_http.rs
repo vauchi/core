@@ -47,6 +47,7 @@ use crate::network::{
     MessagePayload, OhttpClient, PinnedCertificate, RelayClient, Transport, TransportConfig,
     create_envelope,
 };
+use crate::rng::SecureRngExt;
 
 impl Vauchi {
     /// Perform a bidirectional sync: receive pending messages, send outgoing updates.
@@ -356,6 +357,7 @@ impl Vauchi {
                     error: None,
                 }),
                 self.clock.unix_seconds(),
+                self.rng.uuid_v4().into(),
             );
             #[allow(clippy::let_underscore_must_use)]
             let _ = adapter.send(&ack);
@@ -388,6 +390,7 @@ impl Vauchi {
                     error: None,
                 }),
                 self.clock.unix_seconds(),
+                self.rng.uuid_v4().into(),
             );
             #[allow(clippy::let_underscore_must_use)]
             let _ = adapter.send(&ack);
@@ -451,6 +454,7 @@ impl Vauchi {
                     error: None,
                 }),
                 self.clock.unix_seconds(),
+                self.rng.uuid_v4().into(),
             );
             // best-effort: ACK delivery; the relay will refetch on next
             // sync cycle if this batch's ACK is lost in flight
@@ -502,7 +506,7 @@ impl Vauchi {
             self.config.delivery_receipts_enabled,
             self.config.suppress_presence,
         );
-        let relay = RelayClient::new(adapter, relay_config, our_id);
+        let relay = RelayClient::new(adapter, relay_config, our_id).with_rng(self.rng.clone());
 
         // Build SyncController
         let mut ctrl = SyncController::new(

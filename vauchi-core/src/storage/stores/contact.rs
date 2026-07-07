@@ -49,123 +49,8 @@ impl ContactStore<'_> {
     ///
     /// Legacy contacts (no CEK) use storage-key encryption with plaintext
     /// display_name (existing behavior).
-    // TODO(PFC): 193-line save_contact with 15-element tuple — see 2026-07-06-core-pfc-violations C11
     pub fn save_contact(&self, contact: &Contact) -> Result<(), StorageError> {
-        let card_json = serde_json::to_vec(contact.card())
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
-
-        let (card_encrypted, display_name_db, cek_encrypted_param) =
-            if let Some(cek) = contact.cek() {
-                let card_ct = cek
-                    .encrypt(&card_json)
-                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                let cek_ct = crate::crypto::encrypt(self.key, &cek.to_bytes())
-                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                (card_ct, String::new(), Some(cek_ct))
-            } else {
-                let card_ct = crate::crypto::encrypt(self.key, &card_json)
-                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                (card_ct, contact.display_name().to_string(), None::<Vec<u8>>)
-            };
-
-        let (
-            public_key_bytes,
-            shared_key_encrypted,
-            visibility_encrypted,
-            exchange_timestamp,
-            fingerprint_verified,
-            recovery_trusted,
-            proposal_trusted,
-            transport_str,
-            has_recovered,
-            relay_url,
-            trust_metrics_json,
-            contact_kind_str,
-            import_source_str,
-            imported_at_val,
-            original_uid_val,
-        ) = if let Some(ex) = contact.kind().exchanged_data() {
-            let sk_encrypted = crate::crypto::encrypt(self.key, ex.shared_key.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
-            let vis_json = serde_json::to_string(&ex.visibility_rules)
-                .map_err(|e| StorageError::Serialization(e.to_string()))?;
-            let vis_encrypted = crate::crypto::encrypt(self.key, vis_json.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
-            let transport = serde_json::to_value(ex.exchange_transport)
-                .map_err(|e| StorageError::Serialization(e.to_string()))?
-                .as_str()
-                .unwrap_or("Qr")
-                .to_string();
-            let tm_json = ex
-                .trust_metrics
-                .as_ref()
-                .map(|m| {
-                    serde_json::to_string(m).map_err(|e| StorageError::Serialization(e.to_string()))
-                })
-                .transpose()?;
-
-            (
-                ex.public_key.to_vec(),
-                sk_encrypted,
-                Some(vis_encrypted),
-                ex.exchange_timestamp as i64,
-                ex.fingerprint_verified as i32,
-                ex.recovery_trusted as i32,
-                ex.proposal_trusted as i32,
-                transport,
-                ex.has_recovered as i32,
-                ex.relay_url.clone(),
-                tm_json,
-                "exchanged".to_string(),
-                None::<String>,
-                None::<i64>,
-                None::<String>,
-            )
-        } else if let Some(imp) = contact.kind().imported_data() {
-            // Imported contact: empty blobs for crypto columns (HR-2 defense-in-depth).
-            // If these accidentally reach try_into::<[u8; 32]>(), they fail safely.
-            let source_str = serde_json::to_string(&imp.source)
-                .map_err(|e| StorageError::Serialization(e.to_string()))?;
-
-            (
-                vec![],        // public_key: empty blob
-                vec![],        // shared_key_encrypted: empty blob
-                None,          // visibility_rules_encrypted: NULL
-                0i64,          // exchange_timestamp: 0
-                0i32,          // fingerprint_verified: false
-                0i32,          // recovery_trusted: false
-                0i32,          // proposal_trusted: false
-                String::new(), // exchange_transport: empty
-                0i32,          // has_recovered: false
-                None,          // relay_url: None
-                None,          // trust_metrics: None
-                "imported".to_string(),
-                Some(source_str),
-                Some(imp.imported_at as i64),
-                imp.original_uid.clone(),
-            )
-        } else {
-            return Err(StorageError::Serialization("Unknown contact kind".into()));
-        };
-
-        // Serialize reciprocity fields (plain text, snake_case per serde)
-        let reciprocity_str: Option<String> = contact.kind().exchanged_data().and_then(|ex| {
-            ex.reciprocity.map(|r| {
-                serde_json::to_value(r)
-                    .ok()
-                    .and_then(|v| v.as_str().map(String::from))
-                    .unwrap_or_default()
-            })
-        });
-        let confirmation_channel_str: Option<String> =
-            contact.kind().exchanged_data().and_then(|ex| {
-                ex.confirmation_channel.map(|c| {
-                    serde_json::to_value(c)
-                        .ok()
-                        .and_then(|v| v.as_str().map(String::from))
-                        .unwrap_or_default()
-                })
-            });
+        let row = self.contact_to_row(contact)?;
 
         // Upsert (not INSERT OR REPLACE which cascades deletes to field_notes)
         self.conn.execute(
@@ -208,35 +93,35 @@ impl ContactStore<'_> {
                reciprocity             = excluded.reciprocity,
                confirmation_channel    = excluded.confirmation_channel",
             params![
-                contact.id(),
-                public_key_bytes,
-                display_name_db,
-                card_encrypted,
-                shared_key_encrypted,
-                visibility_encrypted,
-                exchange_timestamp,
-                fingerprint_verified,
+                row.id,
+                row.public_key,
+                row.display_name,
+                row.card_encrypted,
+                row.shared_key_encrypted,
+                row.visibility_rules_encrypted,
+                row.exchange_timestamp,
+                row.fingerprint_verified,
                 Option::<i64>::None,
-                contact.is_blocked() as i32,
-                contact.is_hidden() as i32,
-                contact.is_favorite() as i32,
-                recovery_trusted,
-                proposal_trusted,
-                cek_encrypted_param,
-                transport_str,
-                has_recovered,
-                contact.card_updated_at().map(|t| t as i64),
-                relay_url,
-                trust_metrics_json,
-                contact_kind_str,
-                import_source_str,
-                imported_at_val,
-                original_uid_val,
-                contact.deleted_at().map(|t| t as i64),
-                contact.is_archived() as i32,
-                contact.archived_at().map(|t| t as i64),
-                reciprocity_str,
-                confirmation_channel_str,
+                row.blocked,
+                row.hidden,
+                row.favorite,
+                row.recovery_trusted,
+                row.proposal_trusted,
+                row.cek_encrypted,
+                row.exchange_transport,
+                row.has_recovered,
+                row.card_updated_at,
+                row.relay_url,
+                row.trust_metrics,
+                row.contact_kind,
+                row.import_source,
+                row.imported_at,
+                row.original_uid,
+                row.deleted_at,
+                row.archived,
+                row.archived_at,
+                row.reciprocity,
+                row.confirmation_channel,
             ],
         )?;
 

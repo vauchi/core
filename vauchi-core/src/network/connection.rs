@@ -310,6 +310,7 @@ mod tests {
                 message: None,
             }),
             0,
+            "test-reconnect".into(),
         );
 
         conn.send(&msg).unwrap();
@@ -405,6 +406,7 @@ mod tests {
                 message: Some("BRB".into()),
             }),
             0,
+            "test-incoming".into(),
         );
         transport.queue_receive(incoming.clone());
 
@@ -436,6 +438,7 @@ mod tests {
                 message: None,
             }),
             0,
+            "test-pending".into(),
         ));
 
         let mut conn = ConnectionManager::new(transport, create_test_config());

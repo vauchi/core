@@ -7,15 +7,8 @@
 //! Converts contact fields to actionable URIs (tel:, mailto:, https:, etc.)
 //! Implements security whitelist to block dangerous URI schemes.
 
-use std::sync::LazyLock;
-
 use super::{ContactField, FieldType};
 use crate::social::SocialNetworkRegistry;
-
-/// Default social network registry (loaded once, shared across calls).
-// TODO(PFC): global LazyLock registry — see 2026-07-06-core-pfc-violations C12
-static DEFAULT_REGISTRY: LazyLock<SocialNetworkRegistry> =
-    LazyLock::new(SocialNetworkRegistry::with_defaults);
 
 /// Actions that can be performed on a contact field.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -335,7 +328,11 @@ impl ContactField {
             username
         };
 
-        DEFAULT_REGISTRY.profile_url(&label_lower, username)
+        // Use a locally-constructed registry instead of a global singleton (C12).
+        // SocialNetworkRegistry::with_defaults() is cheap (~38 entries, constructed once
+        // per social field URI resolution).
+        let registry = SocialNetworkRegistry::with_defaults();
+        registry.profile_url(&label_lower, username)
     }
 
     /// Get the primary action for this field.

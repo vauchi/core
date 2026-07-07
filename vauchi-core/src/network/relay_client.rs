@@ -24,6 +24,7 @@ use super::transport::{Transport, TransportConfig};
 use crate::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
 use crate::identifiers::ContactId;
 use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
+use crate::rng::SecureRngExt;
 
 /// Generates a hex-encoded anonymous sender ID from an optional shared key.
 /// Returns `None` if no shared key is provided (backward compat — uses real identity).
@@ -107,6 +108,10 @@ pub struct RelayClient<T: Transport> {
     /// [`RelayClient::with_monotonic`] so ack timeouts are deterministic
     /// under test.
     monotonic: Arc<dyn MonotonicClock>,
+    /// Explicit RNG seam for message ID generation (C13).
+    /// Defaults to `OsSecureRng::shared()`; tests inject a deterministic
+    /// rng via [`RelayClient::with_rng`].
+    rng: Arc<dyn crate::rng::SecureRng>,
 }
 
 impl<T: Transport> RelayClient<T> {
@@ -121,7 +126,17 @@ impl<T: Transport> RelayClient<T> {
             in_flight: HashMap::new(),
             our_identity_id,
             monotonic: SystemMonotonicClock::shared(),
+            rng: crate::rng::OsSecureRng::shared(),
         }
+    }
+
+    /// Replace the [`SecureRng`] driving message ID generation.
+    /// Default is [`OsSecureRng::shared`]; tests inject a deterministic
+    /// rng via this builder.
+    #[must_use]
+    pub fn with_rng(mut self, rng: Arc<dyn crate::rng::SecureRng>) -> Self {
+        self.rng = rng;
+        self
     }
 
     /// Replace the [`MonotonicClock`] driving in-flight ack timeouts.
@@ -258,11 +273,13 @@ impl<T: Transport> RelayClient<T> {
 
         let mut last_message_id = MessageId::from(String::new());
         for tokens in batches {
+            let message_id: MessageId = self.rng.uuid_v4().into();
             let envelope = create_envelope(
                 MessagePayload::RegisterMailbox(super::message::RegisterMailbox { tokens }),
                 now,
+                message_id.clone(),
             );
-            last_message_id = envelope.message_id.clone();
+            last_message_id = message_id;
             self.connection.send(&envelope)?;
         }
 
@@ -302,7 +319,12 @@ impl<T: Transport> RelayClient<T> {
             ciphertext,
         };
 
-        let envelope = create_envelope(MessagePayload::EncryptedUpdate(encrypted_update), now);
+        let message_id: MessageId = self.rng.uuid_v4().into();
+        let envelope = create_envelope(
+            MessagePayload::EncryptedUpdate(encrypted_update),
+            now,
+            message_id.clone(),
+        );
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;
@@ -319,7 +341,12 @@ impl<T: Transport> RelayClient<T> {
         request: &PurgeRequest,
         now: u64,
     ) -> Result<MessageId, NetworkError> {
-        let envelope = create_envelope(MessagePayload::PurgeRequest(request.clone()), now);
+        let message_id: MessageId = self.rng.uuid_v4().into();
+        let envelope = create_envelope(
+            MessagePayload::PurgeRequest(request.clone()),
+            now,
+            message_id.clone(),
+        );
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;
@@ -463,7 +490,12 @@ impl<T: Transport> RelayClient<T> {
                 .expect("RatchetMessage serialization is infallible"),
         };
 
-        create_envelope(MessagePayload::EncryptedUpdate(encrypted_update), now)
+        let message_id: MessageId = self.rng.uuid_v4().into();
+        create_envelope(
+            MessagePayload::EncryptedUpdate(encrypted_update),
+            now,
+            message_id,
+        )
     }
 }
 
@@ -513,7 +545,12 @@ impl<T: Transport> RelayClient<T> {
             },
             ciphertext,
         };
-        let envelope = create_envelope(MessagePayload::EncryptedUpdate(encrypted_update), now);
+        let message_id: MessageId = self.rng.uuid_v4().into();
+        let envelope = create_envelope(
+            MessagePayload::EncryptedUpdate(encrypted_update),
+            now,
+            message_id.clone(),
+        );
         let message_id = envelope.message_id.clone();
         self.connection.send(&envelope)?;
         Ok(message_id)

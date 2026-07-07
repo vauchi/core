@@ -34,7 +34,18 @@ use sha2::Sha256;
 
 use super::StorageError;
 
+/// The action a migration performs.
+#[derive(Clone, Copy)]
+#[non_exhaustive]
+pub enum MigrationAction {
+    /// Pure SQL migration.
+    Sql(&'static str),
+    /// Rust callback migration (for data transformations that need encryption key).
+    Callback(fn(&Connection, &SymmetricKey) -> Result<(), StorageError>),
+}
+
 /// A single schema migration step.
+#[derive(Clone, Copy)]
 pub struct Migration {
     /// Monotonically increasing version number (starting at 1).
     pub version: u32,
@@ -42,15 +53,6 @@ pub struct Migration {
     pub name: &'static str,
     /// The migration action: either SQL or a Rust callback.
     pub action: MigrationAction,
-}
-
-/// The action a migration performs.
-#[non_exhaustive]
-pub enum MigrationAction {
-    /// Pure SQL migration.
-    Sql(&'static str),
-    /// Rust callback migration (for data transformations that need encryption key).
-    Callback(fn(&Connection, &SymmetricKey) -> Result<(), StorageError>),
 }
 
 /// Runs schema migrations against a database connection.
@@ -261,305 +263,306 @@ fn encrypt_and_verify(
     Ok(encrypted)
 }
 
-/// Returns all registered migrations in version order.
+/// All registered migrations in version order.
 ///
 /// This is the single source of truth for the database schema.
-/// New migrations are appended to the end of this list.
-// TODO(PFC): 299-line migrations list — see 2026-07-06-core-pfc-violations C16
-pub fn all_migrations() -> Vec<Migration> {
-    vec![
-        Migration {
-            version: 1,
-            name: "baseline_schema",
-            action: MigrationAction::Sql(MIGRATION_V1_BASELINE),
-        },
-        Migration {
-            version: 2,
-            name: "re_encrypt_aes_gcm_to_xchacha20",
-            action: MigrationAction::Sql(""),
-        },
-        Migration {
-            version: 3,
-            name: "replay_nonces_table",
-            action: MigrationAction::Sql(MIGRATION_V3_REPLAY_NONCES),
-        },
-        Migration {
-            version: 4,
-            name: "contact_enhancements",
-            action: MigrationAction::Sql(MIGRATION_V4_CONTACT_ENHANCEMENTS),
-        },
-        Migration {
-            version: 5,
-            name: "gdpr_consent_audit",
-            action: MigrationAction::Sql(MIGRATION_V5_GDPR_CONSENT),
-        },
-        Migration {
-            version: 6,
-            name: "device_sync_checkpoints",
-            action: MigrationAction::Sql(MIGRATION_V6_DEVICE_CHECKPOINTS),
-        },
-        Migration {
-            version: 7,
-            name: "delivery_ttl_indexes",
-            action: MigrationAction::Sql(MIGRATION_V7_DELIVERY_TTL),
-        },
-        Migration {
-            version: 8,
-            name: "recovery_tables",
-            action: MigrationAction::Sql(MIGRATION_V8_RECOVERY),
-        },
-        Migration {
-            version: 9,
-            name: "recovery_trust",
-            action: MigrationAction::Sql(MIGRATION_V9_RECOVERY_TRUST),
-        },
-        Migration {
-            version: 10,
-            name: "gdpr_deletion_consent_versioning",
-            action: MigrationAction::Sql(MIGRATION_V10_GDPR_ENHANCEMENTS),
-        },
-        Migration {
-            version: 11,
-            name: "sync_checkpoints_atomic",
-            action: MigrationAction::Sql(MIGRATION_V11_SYNC_CHECKPOINTS),
-        },
-        Migration {
-            version: 12,
-            name: "contacts_display_name_index",
-            action: MigrationAction::Sql(MIGRATION_V12_CONTACTS_INDEX),
-        },
-        Migration {
-            version: 13,
-            name: "crypto_shredding",
-            action: MigrationAction::Sql(MIGRATION_V13_CRYPTO_SHREDDING),
-        },
-        Migration {
-            version: 14,
-            name: "encrypt_high_priority_tables",
-            action: MigrationAction::Callback(migrate_v14_encrypt_high_priority),
-        },
-        Migration {
-            version: 15,
-            name: "encrypt_medium_priority_tables",
-            action: MigrationAction::Callback(migrate_v15_encrypt_medium_priority),
-        },
-        Migration {
-            version: 16,
-            name: "encrypt_low_priority_tables",
-            action: MigrationAction::Callback(migrate_v16_encrypt_low_priority),
-        },
-        Migration {
-            version: 17,
-            name: "tor_config_column",
-            action: MigrationAction::Sql(MIGRATION_V17_TOR_CONFIG),
-        },
-        Migration {
-            version: 18,
-            name: "encrypt_visibility_rules",
-            action: MigrationAction::Callback(migrate_v18_encrypt_visibility_rules),
-        },
-        Migration {
-            version: 19,
-            name: "app_password_schema",
-            action: MigrationAction::Sql(MIGRATION_V19_APP_PASSWORD),
-        },
-        Migration {
-            version: 20,
-            name: "duress_settings",
-            action: MigrationAction::Sql(MIGRATION_V20_DURESS_SETTINGS),
-        },
-        Migration {
-            version: 21,
-            name: "decoy_contacts",
-            action: MigrationAction::Sql(MIGRATION_V21_DECOY_CONTACTS),
-        },
-        Migration {
-            version: 22,
-            name: "emergency_config",
-            action: MigrationAction::Sql(MIGRATION_V22_EMERGENCY_CONFIG),
-        },
-        Migration {
-            version: 23,
-            name: "encrypt_label_names",
-            action: MigrationAction::Callback(migrate_v23_encrypt_label_names),
-        },
-        Migration {
-            version: 24,
-            name: "per_contact_ratchet_keys",
-            action: MigrationAction::Callback(migrate_v24_per_contact_ratchet_keys),
-        },
-        Migration {
-            version: 25,
-            name: "contact_delta_version_tracking",
-            action: MigrationAction::Sql(MIGRATION_V25_DELTA_VERSION),
-        },
-        Migration {
-            version: 26,
-            name: "recovery_settings",
-            action: MigrationAction::Sql(MIGRATION_V26_RECOVERY_SETTINGS),
-        },
-        Migration {
-            version: 27,
-            name: "trust_metric_fields",
-            action: MigrationAction::Sql(MIGRATION_V27_TRUST_METRICS),
-        },
-        Migration {
-            version: 28,
-            name: "contact_limits_and_merge",
-            action: MigrationAction::Sql(MIGRATION_V28_LIMITS_AND_MERGE),
-        },
-        Migration {
-            version: 29,
-            name: "onboarding_progress",
-            action: MigrationAction::Sql(MIGRATION_V29_ONBOARDING_PROGRESS),
-        },
-        Migration {
-            version: 30,
-            name: "label_display_name_override",
-            action: MigrationAction::Sql(MIGRATION_V30_LABEL_DISPLAY_NAME_OVERRIDE),
-        },
-        Migration {
-            version: 31,
-            name: "contact_relay_fields",
-            action: MigrationAction::Sql(MIGRATION_V31_CONTACT_RELAY_FIELDS),
-        },
-        Migration {
-            version: 32,
-            name: "trust_and_notes",
-            action: MigrationAction::Sql(MIGRATION_V32_TRUST_AND_NOTES),
-        },
-        Migration {
-            version: 33,
-            name: "trust_metrics_column",
-            action: MigrationAction::Sql(MIGRATION_V33_TRUST_METRICS),
-        },
-        Migration {
-            version: 34,
-            name: "imported_contacts",
-            action: MigrationAction::Sql(MIGRATION_V34_IMPORTED_CONTACTS),
-        },
-        Migration {
-            version: 35,
-            name: "local_groups",
-            action: MigrationAction::Sql(MIGRATION_V35_LOCAL_GROUPS),
-        },
-        Migration {
-            version: 36,
-            name: "sent_delta_version_tracking",
-            action: MigrationAction::Sql(MIGRATION_V36_SENT_DELTA_VERSION),
-        },
-        Migration {
-            version: 37,
-            name: "contact_delete_archive",
-            action: MigrationAction::Sql(MIGRATION_V37_CONTACT_DELETE_ARCHIVE),
-        },
-        Migration {
-            version: 38,
-            name: "exchange_states",
-            action: MigrationAction::Sql(MIGRATION_V38_EXCHANGE_STATES),
-        },
-        Migration {
-            version: 39,
-            name: "ohttp_key_cache",
-            action: MigrationAction::Sql(MIGRATION_V39_OHTTP_KEY_CACHE),
-        },
-        Migration {
-            version: 40,
-            name: "reciprocity_confirmation",
-            action: MigrationAction::Sql(MIGRATION_V40_RECIPROCITY),
-        },
-        Migration {
-            version: 41,
-            name: "activity_log",
-            action: MigrationAction::Sql(MIGRATION_V41_ACTIVITY_LOG),
-        },
-        Migration {
-            version: 42,
-            name: "pin_cache",
-            action: MigrationAction::Sql(MIGRATION_V42_PIN_CACHE),
-        },
-        Migration {
-            version: 43,
-            name: "contact_display",
-            action: MigrationAction::Sql(MIGRATION_V43_CONTACT_DISPLAY),
-        },
-        Migration {
-            version: 44,
-            name: "backup_reminder",
-            action: MigrationAction::Sql(MIGRATION_V44_BACKUP_REMINDER),
-        },
-        Migration {
-            version: 45,
-            name: "recovery_progress",
-            action: MigrationAction::Sql(MIGRATION_V45_RECOVERY_PROGRESS),
-        },
-        Migration {
-            version: 46,
-            name: "app_preferences",
-            action: MigrationAction::Sql(MIGRATION_V46_APP_PREFERENCES),
-        },
-        Migration {
-            version: 47,
-            name: "drop_app_preferences",
-            action: MigrationAction::Sql(MIGRATION_V47_DROP_APP_PREFERENCES),
-        },
-        Migration {
-            version: 48,
-            name: "sync_field_timestamps",
-            action: MigrationAction::Sql(MIGRATION_V48_SYNC_FIELD_TIMESTAMPS),
-        },
-        Migration {
-            version: 49,
-            name: "contact_tags",
-            action: MigrationAction::Sql(MIGRATION_V49_TAGS),
-        },
-        Migration {
-            version: 50,
-            name: "named_places",
-            action: MigrationAction::Sql(MIGRATION_V50_PLACES),
-        },
-        Migration {
-            version: 51,
-            name: "contact_exchange_location",
-            action: MigrationAction::Sql(MIGRATION_V51_EXCHANGE_LOCATION),
-        },
-        Migration {
-            version: 52,
-            name: "contact_last_sent_visible_fields",
-            action: MigrationAction::Sql(MIGRATION_V52_LAST_SENT_VISIBLE_FIELDS),
-        },
-        Migration {
-            version: 53,
-            name: "settings_flags",
-            action: MigrationAction::Sql(MIGRATION_V53_SETTINGS_FLAGS),
-        },
-        Migration {
-            version: 54,
-            name: "relay_url",
-            action: MigrationAction::Sql(MIGRATION_V54_RELAY_URL),
-        },
-        Migration {
-            version: 55,
-            name: "own_card_repropagate",
-            action: MigrationAction::Sql(MIGRATION_V55_OWN_CARD_REPROPAGATE),
-        },
-        Migration {
-            version: 56,
-            name: "group_presentation",
-            action: MigrationAction::Sql(MIGRATION_V56_GROUP_PRESENTATION),
-        },
-        Migration {
-            version: 57,
-            name: "contact_last_sent_display_name",
-            action: MigrationAction::Sql(MIGRATION_V57_LAST_SENT_DISPLAY_NAME),
-        },
-        Migration {
-            version: 58,
-            name: "ux_exchange_defaults",
-            action: MigrationAction::Sql(MIGRATION_V58_EXCHANGE_DEFAULTS),
-        },
-    ]
+/// New migrations are appended to the end of this array.
+pub const fn all_migrations() -> &'static [Migration] {
+    &MIGRATIONS
 }
+
+const MIGRATIONS: [Migration; 58] = [
+    Migration {
+        version: 1,
+        name: "baseline_schema",
+        action: MigrationAction::Sql(MIGRATION_V1_BASELINE),
+    },
+    Migration {
+        version: 2,
+        name: "re_encrypt_aes_gcm_to_xchacha20",
+        action: MigrationAction::Sql(""),
+    },
+    Migration {
+        version: 3,
+        name: "replay_nonces_table",
+        action: MigrationAction::Sql(MIGRATION_V3_REPLAY_NONCES),
+    },
+    Migration {
+        version: 4,
+        name: "contact_enhancements",
+        action: MigrationAction::Sql(MIGRATION_V4_CONTACT_ENHANCEMENTS),
+    },
+    Migration {
+        version: 5,
+        name: "gdpr_consent_audit",
+        action: MigrationAction::Sql(MIGRATION_V5_GDPR_CONSENT),
+    },
+    Migration {
+        version: 6,
+        name: "device_sync_checkpoints",
+        action: MigrationAction::Sql(MIGRATION_V6_DEVICE_CHECKPOINTS),
+    },
+    Migration {
+        version: 7,
+        name: "delivery_ttl_indexes",
+        action: MigrationAction::Sql(MIGRATION_V7_DELIVERY_TTL),
+    },
+    Migration {
+        version: 8,
+        name: "recovery_tables",
+        action: MigrationAction::Sql(MIGRATION_V8_RECOVERY),
+    },
+    Migration {
+        version: 9,
+        name: "recovery_trust",
+        action: MigrationAction::Sql(MIGRATION_V9_RECOVERY_TRUST),
+    },
+    Migration {
+        version: 10,
+        name: "gdpr_deletion_consent_versioning",
+        action: MigrationAction::Sql(MIGRATION_V10_GDPR_ENHANCEMENTS),
+    },
+    Migration {
+        version: 11,
+        name: "sync_checkpoints_atomic",
+        action: MigrationAction::Sql(MIGRATION_V11_SYNC_CHECKPOINTS),
+    },
+    Migration {
+        version: 12,
+        name: "contacts_display_name_index",
+        action: MigrationAction::Sql(MIGRATION_V12_CONTACTS_INDEX),
+    },
+    Migration {
+        version: 13,
+        name: "crypto_shredding",
+        action: MigrationAction::Sql(MIGRATION_V13_CRYPTO_SHREDDING),
+    },
+    Migration {
+        version: 14,
+        name: "encrypt_high_priority_tables",
+        action: MigrationAction::Callback(migrate_v14_encrypt_high_priority),
+    },
+    Migration {
+        version: 15,
+        name: "encrypt_medium_priority_tables",
+        action: MigrationAction::Callback(migrate_v15_encrypt_medium_priority),
+    },
+    Migration {
+        version: 16,
+        name: "encrypt_low_priority_tables",
+        action: MigrationAction::Callback(migrate_v16_encrypt_low_priority),
+    },
+    Migration {
+        version: 17,
+        name: "tor_config_column",
+        action: MigrationAction::Sql(MIGRATION_V17_TOR_CONFIG),
+    },
+    Migration {
+        version: 18,
+        name: "encrypt_visibility_rules",
+        action: MigrationAction::Callback(migrate_v18_encrypt_visibility_rules),
+    },
+    Migration {
+        version: 19,
+        name: "app_password_schema",
+        action: MigrationAction::Sql(MIGRATION_V19_APP_PASSWORD),
+    },
+    Migration {
+        version: 20,
+        name: "duress_settings",
+        action: MigrationAction::Sql(MIGRATION_V20_DURESS_SETTINGS),
+    },
+    Migration {
+        version: 21,
+        name: "decoy_contacts",
+        action: MigrationAction::Sql(MIGRATION_V21_DECOY_CONTACTS),
+    },
+    Migration {
+        version: 22,
+        name: "emergency_config",
+        action: MigrationAction::Sql(MIGRATION_V22_EMERGENCY_CONFIG),
+    },
+    Migration {
+        version: 23,
+        name: "encrypt_label_names",
+        action: MigrationAction::Callback(migrate_v23_encrypt_label_names),
+    },
+    Migration {
+        version: 24,
+        name: "per_contact_ratchet_keys",
+        action: MigrationAction::Callback(migrate_v24_per_contact_ratchet_keys),
+    },
+    Migration {
+        version: 25,
+        name: "contact_delta_version_tracking",
+        action: MigrationAction::Sql(MIGRATION_V25_DELTA_VERSION),
+    },
+    Migration {
+        version: 26,
+        name: "recovery_settings",
+        action: MigrationAction::Sql(MIGRATION_V26_RECOVERY_SETTINGS),
+    },
+    Migration {
+        version: 27,
+        name: "trust_metric_fields",
+        action: MigrationAction::Sql(MIGRATION_V27_TRUST_METRICS),
+    },
+    Migration {
+        version: 28,
+        name: "contact_limits_and_merge",
+        action: MigrationAction::Sql(MIGRATION_V28_LIMITS_AND_MERGE),
+    },
+    Migration {
+        version: 29,
+        name: "onboarding_progress",
+        action: MigrationAction::Sql(MIGRATION_V29_ONBOARDING_PROGRESS),
+    },
+    Migration {
+        version: 30,
+        name: "label_display_name_override",
+        action: MigrationAction::Sql(MIGRATION_V30_LABEL_DISPLAY_NAME_OVERRIDE),
+    },
+    Migration {
+        version: 31,
+        name: "contact_relay_fields",
+        action: MigrationAction::Sql(MIGRATION_V31_CONTACT_RELAY_FIELDS),
+    },
+    Migration {
+        version: 32,
+        name: "trust_and_notes",
+        action: MigrationAction::Sql(MIGRATION_V32_TRUST_AND_NOTES),
+    },
+    Migration {
+        version: 33,
+        name: "trust_metrics_column",
+        action: MigrationAction::Sql(MIGRATION_V33_TRUST_METRICS),
+    },
+    Migration {
+        version: 34,
+        name: "imported_contacts",
+        action: MigrationAction::Sql(MIGRATION_V34_IMPORTED_CONTACTS),
+    },
+    Migration {
+        version: 35,
+        name: "local_groups",
+        action: MigrationAction::Sql(MIGRATION_V35_LOCAL_GROUPS),
+    },
+    Migration {
+        version: 36,
+        name: "sent_delta_version_tracking",
+        action: MigrationAction::Sql(MIGRATION_V36_SENT_DELTA_VERSION),
+    },
+    Migration {
+        version: 37,
+        name: "contact_delete_archive",
+        action: MigrationAction::Sql(MIGRATION_V37_CONTACT_DELETE_ARCHIVE),
+    },
+    Migration {
+        version: 38,
+        name: "exchange_states",
+        action: MigrationAction::Sql(MIGRATION_V38_EXCHANGE_STATES),
+    },
+    Migration {
+        version: 39,
+        name: "ohttp_key_cache",
+        action: MigrationAction::Sql(MIGRATION_V39_OHTTP_KEY_CACHE),
+    },
+    Migration {
+        version: 40,
+        name: "reciprocity_confirmation",
+        action: MigrationAction::Sql(MIGRATION_V40_RECIPROCITY),
+    },
+    Migration {
+        version: 41,
+        name: "activity_log",
+        action: MigrationAction::Sql(MIGRATION_V41_ACTIVITY_LOG),
+    },
+    Migration {
+        version: 42,
+        name: "pin_cache",
+        action: MigrationAction::Sql(MIGRATION_V42_PIN_CACHE),
+    },
+    Migration {
+        version: 43,
+        name: "contact_display",
+        action: MigrationAction::Sql(MIGRATION_V43_CONTACT_DISPLAY),
+    },
+    Migration {
+        version: 44,
+        name: "backup_reminder",
+        action: MigrationAction::Sql(MIGRATION_V44_BACKUP_REMINDER),
+    },
+    Migration {
+        version: 45,
+        name: "recovery_progress",
+        action: MigrationAction::Sql(MIGRATION_V45_RECOVERY_PROGRESS),
+    },
+    Migration {
+        version: 46,
+        name: "app_preferences",
+        action: MigrationAction::Sql(MIGRATION_V46_APP_PREFERENCES),
+    },
+    Migration {
+        version: 47,
+        name: "drop_app_preferences",
+        action: MigrationAction::Sql(MIGRATION_V47_DROP_APP_PREFERENCES),
+    },
+    Migration {
+        version: 48,
+        name: "sync_field_timestamps",
+        action: MigrationAction::Sql(MIGRATION_V48_SYNC_FIELD_TIMESTAMPS),
+    },
+    Migration {
+        version: 49,
+        name: "contact_tags",
+        action: MigrationAction::Sql(MIGRATION_V49_TAGS),
+    },
+    Migration {
+        version: 50,
+        name: "named_places",
+        action: MigrationAction::Sql(MIGRATION_V50_PLACES),
+    },
+    Migration {
+        version: 51,
+        name: "contact_exchange_location",
+        action: MigrationAction::Sql(MIGRATION_V51_EXCHANGE_LOCATION),
+    },
+    Migration {
+        version: 52,
+        name: "contact_last_sent_visible_fields",
+        action: MigrationAction::Sql(MIGRATION_V52_LAST_SENT_VISIBLE_FIELDS),
+    },
+    Migration {
+        version: 53,
+        name: "settings_flags",
+        action: MigrationAction::Sql(MIGRATION_V53_SETTINGS_FLAGS),
+    },
+    Migration {
+        version: 54,
+        name: "relay_url",
+        action: MigrationAction::Sql(MIGRATION_V54_RELAY_URL),
+    },
+    Migration {
+        version: 55,
+        name: "own_card_repropagate",
+        action: MigrationAction::Sql(MIGRATION_V55_OWN_CARD_REPROPAGATE),
+    },
+    Migration {
+        version: 56,
+        name: "group_presentation",
+        action: MigrationAction::Sql(MIGRATION_V56_GROUP_PRESENTATION),
+    },
+    Migration {
+        version: 57,
+        name: "contact_last_sent_display_name",
+        action: MigrationAction::Sql(MIGRATION_V57_LAST_SENT_DISPLAY_NAME),
+    },
+    Migration {
+        version: 58,
+        name: "ux_exchange_defaults",
+        action: MigrationAction::Sql(MIGRATION_V58_EXCHANGE_DEFAULTS),
+    },
+];
 
 /// Migration v58: last-used exchange defaults (groups + mode) on ux_state.
 ///

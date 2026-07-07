@@ -7,7 +7,7 @@
 //! Message serialization, framing, and utilities.
 
 use super::error::NetworkError;
-use super::message::{MessageEnvelope, MessagePayload, PROTOCOL_VERSION};
+use super::message::{MessageEnvelope, MessageId, MessagePayload, PROTOCOL_VERSION};
 
 /// Maximum message size (1 MB).
 pub const MAX_MESSAGE_SIZE: usize = 1_048_576;
@@ -69,12 +69,18 @@ pub fn read_frame_length(header: &[u8; FRAME_HEADER_SIZE]) -> usize {
     u32::from_be_bytes(*header) as usize
 }
 
-/// Creates a new message envelope with a fresh ID and timestamp.
-pub fn create_envelope(payload: MessagePayload, now: u64) -> MessageEnvelope {
+/// Creates a new message envelope with the given ID, timestamp, and payload.
+///
+/// The `message_id` must be unique per envelope. Callers typically generate it
+/// via `rng.uuid_v4()` to avoid ambient non-determinism (C13).
+pub fn create_envelope(
+    payload: MessagePayload,
+    now: u64,
+    message_id: MessageId,
+) -> MessageEnvelope {
     MessageEnvelope {
         version: PROTOCOL_VERSION,
-        // TODO(PFC): ambient UUID despite now parameter — see 2026-07-06-core-pfc-violations C13
-        message_id: uuid::Uuid::new_v4().to_string().into(),
+        message_id,
         timestamp: now,
         payload,
     }
@@ -154,8 +160,8 @@ mod tests {
             message: None,
         });
 
-        let env1 = create_envelope(payload.clone(), 0);
-        let env2 = create_envelope(payload, 0);
+        let env1 = create_envelope(payload.clone(), 0, "test-msg-1".into());
+        let env2 = create_envelope(payload, 0, "test-msg-2".into());
 
         assert_ne!(env1.message_id, env2.message_id);
     }

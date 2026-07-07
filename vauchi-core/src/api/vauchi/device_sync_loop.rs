@@ -37,6 +37,7 @@ use crate::network::mailbox_token::{
 use crate::network::{
     HttpTransportAdapter, MessagePayload, RegisterMailbox, Transport, create_envelope,
 };
+use crate::rng::SecureRngExt;
 use crate::sync::device_sync::SyncItem;
 
 impl Vauchi {
@@ -73,9 +74,11 @@ impl Vauchi {
 
         // Register each batch with the adapter
         for tokens in batches {
+            let message_id = self.rng.uuid_v4().into();
             let envelope = create_envelope(
                 MessagePayload::RegisterMailbox(RegisterMailbox { tokens }),
                 self.clock.unix_seconds(),
+                message_id,
             );
             adapter.send(&envelope).map_err(VauchiError::Network)?;
         }

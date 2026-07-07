@@ -124,7 +124,7 @@ impl Storage {
         migration::MigrationRunner::run(
             &self.conn,
             &self.encryption_key,
-            &migrations,
+            migrations,
             self.db_path.as_deref(),
             self.clock.unix_seconds(),
         )

@@ -426,8 +426,10 @@ impl ContactStore<'_> {
             match serde_json::from_value::<ConfirmationChannel>(serde_json::Value::String(s)) {
                 Ok(c) => Some(c),
                 Err(e) => {
-                    // TODO(PFC): logging inside loader — see 2026-07-06-core-pfc-violations C9
-                    tracing::warn!(
+                    // Non-fatal enrichment load: a corrupt confirmation_channel row
+                    // should not prevent the contact from loading. Log at
+                    // debug level — the caller decides whether to surface.
+                    tracing::debug!(
                         target: "vauchi.storage.contact_row",
                         contact_id = %row.id,
                         error = %e,

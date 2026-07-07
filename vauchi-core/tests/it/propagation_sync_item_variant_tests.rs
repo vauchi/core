@@ -105,7 +105,7 @@ fn apply_sync_deletion_cancelled_clears_state() {
 // @internal
 #[test]
 fn apply_sync_imported_contact_removed_deletes_contact() {
-    let mut wb = make_vauchi();
+    let wb = make_vauchi();
 
     // Add an imported contact directly via storage so we have something
     // to remove. Use a UUID-style id matching the imported-contact convention.
@@ -160,7 +160,7 @@ fn apply_sync_imported_contact_removed_nonexistent_is_skipped_non_fatally() {
 // @internal
 #[test]
 fn apply_sync_personal_note_changed_persists_note() {
-    let mut wb = make_vauchi();
+    let wb = make_vauchi();
     let bob = make_exchanged_contact("Bob");
     let bob_id = bob.id().to_string();
     wb.add_contact(bob).unwrap();
@@ -189,7 +189,7 @@ fn apply_sync_personal_note_changed_persists_note() {
 // @internal
 #[test]
 fn apply_sync_proposal_trust_changed_updates_contact_flag() {
-    let mut wb = make_vauchi();
+    let wb = make_vauchi();
     let bob = make_exchanged_contact("Bob");
     let bob_id = bob.id().to_string();
     wb.add_contact(bob).unwrap();
@@ -252,7 +252,7 @@ fn apply_sync_proposal_trust_changed_for_unknown_contact_is_skipped() {
 // @internal
 #[test]
 fn apply_sync_label_change_creates_then_updates_with_fields() {
-    let mut wb = make_vauchi();
+    let wb = make_vauchi();
     let bob = make_exchanged_contact("Bob");
     let bob_id = bob.id().to_string();
     wb.add_contact(bob).unwrap();
@@ -319,7 +319,7 @@ fn apply_sync_label_change_with_is_deleted_removes_label() {
 // @internal
 #[test]
 fn apply_sync_visibility_changed_writes_per_contact_override() {
-    let mut wb = make_vauchi();
+    let wb = make_vauchi();
     let bob = make_exchanged_contact("Bob");
     let bob_id = bob.id().to_string();
     wb.add_contact(bob).unwrap();
@@ -368,7 +368,7 @@ fn apply_sync_imported_contact_add_update_remove_roundtrip() {
     let mut updated_sync_data = sync_data;
     updated_sync_data.display_name = "Dora Updated".to_string();
     let mut updated_card = ContactCard::new("Dora Updated");
-    updated_card.set_display_name("Dora Updated");
+    let _ = updated_card.set_display_name("Dora Updated");
     updated_sync_data.card_json = serde_json::to_string(&updated_card).unwrap();
 
     let applied = wb

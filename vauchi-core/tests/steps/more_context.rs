@@ -5,7 +5,6 @@
 //! Third batch of common context-setup step bindings.
 
 use cucumber::{given, then, when};
-use vauchi_core::{ContactField, FieldType, Vauchi};
 
 use crate::VauchiWorld;
 

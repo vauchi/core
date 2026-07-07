@@ -562,7 +562,7 @@ fn backup_restore_captures_pasted_data_and_requires_it() {
     );
 
     // Password set but no pasted data → continue must fail on backup_data.
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
     });
@@ -575,7 +575,7 @@ fn backup_restore_captures_pasted_data_and_requires_it() {
     );
 
     // Paste the blob → captured, and continue now advances.
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "backup_data".into(),
         value: "deadbeef".into(),
     });
@@ -599,7 +599,7 @@ fn backup_password_value_is_reflected_for_keyboard_frontends() {
         false,
         vauchi_app::i18n::Locale::English,
     );
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "secret".into(),
     });

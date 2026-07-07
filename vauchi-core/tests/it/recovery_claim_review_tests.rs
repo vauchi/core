@@ -268,7 +268,7 @@ fn remind_returns_complete() {
 #[test]
 fn done_from_voucher_qr_returns_complete() {
     let mut engine = vouching_engine(Confidence::High);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "vouch".into(),
     });
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -299,7 +299,7 @@ fn accept_high_confidence_returns_complete() {
 #[test]
 fn confirm_risky_accept_returns_complete() {
     let mut engine = acceptance_engine(Confidence::Low);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "accept_anyway".into(),
     });
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -315,7 +315,7 @@ fn confirm_risky_accept_returns_complete() {
 #[test]
 fn cancel_from_confirm_returns_to_review() {
     let mut engine = acceptance_engine(Confidence::Low);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "accept_anyway".into(),
     });
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -348,7 +348,7 @@ fn unknown_action_returns_update_screen() {
 #[test]
 fn was_cancelled_after_reject() {
     let mut engine = acceptance_engine(Confidence::Low);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "reject".into(),
     });
     assert!(engine.was_cancelled(), "reject should mark as cancelled");

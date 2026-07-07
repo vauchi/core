@@ -7,8 +7,6 @@
 //! Feature file: features/privacy_compliance.feature @deletion
 //! Tests for scheduled deletion with 7-day grace period.
 
-use crate::common;
-
 use vauchi_core::api::DeletionManager;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::identity::Identity;

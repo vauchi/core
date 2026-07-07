@@ -91,8 +91,6 @@ fn identity_check_create_new_goes_to_default_name() {
 
 // @internal
 #[test]
-// @internal
-#[test]
 fn identity_check_link_device_emits_qr_scan_command() {
     use vauchi_core::Command;
     let mut engine = OnboardingEngine::new();
@@ -179,19 +177,6 @@ fn device_link_instructions_back_returns_to_identity_check() {
             assert_eq!(screen.screen_id, "identity_check");
         }
         other => panic!("Expected NavigateTo(identity_check), got {other:?}"),
-    }
-}
-
-fn identity_check_unknown_action_returns_update_screen() {
-    let mut engine = OnboardingEngine::new();
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "nonexistent".into(),
-    });
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "identity_check");
-        }
-        other => panic!("Expected UpdateScreen for unknown action, got {other:?}"),
     }
 }
 

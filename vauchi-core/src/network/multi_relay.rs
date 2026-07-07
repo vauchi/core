@@ -235,6 +235,11 @@ pub struct RelayHealth {
     /// `should_retry_at` retains its explicit `now: Instant` parameter
     /// for callers that prefer to supply the instant directly.
     monotonic: Arc<dyn MonotonicClock>,
+    /// Explicit-randomness seam (Phase 1 / Task 1.2). Drives cooldown
+    /// jitter for thundering-herd prevention. Defaults to
+    /// `OsSecureRng::shared()`; inject via [`RelayHealth::with_rng`]
+    /// for deterministic tests.
+    rng: Arc<dyn crate::rng::SecureRng>,
 }
 
 impl Default for RelayHealth {
@@ -251,6 +256,7 @@ impl RelayHealth {
             base_cooldown: Duration::from_secs(5),
             max_cooldown: Duration::from_secs(300), // 5 minutes
             monotonic: SystemMonotonicClock::shared(),
+            rng: crate::rng::OsSecureRng::shared(),
         }
     }
 
@@ -261,6 +267,7 @@ impl RelayHealth {
             base_cooldown,
             max_cooldown: Duration::from_secs(300),
             monotonic: SystemMonotonicClock::shared(),
+            rng: crate::rng::OsSecureRng::shared(),
         }
     }
 
@@ -270,6 +277,15 @@ impl RelayHealth {
     #[must_use]
     pub fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
         self.monotonic = monotonic;
+        self
+    }
+
+    /// Replace the [`SecureRng`] driving cooldown jitter.
+    /// Default is [`OsSecureRng::shared`]; inject a `DeterministicRng`
+    /// for deterministic jitter tests.
+    #[must_use]
+    pub fn with_rng(mut self, rng: Arc<dyn crate::rng::SecureRng>) -> Self {
+        self.rng = rng;
         self
     }
 
@@ -361,9 +377,7 @@ impl RelayHealth {
             return Duration::ZERO;
         }
         let half = max_ms / 2;
-        // Non-crypto RNG: cooldown jitter for thundering herd prevention
-        // TODO(PFC): ambient RNG for jitter — see 2026-07-06-core-pfc-violations C6
-        let jittered = half + (rand::Rng::gen_range(&mut crate::rng::non_crypto_rng(), 0..=half));
+        let jittered = half + self.rng.random_in_range_u64(0, half);
         Duration::from_millis(jittered)
     }
 }

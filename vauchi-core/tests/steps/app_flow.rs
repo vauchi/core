@@ -105,7 +105,7 @@ fn tap(world: &mut VauchiWorld, label: String) {
             "no affordance labeled {label:?} on the current screen; visible strings: {strings:?}"
         )
     });
-    engine(world).handle_action(UserAction::ActionPressed { action_id });
+    let _ = engine(world).handle_action(UserAction::ActionPressed { action_id });
 }
 
 #[then(expr = "I should see {string}")]

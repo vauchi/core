@@ -734,7 +734,7 @@ fn test_initiator_process_key_ack_rejects_self_identity() {
         card.clone(),
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
-    let mut attacker = BleHandshakeSession::new_responder(
+    let attacker = BleHandshakeSession::new_responder(
         &identity,
         card,
         vauchi_core::clock::SystemClock::shared().unix_seconds(),

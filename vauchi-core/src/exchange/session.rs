@@ -1302,8 +1302,10 @@ impl ExchangeSession {
                 value,
                 self.clock.unix_seconds(),
             )) {
-                // TODO(PFC): logging inside session logic — see 2026-07-06-core-pfc-violations C9
-tracing::warn!(
+                // ADR-042-shape lenient: keep the peer card, drop only the
+                // failing field. Log at debug level — the caller decides
+                // whether to surface warnings to the user.
+                tracing::debug!(
                     error = %e,
                     "ble exchange: dropping peer field that failed validation"
                 );
@@ -1319,8 +1321,9 @@ tracing::warn!(
             // — but log so we see corrupt-payload rates from peers.
             // PII-safe: ContactCardError variants do not include the
             // avatar bytes or any peer identifier.
-            // TODO(PFC): logging inside session logic — see 2026-07-06-core-pfc-violations C9
-tracing::warn!(
+            // Log at debug level — the caller decides whether to surface
+            // warnings to the user.
+            tracing::debug!(
                 error = %e,
                 "ble exchange: dropping peer avatar that failed normalization (ADR-042)"
             );

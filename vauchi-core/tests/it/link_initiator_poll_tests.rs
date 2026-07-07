@@ -41,7 +41,7 @@ fn onboarded_engine_at(mock: &MockRelay) -> (AppEngine, tempfile::TempDir) {
         .build()
         .expect("build vauchi");
     let mut engine = AppEngine::new(vauchi);
-    drive_onboarding(&mut engine);
+    let _ = drive_onboarding(&mut engine);
     (engine, dir)
 }
 

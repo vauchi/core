@@ -148,17 +148,17 @@ fn editing_contact_display_name_persists_through_completion() {
     });
 
     // Edit the display name, advance through the wizard, and save.
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bobby".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     }); // EditFields -> EditVisibility
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     }); // EditVisibility -> Preview
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "save".into(),
     });
 

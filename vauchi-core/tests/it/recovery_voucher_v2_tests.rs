@@ -9,7 +9,7 @@
 //! - @recovery @trust: guardian token in vouchers
 //! - @recovery @security: voucher v2 validation
 
-use vauchi_core::crypto::{PublicKey, SigningKeyPair};
+use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::recovery::guardian::GuardianToken;
 use vauchi_core::{RecoveryClaim, RecoveryError, RecoveryProof, RecoveryVoucher};
 

@@ -9,9 +9,7 @@
 
 #![cfg(feature = "testing")]
 
-use vauchi_core::diagnostic::exchange_debug::{
-    ExchangeDebugEvent, ExchangeDebugLog, LatencySummary,
-};
+use vauchi_core::diagnostic::exchange_debug::{ExchangeDebugEvent, ExchangeDebugLog};
 
 // ===== CommandDispatched event =====
 

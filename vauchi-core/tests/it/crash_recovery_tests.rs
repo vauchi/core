@@ -7,8 +7,6 @@
 //! Feature file: features/platform_edge_cases.feature @crash-recovery
 //! Tests for atomic sync checkpoint persistence and crash resume.
 
-use crate::common;
-
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::Storage;
 use vauchi_core::sync::SyncItem;

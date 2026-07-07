@@ -7,8 +7,6 @@
 //! Feature file: features/performance.feature @pagination @search
 //! Tests for paginated contact listing and SQL-level search.
 
-use crate::common;
-
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;

@@ -9,8 +9,6 @@
 //!
 //! Feature: privacy_compliance.feature @erasure @gdpr
 
-use crate::common;
-
 use vauchi_core::api::{
     DeletionManager, PreSignedPurgeRequest, PurgeSender, RevocationSender, ShredError,
     ShredManager, ShredToken,

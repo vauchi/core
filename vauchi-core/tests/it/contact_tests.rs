@@ -5,7 +5,6 @@
 //! Tests for contact
 //! Extracted from mod.rs
 
-use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::contact::TrustLevel;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::*;

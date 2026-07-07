@@ -118,11 +118,10 @@ pub fn import_vcard(vcard: &str, now: u64) -> Result<ContactCard, VCardError> {
         let field_type_owned = field_type.clone();
         if let Err(e) = card.add_field(ContactField::new(field_type, &label, &value, now)) {
             // ADR-042-shape lenient import: keep the contact, drop only
-            // the failing field — surface validation failures so operators
-            // see corrupt-payload rates from imports. PII-safe:
-            // ContactCardError variants carry no field value or label.
-            // TODO(PFC): logging inside parser — see 2026-07-06-core-pfc-violations C9
-            tracing::warn!(
+            // the failing field. PII-safe: ContactCardError variants carry
+            // no field value or label. Log at debug level — the caller
+            // decides whether to surface warnings to the user.
+            tracing::debug!(
                 error = %e,
                 field_type = ?field_type_owned,
                 "vcard4 import: dropping field that failed validation"

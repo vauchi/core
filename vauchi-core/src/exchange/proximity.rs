@@ -7,6 +7,7 @@
 //! Trait-based proximity verification to prevent remote QR code scanning attacks.
 //! Implementations can use ultrasonic audio, BLE, or other mechanisms.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use thiserror::Error;
 
@@ -215,15 +216,14 @@ impl ProximityVerifier for MockProximityVerifier {
 /// comparing fingerprints displayed on both screens).
 pub struct ManualConfirmationVerifier {
     /// Whether the user confirmed proximity
-    // TODO(PFC): Mutex hidden state in verifier — see 2026-07-06-core-pfc-violations C3
-    confirmed: std::sync::Mutex<bool>,
+    confirmed: AtomicBool,
 }
 
 impl ManualConfirmationVerifier {
     /// Creates a new manual confirmation verifier.
     pub fn new() -> Self {
         ManualConfirmationVerifier {
-            confirmed: std::sync::Mutex::new(false),
+            confirmed: AtomicBool::new(false),
         }
     }
 
@@ -234,7 +234,7 @@ impl ManualConfirmationVerifier {
     #[cfg(any(test, feature = "testing"))]
     pub fn pre_confirmed() -> Self {
         ManualConfirmationVerifier {
-            confirmed: std::sync::Mutex::new(true),
+            confirmed: AtomicBool::new(true),
         }
     }
 
@@ -245,18 +245,18 @@ impl ManualConfirmationVerifier {
     #[cfg(any(test, feature = "testing"))]
     pub fn with_state(confirmed: bool) -> Self {
         ManualConfirmationVerifier {
-            confirmed: std::sync::Mutex::new(confirmed),
+            confirmed: AtomicBool::new(confirmed),
         }
     }
 
     /// Call this when the user confirms proximity.
     pub fn confirm(&self) {
-        *self.confirmed.lock().expect("mutex poisoned") = true;
+        self.confirmed.store(true, Ordering::Release);
     }
 
     /// Check if the user has confirmed.
     pub fn is_confirmed(&self) -> bool {
-        *self.confirmed.lock().expect("mutex poisoned")
+        self.confirmed.load(Ordering::Acquire)
     }
 }
 

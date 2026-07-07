@@ -16,8 +16,6 @@
 //!
 //! Traces to: _private/features/visibility.feature @visibility @preview-as
 
-use crate::common;
-
 use proptest::prelude::*;
 
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};

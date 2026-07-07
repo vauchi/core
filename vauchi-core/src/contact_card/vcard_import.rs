@@ -345,11 +345,10 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<Stri
         // ADR-042: set_avatar normalizes any input image to WebP <= 32 KB.
         // A failure here means the source image was unrecognized or too
         // large to fit within the size cap after resizing. Lenient
-        // import: keep the contact, drop only the avatar — but surface
-        // the kind of failure so operators can see corrupt-payload rates.
+        // import: keep the contact, drop only the avatar.
         // PII-safe: ContactCardError variants do not include image bytes.
-        // TODO(PFC): logging inside importer — see 2026-07-06-core-pfc-violations C9
-        tracing::warn!(
+        // Log at debug level — the caller decides whether to surface warnings.
+        tracing::debug!(
             error = %e,
             "vcard import: dropping avatar that failed normalization (ADR-042)"
         );
@@ -359,14 +358,10 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<Stri
         let field = ContactField::new(field_type.clone(), &label, &value, now);
         if let Err(e) = card.add_field(field) {
             // ADR-042-shape lenient import: keep the contact, drop only
-            // the failing field — but surface the failure so operators
-            // see corrupt-payload rates from imports. PII-safe:
-            // ContactCardError variants (MaxFieldsReached,
-            // Validation(InvalidPhone|InvalidEmail|InvalidUrl|
-            // ValueTooLong|EmptyValue)) carry no field value or label;
-            // field_type is metadata (Phone/Email/Social/...).
-            // TODO(PFC): logging inside importer — see 2026-07-06-core-pfc-violations C9
-            tracing::warn!(
+            // the failing field. PII-safe: ContactCardError variants carry
+            // no field value or label; field_type is metadata.
+            // Log at debug level — the caller decides whether to surface warnings.
+            tracing::debug!(
                 error = %e,
                 field_type = ?field_type,
                 "vcard import: dropping field that failed validation"

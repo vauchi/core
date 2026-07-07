@@ -266,7 +266,10 @@ impl HttpTransport {
             .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())
             .call()
             .map_err(Self::map_ureq_error)?;
-        self.check_response_status(&resp)?;
+        let policy = self.check_response_status(&resp)?;
+        if let (Some(p), Ok(mut stored)) = (policy, self.last_version_policy.lock()) {
+            *stored = Some(p);
+        }
         let body = resp
             .into_body()
             .read_to_vec()
@@ -299,7 +302,10 @@ impl HttpTransport {
             .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())
             .call()
             .map_err(Self::map_ureq_error)?;
-        self.check_response_status(&resp)?;
+        let policy = self.check_response_status(&resp)?;
+        if let (Some(p), Ok(mut stored)) = (policy, self.last_version_policy.lock()) {
+            *stored = Some(p);
+        }
         let body = resp
             .into_body()
             .read_to_vec()
@@ -712,7 +718,10 @@ impl HttpTransport {
             .content_type("message/ohttp-req")
             .send(encrypted)
             .map_err(Self::map_ureq_error)?;
-        self.check_response_status(&resp)?;
+        let policy = self.check_response_status(&resp)?;
+        if let (Some(p), Ok(mut stored)) = (policy, self.last_version_policy.lock()) {
+            *stored = Some(p);
+        }
 
         // Read raw response bytes
         let enc_response = resp
@@ -746,12 +755,12 @@ impl HttpTransport {
     fn check_response_status(
         &self,
         resp: &ureq::http::Response<ureq::Body>,
-    ) -> Result<(), NetworkError> {
-        self.extract_version_policy(resp);
+    ) -> Result<Option<VersionPolicy>, NetworkError> {
+        let policy = Self::extract_version_policy(resp);
 
         let status = resp.status().as_u16();
         match status {
-            200..=299 => Ok(()),
+            200..=299 => Ok(policy),
             426 => {
                 let min_version = resp
                     .headers()
@@ -774,9 +783,9 @@ impl HttpTransport {
         }
     }
 
-    /// Extract version policy from response headers and store it.
-    // TODO(PFC): parsing mutates transport state — see 2026-07-06-core-pfc-violations C4
-    fn extract_version_policy(&self, resp: &ureq::http::Response<ureq::Body>) {
+    /// Extract version policy from response headers. Returns `None` if no
+    /// version headers are present.
+    fn extract_version_policy(resp: &ureq::http::Response<ureq::Body>) -> Option<VersionPolicy> {
         let min = resp
             .headers()
             .get("X-Min-Version")
@@ -791,10 +800,10 @@ impl HttpTransport {
             .and_then(|v| v.to_str().ok());
 
         let policy = VersionPolicy::from_headers(min, warn, deadline);
-        if !policy.is_none_policy()
-            && let Ok(mut stored) = self.last_version_policy.lock()
-        {
-            *stored = Some(policy);
+        if policy.is_none_policy() {
+            None
+        } else {
+            Some(policy)
         }
     }
 
@@ -809,7 +818,10 @@ impl HttpTransport {
             .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())
             .send_json(body)
             .map_err(Self::map_ureq_error)?;
-        self.check_response_status(&resp)?;
+        let policy = self.check_response_status(&resp)?;
+        if let (Some(p), Ok(mut stored)) = (policy, self.last_version_policy.lock()) {
+            *stored = Some(p);
+        }
 
         resp.into_body()
             .read_json::<Resp>()
@@ -823,7 +835,10 @@ impl HttpTransport {
             .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())
             .call()
             .map_err(Self::map_ureq_error)?;
-        self.check_response_status(&resp)?;
+        let policy = self.check_response_status(&resp)?;
+        if let (Some(p), Ok(mut stored)) = (policy, self.last_version_policy.lock()) {
+            *stored = Some(p);
+        }
 
         resp.into_body()
             .read_json::<Resp>()

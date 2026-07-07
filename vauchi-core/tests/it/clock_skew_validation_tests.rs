@@ -7,8 +7,6 @@
 //! Feature file: features/platform_edge_cases.feature @time @clock-skew
 //! Tests for configurable clock skew tolerance and ReplayDetector persistence.
 
-use crate::common;
-
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::Storage;
 use vauchi_core::sync::ReplayDetector;

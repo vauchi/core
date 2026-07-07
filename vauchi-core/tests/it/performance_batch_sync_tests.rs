@@ -7,8 +7,6 @@
 //! Feature file: features/performance.feature @coalesce @batch-encrypt
 //! Tests for rapid edit coalescing and batch encryption pipelines.
 
-use crate::common;
-
 use vauchi_core::SyncManager;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;

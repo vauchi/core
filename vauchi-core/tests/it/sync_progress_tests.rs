@@ -8,8 +8,6 @@
 //! processed counts and correct total.
 //! Traces to: features/performance.feature @progress
 
-use crate::common;
-
 use std::sync::{Arc, Mutex};
 use vauchi_core::api::events::{EventDispatcher, VauchiEvent};
 

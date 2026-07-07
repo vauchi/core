@@ -7,8 +7,6 @@
 //! Verifies that Storage applies performance-critical PRAGMAs on open.
 //! Traces to: features/performance.feature @resources
 
-use crate::common;
-
 use tempfile::NamedTempFile;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::Storage;

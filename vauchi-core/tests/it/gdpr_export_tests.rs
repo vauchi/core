@@ -7,8 +7,6 @@
 //! Feature file: features/privacy_compliance.feature @export @enhanced
 //! Tests for enhanced data export with devices, recovery, and consent.
 
-use crate::common;
-
 use vauchi_core::api::export_all_data;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};

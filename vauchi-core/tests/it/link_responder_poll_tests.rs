@@ -44,7 +44,7 @@ fn onboarded_engine_at(mock: &MockRelay) -> (AppEngine, tempfile::TempDir) {
         .build()
         .expect("build vauchi");
     let mut engine = AppEngine::new(vauchi);
-    drive_onboarding(&mut engine);
+    let _ = drive_onboarding(&mut engine);
     (engine, dir)
 }
 
@@ -54,7 +54,7 @@ fn grant_into_responder(engine: &mut AppEngine) {
     let (init, _) = initiator_generate();
     let payload = parse_exchange_deep_link(&init.url).expect("parse deep link");
     engine.navigate_to(AppScreen::DeepLinkConsent { payload });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "grant".to_string(),
     });
     assert_eq!(

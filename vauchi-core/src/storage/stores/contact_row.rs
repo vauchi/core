@@ -231,8 +231,10 @@ impl ContactStore<'_> {
                 .and_then(|s| match serde_json::from_str(&s) {
                     Ok(m) => Some(m),
                     Err(e) => {
-                        // TODO(PFC): logging inside loader — see 2026-07-06-core-pfc-violations C9
-                        tracing::warn!(
+                        // Non-fatal enrichment load: a corrupt trust_metrics row
+                        // should not prevent the contact from loading. Log at
+                        // debug level — the caller decides whether to surface.
+                        tracing::debug!(
                             target: "vauchi.storage.contact_row",
                             contact_id = %row.id,
                             error = %e,
@@ -249,8 +251,10 @@ impl ContactStore<'_> {
             match serde_json::from_value::<Reciprocity>(serde_json::Value::String(s)) {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    // TODO(PFC): logging inside loader — see 2026-07-06-core-pfc-violations C9
-                    tracing::warn!(
+                    // Non-fatal enrichment load: a corrupt reciprocity row
+                    // should not prevent the contact from loading. Log at
+                    // debug level — the caller decides whether to surface.
+                    tracing::debug!(
                         target: "vauchi.storage.contact_row",
                         contact_id = %row.id,
                         error = %e,

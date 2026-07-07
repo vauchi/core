@@ -36,7 +36,7 @@ fn contact_item(id: &str, name: &str) -> Item {
 /// A fresh engine advanced to the ContactIds step with the given pool available.
 fn engine_at_contacts(available: Vec<Item>) -> EmergencyBroadcastEngine {
     let mut engine = EmergencyBroadcastEngine::new(None).with_available_contacts(available);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
     engine
@@ -113,11 +113,11 @@ fn configure_flow_saves_with_save_outcome() {
     );
 
     // pick both recipients → continue to message
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "contact_ids".into(),
         item_id: "abc".into(),
     });
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "contact_ids".into(),
         item_id: "def".into(),
     });
@@ -127,11 +127,11 @@ fn configure_flow_saves_with_save_outcome() {
     assert!(matches!(r, ActionResult::NavigateTo(ref s) if s.screen_id == "emergency_message"));
 
     // edit message, toggle location, save → Complete with Save outcome
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "message".into(),
         value: "I need help".into(),
     });
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "options".into(),
         item_id: "include_location".into(),
     });
@@ -160,7 +160,7 @@ fn too_many_contacts_is_rejected() {
         .collect();
     let mut engine = engine_at_contacts(available.clone());
     for c in &available {
-        engine.handle_action(UserAction::ItemToggled {
+        let _ = engine.handle_action(UserAction::ItemToggled {
             component_id: "contact_ids".into(),
             item_id: c.id.clone(),
         });
@@ -196,7 +196,7 @@ fn send_flow_requires_confirmation_and_sets_send_outcome() {
     assert_eq!(engine.outcome(), None, "cancel must not set an outcome");
 
     // send again, confirm → Complete with Send outcome
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "send".into(),
     });
     let r = engine.handle_action(UserAction::ActionPressed {
@@ -227,13 +227,13 @@ fn disable_requires_confirmation_and_sets_disable_outcome() {
     assert!(has_confirm, "disable shows an InlineConfirm");
 
     // cancel clears it, no outcome
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel_disable".into(),
     });
     assert_eq!(engine.outcome(), None);
 
     // disable + confirm → Complete with Disable outcome
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "disable".into(),
     });
     let r = engine.handle_action(UserAction::ActionPressed {
@@ -249,7 +249,7 @@ fn textinput_enter_submit_advances_like_continue_and_save() {
     // The message field keeps the keyboard Enter convention (`submit_<id>`);
     // the contacts step is now a picker advanced by `continue`.
     let mut engine = engine_at_contacts(vec![contact_item("abc", "Abby")]);
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "contact_ids".into(),
         item_id: "abc".into(),
     });
@@ -277,7 +277,7 @@ fn textinput_enter_submit_advances_like_continue_and_save() {
 fn contacts_picker_renders_pool_and_reflects_selection() {
     let mut engine =
         engine_at_contacts(vec![contact_item("x", "Xander"), contact_item("y", "Yara")]);
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "contact_ids".into(),
         item_id: "x".into(),
     });

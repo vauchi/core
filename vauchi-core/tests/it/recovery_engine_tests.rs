@@ -163,7 +163,7 @@ fn start_recovery_transitions_to_show_claim_qr() {
 fn cancel_from_claim_qr_returns_to_status() {
     let mut engine = quorum_met();
     engine.set_claim_data([0xAB; 32]);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_recovery".into(),
     });
 
@@ -188,7 +188,7 @@ fn cancel_from_claim_qr_returns_to_status() {
 fn wait_for_voucher_shows_collection_screen() {
     let mut engine = quorum_met();
     engine.set_claim_data([0xAB; 32]);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_recovery".into(),
     });
 
@@ -213,10 +213,10 @@ fn wait_for_voucher_shows_collection_screen() {
 fn add_voucher_updates_progress_count() {
     let mut engine = quorum_met();
     engine.set_claim_data([0xAB; 32]);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_recovery".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "wait_for_voucher".into(),
     });
 
@@ -235,10 +235,10 @@ fn add_voucher_updates_progress_count() {
 fn threshold_met_enables_submit() {
     let mut engine = quorum_met();
     engine.set_claim_data([0xAB; 32]);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_recovery".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "wait_for_voucher".into(),
     });
 
@@ -260,10 +260,10 @@ fn threshold_met_enables_submit() {
 fn submit_proof_transitions_to_complete() {
     let mut engine = quorum_met();
     engine.set_claim_data([0xAB; 32]);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_recovery".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "wait_for_voucher".into(),
     });
     engine.add_voucher_for_testing("Alice");
@@ -296,16 +296,16 @@ fn submit_proof_transitions_to_complete() {
 fn done_from_complete_returns_complete() {
     let mut engine = quorum_met();
     engine.set_claim_data([0xAB; 32]);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_recovery".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "wait_for_voucher".into(),
     });
     engine.add_voucher_for_testing("Alice");
     engine.add_voucher_for_testing("Bob");
     engine.add_voucher_for_testing("Carol");
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "submit_proof".into(),
     });
 
@@ -338,10 +338,10 @@ fn recovery_unknown_action_returns_update_screen() {
 fn submit_before_threshold_not_enabled() {
     let mut engine = quorum_met();
     engine.set_claim_data([0xAB; 32]);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_recovery".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "wait_for_voucher".into(),
     });
     engine.add_voucher_for_testing("Alice");
@@ -402,16 +402,16 @@ fn no_linked_devices_hides_hint() {
 fn complete_screen_explains_what_is_recovered() {
     let mut engine = quorum_met();
     engine.set_claim_data([0xAB; 32]);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_recovery".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "wait_for_voucher".into(),
     });
     engine.add_voucher_for_testing("Alice");
     engine.add_voucher_for_testing("Bob");
     engine.add_voucher_for_testing("Carol");
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "submit_proof".into(),
     });
 

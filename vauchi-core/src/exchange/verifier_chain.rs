@@ -9,7 +9,7 @@
 //! to the next verifier. The first successful verifier determines the
 //! final confidence level.
 
-use std::sync::Mutex;
+use std::sync::RwLock;
 use std::time::Duration;
 
 use super::verifier_event::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};
@@ -51,9 +51,9 @@ type EventCallback = Box<dyn Fn(&ProximityVerifierEvent) + Send + Sync>;
 pub struct VerifierChain {
     entries: Vec<ChainEntry>,
     /// Result from the most recent `verify_proximity_two_way` call.
-    /// Single Mutex ensures log + confidence are atomically consistent.
-    // TODO(PFC): Mutex hidden state in verifier — see 2026-07-06-core-pfc-violations C3
-    last_result: Mutex<Option<VerificationResult>>,
+    /// `RwLock` allows concurrent reads (confidence_level, last_event_log, winning_method)
+    /// without blocking — the write in verify_proximity_two_way is brief and infrequent.
+    last_result: RwLock<Option<VerificationResult>>,
     /// Optional callback for real-time event emission during verification.
     event_callback: Option<EventCallback>,
 }
@@ -62,7 +62,7 @@ impl VerifierChain {
     pub fn new() -> Self {
         VerifierChain {
             entries: Vec::new(),
-            last_result: Mutex::new(None),
+            last_result: RwLock::new(None),
             event_callback: None,
         }
     }
@@ -171,10 +171,9 @@ impl VerifierChain {
     /// trait) has not been called yet.
     pub fn last_event_log(&self) -> Option<VerifierEventLog> {
         self.last_result
-            .lock()
-            .expect("mutex poisoned")
-            .as_ref()
-            .map(|r| r.log.clone())
+            .read()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|r| r.log.clone()))
     }
 
     /// Returns the winning verifier method from the last successful verification.
@@ -183,10 +182,9 @@ impl VerifierChain {
     /// methods were exhausted without success.
     pub fn winning_method(&self) -> Option<VerifierMethod> {
         self.last_result
-            .lock()
-            .expect("mutex poisoned")
-            .as_ref()
-            .and_then(|r| r.winning_method)
+            .read()
+            .ok()
+            .and_then(|guard| guard.as_ref().and_then(|r| r.winning_method))
     }
 }
 
@@ -211,10 +209,9 @@ impl ProximityVerifier for VerifierChain {
         // Return the winning verifier's confidence from the last successful run.
         // Falls back to Unknown if no verification has been performed yet.
         self.last_result
-            .lock()
-            .expect("mutex poisoned")
-            .as_ref()
-            .and_then(|r| r.winning_confidence)
+            .read()
+            .ok()
+            .and_then(|guard| guard.as_ref().and_then(|r| r.winning_confidence))
             .unwrap_or(ProximityConfidence::Unknown)
     }
 
@@ -251,11 +248,13 @@ impl ProximityVerifier for VerifierChain {
         let winning_method = log.final_method();
 
         // Store log + confidence + method atomically in a single lock acquisition
-        *self.last_result.lock().expect("mutex poisoned") = Some(VerificationResult {
-            log,
-            winning_confidence,
-            winning_method,
-        });
+        if let Ok(mut guard) = self.last_result.write() {
+            *guard = Some(VerificationResult {
+                log,
+                winning_confidence,
+                winning_method,
+            });
+        }
 
         if winning_confidence.is_some() {
             Ok(())

@@ -7,8 +7,6 @@
 //! Enforces non-functional performance requirements from features/performance.feature.
 //! These tests ARE the implementation — they codify threshold assertions.
 
-use crate::common;
-
 use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
 use vauchi_core::contact::Contact;

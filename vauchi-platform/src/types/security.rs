@@ -107,21 +107,13 @@ impl From<&vauchi_core::storage::DeletionState> for MobileDeletionInfo {
             vauchi_core::storage::DeletionState::Scheduled {
                 scheduled_at,
                 execute_at,
-            } => {
-                // TODO(PFC): SystemTime::now() inside From impl — see 2026-07-06-core-pfc-violations C2
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                let remaining_secs = execute_at.saturating_sub(now);
-                let days_remaining = (remaining_secs / 86400) as u32;
-                MobileDeletionInfo {
-                    state: MobileDeletionState::Scheduled,
-                    scheduled_at: *scheduled_at,
-                    execute_at: *execute_at,
-                    days_remaining,
-                }
-            }
+            } => MobileDeletionInfo {
+                state: MobileDeletionState::Scheduled,
+                scheduled_at: *scheduled_at,
+                execute_at: *execute_at,
+                days_remaining: 0,
+            },
+
             vauchi_core::storage::DeletionState::Executed { .. } => MobileDeletionInfo {
                 state: MobileDeletionState::Executed,
                 scheduled_at: 0,

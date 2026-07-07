@@ -50,9 +50,10 @@ impl PlatformAppEngine {
                 engine.invalidate_screen(&AppScreen::Settings);
                 engine.invalidate_screen(&AppScreen::Privacy);
                 engine.invalidate_screen(&AppScreen::EmergencyShred);
-                Ok(DomainCommandResult::DeletionInfo {
-                    info: crate::types::MobileDeletionInfo::from(&state),
-                })
+                let now = engine.vauchi().clock().unix_seconds();
+                let mut info = crate::types::MobileDeletionInfo::from(&state);
+                info.days_remaining = ((info.execute_at.saturating_sub(now)) / 86400) as u32;
+                Ok(DomainCommandResult::DeletionInfo { info })
             }
             DomainCommand::CancelIdentityDeletion => {
                 let storage = engine.vauchi().storage();
@@ -108,10 +109,7 @@ impl PlatformAppEngine {
                     vauchi_core::storage::DeletionState::None => MShred::None,
                     vauchi_core::storage::DeletionState::Scheduled { execute_at, .. } => {
                         // TODO(PFC): SystemTime::now() in PAE dispatch — see 2026-07-06-core-pfc-violations C8
-                        let now = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_secs())
-                            .unwrap_or(0);
+                        let now = engine.vauchi().clock().unix_seconds();
                         MShred::Scheduled {
                             remaining_secs: execute_at.saturating_sub(now),
                         }

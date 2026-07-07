@@ -11,8 +11,6 @@
 //! - New aha moment types
 //! - Label members (get_group_members) API
 
-use crate::common;
-
 use vauchi_core::{
     AhaMomentType, Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
 };

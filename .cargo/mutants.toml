@@ -54,6 +54,11 @@ timeout_multiplier = 1.5
 # Use nextest for faster mutant killing (exits on first failure)
 test_tool = "nextest"
 
+# Build with the `mutants` profile (debug = "none") for ~25% faster per-mutant
+# builds vs the default `test` profile. Measured 2026-07-07: clean build of
+# vauchi-core drops from 17.0s to 12.8s (saves ~4.2s per mutant).
+profile = "mutants"
+
 # Skip doctests — each doctest compiles as a separate binary, slow for mutation.
 # `--features testing` enables the `it` integration target (required-features =
 # ["testing"]). Without it, the entire integration suite — the bulk of the

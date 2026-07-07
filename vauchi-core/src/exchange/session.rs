@@ -882,118 +882,151 @@ impl ExchangeSession {
     /// 3. Emits response commands based on the new state
     ///
     /// After calling this, use `drain_commands()` to get outgoing commands.
-    // TODO(PFC): giant catch-all match — see 2026-07-06-core-pfc-violations C15
     pub fn apply_hardware_event(&mut self, event: Event) -> Result<(), ExchangeError> {
         match event {
-            Event::QrScanned { data } => {
-                let qr = ExchangeQR::from_data_string(&data)?;
-                self.apply(ExchangeEvent::ProcessQR(qr))
-            }
-            Event::NfcDataReceived { data } => {
-                let result = self.apply(ExchangeEvent::NfcTapComplete {
-                    their_payload: data,
-                });
-                // Deactivate NFC interface after tap is processed
-                if result.is_ok() {
-                    self.emit_command(Command::NfcDeactivate);
-                }
-                result
-            }
-            Event::BleConnected { device_id } => {
-                self.handle_ble_connected(device_id)
-            }
+            Event::QrScanned { data } => self.handle_qr_scanned(data),
+            Event::NfcDataReceived { data } => self.handle_nfc_data_received(data),
+            Event::BleConnected { device_id } => self.handle_ble_connected(device_id),
             Event::BleCharacteristicRead { uuid, data }
             | Event::BleCharacteristicNotified { uuid, data } => {
                 self.handle_ble_characteristic_data(uuid, data)
             }
+            Event::BleDeviceDiscovered { id, .. } => self.handle_ble_device_discovered(id),
+            Event::BleDisconnected { reason } => self.handle_ble_disconnected(reason),
+            Event::HardwareError { transport, error } => {
+                self.handle_hardware_error(transport, error)
+            }
+            Event::HardwareUnavailable { transport } => {
+                self.handle_hardware_unavailable(transport)
+            }
+            Event::PermissionDenied { transport } => {
+                self.handle_permission_denied(transport)
+            }
+            Event::DirectPayloadReceived { data } => {
+                let payload_str =
+                    String::from_utf8(data).map_err(|_| ExchangeError::InvalidQRFormat)?;
+                self.handle_direct_payload_received(payload_str)
+            }
+            Event::DirectCardReceived { ciphertext } => self.handle_direct_card_received(ciphertext),
             Event::AudioSamplesRecorded { .. } => {
                 // Audio proximity response — trigger proximity check.
                 // Decoding lives in ProximityRunner; the session just
                 // ack-tracks that something arrived.
                 Ok(())
             }
-            Event::BleDeviceDiscovered { id, .. } => {
-                // Discovered a peer — stop scanning (battery), connect.
-                self.ble_is_initiator = true;
-                self.emit_command(Command::BleStopScanning);
-                self.emit_command(Command::BleConnect { device_id: id });
-                Ok(())
-            }
-            Event::BleDisconnected { reason } => {
-                if matches!(self.state, ExchangeState::AwaitingBleConnection) {
-                    self.apply(ExchangeEvent::Fail(ExchangeError::BleConnectionLost))?;
-                }
-                self.debug_event(ExchangeDebugEvent::ExchangeFailed {
-                    error: format!("BLE disconnected: {}", reason),
-                });
-                Ok(())
-            }
-            Event::HardwareError { transport, error } => {
-                self.apply(ExchangeEvent::Fail(ExchangeError::HardwareFailure {
-                    transport,
-                    error,
-                }))
-            }
-            Event::HardwareUnavailable { transport } => {
-                self.debug_event(ExchangeDebugEvent::ExchangeFailed {
-                    error: format!("{} hardware unavailable", transport),
-                });
-                // Attempt transport fallback based on device capabilities.
-                self.attempt_transport_fallback(&transport);
-                Ok(())
-            }
-            Event::PermissionDenied { transport } => {
-                self.debug_event(ExchangeDebugEvent::ExchangeFailed {
-                    error: format!("{} permission denied", transport),
-                });
-                // Same fallback logic — the transport can't be used regardless
-                // of whether hardware is absent or permission was denied.
-                self.attempt_transport_fallback(&transport);
-                Ok(())
-            }
-            // Direct transport (USB/TCP)
-            Event::DirectPayloadReceived { data } => {
-                let payload_str =
-                    String::from_utf8(data).map_err(|_| ExchangeError::InvalidQRFormat)?;
-                self.handle_direct_payload_received(payload_str)
-            }
-            Event::DirectCardReceived { ciphertext } => {
-                self.handle_direct_card_received(ciphertext)
-            }
-            // New hardware event variants — not yet wired into the session state machine.
-            // Frontends may send these; they are acknowledged without state change until
-            // the corresponding session logic is implemented.
-            Event::AccelerometerData { .. }
-            | Event::ImpactDetected { .. }
-            | Event::RelayEscrowReady { .. }
+            ignored => self.handle_ignored_event(&ignored),
+        }
+    }
+
+    /// Handles a QR scan event by parsing the data and initiating the exchange.
+    fn handle_qr_scanned(&mut self, data: String) -> Result<(), ExchangeError> {
+        let qr = ExchangeQR::from_data_string(&data)?;
+        self.apply(ExchangeEvent::ProcessQR(qr))
+    }
+
+    /// Handles NFC data received from a tap exchange.
+    fn handle_nfc_data_received(&mut self, data: Vec<u8>) -> Result<(), ExchangeError> {
+        let result = self.apply(ExchangeEvent::NfcTapComplete {
+            their_payload: data,
+        });
+        // Deactivate NFC interface after tap is processed
+        if result.is_ok() {
+            self.emit_command(Command::NfcDeactivate);
+        }
+        result
+    }
+
+    /// Handles BLE peer discovery — stop scanning and initiate connection.
+    fn handle_ble_device_discovered(&mut self, id: String) -> Result<(), ExchangeError> {
+        self.ble_is_initiator = true;
+        self.emit_command(Command::BleStopScanning);
+        self.emit_command(Command::BleConnect { device_id: id });
+        Ok(())
+    }
+
+    /// Handles BLE disconnection. If we were awaiting connection, fail the exchange.
+    fn handle_ble_disconnected(&mut self, reason: String) -> Result<(), ExchangeError> {
+        if matches!(self.state, ExchangeState::AwaitingBleConnection) {
+            self.apply(ExchangeEvent::Fail(ExchangeError::BleConnectionLost))?;
+        }
+        self.debug_event(ExchangeDebugEvent::ExchangeFailed {
+            error: format!("BLE disconnected: {}", reason),
+        });
+        Ok(())
+    }
+
+    /// Handles a hardware error by failing the exchange.
+    fn handle_hardware_error(
+        &mut self,
+        transport: String,
+        error: String,
+    ) -> Result<(), ExchangeError> {
+        self.apply(ExchangeEvent::Fail(ExchangeError::HardwareFailure {
+            transport,
+            error,
+        }))
+    }
+
+    /// Handles hardware unavailable by logging and attempting transport fallback.
+    fn handle_hardware_unavailable(
+        &mut self,
+        transport: String,
+    ) -> Result<(), ExchangeError> {
+        self.debug_event(ExchangeDebugEvent::ExchangeFailed {
+            error: format!("{} hardware unavailable", transport),
+        });
+        self.attempt_transport_fallback(&transport);
+        Ok(())
+    }
+
+    /// Handles permission denied by logging and attempting transport fallback.
+    fn handle_permission_denied(
+        &mut self,
+        transport: String,
+    ) -> Result<(), ExchangeError> {
+        self.debug_event(ExchangeDebugEvent::ExchangeFailed {
+            error: format!("{} permission denied", transport),
+        });
+        // Same fallback logic — the transport can't be used regardless
+        // of whether hardware is absent or permission was denied.
+        self.attempt_transport_fallback(&transport);
+        Ok(())
+    }
+
+    /// Handles events that the exchange session state machine intentionally ignores.
+    ///
+    /// These are platform events that are valid but not relevant to the exchange
+    /// protocol. Each variant has a documented reason for being ignored.
+    fn handle_ignored_event(&mut self, event: &Event) -> Result<(), ExchangeError> {
+        match event {
+            // TapHoverShake accelerometer events — proximity verification is handled
+            // by the BleExchangeFlow / MultiStageExchangeEngine, not the legacy session.
+            Event::AccelerometerData { .. } | Event::ImpactDetected { .. } => {}
+            // Relay escrow events are handled by the link-exchange engine (ADR-049).
+            Event::RelayEscrowReady { .. }
             | Event::RelayEscrowBlobReceived { .. }
             | Event::RelayEscrowFailed { .. }
             | Event::LinkShared
-            | Event::LinkOpened { .. }
+            | Event::LinkOpened { .. } => {}
             // Image picking events are for the avatar editor, not exchanges.
-            | Event::ImageReceived { .. }
-            | Event::ImagePickCancelled
-            // QrScanProgress is a UI-only signal handled by ExchangeEngine's
+            Event::ImageReceived { .. } | Event::ImagePickCancelled => {}
+            // QR scan progress is a UI-only signal handled by ExchangeEngine's
             // ScanQualityTracker — the session state machine ignores it.
-            | Event::QrScanProgress { .. }
-            // File picking events drive vCard / backup import in vauchi-app —
-            // the exchange session state machine ignores them.
-            | Event::FilePickedFromUser { .. }
-            | Event::FilePickCancelledByUser
-            // Biometric unlock event is auth-layer; the exchange state
-            // machine ignores it.
-            | Event::BiometricUnlockSucceeded
-            // BLE MTU negotiation is a transport-layer signal consumed
-            // by the binding's GATT chunker (and, post-32m T2.2, by
-            // `BleExchangeFlow` to size its writes). The core
-            // `ExchangeSession` state machine has no opinion on it.
-            | Event::BleMtuNegotiated { .. }
-            // LocationResult is a contact *annotation* (ADR-051 "where we
-            // met"), not a handshake event. The exchange state machine
-            // ignores it; the annotation layer captures it at exchange
-            // completion (contact-annotations T2.2).
-            | Event::LocationResult { .. } => Ok(()),
+            Event::QrScanProgress { .. } => {}
+            // File picking events drive vCard / backup import in vauchi-app.
+            Event::FilePickedFromUser { .. } | Event::FilePickCancelledByUser => {}
+            // Biometric unlock event is auth-layer; the exchange state machine ignores it.
+            Event::BiometricUnlockSucceeded => {}
+            // BLE MTU negotiation is a transport-layer signal consumed by the binding's
+            // GATT chunker. The core session has no opinion on it.
+            Event::BleMtuNegotiated { .. } => {}
+            // LocationResult is a contact annotation (ADR-051 "where we met"), not a
+            // handshake event. The annotation layer captures it at exchange completion.
+            Event::LocationResult { .. } => {}
+            // All other events are not expected by the exchange session.
+            _ => {}
         }
+        Ok(())
     }
 
     /// Emits initial commands for the current transport type.

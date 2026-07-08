@@ -29,9 +29,9 @@ repository = "https://gitlab.com/vauchi/core"
 authors = ["Vauchi Contributors"]
 
 [workspace.dependencies]
-vauchi-core = { path = "vauchi-core", version = "0.52.2", default-features = false }
-vauchi-app = { path = "vauchi-app", version = "0.52.2", default-features = false }
-vauchi-protocol = { path = "vauchi-protocol", version = "0.52.2" }
+vauchi-core = { path = "vauchi-core", version = "0.52.3", default-features = false }
+vauchi-app = { path = "vauchi-app", version = "0.52.3", default-features = false }
+vauchi-protocol = { path = "vauchi-protocol", version = "0.52.3" }
 
 # Vendored fork of rqrr 0.10.1 — patches Perspective::map to clamp instead of
 # abort on a near-degenerate QR perspective (panic=abort makes the upstream

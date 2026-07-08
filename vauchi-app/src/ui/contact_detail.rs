@@ -499,12 +499,14 @@ impl ContactDetailEngine {
             &self.tags,
             &self.tag_input,
             &self.tag_suggestions,
+            self.locale,
         ));
         // Exchange place (ADR-051): label + name input + suggestions + clear.
         components.extend(place_components(
             &self.exchange_place,
             &self.place_input,
             &self.place_suggestions,
+            self.locale,
         ));
         // Trust & permissions group (local-only, never shared with the contact)
         components.push(Component::SettingsGroup {

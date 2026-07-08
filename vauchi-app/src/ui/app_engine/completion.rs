@@ -111,7 +111,7 @@ impl AppEngine {
                 ActionResult::NavigateTo(screen)
             }
             Err(e) => ActionResult::ShowAlert {
-                title: "Error".into(),
+                title: self.t("error.title"),
                 message: format!("Failed to create identity: {e}"),
             },
         }
@@ -201,7 +201,7 @@ impl AppEngine {
         let contact_id = contact.id().to_string();
         if let Err(e) = self.vauchi.update_contact(&contact) {
             return Err(Box::new(ActionResult::ShowAlert {
-                title: "Exchange Error".into(),
+                title: self.t("exchange.error.title"),
                 message: format!("Failed to save contact: {e}"),
             }));
         }
@@ -212,14 +212,14 @@ impl AppEngine {
                         .save_exchange_ratchet(&contact_id, &ratchet, is_initiator)
                 {
                     return Err(Box::new(ActionResult::ShowAlert {
-                        title: "Exchange Error".into(),
+                        title: self.t("exchange.error.title"),
                         message: format!("Failed to initialize encryption: {e}"),
                     }));
                 }
             }
             Err(e) => {
                 return Err(Box::new(ActionResult::ShowAlert {
-                    title: "Exchange Error".into(),
+                    title: self.t("exchange.error.title"),
                     message: format!("Failed to initialize encryption: {e}"),
                 }));
             }
@@ -308,7 +308,7 @@ impl AppEngine {
                 VerifyAction::Verified => {
                     if let Err(e) = self.vauchi.verify_contact_fingerprint(contact_id) {
                         return ActionResult::ShowAlert {
-                            title: "Verification Failed".into(),
+                            title: self.t("verify_fingerprint.error_title"),
                             message: format!("{e}"),
                         };
                     }
@@ -316,7 +316,7 @@ impl AppEngine {
                 VerifyAction::Unverified => {
                     if let Err(e) = self.vauchi.unverify_contact_fingerprint(contact_id) {
                         return ActionResult::ShowAlert {
-                            title: "Verification Failed".into(),
+                            title: self.t("verify_fingerprint.error_title"),
                             message: format!("{e}"),
                         };
                     }
@@ -370,7 +370,7 @@ impl AppEngine {
                         .configure_emergency_broadcast(ids, message, include_location)
                 {
                     return ActionResult::ShowAlert {
-                        title: "Error".into(),
+                        title: self.t("error.title"),
                         message: format!("Failed to save emergency broadcast: {e}"),
                     };
                 }
@@ -389,14 +389,14 @@ impl AppEngine {
                     }
                 }
                 Err(e) => ActionResult::ShowAlert {
-                    title: "Send failed".into(),
+                    title: self.t("emergency_broadcast.send_failed_title"),
                     message: format!("{e}"),
                 },
             },
             Some(EmergencyOutcome::Disable) => {
                 if let Err(e) = self.vauchi.delete_emergency_config() {
                     return ActionResult::ShowAlert {
-                        title: "Error".into(),
+                        title: self.t("error.title"),
                         message: format!("Failed to disable emergency broadcast: {e}"),
                     };
                 }
@@ -580,7 +580,7 @@ impl AppEngine {
             new.zeroize();
             if let Some(message) = alert {
                 return ActionResult::ShowAlert {
-                    title: "Error".into(),
+                    title: self.t("error.title"),
                     message,
                 };
             }
@@ -609,7 +609,7 @@ impl AppEngine {
             if setup.enabled {
                 if let Err(e) = self.vauchi.setup_duress_password(&setup.pin) {
                     return ActionResult::ShowAlert {
-                        title: "Error".into(),
+                        title: self.t("error.title"),
                         message: format!("Failed to set duress PIN: {e}"),
                     };
                 }
@@ -620,13 +620,13 @@ impl AppEngine {
                 };
                 if let Err(e) = self.vauchi.save_duress_settings(&settings) {
                     return ActionResult::ShowAlert {
-                        title: "Error".into(),
+                        title: self.t("error.title"),
                         message: format!("Failed to save duress settings: {e}"),
                     };
                 }
             } else if let Err(e) = self.vauchi.disable_duress() {
                 return ActionResult::ShowAlert {
-                    title: "Error".into(),
+                    title: self.t("error.title"),
                     message: format!("Failed to disable duress: {e}"),
                 };
             }
@@ -660,7 +660,7 @@ impl AppEngine {
                 }
                 Err(e) => {
                     return ActionResult::ShowAlert {
-                        title: "Revoke Failed".into(),
+                        title: self.t("device_management.revoke_failed_title"),
                         message: format!("{e}"),
                     };
                 }
@@ -694,7 +694,7 @@ impl AppEngine {
                     card.clear_avatar();
                     if let Err(e) = self.vauchi.update_own_card(&card) {
                         return ActionResult::ShowAlert {
-                            title: "Avatar Update Failed".into(),
+                            title: self.t("avatar_editor.update_failed_title"),
                             message: format!("{e}"),
                         };
                     }
@@ -704,13 +704,13 @@ impl AppEngine {
                 if let Ok(Some(mut card)) = self.vauchi.own_card() {
                     if let Err(e) = card.set_avatar(avatar) {
                         return ActionResult::ShowAlert {
-                            title: "Avatar Update Failed".into(),
+                            title: self.t("avatar_editor.update_failed_title"),
                             message: format!("{e}"),
                         };
                     }
                     if let Err(e) = self.vauchi.update_own_card(&card) {
                         return ActionResult::ShowAlert {
-                            title: "Avatar Update Failed".into(),
+                            title: self.t("avatar_editor.update_failed_title"),
                             message: format!("{e}"),
                         };
                     }

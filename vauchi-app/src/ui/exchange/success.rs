@@ -14,6 +14,7 @@
 //!
 //! Design / scope: `_private/docs/problems/2026-06-04-exchange-terminal-screens`.
 
+use crate::i18n::Locale;
 use crate::ui::component::icon_for_field_type;
 use crate::ui::*;
 
@@ -41,7 +42,9 @@ pub fn build_exchange_success_screen(
     title: impl Into<String>,
     done_action_id: &str,
     summary: &ExchangeSuccessSummary,
+    locale: Locale,
 ) -> ScreenModel {
+    let t = |key: &str| crate::i18n::get_string(locale, key);
     // Second-person possessive-friendly handle for the narration.
     let they = if summary.peer_name.is_empty() {
         "they".to_string()
@@ -52,9 +55,9 @@ pub fn build_exchange_success_screen(
     let mut components: Vec<Component> = vec![Component::StatusIndicator {
         id: "status".into(),
         icon: Some("checkmark.circle".into()),
-        title: "Exchange Complete".into(),
+        title: t("exchange.terminal.complete"),
         detail: Some(if summary.peer_name.is_empty() {
-            "Exchange complete.".into()
+            t("exchange.success_title")
         } else {
             format!("Exchanged with {}", summary.peer_name)
         }),
@@ -96,7 +99,7 @@ pub fn build_exchange_success_screen(
         components.push(Component::InfoPanel {
             id: "added_to_groups".into(),
             icon: Some("folder".into()),
-            title: "Added to".into(),
+            title: t("exchange.success.added_to"),
             items: summary
                 .group_names
                 .iter()
@@ -134,7 +137,7 @@ pub fn build_exchange_success_screen(
         components,
         vec![ScreenAction {
             id: done_action_id.into(),
-            label: "Done".into(),
+            label: t("action.done"),
             style: ActionStyle::Primary,
             enabled: true,
             a11y: None,
@@ -174,7 +177,13 @@ mod tests {
             my_visible_fields: vec!["Phone".into(), "Website".into()],
             group_names: vec!["Friends".into()],
         };
-        let screen = build_exchange_success_screen("exchange_success", "Done", "done", &summary);
+        let screen = build_exchange_success_screen(
+            "exchange_success",
+            "Done",
+            "done",
+            &summary,
+            Locale::English,
+        );
         let ids = component_ids(&screen);
         assert!(ids.contains(&"status".to_string()), "status present");
         assert!(
@@ -201,6 +210,7 @@ mod tests {
             "Done",
             "done",
             &ExchangeSuccessSummary::default(),
+            Locale::English,
         );
         let ids = component_ids(&screen);
         assert!(ids.contains(&"status".to_string()), "status always present");

@@ -31,7 +31,7 @@ impl AppEngine {
     ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Contacts => {
-                let contacts = Self::load_contact_items(vauchi);
+                let contacts = Self::load_contact_items(vauchi, render_context.resolved_locale());
                 let all_groups = vauchi.list_groups().unwrap_or_default();
                 if all_groups.is_empty() {
                     Box::new(
@@ -94,7 +94,10 @@ impl AppEngine {
                         actions: vec![],
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", contact.display_name())),
-                            hint: Some("Double tap to view contact details".into()),
+                            hint: Some(crate::i18n::get_string(
+                                render_context.resolved_locale(),
+                                "contact_detail.double_tap_to_view_hint",
+                            )),
                             role: None,
                         }),
                     };

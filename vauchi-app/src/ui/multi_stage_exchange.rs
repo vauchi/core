@@ -600,6 +600,7 @@ impl MultiStageExchangeEngine {
                 title,
                 DONE_ACTION_ID,
                 summary,
+                self.locale,
             );
         }
         let detail = self

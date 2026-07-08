@@ -48,7 +48,7 @@ impl AppEngine {
             && let Err(e) = self.vauchi.set_contact_display_name(contact_id, &name)
         {
             return ActionResult::ShowAlert {
-                title: "Edit Failed".into(),
+                title: self.t("contact_edit.error_title"),
                 message: format!("{e}"),
             };
         }
@@ -64,7 +64,7 @@ impl AppEngine {
     pub(super) fn complete_group_detail(&mut self, group_id: &str) -> ActionResult {
         if let Err(e) = self.vauchi.delete_group(group_id) {
             return ActionResult::ShowAlert {
-                title: "Delete Group Failed".into(),
+                title: self.t("group_detail.delete_error_title"),
                 message: format!("{e}"),
             };
         }
@@ -98,7 +98,7 @@ impl AppEngine {
                         }
                     }
                     Err(e) => ActionResult::ShowAlert {
-                        title: "Merge Failed".into(),
+                        title: self.t("contact_merge.error_title"),
                         message: format!("{e}"),
                     },
                 }

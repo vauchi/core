@@ -201,6 +201,11 @@ pub struct AppEngine {
 }
 
 impl AppEngine {
+    /// Shorthand for the current render locale's translation lookup.
+    pub(super) fn t(&self, key: &str) -> String {
+        crate::i18n::get_string(self.render_context.resolved_locale(), key)
+    }
+
     /// Returns a reference to the inner Vauchi instance.
     pub fn vauchi(&self) -> &Vauchi {
         &self.vauchi

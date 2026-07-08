@@ -173,7 +173,7 @@ impl AppEngine {
             return screen;
         }
         screen.components.push(Component::Banner {
-            text: "You're offline. Changes will sync when you reconnect.".into(),
+            text: self.t("offline.banner"),
             action_label: String::new(),
             action_id: ACTION_OFFLINE_BANNER.into(),
             a11y: None,
@@ -243,8 +243,8 @@ impl AppEngine {
                 screen.components.insert(
                     0,
                     Component::Banner {
-                        text: "A new version is available.".into(),
-                        action_label: "Update".into(),
+                        text: self.t("update.available_banner"),
+                        action_label: self.t("update.available_action"),
                         action_id: ACTION_OPEN_UPDATE_LINK.into(),
                         a11y: None,
                     },
@@ -258,8 +258,12 @@ impl AppEngine {
                 screen.components.insert(
                     0,
                     Component::Banner {
-                        text: format!("Update required by {date}."),
-                        action_label: "Update".into(),
+                        text: crate::i18n::get_string_with_args(
+                            self.render_context.resolved_locale(),
+                            "update.required_by",
+                            &[("date", &date)],
+                        ),
+                        action_label: self.t("update.available_action"),
                         action_id: ACTION_OPEN_UPDATE_LINK.into(),
                         a11y: None,
                     },
@@ -270,15 +274,15 @@ impl AppEngine {
                 grace_deadline: None,
             } => ScreenModel::new(
                 "update_required",
-                "Update Required",
+                self.t("update.required_title"),
                 vec![Component::Text {
                     id: "update_message".into(),
-                    content: "This version is no longer supported. Please update to continue using the app.".into(),
+                    content: self.t("update.unsupported_message"),
                     style: TextStyle::Body,
                 }],
                 vec![ScreenAction {
                     id: ACTION_OPEN_UPDATE_LINK.into(),
-                    label: "Update Now".into(),
+                    label: self.t("update.update_now_action"),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,

@@ -90,7 +90,7 @@ impl AppEngine {
                 ActionResult::NavigateTo(screen)
             }
             Err(e) => ActionResult::ShowAlert {
-                title: "Error".into(),
+                title: self.t("error.title"),
                 message: format!("{e}"),
             },
         }
@@ -117,14 +117,14 @@ impl AppEngine {
             Ok(Some(mut card)) => {
                 if let Err(e) = card.update_field_value(field_id, &value, now) {
                     return ActionResult::ShowAlert {
-                        title: "Error".into(),
+                        title: self.t("error.title"),
                         message: format!("Failed to update field: {e}"),
                     };
                 }
                 let note_opt = if note.is_empty() { None } else { Some(note) };
                 if let Err(e) = card.update_field_note(field_id, note_opt) {
                     return ActionResult::ShowAlert {
-                        title: "Error".into(),
+                        title: self.t("error.title"),
                         message: format!("Failed to update field note: {e}"),
                     };
                 }
@@ -132,7 +132,7 @@ impl AppEngine {
             }
             Ok(None) => {
                 return ActionResult::ShowAlert {
-                    title: "Error".into(),
+                    title: self.t("error.title"),
                     message: "No contact card found".into(),
                 };
             }

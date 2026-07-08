@@ -361,34 +361,45 @@ pub(super) enum NfcFlowError {
 /// minimal placeholder shape — the production renderer copy follows
 /// in a later phase once `NfcExchangeView` is retired. The screen-id
 /// + cancel action are stable so iOS/Android can route on them today.
-pub(super) fn build_nfc_screen(step: &NfcStep) -> ScreenModel {
-    let (screen_id, title, subtitle): (&str, &str, &str) = match step {
-        NfcStep::Idle => ("exchange_nfc_idle", "Preparing NFC", "Just a moment..."),
+pub(super) fn build_nfc_screen(step: &NfcStep, locale: crate::i18n::Locale) -> ScreenModel {
+    let t = |key: &str| crate::i18n::get_string(locale, key);
+    let (screen_id, title_key, subtitle_key): (&str, &str, &str) = match step {
+        NfcStep::Idle => (
+            "exchange_nfc_idle",
+            "exchange.nfc.preparing_title",
+            "exchange.nfc.preparing_subtitle",
+        ),
         NfcStep::AwaitingTap => (
             "exchange_nfc_awaiting_tap",
-            "Tap to exchange",
-            "Hold your phones back-to-back",
+            "exchange.nfc.awaiting_tap_title",
+            "exchange.nfc.awaiting_tap_subtitle",
         ),
         NfcStep::PayloadSent | NfcStep::AckSent => (
             "exchange_nfc_in_progress",
-            "Exchanging cards",
-            "Keep your phones still",
+            "exchange.nfc.in_progress_title",
+            "exchange.nfc.in_progress_subtitle",
         ),
-        NfcStep::Complete => ("exchange_nfc_complete", "Done", "Cards exchanged"),
+        NfcStep::Complete => (
+            "exchange_nfc_complete",
+            "exchange.nfc.complete_title",
+            "exchange.nfc.complete_subtitle",
+        ),
     };
+    let title = t(title_key);
+    let subtitle = t(subtitle_key);
 
     ScreenModel {
         screen_id: screen_id.into(),
-        title: title.into(),
-        subtitle: Some(subtitle.into()),
+        title: title.clone(),
+        subtitle: Some(subtitle.clone()),
         components: vec![Component::Text {
             id: "nfc_status".into(),
-            content: subtitle.into(),
+            content: subtitle,
             style: TextStyle::Body,
         }],
         actions: vec![ScreenAction {
             id: "cancel".into(),
-            label: "Cancel".into(),
+            label: t("action.cancel"),
             style: ActionStyle::Secondary,
             enabled: !matches!(step, NfcStep::Complete),
             a11y: None,
@@ -650,7 +661,7 @@ mod tests {
     // @internal
     #[test]
     fn idle_screen_has_cancel_affordance() {
-        let s = build_nfc_screen(&NfcStep::Idle);
+        let s = build_nfc_screen(&NfcStep::Idle, crate::i18n::Locale::English);
         assert_eq!(s.screen_id, "exchange_nfc_idle");
         assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
         assert!(s.actions.iter().any(|a| a.id == "cancel" && a.enabled));
@@ -659,7 +670,7 @@ mod tests {
     // @internal
     #[test]
     fn awaiting_tap_screen_has_cancel_affordance() {
-        let s = build_nfc_screen(&NfcStep::AwaitingTap);
+        let s = build_nfc_screen(&NfcStep::AwaitingTap, crate::i18n::Locale::English);
         assert_eq!(s.screen_id, "exchange_nfc_awaiting_tap");
         assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
         assert!(s.actions.iter().any(|a| a.id == "cancel" && a.enabled));
@@ -668,8 +679,8 @@ mod tests {
     // @internal
     #[test]
     fn in_progress_screens_share_screen_id_and_keep_cancel_enabled() {
-        let sent = build_nfc_screen(&NfcStep::PayloadSent);
-        let ack = build_nfc_screen(&NfcStep::AckSent);
+        let sent = build_nfc_screen(&NfcStep::PayloadSent, crate::i18n::Locale::English);
+        let ack = build_nfc_screen(&NfcStep::AckSent, crate::i18n::Locale::English);
         assert_eq!(sent.screen_id, "exchange_nfc_in_progress");
         assert_eq!(ack.screen_id, "exchange_nfc_in_progress");
         assert_eq!(action_ids(&sent), vec!["cancel".to_string()]);
@@ -679,7 +690,7 @@ mod tests {
     // @internal
     #[test]
     fn complete_screen_disables_cancel() {
-        let s = build_nfc_screen(&NfcStep::Complete);
+        let s = build_nfc_screen(&NfcStep::Complete, crate::i18n::Locale::English);
         assert_eq!(s.screen_id, "exchange_nfc_complete");
         // Cancel is still listed (so the action surface is stable across
         // states) but disabled — the exchange has already completed.

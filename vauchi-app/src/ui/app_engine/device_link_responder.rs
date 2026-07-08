@@ -207,7 +207,7 @@ impl AppEngine {
             let url = invitation_url.clone();
             if let Err(e) = self.start_device_link_responder(&url, device_name) {
                 return ActionResult::ShowAlert {
-                    title: "Invalid Invitation".into(),
+                    title: self.t("device_link.invalid_invitation_title"),
                     message: e,
                 };
             }

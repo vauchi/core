@@ -160,7 +160,7 @@ impl AppEngine {
                 Ok(screen) => return Some(ActionResult::NavigateTo(screen)),
                 Err(message) => {
                     return Some(ActionResult::ShowAlert {
-                        title: "Invalid Device Link".into(),
+                        title: self.t("device_link.invalid_title"),
                         message,
                     });
                 }
@@ -299,7 +299,7 @@ impl AppEngine {
                         })
                     }
                     Err(e) => Some(ActionResult::ShowAlert {
-                        title: "Import failed".into(),
+                        title: self.t("contacts.import_error_title"),
                         message: e.to_string(),
                     }),
                 }
@@ -429,7 +429,7 @@ impl AppEngine {
             Err(_) => {
                 self.reset_onboarding_to_identity_check();
                 return ActionResult::ShowAlert {
-                    title: "Restore failed".into(),
+                    title: self.t("backup.restore_error_title"),
                     message: "The selected file does not look like a Vauchi backup.".into(),
                 };
             }
@@ -444,7 +444,7 @@ impl AppEngine {
             Err(e) => {
                 self.reset_onboarding_to_identity_check();
                 ActionResult::ShowAlert {
-                    title: "Restore failed".into(),
+                    title: self.t("backup.restore_error_title"),
                     message: format!("{e}"),
                 }
             }
@@ -564,7 +564,7 @@ impl AppEngine {
                     }
                 }
                 Err(e) => ActionResult::ShowAlert {
-                    title: "Archive Failed".into(),
+                    title: self.t("contacts.archive_failed_title"),
                     message: format!("{e}"),
                 },
             },
@@ -574,7 +574,7 @@ impl AppEngine {
                     undo_action_id: None,
                 },
                 Err(e) => ActionResult::ShowAlert {
-                    title: "Unarchive Failed".into(),
+                    title: self.t("contacts.unarchive_failed_title"),
                     message: format!("{e}"),
                 },
             },
@@ -584,7 +584,7 @@ impl AppEngine {
                     undo_action_id: Some(format!("undo_hide_contact:{contact_id}")),
                 },
                 Err(e) => ActionResult::ShowAlert {
-                    title: "Hide Failed".into(),
+                    title: self.t("contacts.hide_failed_title"),
                     message: format!("{e}"),
                 },
             },
@@ -594,7 +594,7 @@ impl AppEngine {
                     undo_action_id: None,
                 },
                 Err(e) => ActionResult::ShowAlert {
-                    title: "Unhide Failed".into(),
+                    title: self.t("contacts.unhide_failed_title"),
                     message: format!("{e}"),
                 },
             },
@@ -605,7 +605,7 @@ impl AppEngine {
                     undo_action_id: Some(format!("undo_delete_contact:{contact_id}")),
                 },
                 Err(e) => ActionResult::ShowAlert {
-                    title: "Delete Failed".into(),
+                    title: self.t("contacts.delete_failed_title"),
                     message: format!("{e}"),
                 },
             },
@@ -616,7 +616,7 @@ impl AppEngine {
                         undo_action_id: None,
                     },
                     Err(e) => ActionResult::ShowAlert {
-                        title: "Restore Failed".into(),
+                        title: self.t("contacts.restore_failed_title"),
                         message: format!("{e}"),
                     },
                 }

@@ -347,7 +347,8 @@ vauchi-core/src/storage/mod.rs 1079
 # (+18 2026-07-06: M5 B3 device-link join scaffolding —
 #  device_link_responder field + initializer + advance call in
 #  poll_notifications + OpenDeviceLinkInvitation intercept wiring.)
-vauchi-app/src/ui/app_engine/mod.rs 790
+vauchi-app/src/ui/app_engine/mod.rs 795
+# (+5 2026-07-08: AppEngine::t() locale helper for the M3 i18n residual.)
 # (2026-07-01: Glance orchestration + its INLINE_TEST_REQUIRED test mod —
 #  Slice B. The privacy/binding tests call private build_ble_session_inputs /
 #  pending_exchange_groups so they must stay inline; the pub-API Glance
@@ -496,7 +497,9 @@ vauchi-app/src/ui/app_engine/routing.rs 667
 #  replacing the 3 hardcoded `false` literals. 1007 → 1011.)
 # (+9 2026-07-06: M5 B3 DeviceLinkJoin engine factory arm — humble
 #  renderer gets the join screen from core.)
-vauchi-app/src/ui/app_engine/screens.rs 1020
+vauchi-app/src/ui/app_engine/screens.rs 1036
+# (+16 2026-07-08: factory arms thread resolved_locale into the remaining
+#  engines that gained with_locale builders for the M3 i18n residual.)
 
 # SPLIT-WARRANTED — crossed the 1000-line hard limit in M5 B1
 # (2026-07-05) when the merged "add another device" onboarding option

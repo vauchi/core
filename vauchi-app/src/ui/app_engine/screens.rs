@@ -398,10 +398,11 @@ impl AppEngine {
                 )
             }
             AppScreen::Recovery => {
-                let contacts: Vec<Item> = Self::load_contact_items(vauchi)
-                    .into_iter()
-                    .map(|c| c.item)
-                    .collect();
+                let contacts: Vec<Item> =
+                    Self::load_contact_items(vauchi, render_context.resolved_locale())
+                        .into_iter()
+                        .map(|c| c.item)
+                        .collect();
                 let device_count = vauchi
                     .list_devices()
                     .map(|d| d.len().saturating_sub(1))
@@ -419,7 +420,8 @@ impl AppEngine {
                 use crate::ui::social_graph::{SocialContactEntry, SocialTrustLevel};
                 use vauchi_core::contact::TrustLevel;
 
-                let contact_items = Self::load_contact_items(vauchi);
+                let contact_items =
+                    Self::load_contact_items(vauchi, render_context.resolved_locale());
                 let entries: Vec<SocialContactEntry> = contact_items
                     .into_iter()
                     .map(|indexed| {
@@ -510,7 +512,7 @@ impl AppEngine {
             }
             AppScreen::Groups => {
                 let all_groups = vauchi.list_groups().unwrap_or_default();
-                let contacts = Self::load_contact_items(vauchi);
+                let contacts = Self::load_contact_items(vauchi, render_context.resolved_locale());
                 let group_infos: Vec<GroupInfo> = all_groups
                     .iter()
                     .map(|g| {
@@ -550,7 +552,10 @@ impl AppEngine {
                         actions: vec![],
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", c.display_name())),
-                            hint: Some("Double tap to view contact details".into()),
+                            hint: Some(crate::i18n::get_string(
+                                render_context.resolved_locale(),
+                                "contact_detail.double_tap_to_view_hint",
+                            )),
                             role: None,
                         }),
                     })
@@ -831,7 +836,10 @@ impl AppEngine {
         )
     }
 
-    pub(super) fn load_contact_items(vauchi: &Vauchi) -> Vec<IndexedItem> {
+    pub(super) fn load_contact_items(
+        vauchi: &Vauchi,
+        locale: crate::i18n::Locale,
+    ) -> Vec<IndexedItem> {
         match vauchi.list_contacts() {
             Ok(contacts) => contacts
                 .iter()
@@ -856,10 +864,13 @@ impl AppEngine {
                         subtitle,
                         avatar_initials: initials(c.display_name()),
                         status,
-                        actions: contact_row_actions(c.is_imported(), c.is_hidden()),
+                        actions: contact_row_actions(c.is_imported(), c.is_hidden(), locale),
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", c.display_name())),
-                            hint: Some("Double tap to view contact details".into()),
+                            hint: Some(crate::i18n::get_string(
+                                locale,
+                                "contact_detail.double_tap_to_view_hint",
+                            )),
                             role: None,
                         }),
                     };
@@ -984,19 +995,24 @@ impl AppEngine {
 /// Per-row swipe actions offered on the contact list. Imported contacts
 /// get a reversible soft-delete; exchanged ones get archive. Both can
 /// be hidden/unhidden.
-fn contact_row_actions(is_imported: bool, is_hidden: bool) -> Vec<ListItemAction> {
+fn contact_row_actions(
+    is_imported: bool,
+    is_hidden: bool,
+    locale: crate::i18n::Locale,
+) -> Vec<ListItemAction> {
+    let t = |key: &str| crate::i18n::get_string(locale, key);
     let mut actions = Vec::new();
     if is_hidden {
         actions.push(ListItemAction {
             id: "unhide".into(),
-            label: "Unhide".into(),
+            label: t("contacts.action_unhide"),
             kind: ListItemActionKind::Unhide,
             destructive: false,
         });
     } else {
         actions.push(ListItemAction {
             id: "hide".into(),
-            label: "Hide".into(),
+            label: t("contacts.action_hide"),
             kind: ListItemActionKind::Hide,
             destructive: false,
         });
@@ -1004,14 +1020,14 @@ fn contact_row_actions(is_imported: bool, is_hidden: bool) -> Vec<ListItemAction
     if is_imported {
         actions.push(ListItemAction {
             id: "delete".into(),
-            label: "Delete".into(),
+            label: t("action.delete"),
             kind: ListItemActionKind::Delete,
             destructive: false,
         });
     } else {
         actions.push(ListItemAction {
             id: "archive".into(),
-            label: "Archive".into(),
+            label: t("contacts.action_archive"),
             kind: ListItemActionKind::Archive,
             destructive: false,
         });

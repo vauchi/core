@@ -688,9 +688,10 @@ impl ExchangeEngine {
                 let summary = self.success_summary.as_ref().expect("guarded by is_some()");
                 crate::ui::exchange::success::build_exchange_success_screen(
                     "exchange_success",
-                    "Success",
+                    self.t("exchange.terminal.success"),
                     "done",
                     summary,
+                    self.config.locale,
                 )
             }
             ExchangeStep::Success => ScreenModel {

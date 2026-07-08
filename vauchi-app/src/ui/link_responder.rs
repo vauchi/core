@@ -157,6 +157,7 @@ impl LinkResponderEngine {
                 self.t("link_exchange.contact_added_title"),
                 ACTION_DONE,
                 summary,
+                self.locale,
             );
         }
         ScreenModel {

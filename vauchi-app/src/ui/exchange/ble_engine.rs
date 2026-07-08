@@ -244,6 +244,7 @@ impl BleExchangeEngine {
                 self.t("exchange.terminal.success"),
                 ACTION_DONE,
                 summary,
+                self.locale,
             );
         }
         ScreenModel {

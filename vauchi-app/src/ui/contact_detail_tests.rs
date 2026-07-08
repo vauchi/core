@@ -7,6 +7,10 @@
 //! `#[path]`; stays a unit-test child module (private-field access
 //! preserved).
 
+// INLINE_TEST_REQUIRED: extracted from contact_detail.rs via #[path] to keep
+// the engine file under the 1000-line hard limit; needs private-field access.
+
+#[cfg(test)]
 use super::*;
 
 fn sample_contact() -> Item {

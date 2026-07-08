@@ -50,12 +50,12 @@ impl SupportEngine {
                     InfoItem {
                         icon: Some("github".into()),
                         title: self.t("support.github_sponsors_label"),
-                        detail: "https://github.com/sponsors/vauchi".into(),
+                        detail: self.t("support.github_sponsors_url"),
                     },
                     InfoItem {
                         icon: Some("liberapay".into()),
                         title: self.t("support.liberapay_label"),
-                        detail: "https://liberapay.com/vauchi".into(),
+                        detail: self.t("support.liberapay_url"),
                     },
                 ],
                 a11y: None,

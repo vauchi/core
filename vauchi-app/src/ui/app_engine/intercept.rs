@@ -380,13 +380,13 @@ impl AppEngine {
                     {
                         if let Err(e) = card.remove_field(field_id) {
                             return Some(ActionResult::ShowAlert {
-                                title: "Delete Failed".into(),
+                                title: self.t("contacts.delete_failed_title"),
                                 message: format!("{e}"),
                             });
                         }
                         if let Err(e) = self.vauchi.update_own_card(&card) {
                             return Some(ActionResult::ShowAlert {
-                                title: "Delete Failed".into(),
+                                title: self.t("contacts.delete_failed_title"),
                                 message: format!("{e}"),
                             });
                         }
@@ -627,7 +627,7 @@ impl AppEngine {
         // navigating to a merge preview the user can't actually confirm.
         if primary.is_imported() != secondary.is_imported() {
             return Some(ActionResult::ShowAlert {
-                title: "Can't Merge".into(),
+                title: self.t("contact_merge.cant_merge_title"),
                 message: "These contacts can't be merged because one was \
                           exchanged in person and the other was imported. \
                           Delete the imported one if it duplicates the \
@@ -746,7 +746,7 @@ impl AppEngine {
                 ))
                 .then(|| ActionResult::UpdateScreen(self.engine.current_screen())),
             Err(e) => Some(ActionResult::ShowAlert {
-                title: "Voucher Creation Failed".into(),
+                title: self.t("recovery_help.voucher_error_title"),
                 message: format!("{e}"),
             }),
         }

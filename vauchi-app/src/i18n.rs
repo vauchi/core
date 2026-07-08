@@ -324,6 +324,24 @@ mod tests {
             .unwrap_or_else(|e| e.into_inner())
     }
 
+    /// RAII guard that resets the global locale store to the real locale
+    /// files when dropped. Use in any test that mutates the store with
+    /// temporary/minimal locale data so later tests still see the full
+    /// English strings.
+    struct StoreGuard {
+        _guard: std::sync::MutexGuard<'static, ()>,
+    }
+    impl Drop for StoreGuard {
+        fn drop(&mut self) {
+            reset_store();
+        }
+    }
+    fn store_guard() -> StoreGuard {
+        StoreGuard {
+            _guard: lock_store(),
+        }
+    }
+
     /// Helper: create a temp dir with locale JSON files for testing
     fn setup_test_locales() -> TempDir {
         let dir = TempDir::new().unwrap();
@@ -385,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_init_loads_locales() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -397,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_init_german_strings() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -408,7 +426,7 @@ mod tests {
 
     #[test]
     fn test_fallback_to_english() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -421,7 +439,7 @@ mod tests {
 
     #[test]
     fn test_get_string_missing() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -432,7 +450,7 @@ mod tests {
 
     #[test]
     fn test_interpolation() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -449,7 +467,7 @@ mod tests {
 
     #[test]
     fn test_meta_key_excluded() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -460,7 +478,7 @@ mod tests {
 
     #[test]
     fn test_reload_locale_updates_strings() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -484,7 +502,7 @@ mod tests {
 
     #[test]
     fn test_bundled_english_fallback() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         // Without init(), should fall back to bundled_english
         let s = get_string(Locale::English, "app.name");
@@ -518,7 +536,7 @@ mod tests {
     #[test]
     fn test_concurrent_read_during_reload() {
         // allow(zero_assertions): Concurrency stress test — validates no panic under contention
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -545,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_init_with_nonexistent_dir() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         let result = init(Path::new("/tmp/nonexistent-vauchi-i18n-test"));
         // Should succeed with empty store (dir doesn't exist = no files)
@@ -554,7 +572,7 @@ mod tests {
 
     #[test]
     fn test_is_initialized_false_before_init() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         clear_store();
         assert!(!is_initialized());
         // Restore for other tests
@@ -563,7 +581,7 @@ mod tests {
 
     #[test]
     fn test_load_locale_from_bytes_without_init() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         clear_store();
         let data = serde_json::json!({ "app.name": "Test" });
         load_locale_from_bytes("en", data.to_string().as_bytes()).unwrap();
@@ -575,7 +593,7 @@ mod tests {
 
     #[test]
     fn test_all_strings_returns_full_map() {
-        let _lock = lock_store();
+        let _guard = store_guard();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();

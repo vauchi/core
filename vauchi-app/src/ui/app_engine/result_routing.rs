@@ -59,7 +59,7 @@ impl AppEngine {
                 {
                     let _ = device_name;
                     ActionResult::ShowAlert {
-                        title: "Device Link Unavailable".into(),
+                        title: self.t("device_link.unavailable_title"),
                         message: "This build does not support device-link join.".into(),
                     }
                 }
@@ -224,7 +224,7 @@ impl AppEngine {
             .set_group_field_visibility_and_repropagate(group_id, field_id, visible)
         {
             return ActionResult::ShowAlert {
-                title: "Visibility Update Failed".into(),
+                title: self.t("group_detail.visibility_error_title"),
                 message: format!("{e}"),
             };
         }

@@ -179,8 +179,8 @@ impl NfcExchangeEngine {
 
     fn build_screen(&self) -> ScreenModel {
         match &self.screen {
-            NfcScreen::RoleSelection => build_nfc_role_screen(),
-            NfcScreen::Active => build_nfc_screen(&self.active_step()),
+            NfcScreen::RoleSelection => build_nfc_role_screen(self.locale),
+            NfcScreen::Active => build_nfc_screen(&self.active_step(), self.locale),
             NfcScreen::Success => self.build_success_screen(),
             NfcScreen::Failed { reason } => self.build_failed_screen(reason.clone()),
         }
@@ -441,27 +441,28 @@ impl WorkflowEngine for NfcExchangeEngine {
 /// Per ADR-043/044 the renderer is humble: a generic `ActionList` whose
 /// item/title strings are i18n keys the frontend resolves (ADR-038). The item
 /// ids route in `handle_action` to the initiator / responder entry.
-fn build_nfc_role_screen() -> ScreenModel {
+fn build_nfc_role_screen(locale: Locale) -> ScreenModel {
+    let t = |key: &str| get_string(locale, key);
     ScreenModel {
         screen_id: "exchange_nfc_role".into(),
-        title: "exchange.nfc.choose_role".into(),
-        subtitle: Some("exchange.nfc.choose_role_subtitle".into()),
+        title: t("exchange.nfc.choose_role"),
+        subtitle: Some(t("exchange.nfc.choose_role_subtitle")),
         components: vec![Component::ActionList {
             id: "nfc_role".into(),
             items: vec![
                 ActionListItem {
                     id: ROLE_SEND.into(),
-                    label: "exchange.mode.nfc_send".into(),
+                    label: t("exchange.mode.nfc_send"),
                     icon: None,
-                    detail: Some("exchange.mode.nfc_send_description".into()),
+                    detail: Some(t("exchange.mode.nfc_send_description")),
                     a11y: None,
                     info_key: None,
                 },
                 ActionListItem {
                     id: ROLE_RECEIVE.into(),
-                    label: "exchange.mode.nfc_receive".into(),
+                    label: t("exchange.mode.nfc_receive"),
                     icon: None,
-                    detail: Some("exchange.mode.nfc_receive_description".into()),
+                    detail: Some(t("exchange.mode.nfc_receive_description")),
                     a11y: None,
                     info_key: None,
                 },
@@ -469,7 +470,7 @@ fn build_nfc_role_screen() -> ScreenModel {
         }],
         actions: vec![ScreenAction {
             id: ACTION_CANCEL.into(),
-            label: "action.cancel".into(),
+            label: t("action.cancel"),
             style: ActionStyle::Secondary,
             enabled: true,
             a11y: None,

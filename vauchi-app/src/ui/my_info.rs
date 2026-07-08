@@ -100,6 +100,10 @@ impl MyInfoEngine {
         self
     }
 
+    fn t(&self, key: &str) -> String {
+        get_string(self.locale, key)
+    }
+
     /// Set the user's display name and own card fields.
     pub fn with_own_card(mut self, display_name: String, fields: Vec<OwnFieldInfo>) -> Self {
         self.display_name = display_name;
@@ -194,7 +198,7 @@ impl MyInfoEngine {
         if self.own_fields.is_empty() {
             components.push(Component::Text {
                 id: "empty_hint".into(),
-                content: "No entries yet. Add your first entry to share with contacts.\n\nYou can add phone numbers, email addresses, websites, social profiles, and more. Tap \"Add Entry\" to get started.".into(),
+                content: self.t("my_info.empty_entries"),
                 style: TextStyle::Caption,
             });
             return components;
@@ -246,7 +250,7 @@ impl MyInfoEngine {
         if self.groups.is_empty() {
             components.push(Component::Text {
                 id: "no_groups".into(),
-                content: "No groups created. Create groups to control field visibility.".into(),
+                content: self.t("my_info.empty_groups"),
                 style: TextStyle::Caption,
             });
             return components;
@@ -322,7 +326,7 @@ impl MyInfoEngine {
             action_id: "exit-preview".into(),
             a11y: Some(A11y {
                 label: Some(format!("Viewing as {contact_name}")),
-                hint: Some("Action: Exit Preview".into()),
+                hint: Some(self.t("my_info.exit_preview_a11y_hint")),
                 role: Some(AccessibilityRole::Alert),
             }),
         });
@@ -335,14 +339,14 @@ impl MyInfoEngine {
         components.push(Component::InfoPanel {
             id: "preview_shared_name".into(),
             icon: None,
-            title: "They see you as".into(),
+            title: self.t("my_info.preview.title"),
             items: vec![InfoItem {
                 icon: None,
-                title: "Display Name".into(),
+                title: self.t("settings.display_name"),
                 detail: preview.shared_display_name.clone(),
             }],
             a11y: Some(A11y {
-                label: Some("They see you as".into()),
+                label: Some(self.t("my_info.preview.title")),
                 hint: None,
                 role: Some(AccessibilityRole::Heading),
             }),
@@ -356,7 +360,7 @@ impl MyInfoEngine {
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_groups: vec![],
                 a11y: Some(A11y {
-                    label: Some("Contact fields".into()),
+                    label: Some(self.t("my_info.preview.fields_a11y_label")),
                     hint: None,
                     role: None,
                 }),
@@ -380,7 +384,7 @@ impl MyInfoEngine {
         if self.show_exchange_prompt {
             actions.push(ScreenAction {
                 id: "go_exchange".into(),
-                label: "Exchange Now".into(),
+                label: self.t("my_info.exchange_now_button"),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
@@ -415,7 +419,7 @@ impl MyInfoEngine {
             },
             ScreenAction {
                 id: "preview-as-picker".into(),
-                label: "Preview as...".into(),
+                label: self.t("my_info.preview_as_button"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -431,7 +435,7 @@ impl WorkflowEngine for MyInfoEngine {
             let components = self.build_preview_view(contact_name);
             let actions = vec![ScreenAction {
                 id: "exit-preview".into(),
-                label: "Exit Preview".into(),
+                label: self.t("my_info.exit_preview_button"),
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -458,8 +462,8 @@ impl WorkflowEngine for MyInfoEngine {
             brightness: 0.0,
             editable: true,
             a11y: Some(A11y {
-                label: Some("Your avatar".into()),
-                hint: Some("Tap to edit avatar".into()),
+                label: Some(self.t("my_info.avatar_a11y_label")),
+                hint: Some(self.t("my_info.avatar_a11y_hint")),
                 role: Some(AccessibilityRole::Button),
             }),
         });
@@ -469,14 +473,14 @@ impl WorkflowEngine for MyInfoEngine {
             components.push(Component::InfoPanel {
                 id: "exchange_prompt".into(),
                 icon: Some("exchange".into()),
-                title: "Ready to exchange?".into(),
+                title: self.t("my_info.exchange_prompt_title"),
                 items: vec![InfoItem {
                     icon: Some("people".into()),
-                    title: "Find someone nearby".into(),
-                    detail: "Share your contact card in person — private and secure.".into(),
+                    title: self.t("my_info.exchange_prompt_action"),
+                    detail: self.t("my_info.exchange_prompt_detail"),
                 }],
                 a11y: Some(A11y {
-                    label: Some("Ready to exchange?".into()),
+                    label: Some(self.t("my_info.exchange_prompt_a11y_label")),
                     hint: None,
                     role: Some(AccessibilityRole::Heading),
                 }),

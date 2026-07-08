@@ -11,6 +11,7 @@
 //! `vauchi-platform` mobile bridge (which builds native ContactDetail
 //! views from `MobileContact` via the same canonical predicates).
 
+use crate::i18n::Locale;
 use crate::ui::*;
 use vauchi_core::contact::trust::TrustLevel;
 use vauchi_core::exchange::reciprocity::Reciprocity;
@@ -35,21 +36,27 @@ pub struct ContactTag {
 ///
 /// Pure presentation: the engine owns the data, the AppEngine intercept
 /// owns persistence. Component/field names stay UI-shaped (Wire Humble).
-pub fn tag_components(tags: &[ContactTag], query: &str, suggestions: &[String]) -> Vec<Component> {
+pub fn tag_components(
+    tags: &[ContactTag],
+    query: &str,
+    suggestions: &[String],
+    locale: Locale,
+) -> Vec<Component> {
+    let t = |key: &str| crate::i18n::get_string(locale, key);
     let mut out = Vec::with_capacity(3);
 
     out.push(Component::ActionList {
         id: "contact_tags".into(),
         items: tags
             .iter()
-            .map(|t| ActionListItem {
-                id: format!("remove_tag:{}", t.id),
-                label: t.name.clone(),
+            .map(|tag| ActionListItem {
+                id: format!("remove_tag:{}", tag.id),
+                label: tag.name.clone(),
                 icon: None,
                 detail: None,
                 a11y: Some(A11y {
-                    label: Some(format!("Remove tag {}", t.name)),
-                    hint: Some("Removes this tag from the contact".into()),
+                    label: Some(format!("Remove tag {}", tag.name)),
+                    hint: Some(t("contact_detail.tag_remove_a11y_hint")),
                     role: None,
                 }),
                 info_key: None,
@@ -59,14 +66,14 @@ pub fn tag_components(tags: &[ContactTag], query: &str, suggestions: &[String]) 
 
     out.push(Component::TextInput {
         id: "add_tag".into(),
-        label: "Add tag".into(),
+        label: t("contact_detail.add_tag_label"),
         value: query.to_string(),
-        placeholder: Some("Tag name".into()),
+        placeholder: Some(t("contact_detail.tag_placeholder")),
         max_length: None,
         validation_error: None,
         input_type: InputType::Text,
         a11y: Some(A11y {
-            label: Some("Add a tag to this contact".into()),
+            label: Some(t("contact_detail.add_tag_a11y_label")),
             hint: None,
             role: Some(AccessibilityRole::TextField),
         }),
@@ -201,7 +208,9 @@ pub fn place_components(
     place: &Option<ContactPlace>,
     query: &str,
     suggestions: &[String],
+    locale: Locale,
 ) -> Vec<Component> {
+    let t = |key: &str| crate::i18n::get_string(locale, key);
     let Some(place) = place else {
         return Vec::new();
     };
@@ -219,14 +228,14 @@ pub fn place_components(
 
     out.push(Component::TextInput {
         id: "name_place".into(),
-        label: "Name this place".into(),
+        label: t("contact_detail.place_name_label"),
         value: query.to_string(),
-        placeholder: Some("Place name".into()),
+        placeholder: Some(t("contact_detail.place_name_placeholder")),
         max_length: None,
         validation_error: None,
         input_type: InputType::Text,
         a11y: Some(A11y {
-            label: Some("Name this exchange place".into()),
+            label: Some(t("contact_detail.place_name_a11y_label")),
             hint: None,
             role: Some(AccessibilityRole::TextField),
         }),
@@ -258,11 +267,11 @@ pub fn place_components(
         id: "place_actions".into(),
         items: vec![ActionListItem {
             id: "clear_exchange_place".into(),
-            label: "Remove location".into(),
+            label: t("contact_detail.remove_location_label"),
             icon: None,
             detail: None,
             a11y: Some(A11y {
-                label: Some("Remove the recorded exchange location".into()),
+                label: Some(t("contact_detail.remove_location_a11y_label")),
                 hint: None,
                 role: None,
             }),

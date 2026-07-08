@@ -145,7 +145,7 @@ impl AppEngine {
             return Some(match self.open_device_link_invitation(uri) {
                 Ok(screen) => ActionResult::NavigateTo(screen),
                 Err(message) => ActionResult::ShowAlert {
-                    title: "Invalid Device Link".into(),
+                    title: self.t("device_link.invalid_title"),
                     message,
                 },
             });
@@ -154,7 +154,7 @@ impl AppEngine {
         // 3. Unknown vauchi link (or non-vauchi scheme that the OS somehow
         //    delivered). Surface a single, core-owned error.
         Some(ActionResult::ShowAlert {
-            title: "Invalid Link".into(),
+            title: self.t("deep_link.invalid_title"),
             message: "This link cannot be opened in Vauchi.".into(),
         })
     }

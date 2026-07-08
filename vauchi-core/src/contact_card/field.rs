@@ -62,6 +62,24 @@ impl FieldType {
         matches!(self, FieldType::Social)
     }
 
+    /// Returns the platform-neutral icon token for this field type.
+    ///
+    /// The vocabulary follows the SF Symbols core set (`phone`, `envelope`,
+    /// `globe`, `mappin`, `at`, `gift`) which has direct equivalents in
+    /// Material Symbols. Non-semantic renderers should fall back to `"tag"`
+    /// for unknown field types.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            FieldType::Phone => "phone",
+            FieldType::Email => "envelope",
+            FieldType::Website => "globe",
+            FieldType::Address => "mappin",
+            FieldType::Social => "at",
+            FieldType::Birthday => "gift",
+            FieldType::Custom => "tag",
+        }
+    }
+
     /// Resolves a human-friendly alias to a `FieldType` and optional label.
     ///
     /// Social network aliases (e.g. "twitter", "instagram") return the label
@@ -372,5 +390,33 @@ impl ContactField {
             _ => {}
         }
         Ok(())
+    }
+}
+
+// INLINE_TEST_REQUIRED: FieldType::icon is the single source of truth for the
+// platform-neutral icon vocabulary; co-locate tests so new variants surface
+// here and in vauchi-app's string-based wrapper at the same time.
+#[cfg(test)]
+mod field_type_icon_tests {
+    use super::FieldType;
+
+    // @internal
+    #[test]
+    fn icon_maps_known_field_types() {
+        assert_eq!(FieldType::Phone.icon(), "phone");
+        assert_eq!(FieldType::Email.icon(), "envelope");
+        assert_eq!(FieldType::Website.icon(), "globe");
+        assert_eq!(FieldType::Address.icon(), "mappin");
+        assert_eq!(FieldType::Social.icon(), "at");
+        assert_eq!(FieldType::Birthday.icon(), "gift");
+        assert_eq!(FieldType::Custom.icon(), "tag");
+    }
+
+    // @internal
+    #[test]
+    fn icon_returns_static_str() {
+        let a = FieldType::Email.icon();
+        let b = FieldType::Email.icon();
+        assert!(std::ptr::eq(a, b));
     }
 }

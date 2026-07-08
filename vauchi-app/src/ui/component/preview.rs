@@ -12,6 +12,7 @@
 //! `PreviewVariant` at the wire boundary.
 
 use serde::{Deserialize, Serialize};
+use vauchi_core::FieldType;
 
 use super::A11y;
 
@@ -53,14 +54,18 @@ pub struct Field {
 ///
 /// Matching is case-insensitive so callers can pass either Debug-format
 /// (`"Phone"`) or lowercase (`"phone"`) strings — both common in tree.
+///
+/// The actual values are delegated to [`FieldType::icon`] in `vauchi-core`
+/// so the vocabulary has a single source of truth.
 pub fn icon_for_field_type(field_type: &str) -> &'static str {
     match field_type.to_ascii_lowercase().as_str() {
-        "phone" => "phone",
-        "email" => "envelope",
-        "website" => "globe",
-        "address" => "mappin",
-        "social" => "at",
-        "birthday" => "gift",
+        "phone" => FieldType::Phone.icon(),
+        "email" => FieldType::Email.icon(),
+        "website" => FieldType::Website.icon(),
+        "address" => FieldType::Address.icon(),
+        "social" => FieldType::Social.icon(),
+        "birthday" => FieldType::Birthday.icon(),
+        "custom" => FieldType::Custom.icon(),
         _ => "tag",
     }
 }

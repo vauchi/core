@@ -21,8 +21,8 @@
 
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
-use rand::RngCore;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
+use rand_core::RngCore;
 use x25519_dalek::{PublicKey, StaticSecret};
 
 use super::RecoveryError;

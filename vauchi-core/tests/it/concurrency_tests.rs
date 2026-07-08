@@ -11,7 +11,7 @@
 //! 3. Read-after-write consistency
 //! 4. WAL mode concurrent access (if enabled)
 
-use rand::Rng;
+use rand_core::RngCore;
 use std::thread;
 use tempfile::tempdir;
 use vauchi_core::contact::Contact;
@@ -53,7 +53,7 @@ fn create_test_contact(name: &str) -> Contact {
 
     // Generate a random public key so each contact has a unique ID
     let mut public_key = [0u8; 32];
-    rand::thread_rng().fill(&mut public_key);
+    rand_core::OsRng.fill_bytes(&mut public_key);
 
     let shared_key = SymmetricKey::generate();
     Contact::from_exchange(public_key, card, shared_key, 0)

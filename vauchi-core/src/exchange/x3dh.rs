@@ -24,7 +24,7 @@
 //! - **Identity binding**: The shared secret is cryptographically tied to both
 //!   parties' long-term X25519 keys, preventing key-compromise impersonation.
 
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use x25519_dalek::{EphemeralSecret, PublicKey};
 use zeroize::Zeroize;
 

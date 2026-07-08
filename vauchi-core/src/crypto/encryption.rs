@@ -115,7 +115,7 @@ impl SymmetricKey {
 /// # Nonce Security (Tracker #226)
 ///
 /// Each encryption generates a fresh 24-byte (192-bit) nonce from
-/// `rand::rngs::OsRng` (OS CSPRNG). The 192-bit nonce space of
+/// `rand_core::OsRng` (OS CSPRNG). The 192-bit nonce space of
 /// XChaCha20-Poly1305 makes random collision negligible even at high
 /// volume (~2^96 encryptions before birthday-bound concern). This is
 /// why XChaCha20 was chosen over AES-GCM (96-bit nonce, birthday-bound

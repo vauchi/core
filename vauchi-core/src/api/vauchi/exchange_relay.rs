@@ -205,7 +205,7 @@ impl Vauchi {
         // secret after learning the initiator's exchange key.
 
         use crate::crypto::kdf::HKDF;
-        use rand::rngs::OsRng;
+        use rand_core::OsRng;
         use x25519_dalek::{EphemeralSecret, PublicKey};
         use zeroize::Zeroize;
 

@@ -4,7 +4,7 @@
 
 //! Integration tests for sealed-box encryption (ephemeral X25519 + XChaCha20-Poly1305).
 
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use rstest::rstest;
 use x25519_dalek::{PublicKey, StaticSecret};
 

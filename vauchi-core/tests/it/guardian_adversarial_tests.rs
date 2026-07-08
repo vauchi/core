@@ -10,7 +10,7 @@
 //! Traces to: features/contact_recovery.feature
 //! - @recovery @security: adversarial input handling
 
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret};
 
 use vauchi_core::crypto::SigningKeyPair;

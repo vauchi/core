@@ -9,7 +9,7 @@
 //!
 //! Traces to: features/contact_recovery.feature
 
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use sha2::{Digest, Sha256};
 use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::recovery::guardian::GuardianToken;

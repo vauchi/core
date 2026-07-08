@@ -23,7 +23,7 @@ fn build_signed_payload(signing_key: &SigningKey, pins: &[[u8; 32]]) -> Vec<u8> 
 }
 
 fn test_keypair() -> (SigningKey, [u8; 32]) {
-    let sk = SigningKey::generate(&mut rand::thread_rng());
+    let sk = SigningKey::generate(&mut rand_core::OsRng);
     let vk_bytes = sk.verifying_key().to_bytes();
     (sk, vk_bytes)
 }

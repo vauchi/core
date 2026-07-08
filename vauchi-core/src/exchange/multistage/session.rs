@@ -26,7 +26,7 @@ use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 
 use chacha20poly1305::ChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret as X25519Secret};

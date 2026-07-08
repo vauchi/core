@@ -9,7 +9,7 @@
 //! encryption, and restoration — the missing wiring layer.
 
 use ed25519_dalek::SigningKey;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;

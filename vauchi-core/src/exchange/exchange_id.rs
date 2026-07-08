@@ -20,8 +20,8 @@ pub struct ExchangeId([u8; 32]);
 impl ExchangeId {
     /// Generate a new random `ExchangeId` using the OS CSPRNG.
     pub fn generate() -> Self {
-        use rand::RngCore;
-        use rand::rngs::OsRng;
+        use rand_core::OsRng;
+        use rand_core::RngCore;
         let mut bytes = [0u8; 32];
         OsRng.fill_bytes(&mut bytes);
         Self(bytes)

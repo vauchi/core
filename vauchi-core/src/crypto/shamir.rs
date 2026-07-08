@@ -27,8 +27,8 @@
 //! Re-evaluate audited crates (e.g., `shamir-zero`, `secret-sharing-rs`)
 //! post-v0.5.0 to replace this custom implementation.
 
-use rand::RngCore;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
+use rand_core::RngCore;
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 

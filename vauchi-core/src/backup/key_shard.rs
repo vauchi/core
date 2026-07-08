@@ -296,7 +296,7 @@ pub fn open_share_for_guardian(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
     use x25519_dalek::StaticSecret;
 
     fn guardian_keypair() -> (StaticSecret, PublicKey) {

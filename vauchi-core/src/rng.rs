@@ -15,7 +15,7 @@
 //! permutations, where a deterministic test substitute saves whole
 //! classes of flaky tests.
 //!
-//! Production: `OsSecureRng` wraps `rand::rngs::OsRng`. Construct via
+//! Production: `OsSecureRng` wraps `rand_core::OsRng`. Construct via
 //! `OsSecureRng::shared()` and store as `Arc<dyn SecureRng>`.
 //!
 //! Test:`DeterministicRng` (gated by `feature = "testing"`) returns a
@@ -25,7 +25,7 @@
 
 use std::sync::Arc;
 
-use rand::RngCore;
+use rand_core::RngCore;
 
 /// An explicit-randomness seam. Every `vauchi-core` site that today
 /// reads `rand::thread_rng` (non-crypto: jitter, load-balancing,
@@ -124,7 +124,7 @@ pub trait SecureRngExt: SecureRng {
 // the extension methods automatically.
 impl<R: SecureRng + ?Sized> SecureRngExt for R {}
 
-/// Production RNG. Reads from the OS CSPRNG (`rand::rngs::OsRng`).
+/// Production RNG. Reads from the OS CSPRNG (`rand_core::OsRng`).
 ///
 /// Constructed via `OsSecureRng::new()` or `OsSecureRng::shared()`.
 /// The `shared()` constructor returns a long-lived `Arc<dyn SecureRng>`
@@ -147,14 +147,13 @@ impl OsSecureRng {
 
 impl SecureRng for OsSecureRng {
     fn fill_bytes(&self, buf: &mut [u8]) {
-        rand::rngs::OsRng.fill_bytes(buf);
+        rand_core::OsRng.fill_bytes(buf);
     }
 }
 
 /// Stepping-stone non-crypto RNG helper, transitional for Phase 1 /
 /// Task 1.2 / Step 3. Returns an `OsRng` value usable wherever a
-/// `rand::Rng` is needed — `gen_range`, `SliceRandom::shuffle`,
-/// `SliceRandom::choose`, etc.
+/// `rand_core::RngCore` is needed — `fill_bytes`, `random_u64`, etc.
 ///
 /// Every callsite is a `TODO` for structural threading: the owning
 /// type should hold an `Arc<dyn SecureRng>` field and use that
@@ -164,16 +163,16 @@ impl SecureRng for OsSecureRng {
 ///
 /// Hidden from public docs because it is not part of the API contract.
 #[doc(hidden)]
-pub fn non_crypto_rng() -> rand::rngs::OsRng {
-    rand::rngs::OsRng
+pub fn non_crypto_rng() -> rand_core::OsRng {
+    rand_core::OsRng
 }
 
 /// Test-only RNG with caller-controlled state.
 ///
 /// Gated by the `testing` feature so production binaries cannot
 /// accidentally substitute it. The RNG returns a deterministic
-/// sequence seeded at construction (via `rand::rngs::StdRng`, which
-/// itself wraps ChaCha12 — strong enough for test fixtures).
+/// sequence seeded at construction (via `rand_chacha::ChaCha12Rng`, which
+/// is the same ChaCha12 algorithm `rand::StdRng` wraps — strong enough for test fixtures).
 ///
 /// ```ignore
 /// use vauchi_core::rng::{DeterministicRng, SecureRng};
@@ -188,7 +187,7 @@ pub fn non_crypto_rng() -> rand::rngs::OsRng {
 /// ```
 #[cfg(any(test, feature = "testing"))]
 pub struct DeterministicRng {
-    state: std::sync::Mutex<rand::rngs::StdRng>,
+    state: std::sync::Mutex<rand_chacha::ChaCha12Rng>,
 }
 
 #[cfg(any(test, feature = "testing"))]
@@ -196,9 +195,9 @@ impl DeterministicRng {
     /// Seed the RNG with a `u64`. The same seed yields the same
     /// sequence — the whole point of a test RNG.
     pub fn from_seed(seed: u64) -> Self {
-        use rand::SeedableRng;
+        use rand_core::SeedableRng;
         Self {
-            state: std::sync::Mutex::new(rand::rngs::StdRng::seed_from_u64(seed)),
+            state: std::sync::Mutex::new(rand_chacha::ChaCha12Rng::seed_from_u64(seed)),
         }
     }
 

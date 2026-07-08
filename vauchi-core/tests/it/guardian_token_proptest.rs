@@ -52,7 +52,7 @@ proptest! {
     // @internal
     #[test]
     fn sealed_box_roundtrip(plaintext in prop::collection::vec(any::<u8>(), 0..512)) {
-        let recipient_secret = StaticSecret::random_from_rng(rand::rngs::OsRng);
+        let recipient_secret = StaticSecret::random_from_rng(rand_core::OsRng);
         let recipient_pk = PublicKey::from(&recipient_secret);
 
         let sealed = sealed_box::seal(&plaintext, &recipient_pk).expect("seal succeeds for a valid recipient key");

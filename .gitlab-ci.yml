@@ -158,6 +158,29 @@ lint:version-check:
           - "**/Cargo.toml"
           - "**/Cargo.lock"
 
+lint:workspace-version-alignment:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  allow_failure: false
+  before_script:
+    - apk add --no-cache bash git python3
+    - |
+      if [ ! -d ../scripts ]; then
+        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
+      else
+        git -C ../scripts pull --ff-only 2>/dev/null || true
+      fi
+  script:
+    - bash ../scripts/scripts/check-workspace-versions.sh Cargo.toml
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "Cargo.toml"
+
 lint:format:
   extends: [.linux-runner-nocache, .lint-format, .validation-rust, .timeout-quick]
   needs: []

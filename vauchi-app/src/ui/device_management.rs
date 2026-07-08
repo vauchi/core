@@ -176,7 +176,9 @@ impl WorkflowEngine for DeviceManagementEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { ref action_id } if action_id == "link_device" => {
-                ActionResult::StartDeviceLink
+                ActionResult::StartDeviceLink {
+                    role: DeviceLinkRole::Initiator,
+                }
             }
             UserAction::ActionPressed { ref action_id } if action_id == "revoke_device" => {
                 // Find the first revocable device (selected device in TUI)

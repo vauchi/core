@@ -431,7 +431,7 @@ proptest! {
                 ActionResult::CompleteWith { .. } => {
                     // CompleteWith is valid — onboarding finished with destination
                 }
-                ActionResult::StartDeviceLink => {
+                ActionResult::StartDeviceLink { .. } => {
                     // External handoff — valid from LinkChoice step
                     // (backup-restore now flows through Commands /
                     // FilePickFromUser per ADR-031 Phase 2B of

@@ -68,7 +68,9 @@ mod tag_promotion;
 mod tags_list;
 #[cfg(any(test, feature = "test-support"))]
 pub mod testing;
-pub use action::{ActionResult, ContactActionKind, PostOnboardingDestination, UserAction};
+pub use action::{
+    ActionResult, ContactActionKind, DeviceLinkRole, PostOnboardingDestination, UserAction,
+};
 pub use activity_log::{ActivityLogEngine, ActivityLogItem};
 #[cfg(feature = "network-rustls")]
 pub use app_engine::{AppEngine, AppScreen, TabLayout};

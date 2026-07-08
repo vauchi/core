@@ -553,7 +553,9 @@ impl WorkflowEngine for DeviceReplacementEngine {
         match action {
             UserAction::ActionPressed { action_id } => match self.step {
                 Step::SelectMode => match action_id.as_str() {
-                    "has_old_device" => ActionResult::StartDeviceLink,
+                    "has_old_device" => ActionResult::StartDeviceLink {
+                        role: DeviceLinkRole::Responder,
+                    },
                     "lost_device" => ActionResult::Commands {
                         commands: vec![Command::FilePickFromUser {
                             accepted_mime_types: backup_mime_types(),
@@ -828,7 +830,12 @@ mod tests {
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "has_old_device".into(),
         });
-        assert!(matches!(result, ActionResult::StartDeviceLink));
+        assert!(matches!(
+            result,
+            ActionResult::StartDeviceLink {
+                role: DeviceLinkRole::Responder
+            }
+        ));
     }
 
     // @internal

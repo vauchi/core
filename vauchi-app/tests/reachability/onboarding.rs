@@ -82,18 +82,24 @@ fn initial_screen_affordance_set_matches_plan() {
 }
 
 /// BFS reachability check against the full handler set today
-/// reports two documented orphans on the main onboarding flow.
+/// reports four documented orphans on the main onboarding flow.
 /// Pinning them here so any fix that lands without updating this
 /// test fails loudly.
 ///
 /// The screen set that the BFS currently reaches is:
 /// `identity_check` (entry),
-/// `device_link_instructions` (via `link_device`),
 /// `default_name` (via `create_new`),
 /// `groups_setup` (via `continue` on default_name with
-/// a non-empty name), `contact_info`, and `what_next`. Six screens.
+/// a non-empty name), `contact_info`, and `what_next`. Five screens.
 ///
-/// Two remaining orphans:
+/// `device_link_instructions` is no longer in the BFS reach because
+/// `link_device` now emits `ActionResult::StartDeviceLink { role: Responder }`,
+/// which the walker treats as a terminal external handoff (the screen is
+/// still rendered after AppEngine routes the result to `Commands(QrRequestScan)`).
+///
+/// Four remaining orphans:
+/// - `back` / `scan_qr` — handler arms on `device_link_instructions`,
+///   reached only through the terminal `StartDeviceLink` handoff above.
 /// - `submit_display_name` — handler arm at
 ///   `onboarding.rs:551`, no `ScreenAction` in `build_default_name`
 ///   (`onboarding.rs:263`) emits that id. Pressing "Continue" on
@@ -131,6 +137,8 @@ fn bfs_pins_remaining_orphans() {
     assert_eq!(
         report.orphan_handlers,
         BTreeSet::from([
+            "back".to_string(),
+            "scan_qr".to_string(),
             "submit_display_name".to_string(),
             "submit_backup_password".to_string(),
         ]),
@@ -150,7 +158,7 @@ fn bfs_pins_remaining_orphans() {
     );
 }
 
-/// Guards the BFS itself: the full flow should reach six distinct
+/// Guards the BFS itself: the full flow should reach five distinct
 /// screens. If this drops, the BFS regressed or a screen
 /// disappeared silently.
 // @internal
@@ -163,7 +171,6 @@ fn bfs_reaches_all_onboarding_screens() {
         ids,
         BTreeSet::from([
             "identity_check".to_string(),
-            "device_link_instructions".to_string(),
             "default_name".to_string(),
             "groups_setup".to_string(),
             "contact_info".to_string(),

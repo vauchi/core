@@ -141,6 +141,20 @@ pub enum PostOnboardingDestination {
     BackupSetup,
 }
 
+/// Role the frontend should assume when entering the device-link flow.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum DeviceLinkRole {
+    /// This device creates the link invitation (device-management
+    /// "Link New Device" / the link-initiator UI).
+    Initiator,
+    /// This device joins an existing link by scanning an invitation
+    /// (onboarding or device-replacement "I have my old device").
+    Responder,
+}
+
 /// The result of handling a user action.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -158,8 +172,10 @@ pub enum ActionResult {
     CompleteWith {
         destination: PostOnboardingDestination,
     },
-    /// Frontend should switch to the device linking flow.
-    StartDeviceLink,
+    /// Frontend should switch to the device linking flow in the given role.
+    StartDeviceLink {
+        role: DeviceLinkRole,
+    },
     /// Frontend should open the contact detail view.
     OpenContact {
         contact_id: String,

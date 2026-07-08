@@ -10,7 +10,7 @@
 //! here so the match stays a readable table.
 
 use super::{AppEngine, AppScreen};
-use crate::ui::action::{ActionResult, PostOnboardingDestination};
+use crate::ui::action::{ActionResult, DeviceLinkRole, PostOnboardingDestination};
 use vauchi_core::exchange::mode::ExchangeMode;
 
 impl AppEngine {
@@ -25,13 +25,18 @@ impl AppEngine {
             ActionResult::EditContact { contact_id } => {
                 ActionResult::NavigateTo(self.navigate_to(AppScreen::ContactEdit { contact_id }))
             }
-            // DeviceManagementEngine emits StartDeviceLink when the user taps
-            // "Link New Device" — the link flow is fully core-driven, so route
-            // straight there. Onboarding / DeviceReplacement also emit it but
-            // on screens with their own native flows, so leave those untouched.
-            ActionResult::StartDeviceLink if self.screen == AppScreen::DeviceManagement => {
-                ActionResult::NavigateTo(self.navigate_to(AppScreen::DeviceLinking))
-            }
+            // Core resolves the device-link entry point by role so frontends
+            // never need to map the screen they were on to a link flow.
+            // Initiator starts the core-driven invitation engine; Responder
+            // asks the frontend to scan an invitation QR.
+            ActionResult::StartDeviceLink { role } => match role {
+                DeviceLinkRole::Initiator => {
+                    ActionResult::NavigateTo(self.navigate_to(AppScreen::DeviceLinking))
+                }
+                DeviceLinkRole::Responder => ActionResult::Commands {
+                    commands: vec![vauchi_core::Command::QrRequestScan],
+                },
+            },
             // ExchangeEngine emits these when the user picks an exchange mode.
             // All four carry the group-selection preamble across the engine
             // handoff (see start_exchange_to). The `mode` payload threads down

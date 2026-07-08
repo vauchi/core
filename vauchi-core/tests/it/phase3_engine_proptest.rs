@@ -135,7 +135,7 @@ fn validate_result(
         | ActionResult::WipeComplete
         | ActionResult::RequestCamera
         | ActionResult::ValidationError { .. }
-        | ActionResult::StartDeviceLink
+        | ActionResult::StartDeviceLink { .. }
         | ActionResult::OpenContact { .. }
         | ActionResult::EditContact { .. }
         | ActionResult::OpenUrl { .. }

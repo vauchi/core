@@ -91,19 +91,16 @@ fn identity_check_create_new_goes_to_default_name() {
 
 // @internal
 #[test]
-fn identity_check_link_device_emits_qr_scan_command() {
-    use vauchi_core::Command;
+fn identity_check_link_device_emits_responder_start_device_link() {
+    use vauchi_app::ui::DeviceLinkRole;
     let mut engine = OnboardingEngine::new();
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "link_device".into(),
     });
     match result {
-        ActionResult::Commands { commands } => {
-            assert_eq!(commands.len(), 1);
-            assert!(
-                matches!(commands[0], Command::QrRequestScan),
-                "link_device should request QR scan"
-            );
+        ActionResult::StartDeviceLink {
+            role: DeviceLinkRole::Responder,
+        } => {
             let screen = engine.current_screen();
             assert_eq!(screen.screen_id, "device_link_instructions");
             assert!(
@@ -111,7 +108,7 @@ fn identity_check_link_device_emits_qr_scan_command() {
                 "Pre-gate screens have no progress bar"
             );
         }
-        other => panic!("Expected Commands, got {other:?}"),
+        other => panic!("Expected StartDeviceLink(Responder), got {other:?}"),
     }
 }
 

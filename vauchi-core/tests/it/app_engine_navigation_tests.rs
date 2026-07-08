@@ -85,12 +85,10 @@ fn navigate_to_emergency_shred_shows_warning() {
 }
 
 // @internal
-// "Link New Device" on the DeviceManagement screen used to return a raw
-// `StartDeviceLink` ActionResult that frontends had to handle natively
-// (no-op on every shipped frontend). AppEngine now intercepts that
-// result when the user is on DeviceManagement and routes to the
-// core-driven DeviceLinkingEngine, so frontends only need to render
-// the resulting screen.
+// "Link New Device" on the DeviceManagement screen returns a typed
+// `StartDeviceLink { role: Initiator }` ActionResult. AppEngine routes
+// the initiator role to the core-driven DeviceLinkingEngine, so
+// frontends only need to render the resulting screen.
 // @internal
 #[test]
 fn link_new_device_from_device_management_navigates_to_device_linking() {
@@ -113,7 +111,37 @@ fn link_new_device_from_device_management_navigates_to_device_linking() {
         }
         other => panic!(
             "expected NavigateTo(link_show_qr), got {other:?} — \
-             AppEngine intercept on DeviceManagement→StartDeviceLink missing"
+             AppEngine routing for StartDeviceLink(Initiator) missing"
+        ),
+    }
+}
+
+// @internal
+// Onboarding's "link_device" emits `StartDeviceLink { role: Responder }`.
+// AppEngine routes the responder role to a QR-scan command instead of
+// leaving each frontend to mint the command from the screen context.
+#[test]
+fn onboarding_link_device_responder_routes_to_qr_scan_command() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Onboarding);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "link_device".into(),
+    });
+
+    match result {
+        ActionResult::Commands { commands } => {
+            assert_eq!(commands.len(), 1);
+            assert!(
+                matches!(commands[0], vauchi_core::Command::QrRequestScan),
+                "responder role should route to QrRequestScan command"
+            );
+        }
+        other => panic!(
+            "expected Commands(QrRequestScan), got {other:?} — \
+             AppEngine routing for StartDeviceLink(Responder) missing"
         ),
     }
 }

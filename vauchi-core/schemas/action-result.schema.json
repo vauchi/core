@@ -79,11 +79,25 @@
       "additionalProperties": false
     },
     {
-      "description": "Frontend should switch to the device linking flow.",
-      "type": "string",
-      "enum": [
+      "description": "Frontend should switch to the device linking flow in the given role.",
+      "type": "object",
+      "required": [
         "StartDeviceLink"
-      ]
+      ],
+      "properties": {
+        "StartDeviceLink": {
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "$ref": "#/definitions/DeviceLinkRole"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Frontend should open the contact detail view.",
@@ -2664,6 +2678,25 @@
           "$ref": "#/definitions/TypographyTokens"
         }
       }
+    },
+    "DeviceLinkRole": {
+      "description": "Role the frontend should assume when entering the device-link flow.",
+      "oneOf": [
+        {
+          "description": "This device creates the link invitation (device-management \"Link New Device\" / the link-initiator UI).",
+          "type": "string",
+          "enum": [
+            "initiator"
+          ]
+        },
+        {
+          "description": "This device joins an existing link by scanning an invitation (onboarding or device-replacement \"I have my old device\").",
+          "type": "string",
+          "enum": [
+            "responder"
+          ]
+        }
+      ]
     },
     "DropdownOption": {
       "description": "An option in a [`Component::Dropdown`].",

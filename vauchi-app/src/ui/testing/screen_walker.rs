@@ -333,7 +333,7 @@ fn is_terminal(result: &ActionResult) -> bool {
         result,
         ActionResult::Complete
             | ActionResult::CompleteWith { .. }
-            | ActionResult::StartDeviceLink
+            | ActionResult::StartDeviceLink { .. }
             | ActionResult::StartLinkExchange
             | ActionResult::OpenContact { .. }
             | ActionResult::EditContact { .. }

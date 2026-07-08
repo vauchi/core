@@ -647,13 +647,13 @@ impl OnboardingEngine {
                 self.navigate_to(Step::DefaultName)
             }
             UserAction::ActionPressed { action_id } if action_id == "link_device" => {
-                // Transition to the instruction screen and immediately ask
-                // the frontend to open the QR scanner. The actual invitation
-                // is ingested through the existing `LinkOpened` deep-link or
+                // Transition to the instruction screen and ask the app layer
+                // to open the QR scanner. The actual invitation is ingested
+                // through the existing `LinkOpened` deep-link or
                 // `Event::QrScanned` hardware path in `AppEngine`.
                 self.step = Step::DeviceLinkInstructions;
-                ActionResult::Commands {
-                    commands: vec![Command::QrRequestScan],
+                ActionResult::StartDeviceLink {
+                    role: DeviceLinkRole::Responder,
                 }
             }
             UserAction::ActionPressed { action_id } if action_id == "load_backup" => {

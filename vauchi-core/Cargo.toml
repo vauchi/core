@@ -64,9 +64,6 @@ chacha20poly1305 = "0.10.1"
 # Argon2id password KDF (spec-mandated, outside RustCrypto primary set but spec-mandated)
 argon2 = "0.5.3"
 
-# Async trait support for async sync pipeline
-async-trait = "0.1"
-
 # Compression for delta payloads
 flate2 = "1.0"
 

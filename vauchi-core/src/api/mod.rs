@@ -148,10 +148,9 @@ pub use sync_controller::{SyncController, SyncResult};
 
 // Sync Application Services
 pub use sync::{
-    AsyncBinarySender, BinarySendError, BinarySender, CardUpdateError, CardUpdateResult,
-    DeviceSyncOrchestrator, ReceiveOutcome, ReceivedAlert, SyncError, SyncManager,
-    build_device_sync_envelopes, process_card_updates, process_single_card_update,
-    send_device_sync, send_device_sync_async,
+    CardUpdateError, CardUpdateResult, DeviceSyncOrchestrator, ReceiveOutcome, ReceivedAlert,
+    SyncError, SyncManager, build_device_sync_envelopes, process_card_updates,
+    process_single_card_update,
 };
 
 // App Password / Duress PIN

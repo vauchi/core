@@ -11,6 +11,7 @@ pub mod kdf;
 pub mod padding;
 pub mod password_kdf;
 pub mod ratchet;
+pub mod shamir;
 pub mod shredding;
 pub mod signing;
 pub mod x3dh;

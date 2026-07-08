@@ -36,8 +36,22 @@ use crate::crypto::{SymmetricKey, decrypt, derive_key_argon2id, encrypt, random_
 /// Backup format version byte for v3 (full backup).
 pub(crate) const FULL_BACKUP_VERSION: u8 = 0x03;
 
+/// Backup format version byte for v3 with an explicit random key.
+///
+/// Format: `0x04 || salt (16) || ciphertext`
+/// Same inner envelope as v3, but the key is a random 32-byte key rather than
+/// derived from a password. This is used for guardian key-shard backups.
+pub(crate) const GUARDIAN_BACKUP_VERSION: u8 = 0x04;
+
 /// HKDF domain separation info for v3 backup key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-backup-v3";
+
+/// HKDF domain separation info for v4 guardian backup key derivation.
+///
+/// The key is generated randomly, but we still run it through HKDF with domain
+/// separation so that a key accidentally used in another context cannot be
+/// directly reused as a v4 backup key.
+const GUARDIAN_BACKUP_HKDF_INFO: &[u8] = b"vauchi-backup-v4-guardian";
 
 /// Identity data required for a full backup export.
 pub struct FullBackupIdentityData {
@@ -137,6 +151,22 @@ fn derive_v3_key(password: &str, salt: &[u8; 16]) -> Result<SymmetricKey, Backup
     Ok(key)
 }
 
+/// Derives the v4 guardian backup encryption key from an explicit random key.
+fn derive_v4_key(key: &SymmetricKey, salt: &[u8; 16]) -> Result<SymmetricKey, BackupError> {
+    let prk = HKDF::extract(Some(salt), key.as_bytes());
+    let okm = HKDF::expand(&prk, GUARDIAN_BACKUP_HKDF_INFO, 32)
+        .map_err(|_| BackupError::KeyDerivation)?;
+
+    let mut key_bytes: [u8; 32] = okm
+        .as_slice()
+        .try_into()
+        .map_err(|_| BackupError::KeyDerivation)?;
+    let derived =
+        SymmetricKey::try_from_bytes(key_bytes).map_err(|_| BackupError::KeyDerivation)?;
+    key_bytes.zeroize();
+    Ok(derived)
+}
+
 /// zlib magic byte: every zlib header starts with 0x78.
 const ZLIB_MAGIC: u8 = 0x78;
 
@@ -221,15 +251,81 @@ pub fn export_full_backup(
     let compressed = compress_backup(&plaintext)?;
 
     let salt: [u8; 16] = random_bytes();
-
     let key = derive_v3_key(password, &salt)?;
-
     let ciphertext =
         encrypt(&key, &compressed).map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
 
-    // Assemble output: version || salt || ciphertext
     let mut out = Vec::with_capacity(1 + 16 + ciphertext.len());
     out.push(FULL_BACKUP_VERSION);
+    out.extend_from_slice(&salt);
+    out.extend_from_slice(&ciphertext);
+    Ok(out)
+}
+
+/// Exports a full v4 guardian backup using an explicit random symmetric key.
+///
+/// ## Format
+///
+/// `GUARDIAN_BACKUP_VERSION (0x04) || salt (16 bytes) || ciphertext`
+///
+/// The ciphertext encrypts a JSON `FullBackupEnvelope`. The encryption key is
+/// provided by the caller (typically a freshly generated key that is then split
+/// and distributed as guardian key shards).
+pub fn export_guardian_backup(
+    identity_data: &FullBackupIdentityData,
+    contacts: &[Contact],
+    own_card: Option<&ContactCard>,
+    labels: &[(String, String, Vec<String>)],
+    key: &SymmetricKey,
+    now: u64,
+) -> Result<Vec<u8>, BackupError> {
+    let identity = IdentitySection {
+        display_name: identity_data.display_name.clone(),
+        master_seed_b64: BASE64.encode(identity_data.master_seed),
+        device_index: identity_data.device_index,
+        device_name: identity_data.device_name.clone(),
+    };
+
+    let contact_values: Vec<serde_json::Value> = contacts
+        .iter()
+        .map(|c| {
+            let entry = ContactBackupEntry::from_contact(c)?;
+            serde_json::to_value(&entry).map_err(|e| BackupError::Serialization(e.to_string()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let label_sections: Vec<LabelSection> = labels
+        .iter()
+        .map(|(id, name, contact_ids)| LabelSection {
+            label_id: id.clone(),
+            name: name.clone(),
+            contacts: contact_ids.clone(),
+        })
+        .collect();
+
+    let envelope = FullBackupEnvelope {
+        version: 4,
+        created_at: now,
+        sections: BackupSections {
+            identity,
+            contacts: contact_values,
+            own_card: own_card.cloned(),
+            labels: label_sections,
+        },
+    };
+
+    let plaintext = Zeroizing::new(
+        serde_json::to_vec(&envelope).map_err(|e| BackupError::Serialization(e.to_string()))?,
+    );
+    let compressed = compress_backup(&plaintext)?;
+
+    let salt: [u8; 16] = random_bytes();
+    let derived_key = derive_v4_key(key, &salt)?;
+    let ciphertext = encrypt(&derived_key, &compressed)
+        .map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
+
+    let mut out = Vec::with_capacity(1 + 16 + ciphertext.len());
+    out.push(GUARDIAN_BACKUP_VERSION);
     out.extend_from_slice(&salt);
     out.extend_from_slice(&ciphertext);
     Ok(out)
@@ -258,6 +354,42 @@ pub fn import_full_backup(data: &[u8], password: &str) -> Result<FullBackupEnvel
 
     let decrypted =
         Zeroizing::new(decrypt(&key, ciphertext).map_err(|_| BackupError::DecryptionFailed)?);
+    let plaintext = decompress_backup(&decrypted)?;
+
+    let envelope: FullBackupEnvelope = serde_json::from_slice(&plaintext)
+        .map_err(|e| BackupError::Deserialization(e.to_string()))?;
+
+    Ok(envelope)
+}
+
+/// Imports a full v4 guardian backup using an explicit symmetric key.
+///
+/// This is the companion to [`export_guardian_backup`]. The caller supplies the
+/// key reconstructed from guardian key shards.
+pub fn import_guardian_backup(
+    data: &[u8],
+    key: &SymmetricKey,
+) -> Result<FullBackupEnvelope, BackupError> {
+    // Minimum: version (1) + salt (16) + nonce (24) + tag (16) + some ciphertext
+    if data.len() < 1 + 16 {
+        return Err(BackupError::TooShort);
+    }
+
+    let version = data[0];
+    if version != GUARDIAN_BACKUP_VERSION {
+        return Err(BackupError::UnsupportedVersion(version));
+    }
+
+    let salt: [u8; 16] = data[1..17]
+        .try_into()
+        .expect("salt slice is exactly 16 bytes");
+    let ciphertext = &data[17..];
+
+    let derived_key = derive_v4_key(key, &salt)?;
+
+    let decrypted = Zeroizing::new(
+        decrypt(&derived_key, ciphertext).map_err(|_| BackupError::DecryptionFailed)?,
+    );
     let plaintext = decompress_backup(&decrypted)?;
 
     let envelope: FullBackupEnvelope = serde_json::from_slice(&plaintext)

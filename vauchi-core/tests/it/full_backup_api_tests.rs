@@ -8,10 +8,13 @@
 //! on the Vauchi struct correctly orchestrate data gathering from storage,
 //! encryption, and restoration — the missing wiring layer.
 
+use ed25519_dalek::SigningKey;
+use rand::rngs::OsRng;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::{ContactField, FieldType, ImportSource, Vauchi, VauchiConfig};
+use x25519_dalek::StaticSecret;
 
 const BACKUP_PASSWORD: &str = "correct-horse-battery-staple";
 
@@ -205,4 +208,135 @@ fn full_backup_api_import_rejects_existing_identity() {
 
     let result = v2.import_full_backup(&backup_hex, BACKUP_PASSWORD);
     assert!(result.is_err(), "import should reject when identity exists");
+}
+
+// ── Guardian key shard backup E2E ──────────────────────────────────────────
+
+/// A guardian keypair for testing: Ed25519 identity key plus the matching
+/// X25519 key used to open sealed shares.
+struct GuardianKeys {
+    ed25519_pk: [u8; 32],
+    x25519_sk: StaticSecret,
+}
+
+impl GuardianKeys {
+    fn generate() -> Self {
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let ed25519_pk = signing_key.verifying_key().to_bytes();
+        let x25519_sk = StaticSecret::from(signing_key.to_scalar_bytes());
+        Self {
+            ed25519_pk,
+            x25519_sk,
+        }
+    }
+}
+
+/// End-to-end guardian backup: create identity + data, export with 2-of-3 shards,
+/// recover with any 2 guardians, verify the decrypted envelope matches.
+// @scenario: backup_format_versioning :: Guardian backup round-trip with shards
+#[test]
+fn guardian_backup_with_shards_roundtrip() {
+    let v = setup_vauchi_with_data();
+    let original_public_id = v.public_id().unwrap();
+
+    let guardians = [
+        GuardianKeys::generate(),
+        GuardianKeys::generate(),
+        GuardianKeys::generate(),
+    ];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(|g| g.ed25519_pk).collect();
+
+    let (backup_hex, sealed_shares) = v
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    assert!(!backup_hex.is_empty());
+    let backup_bytes = hex::decode(&backup_hex).unwrap();
+    assert_eq!(
+        backup_bytes[0], 0x04,
+        "guardian backup must use v4 format byte"
+    );
+    assert_eq!(
+        sealed_shares.len(),
+        3,
+        "expected one sealed share per guardian"
+    );
+
+    // Open shares 0 and 2 with the corresponding guardian X25519 secret keys.
+    let recovery_pairs = vec![
+        (sealed_shares[0].clone(), guardians[0].x25519_sk.clone()),
+        (sealed_shares[2].clone(), guardians[2].x25519_sk.clone()),
+    ];
+
+    let envelope = v
+        .recover_guardian_backup(&backup_hex, &recovery_pairs)
+        .unwrap();
+
+    // Identity round-tripped.
+    assert_eq!(envelope.sections.identity.display_name, "Alice Smith");
+
+    // Contacts round-tripped.
+    assert_eq!(envelope.sections.contacts.len(), 3);
+
+    // Own card round-tripped.
+    let own_card = envelope
+        .sections
+        .own_card
+        .as_ref()
+        .expect("own card must be present");
+    assert_eq!(own_card.fields().len(), 2);
+
+    // Master seed can be extracted and yields the same public identity.
+    let seed = vauchi_core::extract_master_seed(&envelope.sections.identity).unwrap();
+    let restored_identity = vauchi_core::Identity::from_device_link(
+        *seed,
+        envelope.sections.identity.display_name.clone(),
+        envelope.sections.identity.device_index,
+        envelope.sections.identity.device_name.clone(),
+        0,
+    );
+    assert_eq!(restored_identity.public_id(), original_public_id);
+}
+
+/// Recovery must fail when fewer than the threshold of shares is provided.
+// @scenario: backup_format_versioning :: Guardian backup recovery rejects insufficient shares
+#[test]
+fn guardian_backup_recovery_rejects_insufficient_shares() {
+    let v = setup_vauchi_with_data();
+    let guardians = [
+        GuardianKeys::generate(),
+        GuardianKeys::generate(),
+        GuardianKeys::generate(),
+    ];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(|g| g.ed25519_pk).collect();
+
+    let (backup_hex, sealed_shares) = v
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    // Only one share: reconstruction must fail.
+    let recovery_pairs = vec![(sealed_shares[0].clone(), guardians[0].x25519_sk.clone())];
+    let result = v.recover_guardian_backup(&backup_hex, &recovery_pairs);
+    assert!(result.is_err(), "recovery with 1-of-2 threshold must fail");
+}
+
+/// A sealed share must not open with a different guardian's secret key.
+// @scenario: backup_format_versioning :: Guardian sealed share rejects wrong secret key
+#[test]
+fn guardian_backup_share_rejects_wrong_key() {
+    let v = setup_vauchi_with_data();
+    let guardians = [GuardianKeys::generate(), GuardianKeys::generate()];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(|g| g.ed25519_pk).collect();
+
+    let (_backup_hex, sealed_shares) = v
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    // Use guardian 1's secret to open guardian 0's share.
+    let wrong_pair = vec![(sealed_shares[0].clone(), guardians[1].x25519_sk.clone())];
+    let result = v.recover_guardian_backup("00", &wrong_pair);
+    assert!(
+        result.is_err(),
+        "share must not open with wrong guardian key"
+    );
 }

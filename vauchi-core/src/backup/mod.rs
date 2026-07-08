@@ -11,9 +11,15 @@
 
 pub mod contact_backup;
 pub mod full_backup;
+pub mod key_shard;
 
 pub use contact_backup::{BackupError, export_contact_backup, import_contact_backup};
 pub use full_backup::{
     BackupSections, FullBackupEnvelope, FullBackupIdentityData, IdentitySection, LabelSection,
-    export_full_backup, extract_master_seed, import_full_backup, restore_contacts_from_envelope,
+    export_full_backup, export_guardian_backup, extract_master_seed, import_full_backup,
+    import_guardian_backup, restore_contacts_from_envelope,
+};
+pub use key_shard::{
+    BackupKey, BackupKeyShard, KeyShardConfig, KeyShardError, open_share_for_guardian,
+    reconstruct_backup_key, seal_share_for_guardian, split_backup_key,
 };

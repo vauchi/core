@@ -699,4 +699,140 @@ impl Vauchi {
         state.record_backup(self.clock.unix_seconds());
         self.save_backup_reminder_state(&state)
     }
+
+    // === Guardian Key Shard Backup Operations ===
+
+    /// Exports a full v4 guardian backup and splits the encryption key into shards.
+    ///
+    /// Returns the encrypted backup blob (hex-encoded) and a vector of sealed
+    /// shares, one per guardian. The backup key is generated randomly, split
+    /// with Shamir's Secret Sharing, and each share is sealed to the guardian's
+    /// X25519 public key (derived from their Ed25519 identity key).
+    ///
+    /// **Share ordering:** `sealed_shares[i]` corresponds to `guardian_pks[i]`.
+    /// The caller must preserve this mapping when distributing shares to
+    /// guardians; otherwise recovery will reconstruct the wrong key.
+    ///
+    /// # Arguments
+    /// * `guardian_pks` - Ed25519 public keys of the designated guardians.
+    /// * `threshold` - Minimum number of guardians needed to recover the key.
+    ///
+    /// # Errors
+    /// Returns [`VauchiError::InvalidState`] if there are fewer guardians than
+    /// the threshold, if a guardian key is invalid, or if shard parameters are
+    /// out of range.
+    pub fn export_guardian_backup_with_shards(
+        &self,
+        guardian_pks: &[[u8; 32]],
+        threshold: u8,
+    ) -> VauchiResult<(String, Vec<Vec<u8>>)> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let config = crate::backup::KeyShardConfig::new(threshold, guardian_pks.len() as u8)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+
+        let identity_data = crate::backup::FullBackupIdentityData {
+            display_name: identity.display_name().to_string(),
+            master_seed: *identity.master_seed(),
+            device_index: identity.device_index(),
+            device_name: identity.device_info().device_name().to_string(),
+        };
+
+        let contacts = self.storage.contacts().list_contacts()?;
+        let own_card = self.storage.contacts().load_own_card()?;
+        let groups = self.storage.labels().load_all_groups()?;
+        let labels: Vec<(String, String, Vec<String>)> = groups
+            .iter()
+            .map(|g| {
+                (
+                    g.id().to_string(),
+                    g.name().to_string(),
+                    g.contacts().iter().cloned().collect(),
+                )
+            })
+            .collect();
+
+        let backup_key = crate::backup::BackupKey::generate();
+        let blob = crate::backup::export_guardian_backup(
+            &identity_data,
+            &contacts,
+            own_card.as_ref(),
+            &labels,
+            backup_key.symmetric_key(),
+            self.clock.unix_seconds(),
+        )
+        .map_err(|e| VauchiError::Configuration(format!("Guardian backup export failed: {e}")))?;
+
+        let shards = crate::backup::split_backup_key(&backup_key, config)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+
+        let mut sealed_shares = Vec::with_capacity(guardian_pks.len());
+        for (shard, pk) in shards.iter().zip(guardian_pks.iter()) {
+            let x25519_pk = ed25519_pk_to_x25519(pk)?;
+            let sealed = crate::backup::seal_share_for_guardian(shard, &x25519_pk)
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+            sealed_shares.push(sealed);
+        }
+
+        // best-effort timestamp update
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.record_backup_completed();
+
+        Ok((hex::encode(blob), sealed_shares))
+    }
+
+    /// Recovers a v4 guardian backup from sealed shares.
+    ///
+    /// Takes the encrypted backup blob (hex-encoded) and a vector of sealed
+    /// shares from guardians. Decrypts each share with the corresponding
+    /// guardian's X25519 secret key, reconstructs the backup key, and returns
+    /// the decrypted [`FullBackupEnvelope`].
+    ///
+    /// **This method does not restore identity, contacts, or labels to storage.**
+    /// The caller must apply the returned envelope the same way
+    /// [`Self::import_full_backup`] applies a decrypted v3 backup, or call
+    /// [`Self::import_full_backup`] if the backup was exported as a password
+    /// backup instead.
+    ///
+    /// # Arguments
+    /// * `backup_data` - Hex-encoded backup blob from [`Self::export_guardian_backup_with_shards`].
+    /// * `sealed_shares` - Sealed shares, each paired with the guardian's X25519 secret key.
+    ///
+    /// # Errors
+    /// Returns [`VauchiError::InvalidState`] if share decryption or key
+    /// reconstruction fails.
+    pub fn recover_guardian_backup(
+        &self,
+        backup_data: &str,
+        sealed_shares: &[(Vec<u8>, x25519_dalek::StaticSecret)],
+    ) -> VauchiResult<crate::backup::FullBackupEnvelope> {
+        let mut shards = Vec::with_capacity(sealed_shares.len());
+        for (sealed, sk) in sealed_shares {
+            let shard = crate::backup::open_share_for_guardian(sealed, sk)
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+            shards.push(shard);
+        }
+
+        let backup_key = crate::backup::reconstruct_backup_key(&shards)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+
+        let bytes = hex::decode(backup_data.trim())
+            .map_err(|e| VauchiError::Configuration(format!("Invalid hex data: {e}")))?;
+
+        crate::backup::import_guardian_backup(&bytes, backup_key.symmetric_key())
+            .map_err(|e| VauchiError::Configuration(format!("Guardian backup import failed: {e}")))
+    }
+}
+
+/// Converts an Ed25519 public key to an X25519 (Curve25519) public key.
+///
+/// Uses the birational map from Edwards to Montgomery form.
+fn ed25519_pk_to_x25519(ed25519_pk: &[u8; 32]) -> VauchiResult<x25519_dalek::PublicKey> {
+    let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(ed25519_pk)
+        .map_err(|e| VauchiError::Crypto(format!("invalid Ed25519 public key: {e}")))?;
+    let montgomery = verifying_key.to_montgomery();
+    Ok(x25519_dalek::PublicKey::from(montgomery.to_bytes()))
 }

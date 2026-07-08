@@ -137,9 +137,12 @@ pub mod avatar;
 pub use aha_moments::AhaMoment;
 pub mod backup;
 pub use backup::{
-    BackupError, BackupSections, FullBackupEnvelope, FullBackupIdentityData, IdentitySection,
-    LabelSection, export_contact_backup, export_full_backup, extract_master_seed,
-    import_contact_backup, import_full_backup, restore_contacts_from_envelope,
+    BackupError, BackupKey, BackupKeyShard, BackupSections, FullBackupEnvelope,
+    FullBackupIdentityData, IdentitySection, KeyShardConfig, KeyShardError, LabelSection,
+    export_contact_backup, export_full_backup, export_guardian_backup, extract_master_seed,
+    import_contact_backup, import_full_backup, import_guardian_backup, open_share_for_guardian,
+    reconstruct_backup_key, restore_contacts_from_envelope, seal_share_for_guardian,
+    split_backup_key,
 };
 pub mod demo_contact;
 pub use demo_contact::{

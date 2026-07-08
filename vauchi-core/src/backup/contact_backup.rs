@@ -52,6 +52,9 @@ pub enum BackupError {
 
     #[error("Key derivation failed")]
     KeyDerivation,
+
+    #[error("Key shard error: {0}")]
+    KeyShard(String),
 }
 
 /// Internal representation of a single contact in the backup JSON payload.

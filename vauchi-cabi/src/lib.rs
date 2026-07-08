@@ -160,38 +160,6 @@ pub unsafe extern "C" fn vauchi_config_set_storage_key(
     .unwrap_or_default()
 }
 
-/// Enable or disable BLE backend.
-///
-/// # Safety
-/// `config` must be a valid config handle or null.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn vauchi_config_enable_ble(config: *mut CabiConfig, enabled: bool) {
-    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        // SAFETY: Caller guarantees config is a valid CabiConfig pointer or null.
-        unsafe {
-            if !config.is_null() {
-                (*config).ble_enabled = enabled;
-            }
-        }
-    }));
-}
-
-/// Enable or disable audio (ultrasonic) backend.
-///
-/// # Safety
-/// `config` must be a valid config handle or null.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn vauchi_config_enable_audio(config: *mut CabiConfig, enabled: bool) {
-    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        // SAFETY: Caller guarantees config is a valid CabiConfig pointer or null.
-        unsafe {
-            if !config.is_null() {
-                (*config).audio_enabled = enabled;
-            }
-        }
-    }));
-}
-
 /// Create an AppEngine from a config builder.
 ///
 /// The config handle is consumed (freed) by this call — do not free it
@@ -1552,54 +1520,6 @@ mod tests {
             let result = vauchi_config_set_storage_key(config, std::ptr::null(), 32);
             assert!(!result, "null key pointer should return false");
 
-            vauchi_config_free(config);
-        }
-    }
-
-    // ── Config enable_ble/audio tests ──────────────────────────────
-
-    #[test]
-    fn config_enable_ble_toggles() {
-        // SAFETY: Valid config handle, toggling a boolean field.
-        unsafe {
-            let dir = CString::new("/tmp/vauchi-test").unwrap();
-            let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
-            assert!(!config.is_null());
-
-            vauchi_config_enable_ble(config, false);
-            assert!(!(*config).ble_enabled);
-            vauchi_config_enable_ble(config, true);
-            assert!((*config).ble_enabled);
-
-            vauchi_config_free(config);
-        }
-    }
-
-    #[test]
-    fn config_enable_audio_toggles() {
-        // SAFETY: Valid config handle, toggling a boolean field.
-        unsafe {
-            let dir = CString::new("/tmp/vauchi-test").unwrap();
-            let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
-            assert!(!config.is_null());
-
-            vauchi_config_enable_audio(config, false);
-            assert!(!(*config).audio_enabled);
-
-            vauchi_config_free(config);
-        }
-    }
-
-    #[test]
-    fn config_enable_ble_null_config_no_crash() {
-        // SAFETY: Null config — should be a no-op. Verify a separate config is unaffected.
-        unsafe {
-            vauchi_config_enable_ble(std::ptr::null_mut(), true);
-            // Prove we didn't corrupt memory: create a real config and verify default
-            let dir = CString::new("/tmp/vauchi-test").unwrap();
-            let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
-            assert!(!config.is_null());
-            assert!((*config).ble_enabled, "default should be true");
             vauchi_config_free(config);
         }
     }

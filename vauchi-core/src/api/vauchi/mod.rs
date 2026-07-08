@@ -274,44 +274,6 @@ impl Vauchi {
         Self::init(config, secure_storage, Some(clock), Some(rng))
     }
 
-    /// Creates a new Vauchi instance (transport factory accepted but not invoked).
-    ///
-    /// **ADR-030**: The factory parameter is retained for call-site compatibility
-    /// only. The closure is never called and no transport is created or stored.
-    /// Use [`Vauchi::new()`] or [`Vauchi::with_secure_storage()`] instead.
-    #[deprecated(
-        since = "0.15.0",
-        note = "ADR-030: transport factory is not invoked. Use Vauchi::new() or Vauchi::with_secure_storage(). Transport will be reconnected in a future phase."
-    )]
-    pub fn with_transport_factory<T: crate::network::Transport, F>(
-        config: VauchiConfig,
-        _transport_factory: F,
-    ) -> VauchiResult<Self>
-    where
-        F: FnOnce() -> T,
-    {
-        Self::init(config, None, None, None)
-    }
-
-    /// Creates a new Vauchi instance with optional SecureStorage (transport factory not invoked).
-    ///
-    /// **ADR-030**: The factory parameter is retained for call-site compatibility only.
-    /// Use [`Vauchi::with_secure_storage()`] instead.
-    #[deprecated(
-        since = "0.15.0",
-        note = "ADR-030: transport factory is not invoked. Use Vauchi::with_secure_storage(). Transport will be reconnected in a future phase."
-    )]
-    pub fn with_transport_and_secure_storage<T: crate::network::Transport, F>(
-        config: VauchiConfig,
-        _transport_factory: F,
-        secure_storage: Option<Arc<dyn SecureStorage>>,
-    ) -> VauchiResult<Self>
-    where
-        F: FnOnce() -> T,
-    {
-        Self::init(config, secure_storage, None, None)
-    }
-
     /// Internal initializer shared by all constructors.
     fn init(
         mut config: VauchiConfig,

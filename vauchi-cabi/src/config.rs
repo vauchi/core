@@ -18,8 +18,6 @@ pub struct CabiConfig {
     pub(crate) data_dir: PathBuf,
     pub(crate) relay_url: String,
     pub(crate) storage_key: Option<SymmetricKey>,
-    pub(crate) ble_enabled: bool,
-    pub(crate) audio_enabled: bool,
 }
 
 impl CabiConfig {
@@ -28,8 +26,6 @@ impl CabiConfig {
             data_dir,
             relay_url,
             storage_key: None,
-            ble_enabled: true,
-            audio_enabled: true,
         }
     }
 

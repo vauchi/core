@@ -67,8 +67,6 @@ pub mod relay_client;
 #[cfg(not(feature = "testing"))]
 mod relay_client;
 
-pub mod simple_message;
-
 pub mod escrow_client;
 
 #[cfg(feature = "testing")]
@@ -83,7 +81,6 @@ mod multi_relay;
 
 // websocket and noise modules removed — relay uses HTTP v2 transport
 
-pub mod forwarding;
 #[cfg(feature = "network-http")]
 pub mod http_adapter;
 #[cfg(feature = "network-http")]
@@ -100,10 +97,9 @@ pub use error::NetworkError;
 
 pub use message::{
     AckStatus, Acknowledgment, DeletionStage, DeregisterMailbox, EmergencyAlert, EncryptedUpdate,
-    ForwardingHint, ForwardingHints, GeoLocation, Handshake, IdentityDeletionNotice,
-    IdentityRevoked, MessageEnvelope, MessageId, MessagePayload, PROTOCOL_VERSION, PresenceStatus,
-    PresenceUpdate, PurgeRequest, RatchetHeader, RegisterMailbox, VersionNegotiation,
-    negotiate_version,
+    GeoLocation, Handshake, IdentityDeletionNotice, IdentityRevoked, MessageEnvelope, MessageId,
+    MessagePayload, PROTOCOL_VERSION, PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader,
+    RegisterMailbox, VersionNegotiation, negotiate_version,
 };
 
 pub use protocol::{
@@ -129,9 +125,6 @@ pub use anonymous::{
 };
 
 pub use pinning::{PinnedCertificate, verify_pin};
-
-mod classify;
-pub use classify::{MessageType, classify_message};
 
 #[cfg(feature = "network-http")]
 pub use http_transport::{HttpTransport, HttpTransportConfig};

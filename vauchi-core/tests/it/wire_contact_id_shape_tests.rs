@@ -14,12 +14,9 @@
 //!
 //! Sites covered: EncryptedUpdate.{sender_id,recipient_id},
 //! IdentityRevoked.{sender_id,recipient_id},
-//! EmergencyAlert.sender_id,
-//! SimpleEncryptedUpdate.{sender_id,recipient_id},
-//! SimpleIdentityRevoked.{sender_id,recipient_id}.
+//! EmergencyAlert.sender_id.
 
 use vauchi_core::identifiers::DhPublicKey;
-use vauchi_core::network::simple_message::{SimpleEncryptedUpdate, SimpleIdentityRevoked};
 use vauchi_core::network::{
     EmergencyAlert, EncryptedUpdate, IdentityRevoked, MessageEnvelope, MessagePayload,
     PROTOCOL_VERSION, RatchetHeader,
@@ -104,46 +101,5 @@ fn emergency_alert_sender_is_raw_string() {
     assert_eq!(
         json["sender_id"],
         serde_json::Value::String(SENDER.to_string())
-    );
-}
-
-// @internal
-#[test]
-fn simple_encrypted_update_sender_and_recipient_are_raw_strings() {
-    let update = SimpleEncryptedUpdate {
-        recipient_id: RECIPIENT.to_string().into(),
-        sender_id: SENDER.to_string().into(),
-        ciphertext: vec![0xCC; 8],
-    };
-    let json: serde_json::Value =
-        serde_json::from_str(&serde_json::to_string(&update).unwrap()).unwrap();
-    assert_eq!(
-        json["recipient_id"],
-        serde_json::Value::String(RECIPIENT.to_string())
-    );
-    assert_eq!(
-        json["sender_id"],
-        serde_json::Value::String(SENDER.to_string())
-    );
-}
-
-// @internal
-#[test]
-fn simple_identity_revoked_sender_and_recipient_are_raw_strings() {
-    let revoked = SimpleIdentityRevoked {
-        sender_id: SENDER.to_string().into(),
-        recipient_id: RECIPIENT.to_string().into(),
-        timestamp: 0,
-        signature: vec![0xDD; 64],
-    };
-    let json: serde_json::Value =
-        serde_json::from_str(&serde_json::to_string(&revoked).unwrap()).unwrap();
-    assert_eq!(
-        json["sender_id"],
-        serde_json::Value::String(SENDER.to_string())
-    );
-    assert_eq!(
-        json["recipient_id"],
-        serde_json::Value::String(RECIPIENT.to_string())
     );
 }

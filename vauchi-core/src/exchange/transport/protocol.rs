@@ -28,7 +28,6 @@
 
 use crate::crypto::kdf::HKDF;
 use crate::exchange::error::ExchangeError;
-use crate::exchange::transport::caps::TransportCaps;
 use chacha20poly1305::XChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit};
 use rand::RngCore;
@@ -37,7 +36,7 @@ use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::{Zeroize, Zeroizing};
 
 /// Size of the offer payload in bytes.
-const OFFER_SIZE: usize = 90;
+const OFFER_SIZE: usize = 88;
 
 /// Size of the nonce in the offer.
 const NONCE_SIZE: usize = 16;
@@ -71,8 +70,6 @@ pub struct ExchangeProtocol {
     ephemeral_secret: StaticSecret,
     /// Random nonce included in offer.
     nonce: [u8; NONCE_SIZE],
-    /// Transport capabilities to advertise.
-    caps: TransportCaps,
 }
 
 impl ExchangeProtocol {
@@ -88,20 +85,12 @@ impl ExchangeProtocol {
             identity_secret,
             ephemeral_secret,
             nonce,
-            caps: TransportCaps::empty(),
         }
     }
 
-    /// Sets the transport capabilities for this protocol instance.
-    /// Returns self for method chaining.
-    pub fn with_capabilities(mut self, caps: TransportCaps) -> Self {
-        self.caps = caps;
-        self
-    }
-
-    /// Creates an offer payload (90 bytes).
+    /// Creates an offer payload (88 bytes).
     ///
-    /// Layout: identity_pub(32) + ephemeral_pub(32) + nonce(16) + timestamp(8) + caps(2)
+    /// Layout: identity_pub(32) + ephemeral_pub(32) + nonce(16) + timestamp(8)
     pub fn create_offer(&self, now: u64) -> Result<Vec<u8>, ExchangeError> {
         let identity_pub = PublicKey::from(&self.identity_secret);
         let ephemeral_pub = PublicKey::from(&self.ephemeral_secret);
@@ -113,7 +102,6 @@ impl ExchangeProtocol {
         offer.extend_from_slice(ephemeral_pub.as_bytes());
         offer.extend_from_slice(&self.nonce);
         offer.extend_from_slice(&timestamp.to_be_bytes());
-        offer.extend_from_slice(&self.caps.to_bytes());
 
         debug_assert_eq!(offer.len(), OFFER_SIZE);
         Ok(offer)

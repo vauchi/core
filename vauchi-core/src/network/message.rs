@@ -47,8 +47,6 @@ pub enum MessagePayload {
     IdentityDeletionNotice(IdentityDeletionNotice),
     /// Relay purge request (sent during shred to delete server-side data).
     PurgeRequest(PurgeRequest),
-    /// Forwarding hints from the relay indicating blobs stored on other relays.
-    ForwardingHints(ForwardingHints),
     /// Client registers mailbox tokens for message delivery routing (SP-33).
     RegisterMailbox(RegisterMailbox),
     /// Client deregisters mailbox tokens (SP-33).
@@ -212,58 +210,6 @@ pub struct PurgeRequest {
     pub purge_token: [u8; 32],
     /// Unix timestamp when the request was signed.
     pub timestamp: u64,
-}
-
-/// Forwarding hints indicating blobs stored on federated relay peers.
-///
-/// When a relay offloads blobs to peer relays, it sends forwarding hints
-/// to the recipient so they can fetch the blobs from the correct relay.
-///
-/// ## Signed Hints (Tracker #117)
-///
-/// When signed by the relay, `relay_signing_key` contains the relay's
-/// Ed25519 public key and `signature` contains the Ed25519 signature
-/// over the canonical hint data. Clients should verify the signature
-/// against a pinned relay public key before following the hints.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ForwardingHints {
-    /// List of forwarding hints.
-    pub hints: Vec<ForwardingHint>,
-    /// Relay's Ed25519 signing public key (32 bytes, hex-encoded).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub relay_signing_key: Option<String>,
-    /// Ed25519 signature over the canonical hint data (hex-encoded).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub signature: Option<String>,
-}
-
-/// A single forwarding hint pointing to a blob on another relay.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ForwardingHint {
-    /// The blob ID to fetch.
-    pub blob_id: String,
-    /// The relay URL where the blob is stored.
-    pub relay_url: String,
-    /// Unix timestamp when the hint expires.
-    pub expires_at_secs: u64,
-}
-
-impl ForwardingHints {
-    /// Computes the canonical byte representation for signature verification.
-    ///
-    /// Hints are sorted by `blob_id` to ensure deterministic ordering.
-    pub fn canonical_data(&self) -> Vec<u8> {
-        let mut sorted_hints: Vec<&ForwardingHint> = self.hints.iter().collect();
-        sorted_hints.sort_by(|a, b| a.blob_id.cmp(&b.blob_id));
-
-        let mut data = Vec::new();
-        for hint in &sorted_hints {
-            data.extend_from_slice(hint.blob_id.as_bytes());
-            data.extend_from_slice(hint.relay_url.as_bytes());
-            data.extend_from_slice(&hint.expires_at_secs.to_be_bytes());
-        }
-        data
-    }
 }
 
 /// Stages of identity deletion.

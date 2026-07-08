@@ -119,8 +119,8 @@ pub enum ExchangeEvent {
 /// An exchange session managing the state of a contact exchange.
 ///
 /// Stores the proximity verifier as `Box<dyn ProximityVerifier>`, eliminating
-/// the need for generic type parameters and enabling VerifierChain to be used
-/// directly without enum dispatch wrappers.
+/// the need for generic type parameters and enabling any verifier backend to be
+/// used directly without enum dispatch wrappers.
 pub struct ExchangeSession {
     /// Current state
     state: ExchangeState,
@@ -684,28 +684,12 @@ impl ExchangeSession {
         self.proximity_confidence
     }
 
-    /// Returns the verification event log from the proximity verifier.
-    ///
-    /// Only populated when using a `VerifierChain`. Single verifiers
-    /// return `None` (no event logging).
-    pub fn proximity_event_log(&self) -> Option<super::VerifierEventLog> {
-        self.proximity.verification_event_log()
-    }
-
     /// Builds TrustMetrics from the current session state.
     ///
     /// Called internally when creating a contact after successful exchange.
     fn build_trust_metrics(&self) -> TrustMetrics {
-        let log = self.proximity_event_log().unwrap_or_default();
-        let method = log.final_method();
         let timestamp = self.clock.unix_seconds();
-        TrustMetrics::new(
-            self.transport,
-            self.proximity_confidence,
-            method,
-            log,
-            timestamp,
-        )
+        TrustMetrics::new(self.transport, self.proximity_confidence, timestamp)
     }
 
     /// Returns a reference to the proximity verifier (test-only).

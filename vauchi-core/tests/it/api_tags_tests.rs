@@ -279,21 +279,19 @@ fn begin_tag_promotion_unknown_tag_errors() {
 // @scenario: contact-annotations.feature - Tags are never shared with the contact
 // @internal
 #[test]
-fn tags_never_appear_in_card_snapshot_wire_form() {
-    use vauchi_core::exchange::CardSnapshot;
-
+fn tags_never_appear_in_card_wire_form() {
     let wb = setup();
     let bob = add_contact(&wb, "Bob");
     wb.add_tag_to_contact(&bob, "WIRE-LEAK-CANARY").unwrap();
 
-    // The own card is the exchange wire form. Freezing its snapshot must never
+    // The own card is the exchange wire form. Serializing it directly must never
     // carry tag data — tags live in a separate store, off the card entirely.
     let card = wb.own_card().unwrap().unwrap();
-    let bytes = CardSnapshot::freeze(card, 0).to_bytes().unwrap();
+    let bytes = serde_json::to_vec(&card).expect("serialize card");
     let wire = String::from_utf8_lossy(&bytes);
 
     assert!(
         !wire.contains("WIRE-LEAK-CANARY"),
-        "tag name must never reach the exchanged CardSnapshot"
+        "tag name must never reach the exchanged card"
     );
 }

@@ -30,7 +30,7 @@ use vauchi_core::exchange::multistage::base45;
 use vauchi_core::exchange::shake_protocol;
 use vauchi_core::exchange::{ExchangeQR, X3DHKeyPair, link_mode};
 use vauchi_core::identity::Identity;
-use vauchi_core::network::simple_message;
+use vauchi_core::network::protocol::decode_message;
 
 /// Build one genuinely-valid QR data string (base64 ASCII) to truncate.
 fn valid_qr_data_string() -> String {
@@ -88,13 +88,13 @@ proptest! {
         prop_assert!(link_mode::parse_card_payload(&bytes).is_err());
     }
 
-    /// Arbitrary byte buffers into the relay simple-message decoder are
-    /// rejected (too short or non-envelope JSON), never panic. Exercises the
-    /// `< FRAME_HEADER_SIZE` guard and the `data[FRAME_HEADER_SIZE..]` slice.
+    /// Arbitrary byte buffers into the relay message decoder are rejected
+    /// (oversized or non-envelope JSON), never panic. Exercises the
+    /// `MAX_MESSAGE_SIZE` guard and the JSON parse path.
     // @internal
     #[test]
-    fn decode_simple_message_rejects_arbitrary(bytes in prop::collection::vec(any::<u8>(), 0..256)) {
-        prop_assert!(simple_message::decode_simple_message(&bytes).is_err());
+    fn decode_message_rejects_arbitrary(bytes in prop::collection::vec(any::<u8>(), 0..256)) {
+        prop_assert!(decode_message(&bytes).is_err());
     }
 
     /// The acoustic shake-envelope decoder never panics on arbitrary bytes,

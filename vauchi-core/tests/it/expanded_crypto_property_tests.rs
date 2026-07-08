@@ -16,10 +16,9 @@ use vauchi_core::crypto::{DoubleRatchetState, HKDF, SymmetricKey, derive_key_arg
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::{
-    AckStatus, Acknowledgment, DeletionStage, EncryptedUpdate, ForwardingHint, ForwardingHints,
-    Handshake, IdentityDeletionNotice, IdentityRevoked, MessageEnvelope, MessagePayload,
-    PROTOCOL_VERSION, PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader,
-    VersionNegotiation,
+    AckStatus, Acknowledgment, DeletionStage, EncryptedUpdate, Handshake, IdentityDeletionNotice,
+    IdentityRevoked, MessageEnvelope, MessagePayload, PROTOCOL_VERSION, PresenceStatus,
+    PresenceUpdate, PurgeRequest, RatchetHeader, VersionNegotiation,
 };
 
 // ============================================================
@@ -634,45 +633,6 @@ proptest! {
             prop_assert_eq!(r.timestamp, timestamp);
         } else {
             prop_assert!(false, "Expected PurgeRequest variant");
-        }
-    }
-
-    /// Property: ForwardingHints payload roundtrips through JSON serialization.
-// @internal
-    #[test]
-    fn prop_forwarding_hints_roundtrip(
-        blob_id in "[a-f0-9]{16}",
-        relay_url in "https://[a-z]{3,10}\\.[a-z]{2,4}/relay",
-        expires_at in timestamp_strategy(),
-        msg_id in message_id_strategy(),
-        timestamp in timestamp_strategy()
-    ) {
-        let envelope = MessageEnvelope {
-            version: PROTOCOL_VERSION,
-            message_id: msg_id.clone().into(),
-            timestamp,
-            payload: MessagePayload::ForwardingHints(ForwardingHints {
-                hints: vec![ForwardingHint {
-                    blob_id: blob_id.clone(),
-                    relay_url: relay_url.clone(),
-                    expires_at_secs: expires_at,
-                }],
-                relay_signing_key: None,
-                signature: None,
-            }),
-        };
-
-        let json = serde_json::to_string(&envelope).expect("serialization should succeed");
-        let restored: MessageEnvelope = serde_json::from_str(&json)
-            .expect("deserialization should succeed");
-
-        if let MessagePayload::ForwardingHints(h) = &restored.payload {
-            prop_assert_eq!(h.hints.len(), 1);
-            prop_assert_eq!(&h.hints[0].blob_id, &blob_id);
-            prop_assert_eq!(&h.hints[0].relay_url, &relay_url);
-            prop_assert_eq!(h.hints[0].expires_at_secs, expires_at);
-        } else {
-            prop_assert!(false, "Expected ForwardingHints variant");
         }
     }
 

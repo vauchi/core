@@ -11,7 +11,7 @@ use vauchi_core::contact::{Contact, ImportSource};
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::crypto::cek::ContentEncryptionKey;
-use vauchi_core::exchange::{ConfirmationChannel, Reciprocity, TrustMetrics, VerifierEventLog};
+use vauchi_core::exchange::{ConfirmationChannel, Reciprocity, TrustMetrics};
 use vauchi_core::{ExchangeTransport, ProximityConfidence};
 
 fn exchanged_contact(name: &str) -> Contact {
@@ -116,8 +116,6 @@ fn trust_metrics_returns_some_after_set() {
     let metrics = TrustMetrics::new(
         ExchangeTransport::Qr,
         ProximityConfidence::Unknown,
-        None,
-        VerifierEventLog::new(),
         1_700_000_000,
     );
     c.set_trust_metrics(Some(metrics));

@@ -76,10 +76,10 @@ pub struct ExchangeConfig {
     /// picker makes it the hero action when it can run here (M2 S3, D2.3).
     #[serde(default)]
     pub last_used_mode: Option<ExchangeMode>,
-    /// Frozen card snapshot for exchange. `None` = snapshot at exchange start.
+    /// Frozen own card for exchange. `None` = build at exchange start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema-gen", schemars(skip))]
-    pub card_snapshot: Option<vauchi_core::exchange::card_snapshot::CardSnapshot>,
+    pub card_snapshot: Option<vauchi_core::contact_card::ContactCard>,
     /// Owner's groups (with their `visible_fields`), used to resolve which
     /// fields the selected exchange group(s) may see — fed to
     /// [`group_filter::resolve_exchange_allow`] so the field preview matches
@@ -601,7 +601,7 @@ impl ExchangeEngine {
             .config
             .card_snapshot
             .as_ref()
-            .map(|s| s.card().clone())
+            .cloned()
             .unwrap_or_else(|| ContactCard::new(&self.config.own_name));
         // G2: resolve the fields the selected group(s) expose so the preview
         // matches the card the BLE payload transmits. `None` (no groups) →
@@ -631,7 +631,7 @@ impl ExchangeEngine {
             .config
             .card_snapshot
             .as_ref()
-            .map(|s| s.card().clone())
+            .cloned()
             .unwrap_or_else(|| vauchi_core::contact_card::ContactCard::new(&self.config.own_name));
         if let Some(ref fp) = self.field_preview
             && fp.display_name != card.display_name()

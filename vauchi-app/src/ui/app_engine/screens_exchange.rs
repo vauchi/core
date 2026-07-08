@@ -31,10 +31,7 @@ impl AppEngine {
                     .iter()
                     .map(|g| (g.id().to_string(), g.name().to_string()))
                     .collect();
-                let snapshot_now = vauchi.clock().unix_seconds();
-                let card_snapshot = card.as_ref().cloned().map(|c| {
-                    vauchi_core::exchange::card_snapshot::CardSnapshot::freeze(c, snapshot_now)
-                });
+                let card_snapshot = card.as_ref().cloned();
                 // Last-used defaults (M2 S1): a repeat user skips the group
                 // gate with their prior groups pre-applied. Stored ids are
                 // filtered against the live group list (deleted groups drop

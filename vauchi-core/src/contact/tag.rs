@@ -14,7 +14,7 @@
 //!
 //! Key invariant: `Tag` has no `visible_fields` field, so
 //! it is structurally impossible to leak tag membership over the wire. Tags
-//! are never serialised into a `CardSnapshot`. See `ADR-051`.
+//! are never serialised into the exchanged contact card. See `ADR-051`.
 
 use std::collections::HashSet;
 

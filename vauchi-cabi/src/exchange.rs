@@ -12,13 +12,13 @@ use zeroize::Zeroizing;
 use vauchi_core::ContactCard;
 use vauchi_core::exchange::{
     ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
-    ProximityConfidence, ProximityError, ProximityVerifier, VerifierChain, VerifierMethod,
+    ProximityConfidence, ProximityError, ProximityVerifier,
 };
 
 use super::{VauchiApp, VauchiExchange, from_c_str, to_c_string};
 
 /// Wrapper to share a `ManualConfirmationVerifier` via `Arc` while
-/// implementing `ProximityVerifier` for the `VerifierChain`.
+/// implementing `ProximityVerifier` for the exchange session.
 struct SharedManualVerifier(Arc<ManualConfirmationVerifier>);
 
 impl ProximityVerifier for SharedManualVerifier {
@@ -91,16 +91,11 @@ pub unsafe extern "C" fn vauchi_exchange_create(app: *mut VauchiApp) -> *mut Vau
             };
 
             let manual = Arc::new(ManualConfirmationVerifier::new());
-            let mut chain = VerifierChain::new();
-            chain.add(
-                VerifierMethod::ManualConfirmation,
-                Box::new(SharedManualVerifier(manual.clone())),
-            );
 
             let session = ExchangeSession::new_qr(
                 identity,
                 card,
-                chain,
+                SharedManualVerifier(manual.clone()),
                 vauchi_core::clock::SystemClock::shared(),
             );
 

@@ -172,14 +172,12 @@ fn test_low_proximity_nfc_is_standard() {
 // @internal
 #[test]
 fn usb_transport_with_metrics_is_high_trust() {
-    use vauchi_core::exchange::{TrustMetrics, VerifierEventLog};
+    use vauchi_core::exchange::TrustMetrics;
 
     let mut contact = make_contact(|_| {});
     let metrics = TrustMetrics::new(
         ExchangeTransport::Usb,
         ProximityConfidence::Unknown,
-        None,
-        VerifierEventLog::new(),
         1711324800,
     );
     contact.set_trust_metrics(Some(metrics));
@@ -188,32 +186,24 @@ fn usb_transport_with_metrics_is_high_trust() {
 
 // @internal
 #[test]
-fn qr_with_ultrasonic_verifier_is_high_trust() {
-    use vauchi_core::exchange::{TrustMetrics, VerifierEventLog, VerifierMethod};
+fn qr_with_high_proximity_is_high_trust() {
+    use vauchi_core::exchange::TrustMetrics;
 
     let mut contact = make_contact(|_| {});
-    let metrics = TrustMetrics::new(
-        ExchangeTransport::Qr,
-        ProximityConfidence::High,
-        Some(VerifierMethod::Ultrasonic),
-        VerifierEventLog::new(),
-        1711324800,
-    );
+    let metrics = TrustMetrics::new(ExchangeTransport::Qr, ProximityConfidence::High, 1711324800);
     contact.set_trust_metrics(Some(metrics));
     assert_eq!(contact.trust_level(), TrustLevel::High);
 }
 
 // @internal
 #[test]
-fn ble_with_manual_confirm_is_standard_trust() {
-    use vauchi_core::exchange::{TrustMetrics, VerifierEventLog, VerifierMethod};
+fn ble_with_medium_proximity_is_standard_trust() {
+    use vauchi_core::exchange::TrustMetrics;
 
     let mut contact = make_contact(|_| {});
     let metrics = TrustMetrics::new(
         ExchangeTransport::Ble,
         ProximityConfidence::Medium,
-        Some(VerifierMethod::ManualConfirmation),
-        VerifierEventLog::new(),
         1711324800,
     );
     contact.set_trust_metrics(Some(metrics));
@@ -223,15 +213,13 @@ fn ble_with_manual_confirm_is_standard_trust() {
 // @internal
 #[test]
 fn recovered_overrides_usb_physical() {
-    use vauchi_core::exchange::{TrustMetrics, VerifierEventLog};
+    use vauchi_core::exchange::TrustMetrics;
 
     let mut contact = make_contact(|_| {});
     contact.set_has_recovered(true);
     let metrics = TrustMetrics::new(
         ExchangeTransport::Usb,
         ProximityConfidence::Unknown,
-        None,
-        VerifierEventLog::new(),
         1711324800,
     );
     contact.set_trust_metrics(Some(metrics));
@@ -241,14 +229,12 @@ fn recovered_overrides_usb_physical() {
 // @internal
 #[test]
 fn trust_metrics_present_no_signal_gives_standard() {
-    use vauchi_core::exchange::{TrustMetrics, VerifierEventLog};
+    use vauchi_core::exchange::TrustMetrics;
 
     let mut contact = make_contact(|_| {});
     let metrics = TrustMetrics::new(
         ExchangeTransport::Qr,
         ProximityConfidence::Unknown,
-        None,
-        VerifierEventLog::new(),
         1711324800,
     );
     contact.set_trust_metrics(Some(metrics));

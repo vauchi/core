@@ -6,19 +6,18 @@
 
 #![cfg(feature = "testing")]
 
-use vauchi_core::exchange::transport::caps::TransportCaps;
 use vauchi_core::exchange::transport::protocol::ExchangeProtocol;
 
-/// Offer must be exactly 90 bytes:
-/// identity_pub(32) + ephemeral_pub(32) + nonce(16) + timestamp(8) + caps(2)
+/// Offer must be exactly 88 bytes:
+/// identity_pub(32) + ephemeral_pub(32) + nonce(16) + timestamp(8)
 // @internal
 #[test]
-fn create_offer_returns_90_bytes() {
+fn create_offer_returns_88_bytes() {
     let protocol = ExchangeProtocol::new_random();
     let offer = protocol
         .create_offer(0u64)
         .expect("create_offer should succeed");
-    assert_eq!(offer.len(), 90, "offer must be exactly 90 bytes");
+    assert_eq!(offer.len(), 88, "offer must be exactly 88 bytes");
 }
 
 /// Two parties performing mutual key agreement must derive identical shared keys.
@@ -147,21 +146,4 @@ fn short_offer_rejected() {
 
     let result = alice.process_offer(&[]);
     assert!(result.is_err(), "empty offer must be rejected");
-}
-
-/// Capabilities bitfield must appear at bytes 88..90 of the offer.
-// @internal
-#[test]
-fn capabilities_embedded_in_offer_bytes_88_90() {
-    let caps = TransportCaps::BLE | TransportCaps::WIFI_AWARE;
-    let protocol = ExchangeProtocol::new_random().with_capabilities(caps);
-
-    let offer = protocol.create_offer(0u64).expect("create_offer");
-
-    let caps_bytes = [offer[88], offer[89]];
-    let decoded_caps = TransportCaps::from_bytes(caps_bytes);
-    assert_eq!(
-        decoded_caps, caps,
-        "capabilities at bytes 88..90 must match"
-    );
 }

@@ -5,11 +5,7 @@
 use proptest::prelude::*;
 use vauchi_core::AudioCapability;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
-use vauchi_core::exchange::mode::{DataTransport, ExchangeContext, ProximityMethod};
-use vauchi_core::exchange::{
-    ExchangeId, ExchangeMode, ExchangeRecord, ExchangeTrustLevel, ProximityResult,
-    check_mode_availability, recommend_mode,
-};
+use vauchi_core::exchange::{ExchangeId, ExchangeMode, check_mode_availability, recommend_mode};
 
 fn arb_exchange_mode() -> impl Strategy<Value = ExchangeMode> {
     prop_oneof![
@@ -54,38 +50,6 @@ fn arb_capabilities() -> impl Strategy<Value = DeviceCapabilities> {
 }
 
 proptest! {
-// @internal
-    #[test]
-    fn trust_score_always_in_zero_one(
-        confidence in 0.0f64..=1.0,
-        relay_fb in any::<bool>(),
-    ) {
-        let record = ExchangeRecord {
-            mode: ExchangeMode::Hover,
-            context: ExchangeContext::InPerson,
-            transport_used: DataTransport::QrMultiStage,
-            relay_fallback: relay_fb,
-            proximity_results: vec![ProximityResult {
-                method: ProximityMethod::Audio,
-                confidence,
-                succeeded: true,
-            }],
-            timestamp: 0,
-            reverifications: vec![],
-        };
-        let score = record.trust_score();
-        prop_assert!(score >= 0.0);
-        prop_assert!(score <= 1.0);
-    }
-
-// @internal
-    #[test]
-    fn trust_level_covers_all_scores(score in 0.0f64..=1.0) {
-        let level = ExchangeTrustLevel::from_score(score);
-        // display_text must return a non-empty string for every level
-        prop_assert!(!level.display_text().is_empty());
-    }
-
 // @internal
     #[test]
     fn recommend_always_returns_a_mode(caps in arb_capabilities()) {

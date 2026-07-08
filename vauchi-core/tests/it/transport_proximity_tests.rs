@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use vauchi_core::exchange::{TransportProximity, TrustMetrics, VerifierEventLog, VerifierMethod};
+use vauchi_core::exchange::{TransportProximity, TrustMetrics};
 use vauchi_core::{ExchangeTransport, ProximityConfidence};
 
 // @internal
@@ -56,8 +56,6 @@ fn trust_metrics_serde_roundtrip() {
     let metrics = TrustMetrics {
         transport: ExchangeTransport::Ble,
         proximity: ProximityConfidence::High,
-        verifier_method: Some(VerifierMethod::Ultrasonic),
-        verifier_log: VerifierEventLog::new(),
         transport_proximity: TransportProximity::Proximate,
         timestamp: 1711324800,
     };
@@ -68,10 +66,6 @@ fn trust_metrics_serde_roundtrip() {
     assert_eq!(deserialized.transport, ExchangeTransport::Ble);
     assert_eq!(deserialized.proximity, ProximityConfidence::High);
     assert_eq!(
-        deserialized.verifier_method,
-        Some(VerifierMethod::Ultrasonic)
-    );
-    assert_eq!(
         deserialized.transport_proximity,
         TransportProximity::Proximate
     );
@@ -80,7 +74,21 @@ fn trust_metrics_serde_roundtrip() {
 
 // @internal
 #[test]
-fn trust_metrics_strong_transport_is_strong() {
+fn trust_metrics_new_uses_transport_proximity() {
+    let metrics = TrustMetrics::new(
+        ExchangeTransport::Nfc,
+        ProximityConfidence::High,
+        1711324800,
+    );
+    assert_eq!(
+        metrics.transport_proximity,
+        TransportProximity::ContactRange
+    );
+}
+
+// @internal
+#[test]
+fn transport_proximity_strong_transport_is_strong() {
     assert!(TransportProximity::Physical.is_strong());
     assert!(TransportProximity::ContactRange.is_strong());
     assert!(!TransportProximity::Proximate.is_strong());

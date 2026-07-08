@@ -9,7 +9,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::verifier_event::{VerifierEventLog, VerifierMethod};
 use crate::types::{ExchangeTransport, ProximityConfidence};
 
 /// Inherent proximity guarantee of the transport channel,
@@ -53,18 +52,14 @@ impl TransportProximity {
 /// Records every signal that contributed to a contact's trust level.
 ///
 /// Stored on `Contact` alongside `TrustLevel`. Makes trust auditable:
-/// "Why is this contact High trust?" → "BLE transport + ultrasonic
-/// verification (bidirectional, method: Ultrasonic)."
+/// "Why is this contact High trust?" → "NFC transport + high proximity
+/// confidence."
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrustMetrics {
     /// Which transport moved the exchange payload.
     pub transport: ExchangeTransport,
-    /// Proximity confidence from the verifier chain.
+    /// Proximity confidence from the verifier.
     pub proximity: ProximityConfidence,
-    /// Which verifier method won (if any).
-    pub verifier_method: Option<VerifierMethod>,
-    /// Full verifier event log — which methods tried, failed, why.
-    pub verifier_log: VerifierEventLog,
     /// Inherent proximity of the transport itself.
     pub transport_proximity: TransportProximity,
     /// Unix timestamp of the exchange (seconds since epoch).
@@ -76,16 +71,12 @@ impl TrustMetrics {
     pub fn new(
         transport: ExchangeTransport,
         proximity: ProximityConfidence,
-        verifier_method: Option<VerifierMethod>,
-        verifier_log: VerifierEventLog,
         timestamp: u64,
     ) -> Self {
         let transport_proximity = TransportProximity::for_transport(transport);
         Self {
             transport,
             proximity,
-            verifier_method,
-            verifier_log,
             transport_proximity,
             timestamp,
         }

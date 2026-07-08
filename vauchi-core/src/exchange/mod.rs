@@ -26,7 +26,6 @@ test_pub_mod!(
     ble_chunking,
     ble_handshake,
     ble_payload,
-    ble_rollback,
     encrypted_message,
     error,
     exchange_payload,
@@ -35,13 +34,10 @@ test_pub_mod!(
     nfc_apdu_chaining,
     nfc_card_payload,
     nfc_handshake,
-    nfc_rollback,
     proximity,
     qr,
     session,
     trust_metrics,
-    verifier_chain,
-    verifier_event,
     x3dh,
 );
 
@@ -58,13 +54,11 @@ pub mod audio_cpal;
 pub mod audio_modem;
 
 pub mod capability;
-pub mod card_snapshot;
 pub mod confirmation_escrow;
 pub mod device_link;
 pub mod direct_transport;
 pub mod escrow;
 pub mod exchange_id;
-pub mod exchange_record;
 pub mod key_order;
 pub mod link_initiator;
 pub mod link_mode;
@@ -82,9 +76,6 @@ pub mod shake_protocol;
 pub mod tcp_transport;
 
 pub mod transport;
-
-#[cfg(any(test, feature = "testing"))]
-pub mod verifier_harness;
 
 pub use accelerometer::{
     AccelerometerBackend, AccelerometerConfig, AccelerometerSample, AccelerometerVerifier,
@@ -107,7 +98,6 @@ pub use ble_handshake::{
     BleHandshakeState,
 };
 pub use ble_payload::BleCardPayload;
-pub use ble_rollback::BleRollback;
 pub use device_link::{
     DeviceLinkConfirmation, DeviceLinkInitiator, DeviceLinkInitiatorRestored,
     DeviceLinkJoinInvitation, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder,
@@ -124,7 +114,6 @@ pub use nfc_apdu_chaining::{
 };
 pub use nfc_card_payload::NfcCardPayload;
 pub use nfc_handshake::{NfcExchangeResult, NfcHandshakeSession, NfcHandshakeState};
-pub use nfc_rollback::{NfcRollback, NoopNfcRollback};
 #[cfg(any(test, feature = "testing"))]
 pub use proximity::MockProximityVerifier;
 pub use proximity::{
@@ -137,10 +126,6 @@ pub use session::{
     ExchangeSession, ExchangeState, ExchangeTransport,
 };
 pub use trust_metrics::{TransportProximity, TrustMetrics};
-pub use verifier_chain::VerifierChain;
-pub use verifier_event::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};
-#[cfg(any(test, feature = "testing"))]
-pub use verifier_harness::{PeerCapabilities, Scenario, SimulatedPeer, VerificationOutcome};
 pub use x3dh::{X3DH, X3DHKeyPair};
 
 pub use multistage::session::{AccelStateError, AudioStateError, MultiStageSession};
@@ -148,11 +133,7 @@ pub use multistage::types::{
     AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
 };
 
-pub use card_snapshot::CardSnapshot;
 pub use exchange_id::ExchangeId;
-pub use exchange_record::{
-    ExchangeRecord, ExchangeTrustLevel, ProximityResult, ReverificationRecord,
-};
 pub use mode::{
     BootstrapMethod, DataTransport, DeviceRequirement, ExchangeContext, ExchangeMode, ModeCategory,
     ModeConfig, ProximityMethod,

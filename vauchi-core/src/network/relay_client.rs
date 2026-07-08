@@ -74,7 +74,6 @@ struct InFlightMessage {
     message_id: MessageId,
     update_id: String,
     sent_at: Instant,
-    retry_count: u32,
 }
 
 /// Relay client for sending encrypted updates.
@@ -200,7 +199,6 @@ impl<T: Transport> RelayClient<T> {
                 message_id: message_id.clone(),
                 update_id: update_id.to_string(),
                 sent_at: self.monotonic.now(),
-                retry_count: 0,
             },
         );
 
@@ -236,7 +234,6 @@ impl<T: Transport> RelayClient<T> {
                 message_id: message_id.clone(),
                 update_id: update_id.to_string(),
                 sent_at: self.monotonic.now(),
-                retry_count: 0,
             },
         );
 

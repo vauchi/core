@@ -63,12 +63,6 @@ pub fn decode_message(data: &[u8]) -> Result<MessageEnvelope, NetworkError> {
     Ok(envelope)
 }
 
-/// Reads the length prefix from a frame header.
-#[allow(dead_code)] // Exported for use by transport implementations
-pub fn read_frame_length(header: &[u8; FRAME_HEADER_SIZE]) -> usize {
-    u32::from_be_bytes(*header) as usize
-}
-
 /// Creates a new message envelope with the given ID, timestamp, and payload.
 ///
 /// The `message_id` must be unique per envelope. Callers typically generate it
@@ -86,7 +80,7 @@ pub fn create_envelope(
     }
 }
 
-// INLINE_TEST_REQUIRED: Tests private read_frame_length function for wire protocol parsing
+// INLINE_TEST_REQUIRED: Tests frame encoding/decoding for wire protocol parsing
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,7 +116,7 @@ mod tests {
         let envelope = create_test_envelope();
         let encoded = encode_message(&envelope).unwrap();
 
-        let length = read_frame_length(&encoded[..4].try_into().unwrap());
+        let length = u32::from_be_bytes(encoded[..FRAME_HEADER_SIZE].try_into().unwrap()) as usize;
 
         assert_eq!(length, encoded.len() - FRAME_HEADER_SIZE);
     }
@@ -164,15 +158,6 @@ mod tests {
         let env2 = create_envelope(payload, 0, "test-msg-2".into());
 
         assert_ne!(env1.message_id, env2.message_id);
-    }
-
-    #[test]
-    fn test_read_frame_length() {
-        let header: [u8; 4] = [0x00, 0x00, 0x01, 0x00]; // 256 in big-endian
-        assert_eq!(read_frame_length(&header), 256);
-
-        let header2: [u8; 4] = [0x00, 0x01, 0x00, 0x00]; // 65536 in big-endian
-        assert_eq!(read_frame_length(&header2), 65536);
     }
 
     #[test]

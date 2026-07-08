@@ -113,8 +113,8 @@ pub use recovery::{
 pub mod network;
 #[cfg(feature = "network-rustls")]
 pub use network::{
-    ConnectionState, EmergencyAlert, GeoLocation, MessageEnvelope, MessageType, MockTransport,
-    NetworkError, RelayClient, RelayClientConfig, Transport, classify_message,
+    ConnectionState, EmergencyAlert, GeoLocation, MessageEnvelope, MockTransport, NetworkError,
+    RelayClient, RelayClientConfig, Transport,
 };
 #[cfg(feature = "storage")]
 pub mod sync;

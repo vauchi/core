@@ -14,8 +14,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::{
     ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ExchangeTransport,
-    MockProximityVerifier, ProximityConfidence, TransportProximity, TrustMetrics, VerifierEventLog,
-    VerifierMethod, X3DHKeyPair,
+    MockProximityVerifier, ProximityConfidence, TransportProximity, TrustMetrics, X3DHKeyPair,
 };
 use vauchi_core::{Identity, Storage};
 
@@ -459,69 +458,6 @@ fn test_storage_roundtrip_default_trust_fields() {
 }
 
 // ============================================================
-// Task 3 (tidy): VerifierChain winning_method accessor
-// ============================================================
-
-// @internal
-#[test]
-fn verifier_chain_reports_winning_method() {
-    use vauchi_core::exchange::ProximityVerifier;
-    use vauchi_core::exchange::{ManualConfirmationVerifier, VerifierChain, VerifierMethod};
-
-    let mut chain = VerifierChain::new();
-    chain.add(
-        VerifierMethod::ManualConfirmation,
-        Box::new(ManualConfirmationVerifier::pre_confirmed()),
-    );
-
-    let challenge = [0u8; 16];
-    let timeout = std::time::Duration::from_millis(100);
-    let result = chain.verify_proximity_two_way(&challenge, &challenge, timeout, true);
-    assert!(result.is_ok());
-
-    let method = chain.winning_method();
-    assert_eq!(method, Some(VerifierMethod::ManualConfirmation));
-}
-
-// ============================================================
-// Task 1 (tidy): VerifierEventLog serde roundtrip
-// ============================================================
-
-// @internal
-#[test]
-fn verifier_event_log_serde_roundtrip() {
-    use vauchi_core::ProximityConfidence;
-    use vauchi_core::exchange::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};
-
-    let mut log = VerifierEventLog::new();
-    log.push(ProximityVerifierEvent::InProgress {
-        method: VerifierMethod::Ultrasonic,
-        progress_pct: 0,
-    });
-    log.push(ProximityVerifierEvent::MethodFailed {
-        method: VerifierMethod::Ultrasonic,
-        reason: "no microphone".to_string(),
-    });
-    log.push(ProximityVerifierEvent::FallingBack {
-        failed_method: VerifierMethod::Ultrasonic,
-        next_method: VerifierMethod::ManualConfirmation,
-    });
-    log.push(ProximityVerifierEvent::Completed {
-        method: VerifierMethod::ManualConfirmation,
-        confidence: ProximityConfidence::Medium,
-    });
-
-    let json = serde_json::to_string(&log).expect("serialize");
-    let deserialized: VerifierEventLog = serde_json::from_str(&json).expect("deserialize");
-    assert_eq!(deserialized.events().len(), 4);
-    assert!(deserialized.is_completed());
-    assert_eq!(
-        deserialized.final_confidence(),
-        Some(ProximityConfidence::Medium)
-    );
-}
-
-// ============================================================
 // Task 6: TrustMetrics on Contact + storage roundtrip
 // ============================================================
 
@@ -546,8 +482,6 @@ fn contact_stores_trust_metrics() {
     let metrics = TrustMetrics::new(
         ExchangeTransport::Ble,
         ProximityConfidence::High,
-        Some(VerifierMethod::Ultrasonic),
-        VerifierEventLog::new(),
         1_711_324_800,
     );
     contact.set_trust_metrics(Some(metrics));
@@ -564,8 +498,6 @@ fn contact_trust_metrics_can_be_cleared() {
     let metrics = TrustMetrics::new(
         ExchangeTransport::Nfc,
         ProximityConfidence::High,
-        None,
-        VerifierEventLog::new(),
         1_711_324_800,
     );
     contact.set_trust_metrics(Some(metrics));
@@ -583,8 +515,6 @@ fn storage_roundtrip_preserves_trust_metrics() {
     let metrics = TrustMetrics::new(
         ExchangeTransport::Ble,
         ProximityConfidence::High,
-        Some(VerifierMethod::Ultrasonic),
-        VerifierEventLog::new(),
         1_711_324_800,
     );
     contact.set_trust_metrics(Some(metrics));
@@ -596,7 +526,6 @@ fn storage_roundtrip_preserves_trust_metrics() {
     let m = loaded.trust_metrics().expect("must survive roundtrip");
     assert_eq!(m.transport, ExchangeTransport::Ble);
     assert_eq!(m.proximity, ProximityConfidence::High);
-    assert_eq!(m.verifier_method, Some(VerifierMethod::Ultrasonic));
     assert_eq!(m.transport_proximity, TransportProximity::Proximate);
     assert_eq!(m.timestamp, 1_711_324_800);
 }
@@ -625,8 +554,6 @@ fn list_contacts_preserves_trust_metrics() {
     let metrics = TrustMetrics::new(
         ExchangeTransport::Nfc,
         ProximityConfidence::High,
-        None,
-        VerifierEventLog::new(),
         1_711_400_000,
     );
     contact.set_trust_metrics(Some(metrics));

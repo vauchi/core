@@ -15,8 +15,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{
     ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ExchangeTransport,
-    ManualConfirmationVerifier, MockProximityVerifier, ProximityConfidence, TransportProximity,
-    VerifierChain, VerifierMethod, X3DHKeyPair,
+    MockProximityVerifier, ProximityConfidence, TransportProximity, X3DHKeyPair,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -39,52 +38,6 @@ fn run_full_qr_exchange_with_mock() -> Contact {
         bob_identity,
         bob_card,
         proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    bob_session.apply(ExchangeEvent::StartQR).unwrap();
-    bob_session
-        .apply(ExchangeEvent::ProcessQR(alice_qr))
-        .unwrap();
-    bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
-    bob_session
-        .apply(ExchangeEvent::PerformKeyAgreement)
-        .unwrap();
-    bob_session.run_proximity_check();
-
-    let alice_card = ContactCard::new("Alice");
-    bob_session
-        .apply(ExchangeEvent::CompleteExchange(alice_card))
-        .unwrap();
-
-    match bob_session.state() {
-        ExchangeState::Complete { contact } => *contact.clone(),
-        other => panic!("Expected Complete state, got {:?}", other),
-    }
-}
-
-/// Runs a full QR exchange using a VerifierChain with ManualConfirmation.
-fn run_full_qr_exchange_with_verifier_chain() -> Contact {
-    let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob", 0);
-
-    let alice_qr = ExchangeQR::generate(
-        &alice_identity,
-        &alice_ephemeral,
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    );
-
-    let bob_card = ContactCard::new("Bob");
-    let mut chain = VerifierChain::new();
-    chain.add(
-        VerifierMethod::ManualConfirmation,
-        Box::new(ManualConfirmationVerifier::pre_confirmed()),
-    );
-    let mut bob_session = ExchangeSession::new_qr(
-        bob_identity,
-        bob_card,
-        chain,
         vauchi_core::clock::SystemClock::shared(),
     );
 
@@ -140,57 +93,6 @@ fn test_completed_qr_exchange_contact_has_trust_metrics() {
     assert!(
         metrics.timestamp > 0,
         "Exchange timestamp must be a positive Unix epoch"
-    );
-}
-
-// @scenario: contact_exchange :: QR exchange with mock has no verifier method
-#[test]
-fn test_qr_exchange_mock_verifier_has_no_method() {
-    let contact = run_full_qr_exchange_with_mock();
-
-    let metrics = contact.trust_metrics().expect("must have metrics");
-
-    // MockProximityVerifier does not implement verification_event_log(),
-    // so the event log is empty and final_method() is None.
-    assert_eq!(
-        metrics.verifier_method, None,
-        "Mock verifier produces no verifier method in metrics"
-    );
-    assert!(
-        metrics.verifier_log.events().is_empty(),
-        "Mock verifier produces empty event log"
-    );
-}
-
-// ============================================================
-// Wiring: VerifierChain populates verifier method
-// ============================================================
-
-// @scenario: contact_exchange :: VerifierChain exchange records winning method in trust metrics
-#[test]
-fn test_verifier_chain_exchange_records_method_in_trust_metrics() {
-    let contact = run_full_qr_exchange_with_verifier_chain();
-
-    let metrics = contact.trust_metrics().expect("must have metrics");
-
-    assert_eq!(
-        metrics.transport,
-        ExchangeTransport::Qr,
-        "Transport must be QR"
-    );
-    assert_eq!(
-        metrics.verifier_method,
-        Some(VerifierMethod::ManualConfirmation),
-        "VerifierChain with ManualConfirmation must record the winning method"
-    );
-    assert_eq!(
-        metrics.proximity,
-        ProximityConfidence::Medium,
-        "ManualConfirmationVerifier yields Medium confidence"
-    );
-    assert!(
-        !metrics.verifier_log.events().is_empty(),
-        "VerifierChain must produce a non-empty event log"
     );
 }
 

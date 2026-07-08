@@ -37,7 +37,7 @@
 # Include shared templates
 include:
   - project: 'vauchi/scripts'
-    ref: main
+    ref: ci-templates-v2026.07.1
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/content-fetch.yml'
@@ -82,6 +82,9 @@ include:
   # so tag pipelines skip ~45 min (Apple) + ~35 min (Android) of rebuild.
   # Extracted 2026-04-22 as T2.3 Phase 0 Part 6.
   - local: ci/prebuild.yml
+
+variables:
+  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.1"
 
 # Cosign pinned version + checksum (used by update:swift-bindings and publish:maven)
 # Single source of truth for cosign binary integrity — update BOTH values together.
@@ -158,28 +161,79 @@ lint:version-check:
           - "**/Cargo.toml"
           - "**/Cargo.lock"
 
-lint:workspace-version-alignment:
+# Cross-cutting lint ratchet — combines the small alpine+docker lint checks
+# that previously ran as separate jobs. Each check runs sequentially in the
+# same container; a failure stops the job (fail-fast). Keeps tags: [docker].
+lint:cross-cutting-blocking:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
   tags: [docker]
   needs: []
   allow_failure: false
   before_script:
-    - apk add --no-cache bash git python3
+    - apk add --no-cache bash git python3 ripgrep jq findutils
     - |
       if [ ! -d ../scripts ]; then
-        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
+        git clone --depth=1 --branch "${VAUCHI_SCRIPTS_REF}" https://gitlab.com/vauchi/scripts.git ../scripts
       else
         git -C ../scripts pull --ff-only 2>/dev/null || true
       fi
+    - !reference [.clone-locales, before_script]
   script:
+    # lint:workspace-version-alignment
     - bash ../scripts/scripts/check-workspace-versions.sh Cargo.toml
+    # lint:locale-key-coverage
+    - bash ../locales/scripts/check-locale-key-coverage.sh
+        vauchi-app/src ../locales '*.rs'
+    # lint:adr-046
+    - bash ../scripts/scripts/check-aead.sh .
+    # lint:core-purity
+    - |
+      set -eu
+      SCRIPT=../scripts/scripts/audit-mobile-surface.sh
+      if [ ! -f "$SCRIPT" ]; then
+        echo "audit-mobile-surface.sh not yet on scripts/main — skipping."
+        echo "(Will activate automatically once the introducing MR merges.)"
+        exit 0
+      fi
+      WS=$(mktemp -d)
+      ln -sfn "$CI_PROJECT_DIR" "$WS/core"
+      bash "$SCRIPT" --check-core-purity "$WS"
+    # lint:crypto-hygiene
+    - |
+      set -eu
+      SCRIPT=../scripts/scripts/audit-crypto-hygiene.sh
+      BASELINE=../scripts/scripts/audit-crypto-hygiene.baseline.json
+      if [ ! -f "$SCRIPT" ] || [ ! -f "$BASELINE" ]; then
+        echo "audit-crypto-hygiene not yet on scripts/main — skipping."
+        echo "(Will activate automatically once the introducing MR merges.)"
+        exit 0
+      fi
+      WS=$(mktemp -d)
+      ln -sfn "$CI_PROJECT_DIR" "$WS/core"
+      bash "$SCRIPT" --check "$BASELINE" "$WS"
+    # lint:test-hygiene
+    - |
+      set -eu
+      SCRIPT=../scripts/scripts/audit-test-hygiene.sh
+      BASELINE=../scripts/scripts/audit-test-hygiene.baseline.json
+      if [ ! -f "$SCRIPT" ] || [ ! -f "$BASELINE" ]; then
+        echo "audit-test-hygiene not yet on scripts/main — skipping."
+        echo "(Will activate automatically once the introducing MR merges.)"
+        exit 0
+      fi
+      WS=$(mktemp -d)
+      ln -sfn "$CI_PROJECT_DIR" "$WS/core"
+      bash "$SCRIPT" --check "$BASELINE" "$WS"
   rules:
     - if: $CI_MERGE_REQUEST_IID
       changes:
         compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths:
           - "Cargo.toml"
+          - "**/*.rs"
+          - ".gitlab-ci.yml"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 lint:format:
   extends: [.linux-runner-nocache, .lint-format, .validation-rust, .timeout-quick]
@@ -249,79 +303,6 @@ lint:cabi-header:
     - cargo build -p vauchi-cabi
     - git diff --exit-code vauchi-cabi/include/vauchi.h || { echo "CABI header is stale — rebuild with 'cargo build -p vauchi-cabi' and commit the updated include/vauchi.h"; exit 1; }
 
-# Locale key coverage — extract i18n keys referenced in source and verify
-# each one exists in `en.json`. Catches typos and stale call sites before
-# they ship as the runtime fallback `format!("Missing: {}", key)` at
-# vauchi-app/src/i18n.rs.
-#
-# Pattern mirrors workspace-root `lint:claude-md`: alpine + apk add the
-# tools, then run a shared script from a sibling repo. Script is fetched
-# via the existing `.clone-locales` template (already used by lint:clippy
-# and test:* jobs above).
-#
-# Script lives at locales/scripts/check-locale-key-coverage.sh
-# (vauchi/locales). Uses positional args for forward+backward compat
-# while `vauchi/locales!58` (script fix-and-tighten) is in-flight; once
-# merged, the new flag-based API also works through the positional form.
-#
-# Variable-key call sites (`get_string(locale, &computed_key)`) are
-# statically unreachable and not validated here — that's by design,
-# covered by test discipline + runtime fallback.
-#
-# Wired 2026-05-08 as Phase 2 of `_private!1180` problem record.
-lint:locale-key-coverage:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  before_script:
-    - apk add --no-cache bash ripgrep jq git findutils
-    - !reference [.clone-locales, before_script]
-  script:
-    - bash ../locales/scripts/check-locale-key-coverage.sh
-        vauchi-app/src ../locales '*.rs'
-  rules:
-    - if: $CI_MERGE_REQUEST_IID
-      changes:
-        compare_to: refs/heads/$CI_DEFAULT_BRANCH
-        paths:
-          - "vauchi-app/src/**/*.rs"
-          - ".gitlab-ci.yml"
-
-# ADR-046: HPKE-internal AEAD must be ChaCha20-Poly1305 (not AES-GCM).
-# `scripts/scripts/check-aead.sh` greps `*.rs` for forbidden
-# `hpke::Aead::Aes128Gcm` / `Aes256Gcm` symbols outside the
-# `// ADR-046-EXEMPT: <reason>` allow-list.
-#
-# Pre-commit also runs this script
-# (`scripts/hooks/pre-commit:174-183`), but pre-commit is bypassable
-# (`--no-verify`) and absent on machines that didn't install the
-# hook. CI is the durable gate. ADR-046 §"Compliance check" cited
-# the script as "planned, not yet implemented" — the script existed,
-# the wiring did not (audit finding A-3 / F3, 2026-05-08).
-lint:adr-046:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  before_script:
-    - apk add --no-cache bash ripgrep git
-    - |
-      if [ ! -d ../scripts ]; then
-        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
-      else
-        git -C ../scripts pull --ff-only 2>/dev/null || true
-      fi
-  script:
-    - bash ../scripts/scripts/check-aead.sh .
-  rules:
-    - if: $CI_MERGE_REQUEST_IID
-      changes:
-        compare_to: refs/heads/$CI_DEFAULT_BRANCH
-        paths:
-          - "**/*.rs"
-          - ".gitlab-ci.yml"
-
 # Legacy-surface ratchet metric (Phase 0 / Task 0.1 / Step 2 of
 # `_private/docs/planning/todo/2026-05-11-pure-functional-core-program-plan.md`).
 #
@@ -333,8 +314,8 @@ lint:adr-046:
 # Task 6.3 flips it to a hard gate.
 #
 # The audit script lives in the scripts repo and is cloned the same
-# way as `lint:adr-046`. If the script is not yet on scripts/main
-# (e.g. pre-merge of the introducing MR), the job no-ops cleanly.
+# way as `lint:cross-cutting-blocking`. If the script is not yet on
+# scripts/main (e.g. pre-merge of the introducing MR), the job no-ops cleanly.
 metric:audit-mobile-surface:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
@@ -345,7 +326,7 @@ metric:audit-mobile-surface:
     - apk add --no-cache bash git python3
     - |
       if [ ! -d ../scripts ]; then
-        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
+        git clone --depth=1 --branch "${VAUCHI_SCRIPTS_REF}" https://gitlab.com/vauchi/scripts.git ../scripts
       else
         git -C ../scripts pull --ff-only 2>/dev/null || true
       fi
@@ -428,137 +409,6 @@ metric:audit-mobile-surface:
           - "**/*.rs"
           - ".gitlab-ci.yml"
 
-# Pure-functional-core seal (HARD gate). The metric:audit-mobile-surface
-# job above is intentionally advisory (allow_failure: true) — its
-# legacy-surface counters can legitimately be non-zero mid-retirement, so a
-# delta there is information, not a failure. The purity seal is categorically
-# different: vauchi-core state machines must own NO ambient time/rng/sleep
-# (the five core_* counters are locked at 0), so any regression is always a
-# bug, never expected debt. A separate hard job keeps the metric advisory
-# while gating the seal. Same script, --check-core-purity mode, which scans
-# only core/vauchi-core/src (seam files clock/rng/sleeper/monotonic, the test
-# trees, and diagnostic perf-timers are exempt — see the script header).
-# This is the CI half of closing the "seal is local-only" gap; the workspace
-# humble-UI ratchets (frontend-vocab / dispatch-purity / app-preferences)
-# cannot be gated here — they scan the android/ios/cli trees, absent in a
-# single-repo pipeline, so they live in the push hook instead.
-lint:core-purity:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  allow_failure: false
-  before_script:
-    - apk add --no-cache bash git
-    - |
-      if [ ! -d ../scripts ]; then
-        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
-      else
-        git -C ../scripts pull --ff-only 2>/dev/null || true
-      fi
-  script:
-    - |
-      set -eu
-      SCRIPT=../scripts/scripts/audit-mobile-surface.sh
-      if [ ! -f "$SCRIPT" ]; then
-        echo "audit-mobile-surface.sh not yet on scripts/main — skipping."
-        echo "(Will activate automatically once the introducing MR merges.)"
-        exit 0
-      fi
-      # The audit expects a workspace root containing a core/ sub-directory.
-      # We are inside core, so symlink to mimic the layout — the same dance
-      # metric:audit-mobile-surface uses for its HEAD snapshot.
-      WS=$(mktemp -d)
-      ln -sfn "$CI_PROJECT_DIR" "$WS/core"
-      bash "$SCRIPT" --check-core-purity "$WS"
-  rules:
-    - if: $CI_MERGE_REQUEST_IID
-      changes:
-        compare_to: refs/heads/$CI_DEFAULT_BRANCH
-        paths:
-          - "**/*.rs"
-          - ".gitlab-ci.yml"
-
-# Crypto-hygiene ratchet (HARD gate). Converts the grep-tractable honor-
-# system crypto rules into a mechanical gate: empty HKDF info, a
-# non-allow-listed HKDF info collision (ADR-007 domain separation), or a
-# direct trust-level setter (ADR-034). Baseline 0; the allow-list of
-# intentionally-shared derivations lives next to the script. Core-local,
-# so — unlike the workspace humble-UI ratchets — it works as a real CI
-# gate. Same alpine + symlink skeleton as lint:core-purity above.
-lint:crypto-hygiene:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  allow_failure: false
-  before_script:
-    - apk add --no-cache bash git
-    - |
-      if [ ! -d ../scripts ]; then
-        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
-      else
-        git -C ../scripts pull --ff-only 2>/dev/null || true
-      fi
-  script:
-    - |
-      set -eu
-      SCRIPT=../scripts/scripts/audit-crypto-hygiene.sh
-      BASELINE=../scripts/scripts/audit-crypto-hygiene.baseline.json
-      if [ ! -f "$SCRIPT" ] || [ ! -f "$BASELINE" ]; then
-        echo "audit-crypto-hygiene not yet on scripts/main — skipping."
-        echo "(Will activate automatically once the introducing MR merges.)"
-        exit 0
-      fi
-      WS=$(mktemp -d)
-      ln -sfn "$CI_PROJECT_DIR" "$WS/core"
-      bash "$SCRIPT" --check "$BASELINE" "$WS"
-  rules:
-    - if: $CI_MERGE_REQUEST_IID
-      changes:
-        compare_to: refs/heads/$CI_DEFAULT_BRANCH
-        paths:
-          - "**/*.rs"
-          - ".gitlab-ci.yml"
-
-# Test-hygiene ratchet (HARD gate). CC-06 (no real-time sleeps in tests) +
-# no silent eprintln-SKIP-return soft skips, over core/vauchi-core/tests.
-# Ratchet-down: baselines locked at current debt; counts may drop, never
-# rise. Same alpine + symlink skeleton as the seal/crypto jobs above.
-lint:test-hygiene:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  allow_failure: false
-  before_script:
-    - apk add --no-cache bash git
-    - |
-      if [ ! -d ../scripts ]; then
-        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
-      else
-        git -C ../scripts pull --ff-only 2>/dev/null || true
-      fi
-  script:
-    - |
-      set -eu
-      SCRIPT=../scripts/scripts/audit-test-hygiene.sh
-      BASELINE=../scripts/scripts/audit-test-hygiene.baseline.json
-      if [ ! -f "$SCRIPT" ] || [ ! -f "$BASELINE" ]; then
-        echo "audit-test-hygiene not yet on scripts/main — skipping."
-        echo "(Will activate automatically once the introducing MR merges.)"
-        exit 0
-      fi
-      WS=$(mktemp -d)
-      ln -sfn "$CI_PROJECT_DIR" "$WS/core"
-      bash "$SCRIPT" --check "$BASELINE" "$WS"
-  rules:
-    - if: $CI_MERGE_REQUEST_IID
-      changes:
-        compare_to: refs/heads/$CI_DEFAULT_BRANCH
-        paths:
-          - "**/*.rs"
-          - ".gitlab-ci.yml"
 
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
 
@@ -923,13 +773,14 @@ security:vet:
   script:
     - |
       curl --silent --fail \
-        "${CI_API_V4_URL}/projects/77957857/repository/files/scripts%2Fci%2Fvet-autofix.sh/raw?ref=main" \
+        "${CI_API_V4_URL}/projects/77957857/repository/files/scripts%2Fci%2Fvet-autofix.sh/raw?ref=${VAUCHI_SCRIPTS_REF}" \
         -o vet-autofix.sh
       chmod +x vet-autofix.sh
     - ./vet-autofix.sh
 
 # Refine semgrep-sast from security.yml: gate on lint, run only on Rust changes
 semgrep-sast:
+  allow_failure: false
   needs:
     - job: lint:format
       optional: true
@@ -947,6 +798,7 @@ semgrep-sast:
 
 # Refine secret_detection from security.yml: gate on lint
 secret_detection:
+  allow_failure: false
   needs:
     - job: lint:format
       optional: true

@@ -26,6 +26,12 @@ use crate::types::DuressSettings;
 /// implementations cannot drift apart.
 pub const BIOMETRIC_UNLOCK_MIN_DURATION: Duration = Duration::from_millis(300);
 
+/// Maximum number of contacts that can receive duress alerts.
+///
+/// Kept for settings validation even though the current duress flow triggers
+/// a local wipe instead of sending alerts.
+pub const MAX_DURESS_CONTACTS: usize = 5;
+
 impl Vauchi {
     // === Delivery Status Operations ===
 
@@ -110,7 +116,6 @@ impl Vauchi {
             }
             AuthResult::Duress => {
                 self.auth_mode = AuthMode::Duress;
-                self.queue_duress_alert()?;
                 Ok(AuthMode::Duress)
             }
             AuthResult::Invalid => Err(VauchiError::InvalidState("invalid password".into())),
@@ -313,6 +318,12 @@ impl Vauchi {
 
     /// Saves duress alert settings (trusted contacts, message, location).
     pub fn save_duress_settings(&self, settings: &DuressSettings) -> VauchiResult<()> {
+        if settings.alert_contact_ids.len() > MAX_DURESS_CONTACTS {
+            return Err(VauchiError::InvalidState(format!(
+                "maximum {MAX_DURESS_CONTACTS} duress contacts allowed, got {}",
+                settings.alert_contact_ids.len()
+            )));
+        }
         self.storage.duress().save_duress_settings(settings)?;
         Ok(())
     }
@@ -327,33 +338,6 @@ impl Vauchi {
     /// Deletes duress alert settings.
     pub fn delete_duress_settings(&self) -> VauchiResult<()> {
         self.storage.duress().delete_duress_settings()?;
-        Ok(())
-    }
-
-    /// Queues a duress alert for sending to trusted contacts.
-    ///
-    /// Called internally by `authenticate()` when the duress PIN is entered.
-    /// If no duress settings are configured, this is a no-op.
-    ///
-    /// The alert is queued as a `card_delta` [`PendingUpdate`] in the storage-
-    /// backed pending queue, which the normal `sync()` send phase consumes
-    /// via [`SyncController`] — indistinguishable from normal sync traffic
-    /// (ADR-032). Best-effort: a send/queue failure must NEVER block the duress
-    /// unlock (the user must still reach the decoy UI). There is no observable
-    /// network activity here, so the timing does not betray duress to an observer.
-    pub(super) fn queue_duress_alert(&mut self) -> VauchiResult<()> {
-        let settings = self.storage.duress().load_duress_settings()?;
-        if let Some(settings) = settings {
-            let recipients = settings.alert_contact_ids.clone();
-            let message = settings.alert_message.clone();
-            // Result deliberately ignored (best-effort — see above).
-            let _sent = self.queue_safety_alerts(
-                crate::sync::safety_alert::AlertKind::Duress,
-                &recipients,
-                &message,
-                None,
-            );
-        }
         Ok(())
     }
 

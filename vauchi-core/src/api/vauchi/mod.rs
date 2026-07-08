@@ -237,6 +237,11 @@ pub struct Vauchi {
     /// so MyInfoEngine can render "Last synced X ago" without the frontend
     /// owning the timestamp (humble-UI follow-up to ios!472).
     last_sync_unix_seconds: Option<u64>,
+    /// Wall-clock unix seconds of the last emergency broadcast. In-memory
+    /// only; resets on process restart. Used to enforce
+    /// `BROADCAST_COOLDOWN_SECS` without adding a new storage column for a
+    /// pre-release guard.
+    last_emergency_broadcast_unix_seconds: Option<u64>,
 }
 
 impl Vauchi {
@@ -352,6 +357,7 @@ impl Vauchi {
             #[cfg(feature = "network-http")]
             last_exchange_time: None,
             last_sync_unix_seconds: None,
+            last_emergency_broadcast_unix_seconds: None,
         })
     }
 
@@ -552,6 +558,7 @@ impl Vauchi {
             #[cfg(feature = "network-http")]
             last_exchange_time: None,
             last_sync_unix_seconds: None,
+            last_emergency_broadcast_unix_seconds: None,
         })
     }
 }

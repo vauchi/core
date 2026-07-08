@@ -12,6 +12,7 @@
 
 use super::{AppEngine, AppScreen};
 use crate::ui::action::{ActionResult, UserAction};
+use vauchi_core::api::AuthMode;
 use vauchi_core::contact_card::FieldType;
 use zeroize::Zeroize;
 
@@ -129,7 +130,17 @@ impl AppEngine {
             }
         };
         match self.vauchi.authenticate(&pin) {
-            Ok(_auth_mode) => {
+            Ok(AuthMode::Duress) => match self.vauchi.perform_emergency_wipe(true) {
+                Ok(_) => {
+                    self.engine_cache.clear();
+                    ActionResult::WipeComplete
+                }
+                Err(_) => ActionResult::ShowToast {
+                    message: "Duress wipe failed.".into(),
+                    undo_action_id: None,
+                },
+            },
+            Ok(_) => {
                 let screen = self.navigate_to_internal(AppScreen::MyInfo);
                 ActionResult::NavigateTo(screen)
             }

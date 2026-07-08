@@ -33,25 +33,3 @@ pub struct BroadcastResult {
     /// Total number of trusted contacts in the config.
     pub total: usize,
 }
-
-/// Emergency wipe readiness status.
-///
-/// Aggregates the configuration state of all emergency-related features
-/// so clients can display readiness at a glance.
-#[derive(Debug, Clone)]
-pub struct EmergencyWipeStatus {
-    /// Whether emergency broadcast is configured (trusted contacts selected).
-    pub broadcast_configured: bool,
-    /// Whether duress PIN settings are configured.
-    pub duress_configured: bool,
-    /// Whether a soft shred (deletion) is currently scheduled.
-    pub deletion_scheduled: bool,
-    /// Whether a hard shred (deletion) has been executed.
-    pub deletion_executed: bool,
-    /// Whether there is at least one recovery-trusted contact.
-    pub has_trusted_contacts: bool,
-    /// Number of recovery-trusted contacts.
-    pub trusted_contact_count: usize,
-    /// Whether an app password is set (required for duress).
-    pub password_enabled: bool,
-}

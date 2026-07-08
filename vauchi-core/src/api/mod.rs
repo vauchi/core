@@ -161,7 +161,7 @@ pub use duress::{DuressAlert, DuressAlertType};
 
 // Emergency Broadcast System
 pub use crate::types::MAX_TRUSTED_CONTACTS;
-pub use emergency::{BroadcastResult, EmergencyWipeStatus};
+pub use emergency::BroadcastResult;
 
 // Vauchi
 pub use vauchi::{

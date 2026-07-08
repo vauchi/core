@@ -12,7 +12,7 @@ use crate::rng::SecureRngExt;
 use crate::storage::Storage;
 
 use super::super::config::VauchiConfig;
-use super::super::emergency::{BroadcastResult, EmergencyWipeStatus};
+use super::super::emergency::{BROADCAST_COOLDOWN_SECS, BroadcastResult};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventDispatcher, VauchiEvent};
 use super::Vauchi;
@@ -69,6 +69,16 @@ impl Vauchi {
     ///
     /// Returns a `BroadcastResult` with sent/total counts.
     pub fn send_emergency_broadcast(&mut self) -> VauchiResult<BroadcastResult> {
+        let now = self.clock.unix_seconds();
+        if let Some(last) = self.last_emergency_broadcast_unix_seconds {
+            let elapsed = now.saturating_sub(last);
+            if elapsed < BROADCAST_COOLDOWN_SECS {
+                return Err(VauchiError::InvalidState(format!(
+                    "emergency broadcast cooldown active: {elapsed}s since last broadcast"
+                )));
+            }
+        }
+
         let config = self
             .storage
             .emergency()
@@ -88,6 +98,7 @@ impl Vauchi {
             None,
         )?;
 
+        self.last_emergency_broadcast_unix_seconds = Some(now);
         self.events.dispatch(VauchiEvent::EmergencyBroadcastSent {
             sent_count: sent,
             total,
@@ -187,44 +198,6 @@ impl Vauchi {
     pub fn delete_emergency_config(&mut self) -> VauchiResult<()> {
         self.storage.emergency().delete_emergency_config()?;
         Ok(())
-    }
-
-    /// Returns the emergency wipe readiness status.
-    ///
-    /// Aggregates:
-    /// - Whether emergency broadcast is configured
-    /// - Whether duress settings are configured
-    /// - Whether a deletion (shred) is scheduled or executed
-    /// - Whether the user has at least one trusted contact
-    pub fn get_emergency_wipe_status(&self) -> VauchiResult<EmergencyWipeStatus> {
-        let broadcast_configured = self.storage.emergency().load_emergency_config()?.is_some();
-        let duress_configured = self.storage.duress().load_duress_settings()?.is_some();
-
-        let deletion_state = self.storage.consent().load_deletion_state()?;
-        let deletion_scheduled = matches!(
-            deletion_state,
-            crate::storage::DeletionState::Scheduled { .. }
-        );
-        let deletion_executed = matches!(
-            deletion_state,
-            crate::storage::DeletionState::Executed { .. }
-        );
-
-        let contacts = self.storage.contacts().list_contacts()?;
-        let trusted_contact_count = contacts.iter().filter(|c| c.is_recovery_trusted()).count();
-        let has_trusted_contacts = trusted_contact_count > 0;
-
-        let password_enabled = self.storage.identity().load_password_config()?.is_some();
-
-        Ok(EmergencyWipeStatus {
-            broadcast_configured,
-            duress_configured,
-            deletion_scheduled,
-            deletion_executed,
-            has_trusted_contacts,
-            trusted_contact_count,
-            password_enabled,
-        })
     }
 
     /// Performs an emergency data wipe (panic shred).

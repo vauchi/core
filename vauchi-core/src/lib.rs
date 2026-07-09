@@ -56,9 +56,9 @@ pub mod install_id;
 pub use types::{
     AhaMomentTracker, AhaMomentType, AudioCapability, BackupReminderState, BiometricUnlockOutcome,
     ConsentRecord, ConsentType, DEFAULT_EMERGENCY_MESSAGE, DemoContactState, DuressSettings,
-    EmergencyBroadcastConfig, EventOrigin, ExchangeTransport, MAX_TRUSTED_CONTACTS,
-    OnboardingProgress, OnboardingStep, OwnCardRepropagateState, ProximityConfidence,
-    ReminderFrequency,
+    EmergencyBroadcastConfig, EmergencyWipeStatus, EventOrigin, ExchangeTransport,
+    MAX_TRUSTED_CONTACTS, OnboardingProgress, OnboardingStep, OwnCardRepropagateState,
+    ProximityConfidence, ReminderFrequency,
 };
 pub mod contact;
 pub mod contact_card;

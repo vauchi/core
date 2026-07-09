@@ -266,6 +266,52 @@ impl Vauchi {
         Ok(())
     }
 
+    /// Returns a snapshot of emergency readiness and deletion state.
+    ///
+    /// Combines the emergency broadcast config, duress settings, app password
+    /// state, current deletion state, and recovery-trusted contact count into a
+    /// single struct for the frontend emergency overview screen.
+    pub fn get_emergency_wipe_status(&self) -> VauchiResult<crate::types::EmergencyWipeStatus> {
+        let broadcast_configured = self
+            .storage
+            .emergency()
+            .load_emergency_config()?
+            .is_some_and(|c| !c.trusted_contact_ids.is_empty());
+        let duress_configured = self.storage.duress().load_duress_settings()?.is_some();
+
+        let deletion_state = self.storage.consent().load_deletion_state()?;
+        let deletion_scheduled = matches!(
+            deletion_state,
+            crate::storage::DeletionState::Scheduled { .. }
+        );
+        let deletion_executed = matches!(
+            deletion_state,
+            crate::storage::DeletionState::Executed { .. }
+        );
+
+        let trusted_contacts: Vec<_> = self
+            .storage
+            .contacts()
+            .list_contacts()?
+            .into_iter()
+            .filter(|c| c.is_recovery_trusted())
+            .collect();
+        let trusted_contact_count = trusted_contacts.len();
+        let has_trusted_contacts = trusted_contact_count > 0;
+
+        let password_enabled = self.is_password_enabled()?;
+
+        Ok(crate::types::EmergencyWipeStatus {
+            broadcast_configured,
+            duress_configured,
+            deletion_scheduled,
+            deletion_executed,
+            has_trusted_contacts,
+            trusted_contact_count,
+            password_enabled,
+        })
+    }
+
     // === Decoy Contacts ===
 
     /// Adds a decoy contact for duress mode.

@@ -286,6 +286,12 @@ impl Vauchi {
         clock: Option<Arc<dyn Clock>>,
         rng: Option<Arc<dyn SecureRng>>,
     ) -> VauchiResult<Self> {
+        // Install the rustls crypto provider before any network code runs.
+        // vauchi-app compiles reqwest with `rustls-tls-webpki-roots-no-provider`
+        // so this global install is required to avoid the "No CryptoProvider"
+        // panic on the first HTTPS request.
+        crate::network::ensure_rustls_provider_installed();
+
         let clock = clock.unwrap_or_else(SystemClock::shared);
         let rng = rng.unwrap_or_else(OsSecureRng::shared);
         let sleeper = SystemSleeper::shared();

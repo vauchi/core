@@ -230,12 +230,31 @@ pub fn init(resource_dir: &Path) -> Result<(), I18nError> {
 ///
 /// Called by the content update system after downloading locale files from CDN.
 /// If the store hasn't been initialized yet, creates it first.
+///
+/// Merges the downloaded strings on top of the existing store entry (or the
+/// bundled English fallback for the "en" locale) instead of replacing it
+/// outright. This prevents a partial CDN locale file from wiping keys the
+/// running app still needs, which would surface as "Missing: ..." placeholders.
 pub fn load_locale_from_bytes(code: &str, data: &[u8]) -> Result<(), I18nError> {
-    let strings = parse_locale_bytes(data)?;
+    let mut strings = parse_locale_bytes(data)?;
 
     let mut lock = LOCALE_STORE.write().map_err(|_| I18nError::LockPoisoned)?;
 
     let store = lock.get_or_insert_with(HashMap::new);
+
+    // Preserve keys the downloaded file is missing by backfilling from the
+    // previous store entry, then from the bundled English fallback for en.
+    if let Some(existing) = store.get(code) {
+        for (key, value) in existing {
+            strings.entry(key.clone()).or_insert_with(|| value.clone());
+        }
+    }
+    if code == "en" {
+        for (key, value) in bundled_english_cached() {
+            strings.entry(key.clone()).or_insert_with(|| value.clone());
+        }
+    }
+
     store.insert(code.to_string(), strings);
     Ok(())
 }

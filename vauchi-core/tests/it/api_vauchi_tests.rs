@@ -15,6 +15,18 @@ fn create_test_vauchi() -> Vauchi {
 
 // @internal
 #[test]
+fn test_vauchi_new_installs_rustls_provider() {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("vauchi.db");
+    let _wb = VauchiBuilder::new().storage_path(db_path).build().unwrap();
+    assert!(
+        rustls::crypto::CryptoProvider::get_default().is_some(),
+        "Vauchi::new must install the rustls crypto provider"
+    );
+}
+
+// @internal
+#[test]
 fn test_vauchi_create_identity() {
     let mut wb = create_test_vauchi();
 

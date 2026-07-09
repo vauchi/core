@@ -122,6 +122,29 @@ impl EmergencyBroadcastConfig {
     }
 }
 
+/// Snapshot of emergency-related configuration and state.
+///
+/// Returned by [`Vauchi::get_emergency_wipe_status`](crate::api::Vauchi::get_emergency_wipe_status)
+/// so frontends can render an emergency readiness overview without issuing
+/// multiple API calls.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmergencyWipeStatus {
+    /// An emergency broadcast has been configured with at least one trusted contact.
+    pub broadcast_configured: bool,
+    /// Duress settings have been configured.
+    pub duress_configured: bool,
+    /// Identity deletion is scheduled (grace period active).
+    pub deletion_scheduled: bool,
+    /// Identity deletion has already been executed.
+    pub deletion_executed: bool,
+    /// At least one contact is marked as recovery-trusted.
+    pub has_trusted_contacts: bool,
+    /// Number of recovery-trusted contacts.
+    pub trusted_contact_count: usize,
+    /// An app password has been configured.
+    pub password_enabled: bool,
+}
+
 // --- UX types used by storage and API ---
 
 /// Steps in the onboarding wizard.

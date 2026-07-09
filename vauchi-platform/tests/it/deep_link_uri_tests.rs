@@ -11,7 +11,7 @@
 //! shape for unsupported links.
 
 use serde_json::Value;
-use vauchi_platform::PlatformAppEngine;
+use vauchi_platform::{PlatformAppEngine, PlatformAppEngineTestHelpers};
 
 fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -205,4 +205,81 @@ fn valid_device_link_uri_navigates_to_join_screen() {
         .get("NavigateTo")
         .expect("expected NavigateTo result");
     assert_eq!(screen["screen_id"], "device_link_join");
+}
+
+// @internal
+fn add_test_contact(engine: &PlatformAppEngine, name: &str) -> String {
+    let card = vauchi_core::contact_card::ContactCard::new(name);
+    let contact = vauchi_core::Contact::from_exchange(
+        [0xAB; 32],
+        card,
+        vauchi_core::crypto::SymmetricKey::generate(),
+        0,
+    );
+    let id = contact.id().to_string();
+    engine
+        .save_test_contact(&contact)
+        .expect("save test contact");
+    id
+}
+
+// @internal
+#[test]
+fn valid_contact_uri_navigates_to_contact_detail() {
+    let (engine, _dir) = create_engine();
+    let contact_id = add_test_contact(&engine, "Alice");
+    let result = engine
+        .handle_action_json(link_opened_action(&format!(
+            "vauchi://contact/{contact_id}"
+        )))
+        .expect("contact URL must dispatch");
+    let action_result = action_result_from_envelope(&result);
+    let screen = action_result
+        .get("NavigateTo")
+        .expect("expected NavigateTo result");
+    assert_eq!(screen["screen_id"], "contact_detail");
+    assert_eq!(
+        screen["title"], "Alice",
+        "ContactDetail title should be the contact's display name"
+    );
+}
+
+// @internal
+#[test]
+fn unknown_contact_uri_returns_show_alert() {
+    let (engine, _dir) = create_engine();
+    let before = current_screen_id(&engine);
+    let result = engine
+        .handle_action_json(link_opened_action("vauchi://contact/unknown-id-123"))
+        .expect("contact URL must dispatch");
+    let action_result = action_result_from_envelope(&result);
+    assert!(
+        action_result.get("ShowAlert").is_some(),
+        "unknown contact id must surface ShowAlert, got {result}"
+    );
+    assert_eq!(
+        current_screen_id(&engine),
+        before,
+        "screen must not change on unknown contact"
+    );
+}
+
+// @internal
+#[test]
+fn malformed_contact_uri_returns_show_alert() {
+    let (engine, _dir) = create_engine();
+    let before = current_screen_id(&engine);
+    let result = engine
+        .handle_action_json(link_opened_action("vauchi://contact/abc/def"))
+        .expect("contact URL must dispatch");
+    let action_result = action_result_from_envelope(&result);
+    assert!(
+        action_result.get("ShowAlert").is_some(),
+        "malformed contact URI must surface ShowAlert, got {result}"
+    );
+    assert_eq!(
+        current_screen_id(&engine),
+        before,
+        "screen must not change on malformed contact URI"
+    );
 }

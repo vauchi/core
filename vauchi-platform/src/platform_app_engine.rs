@@ -20,10 +20,13 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::types::{
-    MobileLocale, MobileNotificationCategory, MobilePendingNotification, MobileTabInfo,
-    MobileTabLayout,
+    MobileLocale, MobileNotificationCategory, MobileNotificationPriority,
+    MobilePendingNotification, MobileTabInfo, MobileTabLayout,
 };
-use vauchi_app::notification_types::NotificationCategory as CoreNotificationCategory;
+use vauchi_app::notification_types::{
+    NotificationCategory as CoreNotificationCategory,
+    NotificationPriority as CoreNotificationPriority,
+};
 use vauchi_app::orchestrator::ble_handshake_machine::BleMachineEvent;
 use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
 use vauchi_core::api::{HandlerId, Vauchi, VauchiConfig, VauchiEvent};
@@ -800,6 +803,15 @@ impl PlatformAppEngine {
                 title: n.title,
                 body: n.body,
                 contact_id: n.contact_id,
+                deep_link_uri: n.deep_link_uri,
+                os_category_id: n.os_category_id,
+                os_channel_id: n.os_channel_id,
+                priority: match n.priority {
+                    CoreNotificationPriority::Default => MobileNotificationPriority::Default,
+                    CoreNotificationPriority::High => MobileNotificationPriority::High,
+                    CoreNotificationPriority::Urgent => MobileNotificationPriority::Urgent,
+                },
+                os_category_options: n.os_category_options,
             })
             .collect();
         Ok(mapped)

@@ -26,6 +26,15 @@ pub enum NotificationCategory {
     CardUpdate,
 }
 
+/// Presentation urgency for an OS notification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+pub enum NotificationPriority {
+    Default,
+    High,
+    Urgent,
+}
+
 /// User preferences for OS notifications.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -63,6 +72,24 @@ pub struct PendingNotification {
     pub title: String,
     pub body: String,
     pub contact_id: String,
+    /// Deep-link URI the frontend should open when the user taps the
+    /// notification. Core owns the URI format (ADR-021); the shell forwards
+    /// it verbatim via `UserAction::LinkOpened`.
+    pub deep_link_uri: Option<String>,
+    /// Opaque OS category identifier (iOS/macOS `UNNotificationCategory`
+    /// identifier). Core mints the id; the shell must not interpret it as a
+    /// domain concept (ADR-043 Am6).
+    pub os_category_id: String,
+    /// Opaque OS channel identifier (Android `NotificationChannel` id). Core
+    /// mints the id; the shell must not interpret it as a domain concept
+    /// (ADR-043 Am6).
+    pub os_channel_id: String,
+    /// Presentation urgency. The shell maps this to OS-specific priority /
+    /// importance hints; it must not switch on the notification category.
+    pub priority: NotificationPriority,
+    /// Opaque tokens that control OS-specific category options. The shell maps
+    /// each token to the corresponding platform option.
+    pub os_category_options: Vec<String>,
 }
 
 /// Activity log entry types stored in the payload column.

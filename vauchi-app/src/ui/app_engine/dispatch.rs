@@ -140,7 +140,28 @@ impl AppEngine {
             ));
         }
 
-        // 2. Device-link join invitation → join screen (fresh device only).
+        // 2. Contact deep link → contact detail screen.
+        if let Some(contact_id) = parse_contact_deep_link(uri) {
+            return Some(match self.vauchi.get_contact(&contact_id) {
+                Ok(Some(_)) => ActionResult::NavigateTo(
+                    self.navigate_to(AppScreen::ContactDetail { contact_id }),
+                ),
+                Ok(None) => ActionResult::ShowAlert {
+                    title: self.t("contact_detail.not_found_title"),
+                    message: crate::i18n::get_string_with_args(
+                        self.render_context.resolved_locale(),
+                        "contact_detail.not_found_detail",
+                        &[("id", &contact_id)],
+                    ),
+                },
+                Err(_err) => ActionResult::ShowAlert {
+                    title: self.t("error.title"),
+                    message: self.t("error.generic"),
+                },
+            });
+        }
+
+        // 3. Device-link join invitation → join screen (fresh device only).
         if uri.starts_with("vauchi://device-link") {
             return Some(match self.open_device_link_invitation(uri) {
                 Ok(screen) => ActionResult::NavigateTo(screen),
@@ -151,7 +172,7 @@ impl AppEngine {
             });
         }
 
-        // 3. Unknown vauchi link (or non-vauchi scheme that the OS somehow
+        // 4. Unknown vauchi link (or non-vauchi scheme that the OS somehow
         //    delivered). Surface a single, core-owned error.
         Some(ActionResult::ShowAlert {
             title: self.t("deep_link.invalid_title"),
@@ -312,6 +333,19 @@ impl AppEngine {
 
         None
     }
+}
+
+/// Parse a `vauchi://contact/<id>` URI and return the contact id if valid.
+///
+/// Rejects empty ids, ids containing path separators, and any query/fragment
+/// noise so the frontend cannot accidentally route to a malformed contact.
+fn parse_contact_deep_link(uri: &str) -> Option<String> {
+    let prefix = "vauchi://contact/";
+    let rest = uri.strip_prefix(prefix)?;
+    if rest.is_empty() || rest.contains('/') || rest.contains('?') || rest.contains('#') {
+        return None;
+    }
+    Some(rest.to_string())
 }
 
 /// Translate renderer-convention InlineConfirm presses into the

@@ -27,7 +27,9 @@ pub use device::{
     MobileSyncResult, MobileSyncStatus, MobileSyncStatusKind, MobileSyncStatusView,
     sync_status_view,
 };
-pub use notification::{MobileNotificationCategory, MobilePendingNotification};
+pub use notification::{
+    MobileNotificationCategory, MobileNotificationPriority, MobilePendingNotification,
+};
 pub use security::{
     MobileAuthMode, MobileBiometricUnlockOutcome, MobileBroadcastResult, MobileConsentRecord,
     MobileConsentStatus, MobileConsentType, MobileDecoyContact, MobileDeletionInfo,

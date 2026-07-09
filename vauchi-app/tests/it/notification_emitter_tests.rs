@@ -6,6 +6,7 @@ use vauchi_app::i18n::Locale;
 use vauchi_app::notification_emitter::NotificationEmitter;
 use vauchi_app::notification_types::{
     ActivityLogEntry, EventOrigin, NotificationCategory, NotificationPreferences,
+    NotificationPriority,
 };
 
 fn test_name_resolver(contact_id: &str) -> String {
@@ -265,8 +266,9 @@ fn card_update_produces_notification_when_enabled() {
     assert_eq!(n.category, NotificationCategory::CardUpdate);
     assert_eq!(n.title, "Vauchi");
     assert_eq!(n.body, "Carol updated their card");
-    // contact_id is carried so a tap can deep-link to ContactDetail.
+    // contact_id + core-owned deep link so a tap reaches ContactDetail.
     assert_eq!(n.contact_id, "carol");
+    assert_eq!(n.deep_link_uri, Some("vauchi://contact/carol".to_string()));
 }
 
 // @internal
@@ -347,4 +349,92 @@ fn empty_entries_produces_no_notifications() {
         test_name_resolver,
     );
     assert!(results.is_empty());
+}
+
+// @internal
+#[test]
+fn contact_bearing_notifications_include_core_owned_deep_link() {
+    let entries = vec![
+        (
+            "evt-em".to_string(),
+            ActivityLogEntry::EmergencyAlertReceived {
+                contact_id: "alice".to_string(),
+            },
+        ),
+        (
+            "evt-du".to_string(),
+            ActivityLogEntry::DuressAlertReceived {
+                contact_id: "bob".to_string(),
+            },
+        ),
+        (
+            "evt-ca".to_string(),
+            ActivityLogEntry::ContactAdded {
+                contact_id: "carol".to_string(),
+                origin: EventOrigin::Synced,
+            },
+        ),
+        (
+            "evt-cu".to_string(),
+            ActivityLogEntry::CardUpdateReceived {
+                contact_id: "dave".to_string(),
+                changed_fields: vec![],
+            },
+        ),
+    ];
+    let results = NotificationEmitter::evaluate(
+        &entries,
+        &prefs_all_on(),
+        Locale::English,
+        test_name_resolver,
+    );
+    assert_eq!(results.len(), 4);
+    for n in &results {
+        assert!(
+            n.deep_link_uri.is_some(),
+            "{:?} notification should carry a deep link",
+            n.category
+        );
+        let expected = format!("vauchi://contact/{}", n.contact_id);
+        assert_eq!(n.deep_link_uri, Some(expected));
+    }
+}
+
+// @internal
+#[test]
+fn contact_bearing_notifications_include_core_owned_os_hints() {
+    let entries = vec![
+        (
+            "evt-em".to_string(),
+            ActivityLogEntry::EmergencyAlertReceived {
+                contact_id: "alice".to_string(),
+            },
+        ),
+        (
+            "evt-cu".to_string(),
+            ActivityLogEntry::CardUpdateReceived {
+                contact_id: "bob".to_string(),
+                changed_fields: vec![],
+            },
+        ),
+    ];
+    let results = NotificationEmitter::evaluate(
+        &entries,
+        &prefs_all_on(),
+        Locale::English,
+        test_name_resolver,
+    );
+
+    assert_eq!(results.len(), 2);
+    let emergency = &results[0];
+    assert_eq!(emergency.os_category_id, "emergency_alert");
+    assert_eq!(emergency.os_channel_id, "alerts");
+    assert_eq!(emergency.priority, NotificationPriority::Urgent);
+    assert_eq!(emergency.os_category_options, vec!["custom_dismiss_action"]);
+
+    let card_update = &results[1];
+    assert_eq!(card_update.os_category_id, "card_update");
+    assert_eq!(card_update.os_channel_id, "updates");
+    assert_eq!(card_update.priority, NotificationPriority::Default);
+    assert!(card_update.os_category_options.is_empty());
 }

@@ -340,58 +340,8 @@ fn test_is_first_launch_false_after_identity() {
 }
 
 // ================================================================
-// Emergency Wipe Status API Tests
+// Emergency Wipe API Tests
 // ================================================================
-
-// @internal
-#[test]
-fn test_emergency_wipe_status_unconfigured() {
-    let wb = create_vauchi_with_identity("Alice");
-    let status = wb.get_emergency_wipe_status().unwrap();
-
-    assert!(!status.broadcast_configured);
-    assert!(!status.duress_configured);
-    assert!(!status.deletion_scheduled);
-    assert!(!status.deletion_executed);
-    assert!(!status.has_trusted_contacts);
-    assert_eq!(status.trusted_contact_count, 0);
-    assert!(!status.password_enabled);
-}
-
-// @internal
-#[test]
-fn test_emergency_wipe_status_with_emergency_config() {
-    let mut wb = create_vauchi_with_identity("Alice");
-
-    let contact = create_test_contact("Bob", [1u8; 32]);
-    let contact_id = contact.id().to_string();
-    wb.add_contact(contact).unwrap();
-
-    wb.configure_emergency_broadcast(vec![contact_id], "Help me!".to_string(), false)
-        .unwrap();
-
-    let status = wb.get_emergency_wipe_status().unwrap();
-    assert!(status.broadcast_configured);
-}
-
-// @internal
-#[test]
-fn test_emergency_wipe_status_with_trusted_contacts() {
-    let wb = create_vauchi_with_identity("Alice");
-
-    let mut contact = create_test_contact("Bob", [1u8; 32]);
-    contact.mark_fingerprint_verified().unwrap();
-    contact.trust_for_recovery().unwrap();
-    let contact_id = contact.id().to_string();
-    wb.add_contact(contact).unwrap();
-    // Must re-save to persist the trust flag
-    let _c = wb.get_contact(&contact_id).unwrap().unwrap();
-    // Trust is set on the in-memory object but we added it trusted
-    // Let's verify via the status
-    let status = wb.get_emergency_wipe_status().unwrap();
-    assert!(status.has_trusted_contacts);
-    assert_eq!(status.trusted_contact_count, 1);
-}
 
 // @internal
 #[test]

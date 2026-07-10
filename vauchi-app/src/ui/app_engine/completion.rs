@@ -130,17 +130,17 @@ impl AppEngine {
             }
         };
         match self.vauchi.authenticate(&pin) {
-            Ok(AuthMode::Duress) => match self.vauchi.perform_emergency_wipe(true) {
-                Ok(_) => {
+            Ok(mode) => {
+                if mode == AuthMode::Duress {
+                    // ADR-032 decoy mode: proceed exactly like a normal
+                    // unlock — auth_mode already routes every read to the
+                    // decoy set and the covert alert queued by
+                    // authenticate() rides the next sync. Wiping here would
+                    // both reveal the duress entry to the coercer and
+                    // destroy the queued alert before delivery. The cache
+                    // clear drops any pre-lock screens built from real data.
                     self.engine_cache.clear();
-                    ActionResult::WipeComplete
                 }
-                Err(_) => ActionResult::ShowToast {
-                    message: "Duress wipe failed.".into(),
-                    undo_action_id: None,
-                },
-            },
-            Ok(_) => {
                 let screen = self.navigate_to_internal(AppScreen::MyInfo);
                 ActionResult::NavigateTo(screen)
             }

@@ -647,14 +647,14 @@ impl OnboardingEngine {
                 self.navigate_to(Step::DefaultName)
             }
             UserAction::ActionPressed { action_id } if action_id == "link_device" => {
-                // Transition to the instruction screen and ask the app layer
-                // to open the QR scanner. The actual invitation is ingested
-                // through the existing `LinkOpened` deep-link or
-                // `Event::QrScanned` hardware path in `AppEngine`.
-                self.step = Step::DeviceLinkInstructions;
-                ActionResult::StartDeviceLink {
-                    role: DeviceLinkRole::Responder,
-                }
+                // Transition to the instruction screen. The actual invitation
+                // is ingested through the existing `LinkOpened` deep-link or
+                // `Event::QrScanned` hardware path in `AppEngine`, both of
+                // which route to `AppScreen::DeviceLinkJoin`. The scan button
+                // on the instructions screen emits `Command::QrRequestScan`
+                // directly, so no `StartDeviceLink` result is needed here
+                // (`2026-07-06-mobile-domain-shell-violations` I9).
+                self.navigate_to(Step::DeviceLinkInstructions)
             }
             UserAction::ActionPressed { action_id } if action_id == "load_backup" => {
                 self.trigger_backup_restore()
@@ -902,7 +902,12 @@ impl OnboardingEngine {
                     "start_app" => PostOnboardingDestination::MainScreen,
                     _ => return ActionResult::UpdateScreen(self.current_screen()),
                 };
-                ActionResult::CompleteWith { destination }
+                // Signal onboarding completion with the chosen destination.
+                // AppEngine routes this to identity creation + navigation so
+                // frontends no longer enumerate onboarding screen ids to
+                // detect completion (`2026-07-06-mobile-domain-shell-violations`
+                // I7/A13).
+                ActionResult::OnboardingComplete { destination }
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }

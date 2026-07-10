@@ -61,7 +61,7 @@ fn walk_all_screens() -> Vec<(String, ScreenModel)> {
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "link_device".into(),
     });
-    assert!(matches!(result, ActionResult::StartDeviceLink { .. }));
+    assert!(matches!(result, ActionResult::NavigateTo(_)));
     let screen = engine.current_screen();
     screens.push(("device_link_instructions".to_string(), screen));
 

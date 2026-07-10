@@ -77,6 +77,40 @@ pub fn drive_onboarding(engine: &mut AppEngine) -> ActionResult {
     })
 }
 
+/// Drive through the full onboarding flow and press the given final
+/// destination action (`start_app`, `exchange`, or `import_contacts`).
+pub fn drive_onboarding_with_destination(
+    engine: &mut AppEngine,
+    final_action: &str,
+) -> ActionResult {
+    // Steps 1-5: navigate to what_next.
+    let r = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+    assert!(
+        matches!(r, ActionResult::NavigateTo(_)),
+        "create_new should navigate to default_name"
+    );
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Alice".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    // Step 6: press the chosen post-onboarding destination.
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: final_action.into(),
+    })
+}
+
 /// Drive onboarding to the name step and attempt to continue without entering a name.
 /// Returns the result of pressing "continue" without a display name.
 pub fn drive_onboarding_without_name(engine: &mut AppEngine) -> ActionResult {

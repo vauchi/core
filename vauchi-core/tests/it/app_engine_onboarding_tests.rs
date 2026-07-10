@@ -6,7 +6,9 @@
 
 use crate::common;
 
-use common::app_engine_helpers::{drive_onboarding, drive_onboarding_without_name};
+use common::app_engine_helpers::{
+    drive_onboarding, drive_onboarding_with_destination, drive_onboarding_without_name,
+};
 use vauchi_app::ui::{
     ActionResult, AppEngine, AppScreen, Component, FormDialogType, UserAction, WorkflowEngine,
 };
@@ -40,10 +42,17 @@ fn onboarding_complete_navigates_to_home() {
 
     let result = drive_onboarding(&mut engine);
 
-    // Should navigate to Home after onboarding completes (T-1: verify screen_id)
-    let ActionResult::NavigateTo(screen) = result else {
-        panic!("expected NavigateTo, got {result:?}");
+    // AppEngine now returns `OnboardingComplete` to the boundary while
+    // still navigating to the chosen destination internally
+    // (`2026-07-06-mobile-domain-shell-violations` I7/A13).
+    let ActionResult::OnboardingComplete { destination } = result else {
+        panic!("expected OnboardingComplete, got {result:?}");
     };
+    assert_eq!(
+        destination,
+        vauchi_app::ui::PostOnboardingDestination::MainScreen
+    );
+    let screen = engine.current_screen();
     assert_eq!(
         screen.screen_id, "my_info",
         "onboarding completion should navigate to home"
@@ -246,6 +255,79 @@ fn add_field_after_onboarding_identity_creation() {
         }
         other => panic!("Unexpected result: {other:?}"),
     }
+}
+
+// @internal
+#[test]
+fn onboarding_complete_with_exchange_navigates_to_exchange() {
+    let vauchi = Vauchi::in_memory().unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let result = drive_onboarding_with_destination(&mut engine, "exchange");
+
+    let ActionResult::OnboardingComplete { destination } = result else {
+        panic!("expected OnboardingComplete, got {result:?}");
+    };
+    assert_eq!(
+        destination,
+        vauchi_app::ui::PostOnboardingDestination::Exchange
+    );
+    assert_eq!(engine.current_app_screen(), &AppScreen::Exchange);
+    assert_eq!(engine.current_screen().screen_id, "exchange");
+}
+
+// @internal
+#[test]
+fn onboarding_complete_with_import_contacts_navigates_to_contacts() {
+    let vauchi = Vauchi::in_memory().unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let result = drive_onboarding_with_destination(&mut engine, "import_contacts");
+
+    let ActionResult::OnboardingComplete { destination } = result else {
+        panic!("expected OnboardingComplete, got {result:?}");
+    };
+    assert_eq!(
+        destination,
+        vauchi_app::ui::PostOnboardingDestination::ImportContacts
+    );
+    assert_eq!(engine.current_app_screen(), &AppScreen::Contacts);
+    assert_eq!(engine.current_screen().screen_id, "contacts");
+}
+
+// @internal
+#[test]
+fn request_camera_result_routes_to_qr_request_scan_command() {
+    use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
+    use vauchi_core::Command;
+
+    let vauchi = Vauchi::in_memory().unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Onboarding);
+
+    // Drive to the device-link instructions screen.
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "link_device".into(),
+    });
+    let ActionResult::NavigateTo(screen) = result else {
+        panic!("expected NavigateTo(device_link_instructions), got {result:?}");
+    };
+    assert_eq!(screen.screen_id, "device_link_instructions");
+
+    // The scan button emits `Command::QrRequestScan` directly, which is
+    // the same path the deprecated `RequestCamera` result now routes to
+    // (`2026-07-06-mobile-domain-shell-violations` I8/A5).
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "scan_qr".into(),
+    });
+    let ActionResult::Commands { commands } = result else {
+        panic!("expected Commands, got {result:?}");
+    };
+    assert_eq!(commands.len(), 1);
+    assert!(
+        matches!(commands[0], Command::QrRequestScan),
+        "scan_qr should emit QrRequestScan command"
+    );
 }
 
 // ── stateful proptest: onboarding random actions (CC-13) ─────────────

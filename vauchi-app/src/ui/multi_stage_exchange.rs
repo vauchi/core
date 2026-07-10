@@ -813,6 +813,7 @@ impl WorkflowEngine for MultiStageExchangeEngine {
         // Stamping the hint at the render boundary lets shells follow core
         // off the native wrapper without matching the `screen_id`.
         screen.requires_poll = true;
+        screen.native_wrapper_hint = NativeWrapperHint::MultiStageExchange;
         screen
     }
 

@@ -329,7 +329,12 @@ impl NfcExchangeEngine {
 
 impl WorkflowEngine for NfcExchangeEngine {
     fn current_screen(&self) -> ScreenModel {
-        self.build_screen()
+        let mut screen = self.build_screen();
+        // The NFC engine renders inside the native NFC exchange wrapper,
+        // not the standard core screen renderer (I5/A2 of
+        // `2026-07-06-mobile-domain-shell-violations`).
+        screen.native_wrapper_hint = crate::ui::NativeWrapperHint::NfcExchange;
+        screen
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
@@ -581,6 +586,20 @@ mod tests {
         let e = engine();
         assert_eq!(e.current_screen().screen_id, "exchange_nfc_role");
         assert!(!e.was_cancelled());
+    }
+
+    // @internal
+    #[test]
+    fn current_screen_stamps_native_wrapper_hint() {
+        // The NFC engine renders inside the native NFC exchange wrapper;
+        // core owns the decision via `native_wrapper_hint`
+        // (`2026-07-06-mobile-domain-shell-violations` I5/A2).
+        let e = engine();
+        let screen = e.current_screen();
+        assert_eq!(
+            screen.native_wrapper_hint,
+            crate::ui::NativeWrapperHint::NfcExchange
+        );
     }
 
     // @internal

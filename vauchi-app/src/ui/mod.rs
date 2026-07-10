@@ -166,8 +166,8 @@ pub use recovery_help::{ParsedClaimSummary, RecoveryHelpEngine};
 pub use recovery_status::RecoveryEngine;
 pub use render_context::RenderContext;
 pub use screen::{
-    ActionStyle, CURRENT_SCHEMA_VERSION, Progress, ScreenAction, ScreenLayout, ScreenModel,
-    ScreenPresentationKind, TabInfo,
+    ActionStyle, CURRENT_SCHEMA_VERSION, NativeWrapperHint, Progress, ScreenAction, ScreenLayout,
+    ScreenModel, ScreenPresentationKind, TabInfo,
 };
 pub use settings::{SettingsConfig, SettingsEngine};
 pub use social_graph::{SocialContactEntry, SocialGraphEngine, SocialTrustLevel};

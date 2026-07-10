@@ -91,24 +91,23 @@ fn identity_check_create_new_goes_to_default_name() {
 
 // @internal
 #[test]
-fn identity_check_link_device_emits_responder_start_device_link() {
-    use vauchi_app::ui::DeviceLinkRole;
+fn identity_check_link_device_navigates_to_instructions() {
     let mut engine = OnboardingEngine::new();
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "link_device".into(),
     });
     match result {
-        ActionResult::StartDeviceLink {
-            role: DeviceLinkRole::Responder,
-        } => {
-            let screen = engine.current_screen();
+        ActionResult::NavigateTo(screen) => {
             assert_eq!(screen.screen_id, "device_link_instructions");
             assert!(
                 screen.progress.is_none(),
                 "Pre-gate screens have no progress bar"
             );
+            // The instruction screen's scan button emits `QrRequestScan`
+            // directly; `StartDeviceLink` is no longer emitted from
+            // onboarding (`2026-07-06-mobile-domain-shell-violations` I9).
         }
-        other => panic!("Expected StartDeviceLink(Responder), got {other:?}"),
+        other => panic!("Expected NavigateTo(device_link_instructions), got {other:?}"),
     }
 }
 
@@ -612,7 +611,7 @@ fn what_next_has_three_actions_with_start_app_as_primary() {
 }
 
 #[test]
-fn what_next_exchange_completes_with_exchange() {
+fn what_next_exchange_emits_onboarding_complete_with_exchange() {
     let mut engine = OnboardingEngine::new();
     advance_to_what_next(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -620,14 +619,14 @@ fn what_next_exchange_completes_with_exchange() {
     });
     assert!(matches!(
         result,
-        ActionResult::CompleteWith {
+        ActionResult::OnboardingComplete {
             destination: PostOnboardingDestination::Exchange
         }
     ));
 }
 
 #[test]
-fn what_next_start_app_completes_with_main_screen() {
+fn what_next_start_app_emits_onboarding_complete_with_main_screen() {
     let mut engine = OnboardingEngine::new();
     advance_to_what_next(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -635,14 +634,14 @@ fn what_next_start_app_completes_with_main_screen() {
     });
     assert!(matches!(
         result,
-        ActionResult::CompleteWith {
+        ActionResult::OnboardingComplete {
             destination: PostOnboardingDestination::MainScreen
         }
     ));
 }
 
 #[test]
-fn what_next_import_contacts_completes_with_import() {
+fn what_next_import_contacts_emits_onboarding_complete_with_import() {
     let mut engine = OnboardingEngine::new();
     advance_to_what_next(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -650,7 +649,7 @@ fn what_next_import_contacts_completes_with_import() {
     });
     assert!(matches!(
         result,
-        ActionResult::CompleteWith {
+        ActionResult::OnboardingComplete {
             destination: PostOnboardingDestination::ImportContacts
         }
     ));
@@ -714,7 +713,7 @@ fn full_flow_to_completion() {
     });
     assert!(matches!(
         result,
-        ActionResult::CompleteWith {
+        ActionResult::OnboardingComplete {
             destination: PostOnboardingDestination::MainScreen
         }
     ));

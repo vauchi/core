@@ -117,11 +117,12 @@ fn link_new_device_from_device_management_navigates_to_device_linking() {
 }
 
 // @internal
-// Onboarding's "link_device" emits `StartDeviceLink { role: Responder }`.
-// AppEngine routes the responder role to a QR-scan command instead of
-// leaving each frontend to mint the command from the screen context.
+// Onboarding's "link_device" now navigates straight to the instruction
+// screen; the scan button there emits `Command::QrRequestScan` directly.
+// No `StartDeviceLink` result crosses the boundary for this path
+// (`2026-07-06-mobile-domain-shell-violations` I9).
 #[test]
-fn onboarding_link_device_responder_routes_to_qr_scan_command() {
+fn onboarding_link_device_navigates_to_device_link_instructions() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
@@ -132,17 +133,14 @@ fn onboarding_link_device_responder_routes_to_qr_scan_command() {
     });
 
     match result {
-        ActionResult::Commands { commands } => {
-            assert_eq!(commands.len(), 1);
-            assert!(
-                matches!(commands[0], vauchi_core::Command::QrRequestScan),
-                "responder role should route to QrRequestScan command"
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(
+                screen.screen_id, "device_link_instructions",
+                "tapping link_device on onboarding should land on instructions, got {}",
+                screen.screen_id
             );
         }
-        other => panic!(
-            "expected Commands(QrRequestScan), got {other:?} — \
-             AppEngine routing for StartDeviceLink(Responder) missing"
-        ),
+        other => panic!("expected NavigateTo(device_link_instructions), got {other:?}"),
     }
 }
 

@@ -22,13 +22,25 @@ impl AppEngine {
             }
             ActionResult::Complete => self.handle_completion(),
             ActionResult::CompleteWith { destination } => self.route_complete_with(destination),
+            ActionResult::OnboardingComplete { destination } => {
+                self.route_onboarding_complete(destination)
+            }
+            // Deprecated per ADR-022 Addendum D: any engine still emitting
+            // `RequestCamera` is routed to the equivalent `QrRequestScan`
+            // command so frontends don't need a dedicated branch
+            // (`2026-07-06-mobile-domain-shell-violations` I8/A5).
+            ActionResult::RequestCamera => ActionResult::Commands {
+                commands: vec![vauchi_core::Command::QrRequestScan],
+            },
             ActionResult::EditContact { contact_id } => {
                 ActionResult::NavigateTo(self.navigate_to(AppScreen::ContactEdit { contact_id }))
             }
             // Core resolves the device-link entry point by role so frontends
             // never need to map the screen they were on to a link flow.
             // Initiator starts the core-driven invitation engine; Responder
-            // asks the frontend to scan an invitation QR.
+            // asks to open the QR scanner — the scan result routes to
+            // `AppScreen::DeviceLinkJoin` via the existing deep-link/QR path
+            // (`2026-07-06-mobile-domain-shell-violations` I9).
             ActionResult::StartDeviceLink { role } => match role {
                 DeviceLinkRole::Initiator => {
                     ActionResult::NavigateTo(self.navigate_to(AppScreen::DeviceLinking))
@@ -182,6 +194,36 @@ impl AppEngine {
             PostOnboardingDestination::BackupSetup => AppScreen::Backup,
         };
         ActionResult::NavigateTo(self.navigate_to(target))
+    }
+
+    /// `OnboardingComplete` — create identity, persist onboarding data, then
+    /// route to the chosen post-onboarding destination. Returns the same
+    /// `OnboardingComplete` result to the boundary so the shell can flip its
+    /// app state (`2026-07-06-mobile-domain-shell-violations` I7/A13).
+    fn route_onboarding_complete(
+        &mut self,
+        destination: PostOnboardingDestination,
+    ) -> ActionResult {
+        let base_result = self.complete_onboarding();
+        if matches!(
+            base_result,
+            ActionResult::ValidationError { .. } | ActionResult::ShowAlert { .. }
+        ) {
+            return base_result;
+        }
+        // `complete_onboarding` already navigates to MyInfo. If the user
+        // chose a different destination, navigate there now.
+        if destination != PostOnboardingDestination::MainScreen {
+            let target = match destination {
+                PostOnboardingDestination::Exchange => AppScreen::Exchange,
+                PostOnboardingDestination::ImportContacts => AppScreen::Contacts,
+                PostOnboardingDestination::SecurityInfo => AppScreen::Help,
+                PostOnboardingDestination::BackupSetup => AppScreen::Backup,
+                PostOnboardingDestination::MainScreen => AppScreen::MyInfo,
+            };
+            let _screen = self.navigate_to_internal(target);
+        }
+        ActionResult::OnboardingComplete { destination }
     }
 
     /// `ShowFormDialog` — resolve the group create/rename dialog and navigate

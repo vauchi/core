@@ -172,6 +172,14 @@ pub enum ActionResult {
     CompleteWith {
         destination: PostOnboardingDestination,
     },
+    /// Onboarding is finished; the engine has already navigated to the
+    /// chosen post-onboarding screen. Frontends should flip their app state
+    /// from "onboarding" to "ready" and render the current screen.
+    /// Replaces frontend-side enumeration of onboarding `screen_id`s
+    /// (`2026-07-06-mobile-domain-shell-violations` I7/A13).
+    OnboardingComplete {
+        destination: PostOnboardingDestination,
+    },
     /// Frontend should switch to the device linking flow in the given role.
     StartDeviceLink {
         role: DeviceLinkRole,

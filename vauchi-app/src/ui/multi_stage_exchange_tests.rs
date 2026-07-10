@@ -16,6 +16,20 @@ fn engine_with_state(state: ProtocolState) -> MultiStageExchangeEngine {
 
 // @internal
 #[test]
+fn current_screen_stamps_native_wrapper_hint() {
+    // The multi-stage engine renders inside the native hardware wrapper
+    // on mobile; core owns the decision via `native_wrapper_hint`
+    // (`2026-07-06-mobile-domain-shell-violations` I5/A2).
+    let engine = engine_with_state(ProtocolState::Idle);
+    let screen = engine.current_screen();
+    assert_eq!(
+        screen.native_wrapper_hint,
+        NativeWrapperHint::MultiStageExchange
+    );
+}
+
+// @internal
+#[test]
 fn retry_routes_to_mode_picker_via_cancelled_complete() {
     // Retry on the Failed screen returns the user to the exchange
     // mode-selection picker (not an in-place restart). It returns

@@ -79,6 +79,27 @@
       "additionalProperties": false
     },
     {
+      "description": "Onboarding is finished; the engine has already navigated to the chosen post-onboarding screen. Frontends should flip their app state from \"onboarding\" to \"ready\" and render the current screen. Replaces frontend-side enumeration of onboarding `screen_id`s (`2026-07-06-mobile-domain-shell-violations` I7/A13).",
+      "type": "object",
+      "required": [
+        "OnboardingComplete"
+      ],
+      "properties": {
+        "OnboardingComplete": {
+          "type": "object",
+          "required": [
+            "destination"
+          ],
+          "properties": {
+            "destination": {
+              "$ref": "#/definitions/PostOnboardingDestination"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "Frontend should switch to the device linking flow in the given role.",
       "type": "object",
       "required": [
@@ -3185,6 +3206,32 @@
         }
       }
     },
+    "NativeWrapperHint": {
+      "description": "Hint telling the native shell which hardware-wrapper flow hosts this screen. Replaces frontend-side `screen_id` substring checks used to decide whether to render a `CoreScreenView` or a dedicated native exchange wrapper (`2026-07-06-mobile-domain-shell-violations` I5/A2).",
+      "oneOf": [
+        {
+          "description": "No native wrapper; render through the standard core screen renderer.",
+          "type": "string",
+          "enum": [
+            "None"
+          ]
+        },
+        {
+          "description": "The multi-stage bilateral QR/camera exchange wrapper.",
+          "type": "string",
+          "enum": [
+            "MultiStageExchange"
+          ]
+        },
+        {
+          "description": "The NFC tap-to-exchange wrapper.",
+          "type": "string",
+          "enum": [
+            "NfcExchange"
+          ]
+        }
+      ]
+    },
     "NotificationCategory": {
       "description": "Notification categories that produce OS notifications.",
       "oneOf": [
@@ -3218,6 +3265,15 @@
         }
       ]
     },
+    "NotificationPriority": {
+      "description": "Presentation urgency for an OS notification.",
+      "type": "string",
+      "enum": [
+        "Default",
+        "High",
+        "Urgent"
+      ]
+    },
     "Orientation": {
       "description": "Screen orientation a frontend should pin to via [`Command::SetOrientationLock`]. Values mirror the platform-native vocabulary (`Activity.requestedOrientation` on Android, `UIInterfaceOrientationMask` on iOS) but are platform-neutral — each frontend maps to its OS API.",
       "oneOf": [
@@ -3245,6 +3301,10 @@
         "category",
         "contact_id",
         "event_key",
+        "os_category_id",
+        "os_category_options",
+        "os_channel_id",
+        "priority",
         "title"
       ],
       "properties": {
@@ -3257,8 +3317,38 @@
         "contact_id": {
           "type": "string"
         },
+        "deep_link_uri": {
+          "description": "Deep-link URI the frontend should open when the user taps the notification. Core owns the URI format (ADR-021); the shell forwards it verbatim via `UserAction::LinkOpened`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "event_key": {
           "type": "string"
+        },
+        "os_category_id": {
+          "description": "Opaque OS category identifier (iOS/macOS `UNNotificationCategory` identifier). Core mints the id; the shell must not interpret it as a domain concept (ADR-043 Am6).",
+          "type": "string"
+        },
+        "os_category_options": {
+          "description": "Opaque tokens that control OS-specific category options. The shell maps each token to the corresponding platform option.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "os_channel_id": {
+          "description": "Opaque OS channel identifier (Android `NotificationChannel` id). Core mints the id; the shell must not interpret it as a domain concept (ADR-043 Am6).",
+          "type": "string"
+        },
+        "priority": {
+          "description": "Presentation urgency. The shell maps this to OS-specific priority / importance hints; it must not switch on the notification category.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/NotificationPriority"
+            }
+          ]
         },
         "title": {
           "type": "string"
@@ -3445,6 +3535,14 @@
             }
           ]
         },
+        "native_wrapper_hint": {
+          "description": "Which native hardware wrapper should host this screen, if any. `None` means render through the standard core screen renderer. Core owns the decision; frontends stop matching domain `screen_id`s to decide between `CoreScreenView` and dedicated exchange wrappers (`2026-07-06-mobile-domain-shell-violations` I5/A2).",
+          "allOf": [
+            {
+              "$ref": "#/definitions/NativeWrapperHint"
+            }
+          ]
+        },
         "parent_screen_id": {
           "description": "Sidebar/tab the screen belongs to, when it is a sub-screen of a top-level tab (e.g. `contact_detail` belongs to `contacts`). `None` for top-level tabs and transient/global screens (lock, onboarding). Replaces frontend-side `MapScreenToParentId`-style switch statements (`2026-05-01-screen-id-metadata-in-core` G1).",
           "type": [
@@ -3470,6 +3568,14 @@
               "type": "null"
             }
           ]
+        },
+        "requires_animated_qr": {
+          "description": "Whether the screen needs an animated-QR frame-cycle timer while visible. Core owns the decision; frontends start/stop the timer based on this flag instead of matching domain `screen_id`s (`2026-07-06-mobile-domain-shell-violations` I4).",
+          "type": "boolean"
+        },
+        "requires_poll": {
+          "description": "Whether the screen needs a periodic poll tick while visible (e.g. the multi-stage exchange engine). Core owns the decision; frontends start/stop the poll loop based on this flag instead of matching domain `screen_id`s.",
+          "type": "boolean"
         },
         "schema_version": {
           "description": "Schema version — shells ignore components from higher versions.",

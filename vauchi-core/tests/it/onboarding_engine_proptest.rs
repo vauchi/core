@@ -117,7 +117,7 @@ fn advance_to_what_next(engine: &mut OnboardingEngine, name: &str) {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
-    /// Any valid display name eventually reaches CompleteWith via the full path.
+    /// Any valid display name eventually reaches OnboardingComplete via the full path.
 // @internal
     #[test]
     fn forward_progress_reaches_complete(name in "[A-Za-z ]{1,50}") {
@@ -133,8 +133,8 @@ proptest! {
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "start_app".into(),
         });
-        let is_complete_with = matches!(result, ActionResult::CompleteWith { .. });
-        prop_assert!(is_complete_with);
+        let is_onboarding_complete = matches!(result, ActionResult::OnboardingComplete { .. });
+        prop_assert!(is_onboarding_complete);
     }
 }
 
@@ -429,13 +429,15 @@ proptest! {
                     // Complete is valid — engine reached the end
                 }
                 ActionResult::CompleteWith { .. } => {
-                    // CompleteWith is valid — onboarding finished with destination
+                    // Kept for backward compatibility; onboarding now emits
+                    // OnboardingComplete instead.
+                }
+                ActionResult::OnboardingComplete { .. } => {
+                    // Onboarding finished with a chosen destination.
                 }
                 ActionResult::StartDeviceLink { .. } => {
-                    // External handoff — valid from LinkChoice step
-                    // (backup-restore now flows through Commands /
-                    // FilePickFromUser per ADR-031 Phase 2B of
-                    // 2026-05-03-core-file-picker-command).
+                    // No longer emitted from onboarding; kept for other
+                    // engines that still route device-link entry points.
                 }
                 ActionResult::OpenContact { .. }
                 | ActionResult::EditContact { .. }

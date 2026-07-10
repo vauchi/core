@@ -41,6 +41,14 @@
         }
       ]
     },
+    "native_wrapper_hint": {
+      "description": "Which native hardware wrapper should host this screen, if any. `None` means render through the standard core screen renderer. Core owns the decision; frontends stop matching domain `screen_id`s to decide between `CoreScreenView` and dedicated exchange wrappers (`2026-07-06-mobile-domain-shell-violations` I5/A2).",
+      "allOf": [
+        {
+          "$ref": "#/definitions/NativeWrapperHint"
+        }
+      ]
+    },
     "parent_screen_id": {
       "description": "Sidebar/tab the screen belongs to, when it is a sub-screen of a top-level tab (e.g. `contact_detail` belongs to `contacts`). `None` for top-level tabs and transient/global screens (lock, onboarding). Replaces frontend-side `MapScreenToParentId`-style switch statements (`2026-05-01-screen-id-metadata-in-core` G1).",
       "type": [
@@ -66,6 +74,14 @@
           "type": "null"
         }
       ]
+    },
+    "requires_animated_qr": {
+      "description": "Whether the screen needs an animated-QR frame-cycle timer while visible. Core owns the decision; frontends start/stop the timer based on this flag instead of matching domain `screen_id`s (`2026-07-06-mobile-domain-shell-violations` I4).",
+      "type": "boolean"
+    },
+    "requires_poll": {
+      "description": "Whether the screen needs a periodic poll tick while visible (e.g. the multi-stage exchange engine). Core owns the decision; frontends start/stop the poll loop based on this flag instead of matching domain `screen_id`s.",
+      "type": "boolean"
     },
     "schema_version": {
       "description": "Schema version — shells ignore components from higher versions.",
@@ -1775,6 +1791,32 @@
           "minimum": 0.0
         }
       }
+    },
+    "NativeWrapperHint": {
+      "description": "Hint telling the native shell which hardware-wrapper flow hosts this screen. Replaces frontend-side `screen_id` substring checks used to decide whether to render a `CoreScreenView` or a dedicated native exchange wrapper (`2026-07-06-mobile-domain-shell-violations` I5/A2).",
+      "oneOf": [
+        {
+          "description": "No native wrapper; render through the standard core screen renderer.",
+          "type": "string",
+          "enum": [
+            "None"
+          ]
+        },
+        {
+          "description": "The multi-stage bilateral QR/camera exchange wrapper.",
+          "type": "string",
+          "enum": [
+            "MultiStageExchange"
+          ]
+        },
+        {
+          "description": "The NFC tap-to-exchange wrapper.",
+          "type": "string",
+          "enum": [
+            "NfcExchange"
+          ]
+        }
+      ]
     },
     "PreviewVariant": {
       "description": "One alternate look at a `Component::Preview` — a per-variant view of the same content. Today only contact-card group views populate this; future variants (per-locale views, accessibility variants, previews-as-other-relationship) reuse the same shape.\n\nEngines populate `variant_id` with whatever stable identifier they know (group name, locale code, etc.); the renderer only matches it against `Component::Preview.selected_variant` and never reads the string for meaning.",

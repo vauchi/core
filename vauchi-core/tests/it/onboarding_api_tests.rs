@@ -334,27 +334,22 @@ fn test_identity_check_create_new_goes_to_default_name() {
 
 // @scenario: onboarding:identity_check_link_device
 #[test]
-fn test_identity_check_link_device_emits_responder_start_device_link() {
-    use vauchi_app::ui::{
-        ActionResult, DeviceLinkRole, OnboardingEngine, UserAction, WorkflowEngine,
-    };
+fn test_identity_check_link_device_navigates_to_instructions() {
+    use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "link_device".into(),
     });
     match result {
-        ActionResult::StartDeviceLink {
-            role: DeviceLinkRole::Responder,
-        } => {
-            let screen = engine.current_screen();
+        ActionResult::NavigateTo(screen) => {
             assert_eq!(screen.screen_id, "device_link_instructions");
             assert!(
                 screen.progress.is_none(),
                 "DeviceLinkInstructions should have no progress indicator"
             );
         }
-        other => panic!("Expected StartDeviceLink(Responder), got {other:?}"),
+        other => panic!("Expected NavigateTo(device_link_instructions), got {other:?}"),
     }
 }
 

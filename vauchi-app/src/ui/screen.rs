@@ -68,6 +68,31 @@ impl ScreenLayout {
     }
 }
 
+/// Hint telling the native shell which hardware-wrapper flow hosts this
+/// screen. Replaces frontend-side `screen_id` substring checks used to
+/// decide whether to render a `CoreScreenView` or a dedicated native
+/// exchange wrapper (`2026-07-06-mobile-domain-shell-violations` I5/A2).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum NativeWrapperHint {
+    /// No native wrapper; render through the standard core screen renderer.
+    #[default]
+    None,
+    /// The multi-stage bilateral QR/camera exchange wrapper.
+    MultiStageExchange,
+    /// The NFC tap-to-exchange wrapper.
+    NfcExchange,
+}
+
+impl NativeWrapperHint {
+    /// `true` when the hint is `None`. Used by serde `skip_serializing_if`
+    /// so the common case (standard core rendering) stays off the wire.
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+}
+
 /// Describes a full screen to render.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -125,6 +150,13 @@ pub struct ScreenModel {
     /// domain `screen_id`s.
     #[serde(default, skip_serializing_if = "is_false")]
     pub requires_poll: bool,
+    /// Which native hardware wrapper should host this screen, if any.
+    /// `None` means render through the standard core screen renderer.
+    /// Core owns the decision; frontends stop matching domain `screen_id`s
+    /// to decide between `CoreScreenView` and dedicated exchange wrappers
+    /// (`2026-07-06-mobile-domain-shell-violations` I5/A2).
+    #[serde(default, skip_serializing_if = "NativeWrapperHint::is_none")]
+    pub native_wrapper_hint: NativeWrapperHint,
 }
 
 /// serde `skip_serializing_if` predicate for `bool` fields defaulting to
@@ -160,6 +192,7 @@ impl Default for ScreenModel {
             layout: ScreenLayout::Scroll,
             requires_animated_qr: false,
             requires_poll: false,
+            native_wrapper_hint: NativeWrapperHint::None,
         }
     }
 }
@@ -191,6 +224,7 @@ impl ScreenModel {
             layout: ScreenLayout::Scroll,
             requires_animated_qr: false,
             requires_poll: false,
+            native_wrapper_hint: NativeWrapperHint::None,
         }
     }
 
@@ -411,6 +445,7 @@ mod tests {
     // which screens need animated-QR frame cycling or poll ticks, so
     // frontends stop branching on domain `screen_id`s.
 
+    // @internal
     #[test]
     fn lifecycle_hints_default_to_false() {
         let m = ScreenModel::new("test", "Title", vec![], vec![]);
@@ -470,6 +505,63 @@ mod tests {
         let m: ScreenModel = serde_json::from_str(legacy).expect("legacy JSON must parse");
         assert!(!m.requires_animated_qr);
         assert!(!m.requires_poll);
+    }
+
+    // Native wrapper hints (I5/A2 of
+    // `2026-07-06-mobile-domain-shell-violations`). Core tells the shell
+    // which screens render inside a dedicated hardware wrapper instead of
+    // the standard core renderer, so frontends stop matching domain
+    // `screen_id`s like `multi_stage_exchange` / `exchange_nfc*`.
+
+    // @internal
+    #[test]
+    fn native_wrapper_hint_defaults_to_none() {
+        let m = ScreenModel::new("test", "Title", vec![], vec![]);
+        assert_eq!(m.native_wrapper_hint, NativeWrapperHint::None);
+    }
+
+    // @internal
+    #[test]
+    fn native_wrapper_hint_omitted_when_none() {
+        let m = ScreenModel::new("test", "Title", vec![], vec![]);
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(
+            !json.contains("native_wrapper_hint"),
+            "None native_wrapper_hint must be omitted from wire JSON: {json}"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn native_wrapper_hint_roundtrips_each_variant() {
+        for hint in [
+            NativeWrapperHint::MultiStageExchange,
+            NativeWrapperHint::NfcExchange,
+        ] {
+            let mut m = ScreenModel::new("test", "Title", vec![], vec![]);
+            m.native_wrapper_hint = hint.clone();
+            let json = serde_json::to_string(&m).unwrap();
+            let restored: ScreenModel = serde_json::from_str(&json).unwrap();
+            assert_eq!(
+                restored.native_wrapper_hint, hint,
+                "native_wrapper_hint round-trip failed for {hint:?}"
+            );
+        }
+    }
+
+    // @internal
+    #[test]
+    fn legacy_json_without_native_wrapper_hint_parses_as_none() {
+        let legacy = r#"{
+            "screen_id": "test",
+            "title": "Test Screen",
+            "subtitle": null,
+            "components": [],
+            "actions": [],
+            "progress": null
+        }"#;
+        let m: ScreenModel = serde_json::from_str(legacy).expect("legacy JSON must parse");
+        assert_eq!(m.native_wrapper_hint, NativeWrapperHint::None);
     }
 }
 

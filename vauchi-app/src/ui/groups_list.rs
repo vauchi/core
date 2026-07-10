@@ -39,6 +39,12 @@ pub struct GroupInfo {
 pub struct GroupsEngine {
     groups: Vec<GroupInfo>,
     mode: GroupsMode,
+    /// One-shot model-shift education, shown the first time the owner
+    /// creates a group while already having exchanged contacts: entries
+    /// assigned to a group become visible only to its members; unassigned
+    /// entries keep their Visible/Hidden toggle (Decision 3,
+    /// 2026-07-05-ungrouped-contacts-default-open).
+    education_banner: bool,
     locale: Locale,
 }
 
@@ -47,8 +53,34 @@ impl GroupsEngine {
         Self {
             groups,
             mode,
+            education_banner: false,
             locale: Locale::English,
         }
+    }
+
+    /// Enable the one-shot first-group education banner.
+    pub fn with_education_banner(mut self, show: bool) -> Self {
+        self.education_banner = show;
+        self
+    }
+
+    /// Decides the one-shot banner and burns the flag: true exactly once —
+    /// when the first group exists alongside ≥1 contact and the education
+    /// has never been shown. Storage failures skip the banner rather than
+    /// re-showing it forever.
+    #[cfg(feature = "network-rustls")]
+    pub fn first_group_education(vauchi: &vauchi_core::api::Vauchi, group_count: usize) -> bool {
+        if group_count != 1 || vauchi.contact_count().unwrap_or(0) == 0 {
+            return false;
+        }
+        let Ok(mut flags) = vauchi.load_settings_flags() else {
+            return false;
+        };
+        if flags.first_group_education_shown {
+            return false;
+        }
+        flags.first_group_education_shown = true;
+        vauchi.save_settings_flags(&flags).is_ok()
     }
 
     /// Set the render locale (defaults to English) — threaded from the
@@ -69,6 +101,14 @@ impl GroupsEngine {
 
     fn build_screen(&self) -> ScreenModel {
         let mut components = Vec::new();
+
+        if self.education_banner {
+            components.push(Component::Text {
+                id: "first_group_education".into(),
+                content: self.t("groups_list.first_group_education"),
+                style: TextStyle::Caption,
+            });
+        }
 
         // Mode toggle (radio-style: only one selected at a time)
         components.push(self.mode_toggle());
@@ -417,5 +457,57 @@ mod tests {
                 "stale action `{stale}` must be inert, got {result:?}"
             );
         }
+    }
+}
+
+// INLINE_TEST_REQUIRED: exercises the private education_banner render gate.
+#[cfg(all(test, feature = "network-rustls"))]
+mod education_tests {
+    use super::*;
+
+    // @internal
+    #[test]
+    fn education_banner_renders_only_when_enabled() {
+        let on = GroupsEngine::new(Vec::new(), GroupsMode::Members).with_education_banner(true);
+        let off = GroupsEngine::new(Vec::new(), GroupsMode::Members);
+        let has = |e: &GroupsEngine| {
+            e.current_screen()
+                .components
+                .iter()
+                .any(|c| matches!(c, Component::Text { id, .. } if id == "first_group_education"))
+        };
+        assert!(has(&on), "enabled banner renders the education text");
+        assert!(!has(&off), "banner absent unless explicitly enabled");
+    }
+
+    // @internal
+    #[test]
+    fn first_group_education_fires_exactly_once() {
+        use vauchi_core::{Contact, ContactCard, SymmetricKey, Vauchi};
+        let mut wb = Vauchi::in_memory().unwrap();
+        wb.create_identity("Owner").unwrap();
+        assert!(
+            !GroupsEngine::first_group_education(&wb, 1),
+            "no contacts yet -> no education"
+        );
+        let contact = Contact::from_exchange(
+            [3u8; 32],
+            ContactCard::new("Bob"),
+            SymmetricKey::generate(),
+            0,
+        );
+        wb.add_contact(contact).unwrap();
+        assert!(
+            !GroupsEngine::first_group_education(&wb, 0),
+            "no group yet -> no education"
+        );
+        assert!(
+            GroupsEngine::first_group_education(&wb, 1),
+            "first group + contacts -> educate once"
+        );
+        assert!(
+            !GroupsEngine::first_group_education(&wb, 1),
+            "flag burned -> never again"
+        );
     }
 }

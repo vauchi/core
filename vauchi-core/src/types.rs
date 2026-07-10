@@ -349,6 +349,10 @@ pub struct SettingsFlags {
     /// (2026-07-05-ungrouped-contacts-default-open, Decision 2).
     #[serde(default)]
     pub new_field_default_visible: bool,
+    /// One-shot first-group education banner already shown (Decision 3,
+    /// 2026-07-05-ungrouped-contacts-default-open).
+    #[serde(default)]
+    pub first_group_education_shown: bool,
 }
 
 impl Default for SettingsFlags {
@@ -362,6 +366,7 @@ impl Default for SettingsFlags {
             large_touch: false,
             field_centric_visibility_migrated: false,
             new_field_default_visible: false,
+            first_group_education_shown: false,
         }
     }
 }

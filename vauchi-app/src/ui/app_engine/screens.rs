@@ -90,7 +90,6 @@ impl AppEngine {
                 let progress = MyInfoProgress::default();
                 let all_groups = vauchi.list_groups().unwrap_or_default();
 
-                // Build own card fields with visibility info
                 let (display_name, own_fields, avatar_data) = match vauchi.own_card() {
                     Ok(Some(card)) => {
                         let name = card.display_name().to_string();
@@ -99,7 +98,6 @@ impl AppEngine {
                             .fields()
                             .iter()
                             .map(|f| {
-                                // Which groups can see this field?
                                 let visible_groups: Vec<String> = all_groups
                                     .iter()
                                     .filter(|g| g.is_field_visible(f.id()))
@@ -528,8 +526,10 @@ impl AppEngine {
                         }
                     })
                     .collect();
+                let education = GroupsEngine::first_group_education(vauchi, group_infos.len());
                 Box::new(
                     GroupsEngine::new(group_infos, GroupsMode::Members)
+                        .with_education_banner(education)
                         .with_locale(render_context.resolved_locale()),
                 )
             }

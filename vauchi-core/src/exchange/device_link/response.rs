@@ -31,7 +31,8 @@ pub struct DeviceLinkResponse {
     device_index: u32,
     /// Current device registry
     registry: DeviceRegistry,
-    /// Sync payload containing contacts and card (optional, may be empty).
+    /// Sync payload containing contacts, own card, owner-private tags/places,
+    /// exchange locations, and ratchet states (optional, may be empty).
     sync_payload_json: String,
 }
 

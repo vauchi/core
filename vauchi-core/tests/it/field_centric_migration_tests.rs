@@ -151,3 +151,40 @@ fn fresh_install_is_marked_at_identity_creation() {
         "fields added on a fresh install keep the hidden default"
     );
 }
+
+// @internal
+#[test]
+fn new_field_default_setting_materializes_visible_at_add_time() {
+    let mut wb = Vauchi::in_memory().unwrap();
+    wb.create_identity("Owner").unwrap();
+    let mut flags = wb.load_settings_flags().unwrap();
+    flags.new_field_default_visible = true;
+    wb.save_settings_flags(&flags).unwrap();
+
+    let field = ContactField::new(FieldType::Email, "Work", "o@co.example", 0);
+    let field_id = field.id().to_string();
+    wb.add_own_field(field).unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        card.field_visibility().is_explicitly_everyone(&field_id),
+        "visible-default setting writes an explicit Everyone at add time"
+    );
+}
+
+// @internal
+#[test]
+fn new_field_default_setting_off_leaves_field_unruled() {
+    let mut wb = Vauchi::in_memory().unwrap();
+    wb.create_identity("Owner").unwrap();
+
+    let field = ContactField::new(FieldType::Email, "Work", "o@co.example", 0);
+    let field_id = field.id().to_string();
+    wb.add_own_field(field).unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        !card.field_visibility().contains(&field_id),
+        "hidden default (setting off) writes no rule — the entry stays hidden"
+    );
+}

@@ -772,7 +772,6 @@ impl AppEngine {
             .and_then(|c| c.fields().iter().find(|f| f.id() == field_id).cloned());
 
         let Some(field) = field else {
-            // Field not found — return a minimal engine
             return Box::new(
                 MyInfoEntryDetailEngine::new(
                     field_id.to_string(),
@@ -787,7 +786,6 @@ impl AppEngine {
             );
         };
 
-        // Build group visibility state
         let groups: Vec<(String, String, bool)> = all_groups
             .iter()
             .map(|g| {
@@ -822,6 +820,7 @@ impl AppEngine {
             }
         }
 
+        let shown = card.as_ref().is_some_and(|c| c.is_field_shown(field_id));
         Box::new(
             MyInfoEntryDetailEngine::new(
                 field_id.to_string(),
@@ -832,6 +831,7 @@ impl AppEngine {
                 groups,
                 visible_contacts,
             )
+            .with_shown(shown)
             .with_locale(render_context.resolved_locale()),
         )
     }

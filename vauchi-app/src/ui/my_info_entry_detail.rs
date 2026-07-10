@@ -28,6 +28,11 @@ pub struct MyInfoEntryDetailEngine {
     pub groups: Vec<(String, String, bool)>, // (group_id, group_name, is_visible)
     /// Contacts who can see this field (derived from group membership).
     pub visible_contacts: Vec<EntryContactInfo>,
+    /// The unassigned entry's Visible/Hidden toggle state (explicit
+    /// `Everyone`). Rendered only while no group grants the entry —
+    /// group-assigned entries are governed by the group toggles alone
+    /// (field-centric model, 2026-07-05-ungrouped-contacts-default-open).
+    pub shown: bool,
     locale: Locale,
 }
 
@@ -49,8 +54,21 @@ impl MyInfoEntryDetailEngine {
             note,
             groups,
             visible_contacts,
+            shown: false,
             locale: Locale::English,
         }
+    }
+
+    /// Seed the unassigned entry's Visible/Hidden toggle state.
+    pub fn with_shown(mut self, shown: bool) -> Self {
+        self.shown = shown;
+        self
+    }
+
+    /// A field any group grants is group-audience data — the group toggles
+    /// govern it and the all-contacts toggle is not rendered.
+    fn is_group_assigned(&self) -> bool {
+        self.groups.iter().any(|(_, _, visible)| *visible)
     }
 }
 
@@ -112,6 +130,24 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
         });
 
         components.push(Component::Divider);
+
+        // Unassigned entry: one Visible/Hidden toggle governing every
+        // contact alike. Disappears once any group grants the entry.
+        if !self.is_group_assigned() {
+            components.push(Component::ToggleList {
+                id: "entry_visibility".into(),
+                label: self.t("my_info_entry_detail.entry_visibility_label"),
+                items: vec![ToggleItem {
+                    id: "shown".into(),
+                    label: self.t("my_info_entry_detail.visible_to_all"),
+                    selected: self.shown,
+                    subtitle: None,
+                    a11y: None,
+                    info_key: None,
+                }],
+                a11y: None,
+            });
+        }
 
         // Group visibility toggles
         if !self.groups.is_empty() {
@@ -227,6 +263,15 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                 // Toggle group visibility — return a signal so AppEngine can persist
                 ActionResult::NavigateTo(self.current_screen())
             }
+            UserAction::ItemToggled {
+                component_id,
+                item_id,
+            } if component_id == "entry_visibility" && item_id == "shown" => {
+                // Flip the all-contacts toggle — AppEngine persists via
+                // set_field_shown (which arms repropagation).
+                self.shown = !self.shown;
+                ActionResult::NavigateTo(self.current_screen())
+            }
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
                 "edit" => ActionResult::NavigateTo(self.current_screen()),
                 "delete" => ActionResult::Complete,
@@ -234,5 +279,64 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
             },
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
+    }
+}
+
+// INLINE_TEST_REQUIRED: tests exercise the engine's private render logic
+// (is_group_assigned gating) not reachable from tests/it.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn engine(groups: Vec<(String, String, bool)>) -> MyInfoEntryDetailEngine {
+        MyInfoEntryDetailEngine::new(
+            "f1".into(),
+            "email".into(),
+            "Email".into(),
+            "a@b.test".into(),
+            None,
+            groups,
+            Vec::new(),
+        )
+    }
+
+    fn has_entry_visibility_toggle(screen: &ScreenModel) -> bool {
+        screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::ToggleList { id, .. } if id == "entry_visibility"))
+    }
+
+    // @internal
+    #[test]
+    fn unassigned_entry_renders_the_all_contacts_toggle() {
+        let e = engine(vec![("g1".into(), "Team".into(), false)]).with_shown(true);
+        assert!(
+            has_entry_visibility_toggle(&e.current_screen()),
+            "no group grants the entry → the Visible/Hidden toggle renders"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn group_assigned_entry_hides_the_all_contacts_toggle() {
+        let e = engine(vec![("g1".into(), "Team".into(), true)]);
+        assert!(
+            !has_entry_visibility_toggle(&e.current_screen()),
+            "a group grants the entry → group toggles govern, no base toggle"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn toggling_entry_visibility_flips_shown() {
+        let mut e = engine(Vec::new());
+        assert!(!e.shown, "seeded hidden");
+        let result = e.handle_action(UserAction::ItemToggled {
+            component_id: "entry_visibility".into(),
+            item_id: "shown".into(),
+        });
+        assert!(e.shown, "toggle flips the engine state");
+        assert!(matches!(result, ActionResult::NavigateTo(_)));
     }
 }

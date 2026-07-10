@@ -188,3 +188,21 @@ fn new_field_default_setting_off_leaves_field_unruled() {
         "hidden default (setting off) writes no rule — the entry stays hidden"
     );
 }
+
+// @internal
+#[test]
+fn set_field_shown_arms_repropagation() {
+    let (wb, email_id, _phone_id, bob) = pre_migration_world();
+    wb.initialize_sent_baseline(&bob).unwrap();
+    wb.run_owed_repropagation().unwrap();
+    let before = wb.storage().pending().count_all_pending_updates().unwrap();
+
+    wb.set_field_shown(&email_id, true).unwrap();
+    wb.run_owed_repropagation().unwrap();
+
+    let after = wb.storage().pending().count_all_pending_updates().unwrap();
+    assert!(
+        after > before,
+        "the Visible/Hidden toggle must propagate to contacts"
+    );
+}

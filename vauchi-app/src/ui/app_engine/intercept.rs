@@ -295,6 +295,28 @@ impl AppEngine {
             UserAction::ItemToggled {
                 component_id,
                 item_id,
+            } if component_id == "entry_visibility" && item_id == "shown" => {
+                // Persist the unassigned entry's all-contacts toggle. The
+                // engine already flipped its local state; storage is the
+                // source of truth for the new value.
+                let new_shown = !self
+                    .vauchi
+                    .own_card()
+                    .ok()
+                    .flatten()
+                    .map(|c| c.is_field_shown(field_id))
+                    .unwrap_or(false);
+                // best-effort like the group arm: a failed save leaves
+                // storage unchanged and the next rebuild shows truth
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = self.vauchi.set_field_shown(field_id, new_shown);
+                // Invalidate MyInfo cache so it refreshes; the engine's own
+                // handler renders the flipped toggle.
+                self.engine_cache.remove(&AppScreen::MyInfo);
+            }
+            UserAction::ItemToggled {
+                component_id,
+                item_id,
             } if component_id == "group_visibility" => {
                 // Persist group visibility change
                 let group_id = item_id.clone();

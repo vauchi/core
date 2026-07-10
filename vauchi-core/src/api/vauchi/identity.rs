@@ -657,10 +657,9 @@ impl Vauchi {
         Ok(())
     }
 
-    /// Sets whether a field is shown in no-group visibility mode.
-    ///
-    /// When no groups exist, this controls field visibility directly.
-    /// Persists the updated card to storage.
+    /// Sets an unassigned entry's Visible/Hidden toggle (explicit
+    /// `Everyone`/`Nobody`). The toggle governs what every contact sees
+    /// (field-centric model), so the change arms repropagation.
     pub fn set_field_shown(&self, field_id: &str, shown: bool) -> VauchiResult<()> {
         let mut card = self
             .storage
@@ -669,6 +668,7 @@ impl Vauchi {
             .ok_or_else(|| VauchiError::InvalidState("No own card found".into()))?;
         card.set_field_shown(field_id, shown);
         self.storage.contacts().save_own_card(&card)?;
+        self.mark_own_card_repropagate()?;
         Ok(())
     }
 

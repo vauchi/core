@@ -10,14 +10,22 @@
 //! `DirectTransport`) via [`ContactCard::filtered_to`], plus the pre-handoff
 //! preview and success summary — so they cannot diverge.
 //!
-//! Model (see `_private/docs/problems/2026-06-08-exchange-card-not-group-filtered/
-//! investigation.md`): the exchange audience is a **group's `visible_fields`
-//! allow-list** (Layer B, group-keyed — the only layer evaluable before the
-//! peer has a contact id), intersected with the Layer-A `Nobody` floor:
+//! Model (field-centric partition, 2026-07-10 owner decision,
+//! `2026-07-05-ungrouped-contacts-default-open`; original group-audience
+//! analysis in `_private/docs/problems/
+//! 2026-06-08-exchange-card-not-group-filtered/investigation.md`):
 //!
 //! ```text
-//! allow = (⋃_{g ∈ selected} g.visible_fields) \ {f : default(f) == Nobody}
+//! selection = ∅ : allow = {f : toggle(f) == Everyone} \ ⋃_{g} g.visible_fields
+//! selection ≠ ∅ : allow = (⋃_{g ∈ selected} g.visible_fields)
+//!                          \ {f : toggle(f) == Nobody}
 //! ```
+//!
+//! With no selection the audience is "any contact", so exactly the curated
+//! Visible-toggled base is shared — a group-assigned field is group-audience
+//! data even at exchange time. The retired share-all-on-empty behavior would
+//! be revoked by the first propagation pass (which filters through
+//! `get_effective_field_visibility`), so parity here is mandatory.
 //!
 //! `Contacts(id)` / per-contact overrides are post-exchange concerns and take
 //! effect on the next propagation once the contact id exists.
@@ -28,13 +36,12 @@ use vauchi_core::{FieldVisibility, Group, VisibilityRules};
 
 /// Resolves the field-id allow-list for an exchange audience.
 ///
-/// - `None` → **no group filter** (share all fields). Returned when no groups
-///   are selected — there is no audience to restrict to (this is the legacy
-///   no-groups case and is correct).
-/// - `Some(set)` → share exactly `set`, the union of the selected groups'
-///   `visible_fields` minus any field whose card default visibility is
-///   `Nobody` (Layer-A floor). May be **empty** (selected groups expose
-///   nothing → share nothing, default-closed).
+/// - No groups selected → the curated base: fields with an explicit
+///   `Everyone` toggle that no group governs. May be empty (nothing curated
+///   → share only the display name).
+/// - Groups selected → the union of the selected groups' `visible_fields`
+///   minus any field whose toggle is `Nobody` (the floor). May be empty
+///   (selected groups expose nothing → share nothing, default-closed).
 ///
 /// `selected_group_ids` entries with no matching `Group` in `groups` are
 /// ignored. `field_visibility` is the owner card's rules
@@ -43,19 +50,21 @@ pub(crate) fn resolve_exchange_allow(
     selected_group_ids: &[String],
     groups: &[Group],
     field_visibility: &VisibilityRules,
-) -> Option<HashSet<String>> {
+) -> HashSet<String> {
     if selected_group_ids.is_empty() {
-        return None;
+        let mut base = field_visibility.everyone_field_ids();
+        base.retain(|fid| !groups.iter().any(|g| g.visible_fields().contains(fid)));
+        return base;
     }
     let mut allow: HashSet<String> = groups
         .iter()
         .filter(|g| selected_group_ids.iter().any(|id| id == g.id()))
         .flat_map(|g| g.visible_fields().iter().cloned())
         .collect();
-    // Layer-A `Nobody` floor: even a stale group allow-list cannot widen past
-    // a field the owner has marked private.
+    // `Nobody` floor: even a stale group allow-list cannot widen past a
+    // field the owner has toggled Hidden.
     allow.retain(|fid| !matches!(field_visibility.get(fid), FieldVisibility::Nobody));
-    Some(allow)
+    allow
 }
 
 /// Storage-aware convenience: load the owner card and filter it to the fields
@@ -71,12 +80,8 @@ pub(crate) fn filtered_own_card(
 ) -> Option<vauchi_core::contact_card::ContactCard> {
     let card = vauchi.own_card().ok().flatten()?;
     let groups = vauchi.list_groups().unwrap_or_default();
-    Some(
-        match resolve_exchange_allow(selected_group_ids, &groups, card.field_visibility()) {
-            Some(allow) => card.filtered_to(&allow),
-            None => card,
-        },
-    )
+    let allow = resolve_exchange_allow(selected_group_ids, &groups, card.field_visibility());
+    Some(card.filtered_to(&allow))
 }
 
 // INLINE_TEST_REQUIRED: tests exercise the `pub(crate)` resolver, which is
@@ -106,10 +111,28 @@ mod tests {
 
     // @internal
     #[test]
-    fn no_groups_selected_returns_none_share_all() {
-        let groups = vec![group("g1", &["email"])];
-        let allow = resolve_exchange_allow(&[], &groups, &rules_all_everyone());
-        assert_eq!(allow, None, "no audience selected → share all (None)");
+    fn no_selection_shares_the_visible_toggled_base_only() {
+        // No audience selected → exactly the curated base: explicit-Everyone
+        // fields that no group governs (field-centric partition).
+        let groups = vec![group("g1", &["work_email"])];
+        let mut rules = VisibilityRules::new();
+        rules.set_everyone("personal_phone");
+        rules.set_everyone("work_email"); // group-assigned → excluded anyway
+        rules.set_nobody("ssn");
+        let allow = resolve_exchange_allow(&[], &groups, &rules);
+        assert_eq!(
+            allow,
+            HashSet::from(["personal_phone".to_string()]),
+            "unassigned Visible field only; assigned and Hidden fields excluded"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn no_selection_with_nothing_curated_shares_nothing() {
+        // Fields default hidden: an uncurated card exchanges name-only.
+        let allow = resolve_exchange_allow(&[], &[], &rules_all_everyone());
+        assert_eq!(allow, HashSet::new(), "unruled fields stay unshared");
     }
 
     // @internal
@@ -117,7 +140,7 @@ mod tests {
     fn single_group_allows_exactly_its_visible_fields() {
         let groups = vec![group("g1", &["email"])];
         let allow = resolve_exchange_allow(&["g1".into()], &groups, &rules_all_everyone());
-        assert_eq!(allow, Some(HashSet::from(["email".to_string()])));
+        assert_eq!(allow, HashSet::from(["email".to_string()]));
     }
 
     // @internal
@@ -125,8 +148,7 @@ mod tests {
     fn field_not_in_any_selected_group_is_excluded() {
         // Group exposes email only; phone is absent from the allow-list.
         let groups = vec![group("g1", &["email"])];
-        let allow = resolve_exchange_allow(&["g1".into()], &groups, &rules_all_everyone())
-            .expect("groups selected → Some");
+        let allow = resolve_exchange_allow(&["g1".into()], &groups, &rules_all_everyone());
         assert!(allow.contains("email"), "email is in the group");
         assert!(!allow.contains("phone"), "phone is in no selected group");
     }
@@ -139,22 +161,22 @@ mod tests {
             resolve_exchange_allow(&["g1".into(), "g2".into()], &groups, &rules_all_everyone());
         assert_eq!(
             allow,
-            Some(HashSet::from(["email".to_string(), "phone".to_string()]))
+            HashSet::from(["email".to_string(), "phone".to_string()])
         );
     }
 
     // @internal
     #[test]
     fn nobody_default_field_excluded_even_if_group_lists_it() {
-        // Stale group allow-list still lists `ssn`, but the owner marked it
-        // Nobody — the floor must win.
+        // Stale group allow-list still lists `ssn`, but the owner toggled it
+        // Hidden — the floor must win.
         let groups = vec![group("g1", &["email", "ssn"])];
         let mut rules = VisibilityRules::new();
         rules.set_nobody("ssn");
         let allow = resolve_exchange_allow(&["g1".into()], &groups, &rules);
         assert_eq!(
             allow,
-            Some(HashSet::from(["email".to_string()])),
+            HashSet::from(["email".to_string()]),
             "Nobody floor drops ssn despite the group listing it"
         );
     }
@@ -162,12 +184,12 @@ mod tests {
     // @internal
     #[test]
     fn everyone_default_field_in_group_is_included() {
-        // The floor only excludes Nobody; Everyone (default) stays in.
+        // The floor only excludes Nobody; Everyone stays in.
         let groups = vec![group("g1", &["email"])];
         let mut rules = VisibilityRules::new();
         rules.set_everyone("email");
         let allow = resolve_exchange_allow(&["g1".into()], &groups, &rules);
-        assert_eq!(allow, Some(HashSet::from(["email".to_string()])));
+        assert_eq!(allow, HashSet::from(["email".to_string()]));
     }
 
     // @internal
@@ -178,20 +200,21 @@ mod tests {
             resolve_exchange_allow(&["g1".into(), "g2".into()], &groups, &rules_all_everyone());
         assert_eq!(
             allow,
-            Some(HashSet::from(["phone".to_string()])),
+            HashSet::from(["phone".to_string()]),
             "empty group adds nothing; g2 still contributes phone"
         );
     }
 
     // @internal
     #[test]
-    fn all_selected_groups_empty_yields_empty_allow_not_share_all() {
-        // Default-closed: selecting groups that expose nothing shares nothing,
-        // NOT everything. This is the empty-set footgun the Option encoding
-        // prevents (Some(∅) ≠ None).
+    fn all_selected_groups_empty_yields_empty_allow_not_base() {
+        // Default-closed: selecting groups that expose nothing shares
+        // nothing — it does NOT fall back to the no-selection base.
         let groups = vec![group("g1", &[])];
-        let allow = resolve_exchange_allow(&["g1".into()], &groups, &rules_all_everyone());
-        assert_eq!(allow, Some(HashSet::new()), "Some(empty), not None");
+        let mut rules = VisibilityRules::new();
+        rules.set_everyone("personal_phone");
+        let allow = resolve_exchange_allow(&["g1".into()], &groups, &rules);
+        assert_eq!(allow, HashSet::new(), "empty union, no base fallback");
     }
 
     // @internal
@@ -202,8 +225,8 @@ mod tests {
         let allow = resolve_exchange_allow(&["ghost".into()], &groups, &rules_all_everyone());
         assert_eq!(
             allow,
-            Some(HashSet::new()),
-            "no matching group → empty allow (share nothing), still Some"
+            HashSet::new(),
+            "no matching group → empty allow (share nothing)"
         );
     }
 
@@ -255,17 +278,29 @@ mod tests {
 
             let allow = resolve_exchange_allow(&selected, &groups, &rules);
 
+            let assigned: HashSet<String> = groups
+                .iter()
+                .flat_map(|g| g.visible_fields().iter().cloned())
+                .collect();
+            let nobody_set: HashSet<String> =
+                nobody_idx.iter().map(|&i| fid(i)).collect();
+
             if selected.is_empty() {
-                prop_assert_eq!(allow, None, "no selection → share all (None)");
+                // Base = explicit-Everyone fields no group governs.
+                let expected: HashSet<String> = (0..5usize)
+                    .map(fid)
+                    .filter(|f| !nobody_set.contains(f) && !assigned.contains(f))
+                    .collect();
+                prop_assert_eq!(
+                    allow, expected,
+                    "no selection → the Visible-toggled unassigned base"
+                );
             } else {
-                let allow = allow.expect("Some when groups are selected");
                 let union: HashSet<String> = groups
                     .iter()
                     .filter(|g| selected.iter().any(|id| id == g.id()))
                     .flat_map(|g| g.visible_fields().iter().cloned())
                     .collect();
-                let nobody_set: HashSet<String> =
-                    nobody_idx.iter().map(|&i| fid(i)).collect();
 
                 for f in &allow {
                     prop_assert!(union.contains(f), "soundness: {} not in union", f);

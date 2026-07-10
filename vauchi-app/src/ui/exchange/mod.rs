@@ -603,10 +603,10 @@ impl ExchangeEngine {
             .as_ref()
             .cloned()
             .unwrap_or_else(|| ContactCard::new(&self.config.own_name));
-        // G2: resolve the fields the selected group(s) expose so the preview
-        // matches the card the BLE payload transmits. `None` (no groups) →
-        // share all; `Some(set)` → share exactly `set` (empty set = share
-        // nothing, default-closed). One resolver shared with the BLE payload
+        // G2: resolve the fields this exchange exposes so the preview matches
+        // the card the BLE payload transmits. No selection → the curated
+        // Visible-toggled base; groups selected → exactly their union
+        // (empty = share nothing). One resolver shared with the BLE payload
         // and the success summary, so the three cannot diverge.
         let visible_field_ids = group_filter::resolve_exchange_allow(
             &self.selected_groups,
@@ -1257,18 +1257,14 @@ fn build_legacy_success_summary(
             )
         })
         .collect();
-    // What *we* shared, from the confirmed preview. `None` = no group
-    // filter (share all); `Some(set)` = exactly that set. No preview (mode
-    // skipped it) → unknown → empty.
+    // What *we* shared, from the confirmed preview — exactly its resolved
+    // allow-list. No preview (mode skipped it) → unknown → empty.
     let my_visible_fields = field_preview
         .map(|fp| {
             fp.card
                 .fields()
                 .iter()
-                .filter(|f| match &fp.visible_field_ids {
-                    None => true,
-                    Some(allow) => allow.contains(f.id()),
-                })
+                .filter(|f| fp.visible_field_ids.contains(f.id()))
                 .map(|f| f.label().to_string())
                 .collect()
         })
@@ -1368,7 +1364,7 @@ mod tests {
         let preview = FieldPreviewConfig {
             card: mine,
             display_name: "Alice".into(),
-            visible_field_ids: Some(HashSet::from([phone_id])),
+            visible_field_ids: HashSet::from([phone_id]),
             name_options: vec![],
             selected_name_id: field_preview::DEFAULT_NAME_OPTION_ID.into(),
         };

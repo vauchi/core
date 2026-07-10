@@ -29,10 +29,10 @@ pub(super) struct FieldPreviewConfig {
     /// whichever `name_options` entry `selected_name_id` currently
     /// points at.
     pub display_name: String,
-    /// Field IDs to share. `None` = share all (no group filter);
-    /// `Some(set)` = share exactly `set` (an empty set shares nothing —
-    /// default-closed, so a group exposing no fields shares none).
-    pub visible_field_ids: Option<HashSet<String>>,
+    /// Field IDs to share — exactly this set, always resolved by
+    /// `group_filter::resolve_exchange_allow` (an empty set shares nothing;
+    /// fields default hidden under the field-centric model).
+    pub visible_field_ids: HashSet<String>,
     /// Candidate display names for this exchange: the base name
     /// (id `"default"`) plus one deduplicated entry per selected
     /// group carrying a `display_name_override` (M2 S7 Record E). A
@@ -68,10 +68,7 @@ pub(super) fn build_field_preview_screen(
         .fields()
         .iter()
         .map(|f| {
-            let visible = match &config.visible_field_ids {
-                None => true,
-                Some(allow) => allow.contains(f.id()),
-            };
+            let visible = config.visible_field_ids.contains(f.id());
             let visibility = if visible {
                 UiFieldVisibility::Shown
             } else {
@@ -201,13 +198,20 @@ mod tests {
         (vec![], DEFAULT_NAME_OPTION_ID.into())
     }
 
+    /// Allow-list covering every field on the card — the "share the whole
+    /// card" arrange now that the preview always receives a resolved set.
+    fn all_field_ids(card: &ContactCard) -> HashSet<String> {
+        card.fields().iter().map(|f| f.id().to_string()).collect()
+    }
+
     #[test]
     fn preview_shows_all_fields_when_no_visibility_filter() {
         let (name_options, selected_name_id) = no_name_choice();
+        let card = sample_card();
         let config = FieldPreviewConfig {
-            card: sample_card(),
+            visible_field_ids: all_field_ids(&card),
+            card,
             display_name: "Alice".into(),
-            visible_field_ids: None,
             name_options,
             selected_name_id,
         };
@@ -232,7 +236,7 @@ mod tests {
         let config = FieldPreviewConfig {
             card,
             display_name: "Alice".into(),
-            visible_field_ids: Some(HashSet::from([email_id.clone()])),
+            visible_field_ids: HashSet::from([email_id.clone()]),
             name_options,
             selected_name_id,
         };
@@ -257,10 +261,11 @@ mod tests {
     #[test]
     fn preview_shows_display_name_override() {
         let (name_options, selected_name_id) = no_name_choice();
+        let card = sample_card();
         let config = FieldPreviewConfig {
-            card: sample_card(),
+            visible_field_ids: all_field_ids(&card),
+            card,
             display_name: "Dr. Egloff".into(),
-            visible_field_ids: None,
             name_options,
             selected_name_id,
         };
@@ -300,10 +305,11 @@ mod tests {
     #[test]
     fn preview_has_both_actions() {
         let (name_options, selected_name_id) = no_name_choice();
+        let card = sample_card();
         let config = FieldPreviewConfig {
-            card: sample_card(),
+            visible_field_ids: all_field_ids(&card),
+            card,
             display_name: "Alice".into(),
-            visible_field_ids: None,
             name_options,
             selected_name_id,
         };
@@ -319,9 +325,9 @@ mod tests {
         let email_value = card.fields()[0].value().to_string();
         let (name_options, selected_name_id) = no_name_choice();
         let config = FieldPreviewConfig {
+            visible_field_ids: all_field_ids(&card),
             card,
             display_name: "Alice".into(),
-            visible_field_ids: None,
             name_options,
             selected_name_id,
         };
@@ -339,10 +345,11 @@ mod tests {
     // @internal
     #[test]
     fn single_name_option_renders_static_text_not_dropdown() {
+        let card = sample_card();
         let config = FieldPreviewConfig {
-            card: sample_card(),
+            visible_field_ids: all_field_ids(&card),
+            card,
             display_name: "Alice".into(),
-            visible_field_ids: None,
             name_options: vec![DropdownOption {
                 id: DEFAULT_NAME_OPTION_ID.into(),
                 label: "Alice".into(),
@@ -377,10 +384,11 @@ mod tests {
                 label: "Dr. Alice".into(),
             },
         ];
+        let card = sample_card();
         let config = FieldPreviewConfig {
-            card: sample_card(),
+            visible_field_ids: all_field_ids(&card),
+            card,
             display_name: "Alice".into(),
-            visible_field_ids: None,
             name_options: name_options.clone(),
             selected_name_id: DEFAULT_NAME_OPTION_ID.into(),
         };

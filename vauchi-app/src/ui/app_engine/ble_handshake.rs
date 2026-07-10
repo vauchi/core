@@ -521,6 +521,13 @@ mod tests {
     /// AppEngine over an in-memory Vauchi whose own card carries `Email` +
     /// `Phone`, plus a "Work" group exposing only `Email`. Returns the engine
     /// and the Work group id.
+    /// Resolves an own-card field label to its generated id.
+    fn own_field_id(vauchi: &Vauchi, label: &str) -> String {
+        let card = vauchi.own_card().expect("own_card").expect("card present");
+        let field = card.fields().iter().find(|f| f.label() == label);
+        field.expect("labeled field").id().to_string()
+    }
+
     fn engine_with_card_and_group() -> (AppEngine, String) {
         let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
         vauchi.create_identity("Alice").expect("identity");
@@ -538,13 +545,7 @@ mod tests {
         ))
         .expect("add phone");
         vauchi.update_own_card(&card).expect("update own card");
-        let email_id = card
-            .fields()
-            .iter()
-            .find(|f| f.label() == "Email")
-            .expect("email field")
-            .id()
-            .to_string();
+        let email_id = own_field_id(&vauchi, "Email");
         let work = vauchi.create_group("Work").expect("create group");
         let work_id = work.id().to_string();
         vauchi
@@ -562,15 +563,15 @@ mod tests {
 
     // @internal
     #[test]
-    fn ble_payload_shares_full_card_when_no_group_selected() {
-        // pending_exchange_groups empty → resolver returns None → share all.
+    fn ble_payload_shares_visible_toggled_base_when_no_group_selected() {
+        // No selection → curated base: the Visible-toggled unassigned Phone
+        // ships; Work-assigned Email stays out (field-centric, 2026-07-10).
         let (engine, _work) = engine_with_card_and_group();
-        let labels = payload_labels(&engine);
-        assert!(labels.contains(&"Email".to_string()), "Email shared");
-        assert!(
-            labels.contains(&"Phone".to_string()),
-            "no group selected → full card (Phone shared)"
-        );
+        engine
+            .vauchi
+            .set_own_field_public(&own_field_id(&engine.vauchi, "Phone"))
+            .expect("toggle Phone visible");
+        assert_eq!(payload_labels(&engine), vec!["Phone".to_string()]);
     }
 
     // @internal

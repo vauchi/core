@@ -249,15 +249,17 @@ impl Vauchi {
 
     /// Determines the effective visibility of a field for a contact.
     ///
-    /// Returns visibility determined by (in priority order):
+    /// Field-centric model (owner decision 2026-07-10,
+    /// `2026-07-05-ungrouped-contacts-default-open`), in priority order:
     /// 1. Layer C — per-contact override (if set), always wins
-    /// 2. Layer B — group union (visible if any of the contact's groups
-    ///    exposes the field)
-    /// 3. Grouped contacts are default-closed (ADR-054 D3): a grouped contact
-    ///    sees only what its groups grant
-    /// 4. Layer A — public base for an *ungrouped* contact: the contact's
-    ///    legacy `visibility_rules` AND the own card's `field_visibility`
-    ///    (`set_own_field_*`)
+    /// 2. A group the contact belongs to grants the field → visible
+    /// 3. The field is assigned to ANY group → hidden (group-governed;
+    ///    this contact holds no grant), regardless of the toggle
+    /// 4. Unassigned field — the own card's Visible/Hidden toggle
+    ///    (`set_own_field_*` / `set_field_shown`) applies to every contact
+    ///    alike; unruled defaults to hidden. The contact's legacy
+    ///    `visibility_rules` stay a pure restrictor (imported contacts have
+    ///    none → hidden)
     pub fn get_effective_field_visibility(
         &self,
         contact_id: &str,
@@ -276,31 +278,28 @@ impl Vauchi {
             return Ok(is_visible);
         }
 
-        // A group the contact is in that exposes this field grants it (Layer B).
+        // A group the contact is in that exposes this field grants it.
         let labels = self.storage.labels().get_groups_for_contact(contact_id)?;
         if labels.iter().any(|l| l.is_field_visible(field_id)) {
             return Ok(true);
         }
 
-        // ADR-054 D3: a *grouped* contact is default-closed — a field none of
-        // their groups grants is hidden, matching exchange-time filtering so
-        // initial share and propagation agree
-        // (2026-06-08-sync-card-update-not-group-filtered, decision A). The gate
-        // keys on `labels` (THIS contact's groups), not on groups existing
-        // globally: an ungrouped contact is not default-closed but falls through
-        // to the Layer-A public base card below, even while others are grouped.
-        if !labels.is_empty() {
+        // Field-centric partition: a field any group exposes is
+        // group-audience data — closed to every contact without a grant,
+        // matching exchange-time filtering so initial share and propagation
+        // agree (ADR-054 D3 generalized 2026-07-10). The gate keys on ALL
+        // groups, not this contact's: assignment moves the field out of the
+        // toggle's reach.
+        let all_groups = self.storage.labels().load_all_groups()?;
+        if all_groups.iter().any(|g| g.is_field_visible(field_id)) {
             return Ok(false);
         }
 
-        // No group membership for this contact: the public base card. Visible
-        // iff (a) the contact's legacy Layer-A rules allow it — imported
-        // contacts have none → hidden — AND (b) the own card's per-field public
-        // base (`field_visibility`) marks it visible. `set_own_field_*` curates
-        // the public base; per-contact `set_field_*` goes through overrides
-        // (Layer C, checked above). Empty `field_visibility` defaults to
-        // `Everyone`, so this is a no-op until the public base is curated.
-        // (2026-06-14 visibility layering.)
+        // Unassigned field: the Visible/Hidden toggle. Visible only on an
+        // explicit `Everyone` rule — unruled defaults to hidden
+        // (privacy-first, matches `ContactCard::is_field_shown`). The legacy
+        // per-contact rules remain a restrictor so imported contacts (no
+        // rules) stay excluded.
         let legacy_allows = contact
             .visibility_rules()
             .is_some_and(|rules| rules.can_see(field_id, contact_id));
@@ -311,7 +310,7 @@ impl Vauchi {
             .storage
             .contacts()
             .load_own_card()?
-            .is_some_and(|card| card.field_visibility().can_see(field_id, contact_id)))
+            .is_some_and(|card| card.field_visibility().is_explicitly_everyone(field_id)))
     }
 
     /// Resolves an own-card field label to its field id.

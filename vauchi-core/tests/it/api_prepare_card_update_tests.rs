@@ -11,17 +11,16 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{X3DH, X3DHKeyPair};
 use vauchi_core::{Contact, ContactField, FieldType, SymmetricKey, Vauchi};
 
-/// Helper: create Vauchi with identity and own card fields.
+/// Helper: create Vauchi with identity and one Visible own-card field —
+/// fields default hidden (field-centric model), and a fully hidden card
+/// filters every delta to empty before the crypto under test runs.
 fn setup_with_card(name: &str) -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
     wb.create_identity(name).unwrap();
-    wb.add_own_field(ContactField::new(
-        FieldType::Email,
-        "Work",
-        "alice@example.com",
-        0,
-    ))
-    .unwrap();
+    let field = ContactField::new(FieldType::Email, "Work", "alice@example.com", 0);
+    let field_id = field.id().to_string();
+    wb.add_own_field(field).unwrap();
+    wb.set_own_field_public(&field_id).unwrap();
     wb
 }
 

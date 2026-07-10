@@ -116,6 +116,17 @@ impl Vauchi {
             }
             AuthResult::Duress => {
                 self.auth_mode = AuthMode::Duress;
+                // Queue covert duress alerts to configured trusted contacts.
+                // Duress authentication itself must succeed even if alerting
+                // fails, so errors are not propagated.
+                if let Ok(Some(settings)) = self.load_duress_settings() {
+                    let _count = self.queue_safety_alerts(
+                        crate::sync::safety_alert::AlertKind::Duress,
+                        &settings.alert_contact_ids,
+                        &settings.alert_message,
+                        None,
+                    );
+                }
                 Ok(AuthMode::Duress)
             }
             AuthResult::Invalid => Err(VauchiError::InvalidState("invalid password".into())),

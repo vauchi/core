@@ -94,12 +94,13 @@ fn test_propagate_with_cek_rotates_cek() {
 
     let old_card = alice.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
-    let _ = new_card.add_field(ContactField::new(
-        FieldType::Email,
-        "work",
-        "alice@company.com",
-        0,
-    ));
+    let field = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
+    let field_id = field.id().to_string();
+    let _ = new_card.add_field(field);
+    // Fields default hidden (field-centric model) — toggle Visible and
+    // persist so the CEK mechanics under test see a non-empty delta.
+    new_card.set_field_shown(&field_id, true);
+    alice.update_own_card(&new_card).unwrap();
 
     let queued = alice.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1);
@@ -146,12 +147,13 @@ fn test_propagate_without_cek_generates_one() {
 
     let old_card = alice.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
-    let _ = new_card.add_field(ContactField::new(
-        FieldType::Email,
-        "work",
-        "alice@company.com",
-        0,
-    ));
+    let field = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
+    let field_id = field.id().to_string();
+    let _ = new_card.add_field(field);
+    // Fields default hidden (field-centric model) — toggle Visible and
+    // persist so the CEK mechanics under test see a non-empty delta.
+    new_card.set_field_shown(&field_id, true);
+    alice.update_own_card(&new_card).unwrap();
 
     let queued = alice.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1);
@@ -587,12 +589,13 @@ fn test_cek_wrapped_end_to_end_flow() {
 
     let old_card = alice.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
-    let _ = new_card.add_field(ContactField::new(
-        FieldType::Email,
-        "work",
-        "alice@corp.com",
-        0,
-    ));
+    let field = ContactField::new(FieldType::Email, "work", "alice@corp.com", 0);
+    let field_id = field.id().to_string();
+    let _ = new_card.add_field(field);
+    // Fields default hidden (field-centric model) — toggle Visible and
+    // persist so the end-to-end CEK flow sees a non-empty delta.
+    new_card.set_field_shown(&field_id, true);
+    alice.update_own_card(&new_card).unwrap();
 
     let queued = alice.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1);

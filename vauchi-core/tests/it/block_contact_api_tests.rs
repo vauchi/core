@@ -263,6 +263,17 @@ fn test_propagate_skips_blocked_contacts() {
         ))
         .unwrap();
     let new_card = alice.own_card().unwrap().unwrap();
+    // Fields default hidden (field-centric model) — toggle Visible so the
+    // blocked-skip behavior under test sees a non-empty delta.
+    let work_id = new_card
+        .fields()
+        .iter()
+        .find(|f| f.label() == "work")
+        .unwrap()
+        .id()
+        .to_string();
+    alice.set_own_field_public(&work_id).unwrap();
+    let new_card = alice.own_card().unwrap().unwrap();
 
     let queued = alice.propagate_card_update(&old_card, &new_card).unwrap();
 

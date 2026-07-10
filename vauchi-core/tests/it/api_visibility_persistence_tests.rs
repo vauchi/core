@@ -64,11 +64,12 @@ fn test_toggle_visibility_persists() {
     let (wb, contact_id) = setup_with_fields();
     let email_id = own_field_id(&wb, "Work Email");
 
-    // Default: all fields visible
+    // Fields default hidden (field-centric model) — toggle Visible first.
+    wb.set_own_field_public(&email_id).unwrap();
     let visible = wb
         .get_effective_field_visibility(&contact_id, &email_id)
         .unwrap();
-    assert!(visible, "Fields should be visible by default");
+    assert!(visible, "Visible-toggled field should be visible");
 
     let new_state = wb
         .toggle_field_visibility(&contact_id, "Work Email")
@@ -87,6 +88,9 @@ fn test_toggle_visibility_per_field() {
     let (wb, contact_id) = setup_with_fields();
     let email_id = own_field_id(&wb, "Work Email");
     let phone_id = own_field_id(&wb, "Mobile");
+    // Fields default hidden (field-centric model) — toggle both Visible.
+    wb.set_own_field_public(&email_id).unwrap();
+    wb.set_own_field_public(&phone_id).unwrap();
 
     wb.toggle_field_visibility(&contact_id, "Work Email")
         .unwrap();
@@ -107,6 +111,8 @@ fn test_toggle_visibility_per_field() {
 fn test_toggle_twice_restores_visibility() {
     let (wb, contact_id) = setup_with_fields();
     let email_id = own_field_id(&wb, "Work Email");
+    // Fields default hidden (field-centric model) — toggle Visible first.
+    wb.set_own_field_public(&email_id).unwrap();
 
     wb.toggle_field_visibility(&contact_id, "Work Email")
         .unwrap();
@@ -185,14 +191,22 @@ fn set_own_field_private_hides_field_from_ungrouped_contact() {
         .id()
         .to_string();
 
-    // Default public base is `Everyone` → visible to an ungrouped contact.
+    // Fields default hidden (field-centric model): the toggle must be set
+    // Visible explicitly before anything is shown.
+    assert!(
+        !wb.get_effective_field_visibility(&contact_id, &email_id)
+            .unwrap(),
+        "an untoggled field is hidden by default"
+    );
+    wb.set_own_field_public(&email_id).unwrap();
+    wb.set_own_field_public(&phone_id).unwrap();
     assert!(
         wb.get_effective_field_visibility(&contact_id, &email_id)
             .unwrap(),
-        "default public base shows the field"
+        "the Visible toggle shows the field"
     );
 
-    // Remove from the public base → hidden from the ungrouped contact.
+    // Toggle back to Hidden → hidden from the ungrouped contact.
     wb.set_own_field_private(&email_id).unwrap();
     assert!(
         !wb.get_effective_field_visibility(&contact_id, &email_id)

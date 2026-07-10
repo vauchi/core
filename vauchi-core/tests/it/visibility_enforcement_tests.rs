@@ -85,11 +85,11 @@ fn test_default_visibility_is_everyone() {
     assert!(rules.can_see("nonexistent_field", "any_contact"));
 }
 
-/// Verify that a new field added to the card gets propagated to all contacts
-/// (because default visibility is Everyone).
-// @scenario: visibility_control :: New contacts see default-visible fields
+/// A new field propagates to nobody until its Visible toggle is set, then
+/// reaches every contact alike (field-centric model, 2026-07-10).
+// @scenario: visibility_control :: New fields default to hidden for ungrouped contacts
 #[test]
-fn test_new_field_propagated_to_all_contacts_by_default() {
+fn test_new_field_propagates_only_after_visible_toggle() {
     let wb = create_test_vauchi();
 
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
@@ -97,15 +97,18 @@ fn test_new_field_propagated_to_all_contacts_by_default() {
 
     let old_card = wb.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
-    let _ = new_card.add_field(ContactField::new(
-        FieldType::Email,
-        "work",
-        "alice@company.com",
-        0,
-    ));
+    let field = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
+    let field_id = field.id().to_string();
+    let _ = new_card.add_field(field);
 
     let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
-    assert_eq!(queued, 2, "New field should be propagated to both contacts");
+    assert_eq!(queued, 0, "an untoggled new field reaches nobody");
+
+    new_card.set_field_shown(&field_id, true);
+    wb.update_own_card(&new_card).unwrap();
+
+    let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
+    assert_eq!(queued, 2, "a Visible-toggled field reaches every contact");
 
     let bob_pending = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     let carol_pending = wb
@@ -139,15 +142,18 @@ fn test_contacts_variant_enforced_at_propagation() {
         rules.set_contacts(&email_id, allowed);
     });
 
-    // Bob's visibility rules: default (Everyone) — Bob can see everything
+    // Bob's per-contact rules: default (no restriction). The own-card toggle
+    // must still be Visible for anything to propagate (field-centric model).
 
     let old_card = wb.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
     let _ = new_card.add_field(email_field);
+    new_card.set_field_shown(&email_id, true);
+    wb.update_own_card(&new_card).unwrap();
 
     let _queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
 
-    // Bob should get the update (default visibility = Everyone)
+    // Bob should get the update (toggle Visible, no per-contact restriction)
     let bob_pending = wb.storage().pending().get_pending_updates(&bob_id).unwrap();
     assert_eq!(
         bob_pending.len(),
@@ -415,22 +421,23 @@ fn content_edit_reaches_only_the_granting_group() {
     );
 }
 
-// ADR-054 D3: a content edit must reach an *ungrouped* recipient via the
-// Layer-A public base card (not hidden), while a *grouped* recipient receives
-// only their group's union. Brackets the over-restrict direction so the G4 fix
-// cannot hide public fields from ungrouped contacts.
+// Field-centric partition (2026-07-10): a group-assigned field reaches only
+// group members, while a Visible-toggled unassigned field reaches every
+// contact alike — grouped and ungrouped. Brackets both audience changes so
+// neither direction regresses.
 // @scenario: visibility_control :: A content edit reaches ungrouped contacts via the public base card
 #[test]
-fn content_edit_ungrouped_recipient_gets_public_base() {
+fn content_edit_partitions_group_assigned_and_toggled_fields() {
     let wb = create_test_vauchi();
     let wb_pk = *wb.identity().unwrap().signing_public_key();
 
     let work = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
     let work_id = work.id().to_string();
     let personal = ContactField::new(FieldType::Phone, "personal", "+15550000", 0);
+    let personal_id = personal.id().to_string();
 
-    // `work` is granted to the Work group; `personal` is granted by no group,
-    // so it stays Layer-A `Everyone` (public base).
+    // `work` is granted to the Work group (group-assigned); `personal` is in
+    // no group and gets the Visible toggle.
     let group = wb.create_group("Work").unwrap();
     wb.set_group_field_visibility(group.id(), &work_id, true)
         .unwrap();
@@ -444,29 +451,33 @@ fn content_edit_ungrouped_recipient_gets_public_base() {
     let mut new_card = old_card.clone();
     let _ = new_card.add_field(work);
     let _ = new_card.add_field(personal);
+    new_card.set_field_shown(&personal_id, true);
+    wb.update_own_card(&new_card).unwrap();
 
     wb.propagate_card_update(&old_card, &new_card).unwrap();
     deliver(&wb, &mut grouped);
     deliver(&wb, &mut ungrouped);
 
-    // Grouped recipient: only the group's union (`work`), not the ungranted
-    // `personal`.
+    // Grouped recipient: the group's union (`work`) plus the
+    // Visible-toggled unassigned `personal` — the toggle applies to
+    // every contact alike.
     assert!(
         stored_card_has(&grouped, "work"),
         "Grouped recipient's group grants `work`"
     );
     assert!(
-        !stored_card_has(&grouped, "personal"),
-        "Grouped recipient is default-closed: `personal` (no group) is hidden"
+        stored_card_has(&grouped, "personal"),
+        "Visible toggle reaches group members too"
     );
 
-    // Ungrouped recipient: the Layer-A public base card — both `Everyone` fields.
+    // Ungrouped recipient: only the Visible-toggled `personal`; the
+    // group-assigned `work` is closed to non-members.
     assert!(
-        stored_card_has(&ungrouped, "work"),
-        "D3: ungrouped recipient falls back to Layer-A; `work` is Everyone"
+        !stored_card_has(&ungrouped, "work"),
+        "group-assigned `work` is closed to a contact outside the group"
     );
     assert!(
         stored_card_has(&ungrouped, "personal"),
-        "D3: ungrouped recipient receives the public base `personal`"
+        "ungrouped recipient receives the Visible-toggled `personal`"
     );
 }

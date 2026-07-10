@@ -293,12 +293,13 @@ fn test_propagate_card_update_to_contacts() {
 
     let old_card = wb.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
-    let _ = new_card.add_field(ContactField::new(
-        FieldType::Email,
-        "work",
-        "alice@company.com",
-        0,
-    ));
+    let field = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
+    let field_id = field.id().to_string();
+    let _ = new_card.add_field(field);
+    // Fields default hidden (field-centric model) — toggle Visible and
+    // persist so the propagation filter sees the grant.
+    new_card.set_field_shown(&field_id, true);
+    wb.update_own_card(&new_card).unwrap();
 
     let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1);
@@ -452,12 +453,17 @@ fn test_propagate_partial_visibility() {
     wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
         .unwrap();
 
-    // Create cards with both email (hidden) and phone (visible) fields
+    // Create cards with both fields toggled Visible; the legacy per-contact
+    // `Nobody` rule must still hide email from Bob (restrictor semantics).
+    let phone_field_id = phone_field.id().to_string();
     let old_card = wb.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
 
     let _ = new_card.add_field(email_field);
     let _ = new_card.add_field(phone_field);
+    new_card.set_field_shown(&email_field_id, true);
+    new_card.set_field_shown(&phone_field_id, true);
+    wb.update_own_card(&new_card).unwrap();
 
     let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1, "Update should be queued for visible field");

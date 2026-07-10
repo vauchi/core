@@ -233,6 +233,19 @@ fn remove_contact_field_override_queues_repropagation() {
     );
     add_own_field(&engine, MobileFieldType::Phone, "Mobile", "+15550100");
     let bob = add_ratcheted_contact(&engine, "Bob");
+    // Fields default hidden (field-centric model) — grant both via a label
+    // Bob belongs to, so the override below hides and its removal restores.
+    let label = create_label(&engine, "Team");
+    add_contact_to_group(&engine, &label.id, &bob);
+    for field in ["Work", "Mobile"] {
+        engine
+            .dispatch_domain_command(DomainCommand::SetGroupFieldVisibility {
+                label_id: label.id.clone(),
+                field_label: field.into(),
+                is_visible: true,
+            })
+            .expect("SetGroupFieldVisibility");
+    }
 
     engine
         .dispatch_domain_command(DomainCommand::SetContactFieldOverride {

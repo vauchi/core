@@ -437,30 +437,34 @@ fn groups_mode_field_in_no_group_is_hidden() {
 
 // @internal
 #[test]
-fn ungrouped_contact_in_groups_mode_falls_back_to_layer_a() {
-    // ADR-054 D3: a contact in zero groups (while groups exist for others) is
-    // NOT default-closed. Unlike a *grouped* contact
-    // (`groups_mode_field_in_no_group_is_hidden`), they fall back to the
-    // Layer-A `can_see` rules — the public base card.
+fn ungrouped_contact_sees_only_visible_toggled_unassigned_fields() {
+    // Field-centric model (2026-07-10): a contact in zero groups sees an
+    // unassigned field only once its Visible toggle is set; a group-assigned
+    // field stays closed to them regardless of any toggle.
     let (wb, _bob_id) = vauchi_with_work_group_and_bob();
     let carol_id = add_contact_with_ratchet(&wb, "Carol");
 
-    // `personal` has no group grant and no Layer-A rule → default `Everyone`,
-    // so the ungrouped contact sees it (public base card).
+    // `personal` is unassigned and untoggled → hidden by default.
+    assert!(
+        !wb.get_effective_field_visibility(&carol_id, "personal")
+            .unwrap(),
+        "an untoggled unassigned field is hidden from the ungrouped contact"
+    );
+
+    // The Visible toggle shows it to the ungrouped contact.
+    wb.set_own_field_public("personal").unwrap();
     assert!(
         wb.get_effective_field_visibility(&carol_id, "personal")
             .unwrap(),
-        "D3: ungrouped contact falls back to Layer-A; `personal` is Everyone → visible"
+        "the Visible toggle shows the unassigned field"
     );
 
-    // A field explicitly restricted at Layer-A stays hidden even via the
-    // fallback — the public base card excludes private fields.
-    wb.set_field_private_and_repropagate(&carol_id, "work")
-        .unwrap();
+    // `work` is group-assigned → closed to a non-member even when toggled.
+    wb.set_own_field_public("work").unwrap();
     assert!(
         !wb.get_effective_field_visibility(&carol_id, "work")
             .unwrap(),
-        "D3: Layer-A `private` (Nobody) hides `work` from the ungrouped contact"
+        "a group-assigned field stays closed to a contact outside the group"
     );
 }
 
@@ -504,16 +508,22 @@ fn set_field_private_for_a_grouped_contact_hides_via_override() {
 
 // @internal
 #[test]
-fn no_groups_mode_preserves_default_open() {
-    // Control: with NO groups at all, fall back to Layer-A default-open
-    // (empty per-contact rules → can_see Everyone). Must not regress.
+fn no_groups_mode_defaults_hidden_until_toggled() {
+    // With NO groups at all, an untoggled field is hidden (field-centric
+    // default) and the Visible toggle is the single control that shows it.
     let wb = create_test_vauchi();
     wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
+    let work = own_field_id(&wb, "work");
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
     assert!(
-        wb.get_effective_field_visibility(&bob_id, "work").unwrap(),
-        "No-groups mode → default-open fallback keeps `work` visible"
+        !wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
+        "No-groups mode → an untoggled field is hidden by default"
+    );
+    wb.set_own_field_public(&work).unwrap();
+    assert!(
+        wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
+        "No-groups mode → the Visible toggle shows the field"
     );
 }
 

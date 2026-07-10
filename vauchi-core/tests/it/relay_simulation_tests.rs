@@ -303,14 +303,12 @@ fn test_full_update_propagation() {
         .unwrap();
 
     let old_card = alice_wb.own_card().unwrap().unwrap();
-    alice_wb
-        .add_own_field(ContactField::new(
-            FieldType::Email,
-            "work",
-            "alice@company.com",
-            0,
-        ))
-        .unwrap();
+    let field = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
+    let field_id = field.id().to_string();
+    alice_wb.add_own_field(field).unwrap();
+    // Fields default hidden (field-centric model) — toggle Visible so the
+    // relay roundtrip under test has a delta to carry.
+    alice_wb.set_own_field_public(&field_id).unwrap();
     let new_card = alice_wb.own_card().unwrap().unwrap();
 
     let queued = alice_wb

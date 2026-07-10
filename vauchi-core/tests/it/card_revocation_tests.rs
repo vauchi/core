@@ -262,10 +262,12 @@ fn set_own_field_private_revokes_a_public_field_from_an_ungrouped_contact() {
         .unwrap();
     let work = own_field_id(&alice, "work");
     let alice_pk = *alice.identity().unwrap().signing_public_key();
+    // Fields default hidden (field-centric model) — toggle Visible so Bob
+    // receives the initial share that the revocation below takes back.
+    alice.set_own_field_public(&work).unwrap();
 
-    // Bob exchanges and stays UNGROUPED → he sees the public base (`work` is
-    // public by default). Deliver the initial public-base share (add_own_field
-    // armed the marker).
+    // Bob exchanges and stays UNGROUPED → he sees the Visible-toggled field.
+    // Deliver the initial share (the toggle armed the marker).
     let mut bob = add_recipient(&alice, &alice_pk, "Bob");
     alice.run_owed_repropagation().unwrap();
     assert_eq!(

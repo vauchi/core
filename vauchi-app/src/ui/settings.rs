@@ -15,6 +15,10 @@ pub struct SettingsConfig {
     pub display_name: String,
     pub delivery_receipts_enabled: bool,
     pub suppress_presence: bool,
+    /// New contact-card entries start Visible (Decision 2,
+    /// 2026-07-05-ungrouped-contacts-default-open). Default off = hidden.
+    #[serde(default)]
+    pub new_field_default_visible: bool,
     #[serde(default)]
     pub contact_added_notifications: bool,
     #[serde(default = "default_true")]
@@ -167,6 +171,19 @@ impl SettingsEngine {
                     a11y: Some(A11y {
                         label: Some(self.t("settings.suppress_presence_a11y")),
                         hint: Some(self.t("settings.suppress_presence_hint")),
+                        role: None,
+                    }),
+                    info_key: None,
+                },
+                SettingsItem {
+                    id: "new_field_default".into(),
+                    label: self.t("settings.new_field_default"),
+                    kind: SettingsItemKind::Toggle {
+                        enabled: self.config.new_field_default_visible,
+                    },
+                    a11y: Some(A11y {
+                        label: Some(self.t("settings.new_field_default_a11y")),
+                        hint: Some(self.t("settings.new_field_default_hint")),
                         role: None,
                     }),
                     info_key: None,

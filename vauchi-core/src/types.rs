@@ -344,6 +344,11 @@ pub struct SettingsFlags {
     /// (2026-07-05-ungrouped-contacts-default-open).
     #[serde(default)]
     pub field_centric_visibility_migrated: bool,
+    /// New contact-card entries start Visible (explicit `Everyone`
+    /// materialized at `add_own_field` time). Defaults to false = hidden
+    /// (2026-07-05-ungrouped-contacts-default-open, Decision 2).
+    #[serde(default)]
+    pub new_field_default_visible: bool,
 }
 
 impl Default for SettingsFlags {
@@ -356,6 +361,7 @@ impl Default for SettingsFlags {
             reduce_motion: false,
             large_touch: false,
             field_centric_visibility_migrated: false,
+            new_field_default_visible: false,
         }
     }
 }

@@ -324,6 +324,7 @@ impl Vauchi {
             config.card_update_notifications = flags.card_update_notifications;
             config.reduce_motion = flags.reduce_motion;
             config.large_touch = flags.large_touch;
+            config.new_field_default_visible = flags.new_field_default_visible;
         }
         // Seed the persisted relay URL, but only when the caller left the
         // built-in default — an explicit `with_relay_url` (desktop

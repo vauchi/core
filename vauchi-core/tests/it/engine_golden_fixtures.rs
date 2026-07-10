@@ -72,6 +72,7 @@ fn sample_settings_config() -> SettingsConfig {
         display_name: "Alice".into(),
         delivery_receipts_enabled: true,
         suppress_presence: false,
+        new_field_default_visible: false,
         contact_added_notifications: false,
         card_update_notifications: true,
         relay_url: "https://relay.vauchi.app".into(),

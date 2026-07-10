@@ -74,6 +74,20 @@
             }
           },
           {
+            "id": "new_field_default",
+            "label": "New Entries Start Visible",
+            "kind": {
+              "Toggle": {
+                "enabled": false
+              }
+            },
+            "a11y": {
+              "label": "Toggle whether new contact card entries start visible",
+              "hint": "When on, new contact card entries are shared with all contacts. When off, they stay hidden until you share them.",
+              "role": null
+            }
+          },
+          {
             "id": "card_update",
             "label": "Card Updates",
             "kind": {

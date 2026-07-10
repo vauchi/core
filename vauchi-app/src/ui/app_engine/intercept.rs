@@ -75,6 +75,9 @@ impl AppEngine {
                 "suppress_presence" => {
                     config.suppress_presence = !config.suppress_presence;
                 }
+                "new_field_default" => {
+                    config.new_field_default_visible = !config.new_field_default_visible;
+                }
                 "contact_added" => {
                     config.contact_added_notifications = !config.contact_added_notifications;
                 }

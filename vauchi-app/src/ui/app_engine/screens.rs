@@ -218,6 +218,7 @@ impl AppEngine {
                     display_name,
                     delivery_receipts_enabled: vauchi.config().delivery_receipts_enabled,
                     suppress_presence: vauchi.config().suppress_presence,
+                    new_field_default_visible: vauchi.config().new_field_default_visible,
                     contact_added_notifications: vauchi.config().contact_added_notifications,
                     card_update_notifications: vauchi.config().card_update_notifications,
                     relay_url: vauchi.config().relay.server_url.clone(),
@@ -229,9 +230,8 @@ impl AppEngine {
                     available_languages,
                     // Category-2 accessibility flags, self-seeded from
                     // SettingsFlags so they follow the user (ADR-047 Addendum
-                    // 2026-07-05). high_contrast is deferred to M4 S1b (its
-                    // effect is theme colors, frontend-applied) — removed from
-                    // the screen rather than shipped inert.
+                    // 2026-07-05). high_contrast deferred to M4 S1b (theme
+                    // colors, frontend-applied) — removed, not shipped inert.
                     reduce_motion: vauchi.config().reduce_motion,
                     large_touch: vauchi.config().large_touch,
                     show_help_icons: true,

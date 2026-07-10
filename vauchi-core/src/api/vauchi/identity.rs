@@ -582,12 +582,20 @@ impl Vauchi {
         Ok(changed_labels)
     }
 
-    /// Adds a field to the user's own card.
+    /// Adds a field to the user's own card. New entries default to hidden;
+    /// the `new_field_default_visible` setting materializes an explicit
+    /// `Everyone` toggle at add time instead (never a lazy read-time
+    /// fallback, so "unruled" stays unambiguous — Decision 2,
+    /// 2026-07-05-ungrouped-contacts-default-open).
     pub fn add_own_field(&self, field: ContactField) -> VauchiResult<()> {
         let label = field.label().to_string();
         let value = field.value().to_string();
+        let field_id = field.id().to_string();
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.add_field_to_own_card(field)?;
+        if self.load_settings_flags()?.new_field_default_visible {
+            self.set_own_field_public(&field_id)?;
+        }
         self.mark_own_card_repropagate()?;
         self.record_sync_item(crate::sync::SyncItem::CardUpdated {
             field_label: label,

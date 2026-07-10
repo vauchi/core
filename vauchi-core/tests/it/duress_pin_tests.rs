@@ -1022,9 +1022,11 @@ fn test_delete_duress_settings() {
 // =============================================================================
 // =============================================================================
 
-// @internal
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @scenario: duress_mode :: Duress alert looks like normal sync traffic
+// @scenario: duress_mode :: Duress alerts work offline
 #[test]
-fn test_duress_authenticate_queues_nothing() {
+fn test_queue_duress_alert_on_duress_authenticate() {
     let mut wb = create_vauchi_with_identity("Alice");
 
     wb.setup_app_password("my-pin-1234")
@@ -1064,23 +1066,23 @@ fn test_duress_authenticate_queues_nothing() {
     wb.save_duress_settings(&settings)
         .expect("save settings should succeed");
 
-    // Authenticate with duress PIN — silent by design: the alert queue left
-    // the authentication path (74e1269d, 2026-07-08-simplify-duress-emergency;
-    // the wipe fires at complete_lock). Even with settings + a reachable
-    // trusted contact, NOTHING observable may be queued at auth time.
+    // Authenticate with duress PIN — should queue an alert
     let mode = wb.authenticate("duress-999").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
+    // Verify the alert was queued as a storage-backed PendingUpdate
+    // (indistinguishable from a card delta on the wire, per ADR-032).
     let pending = wb
         .storage()
         .pending()
-        .count_all_pending_updates()
-        .expect("count pending");
-    assert_eq!(
-        pending, 0,
-        "duress authentication must queue nothing, even with alert settings configured"
+        .get_all_pending_updates()
+        .expect("load pending");
+    assert!(
+        !pending.is_empty(),
+        "duress authentication should queue at least one pending update"
     );
-    let _ = trusted_id;
+    assert_eq!(pending[0].update_type, "card_delta");
+    assert_eq!(pending[0].contact_id, trusted_id);
 }
 
 // @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
@@ -1111,13 +1113,15 @@ fn test_queue_duress_alert_without_settings_is_noop() {
     );
 }
 
-// The disguised safety-alert wire shape now ships only via the emergency
-// broadcast path — duress auth queues nothing (74e1269d). The PendingUpdate
-// must still be indistinguishable from a card delta (ADR-032).
-// @scenario: emergency_broadcast :: Alert delivery to multiple contacts
+// @scenario: duress_mode :: Duress alert content
 #[test]
-fn test_safety_alert_pending_update_is_disguised_as_card_delta() {
+fn test_duress_alert_contains_timestamp_and_device_id() {
     let mut wb = create_vauchi_with_identity("Alice");
+
+    wb.setup_app_password("my-pin-1234")
+        .expect("setup should succeed");
+    wb.setup_duress_password("duress-999")
+        .expect("setup duress should succeed");
 
     // Create a trusted contact with a ratchet so the alert can be queued.
     let trusted_contact = Contact::from_exchange(
@@ -1142,14 +1146,17 @@ fn test_safety_alert_pending_update_is_disguised_as_card_delta() {
         .save_ratchet_state(&trusted_id, &ratchet, is_initiator)
         .unwrap();
 
-    wb.configure_emergency_broadcast(vec![trusted_id.clone()], "Help".to_string(), false)
-        .expect("configure broadcast should succeed");
+    let settings = vauchi_core::types::DuressSettings {
+        alert_contact_ids: vec![trusted_id.clone()],
+        alert_message: "Help".to_string(),
+        include_location: false,
+    };
+    wb.save_duress_settings(&settings)
+        .expect("save settings should succeed");
 
     let before = wb.clock().unix_seconds();
-    let result = wb
-        .send_emergency_broadcast()
-        .expect("broadcast should succeed");
-    assert_eq!(result.sent, 1);
+    let mode = wb.authenticate("duress-999").expect("auth should succeed");
+    assert_eq!(mode, AuthMode::Duress);
 
     // Verify the alert was queued as a storage-backed PendingUpdate.
     let pending = wb
@@ -1174,8 +1181,9 @@ fn test_safety_alert_pending_update_is_disguised_as_card_delta() {
 // =============================================================================
 
 // @scenario: duress_mode :: Duress credential shows decoy contacts
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 #[test]
-fn test_full_duress_flow_shows_decoys_and_queues_nothing() {
+fn test_full_duress_flow_setup_to_alert() {
     let mut wb = create_vauchi_with_identity("Alice");
 
     // 1. Set up app password
@@ -1240,13 +1248,13 @@ fn test_full_duress_flow_shows_decoys_and_queues_nothing() {
     let contacts = wb.list_contacts().expect("list should succeed");
     assert_eq!(contacts.len(), 1, "should show decoy contacts only");
     assert_eq!(contacts[0].display_name(), "Fake Friend");
-    // 8b. Duress auth is silent: the alert queue left the authentication
-    // path (74e1269d — the wipe fires at complete_lock instead).
+    // 8b. Verify alert was queued as a storage-backed PendingUpdate.
     let pending = wb
         .storage()
         .pending()
-        .count_all_pending_updates()
-        .expect("count pending");
-    assert_eq!(pending, 0, "duress authentication must queue nothing");
-    let _ = trusted_id;
+        .get_all_pending_updates()
+        .expect("load pending");
+    assert!(!pending.is_empty(), "should have queued a duress alert");
+    assert_eq!(pending[0].update_type, "card_delta");
+    assert_eq!(pending[0].contact_id, trusted_id);
 }

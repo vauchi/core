@@ -3,16 +3,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! CC-13 stateful property test for the **production** visibility resolver
-//! `Vauchi::get_effective_field_visibility` (ADR-054 D3).
+//! `Vauchi::get_effective_field_visibility` (ADR-054 D3 + the 2026-07-10
+//! field-centric model).
 //!
 //! A declarative model of the resolver's priority order
-//! (override → group-union → grouped-default-closed → ungrouped public base)
-//! is kept alongside a real `Vauchi`. Random sequences of group / override /
-//! public-base operations are applied to both, then the resolver's verdict is
-//! asserted equal to the model for every (contact, field). Because both
-//! propagation paths filter the wire delta through this exact resolver (G4 fix,
-//! `propagation.rs` + `features.rs`), the resolver invariant is the wire-delta
-//! invariant: a contact never receives a field the model does not grant.
+//! (override → contact-group grant → group-assigned⇒closed → unassigned
+//! toggle, default hidden) is kept alongside a real `Vauchi`. Random
+//! sequences of group / override / toggle operations are applied to both,
+//! then the resolver's verdict is asserted equal to the model for every
+//! (contact, field). Because both propagation paths filter the wire delta
+//! through this exact resolver (G4 fix, `propagation.rs` + `features.rs`),
+//! the resolver invariant is the wire-delta invariant: a contact never
+//! receives a field the model does not grant.
 
 use std::collections::HashSet;
 
@@ -30,8 +32,8 @@ enum Op {
     Grant(usize, usize),           // group, field
     Revoke(usize, usize),          // group, field
     Override(usize, usize, bool),  // contact, field, visible
-    SetOwnPrivate(usize),          // field — remove from the public base
-    SetOwnPublic(usize),           // field — restore to the public base
+    SetOwnPrivate(usize),          // field — toggle Hidden (explicit Nobody)
+    SetOwnPublic(usize),           // field — toggle Visible (explicit Everyone)
 }
 
 /// Declarative mirror of the resolver's documented priority order.
@@ -39,7 +41,7 @@ struct Model {
     groups: Vec<HashSet<usize>>,       // per contact → group indices
     grants: Vec<HashSet<usize>>,       // per group → field indices
     overrides: Vec<Vec<Option<bool>>>, // [contact][field]
-    own_private: HashSet<usize>,       // fields removed from the public base
+    own_visible: HashSet<usize>,       // fields toggled Visible (explicit Everyone)
 }
 
 impl Model {
@@ -48,8 +50,14 @@ impl Model {
             groups: vec![HashSet::new(); N_CONTACTS],
             grants: vec![HashSet::new(); N_GROUPS],
             overrides: vec![vec![None; N_FIELDS]; N_CONTACTS],
-            own_private: HashSet::new(),
+            own_visible: HashSet::new(),
         }
+    }
+
+    /// A field is group-assigned when ANY group grants it, regardless of the
+    /// contact under evaluation (field-centric partition, 2026-07-10).
+    fn assigned(&self, f: usize) -> bool {
+        self.grants.iter().any(|g| g.contains(&f))
     }
 
     /// Expected effective visibility, mirroring `get_effective_field_visibility`.
@@ -58,16 +66,16 @@ impl Model {
             return b; // Layer C: per-contact override wins
         }
         if self.groups[c].iter().any(|g| self.grants[*g].contains(&f)) {
-            return true; // Layer B: any of the contact's groups grants it
+            return true; // one of the contact's groups grants it
         }
-        if !self.groups[c].is_empty() {
-            return false; // grouped contact: default-closed (ADR-054 D3)
+        if self.assigned(f) {
+            return false; // group-assigned; this contact holds no grant
         }
-        // ungrouped: Layer-A public base. `set_own_field_private` removes a
-        // field from it; otherwise it defaults to `Everyone`. (The contacts are
-        // exchanged, so the legacy per-contact rules default to visible and only
-        // the public base shapes the ungrouped verdict here.)
-        !self.own_private.contains(&f)
+        // Unassigned field: the Visible/Hidden toggle applies to every
+        // contact alike; unruled defaults to hidden. (The contacts are
+        // exchanged, so the legacy per-contact rules stay permissive and
+        // only the toggle shapes the verdict here.)
+        self.own_visible.contains(&f)
     }
 }
 
@@ -139,11 +147,11 @@ proptest! {
                     wb.set_contact_visibility_override(&contact_ids[c], &field_ids[f], b).unwrap();
                 }
                 Op::SetOwnPrivate(f) => {
-                    model.own_private.insert(f);
+                    model.own_visible.remove(&f);
                     wb.set_own_field_private(&field_ids[f]).unwrap();
                 }
                 Op::SetOwnPublic(f) => {
-                    model.own_private.remove(&f);
+                    model.own_visible.insert(f);
                     wb.set_own_field_public(&field_ids[f]).unwrap();
                 }
             }
@@ -162,15 +170,18 @@ proptest! {
                     f
                 );
                 // Security invariant (subsumed by the equality, asserted
-                // explicitly): a grouped contact only ever sees a field its
-                // group or an override grants — never a leak.
-                if actual && !model.groups[c].is_empty() {
+                // explicitly): a contact only ever sees a field granted by
+                // an override, one of their groups, or the unassigned-field
+                // Visible toggle — never a leak.
+                if actual {
                     let granted_by_group =
                         model.groups[c].iter().any(|g| model.grants[*g].contains(&f));
                     let granted_by_override = model.overrides[c][f] == Some(true);
+                    let granted_by_toggle =
+                        !model.assigned(f) && model.own_visible.contains(&f);
                     prop_assert!(
-                        granted_by_group || granted_by_override,
-                        "grouped contact {} saw ungranted field {} (leak)",
+                        granted_by_group || granted_by_override || granted_by_toggle,
+                        "contact {} saw ungranted field {} (leak)",
                         c,
                         f
                     );

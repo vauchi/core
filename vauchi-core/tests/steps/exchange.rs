@@ -170,6 +170,25 @@ fn party_updates_field(world: &mut VauchiWorld, party: String, label: String, va
     world.old_cards.insert(party, old);
 }
 
+/// Toggles one of a party's own-card fields Visible (explicit `Everyone`) so
+/// a later sync may deliver it — fields default hidden under the
+/// field-centric model (2026-07-05-ungrouped-contacts-default-open).
+#[when(expr = "{string} makes their {string} field visible to all")]
+fn party_makes_field_visible(world: &mut VauchiWorld, party: String, label: String) {
+    let p = world.party(&party);
+    let fid = p
+        .own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .find(|f| f.label() == label)
+        .unwrap_or_else(|| panic!("no {party} field labeled {label:?}"))
+        .id()
+        .to_string();
+    p.set_own_field_public(&fid).unwrap();
+}
+
 /// Shuttles the pending card update sender→recipient through the real seams
 /// (`prepare_card_update_for_contact` → `process_single_card_update`) — the
 /// same CEK-wrapped ciphertext a relay would carry, minus the transport.

@@ -772,6 +772,28 @@ fn have_email_marked_shown(world: &mut VauchiWorld) {
     world.vauchi.set_own_field_public(&fid).unwrap();
 }
 
+/// Toggles every own-card field Visible (explicit `Everyone`) — the
+/// field-centric model's "share my whole card" arrangement.
+#[given(expr = "all my fields are set to {string}")]
+fn all_fields_set_to(world: &mut VauchiWorld, mode: String) {
+    assert_eq!(
+        mode, "visible to all",
+        "only the visible-to-all mode is bound"
+    );
+    let field_ids: Vec<String> = world
+        .vauchi
+        .own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .map(|f| f.id().to_string())
+        .collect();
+    for fid in field_ids {
+        world.vauchi.set_own_field_public(&fid).unwrap();
+    }
+}
+
 // ── Dave visibility block scenario ────────────────────────────────────────
 
 /// Sets all own-card fields visible to Dave (per-contact Layer C override).

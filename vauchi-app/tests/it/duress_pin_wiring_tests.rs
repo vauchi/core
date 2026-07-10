@@ -182,3 +182,70 @@ fn duress_mismatched_confirmation_is_rejected() {
         "a mismatched confirmation must not persist duress"
     );
 }
+
+// @scenario: duress_mode :: Duress credential shows decoy contacts
+// ADR-032: the duress PIN unlocks into DECOY mode — silent alert queued,
+// decoy contacts shown, the app plausibly normal to the coercer. A wipe on
+// duress unlock is maximally visible AND destroys the just-queued covert
+// alerts before any sync can deliver them.
+#[test]
+fn duress_unlock_enters_decoy_mode_without_wiping() {
+    let mut engine = engine_ready();
+    engine.vauchi_mut().setup_duress_password(PIN).unwrap();
+
+    // Trusted exchanged contact with a ratchet so the covert alert queues.
+    let shared = vauchi_core::SymmetricKey::generate();
+    let trusted = Contact::from_exchange([5u8; 32], ContactCard::new("Ally"), shared.clone(), 0);
+    let trusted_id = trusted.id().to_string();
+    engine.vauchi().add_contact(trusted).unwrap();
+    let dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    engine
+        .vauchi()
+        .create_ratchet_as_initiator(&trusted_id, &shared, *dh.public_key())
+        .unwrap();
+    engine
+        .vauchi()
+        .save_duress_settings(&vauchi_core::types::DuressSettings {
+            alert_contact_ids: vec![trusted_id.clone()],
+            alert_message: "help".into(),
+            include_location: false,
+        })
+        .unwrap();
+
+    engine.set_initial_screen(AppScreen::Lock);
+    // The lock screen's TextInput carries the full value per TextChanged
+    // (unlike the setup flow's per-digit PinInput).
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: PIN.into(),
+    });
+    let result = press(&mut engine, "unlock");
+
+    assert!(
+        !matches!(result, ActionResult::WipeComplete),
+        "duress unlock must NOT wipe (ADR-032 decoy mode), got {result:?}"
+    );
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "duress unlock proceeds into the (decoy) app, got {result:?}"
+    );
+    assert!(
+        engine.vauchi().has_identity(),
+        "storage survives a duress unlock"
+    );
+    let pending = engine
+        .vauchi()
+        .storage()
+        .pending()
+        .count_all_pending_updates()
+        .unwrap();
+    assert!(
+        pending > 0,
+        "the covert alert stays queued for delivery after unlock"
+    );
+    let visible: Vec<String> = contact_ids(&engine);
+    assert!(
+        !visible.contains(&trusted_id),
+        "duress mode lists decoys, never the real contacts"
+    );
+}

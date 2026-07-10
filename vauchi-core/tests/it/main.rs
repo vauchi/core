@@ -147,6 +147,7 @@ mod delta_privacy_tests;
 mod demo_contact_integration_tests;
 mod device_link_join_adopt_tests;
 mod device_link_proximity_tests;
+mod device_link_ratchet_resume_tests;
 mod device_linking_engine_tests;
 mod device_race_condition_tests;
 mod device_store_tests;

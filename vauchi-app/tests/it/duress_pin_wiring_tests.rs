@@ -212,6 +212,20 @@ fn duress_unlock_enters_decoy_mode_without_wiping() {
         })
         .unwrap();
 
+    // Decoy contact: duress mode must present it as the plausible contact list.
+    let decoy_id = "decoy-1".to_string();
+    engine
+        .vauchi()
+        .add_decoy_contact(&decoy_id, "Safe Name", &ContactCard::new("Safe Name"))
+        .unwrap();
+
+    let pending_before = engine
+        .vauchi()
+        .storage()
+        .pending()
+        .count_all_pending_updates()
+        .unwrap();
+
     engine.set_initial_screen(AppScreen::Lock);
     // The lock screen's TextInput carries the full value per TextChanged
     // (unlike the setup flow's per-digit PinInput).
@@ -237,15 +251,34 @@ fn duress_unlock_enters_decoy_mode_without_wiping() {
         .vauchi()
         .storage()
         .pending()
-        .count_all_pending_updates()
+        .get_all_pending_updates()
         .unwrap();
-    assert!(
-        pending > 0,
-        "the covert alert stays queued for delivery after unlock"
+    assert_eq!(
+        pending.len(),
+        pending_before + 1,
+        "exactly one covert alert must be queued by duress unlock"
     );
-    let visible: Vec<String> = contact_ids(&engine);
+    assert_eq!(
+        pending[0].contact_id, trusted_id,
+        "the queued alert must be addressed to the configured trusted contact"
+    );
+    let visible = engine.vauchi().list_contacts().unwrap();
+    let visible_names: Vec<String> = visible
+        .iter()
+        .map(|c| c.display_name().to_string())
+        .collect();
+    assert_eq!(
+        visible.len(),
+        1,
+        "duress mode must show exactly the decoy contact, got {visible_names:?}"
+    );
     assert!(
-        !visible.contains(&trusted_id),
+        visible_names.contains(&"Safe Name".to_string()),
+        "duress mode must show the decoy contact, got {visible_names:?}"
+    );
+    let visible_ids: Vec<String> = visible.iter().map(|c| c.id().to_string()).collect();
+    assert!(
+        !visible_ids.contains(&trusted_id),
         "duress mode lists decoys, never the real contacts"
     );
 }

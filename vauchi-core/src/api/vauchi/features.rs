@@ -507,7 +507,7 @@ impl Vauchi {
     ///
     /// Sends a "full card" delta so the contact receives the card as filtered
     /// by their current visibility rules. Skips if the contact has no ratchet.
-    fn repropagate_to_contact(&self, contact_id: &str) -> VauchiResult<()> {
+    pub(crate) fn repropagate_to_contact(&self, contact_id: &str) -> VauchiResult<()> {
         use crate::crypto::cek::ContentEncryptionKey;
         use crate::storage::{PendingUpdate, UpdateStatus};
         use crate::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};

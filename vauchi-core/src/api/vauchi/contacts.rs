@@ -424,10 +424,18 @@ impl Vauchi {
         Ok(())
     }
 
-    /// Unarchives an exchanged contact.
+    /// Unarchives an exchanged contact and queues a catch-up so they
+    /// receive the current card — archived contacts get no updates
+    /// (Decision 3, 2026-07-05-ungrouped-contacts-default-open), so
+    /// whatever changed while archived must be delivered now.
     pub fn unarchive_contact(&self, id: &str) -> VauchiResult<()> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.unarchive_contact(id)?;
+        match self.repropagate_to_contact(id) {
+            // Expected skips: no ratchet yet, nothing visible to deliver.
+            Ok(()) | Err(VauchiError::NotFound(_)) | Err(VauchiError::InvalidState(_)) => {}
+            Err(e) => return Err(e),
+        }
         self.record_sync_item(crate::sync::SyncItem::ContactUnarchived {
             contact_id: id.to_string(),
             timestamp: self.now_timestamp(),

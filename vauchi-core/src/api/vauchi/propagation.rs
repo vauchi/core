@@ -143,6 +143,15 @@ impl Vauchi {
         if contact.is_blocked() {
             return Err(VauchiError::ContactBlocked(contact_id.to_string()));
         }
+        // Archived contacts receive nothing until unarchived (which queues a
+        // catch-up) — enforced here so direct per-contact callers cannot
+        // bypass the `list_contacts` archived filter (Decision 3,
+        // 2026-07-05-ungrouped-contacts-default-open).
+        if contact.is_archived() {
+            return Err(VauchiError::InvalidState(format!(
+                "contact archived: {contact_id}"
+            )));
+        }
 
         // Compute delta
         let delta = CardDelta::compute(old_card, new_card, self.clock.unix_seconds());

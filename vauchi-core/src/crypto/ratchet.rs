@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use subtle::ConstantTimeEq;
 use thiserror::Error;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::X3DHKeyPair;
 use super::chain::{ChainError, ChainKey, MessageKey};
@@ -75,7 +75,7 @@ pub const RATCHET_STATE_VERSION: u8 = 1;
 ///
 /// The `version` field enables schema evolution: new fields can be added in future
 /// versions while maintaining backward compatibility for loading older states.
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
 pub struct SerializedRatchetState {
     /// Schema version for forward compatibility (#236)
     #[serde(default = "default_ratchet_version")]
@@ -107,22 +107,15 @@ fn default_ratchet_version() -> u8 {
     1
 }
 
-impl Drop for SerializedRatchetState {
-    fn drop(&mut self) {
-        self.root_key.zeroize();
-        self.our_dh_secret.zeroize();
-        if let Some(ref mut key) = self.their_dh {
-            key.zeroize();
-        }
-        if let Some((ref mut key, _)) = self.send_chain {
-            key.zeroize();
-        }
-        if let Some((ref mut key, _)) = self.recv_chain {
-            key.zeroize();
-        }
-        for (_, key) in self.skipped_keys.iter_mut() {
-            key.zeroize();
-        }
+impl std::fmt::Debug for SerializedRatchetState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SerializedRatchetState")
+            .field("version", &self.version)
+            .field("dh_generation", &self.dh_generation)
+            .field("send_message_count", &self.send_message_count)
+            .field("recv_message_count", &self.recv_message_count)
+            .field("skipped_keys_count", &self.skipped_keys.len())
+            .finish_non_exhaustive()
     }
 }
 

@@ -14,8 +14,8 @@ use crate::crypto::{HKDF, SymmetricKey, encryption};
 use crate::identity::device::{DeviceInfo, DeviceRegistry};
 use crate::storage::Storage;
 use crate::sync::device_sync::{
-    ContactExchangeLocation, DeviceSyncError, DeviceSyncPayload, FieldStamp, InterDeviceSyncState,
-    PlaceSyncData, SyncItem, TagSyncData, VersionVector,
+    ContactExchangeLocation, ContactRatchetSyncData, DeviceSyncError, DeviceSyncPayload,
+    FieldStamp, InterDeviceSyncState, PlaceSyncData, SyncItem, TagSyncData, VersionVector,
 };
 
 /// Domain separation for device-to-device encryption key derivation.
@@ -247,13 +247,36 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .map(|(id, loc)| ContactExchangeLocation::from_parts(id, loc))
             .collect();
 
+        // Load ratchet states for exchanged contacts so a replacement device can
+        // resume encrypted communication without an in-person re-exchange.
+        let mut ratchet_states = Vec::new();
+        for contact in &contacts {
+            if !contact.is_exchanged() {
+                continue;
+            }
+            let contact_id = contact.id();
+            if let Some((ratchet, is_initiator)) = self
+                .storage
+                .ratchets()
+                .load_ratchet_state(contact_id)
+                .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+            {
+                ratchet_states.push(ContactRatchetSyncData {
+                    contact_id: contact_id.to_string(),
+                    ratchet_state: ratchet.serialize(),
+                    is_initiator,
+                });
+            }
+        }
+
         // Get current version
         let version = self.version_vector.get(self.current_device.device_id());
 
         Ok(DeviceSyncPayload::new(&contacts, &own_card, version)
             .with_tags(tags)
             .with_places(places)
-            .with_exchange_locations(exchange_locations))
+            .with_exchange_locations(exchange_locations)
+            .with_ratchet_states(ratchet_states))
     }
 
     /// Applies a full sync payload received during device linking.
@@ -314,6 +337,19 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             for loc in &payload.exchange_locations {
                 self.storage
                     .save_exchange_location(&loc.contact_id, &loc.location())
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+
+            // Restore ratchet states for exchanged contacts so this device can
+            // send to and decrypt from existing contacts.
+            for ratchet_data in &payload.ratchet_states {
+                let state = crate::crypto::ratchet::DoubleRatchetState::deserialize(
+                    ratchet_data.ratchet_state.clone(),
+                )
+                .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+                self.storage
+                    .ratchets()
+                    .save_ratchet_state(&ratchet_data.contact_id, &state, ratchet_data.is_initiator)
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
 

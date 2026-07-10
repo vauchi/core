@@ -286,6 +286,23 @@ impl ContactExchangeLocation {
     }
 }
 
+/// Serializable ratchet state for one contact, used during device linking.
+///
+/// The ratchet state is serialized to plaintext before inclusion in the payload
+/// because the `DeviceSyncPayload` itself is transported inside the encrypted
+/// device-link response. The receiving device re-encrypts the state under its
+/// own storage key before persisting it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactRatchetSyncData {
+    /// Contact's unique ID (public key fingerprint).
+    pub contact_id: String,
+    /// Serialized ratchet state (sensitive — protected by the enclosing payload
+    /// encryption during transit).
+    pub ratchet_state: crate::crypto::ratchet::SerializedRatchetState,
+    /// Whether this side was the ratchet initiator for this contact.
+    pub is_initiator: bool,
+}
+
 /// Payload for syncing all contacts during device linking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceSyncPayload {
@@ -306,6 +323,11 @@ pub struct DeviceSyncPayload {
     /// Per-contact exchange locations (ADR-051). `#[serde(default)]` back-compat.
     #[serde(default)]
     pub exchange_locations: Vec<ContactExchangeLocation>,
+    /// Per-contact ratchet states so a replacement device can resume encrypted
+    /// communication with existing contacts. `#[serde(default)]` for back-compat
+    /// with payloads from older devices that predate ratchet-state sync.
+    #[serde(default)]
+    pub ratchet_states: Vec<ContactRatchetSyncData>,
     /// Version number for conflict resolution.
     pub version: u64,
 }
@@ -320,6 +342,7 @@ impl DeviceSyncPayload {
             tags: Vec::new(),
             places: Vec::new(),
             exchange_locations: Vec::new(),
+            ratchet_states: Vec::new(),
             version: 0,
         }
     }
@@ -349,6 +372,7 @@ impl DeviceSyncPayload {
             tags: Vec::new(),
             places: Vec::new(),
             exchange_locations: Vec::new(),
+            ratchet_states: Vec::new(),
             version,
         }
     }
@@ -371,6 +395,13 @@ impl DeviceSyncPayload {
     #[must_use]
     pub fn with_exchange_locations(mut self, locs: Vec<ContactExchangeLocation>) -> Self {
         self.exchange_locations = locs;
+        self
+    }
+
+    /// Attaches ratchet states to this payload (builder style).
+    #[must_use]
+    pub fn with_ratchet_states(mut self, states: Vec<ContactRatchetSyncData>) -> Self {
+        self.ratchet_states = states;
         self
     }
 

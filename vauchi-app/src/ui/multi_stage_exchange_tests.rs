@@ -157,6 +157,14 @@ fn active_screen_layout_is_fixed() {
     let screen = engine_with_qr(ProtocolState::Advertising, "payload").current_screen();
     assert_eq!(screen.screen_id, SCREEN_ID);
     assert_eq!(screen.layout, ScreenLayout::Fixed);
+    assert!(
+        screen.requires_poll,
+        "multi_stage_exchange must ask the shell for poll ticks (I4)"
+    );
+    assert!(
+        !screen.requires_animated_qr,
+        "multi_stage_exchange advances via poll, not animated QR frames"
+    );
 }
 
 // The peer-scan preview and the buttons share one `Row`; the buttons

@@ -807,7 +807,13 @@ pub(crate) fn own_qr_label(state: &ProtocolState, locale: Locale) -> String {
 
 impl WorkflowEngine for MultiStageExchangeEngine {
     fn current_screen(&self) -> ScreenModel {
-        self.build_screen()
+        let mut screen = self.build_screen();
+        // The multi-stage engine needs frontend poll ticks while it is the
+        // active screen (I4 of `2026-07-06-mobile-domain-shell-violations`).
+        // Stamping the hint at the render boundary lets shells follow core
+        // off the native wrapper without matching the `screen_id`.
+        screen.requires_poll = true;
+        screen
     }
 
     fn engine_output(&self) -> Option<EngineOutput> {

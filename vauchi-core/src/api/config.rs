@@ -99,23 +99,20 @@ impl Default for VauchiConfig {
     }
 }
 
-impl From<&VauchiConfig> for crate::types::SettingsFlags {
-    /// Project the settings-toggle subset of a config into the persisted
-    /// `SettingsFlags`. The single source of the config→flags mapping —
-    /// callers (e.g. the humble `persist_settings_toggle`) use this instead
-    /// of a struct literal so `SettingsFlags` stays `#[non_exhaustive]`.
-    fn from(config: &VauchiConfig) -> Self {
-        // A struct literal is fine here — `SettingsFlags` is `#[non_exhaustive]`
-        // only to *other* crates; this impl lives in the same crate, so the
-        // literal keeps every field explicit and stays exhaustive-checked.
-        crate::types::SettingsFlags {
-            delivery_receipts_enabled: config.delivery_receipts_enabled,
-            suppress_presence: config.suppress_presence,
-            contact_added_notifications: config.contact_added_notifications,
-            card_update_notifications: config.card_update_notifications,
-            reduce_motion: config.reduce_motion,
-            large_touch: config.large_touch,
-        }
+impl crate::types::SettingsFlags {
+    /// Overwrites the settings-toggle subset from a config, preserving every
+    /// non-toggle flag (e.g. `field_centric_visibility_migrated`). Replaces
+    /// the former `From<&VauchiConfig>` projection, whose whole-struct
+    /// construction silently reset non-toggle state on every toggle persist.
+    /// The single source of the config→flags mapping — callers (e.g. the
+    /// humble `persist_settings_toggle`) load-merge-save through this.
+    pub fn merge_config_toggles(&mut self, config: &VauchiConfig) {
+        self.delivery_receipts_enabled = config.delivery_receipts_enabled;
+        self.suppress_presence = config.suppress_presence;
+        self.contact_added_notifications = config.contact_added_notifications;
+        self.card_update_notifications = config.card_update_notifications;
+        self.reduce_motion = config.reduce_motion;
+        self.large_touch = config.large_touch;
     }
 }
 

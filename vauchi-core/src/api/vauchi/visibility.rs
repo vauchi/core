@@ -313,6 +313,50 @@ impl Vauchi {
             .is_some_and(|card| card.field_visibility().is_explicitly_everyone(field_id)))
     }
 
+    /// One-time grandfathering sweep for the field-centric visibility model
+    /// (2026-07-05-ungrouped-contacts-default-open, owner decision
+    /// 2026-07-10). Unruled own-card entries that no group governs
+    /// materialize to explicit `Everyone` — re-encoding what contacts
+    /// observably received under the retired default-open model — while
+    /// explicit toggles are never touched. Runs at startup once the storage
+    /// key is available; `create_identity` pre-sets the marker so fresh
+    /// installs never sweep. Returns whether the sweep ran.
+    pub fn migrate_field_centric_visibility(&self) -> VauchiResult<bool> {
+        let mut flags = self.load_settings_flags()?;
+        if flags.field_centric_visibility_migrated {
+            return Ok(false);
+        }
+
+        if let Some(mut card) = self.storage.contacts().load_own_card()? {
+            let groups = self.storage.labels().load_all_groups()?;
+            let assigned = |fid: &str| groups.iter().any(|g| g.is_field_visible(fid));
+            let unruled_unassigned: Vec<String> = card
+                .fields()
+                .iter()
+                .map(|f| f.id().to_string())
+                .filter(|fid| !card.field_visibility().contains(fid) && !assigned(fid))
+                .collect();
+            for fid in &unruled_unassigned {
+                card.field_visibility_mut().set_everyone(fid);
+            }
+            if !unruled_unassigned.is_empty() {
+                self.storage.contacts().save_own_card(&card)?;
+            }
+            // With groups present the algorithm change moves audiences even
+            // though no toggle moved (non-members lose group-assigned
+            // entries; members gain toggled ones) — deliver it now instead
+            // of on the next unrelated edit. Without groups the sweep is a
+            // no-op re-encoding: no traffic.
+            if !groups.is_empty() {
+                self.mark_own_card_repropagate()?;
+            }
+        }
+
+        flags.field_centric_visibility_migrated = true;
+        self.save_settings_flags(&flags)?;
+        Ok(true)
+    }
+
     /// Resolves an own-card field label to its field id.
     ///
     /// Layer-A visibility rules are keyed by field *id*; UniFFI

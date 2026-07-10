@@ -344,8 +344,9 @@ impl Vauchi {
             }
             _ => None,
         };
+        let run_visibility_migration = identity.is_some();
 
-        Ok(Vauchi {
+        let wb = Vauchi {
             config,
             identity,
             storage,
@@ -364,7 +365,15 @@ impl Vauchi {
             last_exchange_time: None,
             last_sync_unix_seconds: None,
             last_emergency_broadcast_unix_seconds: None,
-        })
+        };
+        // Existing installs grandfather their visibility state before any
+        // propagation can run under the field-centric hidden default
+        // (2026-07-05-ungrouped-contacts-default-open). Fresh installs are
+        // marker-gated at create_identity and skip in O(1).
+        if run_visibility_migration {
+            wb.migrate_field_centric_visibility()?;
+        }
+        Ok(wb)
     }
 
     /// Resolves the storage encryption key from available sources.

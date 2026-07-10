@@ -55,6 +55,12 @@ impl VisibilityRules {
         self.rules.is_empty()
     }
 
+    /// Returns true if the field carries an explicit rule (any variant) —
+    /// distinguishes "unruled" from "ruled" where `get`'s fallback cannot.
+    pub fn contains(&self, field_id: &str) -> bool {
+        self.rules.contains_key(field_id)
+    }
+
     /// Returns true only if the field has an explicit `Everyone` rule.
     ///
     /// Returns false if no rule is set (privacy-first default) or if set to

@@ -338,6 +338,12 @@ pub struct SettingsFlags {
     /// Category-2 accessibility flag (see `reduce_motion`).
     #[serde(default)]
     pub large_touch: bool,
+    /// One-time field-centric visibility grandfathering ran (or the install
+    /// is fresh enough to never need it). `#[serde(default)]` = false is the
+    /// trigger for installs that predate the model
+    /// (2026-07-05-ungrouped-contacts-default-open).
+    #[serde(default)]
+    pub field_centric_visibility_migrated: bool,
 }
 
 impl Default for SettingsFlags {
@@ -349,6 +355,7 @@ impl Default for SettingsFlags {
             card_update_notifications: true,
             reduce_motion: false,
             large_touch: false,
+            field_centric_visibility_migrated: false,
         }
     }
 }

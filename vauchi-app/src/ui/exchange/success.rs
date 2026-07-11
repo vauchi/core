@@ -62,6 +62,7 @@ pub fn build_exchange_success_screen(
             format!("Exchanged with {}", summary.peer_name)
         }),
         status: Status::Success,
+        status_label: t(Status::Success.label_key()),
         a11y: None,
     }];
 

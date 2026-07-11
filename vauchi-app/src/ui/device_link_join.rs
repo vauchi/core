@@ -147,6 +147,7 @@ impl DeviceLinkJoinEngine {
                 title: self.t("devices.link.waiting_approval"),
                 detail: None,
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.waiting_approval")),
                     hint: None,
@@ -211,6 +212,7 @@ impl DeviceLinkJoinEngine {
                 title: self.t("devices.link.sending_credentials"),
                 detail: Some(self.t("devices.link.transferring_identity")),
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.completing_a11y")),
                     hint: Some(self.t("devices.link.sending_credentials_hint")),
@@ -234,6 +236,7 @@ impl DeviceLinkJoinEngine {
                 title: self.t("devices.link.join_success"),
                 detail: None,
                 status: Status::Success,
+                status_label: self.t(Status::Success.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.device_linked_status_a11y")),
                     hint: Some(self.t("devices.link.linked_success_hint")),
@@ -263,6 +266,7 @@ impl DeviceLinkJoinEngine {
                 title: self.t("devices.link.linking_failed_status"),
                 detail: Some(failure_detail(reason, self.locale)),
                 status: Status::Failed,
+                status_label: self.t(Status::Failed.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.linking_failed_a11y")),
                     hint: Some(self.t("devices.link.could_not_complete")),

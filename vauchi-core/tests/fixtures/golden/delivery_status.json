@@ -18,6 +18,7 @@
         "title": "Alice",
         "detail": "Delivered 2 min ago",
         "status": "Success",
+        "status_label": "Success",
         "a11y": null
       }
     },
@@ -36,6 +37,7 @@
         "title": "Bob",
         "detail": "Relay unreachable",
         "status": "Failed",
+        "status_label": "Failed",
         "a11y": null
       }
     }

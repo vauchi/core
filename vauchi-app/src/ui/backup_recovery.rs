@@ -385,6 +385,7 @@ impl BackupRecoveryEngine {
                 title: title.clone(),
                 detail: Some(detail.clone()),
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: Some(A11y {
                     label: Some(get_string_with_args(
                         self.locale,
@@ -416,6 +417,7 @@ impl BackupRecoveryEngine {
                 title: title.clone(),
                 detail: None,
                 status: Status::Success,
+                status_label: self.t(Status::Success.label_key()),
                 a11y: Some(A11y {
                     label: Some(get_string_with_args(
                         self.locale,
@@ -453,6 +455,7 @@ impl BackupRecoveryEngine {
                 title: title.clone(),
                 detail: None,
                 status: Status::Failed,
+                status_label: self.t(Status::Failed.label_key()),
                 a11y: Some(A11y {
                     label: Some(get_string_with_args(
                         self.locale,

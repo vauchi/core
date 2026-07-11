@@ -2068,6 +2068,11 @@
                 "status": {
                   "$ref": "#/definitions/Status"
                 },
+                "status_label": {
+                  "description": "Core-resolved localized badge label for `status`. Frontends render it verbatim — deriving text from the discriminant is the W-class leak this field retires (`2026-07-06-mobile-domain-shell-violations`). Serde default keeps pre-field payloads deserializable.",
+                  "default": "",
+                  "type": "string"
+                },
                 "title": {
                   "type": "string"
                 }

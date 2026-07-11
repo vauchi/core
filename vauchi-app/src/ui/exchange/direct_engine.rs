@@ -242,6 +242,7 @@ impl DirectTransportEngine {
                 title: self.t("exchange.terminal.complete"),
                 detail: None,
                 status: Status::Success,
+                status_label: self.t(Status::Success.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("exchange.terminal.complete")),
                     hint: Some(self.t("exchange.terminal.complete_hint")),
@@ -270,6 +271,7 @@ impl DirectTransportEngine {
                 title: self.t("exchange.terminal.failed_status"),
                 detail,
                 status: Status::Failed,
+                status_label: self.t(Status::Failed.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("exchange.terminal.failed_status")),
                     hint: Some(self.t("exchange.terminal.failed_hint")),

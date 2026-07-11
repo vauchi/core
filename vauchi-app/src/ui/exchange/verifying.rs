@@ -26,6 +26,7 @@ pub(super) fn build_verifying_screen(locale: crate::i18n::Locale) -> ScreenModel
             title: t("exchange.verifying.status"),
             detail: None,
             status: Status::InProgress,
+            status_label: t(Status::InProgress.label_key()),
             a11y: Some(A11y {
                 label: Some(t("exchange.verifying.a11y")),
                 hint: Some(t("exchange.verifying.a11y_hint")),

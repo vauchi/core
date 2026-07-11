@@ -154,6 +154,13 @@ pub enum Component {
         title: String,
         detail: Option<String>,
         status: Status,
+        /// Core-resolved localized badge label for `status`. Frontends
+        /// render it verbatim — deriving text from the discriminant is
+        /// the W-class leak this field retires
+        /// (`2026-07-06-mobile-domain-shell-violations`). Serde default
+        /// keeps pre-field payloads deserializable.
+        #[serde(default)]
+        status_label: String,
         #[serde(default)]
         a11y: Option<A11y>,
     },
@@ -459,7 +466,7 @@ pub struct ActionListItem {
 
 /// Status for a status indicator component.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Status {
     Pending,
@@ -467,6 +474,21 @@ pub enum Status {
     Success,
     Failed,
     Warning,
+}
+
+impl Status {
+    /// Catalog key for the badge label. Construction sites resolve it
+    /// (`status_label: t(status.label_key())`) so frontends render the
+    /// label verbatim and never derive text from the discriminant.
+    pub fn label_key(self) -> &'static str {
+        match self {
+            Status::Pending => "status.pending",
+            Status::InProgress => "status.in_progress",
+            Status::Success => "status.success",
+            Status::Failed => "status.failed",
+            Status::Warning => "status.warning",
+        }
+    }
 }
 
 /// Semantic kind for `Component::Indicator` — the four-state color

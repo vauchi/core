@@ -261,6 +261,7 @@ impl SocialGraphEngine {
                 title: self.t("social_graph.empty_title"),
                 detail: Some(self.t("social_graph.empty_detail")),
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: None,
             });
         }

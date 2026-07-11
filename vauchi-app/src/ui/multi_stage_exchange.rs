@@ -368,6 +368,7 @@ impl MultiStageExchangeEngine {
                     title: self.t("multi_stage.camera_required_title"),
                     detail: Some(self.t("multi_stage.camera_required_detail")),
                     status: Status::Warning,
+                    status_label: self.t(Status::Warning.label_key()),
                     a11y: None,
                 }],
                 vec![
@@ -398,6 +399,7 @@ impl MultiStageExchangeEngine {
                     title: self.t("multi_stage.camera_unavailable_title"),
                     detail: Some(self.t("multi_stage.camera_unavailable_detail")),
                     status: Status::Failed,
+                    status_label: self.t(Status::Failed.label_key()),
                     a11y: None,
                 }],
                 vec![ScreenAction {
@@ -476,6 +478,7 @@ impl MultiStageExchangeEngine {
             title: self.t("exchange.terminal.complete"),
             detail: None,
             status: Status::Success,
+            status_label: self.t(Status::Success.label_key()),
             a11y: None,
         });
         let detail = self
@@ -625,6 +628,7 @@ impl MultiStageExchangeEngine {
                     title: self.t("exchange.terminal.complete"),
                     detail: None,
                     status: Status::Success,
+                    status_label: self.t(Status::Success.label_key()),
                     a11y: None,
                 },
                 Component::Text {
@@ -653,6 +657,7 @@ impl MultiStageExchangeEngine {
                 title: self.t("exchange.terminal.failed_status"),
                 detail: Some(reason.to_string()),
                 status: Status::Failed,
+                status_label: self.t(Status::Failed.label_key()),
                 a11y: None,
             }],
             vec![
@@ -690,6 +695,7 @@ impl MultiStageExchangeEngine {
                 title: self.t("multi_stage.shake_not_confirmed_title"),
                 detail: Some(self.t("multi_stage.shake_not_confirmed_detail")),
                 status: Status::Failed,
+                status_label: self.t(Status::Failed.label_key()),
                 a11y: None,
             }],
             vec![
@@ -736,6 +742,7 @@ impl MultiStageExchangeEngine {
                 title: self.t("multi_stage.proximity_not_confirmed_title"),
                 detail: Some(self.t("multi_stage.proximity_not_confirmed_detail")),
                 status: Status::Failed,
+                status_label: self.t(Status::Failed.label_key()),
                 a11y: None,
             }],
             vec![

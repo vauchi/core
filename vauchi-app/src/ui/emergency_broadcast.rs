@@ -119,6 +119,11 @@ impl EmergencyBroadcastEngine {
     }
 
     fn overview_screen(&self) -> ScreenModel {
+        let broadcast_status = if self.configured {
+            Status::Success
+        } else {
+            Status::Warning
+        };
         let mut components = vec![
             Component::InfoPanel {
                 id: "emergency_info".into(),
@@ -147,11 +152,8 @@ impl EmergencyBroadcastEngine {
                     self.t("emergency.not_set_up_status")
                 },
                 detail: None,
-                status: if self.configured {
-                    Status::Success
-                } else {
-                    Status::Warning
-                },
+                status: broadcast_status,
+                status_label: self.t(broadcast_status.label_key()),
                 a11y: None,
             },
         ];

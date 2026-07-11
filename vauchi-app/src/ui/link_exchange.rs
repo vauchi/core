@@ -221,6 +221,7 @@ impl LinkExchangeEngine {
                 title: self.t("link_exchange.waiting_status"),
                 detail: Some(self.t("link_exchange.waiting_detail")),
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("link_exchange.waiting_a11y")),
                     hint: Some(self.t("link_exchange.waiting_a11y_hint")),
@@ -249,6 +250,7 @@ impl LinkExchangeEngine {
                 title: self.t("link_exchange.retrieving_status"),
                 detail: None,
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("link_exchange.retrieving_a11y")),
                     hint: Some(self.t("link_exchange.retrieving_a11y_hint")),
@@ -283,6 +285,7 @@ impl LinkExchangeEngine {
                 title: self.t("link_exchange.success_status"),
                 detail: Some(self.t("link_exchange.success_detail")),
                 status: Status::Success,
+                status_label: self.t(Status::Success.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("link_exchange.contact_added_a11y")),
                     hint: None,
@@ -311,6 +314,7 @@ impl LinkExchangeEngine {
                 title: self.t("exchange.terminal.failed"),
                 detail: Some(failure_detail(reason, self.locale)),
                 status: Status::Failed,
+                status_label: self.t(Status::Failed.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("link_exchange.link_failed_a11y")),
                     hint: None,

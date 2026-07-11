@@ -92,6 +92,11 @@ impl DuressPinEngine {
     }
 
     fn overview_screen(&self) -> ScreenModel {
+        let duress_status = if self.config.enabled {
+            Status::Success
+        } else {
+            Status::Warning
+        };
         let mut components = vec![
             Component::InfoPanel {
                 id: "duress_info".into(),
@@ -120,11 +125,8 @@ impl DuressPinEngine {
                     self.t("resistance.duress.not_set_up")
                 },
                 detail: None,
-                status: if self.config.enabled {
-                    Status::Success
-                } else {
-                    Status::Warning
-                },
+                status: duress_status,
+                status_label: self.t(duress_status.label_key()),
                 a11y: None,
             },
         ];

@@ -100,7 +100,7 @@ impl DeliveryStatusEngine {
                     &self.t("delivery_status.recent_section"),
                 ));
                 for item in &recent {
-                    components.push(status_indicator_for(item));
+                    components.push(status_indicator_for(item, self.locale));
                 }
             }
             // Section: Failed (with per-row retry actions)
@@ -117,7 +117,7 @@ impl DeliveryStatusEngine {
                     ),
                 ));
                 for item in &failed {
-                    components.push(status_indicator_for(item));
+                    components.push(status_indicator_for(item, self.locale));
                 }
             }
             // Section: Pending Retries
@@ -167,13 +167,14 @@ fn section_header(id: &str, label: &str) -> Component {
     }
 }
 
-fn status_indicator_for(item: &DeliveryItem) -> Component {
+fn status_indicator_for(item: &DeliveryItem, locale: Locale) -> Component {
     Component::StatusIndicator {
         id: item.message_id.clone(),
         icon: None,
         title: item.contact_name.clone(),
         detail: item.detail.clone(),
-        status: item.status.clone(),
+        status: item.status,
+        status_label: get_string(locale, item.status.label_key()),
         a11y: None,
     }
 }
@@ -195,16 +196,18 @@ fn retry_indicator(retry: &RetryEntry, locale: Locale) -> Component {
             ],
         ))
     };
+    let status = if retry.max_exceeded {
+        Status::Failed
+    } else {
+        Status::Pending
+    };
     Component::StatusIndicator {
         id: format!("pending:{}", retry.message_id),
         icon: None,
         title: retry.contact_name.clone(),
         detail,
-        status: if retry.max_exceeded {
-            Status::Failed
-        } else {
-            Status::Pending
-        },
+        status,
+        status_label: get_string(locale, status.label_key()),
         a11y: None,
     }
 }

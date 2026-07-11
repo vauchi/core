@@ -112,6 +112,7 @@ mod settings_profile_i18n_tests;
 mod settings_render_context_tests;
 mod settings_security_i18n_tests;
 mod shred_i18n_tests;
+mod status_indicator_label_tests;
 mod sync_chrome_overlay_tests;
 mod update_overlay_tests;
 mod wire_humble_keys_tests;

@@ -165,6 +165,7 @@ impl RecoveryHelpEngine {
                 title: self.t("recovery.verify_in_person_title"),
                 detail: Some(self.t("recovery.vouch_warning")),
                 status: Status::Warning,
+                status_label: self.t(Status::Warning.label_key()),
                 a11y: None,
             },
             Component::InfoPanel {
@@ -303,6 +304,7 @@ impl RecoveryHelpEngine {
                 title: self.t("recovery.claim_expired_title"),
                 detail: Some(self.t("recovery.claim_expired_detail")),
                 status: Status::Failed,
+                status_label: self.t(Status::Failed.label_key()),
                 a11y: None,
             });
         } else {
@@ -312,6 +314,7 @@ impl RecoveryHelpEngine {
                 title: self.t("recovery.verify_in_person_title"),
                 detail: Some(self.t("recovery.verify_in_person_warning")),
                 status: Status::Warning,
+                status_label: self.t(Status::Warning.label_key()),
                 a11y: None,
             });
         }
@@ -359,6 +362,7 @@ impl RecoveryHelpEngine {
                     title: self.t("recovery.voucher_created_status"),
                     detail: Some(self.t("recovery.give_voucher_detail")),
                     status: Status::Success,
+                    status_label: self.t(Status::Success.label_key()),
                     a11y: None,
                 },
                 Component::Text {

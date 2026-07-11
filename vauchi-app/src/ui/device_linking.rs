@@ -446,6 +446,7 @@ impl DeviceLinkingEngine {
                 title: self.t("devices.link.syncing_data"),
                 detail: None,
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.syncing_data_a11y")),
                     hint: Some(self.t("devices.link.syncing_data_hint")),
@@ -469,6 +470,7 @@ impl DeviceLinkingEngine {
                 title: self.t("devices.link.device_linked_title"),
                 detail: None,
                 status: Status::Success,
+                status_label: self.t(Status::Success.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.device_linked_status_a11y")),
                     hint: Some(self.t("devices.link.linked_success_hint")),
@@ -498,6 +500,7 @@ impl DeviceLinkingEngine {
                 title: self.t("devices.generating_link"),
                 detail: None,
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.generating_device_link")),
                     hint: Some(self.t("devices.link.preparing_qr_hint")),
@@ -567,6 +570,7 @@ impl DeviceLinkingEngine {
                 title: self.t("devices.qr_expired"),
                 detail: Some(self.t("devices.link.qr_expired_detail")),
                 status: Status::Warning,
+                status_label: self.t(Status::Warning.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.qr_expired_a11y")),
                     hint: Some(self.t("devices.link.qr_expired_hint")),
@@ -653,6 +657,7 @@ impl DeviceLinkingEngine {
                 title: self.t("devices.link.sending_credentials"),
                 detail: Some(self.t("devices.link.transferring_identity")),
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.completing_a11y")),
                     hint: Some(self.t("devices.link.sending_credentials_hint")),
@@ -685,6 +690,7 @@ impl DeviceLinkingEngine {
                 // "user_denied" (2026-07-03-second-device-join-dead-end item 4).
                 detail: Some(failure_detail(message, self.locale)),
                 status: Status::Failed,
+                status_label: self.t(Status::Failed.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("devices.link.linking_failed_a11y")),
                     hint: Some(self.t("devices.link.could_not_complete")),

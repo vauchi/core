@@ -229,6 +229,7 @@ impl RecoveryEngine {
                     &[("count", &threshold.saturating_sub(trusted).to_string())],
                 )),
                 status: Status::Warning,
+                status_label: self.t(Status::Warning.label_key()),
                 a11y: None,
             });
         }
@@ -351,6 +352,7 @@ impl RecoveryEngine {
                     title: self.t("recovery.share_with_trusted_title"),
                     detail: Some(self.t("recovery.give_claim_instruction")),
                     status: Status::Success,
+                    status_label: self.t(Status::Success.label_key()),
                     a11y: None,
                 },
                 Component::Text {
@@ -399,6 +401,7 @@ impl RecoveryEngine {
                     &[("count", &self.linked_device_count.to_string())],
                 )),
                 status: Status::Success,
+                status_label: self.t(Status::Success.label_key()),
                 a11y: None,
             });
         }
@@ -539,6 +542,7 @@ impl RecoveryEngine {
                 ],
             )),
             status,
+            status_label: self.t(status.label_key()),
             a11y: None,
         }];
 
@@ -613,6 +617,7 @@ impl RecoveryEngine {
                     title: self.t("recovery.proof_submitted_title"),
                     detail: Some(self.t("recovery.proof_submitted_detail")),
                     status: Status::Success,
+                    status_label: self.t(Status::Success.label_key()),
                     a11y: None,
                 },
                 Component::Text {

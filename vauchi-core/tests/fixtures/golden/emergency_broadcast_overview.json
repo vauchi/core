@@ -26,6 +26,7 @@
         "title": "Emergency broadcast not set up",
         "detail": null,
         "status": "Warning",
+        "status_label": "Warning",
         "a11y": null
       }
     }

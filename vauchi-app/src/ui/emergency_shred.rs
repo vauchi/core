@@ -157,6 +157,7 @@ impl EmergencyShredEngine {
                 title: self.t("shred.wipe.wiping_status"),
                 detail: None,
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: None,
             }],
             actions: vec![],
@@ -180,6 +181,7 @@ impl EmergencyShredEngine {
                 title: self.t("shred.wipe.complete_title"),
                 detail: None,
                 status: Status::Success,
+                status_label: self.t(Status::Success.label_key()),
                 a11y: None,
             }],
             actions: vec![ScreenAction {

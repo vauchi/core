@@ -202,6 +202,7 @@ fn all_components() -> Vec<Component> {
             title: "Status".to_string(),
             detail: None,
             status: Status::Success,
+            status_label: "Success".to_string(),
             a11y: None,
         },
         Component::PinInput {

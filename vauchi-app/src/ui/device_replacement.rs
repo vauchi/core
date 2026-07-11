@@ -356,6 +356,7 @@ impl DeviceReplacementEngine {
                 title: self.t("device.transfer_in_progress_title"),
                 detail,
                 status: Status::InProgress,
+                status_label: self.t(Status::InProgress.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("device.transfer_progress_a11y")),
                     hint: Some(self.t("device.transfer_progress_hint")),
@@ -405,6 +406,7 @@ impl DeviceReplacementEngine {
                 title: self.t("device.transfer_complete_status"),
                 detail,
                 status: Status::Success,
+                status_label: self.t(Status::Success.label_key()),
                 a11y: Some(A11y {
                     label: Some(self.t("device.transfer_complete_status")),
                     hint: Some(self.t("device.transfer_complete_hint")),

@@ -26,6 +26,7 @@
         "title": "Verify in person",
         "detail": "Only vouch for someone you can verify IN PERSON. This prevents identity theft.",
         "status": "Warning",
+        "status_label": "Warning",
         "a11y": null
       }
     },

@@ -42,6 +42,9 @@ fn app_with_replacement_at_complete() -> (AppEngine, String) {
     let mut app = AppEngine::new(vauchi);
     let mut wizard = DeviceReplacementEngine::new_source();
     wizard.peer_connected("123456".into());
+    let _ = wizard.handle_action(UserAction::ActionPressed {
+        action_id: "confirm".into(),
+    });
     wizard.sync_complete(1, 1);
     app.engine = Box::new(wizard);
     app.screen = AppScreen::DeviceReplacement;

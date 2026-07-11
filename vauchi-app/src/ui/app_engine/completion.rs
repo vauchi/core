@@ -751,11 +751,18 @@ impl AppEngine {
             }
         };
         if let Some(crate::ui::device_replacement::CompletionOutcome::RemoveOldDevice) = outcome {
-            // Delegate to existing device management unlink
-            // (current device index = 0, handled by the platform layer)
+            let message = match self.vauchi.decommission_current_device() {
+                Ok(_) => "Old device decommissioned. It no longer sends or reads contact updates."
+                    .to_string(),
+                Err(e) => {
+                    tracing::warn!(?e, "decommission_current_device failed");
+                    "Could not decommission this device. Try again from Settings > Devices."
+                        .to_string()
+                }
+            };
             self.navigate_back();
             return ActionResult::ShowToast {
-                message: "Device removal requested. Complete in Settings > Devices.".into(),
+                message,
                 undo_action_id: None,
             };
         }

@@ -174,10 +174,6 @@ criteria = "safe-to-deploy"
 version = "0.8.6"
 criteria = "safe-to-run"
 
-[[exemptions.crossbeam-epoch]]
-version = "0.9.20"
-criteria = "safe-to-run"
-
 [[exemptions.crossbeam-utils]]
 version = "0.8.21"
 criteria = "safe-to-run"
@@ -410,10 +406,6 @@ criteria = "safe-to-deploy"
 version = "0.25.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.ipnet]]
-version = "2.12.0"
-criteria = "safe-to-run"
-
 [[exemptions.itertools]]
 version = "0.12.1"
 criteria = "safe-to-deploy"
@@ -606,18 +598,6 @@ criteria = "safe-to-deploy"
 version = "0.2.3"
 criteria = "safe-to-deploy"
 
-[[exemptions.plotters]]
-version = "0.3.7"
-criteria = "safe-to-run"
-
-[[exemptions.plotters-backend]]
-version = "0.3.7"
-criteria = "safe-to-run"
-
-[[exemptions.plotters-svg]]
-version = "0.3.7"
-criteria = "safe-to-run"
-
 [[exemptions.png]]
 version = "0.18.1"
 criteria = "safe-to-deploy"
@@ -665,10 +645,6 @@ criteria = "safe-to-deploy"
 [[exemptions.rawpointer]]
 version = "0.2.1"
 criteria = "safe-to-deploy"
-
-[[exemptions.rayon]]
-version = "1.12.0"
-criteria = "safe-to-run"
 
 [[exemptions.referencing]]
 version = "0.28.3"
@@ -802,10 +778,6 @@ criteria = "safe-to-deploy"
 version = "1.2.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.sync_wrapper]]
-version = "1.0.2"
-criteria = "safe-to-run"
-
 [[exemptions.synthez]]
 version = "0.3.1"
 criteria = "safe-to-run"
@@ -833,10 +805,6 @@ criteria = "safe-to-deploy"
 [[exemptions.tinyvec]]
 version = "1.11.0"
 criteria = "safe-to-deploy"
-
-[[exemptions.tower-layer]]
-version = "0.3.3"
-criteria = "safe-to-run"
 
 [[exemptions.tracing]]
 version = "0.1.44"

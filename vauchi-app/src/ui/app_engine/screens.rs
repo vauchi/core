@@ -22,7 +22,6 @@ use crate::ui::delivery::{DeliveryItem, DeliveryStatusEngine, RetryEntry};
 use crate::ui::device_linking::DeviceLinkingEngine;
 use crate::ui::device_management::{DeviceListItem, DeviceManagementEngine};
 use crate::ui::duress_pin::{DuressConfig, DuressPinEngine};
-use crate::ui::emergency_broadcast::EmergencyBroadcastEngine;
 use crate::ui::emergency_shred::EmergencyShredEngine;
 use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogEngine;
@@ -378,14 +377,6 @@ impl AppEngine {
             AppScreen::EmergencyShred => {
                 Box::new(EmergencyShredEngine::new(render_context.resolved_locale()))
             }
-            AppScreen::EmergencyBroadcast => {
-                let config = vauchi.load_emergency_config().ok().flatten();
-                Box::new(
-                    EmergencyBroadcastEngine::new(config)
-                        .with_available_contacts(Self::picker_contacts(vauchi))
-                        .with_locale(render_context.resolved_locale()),
-                )
-            }
             AppScreen::DeliveryStatus => {
                 let items = Self::load_delivery_items(vauchi);
                 let retries = Self::load_retry_entries(vauchi);
@@ -414,43 +405,6 @@ impl AppEngine {
                 crate::ui::recovery_help::RecoveryHelpEngine::new()
                     .with_locale(render_context.resolved_locale()),
             ),
-            AppScreen::SocialGraph => {
-                use crate::ui::social_graph::{SocialContactEntry, SocialTrustLevel};
-                use vauchi_core::contact::TrustLevel;
-
-                let contact_items =
-                    Self::load_contact_items(vauchi, render_context.resolved_locale());
-                let entries: Vec<SocialContactEntry> = contact_items
-                    .into_iter()
-                    .map(|indexed| {
-                        let item = indexed.item;
-                        let trust_level = vauchi
-                            .get_contact(&item.id)
-                            .ok()
-                            .flatten()
-                            .map(|c| match c.trust_level() {
-                                TrustLevel::Cautious => SocialTrustLevel::Cautious,
-                                TrustLevel::Verified => SocialTrustLevel::Verified,
-                                TrustLevel::High => SocialTrustLevel::High,
-                                TrustLevel::Standard => SocialTrustLevel::Standard,
-                                // TrustLevel is #[non_exhaustive] — default
-                                // any future variant to Standard (lowest-trust
-                                // bucket) so it surfaces without a warning.
-                                _ => SocialTrustLevel::Standard,
-                            })
-                            .unwrap_or(SocialTrustLevel::Standard);
-                        SocialContactEntry {
-                            contact: item,
-                            trust_level,
-                        }
-                    })
-                    .collect();
-                let group_count = vauchi.list_groups().map(|g| g.len()).unwrap_or(0);
-                Box::new(
-                    crate::ui::SocialGraphEngine::new(entries, group_count)
-                        .with_locale(render_context.resolved_locale()),
-                )
-            }
             AppScreen::TagPromotion { tag_id } => match vauchi.begin_tag_promotion(tag_id) {
                 Ok(draft) => {
                     let fields: Vec<PromotionField> = match vauchi.own_card() {

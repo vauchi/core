@@ -10,8 +10,8 @@
 //! the hub will read (CC-03).
 
 use vauchi_app::ui::{
-    BackupFormSnapshot, Component, EmergencyBroadcastPlan, EngineOutput, InputType,
-    OnboardingEngine, UserAction, WorkflowEngine,
+    BackupFormSnapshot, Component, EngineOutput, InputType, OnboardingEngine, UserAction,
+    WorkflowEngine,
 };
 
 // @scenario: onboarding.feature - Completing onboarding creates identity
@@ -36,23 +36,6 @@ fn onboarding_output_carries_typed_display_name() {
     );
     assert_eq!(snap.data.fields, vec![]);
     assert_eq!(snap.pending_backup, None);
-}
-
-// @scenario: emergency_broadcast.feature - Configuring an emergency broadcast
-#[test]
-fn emergency_broadcast_output_snapshots_empty_plan() {
-    use vauchi_app::ui::EmergencyBroadcastEngine;
-    let engine = EmergencyBroadcastEngine::new(None);
-
-    assert_eq!(
-        engine.engine_output(),
-        Some(EngineOutput::EmergencyBroadcast(EmergencyBroadcastPlan {
-            outcome: None,
-            contact_ids: vec![],
-            message: String::new(),
-            include_location: false,
-        }))
-    );
 }
 
 // @scenario: backup.feature - Restoring from a backup blob

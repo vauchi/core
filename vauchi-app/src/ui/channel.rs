@@ -18,7 +18,6 @@
 //!
 //! Record: `2026-06-10-appengine-typed-engine-channel`.
 
-use super::emergency_broadcast::EmergencyOutcome;
 use super::exchange::success::ExchangeSuccessSummary;
 use super::fingerprint_verify::VerifyAction;
 use super::onboarding::OnboardingData;
@@ -40,8 +39,6 @@ pub enum EngineOutput {
     /// selection, ContactInfo fields), plus the wizard step and any
     /// pending backup-restore file, read at completion time.
     Onboarding(Box<OnboardingSnapshot>),
-    /// The configured emergency broadcast and the user's chosen outcome.
-    EmergencyBroadcast(EmergencyBroadcastPlan),
     /// The display name as edited on the contact-edit screen.
     ContactEdit { display_name: String },
     /// The backup/restore form state (password redacted in `Debug`).
@@ -452,15 +449,6 @@ pub enum FormInput {
     },
 }
 
-/// Snapshot of the emergency-broadcast engine at completion time.
-#[derive(Clone, Debug, PartialEq)]
-pub struct EmergencyBroadcastPlan {
-    pub outcome: Option<EmergencyOutcome>,
-    pub contact_ids: Vec<String>,
-    pub message: String,
-    pub include_location: bool,
-}
-
 /// Snapshot of the backup/restore form.
 ///
 /// `password` is a live credential: it must never reach logs, so
@@ -490,7 +478,6 @@ impl std::fmt::Debug for EngineOutput {
         match self {
             Self::FingerprintVerify(a) => f.debug_tuple("FingerprintVerify").field(a).finish(),
             Self::Onboarding(d) => f.debug_tuple("Onboarding").field(d).finish(),
-            Self::EmergencyBroadcast(p) => f.debug_tuple("EmergencyBroadcast").field(p).finish(),
             Self::ContactEdit { display_name } => f
                 .debug_struct("ContactEdit")
                 .field("display_name", display_name)

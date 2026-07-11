@@ -33,7 +33,6 @@ fn parameterized_contact_screens_resolve_to_contacts_on_both_layouts() {
         AppScreen::ContactDuplicates,
         AppScreen::ContactLimit,
         AppScreen::ArchivedContacts,
-        AppScreen::SocialGraph,
     ] {
         assert_eq!(
             screen.parent_tab_for(TabLayout::Mobile),

@@ -180,7 +180,6 @@ mod duress_contact_api_tests;
 mod duress_pin_engine_tests;
 mod duress_pin_tests;
 mod edge_cases_tests;
-mod emergency_broadcast_engine_tests;
 mod emergency_broadcast_tests;
 mod emergency_shred_engine_tests;
 mod encryption_coverage_tests;

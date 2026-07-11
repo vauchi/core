@@ -320,16 +320,6 @@ fn emergency_shred_fixture_is_fresh() {
     assert_fixture_fresh(&engine.current_screen(), "emergency_shred.json");
 }
 
-// @internal
-#[test]
-fn emergency_broadcast_overview_fixture_is_fresh() {
-    let engine = EmergencyBroadcastEngine::new(None);
-    assert_fixture_fresh(
-        &engine.current_screen(),
-        "emergency_broadcast_overview.json",
-    );
-}
-
 // ── Phase 4: single-screen nav/setup engines (screenshot catalog,
 //    problem 2026-06-12-device-screenshot-catalog) ──────────────────
 
@@ -500,10 +490,6 @@ fn regenerate_all_engine_fixtures() {
             "emergency_shred.json",
             EmergencyShredEngine::new(vauchi_app::i18n::Locale::English).current_screen(),
         ),
-        (
-            "emergency_broadcast_overview.json",
-            EmergencyBroadcastEngine::new(None).current_screen(),
-        ),
         // Phase 4: single-screen nav/setup engines
         (
             "more.json",
@@ -545,7 +531,7 @@ fn regenerate_all_engine_fixtures() {
         ),
     ];
 
-    assert_eq!(fixtures.len(), 24, "expected 24 engine fixtures");
+    assert_eq!(fixtures.len(), 23, "expected 23 engine fixtures");
 
     for (filename, screen) in &fixtures {
         let json = screen_to_json(screen);

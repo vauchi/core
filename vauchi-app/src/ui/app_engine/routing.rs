@@ -386,7 +386,6 @@ impl AppEngine {
                 self.complete_verify_fingerprint(contact_id)
             }
             AppScreen::EmergencyShred => self.complete_emergency_shred(),
-            AppScreen::EmergencyBroadcast => self.complete_emergency_broadcast(),
             AppScreen::Privacy => self.complete_privacy(),
             AppScreen::FormDialog { dialog_type } => self.complete_form_dialog(dialog_type),
             AppScreen::ChangePassword => self.complete_change_password(),

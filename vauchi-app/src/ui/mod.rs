@@ -35,7 +35,6 @@ mod device_replacement;
 mod display_hint;
 mod duplicate_detection;
 mod duress_pin;
-mod emergency_broadcast;
 mod emergency_shred;
 mod engine;
 mod exchange;
@@ -62,7 +61,6 @@ mod recovery_status;
 pub mod render_context;
 mod screen;
 mod settings;
-mod social_graph;
 mod support;
 mod tag_promotion;
 mod tags_list;
@@ -80,10 +78,9 @@ pub use backup_recovery::{BackupLevel, BackupMode, BackupRecoveryEngine};
 pub use change_password::ChangePasswordEngine;
 pub use channel::{
     BackupFormSnapshot, ContactDetailUpdate, ContactListUpdate, DeviceLinkJoinUpdate,
-    DeviceLinkUpdate, DuressPinSetup, EmergencyBroadcastPlan, EngineOutput, EngineUpdate,
-    FormInput, GdprChoice, LinkExchangeUpdate, LinkResponderUpdate, MultiStageUpdate,
-    MyInfoEntryDetailUpdate, OnboardingSnapshot, OnboardingUpdate, PendingBackup,
-    RecoveryHelpUpdate, RecoveryUpdate,
+    DeviceLinkUpdate, DuressPinSetup, EngineOutput, EngineUpdate, FormInput, GdprChoice,
+    LinkExchangeUpdate, LinkResponderUpdate, MultiStageUpdate, MyInfoEntryDetailUpdate,
+    OnboardingSnapshot, OnboardingUpdate, PendingBackup, RecoveryHelpUpdate, RecoveryUpdate,
 };
 pub use component::{
     A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, IndicatorKind,
@@ -120,7 +117,6 @@ pub use device_replacement::{CompletionOutcome, DeviceReplacementEngine, Replace
 pub use display_hint::DisplayHint;
 pub use duplicate_detection::{DuplicateDetectionEngine, DuplicatePair};
 pub use duress_pin::{DuressConfig, DuressPinEngine};
-pub use emergency_broadcast::{EmergencyBroadcastEngine, EmergencyOutcome};
 pub use emergency_shred::EmergencyShredEngine;
 pub use engine::WorkflowEngine;
 pub use exchange::ble_engine::{
@@ -170,7 +166,6 @@ pub use screen::{
     ScreenModel, ScreenPresentationKind, TabInfo,
 };
 pub use settings::{SettingsConfig, SettingsEngine};
-pub use social_graph::{SocialContactEntry, SocialGraphEngine, SocialTrustLevel};
 pub use support::SupportEngine;
 pub use tag_promotion::{PromotionField, TagPromotionEngine};
 pub use tags_list::{TagSummary, TagsEngine};

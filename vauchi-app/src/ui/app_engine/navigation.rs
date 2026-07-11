@@ -46,10 +46,7 @@ impl AppScreen {
             | Self::ContactVisibility { .. }
             | Self::VerifyFingerprint { .. }
             | Self::ContactMerge { .. } => Self::Contacts,
-            Self::ContactDuplicates
-            | Self::ContactLimit
-            | Self::ArchivedContacts
-            | Self::SocialGraph => Self::Contacts,
+            Self::ContactDuplicates | Self::ContactLimit | Self::ArchivedContacts => Self::Contacts,
             Self::MyInfoEntryDetail { .. } | Self::AvatarEditor => Self::MyInfo,
             Self::GroupDetail { .. } => Self::Groups,
             Self::RecoveryHelp | Self::RecoveryClaimReview => Self::Recovery,
@@ -82,10 +79,7 @@ impl AppScreen {
                 | Self::Onboarding => canonical,
                 // Settings sub-flows — collapse under Settings on
                 // desktop (no More tab in the desktop sidebar).
-                Self::DuressPin
-                | Self::ChangePassword
-                | Self::EmergencyShred
-                | Self::EmergencyBroadcast => Self::Settings,
+                Self::DuressPin | Self::ChangePassword | Self::EmergencyShred => Self::Settings,
                 // Exchange-side sync indicator.
                 Self::DeliveryStatus => Self::Exchange,
                 // Multi-stage face-to-face exchange — collapses under
@@ -117,8 +111,7 @@ impl AppScreen {
                 | Self::ActivityLog
                 | Self::DuressPin
                 | Self::ChangePassword
-                | Self::EmergencyShred
-                | Self::EmergencyBroadcast => Self::More,
+                | Self::EmergencyShred => Self::More,
                 Self::DeliveryStatus => Self::Exchange,
                 Self::MultiStageExchange { .. } => Self::Exchange,
                 _ => return None,

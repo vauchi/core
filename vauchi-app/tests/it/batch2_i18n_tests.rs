@@ -5,15 +5,15 @@
 //! M3 S5-13 (`2026-07-03-core-screens-bypass-i18n`): batch-2 of the
 //! small remaining files render in the user's locale. Keys in
 //! `contact_merge.*`/`contact_limit.*`/`my_info_entry_detail.*`/
-//! `delivery_status.*`/`group_detail.*`/`contact_edit.*`/
-//! `social_graph.*` (locales!111). Exact German assertions per CC-03.
+//! `delivery_status.*`/`group_detail.*`/`contact_edit.*`
+//! (locales!111). Exact German assertions per CC-03.
 //! One test per engine — the full a11y/copy detail is covered by each
 //! engine's own inline unit tests.
 
 use vauchi_app::i18n::{Locale, load_locale_from_bytes};
 use vauchi_app::ui::{
     ContactEditEngine, ContactLimitEngine, ContactMergeEngine, DeliveryStatusEngine,
-    EditableContact, GroupDetailEngine, MergePreview, SocialGraphEngine, WorkflowEngine,
+    EditableContact, GroupDetailEngine, MergePreview, WorkflowEngine,
 };
 
 fn load_german() {
@@ -86,16 +86,6 @@ fn contact_edit_renders_german() {
     assert_eq!(screen.title, "Kontakt bearbeiten");
 }
 
-// @scenario: social-graph :: screen renders in the active locale
-// @internal
-#[test]
-fn social_graph_renders_german() {
-    load_german();
-    let engine = SocialGraphEngine::new(vec![], 0).with_locale(Locale::German);
-    let screen = engine.current_screen();
-    assert_eq!(screen.title, "Kontaktnetzwerk");
-}
-
 // English stays exactly as before (regression pin) — one representative check.
 // @internal
 #[test]
@@ -127,9 +117,5 @@ fn batch2_english_copy_unchanged() {
             .current_screen()
             .title,
         "Edit Contact"
-    );
-    assert_eq!(
-        SocialGraphEngine::new(vec![], 0).current_screen().title,
-        "Contact Network"
     );
 }

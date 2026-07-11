@@ -60,7 +60,9 @@ fn join_second_device(device1: &Vauchi, device_name: &str) -> Vauchi {
         current_device,
         registry,
     );
-    let sync_payload = orchestrator.create_full_sync_payload().unwrap();
+    let sync_payload = orchestrator
+        .create_full_sync_payload(vauchi_core::sync::DeviceLinkIntent::ReplaceDevice)
+        .unwrap();
     let sync_json = serde_json::to_string(&sync_payload).unwrap();
 
     let (encrypted_response, _registry, _new_device) = initiator

@@ -286,6 +286,21 @@ impl ContactExchangeLocation {
     }
 }
 
+/// Why a device is being linked, deciding what the sync payload may carry.
+///
+/// Ratchet sessions transfer only on `ReplaceDevice`: cloning a live
+/// session to a device that stays *additional* lets both advance the same
+/// DH chain, which diverges undecryptably at the contact (ADR-035
+/// limitation; per-device sessions are ADR-064).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceLinkIntent {
+    /// The new device joins alongside the existing ones.
+    AddDevice,
+    /// The new device takes over from this one; the source device is
+    /// expected to decommission after the transfer.
+    ReplaceDevice,
+}
+
 /// Serializable ratchet state for one contact, used during device linking.
 ///
 /// The ratchet state is serialized to plaintext before inclusion in the payload

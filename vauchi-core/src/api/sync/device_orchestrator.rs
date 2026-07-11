@@ -14,8 +14,9 @@ use crate::crypto::{HKDF, SymmetricKey, encryption};
 use crate::identity::device::{DeviceInfo, DeviceRegistry};
 use crate::storage::Storage;
 use crate::sync::device_sync::{
-    ContactExchangeLocation, ContactRatchetSyncData, DeviceSyncError, DeviceSyncPayload,
-    FieldStamp, InterDeviceSyncState, PlaceSyncData, SyncItem, TagSyncData, VersionVector,
+    ContactExchangeLocation, ContactRatchetSyncData, DeviceLinkIntent, DeviceSyncError,
+    DeviceSyncPayload, FieldStamp, InterDeviceSyncState, PlaceSyncData, SyncItem, TagSyncData,
+    VersionVector,
 };
 
 /// Domain separation for device-to-device encryption key derivation.
@@ -203,8 +204,13 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
     /// Creates a full sync payload for a newly linked device.
     ///
-    /// This includes all contacts and the user's own contact card.
-    pub fn create_full_sync_payload(&self) -> Result<DeviceSyncPayload, DeviceSyncError> {
+    /// This includes all contacts and the user's own contact card. Ratchet
+    /// sessions are cloned only for [`DeviceLinkIntent::ReplaceDevice`] —
+    /// see the enum docs for why an additional device must not carry them.
+    pub fn create_full_sync_payload(
+        &self,
+        intent: DeviceLinkIntent,
+    ) -> Result<DeviceSyncPayload, DeviceSyncError> {
         // Load contacts from storage
         let contacts = self
             .storage
@@ -250,22 +256,24 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         // Load ratchet states for exchanged contacts so a replacement device can
         // resume encrypted communication without an in-person re-exchange.
         let mut ratchet_states = Vec::new();
-        for contact in &contacts {
-            if !contact.is_exchanged() {
-                continue;
-            }
-            let contact_id = contact.id();
-            if let Some((ratchet, is_initiator)) = self
-                .storage
-                .ratchets()
-                .load_ratchet_state(contact_id)
-                .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
-            {
-                ratchet_states.push(ContactRatchetSyncData {
-                    contact_id: contact_id.to_string(),
-                    ratchet_state: ratchet.serialize(),
-                    is_initiator,
-                });
+        if intent == DeviceLinkIntent::ReplaceDevice {
+            for contact in &contacts {
+                if !contact.is_exchanged() {
+                    continue;
+                }
+                let contact_id = contact.id();
+                if let Some((ratchet, is_initiator)) = self
+                    .storage
+                    .ratchets()
+                    .load_ratchet_state(contact_id)
+                    .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+                {
+                    ratchet_states.push(ContactRatchetSyncData {
+                        contact_id: contact_id.to_string(),
+                        ratchet_state: ratchet.serialize(),
+                        is_initiator,
+                    });
+                }
             }
         }
 

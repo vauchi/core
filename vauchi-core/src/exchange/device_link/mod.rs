@@ -473,7 +473,9 @@ mod tests {
 
         let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string(), 0);
         let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry.clone());
-        let sync_payload = orchestrator.create_full_sync_payload().unwrap();
+        let sync_payload = orchestrator
+            .create_full_sync_payload(crate::sync::DeviceLinkIntent::AddDevice)
+            .unwrap();
         let sync_json = serde_json::to_string(&sync_payload).unwrap();
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone(), 0u64);
@@ -635,7 +637,9 @@ mod tests {
 
         let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string(), 0);
         let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry.clone());
-        let sync_payload = orchestrator.create_full_sync_payload().unwrap();
+        let sync_payload = orchestrator
+            .create_full_sync_payload(crate::sync::DeviceLinkIntent::AddDevice)
+            .unwrap();
         let sync_json = serde_json::to_string(&sync_payload).unwrap();
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);

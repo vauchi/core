@@ -140,7 +140,9 @@ fn test_orchestrator_create_full_sync_payload() {
 
     let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
-    let payload = orchestrator.create_full_sync_payload().unwrap();
+    let payload = orchestrator
+        .create_full_sync_payload(DeviceLinkIntent::AddDevice)
+        .unwrap();
 
     assert_eq!(payload.contact_count(), 1);
     assert!(!payload.own_card_json.is_empty());
@@ -191,7 +193,9 @@ fn test_orchestrator_syncs_tags_round_trip() {
     storage_a.tags().add_to_tag(&tag.id, contact.id()).unwrap();
 
     let orchestrator_a = DeviceSyncOrchestrator::new(&storage_a, device_a, registry_a);
-    let payload = orchestrator_a.create_full_sync_payload().unwrap();
+    let payload = orchestrator_a
+        .create_full_sync_payload(DeviceLinkIntent::AddDevice)
+        .unwrap();
     assert_eq!(payload.tags.len(), 1, "tag included in sync payload");
 
     // Device B: fresh storage receives the payload.
@@ -240,7 +244,9 @@ fn test_orchestrator_syncs_places_and_exchange_locations() {
         .unwrap();
 
     let orchestrator_a = DeviceSyncOrchestrator::new(&storage_a, device_a, registry_a);
-    let payload = orchestrator_a.create_full_sync_payload().unwrap();
+    let payload = orchestrator_a
+        .create_full_sync_payload(DeviceLinkIntent::AddDevice)
+        .unwrap();
     assert_eq!(payload.places.len(), 1, "place in payload");
     assert_eq!(payload.exchange_locations.len(), 1, "location in payload");
 

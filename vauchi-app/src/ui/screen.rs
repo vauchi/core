@@ -157,6 +157,16 @@ pub struct ScreenModel {
     /// (`2026-07-06-mobile-domain-shell-violations` I5/A2).
     #[serde(default, skip_serializing_if = "NativeWrapperHint::is_none")]
     pub native_wrapper_hint: NativeWrapperHint,
+    /// Global/top-bar chrome actions offered on this screen (e.g. the
+    /// Settings gear on the home screen). Core owns *what* chrome actions
+    /// exist; each frontend presents them per its form factor (mobile
+    /// top-bar, desktop may route to its sidebar) instead of hardcoding
+    /// native chrome — retires android's `ReadyScreen`/`isHomeTab` gate and
+    /// the iOS `HomeView` header (`2026-07-06-mobile-domain-shell-violations`).
+    /// Reserved chrome ids (e.g. `open_settings`) resolve to their
+    /// `NavigateTo` before per-screen dispatch. Empty on most screens.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nav_actions: Vec<ScreenAction>,
 }
 
 /// serde `skip_serializing_if` predicate for `bool` fields defaulting to
@@ -193,6 +203,7 @@ impl Default for ScreenModel {
             requires_animated_qr: false,
             requires_poll: false,
             native_wrapper_hint: NativeWrapperHint::None,
+            nav_actions: Vec::new(),
         }
     }
 }
@@ -225,6 +236,7 @@ impl ScreenModel {
             requires_animated_qr: false,
             requires_poll: false,
             native_wrapper_hint: NativeWrapperHint::None,
+            nav_actions: Vec::new(),
         }
     }
 

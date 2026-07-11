@@ -3555,6 +3555,13 @@
             }
           ]
         },
+        "nav_actions": {
+          "description": "Global/top-bar chrome actions offered on this screen (e.g. the Settings gear on the home screen). Core owns *what* chrome actions exist; each frontend presents them per its form factor (mobile top-bar, desktop may route to its sidebar) instead of hardcoding native chrome — retires android's `ReadyScreen`/`isHomeTab` gate and the iOS `HomeView` header (`2026-07-06-mobile-domain-shell-violations`). Reserved chrome ids (e.g. `open_settings`) resolve to their `NavigateTo` before per-screen dispatch. Empty on most screens.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ScreenAction"
+          }
+        },
         "parent_screen_id": {
           "description": "Sidebar/tab the screen belongs to, when it is a sub-screen of a top-level tab (e.g. `contact_detail` belongs to `contacts`). `None` for top-level tabs and transient/global screens (lock, onboarding). Replaces frontend-side `MapScreenToParentId`-style switch statements (`2026-05-01-screen-id-metadata-in-core` G1).",
           "type": [

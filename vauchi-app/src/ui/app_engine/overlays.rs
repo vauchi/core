@@ -350,4 +350,33 @@ impl AppEngine {
         );
         screen
     }
+
+    /// Inject the global Settings chrome action on the home screen. Core
+    /// owns *what* chrome actions a screen offers; each frontend presents
+    /// `nav_actions` per its form factor (mobile top-bar gear, desktop
+    /// sidebar). `open_settings` is resolved to `NavigateTo(Settings)`
+    /// before per-screen dispatch, so this retires the native
+    /// `ReadyScreen`/`isHomeTab` gear
+    /// (`2026-07-06-mobile-domain-shell-violations`).
+    pub(super) fn apply_nav_chrome_overlay(&self, mut screen: ScreenModel) -> ScreenModel {
+        if screen.screen_id != "my_info" {
+            return screen;
+        }
+        if screen
+            .nav_actions
+            .iter()
+            .any(|a| a.id == ACTION_OPEN_SETTINGS)
+        {
+            return screen;
+        }
+        let label = self.t("settings.title");
+        screen.nav_actions.push(ScreenAction {
+            id: ACTION_OPEN_SETTINGS.into(),
+            label: label.clone(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: Some(crate::ui::component::A11y::labeled(label)),
+        });
+        screen
+    }
 }

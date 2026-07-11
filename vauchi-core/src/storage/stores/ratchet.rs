@@ -114,4 +114,13 @@ impl RatchetStore<'_> {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
+    /// Deletes every stored ratchet session, returning how many were removed.
+    ///
+    /// Decommission path for a replaced device: without sessions the send
+    /// loop skips all contacts, so this device can no longer advance a
+    /// chain its replacement now owns.
+    pub fn delete_all_ratchet_states(&self) -> Result<usize, StorageError> {
+        let deleted = self.conn.execute("DELETE FROM contact_ratchets", [])?;
+        Ok(deleted)
+    }
 }

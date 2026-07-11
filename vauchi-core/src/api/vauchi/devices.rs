@@ -152,6 +152,23 @@ impl Vauchi {
         Ok(device_name)
     }
 
+    /// Decommissions this device after a replacement handover.
+    ///
+    /// Wipes every contact ratchet session so this device can no longer
+    /// advance a chain its replacement now owns — two devices advancing
+    /// the same ratchet diverge undecryptably at the contact (ADR-035).
+    /// Without sessions the send loop skips all contacts (fail-safe);
+    /// incoming ratcheted updates stop decrypting as well.
+    ///
+    /// Returns the number of sessions wiped. Irrevocable on this device;
+    /// callers must confirm with the user first (ADR-022 `InlineConfirm`).
+    pub fn decommission_current_device(&self) -> VauchiResult<usize> {
+        if self.identity.is_none() {
+            return Err(VauchiError::IdentityNotInitialized);
+        }
+        Ok(self.storage.ratchets().delete_all_ratchet_states()?)
+    }
+
     /// Returns the count of pending outbound updates across all contacts.
     pub fn pending_update_count(&self) -> VauchiResult<u32> {
         let contacts = self.storage.contacts().list_contacts()?;

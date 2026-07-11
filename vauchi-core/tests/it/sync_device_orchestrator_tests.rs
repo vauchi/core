@@ -7,7 +7,7 @@
 
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
-use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};
+use vauchi_core::crypto::{DoubleRatchetState, SigningKeyPair, SymmetricKey, X3DHKeyPair};
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
 use vauchi_core::sync::*;
 use vauchi_core::*;
@@ -829,4 +829,68 @@ fn field_timestamps_persist_across_reload_for_lww() {
         )
         .unwrap();
     assert_eq!(fresh.len(), 1, "newer incoming edit must win");
+}
+
+fn save_ratchet_for(storage: &Storage, contact_id: &str) {
+    let their_dh = X3DHKeyPair::generate();
+    let ratchet =
+        DoubleRatchetState::initialize_initiator(&SymmetricKey::generate(), *their_dh.public_key())
+            .unwrap();
+    storage
+        .ratchets()
+        .save_ratchet_state(contact_id, &ratchet, true)
+        .unwrap();
+}
+
+/// An add-device link must not clone live ratchet sessions: two devices
+/// advancing the same ratchet diverge at the contact (ADR-035 limitation),
+/// so only an explicit replacement transfers them.
+// @scenario: device_management :: New device receives full state
+// @internal
+#[test]
+fn add_device_sync_payload_excludes_ratchet_states() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+    let device_a = create_test_device(&master_seed, 0, "Device A");
+    let registry = create_test_registry(&master_seed, &device_a);
+
+    let contact = create_test_contact("Bob");
+    storage.contacts().save_contact(&contact).unwrap();
+    save_ratchet_for(&storage, contact.id());
+
+    let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
+    let payload = orchestrator
+        .create_full_sync_payload(DeviceLinkIntent::AddDevice)
+        .unwrap();
+
+    assert_eq!(payload.contact_count(), 1);
+    assert!(
+        payload.ratchet_states.is_empty(),
+        "add-device payload must not clone ratchet sessions"
+    );
+}
+
+/// A replacement link transfers ratchet state so the new device resumes
+/// encrypted communication with existing contacts (sequential replacement).
+// @scenario: device_management :: New device receives full state
+// @internal
+#[test]
+fn replacement_sync_payload_includes_ratchet_states() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+    let device_a = create_test_device(&master_seed, 0, "Device A");
+    let registry = create_test_registry(&master_seed, &device_a);
+
+    let contact = create_test_contact("Bob");
+    storage.contacts().save_contact(&contact).unwrap();
+    save_ratchet_for(&storage, contact.id());
+
+    let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
+    let payload = orchestrator
+        .create_full_sync_payload(DeviceLinkIntent::ReplaceDevice)
+        .unwrap();
+
+    assert_eq!(payload.ratchet_states.len(), 1);
+    assert_eq!(payload.ratchet_states[0].contact_id, contact.id());
+    assert!(payload.ratchet_states[0].is_initiator);
 }

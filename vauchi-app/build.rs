@@ -50,6 +50,11 @@ fn main() {
 
     // Check VAUCHI_LOCALES_DIR env var first (for out-of-tree builds like cargo-mutants),
     // then fall back to relative sibling repo paths.
+    // Without the rerun declaration, cargo caches the bundled English
+    // across env changes: a build made without the var keeps serving a
+    // stale vendored en.json even after the var is set (surfaced as
+    // phantom 'Missing: <key>' smoke-test failures, 2026-07-11).
+    println!("cargo::rerun-if-env-changed=VAUCHI_LOCALES_DIR");
     let env_path = env::var("VAUCHI_LOCALES_DIR")
         .ok()
         .map(|dir| format!("{}/en.json", dir));

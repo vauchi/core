@@ -16,8 +16,10 @@
 //! when retiring more, never to silence a regression.
 
 use vauchi_app::ui::{
-    Component, DropdownOption, Field, InputType, Item, ListItemAction, ListItemActionKind,
-    PreviewVariant, QrMode, Status, TextStyle, UiFieldVisibility, VisibilityMode,
+    ActionListItem, ActionStyle, Component, DropdownOption, Field, IndicatorKind, InputType, Item,
+    ListItemAction, ListItemActionKind, NativeWrapperHint, PreviewVariant, QrMode, ScreenAction,
+    ScreenLayout, ScreenModel, ScreenPresentationKind, Section, Status, TabInfo, TextStyle,
+    UiFieldVisibility, VisibilityMode,
 };
 
 /// Domain-shaped JSON keys retired during Wire Humble Tier 0.
@@ -40,6 +42,10 @@ const FORBIDDEN_KEYS: &[&str] = &[
     "selected_group", // Component::Preview → "selected_variant"
     // Field retired entirely (Phase 2)
     "searchable_fields", // moved to engine-internal IndexedItem.searchable
+    // "avatar" domain word retired from the render wire vocab
+    "AvatarPreview",   // Component variant tag → "ImageCircle"
+    "avatar_data",     // Component::Preview field → "image_data"
+    "avatar_initials", // Item field → "initials"
 ];
 
 /// Recursively walk a JSON value asserting that no forbidden key
@@ -110,19 +116,47 @@ fn sample_preview_variant() -> PreviewVariant {
     }
 }
 
-/// Number of `Component` variants in
-/// `core/vauchi-app/src/ui/component/mod.rs`. Asserted below by
-/// [`all_components_covers_every_variant`] so a new variant added
-/// without a matching sample fails the build, not just review.
+/// Every `Component` variant tag in
+/// `core/vauchi-app/src/ui/component/mod.rs`, spelled out explicitly so
+/// [`all_components_covers_every_variant`] can assert the deny-list scan
+/// serializes an instance of each. A plain count let two variants
+/// (`Indicator`, `SectionedActionList`) go unscanned because the missing
+/// samples and the stale count drifted together.
 ///
-/// `Component` is `#[non_exhaustive]`, so an exhaustive `match` from
-/// this integration-test crate (an *external* crate to `vauchi_app`)
-/// is rejected. Counting unique variant tags via the serialized form
-/// is the next-best mechanical check.
-const COMPONENT_VARIANT_COUNT: usize = 20;
+/// `Component` is `#[non_exhaustive]`, so an exhaustive `match` — the
+/// compiler-enforced enumeration that would make this list redundant — is
+/// rejected from this integration-test crate (external to `vauchi_app`).
+/// That backstop lives in-crate on `ui::testing::screen_walker`'s
+/// wildcard-free `match`, which fails to compile if a variant is added.
+/// Here the explicit tag set is the next-best mechanical check: a variant
+/// added without a sample fails the assertion by name, not just by count.
+const EXPECTED_VARIANT_TAGS: &[&str] = &[
+    "Text",
+    "TextInput",
+    "ToggleList",
+    "FieldList",
+    "Preview",
+    "InfoPanel",
+    "List",
+    "SettingsGroup",
+    "ActionList",
+    "Row",
+    "StatusIndicator",
+    "PinInput",
+    "QrCode",
+    "InlineConfirm",
+    "EditableText",
+    "Divider",
+    "Banner",
+    "Dropdown",
+    "AvatarPreview",
+    "Slider",
+    "Indicator",
+    "SectionedActionList",
+];
 
 /// Curated set of `Component` variants. Adding a new variant?
-/// **Append a sample here AND bump [`COMPONENT_VARIANT_COUNT`].**
+/// **Append a sample here AND add its tag to [`EXPECTED_VARIANT_TAGS`].**
 /// `all_components_covers_every_variant` will fail the build until
 /// you do.
 fn all_components() -> Vec<Component> {
@@ -276,6 +310,28 @@ fn all_components() -> Vec<Component> {
             max_icon: Some("sun.max".to_string()),
             a11y: None,
         },
+        Component::Indicator {
+            id: "ind".to_string(),
+            label: "Offline".to_string(),
+            kind: IndicatorKind::Neutral,
+            action_id: Some("reconnect".to_string()),
+            a11y: None,
+        },
+        Component::SectionedActionList {
+            id: "sal".to_string(),
+            sections: vec![Section {
+                id: "primary".to_string(),
+                label: "Primary".to_string(),
+                items: vec![ActionListItem {
+                    id: "import_contacts".to_string(),
+                    label: "Import".to_string(),
+                    icon: None,
+                    detail: None,
+                    a11y: None,
+                    info_key: None,
+                }],
+            }],
+        },
         Component::Divider,
     ]
 }
@@ -311,6 +367,84 @@ fn no_forbidden_keys_in_helper_types() {
     assert_no_forbidden_keys(&variant, "PreviewVariant");
 }
 
+/// The render surface beyond `Component`: the screen envelope
+/// (`ScreenModel`), its per-screen affordances (`ScreenAction`), the tab
+/// chrome (`TabInfo`), and the presentation enums. A domain-shaped key
+/// leaking through any of these crosses the same core→renderer seam as a
+/// `Component` key, so the deny-list must scan them too. `ScreenModel`
+/// embeds every `Component` sample, so a re-domain-ified component key is
+/// also caught here — a second, envelope-level detector.
+///
+/// Unit enum variants (`ScreenPresentationKind`, `ScreenLayout`,
+/// `NativeWrapperHint`) serialize to bare JSON strings, so the key-walker
+/// only guards them once a variant carries data (its tag becomes an object
+/// key). Scanning them now records the intent and future-proofs that case.
+///
+/// @internal
+#[test]
+fn no_forbidden_keys_in_screen_surface() {
+    let screen = ScreenModel {
+        screen_id: "s".to_string(),
+        title: "Screen".to_string(),
+        components: all_components(),
+        actions: vec![sample_screen_action()],
+        presentation_kind: ScreenPresentationKind::Modal,
+        layout: ScreenLayout::Fixed,
+        native_wrapper_hint: NativeWrapperHint::MultiStageExchange,
+        ..ScreenModel::default()
+    };
+    assert_no_forbidden_keys(&serde_json::to_value(&screen).unwrap(), "ScreenModel");
+
+    assert_no_forbidden_keys(
+        &serde_json::to_value(sample_screen_action()).unwrap(),
+        "ScreenAction",
+    );
+
+    let tab = TabInfo {
+        id: "contacts".to_string(),
+        action_id: "nav_contacts".to_string(),
+        label: "Contacts".to_string(),
+        icon: "person.2".to_string(),
+        badge_count: 0,
+    };
+    assert_no_forbidden_keys(&serde_json::to_value(&tab).unwrap(), "TabInfo");
+
+    for kind in [
+        ScreenPresentationKind::Page,
+        ScreenPresentationKind::Modal,
+        ScreenPresentationKind::Sheet,
+    ] {
+        assert_no_forbidden_keys(
+            &serde_json::to_value(&kind).unwrap(),
+            "ScreenPresentationKind",
+        );
+    }
+    for layout in [
+        ScreenLayout::Scroll,
+        ScreenLayout::Fixed,
+        ScreenLayout::Pinned,
+    ] {
+        assert_no_forbidden_keys(&serde_json::to_value(&layout).unwrap(), "ScreenLayout");
+    }
+    for hint in [
+        NativeWrapperHint::None,
+        NativeWrapperHint::MultiStageExchange,
+        NativeWrapperHint::NfcExchange,
+    ] {
+        assert_no_forbidden_keys(&serde_json::to_value(&hint).unwrap(), "NativeWrapperHint");
+    }
+}
+
+fn sample_screen_action() -> ScreenAction {
+    ScreenAction {
+        id: "save".to_string(),
+        label: "Save".to_string(),
+        style: ActionStyle::Primary,
+        enabled: true,
+        a11y: None,
+    }
+}
+
 /// @internal
 #[test]
 fn deny_list_self_check() {
@@ -327,17 +461,20 @@ fn deny_list_self_check() {
     }
 }
 
-/// Variant-coverage gate: forces `all_components()` to keep up with
-/// new `Component` variants. The counting strategy uses serialized
-/// variant tags rather than an exhaustive `match` because `Component`
-/// is `#[non_exhaustive]` and this test crate is external to
-/// `vauchi_app`, which forbids exhaustive matching.
+/// Variant-coverage gate: forces `all_components()` to serialize an
+/// instance of every `Component` variant so the deny-list scan actually
+/// walks each one. Compares the sampled tag set against the explicit
+/// [`EXPECTED_VARIANT_TAGS`] rather than a bare count — a count check
+/// passed while `Indicator` and `SectionedActionList` were unscanned,
+/// because the missing samples and the stale count masked each other.
+/// Set-equality names the exact missing (variant added, sample forgotten)
+/// or extra (tag listed, sample removed) tag.
 ///
 /// @internal
 #[test]
 fn all_components_covers_every_variant() {
-    use std::collections::HashSet;
-    let tags: HashSet<String> = all_components()
+    use std::collections::BTreeSet;
+    let sampled: BTreeSet<String> = all_components()
         .iter()
         .map(|c| {
             let v = serde_json::to_value(c).expect("serialize component");
@@ -348,18 +485,21 @@ fn all_components_covers_every_variant() {
             }
         })
         .collect();
+    let expected: BTreeSet<String> = EXPECTED_VARIANT_TAGS
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
 
-    assert_eq!(
-        tags.len(),
-        COMPONENT_VARIANT_COUNT,
-        "all_components() exposes {} unique variant tags but \
-         COMPONENT_VARIANT_COUNT = {}. If you added a Component \
-         variant, append a sample AND bump the constant. If you \
-         retired one, remove the sample AND drop the constant. \
-         Tags currently exercised: {:?}",
-        tags.len(),
-        COMPONENT_VARIANT_COUNT,
-        tags
+    let missing: Vec<&String> = expected.difference(&sampled).collect();
+    let extra: Vec<&String> = sampled.difference(&expected).collect();
+
+    assert!(
+        missing.is_empty() && extra.is_empty(),
+        "all_components() variant coverage drifted from EXPECTED_VARIANT_TAGS.\n\
+         Missing samples (variant exists / listed, no serialized sample): {missing:?}\n\
+         Extra samples (sampled tag not in EXPECTED_VARIANT_TAGS): {extra:?}\n\
+         If you added a Component variant, append a sample AND its tag. If you \
+         retired one, remove both."
     );
 }
 

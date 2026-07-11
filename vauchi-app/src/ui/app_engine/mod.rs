@@ -4,19 +4,16 @@
 
 //! Top-level application orchestrator.
 //!
-//! `AppEngine` wraps `Vauchi`, owns the active workflow engine,
-//! handles navigation routing, and implements `WorkflowEngine` so
-//! frontends see a single uniform interface.
+//! `AppEngine` wraps `Vauchi`, owns the active workflow engine, handles
+//! navigation routing, and implements `WorkflowEngine` for all frontends.
 
 mod app_screen;
 mod ble_handshake;
 mod completion;
 mod completion_contact;
 mod completion_forms;
-// INLINE_TEST_REQUIRED: decommission_at_complete_tests injects a completed
-// `DeviceReplacementEngine` into the private `engine`/`screen` AppEngine
-// fields to exercise the decommission-at-Complete hook — crate-internal,
-// cannot live in a `tests/` directory.
+// INLINE_TEST_REQUIRED: injects a completed DeviceReplacementEngine into the
+// private `engine`/`screen` fields to drive the decommission-at-Complete hook.
 #[cfg(test)]
 mod decommission_at_complete_tests;
 mod device_link;
@@ -26,9 +23,8 @@ mod device_link_initiator;
 mod device_link_responder;
 mod dispatch;
 mod help_catalog;
-// INLINE_TEST_REQUIRED: factory_filter_tests drives the `pub(super)`
-// create_engine factory + the `pub(crate)` DirectTransportEngine::outgoing_card
-// seam — both crate-internal, so the test cannot live in a `tests/` directory.
+// INLINE_TEST_REQUIRED: drives the `pub(super)` create_engine factory and the
+// `pub(crate)` DirectTransportEngine::outgoing_card seam — crate-internal.
 #[cfg(test)]
 mod factory_filter_tests;
 mod intercept;
@@ -38,10 +34,8 @@ mod link_responder;
 mod multi_stage_exchange;
 mod navigation;
 mod overlays;
-// INLINE_TEST_REQUIRED: persist_at_complete_tests injects a legacy
-// `ExchangeEngine` into the private `engine`/`screen` AppEngine fields to
-// exercise the persist-at-Complete hook — crate-internal, cannot live in
-// a `tests/` directory.
+// INLINE_TEST_REQUIRED: injects a legacy ExchangeEngine into the private
+// `engine`/`screen` fields to drive the persist-at-Complete hook.
 #[cfg(test)]
 mod persist_at_complete_tests;
 mod result_routing;

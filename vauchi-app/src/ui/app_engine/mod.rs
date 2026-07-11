@@ -13,6 +13,12 @@ mod ble_handshake;
 mod completion;
 mod completion_contact;
 mod completion_forms;
+// INLINE_TEST_REQUIRED: decommission_at_complete_tests injects a completed
+// `DeviceReplacementEngine` into the private `engine`/`screen` AppEngine
+// fields to exercise the decommission-at-Complete hook — crate-internal,
+// cannot live in a `tests/` directory.
+#[cfg(test)]
+mod decommission_at_complete_tests;
 mod device_link;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_initiator;

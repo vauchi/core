@@ -5,7 +5,7 @@
   "subtitle": null,
   "components": [
     {
-      "AvatarPreview": {
+      "ImageCircle": {
         "id": "avatar",
         "initials": "",
         "brightness": 0.0,

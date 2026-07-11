@@ -551,8 +551,15 @@
                     }
                   ]
                 },
-                "avatar_data": {
-                  "description": "Avatar image bytes (WebP). Frontends show this in the circular header area. Falls back to `initials` when None.",
+                "fields": {
+                  "description": "All fields on the card (raw — retained for backwards compatibility).\n\nFrontends should render `visible_fields` instead. This field is kept additive for one binding cycle so consumers can migrate without an ABI break; a follow-up MR removes it.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Field"
+                  }
+                },
+                "image_data": {
+                  "description": "Image bytes (WebP). Frontends show this in the circular header area. Falls back to `initials` when None.",
                   "type": [
                     "array",
                     "null"
@@ -561,13 +568,6 @@
                     "type": "integer",
                     "format": "uint8",
                     "minimum": 0.0
-                  }
-                },
-                "fields": {
-                  "description": "All fields on the card (raw — retained for backwards compatibility).\n\nFrontends should render `visible_fields` instead. This field is kept additive for one binding cycle so consumers can migrate without an ABI break; a follow-up MR removes it.",
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/definitions/Field"
                   }
                 },
                 "initials": {
@@ -1151,13 +1151,13 @@
           "additionalProperties": false
         },
         {
-          "description": "Circular avatar preview with optional brightness adjustment.\n\nUsed in the Avatar Editor screen and as a display component. When `editable` is true, tapping emits `UserAction::ActionPressed { action_id: \"edit_avatar\" }`.",
+          "description": "Circular avatar preview with optional brightness adjustment.\n\nUsed in the Avatar Editor screen and as a display component. When `editable`, tapping forwards the core-supplied `edit_action_id` as `UserAction::ActionPressed` — the frontend never mints the id.",
           "type": "object",
           "required": [
-            "AvatarPreview"
+            "ImageCircle"
           ],
           "properties": {
-            "AvatarPreview": {
+            "ImageCircle": {
               "type": "object",
               "required": [
                 "id",
@@ -1194,6 +1194,13 @@
                   "default": 0.0,
                   "type": "number",
                   "format": "float"
+                },
+                "edit_action_id": {
+                  "description": "Action id the frontend forwards on tap when `editable`; core owns it (never minted frontend-side). `None` when not editable.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "editable": {
                   "description": "Whether tapping opens the avatar editor (own card only).",
@@ -1651,8 +1658,8 @@
       "description": "A lightweight item shown in `Component::List`. UI-shaped: the renderer doesn't know what kind of thing it represents.",
       "type": "object",
       "required": [
-        "avatar_initials",
         "id",
+        "initials",
         "name"
       ],
       "properties": {
@@ -1675,10 +1682,10 @@
             "$ref": "#/definitions/ListItemAction"
           }
         },
-        "avatar_initials": {
+        "id": {
           "type": "string"
         },
-        "id": {
+        "initials": {
           "type": "string"
         },
         "name": {

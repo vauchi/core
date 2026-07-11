@@ -461,6 +461,7 @@ impl WorkflowEngine for MyInfoEngine {
             bg_color: None,
             brightness: 0.0,
             editable: true,
+            edit_action_id: Some("edit_avatar".into()),
             a11y: Some(A11y {
                 label: Some(self.t("my_info.avatar_a11y_label")),
                 hint: Some(self.t("my_info.avatar_a11y_hint")),

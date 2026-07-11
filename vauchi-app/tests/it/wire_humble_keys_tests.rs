@@ -261,7 +261,8 @@ fn all_components() -> Vec<Component> {
             initials: "AB".to_string(),
             bg_color: Some([100, 150, 200]),
             brightness: 0.0,
-            editable: false,
+            editable: true,
+            edit_action_id: Some("edit_avatar".to_string()),
             a11y: None,
         },
         Component::Slider {

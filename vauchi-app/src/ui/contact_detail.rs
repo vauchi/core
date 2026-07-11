@@ -468,6 +468,7 @@ impl ContactDetailEngine {
             bg_color: None,
             brightness: 0.0,
             editable: false,
+            edit_action_id: None,
             a11y: Some(A11y {
                 label: Some(get_string_with_args(
                     self.locale,

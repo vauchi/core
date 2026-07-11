@@ -10,6 +10,7 @@
         "initials": "A",
         "brightness": 0.0,
         "editable": true,
+        "edit_action_id": "edit_avatar",
         "a11y": {
           "label": "Your avatar",
           "hint": "Tap to edit avatar",

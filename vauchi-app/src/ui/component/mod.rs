@@ -232,8 +232,9 @@ pub enum Component {
     /// Circular avatar preview with optional brightness adjustment.
     ///
     /// Used in the Avatar Editor screen and as a display component.
-    /// When `editable` is true, tapping emits
-    /// `UserAction::ActionPressed { action_id: "edit_avatar" }`.
+    /// When `editable`, tapping forwards the core-supplied
+    /// `edit_action_id` as `UserAction::ActionPressed` — the frontend
+    /// never mints the id.
     AvatarPreview {
         id: String,
         /// Raw image bytes (WebP/PNG/JPEG) to display, or None for
@@ -251,6 +252,10 @@ pub enum Component {
         /// Whether tapping opens the avatar editor (own card only).
         #[serde(default)]
         editable: bool,
+        /// Action id the frontend forwards on tap when `editable`; core
+        /// owns it (never minted frontend-side). `None` when not editable.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        edit_action_id: Option<String>,
         #[serde(default)]
         a11y: Option<A11y>,
     },

@@ -210,6 +210,7 @@ impl AvatarEditorEngine {
                     bg_color: None,
                     brightness,
                     editable: false,
+                    edit_action_id: None,
                     a11y: Some(A11y {
                         label: Some(self.t("avatar.preview_a11y")),
                         hint: None,
@@ -260,6 +261,7 @@ impl AvatarEditorEngine {
             bg_color: Some(*bg_color),
             brightness: 0.0,
             editable: false,
+            edit_action_id: None,
             a11y: Some(A11y {
                 label: Some(self.t("avatar.generated_preview_a11y")),
                 hint: None,

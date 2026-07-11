@@ -16,7 +16,7 @@ fn make_contact(id: &str, name: &str, initials: &str) -> Item {
         id: id.into(),
         name: name.into(),
         subtitle: None,
-        avatar_initials: initials.into(),
+        initials: initials.into(),
         status: None,
         actions: vec![],
         a11y: None,

@@ -17,7 +17,7 @@ fn engine_with_quorum() -> RecoveryEngine {
         .map(|i| Item {
             id: format!("c{i}"),
             name: format!("Contact {i}"),
-            avatar_initials: format!("C{i}"),
+            initials: format!("C{i}"),
             ..Default::default()
         })
         .collect();

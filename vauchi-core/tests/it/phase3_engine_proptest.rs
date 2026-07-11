@@ -188,7 +188,7 @@ fn make_duress() -> DuressPinEngine {
                 id: "c1".into(),
                 name: "Contact".into(),
                 subtitle: None,
-                avatar_initials: "C".into(),
+                initials: "C".into(),
                 status: None,
                 actions: vec![],
                 a11y: None,

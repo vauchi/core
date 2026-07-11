@@ -99,7 +99,7 @@ impl TagsEngine {
                     id: t.id.clone(),
                     name: t.name.clone(),
                     subtitle: Some(detail),
-                    avatar_initials: String::new(),
+                    initials: String::new(),
                     status: None,
                     actions: vec![
                         ListItemAction {

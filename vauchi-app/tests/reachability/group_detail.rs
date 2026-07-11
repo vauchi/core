@@ -30,7 +30,7 @@ fn factory() -> GroupDetailEngine {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: None,
-            avatar_initials: "A".into(),
+            initials: "A".into(),
             status: None,
             actions: vec![],
             a11y: None,

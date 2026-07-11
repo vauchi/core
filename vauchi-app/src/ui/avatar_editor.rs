@@ -203,7 +203,7 @@ impl AvatarEditorEngine {
             "avatar_editor",
             self.t("avatar.edit_title"),
             vec![
-                Component::AvatarPreview {
+                Component::ImageCircle {
                     id: "preview".into(),
                     image_data: Some(image_data.to_vec()),
                     initials: self.initials(),
@@ -254,7 +254,7 @@ impl AvatarEditorEngine {
         bg_color: &[u8; 3],
         preview_data: &[u8],
     ) -> ScreenModel {
-        let mut components = vec![Component::AvatarPreview {
+        let mut components = vec![Component::ImageCircle {
             id: "preview".into(),
             image_data: Some(preview_data.to_vec()),
             initials: self.initials(),

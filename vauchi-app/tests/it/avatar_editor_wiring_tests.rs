@@ -6,7 +6,7 @@
 //!
 //! Tests that AppEngine correctly navigates to the AvatarEditor screen,
 //! handles completion (persist avatar / cancel), routes hardware events,
-//! and that MyInfo shows an AvatarPreview component.
+//! and that MyInfo shows an ImageCircle component.
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::Event;
@@ -123,7 +123,7 @@ fn generate_avatar_use_persists_and_navigates_back() {
 
     // The MyInfo screen the device receives must carry the avatar bytes.
     let image_data = returned.components.iter().find_map(|c| match c {
-        Component::AvatarPreview { image_data, .. } => Some(image_data.clone()),
+        Component::ImageCircle { image_data, .. } => Some(image_data.clone()),
         _ => None,
     });
     assert_eq!(
@@ -176,20 +176,20 @@ fn hardware_events_routed_to_avatar_editor() {
     match result.unwrap() {
         ActionResult::UpdateScreen(screen) => {
             assert_eq!(screen.screen_id, "avatar_editor");
-            // Should now be in editing state with AvatarPreview
+            // Should now be in editing state with ImageCircle
             let has_preview = screen
                 .components
                 .iter()
-                .any(|c| matches!(c, Component::AvatarPreview { .. }));
-            assert!(has_preview, "editing state should show AvatarPreview");
+                .any(|c| matches!(c, Component::ImageCircle { .. }));
+            assert!(has_preview, "editing state should show ImageCircle");
         }
         other => panic!("expected UpdateScreen, got {other:?}"),
     }
 }
 
-// ── MyInfo AvatarPreview ───────────────────────────────────────
+// ── MyInfo ImageCircle ───────────────────────────────────────
 
-// @scenario: avatar_editor_wiring :: MyInfo shows AvatarPreview component
+// @scenario: avatar_editor_wiring :: MyInfo shows ImageCircle component
 #[test]
 fn my_info_shows_avatar_preview() {
     let mut engine = engine_with_identity();
@@ -198,14 +198,14 @@ fn my_info_shows_avatar_preview() {
     let has_avatar = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::AvatarPreview { .. }));
+        .any(|c| matches!(c, Component::ImageCircle { .. }));
     assert!(
         has_avatar,
-        "MyInfo should show an AvatarPreview component at the top"
+        "MyInfo should show an ImageCircle component at the top"
     );
 }
 
-// @scenario: avatar_editor_wiring :: MyInfo AvatarPreview shows avatar data after save
+// @scenario: avatar_editor_wiring :: MyInfo ImageCircle shows avatar data after save
 #[test]
 fn my_info_avatar_preview_shows_saved_avatar() {
     let mut engine = engine_with_identity();
@@ -221,16 +221,16 @@ fn my_info_avatar_preview_shows_saved_avatar() {
     // Navigate to MyInfo and check the preview
     let screen = engine.navigate_to(AppScreen::MyInfo);
     let avatar_preview = screen.components.iter().find_map(|c| match c {
-        Component::AvatarPreview { image_data, .. } => Some(image_data.clone()),
+        Component::ImageCircle { image_data, .. } => Some(image_data.clone()),
         _ => None,
     });
     assert!(
         avatar_preview.is_some(),
-        "MyInfo should have AvatarPreview component"
+        "MyInfo should have ImageCircle component"
     );
     assert!(
         avatar_preview.unwrap().is_some(),
-        "AvatarPreview should have image data after avatar was saved"
+        "ImageCircle should have image data after avatar was saved"
     );
 }
 
@@ -251,12 +251,12 @@ fn contact_edit_card_preview_includes_avatar_data() {
     // Navigate to MyInfo, then trigger edit — the CardPreview in edit should have avatar
     let _ = engine.navigate_to(AppScreen::MyInfo);
 
-    // Check that MyInfo's AvatarPreview has the avatar data
+    // Check that MyInfo's ImageCircle has the avatar data
     let screen = engine.current_screen();
     let has_avatar_data = screen.components.iter().any(|c| {
         matches!(
             c,
-            Component::AvatarPreview {
+            Component::ImageCircle {
                 image_data: Some(_),
                 ..
             }
@@ -264,13 +264,13 @@ fn contact_edit_card_preview_includes_avatar_data() {
     });
     assert!(
         has_avatar_data,
-        "MyInfo AvatarPreview should include avatar data from own card"
+        "MyInfo ImageCircle should include avatar data from own card"
     );
 }
 
 // ── Gap 2: ContactDetail avatar ────────────────────────────────
 
-// @scenario: avatar_editor_wiring :: ContactDetail shows AvatarPreview for contact
+// @scenario: avatar_editor_wiring :: ContactDetail shows ImageCircle for contact
 #[test]
 fn contact_detail_shows_avatar_preview() {
     let mut engine = engine_with_identity();
@@ -286,10 +286,10 @@ fn contact_detail_shows_avatar_preview() {
     let has_avatar = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::AvatarPreview { .. }));
+        .any(|c| matches!(c, Component::ImageCircle { .. }));
     assert!(
         has_avatar,
-        "ContactDetail should show an AvatarPreview component"
+        "ContactDetail should show an ImageCircle component"
     );
 }
 

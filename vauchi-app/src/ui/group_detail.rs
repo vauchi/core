@@ -277,7 +277,7 @@ mod tests {
             id: id.into(),
             name: name.into(),
             subtitle: None,
-            avatar_initials: name.chars().next().unwrap_or('?').to_string(),
+            initials: name.chars().next().unwrap_or('?').to_string(),
             status: None,
             actions: vec![],
             a11y: None,

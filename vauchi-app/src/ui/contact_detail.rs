@@ -93,7 +93,7 @@ pub struct ContactDetailEngine {
     delivery_summary: Option<DeliverySummary>,
     /// Whether the user has pressed "Delete" and the InlineConfirm is showing.
     pending_delete: bool,
-    /// Avatar image bytes (WebP) for the AvatarPreview component.
+    /// Avatar image bytes (WebP) for the ImageCircle component.
     avatar_data: Option<Vec<u8>>,
     /// Owner-private tags applied to this contact (ADR-051), rendered as a
     /// removable list. Loaded by the screen factory via
@@ -297,7 +297,7 @@ impl ContactDetailEngine {
         self
     }
 
-    /// Set the avatar image data for the AvatarPreview component.
+    /// Set the avatar image data for the ImageCircle component.
     pub fn with_avatar_data(mut self, data: Option<Vec<u8>>) -> Self {
         self.avatar_data = data;
         self
@@ -461,10 +461,10 @@ impl ContactDetailEngine {
     fn their_info_components(&self) -> Vec<Component> {
         let mut components = Vec::new();
         // Avatar preview at top
-        components.push(Component::AvatarPreview {
+        components.push(Component::ImageCircle {
             id: "avatar".into(),
             image_data: self.avatar_data.clone(),
-            initials: self.contact.avatar_initials.clone(),
+            initials: self.contact.initials.clone(),
             bg_color: None,
             brightness: 0.0,
             editable: false,
@@ -557,7 +557,7 @@ impl ContactDetailEngine {
         let mut contact_info_items = vec![InfoItem {
             icon: None,
             title: self.t("contact_detail.initials_label"),
-            detail: self.contact.avatar_initials.clone(),
+            detail: self.contact.initials.clone(),
         }];
         if !self.trust_level.is_empty() {
             contact_info_items.push(InfoItem {

@@ -200,7 +200,7 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
         | Component::StatusIndicator { .. }
         | Component::QrCode { .. }
         | Component::Divider
-        | Component::AvatarPreview { .. }
+        | Component::ImageCircle { .. }
         | Component::Slider { .. } => {}
     }
 }
@@ -627,7 +627,7 @@ mod tests {
                 id: "c-1".into(),
                 name: "Alice".into(),
                 subtitle: None,
-                avatar_initials: "A".into(),
+                initials: "A".into(),
                 status: None,
                 actions: vec![],
                 a11y: None,
@@ -657,7 +657,7 @@ mod tests {
                 id: "c-1".into(),
                 name: "Alice".into(),
                 subtitle: None,
-                avatar_initials: "A".into(),
+                initials: "A".into(),
                 status: None,
                 actions: vec![
                     ListItemAction {
@@ -716,7 +716,7 @@ mod tests {
                 id: "c-200".into(),
                 name: "Alice".into(),
                 subtitle: None,
-                avatar_initials: "A".into(),
+                initials: "A".into(),
                 status: None,
                 actions: vec![],
                 a11y: None,

@@ -295,7 +295,7 @@ impl ContactEditEngine {
             components: vec![Component::Preview {
                 name: self.contact.display_name.clone(),
                 initials: crate::ui::component::initials(&self.contact.display_name),
-                avatar_data: self.avatar_data.clone(),
+                image_data: self.avatar_data.clone(),
                 fields,
                 variants,
                 selected_variant,

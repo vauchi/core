@@ -140,7 +140,7 @@ pub fn build_visible_fields(
 /// of the first two whitespace-separated words, uppercased.
 ///
 /// Core owns this so frontends never recompute it (e.g. `displayName.take(1)`)
-/// — the initials ride the wire on `Component::Preview`/`AvatarPreview`
+/// — the initials ride the wire on `Component::Preview`/`ImageCircle`
 /// (ADR-021/043 Humble UI). Empty/whitespace-only names yield `""`.
 pub(crate) fn initials(name: &str) -> String {
     name.split_whitespace()

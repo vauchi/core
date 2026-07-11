@@ -22,7 +22,7 @@ pub struct Item {
     pub id: String,
     pub name: String,
     pub subtitle: Option<String>,
-    pub avatar_initials: String,
+    pub initials: String,
     pub status: Option<String>,
     /// Declarative per-row actions (swipe/long-press/context-menu on mobile,
     /// overflow menu on desktop). Empty = no per-row actions. The engine

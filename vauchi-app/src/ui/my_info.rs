@@ -62,7 +62,7 @@ pub struct MyInfoEngine {
     preview_data: Option<SharedInfoView>,
     /// Show a first-exchange prompt (user has no contacts yet).
     show_exchange_prompt: bool,
-    /// Avatar image bytes (WebP) for the AvatarPreview component.
+    /// Avatar image bytes (WebP) for the ImageCircle component.
     avatar_data: Option<Vec<u8>>,
     /// Outbound updates queued for the next sync (per
     /// `Vauchi::pending_update_count`). Rendered as a caption only when > 0.
@@ -129,7 +129,7 @@ impl MyInfoEngine {
         self
     }
 
-    /// Set the avatar image data for the AvatarPreview component.
+    /// Set the avatar image data for the ImageCircle component.
     pub fn with_avatar_data(mut self, data: Option<Vec<u8>>) -> Self {
         self.avatar_data = data;
         self
@@ -454,7 +454,7 @@ impl WorkflowEngine for MyInfoEngine {
         let mut components = Vec::new();
 
         // Avatar preview at top of MyInfo — editable (tap to open AvatarEditor)
-        components.push(Component::AvatarPreview {
+        components.push(Component::ImageCircle {
             id: "avatar".into(),
             image_data: self.avatar_data.clone(),
             initials: crate::ui::component::initials(&self.display_name),

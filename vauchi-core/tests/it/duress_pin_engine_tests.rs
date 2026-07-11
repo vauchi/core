@@ -29,7 +29,7 @@ fn contact_item(id: &str, name: &str) -> Item {
         id: id.into(),
         name: name.into(),
         subtitle: None,
-        avatar_initials: name
+        initials: name
             .chars()
             .next()
             .map(|c| c.to_string())

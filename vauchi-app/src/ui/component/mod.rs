@@ -72,10 +72,10 @@ pub enum Component {
         /// the initials fallback — never recompute `name.take(1)`
         /// (ADR-021/043 Humble UI).
         initials: String,
-        /// Avatar image bytes (WebP). Frontends show this in the circular
+        /// Image bytes (WebP). Frontends show this in the circular
         /// header area. Falls back to `initials` when None.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        avatar_data: Option<Vec<u8>>,
+        image_data: Option<Vec<u8>>,
         /// All fields on the card (raw — retained for backwards compatibility).
         ///
         /// Frontends should render `visible_fields` instead. This field is
@@ -235,7 +235,7 @@ pub enum Component {
     /// When `editable`, tapping forwards the core-supplied
     /// `edit_action_id` as `UserAction::ActionPressed` — the frontend
     /// never mints the id.
-    AvatarPreview {
+    ImageCircle {
         id: String,
         /// Raw image bytes (WebP/PNG/JPEG) to display, or None for
         /// initials-only fallback.

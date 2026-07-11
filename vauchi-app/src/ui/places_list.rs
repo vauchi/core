@@ -85,7 +85,7 @@ impl PlacesEngine {
                 id: p.id.clone(),
                 name: p.name.clone(),
                 subtitle: None,
-                avatar_initials: String::new(),
+                initials: String::new(),
                 status: None,
                 actions: vec![ListItemAction {
                     id: "request_delete".into(),

@@ -483,7 +483,7 @@ mod tests {
             id: id.into(),
             name: format!("Contact {id}"),
             subtitle: None,
-            avatar_initials: "C".into(),
+            initials: "C".into(),
             status: None,
             actions,
             a11y: None,

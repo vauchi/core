@@ -501,7 +501,7 @@ impl AppEngine {
                         id: c.id().to_string(),
                         name: c.display_name().to_string(),
                         subtitle: None,
-                        avatar_initials: initials(c.display_name()),
+                        initials: initials(c.display_name()),
                         status: None,
                         actions: vec![],
                         a11y: Some(A11y {
@@ -816,7 +816,7 @@ impl AppEngine {
                         id: c.id().to_string(),
                         name: c.display_name().to_string(),
                         subtitle,
-                        avatar_initials: initials(c.display_name()),
+                        initials: initials(c.display_name()),
                         status,
                         actions: contact_row_actions(c.is_imported(), c.is_hidden(), locale),
                         a11y: Some(A11y {
@@ -846,7 +846,7 @@ impl AppEngine {
                 id: c.id().to_string(),
                 name: c.display_name().to_string(),
                 subtitle: None,
-                avatar_initials: initials(c.display_name()),
+                initials: initials(c.display_name()),
                 status: None,
                 actions: vec![],
                 a11y: None,

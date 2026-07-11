@@ -82,12 +82,12 @@ fn generate_action_transitions_to_generator() {
         "expected UpdateScreen"
     );
     let screen = engine.current_screen();
-    // Should have an AvatarPreview with image data (generated)
+    // Should have an ImageCircle with image data (generated)
     let has_preview = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::AvatarPreview { .. }));
-    assert!(has_preview, "generator state needs an AvatarPreview");
+        .any(|c| matches!(c, Component::ImageCircle { .. }));
+    assert!(has_preview, "generator state needs an ImageCircle");
 }
 
 // ── Source picker via ListItemSelected (renderer-emitted shape) ──
@@ -151,8 +151,8 @@ fn generate_row_selected_transitions_to_generator() {
         .current_screen()
         .components
         .iter()
-        .any(|c| matches!(c, Component::AvatarPreview { .. }));
-    assert!(has_preview, "generator state needs an AvatarPreview");
+        .any(|c| matches!(c, Component::ImageCircle { .. }));
+    assert!(has_preview, "generator state needs an ImageCircle");
 }
 
 // @scenario: avatar_editor :: Remove row tap (ListItemSelected) completes with removed flag
@@ -206,8 +206,8 @@ fn image_received_transitions_to_editing() {
     let has_preview = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::AvatarPreview { .. }));
-    assert!(has_preview, "editing state needs an AvatarPreview");
+        .any(|c| matches!(c, Component::ImageCircle { .. }));
+    assert!(has_preview, "editing state needs an ImageCircle");
     let has_slider = screen
         .components
         .iter()
@@ -290,7 +290,7 @@ fn mandelbrot_regenerate_updates_preview() {
     // Preview data should differ (different seed)
     let get_preview_data = |screen: &vauchi_app::ui::ScreenModel| {
         screen.components.iter().find_map(|c| match c {
-            Component::AvatarPreview { image_data, .. } => image_data.clone(),
+            Component::ImageCircle { image_data, .. } => image_data.clone(),
             _ => None,
         })
     };
@@ -332,7 +332,7 @@ fn brightness_slider_updates_preview() {
     // Verify brightness is reflected in the preview component
     let screen = engine.current_screen();
     let brightness = screen.components.iter().find_map(|c| match c {
-        Component::AvatarPreview { brightness, .. } => Some(*brightness),
+        Component::ImageCircle { brightness, .. } => Some(*brightness),
         _ => None,
     });
     assert!(

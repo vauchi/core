@@ -89,7 +89,7 @@ impl AppEngine {
                         id: contact.id().to_string(),
                         name: contact.display_name().to_string(),
                         subtitle: None,
-                        avatar_initials: initials(contact.display_name()),
+                        initials: initials(contact.display_name()),
                         status,
                         actions: vec![],
                         a11y: Some(A11y {

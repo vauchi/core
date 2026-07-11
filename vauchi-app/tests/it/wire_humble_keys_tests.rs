@@ -84,7 +84,7 @@ fn sample_item() -> Item {
         id: "i1".to_string(),
         name: "Sample".to_string(),
         subtitle: Some("subtitle".to_string()),
-        avatar_initials: "S".to_string(),
+        initials: "S".to_string(),
         status: Some("active".to_string()),
         actions: vec![ListItemAction {
             id: "archive".to_string(),
@@ -149,7 +149,7 @@ const EXPECTED_VARIANT_TAGS: &[&str] = &[
     "Divider",
     "Banner",
     "Dropdown",
-    "AvatarPreview",
+    "ImageCircle",
     "Slider",
     "Indicator",
     "SectionedActionList",
@@ -190,7 +190,7 @@ fn all_components() -> Vec<Component> {
         Component::Preview {
             name: "Alice".to_string(),
             initials: "A".to_string(),
-            avatar_data: None,
+            image_data: None,
             fields: vec![sample_field()],
             visible_fields: vec![sample_field()],
             variants: vec![sample_preview_variant()],
@@ -289,7 +289,7 @@ fn all_components() -> Vec<Component> {
             }],
             a11y: None,
         },
-        Component::AvatarPreview {
+        Component::ImageCircle {
             id: "ap".to_string(),
             image_data: None,
             initials: "AB".to_string(),

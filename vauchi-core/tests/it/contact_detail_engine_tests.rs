@@ -15,7 +15,7 @@ fn sample_contact() -> Item {
         id: "c1".into(),
         name: "Alice".into(),
         subtitle: Some("alice@example.com".into()),
-        avatar_initials: "AL".into(),
+        initials: "AL".into(),
         status: None,
         actions: vec![],
         a11y: None,

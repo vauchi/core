@@ -13,7 +13,7 @@ pub use crate::contact_card::{MAX_AVATAR_SIZE, normalize_avatar};
 /// Generate a solid-color circle avatar image.
 ///
 /// Returns WebP bytes <= `MAX_AVATAR_SIZE`. Frontends overlay initials
-/// text from the `AvatarPreview` component's `initials` field — this
+/// text from the `ImageCircle` component's `initials` field — this
 /// function only produces the colored circle background.
 pub fn generate_initials_avatar(bg_color: [u8; 3], size: u32) -> Vec<u8> {
     let mut img = image::RgbaImage::new(size, size);

@@ -28,7 +28,7 @@
             "value": "+1-555-0100",
             "icon": "phone",
             "visibility": {
-              "Groups": [
+              "Scopes": [
                 "Family"
               ]
             },
@@ -45,7 +45,7 @@
             "value": "alice@example.com",
             "icon": "envelope",
             "visibility": {
-              "Groups": [
+              "Scopes": [
                 "Friends",
                 "Work"
               ]
@@ -58,7 +58,7 @@
           }
         ],
         "visibility_mode": "ShowHide",
-        "available_groups": [
+        "available_scopes": [
           "Family",
           "Friends",
           "Work"

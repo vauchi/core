@@ -7,7 +7,7 @@
     {
       "InfoPanel": {
         "id": "privacy_info",
-        "icon": "privacy",
+        "icon": "shield",
         "title": "Data Status",
         "items": [
           {
@@ -31,7 +31,7 @@
           {
             "id": "view_data",
             "label": "View My Data",
-            "icon": "data",
+            "icon": "folder",
             "detail": "See what data is stored locally",
             "a11y": {
               "label": "View My Data",
@@ -42,7 +42,7 @@
           {
             "id": "manage_consent",
             "label": "Manage Consent",
-            "icon": "consent",
+            "icon": "checkmark.seal",
             "detail": "Review and update data consent",
             "a11y": {
               "label": "Manage Consent",

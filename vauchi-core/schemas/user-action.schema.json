@@ -132,13 +132,13 @@
     {
       "type": "object",
       "required": [
-        "GroupViewSelected"
+        "VariantSelected"
       ],
       "properties": {
-        "GroupViewSelected": {
+        "VariantSelected": {
           "type": "object",
           "properties": {
-            "group_name": {
+            "variant_id": {
               "type": [
                 "string",
                 "null"

@@ -16,7 +16,7 @@
             "value": "+1-555-0100",
             "icon": "phone",
             "visibility": {
-              "Groups": [
+              "Scopes": [
                 "Family"
               ]
             },
@@ -33,7 +33,7 @@
             "value": "alice@example.com",
             "icon": "envelope",
             "visibility": {
-              "Groups": [
+              "Scopes": [
                 "Friends",
                 "Work"
               ]
@@ -57,7 +57,7 @@
                 "value": "+1-555-0100",
                 "icon": "phone",
                 "visibility": {
-                  "Groups": [
+                  "Scopes": [
                     "Family"
                   ]
                 },
@@ -80,7 +80,7 @@
                 "value": "alice@example.com",
                 "icon": "envelope",
                 "visibility": {
-                  "Groups": [
+                  "Scopes": [
                     "Friends",
                     "Work"
                   ]
@@ -104,7 +104,7 @@
                 "value": "alice@example.com",
                 "icon": "envelope",
                 "visibility": {
-                  "Groups": [
+                  "Scopes": [
                     "Friends",
                     "Work"
                   ]
@@ -127,7 +127,7 @@
             "value": "+1-555-0100",
             "icon": "phone",
             "visibility": {
-              "Groups": [
+              "Scopes": [
                 "Family"
               ]
             },
@@ -144,7 +144,7 @@
             "value": "alice@example.com",
             "icon": "envelope",
             "visibility": {
-              "Groups": [
+              "Scopes": [
                 "Friends",
                 "Work"
               ]

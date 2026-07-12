@@ -7,7 +7,7 @@
     {
       "InfoPanel": {
         "id": "help_intro",
-        "icon": "recovery",
+        "icon": "lifebuoy",
         "title": "Help a Contact Recover",
         "items": [
           {

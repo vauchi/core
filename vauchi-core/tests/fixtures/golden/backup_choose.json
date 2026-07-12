@@ -7,7 +7,7 @@
     {
       "InfoPanel": {
         "id": "backup_info",
-        "icon": "backup",
+        "icon": "drive",
         "title": "Protect your data",
         "items": [
           {

@@ -495,6 +495,8 @@ fn no_forbidden_keys_in_screen_surface() {
         presentation_kind: ScreenPresentationKind::Modal,
         layout: ScreenLayout::Fixed,
         native_wrapper_hint: NativeWrapperHint::MultiStageExchange,
+        parent_screen_id: Some("contacts".to_string()),
+        nav_tab_id: Some("more".to_string()),
         ..ScreenModel::default()
     };
     assert_no_forbidden_keys(&serde_json::to_value(&screen).unwrap(), "ScreenModel");

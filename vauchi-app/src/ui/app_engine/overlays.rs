@@ -126,6 +126,9 @@ impl AppEngine {
         if screen.parent_screen_id.is_none() {
             screen.parent_screen_id = self.screen.parent_screen_id().map(String::from);
         }
+        if screen.nav_tab_id.is_none() {
+            screen.nav_tab_id = self.screen.nav_tab_id();
+        }
         if matches!(
             screen.presentation_kind,
             crate::ui::screen::ScreenPresentationKind::Page

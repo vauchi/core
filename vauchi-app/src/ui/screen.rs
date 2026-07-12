@@ -122,6 +122,15 @@ pub struct ScreenModel {
     /// switch statements (`2026-05-01-screen-id-metadata-in-core` G1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_screen_id: Option<String>,
+    /// The bottom-nav tab that owns this screen (`my_info` / `contacts` /
+    /// `exchange` / `groups` / `more`), or `None` for pre-auth / transient
+    /// screens that show no bottom nav. Unlike [`Self::parent_screen_id`]
+    /// (which stops at the immediate parent for the desktop sidebar), this
+    /// resolves transitively to one of the five tab roots so the mobile /
+    /// TUI 5-tab shells highlight the active tab without re-deriving it from
+    /// the screen id (retires the hand-maintained `match AppScreen -> tab`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nav_tab_id: Option<String>,
     /// How to present the screen. See [`ScreenPresentationKind`]; G2 of
     /// `2026-05-01-screen-id-metadata-in-core`.
     #[serde(default)]
@@ -203,6 +212,7 @@ impl Default for ScreenModel {
             tokens: crate::theme::active_design_tokens(),
             deprecated_components: Vec::new(),
             parent_screen_id: None,
+            nav_tab_id: None,
             presentation_kind: ScreenPresentationKind::Page,
             can_go_back: false,
             is_bootstrap: false,
@@ -237,6 +247,7 @@ impl ScreenModel {
             tokens: crate::theme::active_design_tokens(),
             deprecated_components: Vec::new(),
             parent_screen_id: None,
+            nav_tab_id: None,
             presentation_kind: ScreenPresentationKind::Page,
             can_go_back: false,
             is_bootstrap: false,

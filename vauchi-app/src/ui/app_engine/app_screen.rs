@@ -302,6 +302,75 @@ impl AppScreen {
         }
     }
 
+    /// The bottom-nav tab that owns this screen, surfaced through
+    /// `ScreenModel.nav_tab_id` so the mobile / TUI 5-tab shells highlight
+    /// the active tab without hand-maintaining a `match AppScreen -> tab
+    /// index`. Returns one of the five bottom-nav roots (`my_info` /
+    /// `contacts` / `exchange` / `groups` / `more`), or `None` for pre-auth
+    /// and transient overlay screens that show no bottom nav.
+    ///
+    /// Distinct from [`Self::parent_screen_id`], which stops at the
+    /// immediate parent (`settings`, `recovery`, `tags`, `device_management`)
+    /// for the *desktop sidebar* highlight — widening that to the tab would
+    /// move the sidebar wrongly. This method instead resolves transitively
+    /// to a tab root: those intermediates all live under **More**, and the
+    /// top-level-non-tab screens the 5-tab shells bucket there (Settings,
+    /// Help, Backup, device/recovery/duress flows, …) map to `more`.
+    ///
+    /// Exhaustive — a new variant without a mapping is a compile error.
+    pub fn nav_tab_id(&self) -> Option<String> {
+        let tab = match self {
+            // Pre-auth / transient overlays show no bottom nav — the shell
+            // leaves the current highlight alone rather than force a tab.
+            Self::Onboarding
+            | Self::Lock
+            | Self::FormDialog { .. }
+            | Self::DeepLinkConsent { .. }
+            | Self::DeepLinkResponder { .. }
+            | Self::DeviceLinkJoin { .. } => return None,
+            Self::MyInfo | Self::MyInfoEntryDetail { .. } | Self::AvatarEditor => "my_info",
+            Self::Contacts
+            | Self::ContactDetail { .. }
+            | Self::ContactEdit { .. }
+            | Self::ContactVisibility { .. }
+            | Self::ContactDuplicates
+            | Self::ContactMerge { .. }
+            | Self::ContactLimit
+            | Self::ArchivedContacts
+            | Self::VerifyFingerprint { .. } => "contacts",
+            Self::Exchange
+            | Self::MultiStageExchange { .. }
+            | Self::LinkExchange
+            | Self::BleExchange { .. }
+            | Self::NfcExchange
+            | Self::DirectTransport => "exchange",
+            Self::Groups | Self::GroupDetail { .. } => "groups",
+            Self::More
+            | Self::Settings
+            | Self::SettingsAdvanced
+            | Self::Help
+            | Self::Backup
+            | Self::DeviceLinking
+            | Self::DeviceManagement
+            | Self::DeviceReplacement
+            | Self::DuressPin
+            | Self::ChangePassword
+            | Self::DecoyContacts
+            | Self::EmergencyShred
+            | Self::DeliveryStatus
+            | Self::Recovery
+            | Self::RecoveryHelp
+            | Self::RecoveryClaimReview
+            | Self::Tags
+            | Self::Places
+            | Self::TagPromotion { .. }
+            | Self::Privacy
+            | Self::Support
+            | Self::ActivityLog => "more",
+        };
+        Some(tab.to_string())
+    }
+
     /// How the frontend should present this screen. Surfaced through
     /// `ScreenModel.presentation_kind` per
     /// `2026-05-01-screen-id-metadata-in-core` G2; replaces frontend-side

@@ -12,7 +12,60 @@
 use std::collections::HashSet;
 
 use crate::text::normalize_text;
-use crate::types::{OnboardingProgress, OnboardingStep};
+
+/// Steps in the onboarding wizard.
+///
+/// The user progresses through these in order, though backward
+/// transitions are always allowed and some steps can be skipped.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, PartialOrd, Ord,
+)]
+#[non_exhaustive]
+pub enum OnboardingStep {
+    /// Pre-gate: does the user already have an identity?
+    IdentityCheck,
+    /// Pre-gate: instructions for linking this fresh device to an existing
+    /// identity (scan the QR code or open the invitation link from the
+    /// other device). Reached from `IdentityCheck` via `link_device`.
+    DeviceLinkInstructions,
+    /// Default display name entry (renamed from CreateIdentity)
+    #[serde(alias = "CreateIdentity", alias = "Welcome", alias = "SkipGate")]
+    DefaultName,
+    /// Groups setup: create contact groups
+    GroupsSetup,
+    /// Contact info fields (phone, email) (renamed from AddFields)
+    #[serde(alias = "AddFields", alias = "PreviewCard")]
+    ContactInfo,
+    /// Choose what to do after onboarding
+    #[serde(alias = "SecurityExplanation", alias = "BackupPrompt", alias = "Ready")]
+    WhatNext,
+    /// Password entry for backup restore (after the user has picked the
+    /// encrypted backup file via [`crate::exchange::Command::
+    /// FilePickFromUser`] with `purpose = FilePickPurpose::ImportBackup`).
+    /// Submitting calls [`crate::api::Vauchi::import_full_backup`] in
+    /// the AppEngine completion path; success creates identity from
+    /// the restored data and routes to MainScreen.
+    BackupPasswordEntry,
+}
+
+/// Tracks the user's progress through the onboarding wizard.
+///
+/// Follows the same persistence pattern as `DemoContactState` and
+/// `AhaMomentTracker` — serialized to JSON, encrypted, and stored
+/// in the `ux_state` table.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct OnboardingProgress {
+    /// The step the user is currently on.
+    pub current_step: OnboardingStep,
+    /// Steps that have been completed (visited and passed).
+    pub completed_steps: std::collections::HashSet<OnboardingStep>,
+    /// Timestamp when onboarding was started (Unix epoch seconds).
+    pub started_at: Option<u64>,
+    /// Timestamp when onboarding was completed (Unix epoch seconds).
+    pub completed_at: Option<u64>,
+    /// Whether the user skipped the backup step.
+    pub skipped_backup: bool,
+}
 
 impl OnboardingStep {
     /// Returns all steps in the main "create new identity" flow, in order.
@@ -228,4 +281,115 @@ pub fn display_name_suggestions(full_name: &str) -> Vec<String> {
     }
 
     suggestions
+}
+
+/// State of the demo contact.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct DemoContactState {
+    /// Whether the demo contact is active.
+    pub is_active: bool,
+    /// Whether it was manually dismissed.
+    pub was_dismissed: bool,
+    /// Whether it was auto-removed after first real exchange.
+    pub auto_removed: bool,
+    /// Current tip index (which tip is being shown).
+    pub current_tip_index: usize,
+    /// Timestamp of last update (Unix epoch seconds).
+    pub last_update_timestamp: u64,
+    /// History of shown tip IDs.
+    pub shown_tip_ids: Vec<String>,
+    /// Number of updates sent.
+    pub update_count: u32,
+}
+
+/// Types of aha moments that can be triggered
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub enum AhaMomentType {
+    /// Shown when card creation completes
+    CardCreationComplete,
+    /// Shown on first edit (before having contacts)
+    FirstEdit,
+    /// Shown when first contact is added
+    FirstContactAdded,
+    /// Shown when receiving first update from a contact
+    FirstUpdateReceived,
+    /// Shown when first outbound update is delivered
+    FirstOutboundDelivered,
+    /// Shown when the user edits a field on their card for the first time
+    FirstFieldEdit,
+    /// Shown when the user reaches three contacts
+    ThreeContactsReached,
+    /// Shown when a second device is linked
+    DeviceLinked,
+}
+
+impl AhaMomentType {
+    /// Get all aha moment types in order
+    pub fn all() -> &'static [AhaMomentType] {
+        &[
+            AhaMomentType::CardCreationComplete,
+            AhaMomentType::FirstEdit,
+            AhaMomentType::FirstContactAdded,
+            AhaMomentType::FirstUpdateReceived,
+            AhaMomentType::FirstOutboundDelivered,
+            AhaMomentType::FirstFieldEdit,
+            AhaMomentType::ThreeContactsReached,
+            AhaMomentType::DeviceLinked,
+        ]
+    }
+}
+
+/// Tracks which aha moments have been seen
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct AhaMomentTracker {
+    /// Set of seen moment types
+    seen: std::collections::HashSet<AhaMomentType>,
+}
+
+impl AhaMomentTracker {
+    /// Create a new tracker
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Check if a moment type has been seen
+    pub fn has_seen(&self, moment_type: AhaMomentType) -> bool {
+        self.seen.contains(&moment_type)
+    }
+
+    /// Mark a moment as seen
+    pub fn mark_seen(&mut self, moment_type: AhaMomentType) {
+        self.seen.insert(moment_type);
+    }
+
+    /// Check if a moment should be triggered (not yet seen)
+    pub fn should_trigger(&self, moment_type: AhaMomentType) -> bool {
+        !self.has_seen(moment_type)
+    }
+
+    /// Get count of seen moments
+    pub fn seen_count(&self) -> usize {
+        self.seen.len()
+    }
+
+    /// Get count of total possible moments
+    pub fn total_count(&self) -> usize {
+        AhaMomentType::all().len()
+    }
+
+    /// Reset all seen moments (for testing/debugging)
+    pub fn reset(&mut self) {
+        self.seen.clear()
+    }
+
+    /// Serialize to JSON for storage
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    /// Deserialize from JSON
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
 }

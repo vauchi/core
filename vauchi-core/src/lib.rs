@@ -45,6 +45,10 @@ fn _flame_install() {
     crate::flame::init_layer();
 }
 
+pub mod emergency;
+pub mod exchange_types;
+pub mod reminders;
+pub mod settings;
 pub mod types;
 pub mod visibility;
 

@@ -55,6 +55,7 @@ pub mod audio_modem;
 
 pub mod capability;
 pub mod confirmation_escrow;
+pub mod defaults;
 pub mod device_link;
 pub mod direct_transport;
 pub mod escrow;
@@ -133,6 +134,7 @@ pub use multistage::types::{
     AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
 };
 
+pub use defaults::ExchangeDefaults;
 pub use exchange_id::ExchangeId;
 pub use mode::{
     BootstrapMethod, DataTransport, DeviceRequirement, ExchangeContext, ExchangeMode, ModeCategory,

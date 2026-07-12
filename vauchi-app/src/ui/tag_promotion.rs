@@ -105,14 +105,14 @@ impl TagPromotionEngine {
         };
         components.push(Component::InfoPanel {
             id: "promotion_info".into(),
-            icon: Some("group".into()),
+            icon: Some("people".into()),
             title: get_string_with_args(
                 self.locale,
                 "tag_promotion.promote_title",
                 &[("name", &self.name)],
             ),
             items: vec![InfoItem {
-                icon: Some("members".into()),
+                icon: Some("people".into()),
                 title: self.t("group_detail.members_label"),
                 detail: members,
             }],

@@ -75,11 +75,11 @@ impl GroupDetailEngine {
 
         components.push(Component::InfoPanel {
             id: "group_info".into(),
-            icon: Some("group".into()),
+            icon: Some("people".into()),
             title: self.t("group_detail.group_info_title"),
             items: vec![
                 InfoItem {
-                    icon: Some("members".into()),
+                    icon: Some("people".into()),
                     title: self.t("group_detail.members_label"),
                     detail: format!("{}", self.members.len()),
                 },

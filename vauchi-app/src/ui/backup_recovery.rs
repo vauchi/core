@@ -175,7 +175,7 @@ impl BackupRecoveryEngine {
             components: vec![
                 Component::InfoPanel {
                     id: "backup_info".into(),
-                    icon: Some("backup".into()),
+                    icon: Some("drive".into()),
                     title: self.t("backup.wizard.protect_title"),
                     items: vec![InfoItem {
                         icon: None,

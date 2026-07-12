@@ -473,7 +473,7 @@ impl WorkflowEngine for MyInfoEngine {
         if self.show_exchange_prompt {
             components.push(Component::InfoPanel {
                 id: "exchange_prompt".into(),
-                icon: Some("exchange".into()),
+                icon: Some("swap".into()),
                 title: self.t("my_info.exchange_prompt_title"),
                 items: vec![InfoItem {
                     icon: Some("people".into()),

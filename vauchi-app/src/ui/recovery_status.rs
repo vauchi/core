@@ -182,7 +182,7 @@ impl RecoveryEngine {
         let mut components = vec![
             Component::InfoPanel {
                 id: "intro".into(),
-                icon: Some("recovery".into()),
+                icon: Some("lifebuoy".into()),
                 title: self.t("recovery.lost_device_title"),
                 items: vec![InfoItem {
                     icon: None,
@@ -408,7 +408,7 @@ impl RecoveryEngine {
 
         components.push(Component::InfoPanel {
             id: "quorum_info".into(),
-            icon: Some("recovery".into()),
+            icon: Some("lifebuoy".into()),
             title: self.t("recovery.quorum_status_title"),
             items: vec![
                 InfoItem {
@@ -531,7 +531,7 @@ impl RecoveryEngine {
 
         let mut components: Vec<Component> = vec![Component::StatusIndicator {
             id: "voucher_progress".into(),
-            icon: Some("recovery".into()),
+            icon: Some("lifebuoy".into()),
             title: self.t("recovery.voucher_collection_title"),
             detail: Some(get_string_with_args(
                 self.locale,

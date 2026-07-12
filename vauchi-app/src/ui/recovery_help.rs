@@ -150,7 +150,7 @@ impl RecoveryHelpEngine {
         let components = vec![
             Component::InfoPanel {
                 id: "help_intro".into(),
-                icon: Some("recovery".into()),
+                icon: Some("lifebuoy".into()),
                 title: self.t("recovery.help_contact_recover"),
                 items: vec![InfoItem {
                     icon: None,
@@ -280,7 +280,7 @@ impl RecoveryHelpEngine {
 
         let mut components = vec![Component::InfoPanel {
             id: "claim_details".into(),
-            icon: Some("recovery".into()),
+            icon: Some("lifebuoy".into()),
             title: self.t("recovery.claim_details_title"),
             items: vec![
                 InfoItem {

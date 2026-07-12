@@ -311,7 +311,7 @@ impl WorkflowEngine for ContactListEngine {
                 icon: Some("people".into()),
                 title: self.t("contacts.empty_title"),
                 items: vec![InfoItem {
-                    icon: Some("exchange".into()),
+                    icon: Some("swap".into()),
                     title: self.t("contacts.empty_exchange_title"),
                     detail: self.t("contacts.empty_exchange_detail"),
                 }],

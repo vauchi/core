@@ -147,7 +147,7 @@ impl GroupsEngine {
                 ActionListItem {
                     id: g.id.clone(),
                     label: g.name.clone(),
-                    icon: Some("group".into()),
+                    icon: Some("people".into()),
                     detail: Some(detail),
                     a11y: None,
                     info_key: None,

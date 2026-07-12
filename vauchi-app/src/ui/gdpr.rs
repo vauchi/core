@@ -144,7 +144,7 @@ impl GdprEngine {
             components: vec![
                 Component::InfoPanel {
                     id: "privacy_info".into(),
-                    icon: Some("privacy".into()),
+                    icon: Some("shield".into()),
                     title: self.t("privacy.data_status"),
                     items: vec![
                         InfoItem {
@@ -166,7 +166,7 @@ impl GdprEngine {
                         ActionListItem {
                             id: "view_data".into(),
                             label: self.t("privacy.view_data"),
-                            icon: Some("data".into()),
+                            icon: Some("folder".into()),
                             detail: Some(self.t("privacy.view_data_desc")),
                             a11y: Some(A11y::labeled(self.t("privacy.view_data"))),
                             info_key: None,
@@ -174,7 +174,7 @@ impl GdprEngine {
                         ActionListItem {
                             id: "manage_consent".into(),
                             label: self.t("privacy.manage_consent"),
-                            icon: Some("consent".into()),
+                            icon: Some("checkmark.seal".into()),
                             detail: Some(self.t("privacy.manage_consent_desc")),
                             a11y: Some(A11y::labeled(self.t("privacy.manage_consent"))),
                             info_key: None,
@@ -234,12 +234,12 @@ impl GdprEngine {
         let s = &self.deletion_summary;
         let mut items = vec![
             InfoItem {
-                icon: Some("identity".into()),
+                icon: Some("id_card".into()),
                 title: self.t("privacy.delete.identity_title"),
                 detail: self.t("privacy.delete.identity_detail"),
             },
             InfoItem {
-                icon: Some("contacts".into()),
+                icon: Some("people".into()),
                 title: self.t_count("privacy.delete.contacts_title", s.contact_count),
                 detail: self.t("privacy.delete.contacts_detail"),
             },

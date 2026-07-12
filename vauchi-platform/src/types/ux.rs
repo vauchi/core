@@ -97,6 +97,11 @@ pub struct MobileTabInfo {
     pub icon: String,
     /// Badge count (e.g. pending contact updates). Zero means no badge.
     pub badge_count: u32,
+    /// Whether this tab is the home / primary tab ("My Card").
+    ///
+    /// Mirrors `vauchi_app::ui::TabInfo.is_home` so frontends can
+    /// identify the home tab without hardcoding a domain screen id.
+    pub is_home: bool,
 }
 
 impl From<vauchi_app::ui::TabInfo> for MobileTabInfo {
@@ -107,6 +112,7 @@ impl From<vauchi_app::ui::TabInfo> for MobileTabInfo {
             label: value.label,
             icon: value.icon,
             badge_count: value.badge_count,
+            is_home: value.is_home,
         }
     }
 }

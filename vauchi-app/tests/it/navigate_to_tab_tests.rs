@@ -165,3 +165,37 @@ fn navigate_back_after_navigate_to_tab_returns_to_prior_screen() {
         "navigate_back must return to the screen visited before the last NavigateToTab"
     );
 }
+
+/// The home tab is identified by a UI-shaped `is_home` flag, not by
+/// hardcoding the domain screen id. Exactly one tab is home, and it is
+/// the "my_info" / My Card tab.
+// @internal
+#[test]
+fn tab_info_flags_exactly_one_home_tab() {
+    let tabs = engine_with_identity().tab_info(vauchi_app::Locale::English);
+    assert!(
+        !tabs.is_empty(),
+        "expected top-level tabs after identity creation"
+    );
+
+    let home_tabs: Vec<&vauchi_app::ui::TabInfo> = tabs.iter().filter(|t| t.is_home).collect();
+    assert_eq!(
+        home_tabs.len(),
+        1,
+        "exactly one tab must be marked as home, got {home_tabs:?}"
+    );
+    assert_eq!(
+        home_tabs[0].id, "my_info",
+        "the home tab must be the My Card / my_info tab"
+    );
+
+    for tab in &tabs {
+        if tab.id != "my_info" {
+            assert!(
+                !tab.is_home,
+                "non-home tab `{}` must not have is_home == true",
+                tab.id
+            );
+        }
+    }
+}

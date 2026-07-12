@@ -488,6 +488,7 @@ impl AppEngine {
             label,
             icon: icon.to_string(),
             badge_count: 0,
+            is_home: screen == AppScreen::MyInfo,
         }
     }
 }

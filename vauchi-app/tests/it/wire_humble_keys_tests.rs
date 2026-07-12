@@ -510,6 +510,7 @@ fn no_forbidden_keys_in_screen_surface() {
         label: "Contacts".to_string(),
         icon: "person.2".to_string(),
         badge_count: 0,
+        is_home: false,
     };
     assert_no_forbidden_keys(&serde_json::to_value(&tab).unwrap(), "TabInfo");
 
@@ -688,6 +689,7 @@ fn no_domain_icon_values_in_render_surface() {
         label: "Contacts".to_string(),
         icon: "person.2".to_string(),
         badge_count: 0,
+        is_home: false,
     };
     assert_no_domain_icon_values(&serde_json::to_value(&tab).unwrap(), "TabInfo");
 }

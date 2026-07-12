@@ -643,6 +643,12 @@ pub struct TabInfo {
     /// Badge count (e.g., pending contact updates). Zero means no badge.
     #[serde(default)]
     pub badge_count: u32,
+    /// Whether this tab is the home / primary tab ("My Card").
+    ///
+    /// Frontends use this flag to identify the home tab instead of
+    /// hardcoding the domain screen id (ADR-043/044 Wire Humble).
+    #[serde(default)]
+    pub is_home: bool,
 }
 
 /// Visual style for a screen action.

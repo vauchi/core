@@ -237,6 +237,7 @@ impl OnboardingEngine {
                 },
             ],
             progress: None,
+            is_bootstrap: true,
             ..Default::default()
         }
     }

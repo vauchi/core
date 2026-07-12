@@ -133,6 +133,12 @@ pub struct ScreenModel {
     /// screens are roots / back-stoppers).
     #[serde(default, skip_serializing_if = "is_false")]
     pub can_go_back: bool,
+    /// Whether this screen is the entry/bootstrap onboarding screen.
+    /// Frontends use this flag to offer quit/import-backup shortcuts here
+    /// instead of hardcoding domain `screen_id`s like `"welcome"` or
+    /// `"identity_check"` (ADR-043/044 Humble UI).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_bootstrap: bool,
     /// Whether the renderer scrolls the content or renders a fixed,
     /// non-scrolling layout. See [`ScreenLayout`]. Omitted on the wire
     /// when `Scroll` (the default) so only fixed-layout screens carry it.
@@ -199,6 +205,7 @@ impl Default for ScreenModel {
             parent_screen_id: None,
             presentation_kind: ScreenPresentationKind::Page,
             can_go_back: false,
+            is_bootstrap: false,
             layout: ScreenLayout::Scroll,
             requires_animated_qr: false,
             requires_poll: false,
@@ -232,6 +239,7 @@ impl ScreenModel {
             parent_screen_id: None,
             presentation_kind: ScreenPresentationKind::Page,
             can_go_back: false,
+            is_bootstrap: false,
             layout: ScreenLayout::Scroll,
             requires_animated_qr: false,
             requires_poll: false,

@@ -16,7 +16,8 @@
 use std::collections::BTreeSet;
 
 use vauchi_app::ui::testing::{assert_reachability, check_reachability, check_static_reachability};
-use vauchi_app::ui::{OnboardingEngine, WorkflowEngine};
+use vauchi_app::ui::{OnboardingEngine, UserAction, WorkflowEngine};
+use vauchi_core::types::OnboardingStep as Step;
 
 /// Action ids `handle_identity_check` consumes
 /// (`core/vauchi-app/src/ui/onboarding.rs:644`).
@@ -170,5 +171,29 @@ fn bfs_reaches_all_onboarding_screens() {
             "what_next".to_string(),
         ]),
         "BFS screen set drifted"
+    );
+}
+
+/// The bootstrap screen carries a UI-shaped flag so frontends can offer
+/// quit/import-backup shortcuts without hardcoding domain `screen_id`s.
+/// `identity_check` is the bootstrap entry; subsequent onboarding screens
+/// are not.
+// @internal
+#[test]
+fn identity_check_is_bootstrap_and_later_onboarding_screens_are_not() {
+    let mut engine = OnboardingEngine::new();
+    assert_eq!(engine.current_step(), Step::IdentityCheck);
+    assert!(
+        engine.current_screen().is_bootstrap,
+        "identity_check must be the bootstrap screen"
+    );
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+    assert_eq!(engine.current_step(), Step::DefaultName);
+    assert!(
+        !engine.current_screen().is_bootstrap,
+        "default_name must not be a bootstrap screen"
     );
 }

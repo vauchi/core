@@ -88,7 +88,7 @@ pub(super) fn build_field_preview_screen(
                         UiFieldVisibility::Hidden => {
                             Some("This field is hidden from contacts".into())
                         }
-                        UiFieldVisibility::Groups(_) => Some("Visible to specific groups".into()),
+                        UiFieldVisibility::Scopes(_) => Some("Visible to specific groups".into()),
                     },
                     role: None,
                 }),
@@ -123,7 +123,7 @@ pub(super) fn build_field_preview_screen(
                 id: "preview_fields".into(),
                 fields,
                 visibility_mode: VisibilityMode::ReadOnly,
-                available_groups: vec![],
+                available_scopes: vec![],
                 a11y: Some(A11y {
                     label: Some(t("exchange.preview.fields_a11y")),
                     hint: None,

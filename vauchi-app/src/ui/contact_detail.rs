@@ -617,7 +617,7 @@ impl ContactDetailEngine {
                 id: format!("field_{}", field.id),
                 fields: vec![field.clone()],
                 visibility_mode: VisibilityMode::ReadOnly,
-                available_groups: vec![],
+                available_scopes: vec![],
                 a11y: Some(A11y {
                     label: Some(contact_fields_a11y.clone()),
                     hint: None,
@@ -708,7 +708,7 @@ impl ContactDetailEngine {
                 id: "my_fields".into(),
                 fields: shared.my_fields.clone(),
                 visibility_mode: VisibilityMode::PerGroup,
-                available_groups: shared.visible_groups.clone(),
+                available_scopes: shared.visible_groups.clone(),
                 a11y: Some(A11y {
                     label: Some(self.t("fields.a11y_contact_fields")),
                     hint: Some(self.t("contact_detail.manage_group_visibility_hint")),

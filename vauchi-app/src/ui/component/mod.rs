@@ -61,7 +61,7 @@ pub enum Component {
         id: String,
         fields: Vec<Field>,
         visibility_mode: VisibilityMode,
-        available_groups: Vec<String>,
+        available_scopes: Vec<String>,
         #[serde(default)]
         a11y: Option<A11y>,
     },

@@ -90,7 +90,7 @@ pub fn build_exchange_success_screen(
             id: "received_fields".into(),
             fields,
             visibility_mode: VisibilityMode::ReadOnly,
-            available_groups: Vec::new(),
+            available_scopes: Vec::new(),
             a11y: None,
         });
     }

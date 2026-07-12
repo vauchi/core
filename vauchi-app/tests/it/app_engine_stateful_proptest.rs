@@ -87,8 +87,8 @@ fn action_strategy() -> impl Strategy<Value = UserAction> {
             .prop_map(|(field_id, group_id, visible)| {
                 UserAction::FieldVisibilityChanged { field_id, group_id, visible }
             }),
-        1 => prop::option::of(text_strategy()).prop_map(|group_name| {
-            UserAction::GroupViewSelected { group_name }
+        1 => prop::option::of(text_strategy()).prop_map(|variant_id| {
+            UserAction::VariantSelected { variant_id }
         }),
         2 => (id_strategy(), text_strategy()).prop_map(|(component_id, query)| {
             UserAction::SearchChanged { component_id, query }

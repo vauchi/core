@@ -80,7 +80,7 @@ pub fn icon_for_field_type(field_type: &str) -> &'static str {
 pub enum UiFieldVisibility {
     Shown,
     Hidden,
-    Groups(Vec<String>),
+    Scopes(Vec<String>),
 }
 
 /// One alternate look at a `Component::Preview` — a per-variant view
@@ -129,7 +129,7 @@ pub fn build_visible_fields(
         .filter(|f| {
             matches!(
                 f.visibility,
-                UiFieldVisibility::Shown | UiFieldVisibility::Groups(_)
+                UiFieldVisibility::Shown | UiFieldVisibility::Scopes(_)
             )
         })
         .cloned()
@@ -200,7 +200,7 @@ mod build_visible_fields_tests {
         let fields = vec![
             field("a", UiFieldVisibility::Shown),
             field("b", UiFieldVisibility::Hidden),
-            field("c", UiFieldVisibility::Groups(vec!["work".into()])),
+            field("c", UiFieldVisibility::Scopes(vec!["work".into()])),
         ];
         let result = build_visible_fields(&fields, &[], &None);
         let ids: Vec<_> = result.iter().map(|f| f.id.as_str()).collect();

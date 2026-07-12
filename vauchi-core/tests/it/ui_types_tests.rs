@@ -138,17 +138,17 @@ fn test_user_action_field_visibility_changed_roundtrip() {
 
 // @internal
 #[test]
-fn test_user_action_group_view_selected_roundtrip() {
-    let action = UserAction::GroupViewSelected {
-        group_name: Some("Family".into()),
+fn test_user_action_variant_selected_roundtrip() {
+    let action = UserAction::VariantSelected {
+        variant_id: Some("Family".into()),
     };
     let json = serde_json::to_string(&action).unwrap();
     let restored: UserAction = serde_json::from_str(&json).unwrap();
     match restored {
-        UserAction::GroupViewSelected { group_name } => {
-            assert_eq!(group_name.as_deref(), Some("Family"));
+        UserAction::VariantSelected { variant_id } => {
+            assert_eq!(variant_id.as_deref(), Some("Family"));
         }
-        other => panic!("Expected GroupViewSelected, got {:?}", other),
+        other => panic!("Expected VariantSelected, got {:?}", other),
     }
 }
 
@@ -329,11 +329,11 @@ fn test_component_field_list_roundtrip() {
             label: "Email".into(),
             value: "alice@example.com".into(),
             icon: "envelope".into(),
-            visibility: UiFieldVisibility::Groups(vec!["friends".into()]),
+            visibility: UiFieldVisibility::Scopes(vec!["friends".into()]),
             a11y: None,
         }],
         visibility_mode: VisibilityMode::PerGroup,
-        available_groups: vec!["friends".into(), "family".into()],
+        available_scopes: vec!["friends".into(), "family".into()],
         a11y: None,
     };
 
@@ -344,7 +344,7 @@ fn test_component_field_list_roundtrip() {
             id,
             fields,
             visibility_mode,
-            available_groups,
+            available_scopes,
             ..
         } => {
             assert_eq!(id, "fields");
@@ -353,10 +353,10 @@ fn test_component_field_list_roundtrip() {
             assert_eq!(fields[0].value, "alice@example.com");
             assert_eq!(
                 fields[0].visibility,
-                UiFieldVisibility::Groups(vec!["friends".into()])
+                UiFieldVisibility::Scopes(vec!["friends".into()])
             );
             assert_eq!(visibility_mode, VisibilityMode::PerGroup);
-            assert_eq!(available_groups, vec!["friends", "family"]);
+            assert_eq!(available_scopes, vec!["friends", "family"]);
         }
         other => panic!("Expected FieldList, got {:?}", other),
     }
@@ -497,7 +497,7 @@ fn test_field_visibility_variants() {
     let variants = vec![
         UiFieldVisibility::Shown,
         UiFieldVisibility::Hidden,
-        UiFieldVisibility::Groups(vec!["a".into(), "b".into()]),
+        UiFieldVisibility::Scopes(vec!["a".into(), "b".into()]),
     ];
 
     for vis in &variants {

@@ -77,13 +77,13 @@ fn edit_fields_has_name_input_and_field_list() {
             id,
             fields,
             visibility_mode,
-            available_groups,
+            available_scopes,
             ..
         } => {
             assert_eq!(id, "fields");
             assert_eq!(fields.len(), 2);
             assert_eq!(visibility_mode, &VisibilityMode::ShowHide);
-            assert_eq!(available_groups, &sample_groups());
+            assert_eq!(available_scopes, &sample_groups());
         }
         other => panic!("Expected FieldList, got {:?}", other),
     }
@@ -305,8 +305,8 @@ fn edit_preview_group_selection() {
         action_id: "continue".into(),
     });
 
-    let result = engine.handle_action(UserAction::GroupViewSelected {
-        group_name: Some("Family".into()),
+    let result = engine.handle_action(UserAction::VariantSelected {
+        variant_id: Some("Family".into()),
     });
 
     match result {

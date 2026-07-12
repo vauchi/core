@@ -87,7 +87,7 @@ fn arb_user_action() -> impl Strategy<Value = UserAction> {
             }
         }),
         prop::option::of(arb_group_name())
-            .prop_map(|group_name| UserAction::GroupViewSelected { group_name }),
+            .prop_map(|variant_id| UserAction::VariantSelected { variant_id }),
     ]
 }
 

@@ -92,7 +92,7 @@ impl ContactEditEngine {
 
     fn field_to_display(&self, field: &EditableField) -> Field {
         let visibility = if !field.visible_to_groups.is_empty() {
-            UiFieldVisibility::Groups(field.visible_to_groups.clone())
+            UiFieldVisibility::Scopes(field.visible_to_groups.clone())
         } else if field.shown {
             UiFieldVisibility::Shown
         } else {
@@ -110,7 +110,7 @@ impl ContactEditEngine {
                 hint: match visibility {
                     UiFieldVisibility::Shown => None,
                     UiFieldVisibility::Hidden => Some(self.t("contact_edit.field_hidden_hint")),
-                    UiFieldVisibility::Groups(_) => Some(self.t("contact_edit.field_groups_hint")),
+                    UiFieldVisibility::Scopes(_) => Some(self.t("contact_edit.field_groups_hint")),
                 },
                 role: None,
             }),
@@ -170,7 +170,7 @@ impl ContactEditEngine {
                     id: "fields".into(),
                     fields,
                     visibility_mode: VisibilityMode::ShowHide,
-                    available_groups: self.available_groups.clone(),
+                    available_scopes: self.available_groups.clone(),
                     a11y: Some(A11y {
                         label: Some(self.t("fields.a11y_contact_fields")),
                         hint: Some(self.t("fields.a11y_toggle_hint")),
@@ -448,8 +448,8 @@ impl WorkflowEngine for ContactEditEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
 
-            UserAction::GroupViewSelected { group_name } => {
-                self.selected_preview_group = group_name;
+            UserAction::VariantSelected { variant_id } => {
+                self.selected_preview_group = variant_id;
                 ActionResult::UpdateScreen(self.current_screen())
             }
 

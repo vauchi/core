@@ -358,7 +358,7 @@ impl MyInfoEngine {
                 id: format!("preview_field_{}", field.id),
                 fields: vec![field.clone()],
                 visibility_mode: VisibilityMode::ReadOnly,
-                available_groups: vec![],
+                available_scopes: vec![],
                 a11y: Some(A11y {
                     label: Some(self.t("my_info.preview.fields_a11y_label")),
                     hint: None,

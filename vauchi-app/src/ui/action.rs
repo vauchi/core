@@ -51,8 +51,8 @@ pub enum UserAction {
         group_id: Option<String>,
         visible: bool,
     },
-    GroupViewSelected {
-        group_name: Option<String>,
+    VariantSelected {
+        variant_id: Option<String>,
     },
     SearchChanged {
         component_id: String,

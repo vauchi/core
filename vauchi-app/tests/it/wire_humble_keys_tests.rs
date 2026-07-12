@@ -117,7 +117,7 @@ fn sample_field() -> Field {
 /// deny-list scan can see (and reject) that tag.
 fn sample_scoped_field() -> Field {
     Field {
-        visibility: UiFieldVisibility::Groups(vec!["work".to_string()]),
+        visibility: UiFieldVisibility::Scopes(vec!["work".to_string()]),
         ..sample_field()
     }
 }
@@ -215,7 +215,7 @@ fn all_components() -> Vec<Component> {
             id: "fl".to_string(),
             fields: vec![sample_field(), sample_scoped_field()],
             visibility_mode: VisibilityMode::ReadOnly,
-            available_groups: vec!["work".to_string()],
+            available_scopes: vec!["work".to_string()],
             a11y: None,
         },
         Component::ToggleList {
@@ -459,8 +459,8 @@ fn no_forbidden_keys_in_screen_surface() {
 #[test]
 fn no_forbidden_keys_in_user_actions() {
     let actions = [
-        UserAction::GroupViewSelected {
-            group_name: Some("work".to_string()),
+        UserAction::VariantSelected {
+            variant_id: Some("work".to_string()),
         },
         UserAction::NavigateBack,
         UserAction::SearchChanged {

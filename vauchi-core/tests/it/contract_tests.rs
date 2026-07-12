@@ -109,9 +109,9 @@ fn user_action_variants_validate_against_schema() {
             },
         ),
         (
-            "GroupViewSelected",
-            UserAction::GroupViewSelected {
-                group_name: Some("Family".into()),
+            "VariantSelected",
+            UserAction::VariantSelected {
+                variant_id: Some("Family".into()),
             },
         ),
         (

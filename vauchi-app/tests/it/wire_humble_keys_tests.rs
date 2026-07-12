@@ -52,6 +52,96 @@ const FORBIDDEN_KEYS: &[&str] = &[
     "GroupViewSelected", // UserAction variant tag → "VariantSelected"
 ];
 
+/// Wire icon-token *field* names — the object keys whose string VALUE is
+/// a glyph/SF-Symbol name the renderer looks up in its icon table. Every
+/// `icon`-suffixed field on the render wire (`core/vauchi-app/src/ui`):
+/// `icon` (InfoPanel, StatusIndicator, Field, ActionListItem, TabInfo),
+/// `min_icon`/`max_icon` (Slider). The key-guard above cannot see these
+/// values — it scans keys only — which is the gap this file closes.
+const ICON_FIELD_KEYS: &[&str] = &["icon", "min_icon", "max_icon"];
+
+/// Domain words that must NEVER appear as an icon-token *value*.
+///
+/// Icon values are glyph names (`folder`, `person`, `qrcode`, `shield`,
+/// `devices`, `id_card`, …) the renderer maps to a native symbol. A
+/// *domain* word here would let the renderer branch on what kind of thing
+/// it is drawing — the exact leak Wire Humble forbids — through a channel
+/// the key-only deny-list can't see. core!1359 (avatar) + core!1360
+/// (group/icons) renamed the last domain icon tokens to glyphs; this list
+/// locks that in.
+///
+/// Matched by EXACT token equality, never substring: `id_card` is a legit
+/// glyph and must not trip on `card`; `devices`/`people`/`person` are legit
+/// glyphs and stay off this list even though a domain lives next door.
+const FORBIDDEN_ICON_VALUES: &[&str] = &[
+    "avatar",
+    "contact",
+    "contacts",
+    "card",
+    "group",
+    "groups",
+    "members",
+    "backup",
+    "identity",
+    "privacy",
+    "consent",
+    "recovery",
+    "exchange",
+    "duress",
+    "fingerprint",
+    "mailbox",
+    "relay",
+    "decoy",
+    "emergency",
+    "broadcast",
+    "gdpr",
+    "onboarding",
+    "ratchet",
+    "guardian",
+    "shard",
+    "reciprocity",
+];
+
+/// Recursively walk a JSON value asserting that no icon-token field carries
+/// a domain word as its VALUE. Complements [`assert_no_forbidden_keys`]:
+/// that guards object KEYS, this guards the string VALUE of the icon
+/// fields — the channel a key-only scan is blind to (`"icon": "backup"`).
+/// Exact token equality against [`FORBIDDEN_ICON_VALUES`], so glyph tokens
+/// that merely embed a domain substring (`id_card`) are never flagged.
+fn assert_no_domain_icon_values(value: &serde_json::Value, path: &str) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, child) in map {
+                if ICON_FIELD_KEYS.contains(&key.as_str())
+                    && let serde_json::Value::String(icon) = child
+                {
+                    assert!(
+                        !FORBIDDEN_ICON_VALUES.contains(&icon.as_str()),
+                        "Wire Humble violation: icon token `{icon}` at JSON path \
+                         `{path}.{key}` is a domain word. Icon values must be \
+                         glyph/SF-Symbol names the renderer looks up in a static \
+                         icon table — never a domain word it could branch on. \
+                         core!1359/core!1360 retired the domain icon tokens; pick a \
+                         glyph name. See `.claude/rules/wire-humble.md`."
+                    );
+                }
+                let sub_path = if path.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{path}.{key}")
+                };
+                assert_no_domain_icon_values(child, &sub_path);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for (i, child) in items.iter().enumerate() {
+                assert_no_domain_icon_values(child, &format!("{path}[{i}]"));
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Recursively walk a JSON value asserting that no forbidden key
 /// appears as an object key (which covers both struct field names
 /// and the externally-tagged enum variant tag).
@@ -568,4 +658,93 @@ fn walker_catches_each_forbidden_key() {
             "Walker failed to catch forbidden key `{key}` — regression test is toothless"
         );
     }
+}
+
+/// Value-guard companion to [`no_forbidden_keys_in_screen_surface`]: walks
+/// the same render-surface JSON asserting no icon-token field carries a
+/// domain word as its VALUE. The key-only deny-list can't see icon values
+/// (`"icon": "backup"`); this closes that gap. Green on current main
+/// confirms core!1359/core!1360 renamed every domain icon token to a
+/// glyph, and locks that cleanup against regression.
+///
+/// @internal
+#[test]
+fn no_domain_icon_values_in_render_surface() {
+    let screen = ScreenModel {
+        screen_id: "s".to_string(),
+        title: "Screen".to_string(),
+        components: all_components(),
+        actions: vec![sample_screen_action()],
+        presentation_kind: ScreenPresentationKind::Modal,
+        layout: ScreenLayout::Fixed,
+        native_wrapper_hint: NativeWrapperHint::MultiStageExchange,
+        ..ScreenModel::default()
+    };
+    assert_no_domain_icon_values(&serde_json::to_value(&screen).unwrap(), "ScreenModel");
+
+    let tab = TabInfo {
+        id: "contacts".to_string(),
+        action_id: "nav_contacts".to_string(),
+        label: "Contacts".to_string(),
+        icon: "person.2".to_string(),
+        badge_count: 0,
+    };
+    assert_no_domain_icon_values(&serde_json::to_value(&tab).unwrap(), "TabInfo");
+}
+
+/// The blocklist is the spec. An empty list makes
+/// [`no_domain_icon_values_in_render_surface`] a no-op — fail loud.
+///
+/// @internal
+#[test]
+fn forbidden_icon_values_self_check() {
+    assert!(
+        !FORBIDDEN_ICON_VALUES.is_empty(),
+        "FORBIDDEN_ICON_VALUES is empty — icon-value guard has no teeth"
+    );
+    for value in FORBIDDEN_ICON_VALUES {
+        assert!(
+            !value.is_empty(),
+            "FORBIDDEN_ICON_VALUES contains empty entry"
+        );
+    }
+}
+
+/// Sanity check: the icon-value guard actually catches violations.
+///
+/// Feeds a synthetic `Component` carrying a domain word as its `icon`
+/// token value and asserts the walker trips — proving the guard is not
+/// tautological (CC-03). Also checks each blocklist word directly, and
+/// confirms a glyph token that merely embeds a domain substring
+/// (`id_card`) is NOT flagged (exact-equality, not substring).
+///
+/// @internal
+#[test]
+fn icon_value_walker_catches_domain_word() {
+    let bad = Component::InfoPanel {
+        id: "ip".to_string(),
+        icon: Some("group".to_string()),
+        title: "Info".to_string(),
+        items: vec![],
+        a11y: None,
+    };
+    let value = serde_json::to_value(&bad).expect("serialize component");
+    let result = std::panic::catch_unwind(|| assert_no_domain_icon_values(&value, "Component"));
+    assert!(
+        result.is_err(),
+        "icon-value walker failed to catch domain icon token `group` — guard is toothless"
+    );
+
+    for value in FORBIDDEN_ICON_VALUES {
+        let json = serde_json::json!({ "icon": *value });
+        let result = std::panic::catch_unwind(|| assert_no_domain_icon_values(&json, "test"));
+        assert!(
+            result.is_err(),
+            "icon-value walker failed to catch domain icon token `{value}`"
+        );
+    }
+
+    // Exact-equality, not substring: a glyph embedding a domain word passes.
+    let glyph = serde_json::json!({ "icon": "id_card" });
+    assert_no_domain_icon_values(&glyph, "glyph");
 }

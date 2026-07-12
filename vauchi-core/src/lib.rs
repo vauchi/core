@@ -60,6 +60,7 @@ pub use types::{
     MAX_TRUSTED_CONTACTS, OnboardingProgress, OnboardingStep, OwnCardRepropagateState,
     ProximityConfidence, ReminderFrequency,
 };
+pub mod consent;
 pub mod contact;
 pub mod contact_card;
 pub mod identity;

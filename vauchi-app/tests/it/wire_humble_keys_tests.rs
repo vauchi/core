@@ -19,7 +19,7 @@ use vauchi_app::ui::{
     ActionListItem, ActionStyle, Component, DropdownOption, Field, IndicatorKind, InputType, Item,
     ListItemAction, ListItemActionKind, NativeWrapperHint, PreviewVariant, QrMode, ScreenAction,
     ScreenLayout, ScreenModel, ScreenPresentationKind, Section, Status, TabInfo, TextStyle,
-    UiFieldVisibility, VisibilityMode,
+    UiFieldVisibility, UserAction, VisibilityMode,
 };
 
 /// Domain-shaped JSON keys retired during Wire Humble Tier 0.
@@ -46,6 +46,10 @@ const FORBIDDEN_KEYS: &[&str] = &[
     "AvatarPreview",   // Component variant tag → "ImageCircle"
     "avatar_data",     // Component::Preview field → "image_data"
     "avatar_initials", // Item field → "initials"
+    // "group" domain word retired from the render wire vocab (Phase 3)
+    "available_groups",  // Component::FieldList field → "available_scopes"
+    "Groups",            // UiFieldVisibility::Groups variant tag → "Scopes"
+    "GroupViewSelected", // UserAction variant tag → "VariantSelected"
 ];
 
 /// Recursively walk a JSON value asserting that no forbidden key
@@ -105,6 +109,16 @@ fn sample_field() -> Field {
         icon: "phone".to_string(),
         visibility: UiFieldVisibility::Shown,
         a11y: None,
+    }
+}
+
+/// A field whose visibility carries data, so its serialized form emits the
+/// `UiFieldVisibility` variant tag as an object key — the only way the
+/// deny-list scan can see (and reject) that tag.
+fn sample_scoped_field() -> Field {
+    Field {
+        visibility: UiFieldVisibility::Groups(vec!["work".to_string()]),
+        ..sample_field()
     }
 }
 
@@ -199,7 +213,7 @@ fn all_components() -> Vec<Component> {
         },
         Component::FieldList {
             id: "fl".to_string(),
-            fields: vec![sample_field()],
+            fields: vec![sample_field(), sample_scoped_field()],
             visibility_mode: VisibilityMode::ReadOnly,
             available_groups: vec!["work".to_string()],
             a11y: None,
@@ -432,6 +446,39 @@ fn no_forbidden_keys_in_screen_surface() {
         NativeWrapperHint::NfcExchange,
     ] {
         assert_no_forbidden_keys(&serde_json::to_value(&hint).unwrap(), "NativeWrapperHint");
+    }
+}
+
+/// The action channel: `UserAction`s cross the same core↔renderer seam as
+/// `Component`s (frontends construct them from affordances core minted), so a
+/// domain-shaped variant tag or field name here re-domain-ifies that seam just
+/// as a `Component` key would. Scans a representative spread — including the
+/// preview-variant selection action, whose tag/field the deny-list guards.
+///
+/// @internal
+#[test]
+fn no_forbidden_keys_in_user_actions() {
+    let actions = [
+        UserAction::GroupViewSelected {
+            group_name: Some("work".to_string()),
+        },
+        UserAction::NavigateBack,
+        UserAction::SearchChanged {
+            component_id: "search".to_string(),
+            query: "al".to_string(),
+        },
+        UserAction::ActionPressed {
+            action_id: "save".to_string(),
+        },
+    ];
+    for action in &actions {
+        let value = serde_json::to_value(action).expect("serialize user action");
+        let tag = match &value {
+            serde_json::Value::Object(map) => map.keys().next().cloned().unwrap_or_default(),
+            serde_json::Value::String(s) => s.clone(),
+            _ => "<unknown>".to_string(),
+        };
+        assert_no_forbidden_keys(&value, &format!("UserAction::{tag}"));
     }
 }
 

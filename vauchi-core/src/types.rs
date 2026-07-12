@@ -470,28 +470,11 @@ impl BackupReminderState {
     }
 }
 
-// --- Visibility types (breaks contact ↔ contact_card circular dep) ---
-
-/// Visibility setting for a single field.
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[non_exhaustive]
-pub enum FieldVisibility {
-    /// Visible to everyone (default for new fields)
-    #[default]
-    Everyone,
-    /// Visible only to specific contacts
-    Contacts(std::collections::HashSet<String>),
-    /// Visible to no one (private)
-    Nobody,
-}
-
-/// Visibility rules for all fields in a contact card.
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct VisibilityRules {
-    /// Map from field ID to visibility setting.
-    /// `pub(crate)` so the impl block in `contact::visibility` can access it.
-    pub(crate) rules: std::collections::HashMap<String, FieldVisibility>,
-}
+// Field-visibility types moved to `crate::visibility` — a neutral leaf
+// module that keeps them out of both `contact` and `contact_card` so they
+// cannot reintroduce a contact ↔ contact_card cycle. This re-export keeps
+// the `crate::types::` path stable for existing callers.
+pub use crate::visibility::{FieldVisibility, VisibilityRules};
 
 // --- Aha moment types used by storage and API ---
 

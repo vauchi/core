@@ -46,6 +46,7 @@ fn _flame_install() {
 }
 
 pub mod types;
+pub mod visibility;
 
 pub mod identifiers;
 

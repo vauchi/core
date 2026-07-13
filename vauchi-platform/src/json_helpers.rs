@@ -12,6 +12,7 @@ use vauchi_app::ui::{ActionResult, AppScreen, ScreenModel, UserAction};
 use vauchi_core::Command;
 
 use crate::error::MobileError;
+use crate::types::notification::MobilePendingNotification;
 
 /// Serialize a `ScreenModel` to JSON.
 pub(crate) fn screen_to_json(screen: &ScreenModel) -> Result<String, MobileError> {
@@ -68,6 +69,31 @@ pub(crate) fn action_result_envelope_to_json(
     };
     serde_json::to_string(&envelope).map_err(|e| MobileError::Other {
         detail: format!("Failed to serialize ActionResultEnvelope: {e}"),
+    })
+}
+
+/// Envelope returned by `PlatformAppEngine::on_wakeup`. Carries the OS
+/// notifications produced by the wakeup tick plus any `Command`s emitted —
+/// in practice the next `Command::ScheduleWakeup` so the shell can re-arm
+/// the platform scheduler (ADR-044 Am2a Option C).
+#[derive(Serialize)]
+struct WakeupEnvelope<'a> {
+    notifications: &'a [MobilePendingNotification],
+    commands: &'a [Command],
+}
+
+/// Serialize the OS notifications + drained `Command`s from `on_wakeup` into
+/// the wakeup envelope JSON shape `{"notifications": [...], "commands": [...]}`.
+pub(crate) fn wakeup_envelope_to_json(
+    notifications: &[MobilePendingNotification],
+    commands: &[Command],
+) -> Result<String, MobileError> {
+    let envelope = WakeupEnvelope {
+        notifications,
+        commands,
+    };
+    serde_json::to_string(&envelope).map_err(|e| MobileError::Other {
+        detail: format!("Failed to serialize WakeupEnvelope: {e}"),
     })
 }
 

@@ -4,8 +4,10 @@
 
 //! UniFFI notification types for mobile platforms.
 
+use serde::Serialize;
+
 /// OS notification category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, uniffi::Enum)]
 pub enum MobileNotificationCategory {
     EmergencyAlert,
     /// A contact sent a duress alert (they entered their duress PIN). Distinct
@@ -17,7 +19,7 @@ pub enum MobileNotificationCategory {
 }
 
 /// Presentation urgency mirrored across the boundary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, uniffi::Enum)]
 pub enum MobileNotificationPriority {
     Default,
     High,
@@ -25,7 +27,7 @@ pub enum MobileNotificationPriority {
 }
 
 /// A pending OS notification for the frontend to render.
-#[derive(Debug, Clone, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, uniffi::Record)]
 pub struct MobilePendingNotification {
     pub event_key: String,
     pub category: MobileNotificationCategory,

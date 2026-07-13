@@ -37,7 +37,7 @@ use crate::platform_app_engine_internals::self_heal_post_auth;
 
 use crate::json_helpers::{
     action_result_envelope_to_json, app_screen_from_json, hardware_event_envelope_to_json,
-    screen_envelope_to_json, screen_to_json, user_action_from_json,
+    screen_envelope_to_json, screen_to_json, user_action_from_json, wakeup_envelope_to_json,
 };
 
 // ── PlatformEventListener ──────────────────────────────────────────
@@ -125,6 +125,29 @@ pub struct PlatformAppEngine {
     /// storage key), so hard/panic shred builds senders off the live engine
     /// `Vauchi` + this URL.
     pub(crate) relay_url: String,
+}
+
+impl PlatformAppEngine {
+    /// Compute the screen-invalidation targets that must fire after a
+    /// `poll_notifications`/`on_wakeup` tick. Mirrors the old cycle-thread
+    /// bridge so the frontend re-fetches the current screen when a machine
+    /// advanced. Returns `None` when no invalidation is needed.
+    fn poll_tick_invalidation_targets(&self, engine: &AppEngine) -> Option<Vec<String>> {
+        let multi_stage_active = engine.multi_stage_session_active()
+            && matches!(
+                engine.current_app_screen(),
+                AppScreen::MultiStageExchange { .. }
+            );
+        if multi_stage_active {
+            return Some(vec!["multi_stage_exchange".into()]);
+        }
+        match engine.current_app_screen() {
+            s @ (AppScreen::BleExchange { .. }
+            | AppScreen::NfcExchange
+            | AppScreen::DirectTransport) => Some(vec![s.screen_id().to_string()]),
+            _ => None,
+        }
+    }
 }
 
 #[uniffi::export]
@@ -757,11 +780,7 @@ impl PlatformAppEngine {
         // the new QR / state. Cheap over-fire (frontend renders are
         // idempotent against the same screen JSON), correct in every
         // case the cycle thread used to cover.
-        let multi_stage_active = engine.multi_stage_session_active()
-            && matches!(
-                engine.current_app_screen(),
-                AppScreen::MultiStageExchange { .. }
-            );
+        //
         // Bounded-wait exchange engines (BLE / NFC / cable) fail a stalled
         // step from their own `tick` inside `poll_notifications` above — but,
         // unlike the multi-stage machine, nothing fired an invalidation, so
@@ -770,19 +789,11 @@ impl PlatformAppEngine {
         // `2026-06-11-exchange-waits-forever`: the frontend pump now ticks
         // the engine, but the resulting screen change must also be surfaced.
         // Fire one here so the listener's unconditional `loadScreen()`
-        // re-fetches the post-timeout screen (cheap over-fire — renders are
-        // idempotent against the same screen JSON).
-        let bounded_wait_id: Option<String> = match engine.current_app_screen() {
-            s @ (AppScreen::BleExchange { .. }
-            | AppScreen::NfcExchange
-            | AppScreen::DirectTransport) => Some(s.screen_id().to_string()),
-            _ => None,
-        };
+        // re-fetches the post-timeout screen.
+        let invalidation_targets = self.poll_tick_invalidation_targets(&engine);
         drop(engine);
-        if multi_stage_active {
-            self.fire_screens_invalidated(vec!["multi_stage_exchange".into()]);
-        } else if let Some(id) = bounded_wait_id {
-            self.fire_screens_invalidated(vec![id]);
+        if let Some(targets) = invalidation_targets {
+            self.fire_screens_invalidated(targets);
         }
         let mapped = items
             .into_iter()
@@ -815,6 +826,64 @@ impl PlatformAppEngine {
             })
             .collect();
         Ok(mapped)
+    }
+
+    /// The shell's platform wakeup fired — a desktop in-process interval, an
+    /// iOS `BGAppRefreshTask`, or an Android `WorkManager` task. Runs the same
+    /// relay/exchange advance + activity-log poll as `poll_notifications`, then
+    /// emits the next `Command::ScheduleWakeup` in the returned envelope so the
+    /// shell re-arms. Core owns *when* the heartbeat is due (ADR-044 Am2a
+    /// Option C); the shell owns only the native wakeup mechanism.
+    ///
+    /// Returns a JSON envelope:
+    /// `{"notifications": [<MobilePendingNotification>, ...], "commands": [...]}`.
+    /// The `commands` array carries the next `ScheduleWakeup` (and any other
+    /// commands produced by the tick); the shell schedules it and calls this
+    /// method again when it fires.
+    pub fn on_wakeup(&self) -> Result<String, MobileError> {
+        let (items, pending_commands, invalidation_targets) = {
+            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            let items = engine.on_wakeup();
+            let invalidation_targets = self.poll_tick_invalidation_targets(&engine);
+            let pending_commands = engine.drain_pending_commands();
+            (items, pending_commands, invalidation_targets)
+        };
+        if let Some(targets) = invalidation_targets {
+            self.fire_screens_invalidated(targets);
+        }
+        let mapped: Vec<MobilePendingNotification> = items
+            .into_iter()
+            .map(|n| MobilePendingNotification {
+                event_key: n.event_key,
+                category: match n.category {
+                    CoreNotificationCategory::EmergencyAlert => {
+                        MobileNotificationCategory::EmergencyAlert
+                    }
+                    CoreNotificationCategory::DuressAlert => {
+                        MobileNotificationCategory::DuressAlert
+                    }
+                    CoreNotificationCategory::ContactAdded => {
+                        MobileNotificationCategory::ContactAdded
+                    }
+                    CoreNotificationCategory::CardUpdate => MobileNotificationCategory::CardUpdate,
+                },
+                title: n.title,
+                body: n.body,
+                contact_id: n.contact_id,
+                deep_link_uri: n.deep_link_uri,
+                os_category_id: n.os_category_id,
+                os_channel_id: n.os_channel_id,
+                priority: match n.priority {
+                    CoreNotificationPriority::Default => MobileNotificationPriority::Default,
+                    CoreNotificationPriority::High => MobileNotificationPriority::High,
+                    CoreNotificationPriority::Urgent => MobileNotificationPriority::Urgent,
+                },
+                os_category_options: n.os_category_options,
+            })
+            .collect();
+        wakeup_envelope_to_json(&mapped, &pending_commands)
     }
 
     /// Report device hardware capabilities.

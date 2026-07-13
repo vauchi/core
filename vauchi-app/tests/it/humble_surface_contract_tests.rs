@@ -68,6 +68,7 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "nav_items",
     "navigate_back_json",
     "new",
+    "on_wakeup",
     "periodic_sync_tick",
     "poll_notifications",
     "set_device_capabilities_json",
@@ -272,12 +273,18 @@ fn humble_allowlist_size_matches_plan() {
     // a dedicated URI entry point. The engine peer
     // `AppEngine::intercept_link_opened` stays — called from
     // `handle_action` — so no new binding surface is added.
+    //
+    // `on_wakeup` addition (ADR-044 Am2a Option C, 22 -> 23): the OS
+    // scheduler wakeup (desktop interval / iOS BGAppRefreshTask /
+    // Android WorkManager) is a lifecycle entry point the frontend cannot
+    // fold into `handle_action_json`. It replaces the retired
+    // `UserAction::Heartbeat` pulse with a core-owned schedule boundary.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        22,
-        "Humble allow-list size drifted from the 22 expected after \
-         retiring `handle_deep_link_uri` into `UserAction::LinkOpened` \
-         (M5 B3). Edits to this list require an ADR amendment \
+        23,
+        "Humble allow-list size drifted from the 23 expected after \
+         adding `on_wakeup` (ADR-044 Am2a Option C) and retiring \
+         `UserAction::Heartbeat`. Edits to this list require an ADR amendment \
          (ADR-021/043 for the Humble engine framing — incl. Amendment 3 \
          for the linchpin promotions — or ADR-048's G1-G5 gates for \
          retirements)."

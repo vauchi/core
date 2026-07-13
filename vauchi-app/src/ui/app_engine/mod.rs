@@ -649,11 +649,11 @@ impl AppEngine {
     /// Advance every live relay session (device-link initiator/responder,
     /// link-mode initiator/responder, multi-stage exchange) one protocol step
     /// and tick the active engine's wall-clock. No-op for each idle session.
-    /// Shared by `poll_notifications` (the OS-notification cadence) and the
-    /// `Heartbeat` user action (the exchange-progress cadence, ADR-044 Am2a) —
+    /// Shared by `poll_notifications` (the OS-notification cadence) and
+    /// `on_wakeup` (the core-scheduled wakeup, ADR-044 Am2a Option C) —
     /// retiring the frontend's `requires_poll` loop that called
     /// `poll_notifications` directly. Events logged by the advances surface as
-    /// notifications on the next `poll_notifications`.
+    /// notifications on the next `poll_notifications` / `on_wakeup`.
     pub(super) fn advance_relay_sessions(&mut self) {
         self.drain_events_to_log();
 

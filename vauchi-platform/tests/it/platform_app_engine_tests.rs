@@ -1,3 +1,4 @@
+// allow(large_file)
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -470,6 +471,39 @@ fn poll_notifications_after_card_update_returns_no_notification() {
     assert!(
         notifications.is_empty(),
         "OwnCardUpdated should not produce a notification, got: {notifications:?}"
+    );
+}
+
+// @internal
+#[test]
+fn on_wakeup_returns_envelope_with_schedule_wakeup_command() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+
+    let envelope_json = engine.on_wakeup().expect("on_wakeup");
+    let envelope: serde_json::Value =
+        serde_json::from_str(&envelope_json).expect("parse on_wakeup envelope");
+
+    assert!(
+        envelope.get("notifications").is_some(),
+        "envelope must carry notifications array"
+    );
+    assert!(
+        envelope.get("commands").is_some(),
+        "envelope must carry commands array"
+    );
+
+    let scheduled: Vec<&serde_json::Value> = envelope["commands"]
+        .as_array()
+        .expect("commands array")
+        .iter()
+        .filter(|c| c.get("ScheduleWakeup").is_some())
+        .collect();
+    assert_eq!(
+        scheduled.len(),
+        1,
+        "on_wakeup must emit exactly one ScheduleWakeup command, got {commands:?}",
+        commands = envelope["commands"]
     );
 }
 

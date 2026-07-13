@@ -255,6 +255,7 @@ impl DeviceReplacementEngine {
                 Component::QrCode {
                     id: "qr".into(),
                     data: qr_data,
+                    frames: Vec::new(),
                     mode: QrMode::Display,
                     label: Some(self.t("device.scan_on_new_device_label")),
                     scan_quality: None,

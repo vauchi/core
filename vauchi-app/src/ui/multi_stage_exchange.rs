@@ -30,6 +30,16 @@
 //! `HardwareUnavailable { transport: "camera" }` and
 //! `PermissionDenied { transport: "camera" }` flip the engine into
 //! the corresponding chrome.
+//!
+//! # Animated-QR frame carrier (ADR-044 Amendment 2a, C2a — data half)
+//!
+//! The own-QR ships its frame(s) in `QrCode.frames` so animated QR is
+//! render *data*, not a frontend behavior. The cycle thread pushes one
+//! live frame at a time via `set_qr_payload` (each embeds the current ACK
+//! bitmap from the stateful `MultiStageSession::get_display_qr`), so
+//! `frames` is that single frame today; the deferred half plumbs the
+//! session's full chunk snapshot as a list. `data` stays set for the
+//! pre-migration path.
 
 use vauchi_core::Event;
 use vauchi_core::exchange::{
@@ -466,6 +476,8 @@ impl MultiStageExchangeEngine {
             components.push(Component::QrCode {
                 id: COMPONENT_ID_OWN_QR.into(),
                 data: data.clone(),
+                // Animated-QR frame carrier (ADR-044 Am2a C2a); see module doc.
+                frames: vec![data.clone()],
                 mode: QrMode::Display,
                 label: Some(self.t("multi_stage.qr_broadcast_label")),
                 scan_quality: None,
@@ -530,6 +542,8 @@ impl MultiStageExchangeEngine {
             components.push(Component::QrCode {
                 id: COMPONENT_ID_OWN_QR.into(),
                 data: data.clone(),
+                // Animated-QR frame carrier (ADR-044 Am2a C2a); see module doc.
+                frames: vec![data.clone()],
                 mode: QrMode::Display,
                 // The QR label doubles as the exchange status: "Show this"
                 // while waiting, then the live progress once the exchange is
@@ -552,6 +566,7 @@ impl MultiStageExchangeEngine {
         let scan = Component::QrCode {
             id: COMPONENT_ID_PEER_SCAN.into(),
             data: String::new(),
+            frames: Vec::new(),
             mode: QrMode::Scan,
             label: Some(self.t("exchange.ble.glance_scan")),
             scan_quality: Some(self.scan_quality_tracker.quality()),

@@ -180,6 +180,7 @@ impl BleExchangeEngine {
             components.push(Component::QrCode {
                 id: GLANCE_OWN_QR_COMPONENT_ID.into(),
                 data: data.clone(),
+                frames: Vec::new(),
                 mode: QrMode::Display,
                 label: Some(self.t("exchange.ble.glance_show_qr")),
                 scan_quality: None,
@@ -190,6 +191,7 @@ impl BleExchangeEngine {
             components.push(Component::QrCode {
                 id: GLANCE_SCAN_COMPONENT_ID.into(),
                 data: String::new(),
+                frames: Vec::new(),
                 mode: QrMode::Scan,
                 label: Some(self.t("exchange.ble.glance_scan")),
                 scan_quality: None,

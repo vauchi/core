@@ -482,6 +482,7 @@ impl RecoveryEngine {
                 Component::QrCode {
                     id: "claim_qr".into(),
                     data: qr_data,
+                    frames: Vec::new(),
                     mode: QrMode::Display,
                     label: Some(self.t("recovery.claim_qr_label")),
                     scan_quality: None,

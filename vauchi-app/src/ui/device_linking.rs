@@ -363,6 +363,7 @@ impl DeviceLinkingEngine {
                 Component::QrCode {
                     id: "qr".into(),
                     data: self.invitation_url.clone(),
+                    frames: Vec::new(),
                     mode: QrMode::Display,
                     label: Some(self.t("devices.link.scan_on_new_device")),
                     scan_quality: None,
@@ -528,6 +529,7 @@ impl DeviceLinkingEngine {
                 Component::QrCode {
                     id: "qr".into(),
                     data: self.invitation_url.clone(),
+                    frames: Vec::new(),
                     mode: QrMode::Display,
                     label: Some(self.t("devices.link.scan_on_new_device")),
                     scan_quality: None,

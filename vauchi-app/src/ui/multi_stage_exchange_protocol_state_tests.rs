@@ -54,6 +54,26 @@ fn advertising_renders_active_with_qr_when_payload_present() {
     assert!(has_own_qr, "Advertising with payload must render own QR");
 }
 
+// The own-QR ships its payload in the opaque `frames` carrier (ADR-044
+// Amendment 2a C2a) so animated QR is render data, not a frontend
+// behavior. The engine holds one live frame at a time, so `frames` is
+// that single frame; `data` stays populated for the pre-migration path.
+// @internal
+#[test]
+fn active_own_qr_ships_current_frame_in_frames_carrier() {
+    let engine = engine_with_qr(ProtocolState::Advertising, "vauchi://INIT/abc");
+    let screen = engine.current_screen();
+    let own_qr_frames = screen.components.iter().find_map(|c| match c {
+        Component::QrCode { id, frames, .. } if id == COMPONENT_ID_OWN_QR => Some(frames.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        own_qr_frames,
+        Some(vec!["vauchi://INIT/abc".to_string()]),
+        "own-QR must carry the current payload as a single opaque frame"
+    );
+}
+
 // @internal
 #[test]
 fn discovered_state_narrates_starting_exchange() {

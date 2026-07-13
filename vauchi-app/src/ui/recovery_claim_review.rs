@@ -397,6 +397,7 @@ impl RecoveryClaimReviewEngine {
                 Component::QrCode {
                     id: "voucher_qr".into(),
                     data: "voucher-placeholder".into(),
+                    frames: Vec::new(),
                     mode: QrMode::Display,
                     label: Some(self.t("recovery.voucher_qr_label")),
                     scan_quality: None,

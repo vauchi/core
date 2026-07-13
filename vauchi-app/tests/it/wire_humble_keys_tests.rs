@@ -355,6 +355,7 @@ fn all_components() -> Vec<Component> {
         Component::QrCode {
             id: "qr".to_string(),
             data: "vchi:abc".to_string(),
+            frames: vec!["vchi:abc-0".to_string(), "vchi:abc-1".to_string()],
             mode: QrMode::Display,
             label: Some("Scan me".to_string()),
             scan_quality: None,

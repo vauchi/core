@@ -945,6 +945,13 @@
                 "data": {
                   "type": "string"
                 },
+                "frames": {
+                  "description": "Pre-rendered opaque animated-QR frames. Each entry is the same representation as `data` (a raw string the frontend encodes into one QR), so the renderer draws any frame exactly as it draws the static `data`. When non-empty the frontend animates through the frames while the component is mounted; when empty it renders the single static `data`. Core owns the chunking — the frames are opaque to the frontend (ADR-044 Amendment 2a: animated QR is render data, not a frontend behavior).",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "id": {
                   "type": "string"
                 },

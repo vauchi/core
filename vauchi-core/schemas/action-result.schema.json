@@ -34,6 +34,13 @@
       "additionalProperties": false
     },
     {
+      "description": "The back gesture reached a back-stopping root: there is no screen to pop, so the frontend performs the platform's native back default (Android `moveTaskToBack` / minimize; iOS suspend / no-op; desktop no-op). Core owns the \"nothing to pop\" decision; the frontend owns only the native mechanism. Retires the frontend `can_go_back` gate on its system-back handler (ADR-044 Amendment 2a).",
+      "type": "string",
+      "enum": [
+        "PerformNativeBack"
+      ]
+    },
+    {
       "type": "object",
       "required": [
         "ValidationError"
@@ -3538,6 +3545,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "is_bootstrap": {
+          "description": "Whether this screen is the entry/bootstrap onboarding screen. Frontends use this flag to offer quit/import-backup shortcuts here instead of hardcoding domain `screen_id`s like `\"welcome\"` or `\"identity_check\"` (ADR-043/044 Humble UI).",
+          "type": "boolean"
         },
         "layout": {
           "description": "Whether the renderer scrolls the content or renders a fixed, non-scrolling layout. See [`ScreenLayout`]. Omitted on the wire when `Scroll` (the default) so only fixed-layout screens carry it.",

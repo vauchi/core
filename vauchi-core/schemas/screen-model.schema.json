@@ -33,6 +33,10 @@
         "type": "string"
       }
     },
+    "is_bootstrap": {
+      "description": "Whether this screen is the entry/bootstrap onboarding screen. Frontends use this flag to offer quit/import-backup shortcuts here instead of hardcoding domain `screen_id`s like `\"welcome\"` or `\"identity_check\"` (ADR-043/044 Humble UI).",
+      "type": "boolean"
+    },
     "layout": {
       "description": "Whether the renderer scrolls the content or renders a fixed, non-scrolling layout. See [`ScreenLayout`]. Omitted on the wire when `Scroll` (the default) so only fixed-layout screens carry it.",
       "allOf": [

@@ -14,14 +14,26 @@
 #[cfg(feature = "network-http")]
 use super::SyncChromeStatus;
 use super::{
-    ACTION_DISMISS_DEMO_CONTACT, ACTION_OPEN_SETTINGS, ACTION_OPEN_UPDATE_LINK, ACTION_SYNC_NOW,
-    AppEngine, AppScreen,
+    ACTION_DISMISS_DEMO_CONTACT, ACTION_GO_BACK, ACTION_OPEN_SETTINGS, ACTION_OPEN_UPDATE_LINK,
+    ACTION_SYNC_NOW, AppEngine, AppScreen,
 };
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::engine::WorkflowEngine;
 use vauchi_core::version::AppUpdateStatus;
 
 impl AppEngine {
+    /// The single back decision shared by the OS back gesture
+    /// (`UserAction::NavigateBack`) and the visible `go_back` chrome
+    /// affordance: pop when there is a back step, else hand the frontend its
+    /// native default (ADR-044 Am2a — core owns the empty-history decision).
+    fn back_result(&mut self) -> ActionResult {
+        if self.can_go_back() {
+            ActionResult::NavigateTo(self.navigate_back())
+        } else {
+            ActionResult::PerformNativeBack
+        }
+    }
+
     /// Global-chrome and top-level navigation guards that resolve *before*
     /// per-screen dispatch: sync-now indicator, backup reminder toast,
     /// update link, tab navigation, system back, the settings gear, and the
@@ -92,11 +104,16 @@ impl AppEngine {
         // default — never a phantom re-nav, never a frontend `can_go_back`
         // gate on the handler.
         if matches!(action, UserAction::NavigateBack) {
-            return Some(if self.can_go_back() {
-                ActionResult::NavigateTo(self.navigate_back())
-            } else {
-                ActionResult::PerformNativeBack
-            });
+            return Some(self.back_result());
+        }
+
+        // Visible Back affordance (ADR-044 Am2a): the reserved `go_back`
+        // chrome action stamped on `nav_actions` shares the exact back logic
+        // as the OS `NavigateBack` gesture — one code path, so a rendered
+        // Back button and a swipe can never diverge.
+        if matches!(action, UserAction::ActionPressed { action_id } if action_id == ACTION_GO_BACK)
+        {
+            return Some(self.back_result());
         }
 
         // Global-chrome navigation (ADR-043 Amendment 4): the native

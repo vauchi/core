@@ -21,6 +21,12 @@ pub(super) const ACTION_OPEN_UPDATE_LINK: &str = "open_update_link";
 /// to `NavigateTo(Settings)` before per-screen dispatch (CoreScreenIdMap
 /// rework Tier-0; ADR-043 Amendment 4 — forward nav is core-resolved).
 pub(super) const ACTION_OPEN_SETTINGS: &str = "open_settings";
+/// Reserved global-chrome action id: the visible Back affordance. Stamped
+/// as a `nav_actions` item wherever `can_go_back()` holds, so frontends
+/// render Back from data instead of the `can_go_back` bool (ADR-044 Am2a,
+/// boolean-family retirement). Resolved to the same back logic as
+/// `UserAction::NavigateBack` before per-screen dispatch.
+pub(super) const ACTION_GO_BACK: &str = "go_back";
 /// Action id used by the offline `Component::Banner` injected by
 /// `apply_offline_overlay`. Currently presentational only — no
 /// dispatcher arm. Frontends rendering the banner can ignore taps.
@@ -137,6 +143,19 @@ impl AppEngine {
         }
         // Back affordance from engine nav state (frontends read it off the screen).
         screen.can_go_back = self.can_go_back();
+        if screen.can_go_back && !screen.nav_actions.iter().any(|a| a.id == ACTION_GO_BACK) {
+            let label = self.t("nav.back");
+            screen.nav_actions.insert(
+                0,
+                ScreenAction {
+                    id: ACTION_GO_BACK.into(),
+                    label: label.clone(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: Some(crate::ui::component::A11y::labeled(label)),
+                },
+            );
+        }
         screen
     }
 

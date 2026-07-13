@@ -112,3 +112,75 @@ fn screen_model_can_go_back_mirrors_engine_for_root_and_sub_screen() {
         "a non-root sub-screen with history must offer back"
     );
 }
+
+/// The visible Back affordance rides on `nav_actions` as a reserved `go_back`
+/// action at index 0 — so frontends render Back from data, not from the
+/// `can_go_back` bool (ADR-044 Am2a, boolean-family retirement). A non-root
+/// sub-screen with history carries it.
+// @internal
+#[test]
+fn sub_screen_renders_go_back_nav_action_at_front() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Settings);
+
+    let sub = engine.current_screen();
+    let first = sub
+        .nav_actions
+        .first()
+        .expect("a sub-screen with history must offer a Back nav_action");
+    assert_eq!(
+        first.id, "go_back",
+        "the Back affordance must be the reserved go_back action at index 0"
+    );
+    assert_eq!(
+        first.style,
+        vauchi_app::ui::ActionStyle::Secondary,
+        "Back is a secondary chrome affordance"
+    );
+    assert!(first.enabled, "the Back affordance is enabled when offered");
+}
+
+/// Dispatching the reserved `go_back` action pops exactly where the engine's
+/// own `navigate_back()` does — it shares the `NavigateBack` back logic, so the
+/// visible affordance and the OS gesture are one code path.
+// @internal
+#[test]
+fn go_back_action_matches_navigate_back() {
+    let mut reference = engine_with_identity();
+    reference.navigate_to(AppScreen::Settings);
+    let expected = reference.navigate_back().screen_id;
+
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Settings);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "go_back".to_string(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(screen) => assert_eq!(
+            screen.screen_id, expected,
+            "go_back action must land where navigate_back() does"
+        ),
+        other => panic!("go_back must return NavigateTo at a sub-screen, got {other:?}"),
+    }
+    assert_eq!(
+        engine.current_screen().screen_id,
+        expected,
+        "the engine must actually be on the popped screen afterwards"
+    );
+}
+
+/// A bottom-nav tab root is a back-stopper, so it carries no `go_back`
+/// nav_action — the affordance appears only where there is a back step.
+// @internal
+#[test]
+fn tab_root_has_no_go_back_nav_action() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Contacts);
+
+    let tab = engine.current_screen();
+    assert!(
+        !tab.nav_actions.iter().any(|a| a.id == "go_back"),
+        "a bottom-nav tab root must not render a Back affordance"
+    );
+}

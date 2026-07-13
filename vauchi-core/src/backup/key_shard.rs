@@ -41,7 +41,7 @@ const SHARD_VERSION: u8 = 1;
 ///
 /// Represents one `(index, value)` share of the Shamir split. The `value`
 /// field is zeroized on drop.
-#[derive(PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct BackupKeyShard {
     /// Non-zero byte index (x-coordinate).
     pub index: u8,

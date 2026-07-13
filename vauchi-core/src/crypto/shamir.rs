@@ -66,7 +66,7 @@ pub enum ShamirError {
 ///
 /// `index` is a non-zero byte identifier (the x-coordinate).
 /// `value` is the 32-byte y-coordinate `f(index)`.
-#[derive(PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct Share {
     /// Non-zero byte identifier for this share (x-coordinate).
     pub index: u8,
@@ -347,13 +347,6 @@ fn gf_poly_mul_scalar(scalar: u16, poly: u16) -> u16 {
 mod tests {
     use super::*;
 
-    fn duplicate_share(share: &Share) -> Share {
-        Share {
-            index: share.index,
-            value: share.value,
-        }
-    }
-
     // @internal
     #[test]
     fn round_trip_2_of_3() {
@@ -368,8 +361,7 @@ mod tests {
         let reconstructed = reconstruct(&shares[1..3]).unwrap();
         assert_eq!(reconstructed, secret);
 
-        let reconstructed =
-            reconstruct(&[duplicate_share(&shares[0]), duplicate_share(&shares[2])]).unwrap();
+        let reconstructed = reconstruct(&[shares[0].clone(), shares[2].clone()]).unwrap();
         assert_eq!(reconstructed, secret);
     }
 
@@ -521,7 +513,7 @@ mod tests {
         let shares2 = split(&secret2, 2, 3).unwrap();
 
         // Mix one share from each set
-        let mixed = vec![duplicate_share(&shares1[0]), duplicate_share(&shares2[1])];
+        let mixed = vec![shares1[0].clone(), shares2[1].clone()];
         let result = reconstruct(&mixed).unwrap();
         assert_ne!(result, secret1);
         assert_ne!(result, secret2);

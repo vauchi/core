@@ -230,10 +230,11 @@ char *vauchi_app_navigate_to(struct VauchiApp *handle, const char *screen_name);
  * Navigate back one step. Returns the resulting screen as JSON.
  *
  * Pops the engine's `AppScreen` nav history, or rewinds one in-engine
- * sub-flow step (the exchange flow). Frontends gate this on the
- * `can_go_back` field of the current screen and render a back affordance
- * in their own chrome — so C-ABI frontends (linux-qt, windows) no longer
- * depend on a footer "Back" action.
+ * sub-flow step (the exchange flow). Deprecated for the OS back gesture:
+ * frontends should forward system back via `UserAction::NavigateBack`
+ * (using `vauchi_app_handle_action`) and render the `go_back` chrome
+ * action from `nav_actions`. Kept for the few remaining internal callers
+ * while C-ABI frontends migrate (ADR-044 Amendment 2a).
  *
  * # Safety
  * `handle` must be a valid app handle or null.

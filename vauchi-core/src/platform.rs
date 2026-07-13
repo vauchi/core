@@ -43,6 +43,27 @@ pub enum Command {
     /// Request the frontend to open a QR scanner (camera).
     QrRequestScan,
 
+    /// Core-computed wakeup schedule (ADR-030/031 command + ADR-044 Am2a:
+    /// generic timer *data*, not a per-feature flag). Core stays the single
+    /// authority on *when* the app-level heartbeat is due; the humble shell
+    /// translates this into its platform wakeup — a desktop in-process
+    /// interval/thread, iOS `BGAppRefreshTask`, Android `WorkManager` — and,
+    /// when it fires, calls `AppEngine::on_wakeup()`, which runs due work and
+    /// emits the *next* `ScheduleWakeup`. All fields are relative seconds from
+    /// now (the OS APIs take intervals, and it frees the shell from reading
+    /// core's clock). Every interval is a *hint*: the OS may fire late,
+    /// coalesce, or skip — `on_wakeup` is elapsed-based and idempotent, so a
+    /// missed or doubled wake is safe.
+    ScheduleWakeup {
+        /// Earliest the shell should wake core (never earlier — battery floor).
+        earliest_secs: u32,
+        /// Latest the work should ideally run by; the shell picks a
+        /// higher-fidelity mechanism if this is tight.
+        deadline_secs: u32,
+        /// Minimum spacing between wakes the shell should honor (coalesce).
+        min_interval_secs: u32,
+    },
+
     /// Start advertising the vauchi BLE service with the given payload.
     BleStartAdvertising {
         service_uuid: String,
@@ -371,6 +392,7 @@ impl Command {
         match self {
             Self::QrDisplay { .. } => "QrDisplay",
             Self::QrRequestScan => "QrRequestScan",
+            Self::ScheduleWakeup { .. } => "ScheduleWakeup",
             Self::BleStartAdvertising { .. } => "BleStartAdvertising",
             Self::BleStartScanning { .. } => "BleStartScanning",
             Self::BleConnect { .. } => "BleConnect",

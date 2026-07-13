@@ -681,6 +681,42 @@ impl AppEngine {
         self.engine.tick(now);
     }
 
+    /// The shell's platform wakeup fired — a desktop in-process interval, an
+    /// iOS `BGAppRefreshTask`, or an Android `WorkManager` task, scheduled
+    /// from a prior [`vauchi_core::Command::ScheduleWakeup`]. Run all work now
+    /// due (the same relay/exchange advance + activity-log poll as
+    /// [`Self::poll_notifications`]) and emit the *next* `ScheduleWakeup` so
+    /// the shell re-arms. Core owns *when* the heartbeat is due (ADR-044 Am2a
+    /// Option C); the shell owns only the native wakeup mechanism.
+    ///
+    /// Returns the OS notifications to post; the next schedule rides
+    /// `pending_commands` — the caller drains it via
+    /// [`Self::drain_pending_commands`] after this returns. Elapsed-based and
+    /// idempotent: a delayed, coalesced, or skipped wake is safe (the
+    /// underlying advances/poll are no-ops when nothing is due). Public so
+    /// `PlatformAppEngine` can expose it via UniFFI. The frontend bootstraps
+    /// the loop by calling this once at launch.
+    pub fn on_wakeup(&mut self) -> Vec<PendingNotification> {
+        let notifications = self.poll_notifications();
+        self.pending_commands.push_back(self.compute_next_wakeup());
+        notifications
+    }
+
+    /// Compute the next app-heartbeat wakeup window (ADR-044 Am2a Option C).
+    /// Core is the single authority on *when*; the shell only executes the
+    /// resulting `ScheduleWakeup`. First cut: a fixed ~30 s foreground cadence
+    /// (matching the historical notification poll). The elapsed-based due-math
+    /// (wall `Clock` for calendar-relative token rotation, `MonotonicClock`
+    /// for runtime-elapsed) refines the *values* without changing the command
+    /// shape or the shell contract.
+    fn compute_next_wakeup(&self) -> vauchi_core::Command {
+        vauchi_core::Command::ScheduleWakeup {
+            earliest_secs: 30,
+            deadline_secs: 90,
+            min_interval_secs: 30,
+        }
+    }
+
     /// Poll the activity log and produce pending OS notifications.
     /// Public so PlatformAppEngine can expose it via UniFFI.
     pub fn poll_notifications(&mut self) -> Vec<PendingNotification> {

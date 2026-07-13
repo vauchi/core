@@ -907,6 +907,44 @@
           ]
         },
         {
+          "description": "Core-computed wakeup schedule (ADR-030/031 command + ADR-044 Am2a: generic timer *data*, not a per-feature flag). Core stays the single authority on *when* the app-level heartbeat is due; the humble shell translates this into its platform wakeup — a desktop in-process interval/thread, iOS `BGAppRefreshTask`, Android `WorkManager` — and, when it fires, calls `AppEngine::on_wakeup()`, which runs due work and emits the *next* `ScheduleWakeup`. All fields are relative seconds from now (the OS APIs take intervals, and it frees the shell from reading core's clock). Every interval is a *hint*: the OS may fire late, coalesce, or skip — `on_wakeup` is elapsed-based and idempotent, so a missed or doubled wake is safe.",
+          "type": "object",
+          "required": [
+            "ScheduleWakeup"
+          ],
+          "properties": {
+            "ScheduleWakeup": {
+              "type": "object",
+              "required": [
+                "deadline_secs",
+                "earliest_secs",
+                "min_interval_secs"
+              ],
+              "properties": {
+                "deadline_secs": {
+                  "description": "Latest the work should ideally run by; the shell picks a higher-fidelity mechanism if this is tight.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "earliest_secs": {
+                  "description": "Earliest the shell should wake core (never earlier — battery floor).",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "min_interval_secs": {
+                  "description": "Minimum spacing between wakes the shell should honor (coalesce).",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
           "description": "Start advertising the vauchi BLE service with the given payload.",
           "type": "object",
           "required": [

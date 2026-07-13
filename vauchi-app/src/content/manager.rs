@@ -791,4 +791,13 @@ mod tests {
             "a failed content download must remain retryable"
         );
     }
+
+    #[test]
+    fn test_content_versions_require_exact_numeric_triplets() {
+        assert_eq!(parse_exact_version("1.2.3"), Some([1, 2, 3]));
+        assert_eq!(parse_exact_version("1.2"), None);
+        assert_eq!(parse_exact_version("1.2.3.4"), None);
+        assert_eq!(parse_exact_version("1.two.3"), None);
+        assert_eq!(parse_exact_version("1.2.3-beta"), None);
+    }
 }

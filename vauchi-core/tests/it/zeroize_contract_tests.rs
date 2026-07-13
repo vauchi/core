@@ -6,12 +6,10 @@
 //!
 //! Every type carrying secret key material must implement
 //! `ZeroizeOnDrop`; this file is the enumerated, reviewable list. A
-//! listed type without the trait fails to COMPILE — the error is the
-//! lint, which is why there is no `#[test]` here: a runtime test
-//! could never fail (CC-17/CC-20 forbid that shape), while the
-//! type-checker instantiates every bound below on each build of the
-//! `it` test binary. New secret types must be added here in the same
-//! MR that introduces them.
+//! listed type without the trait fails to compile. The runtime contract also
+//! requires drop glue, preventing a marker-only `ZeroizeOnDrop`
+//! implementation from passing. New secret types must be added here in the
+//! same MR that introduces them.
 //! Page: `_private/docs/lint-errors/vrs01-zeroize-contract.md`
 //!
 //! Deliberately NOT listed (each with its reason):
@@ -26,27 +24,35 @@
 
 use zeroize::ZeroizeOnDrop;
 
-fn assert_zeroize_on_drop<T: ZeroizeOnDrop>() {
-    assert!(
-        std::mem::needs_drop::<T>(),
-        "{} claims ZeroizeOnDrop but has no drop glue",
-        std::any::type_name::<T>()
-    );
+fn has_zeroizing_drop<T: ZeroizeOnDrop>() -> bool {
+    std::mem::needs_drop::<T>()
 }
 
 // @internal
 #[test]
 fn secret_type_contract() {
-    assert_zeroize_on_drop::<vauchi_core::crypto::SymmetricKey>();
-    assert_zeroize_on_drop::<vauchi_core::crypto::signing::SigningKeyPair>();
-    assert_zeroize_on_drop::<vauchi_core::crypto::shredding::ShreddingMasterKey>();
-    assert_zeroize_on_drop::<vauchi_core::crypto::ChainKey>();
-    assert_zeroize_on_drop::<vauchi_core::crypto::MessageKey>();
-    assert_zeroize_on_drop::<vauchi_core::crypto::cek::ContentEncryptionKey>();
-    assert_zeroize_on_drop::<vauchi_core::exchange::transport::protocol::SharedKey>();
-    assert_zeroize_on_drop::<vauchi_core::identifiers::MailboxToken>();
-    assert_zeroize_on_drop::<vauchi_core::sync::device_sync::ContactSyncData>();
-    assert_zeroize_on_drop::<vauchi_core::exchange::escrow::EscrowKeys>();
-    assert_zeroize_on_drop::<vauchi_core::crypto::shamir::Share>();
-    assert_zeroize_on_drop::<vauchi_core::BackupKeyShard>();
+    assert!(has_zeroizing_drop::<vauchi_core::crypto::SymmetricKey>());
+    assert!(has_zeroizing_drop::<
+        vauchi_core::crypto::signing::SigningKeyPair,
+    >());
+    assert!(has_zeroizing_drop::<
+        vauchi_core::crypto::shredding::ShreddingMasterKey,
+    >());
+    assert!(has_zeroizing_drop::<vauchi_core::crypto::ChainKey>());
+    assert!(has_zeroizing_drop::<vauchi_core::crypto::MessageKey>());
+    assert!(has_zeroizing_drop::<
+        vauchi_core::crypto::cek::ContentEncryptionKey,
+    >());
+    assert!(has_zeroizing_drop::<
+        vauchi_core::exchange::transport::protocol::SharedKey,
+    >());
+    assert!(has_zeroizing_drop::<vauchi_core::identifiers::MailboxToken>());
+    assert!(has_zeroizing_drop::<
+        vauchi_core::sync::device_sync::ContactSyncData,
+    >());
+    assert!(has_zeroizing_drop::<
+        vauchi_core::exchange::escrow::EscrowKeys,
+    >());
+    assert!(has_zeroizing_drop::<vauchi_core::crypto::shamir::Share>());
+    assert!(has_zeroizing_drop::<vauchi_core::BackupKeyShard>());
 }

@@ -139,6 +139,29 @@ fn pre_auth_and_transient_screens_own_no_tab() {
     assert_eq!(AppScreen::Onboarding.nav_tab_id(), None);
 }
 
+/// C4 bootstrap-chrome seam: a fresh engine with no identity boots to the
+/// bootstrap screen, and its rendered `ScreenModel` carries
+/// `nav_tab_id == None` — the generic "no bottom nav" consequence the 5-tab
+/// shells render. The mobile TabNav gate hides the bar off the absent
+/// `nav_tab_id`, so the F.home frontend migration can drop its `is_bootstrap`
+/// role-boolean branch (`2026-07-06-mobile-domain-shell-violations` C4/F.home;
+/// upstream-coverage seam per CC-24 — green here before the frontend branch
+/// is deleted).
+// @internal
+#[test]
+fn rendered_bootstrap_screen_shows_no_bottom_nav() {
+    let engine = AppEngine::new(Vauchi::in_memory().unwrap());
+    let screen = engine.current_screen();
+    assert_eq!(
+        screen.screen_id, "identity_check",
+        "a fresh engine with no identity boots to the bootstrap screen",
+    );
+    assert_eq!(
+        screen.nav_tab_id, None,
+        "the bootstrap screen owns no tab, so the shell hides the bottom nav",
+    );
+}
+
 /// Wiring: a screen built through `AppEngine` carries the stamped
 /// `nav_tab_id`, so frontends read it off the rendered `ScreenModel`
 /// instead of re-deriving it from the screen id.

@@ -646,9 +646,15 @@ impl WorkflowEngine for AppEngine {
 }
 
 impl AppEngine {
-    /// Poll the activity log and produce pending OS notifications.
-    /// Public so PlatformAppEngine can expose it via UniFFI.
-    pub fn poll_notifications(&mut self) -> Vec<PendingNotification> {
+    /// Advance every live relay session (device-link initiator/responder,
+    /// link-mode initiator/responder, multi-stage exchange) one protocol step
+    /// and tick the active engine's wall-clock. No-op for each idle session.
+    /// Shared by `poll_notifications` (the OS-notification cadence) and the
+    /// `Heartbeat` user action (the exchange-progress cadence, ADR-044 Am2a) —
+    /// retiring the frontend's `requires_poll` loop that called
+    /// `poll_notifications` directly. Events logged by the advances surface as
+    /// notifications on the next `poll_notifications`.
+    pub(super) fn advance_relay_sessions(&mut self) {
         self.drain_events_to_log();
 
         // Slice 32l T3.1b: advance the device-link initiator one relay step (no-op when idle).
@@ -673,6 +679,14 @@ impl AppEngine {
         // Active-engine wall-clock tick — no-op unless bounded-wait (cable
         // DirectTransport `Waiting` fails a peerless stall; ADR-021, T1.3).
         self.engine.tick(now);
+    }
+
+    /// Poll the activity log and produce pending OS notifications.
+    /// Public so PlatformAppEngine can expose it via UniFFI.
+    pub fn poll_notifications(&mut self) -> Vec<PendingNotification> {
+        self.advance_relay_sessions();
+
+        let now = self.vauchi.clock().unix_seconds();
 
         // Fetch raw rows from the activity log since the last poll.
         let rows = match self.vauchi.activity_log_poll(self.last_poll_time, now) {

@@ -57,6 +57,15 @@ pub enum UserAction {
     /// frontend-local (core cannot own a half-typed field); only the
     /// foreground consequence is core's.
     AppForegrounded,
+    /// A neutral app heartbeat pulse (ADR-044 Am2a). The frontend forwards a
+    /// steady tick and core advances any live relay / exchange session one
+    /// step and re-renders. Retires the frontend's `requires_poll` loop that
+    /// called `poll_notifications` on a per-screen cadence — the frontend owns
+    /// no poll semantics, only the pulse. OS notifications produced by the
+    /// advance are delivered by the separate `poll_notifications` call, so
+    /// none are lost. (The tick *cadence* is a frontend/owner decision, not
+    /// core's; core only reacts to each pulse.)
+    Heartbeat,
     FieldVisibilityChanged {
         field_id: String,
         group_id: Option<String>,

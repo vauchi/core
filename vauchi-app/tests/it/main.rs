@@ -14,6 +14,7 @@ mod app_engine_navigation_tests;
 mod app_engine_onboarding_completion_tests;
 mod app_lifecycle_tests;
 mod ble_handshake_app_engine_tests;
+mod heartbeat_tests;
 // The multi-stage half needs FakeClock (gated inside the file); the
 // BLE half runs featureless.
 mod ceremony_wiring_tests;

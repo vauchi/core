@@ -63,6 +63,16 @@ impl AppEngine {
     }
 
     pub(super) fn intercept_global_chrome(&mut self, action: &UserAction) -> Option<ActionResult> {
+        // Neutral app heartbeat (ADR-044 Am2a): advance any live relay /
+        // exchange session one step and re-render. Retires the frontend's
+        // requires_poll loop that called poll_notifications() directly; OS
+        // notifications produced by the advance are delivered by the separate
+        // poll_notifications() call, so nothing is lost.
+        if matches!(action, UserAction::Heartbeat) {
+            self.advance_relay_sessions();
+            return Some(ActionResult::UpdateScreen(self.current_screen()));
+        }
+
         // Handle sync_now from the chrome Indicator emitted by
         // apply_sync_chrome_overlay. Updates sync_chrome_status with
         // the outcome so the chip reflects the new state on next

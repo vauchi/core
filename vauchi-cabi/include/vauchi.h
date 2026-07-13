@@ -185,6 +185,19 @@ char *vauchi_app_current_screen(struct VauchiApp *handle);
 char *vauchi_app_poll_notifications(struct VauchiApp *app);
 
 /**
+ * Wake-up tick: run due work and return the next OS notifications plus
+ * any commands emitted (in practice the next `Command::ScheduleWakeup`).
+ *
+ * Returns a JSON-encoded `{"notifications": [...], "commands": [...]}` object,
+ * or null on error. The caller must free the returned string via
+ * `vauchi_string_free`.
+ *
+ * # Safety
+ * `app` must be a valid pointer created by `vauchi_app_create*`.
+ */
+char *vauchi_app_on_wakeup(struct VauchiApp *app);
+
+/**
  * Handle a user action (JSON) and return the result as JSON.
  *
  * # Safety

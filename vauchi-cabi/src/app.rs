@@ -266,6 +266,46 @@ pub unsafe extern "C" fn vauchi_app_poll_notifications(app: *mut VauchiApp) -> *
     }
 }
 
+/// Wake-up tick: run due work and return the next OS notifications plus
+/// any commands emitted (in practice the next `Command::ScheduleWakeup`).
+///
+/// Returns a JSON-encoded `{"notifications": [...], "commands": [...]}` object,
+/// or null on error. The caller must free the returned string via
+/// `vauchi_string_free`.
+///
+/// # Safety
+/// `app` must be a valid pointer created by `vauchi_app_create*`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_on_wakeup(app: *mut VauchiApp) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if app.is_null() {
+            return std::ptr::null_mut();
+        }
+
+        let app = unsafe { &*app };
+        let mut engine = match app.engine.lock() {
+            Ok(lock) => lock,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        let notifications = engine.on_wakeup();
+        let commands = engine.drain_pending_commands();
+
+        let envelope = serde_json::json!({
+            "notifications": notifications,
+            "commands": commands,
+        });
+
+        match serde_json::to_string(&envelope) {
+            Ok(json) => to_c_string(&json),
+            Err(_) => std::ptr::null_mut(),
+        }
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 /// Handle a user action (JSON) and return the result as JSON.
 ///
 /// # Safety
@@ -363,10 +403,11 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
 /// Navigate back one step. Returns the resulting screen as JSON.
 ///
 /// Pops the engine's `AppScreen` nav history, or rewinds one in-engine
-/// sub-flow step (the exchange flow). Frontends gate this on the
-/// `can_go_back` field of the current screen and render a back affordance
-/// in their own chrome — so C-ABI frontends (linux-qt, windows) no longer
-/// depend on a footer "Back" action.
+/// sub-flow step (the exchange flow). Deprecated for the OS back gesture:
+/// frontends should forward system back via `UserAction::NavigateBack`
+/// (using `vauchi_app_handle_action`) and render the `go_back` chrome
+/// action from `nav_actions`. Kept for the few remaining internal callers
+/// while C-ABI frontends migrate (ADR-044 Amendment 2a).
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.

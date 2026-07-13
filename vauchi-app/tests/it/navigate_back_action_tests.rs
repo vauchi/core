@@ -51,6 +51,33 @@ fn navigate_back_action_matches_navigate_back() {
     );
 }
 
+/// At a back-stopping root (no back step), the OS back gesture is *not* a
+/// phantom re-nav to MyInfo — core returns `PerformNativeBack` so the frontend
+/// performs the platform's native default (Android minimize / iOS suspend /
+/// desktop no-op). ADR-044 Am2a: back is forwarded unconditionally and core
+/// owns the empty-history decision, so the frontend never gates on
+/// `can_go_back`.
+// @internal
+#[test]
+fn navigate_back_at_root_returns_perform_native_back() {
+    let mut engine = engine_with_identity();
+    // A fresh identity lands on MyInfo — a declared root with no back step.
+    assert!(!engine.can_go_back(), "MyInfo root offers no back step");
+
+    let result = engine.handle_action(UserAction::NavigateBack);
+
+    assert!(
+        matches!(result, ActionResult::PerformNativeBack),
+        "NavigateBack at a back-stopping root must return PerformNativeBack, \
+         got {result:?}"
+    );
+    assert_eq!(
+        *engine.current_app_screen(),
+        AppScreen::MyInfo,
+        "the engine must stay put — no phantom navigation on native back"
+    );
+}
+
 /// `ScreenModel.can_go_back` mirrors `AppEngine::can_go_back()` on every
 /// rendered screen — so the frontend reads its back affordance off the screen
 /// it already has, no separate query.

@@ -84,10 +84,19 @@ impl AppEngine {
             });
         }
 
-        // System back gesture (ADR-043 Am4): typed twin of `navigate_back_json`
-        // — pops via `navigate_back()`, gated on the frontend by `can_go_back`.
+        // System back gesture (ADR-043 Am4 + ADR-044 Am2a): the frontend
+        // forwards it *unconditionally* and core owns the decision. A back
+        // step (engine-internal sub-flow or `nav_history`) pops via
+        // `navigate_back()`; a back-stopping root has nothing to pop, so core
+        // returns `PerformNativeBack` and the frontend performs its native
+        // default — never a phantom re-nav, never a frontend `can_go_back`
+        // gate on the handler.
         if matches!(action, UserAction::NavigateBack) {
-            return Some(ActionResult::NavigateTo(self.navigate_back()));
+            return Some(if self.can_go_back() {
+                ActionResult::NavigateTo(self.navigate_back())
+            } else {
+                ActionResult::PerformNativeBack
+            });
         }
 
         // Global-chrome navigation (ADR-043 Amendment 4): the native

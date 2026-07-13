@@ -38,13 +38,14 @@ pub enum UserAction {
     NavigateToTab {
         action_id: String,
     },
-    /// The OS back gesture (Android system BACK / swipe). `AppEngine::handle_action`
-    /// intercepts it before per-screen dispatch and pops the engine's nav
-    /// history via `navigate_back()` — the typed twin of the `navigate_back_json`
-    /// binding (ADR-043 Amendment 4: navigation is core-resolved). The back
-    /// *affordance* is gated by the frontend on `ScreenModel.can_go_back`, so a
-    /// `NavigateBack` is only forwarded when a back step exists; dispatching it
-    /// otherwise is a no-op re-render (matches `navigate_back_json`).
+    /// The OS back gesture (Android system BACK / swipe, iOS edge-swipe, ESC).
+    /// `AppEngine::handle_action` intercepts it before per-screen dispatch and
+    /// owns the decision (ADR-043 Amendment 4: navigation is core-resolved;
+    /// ADR-044 Amendment 2a: the frontend forwards it *unconditionally* and
+    /// never gates its handler on `can_go_back`). A back step (engine-internal
+    /// sub-flow or `nav_history`) pops via `navigate_back()` → `NavigateTo`; a
+    /// back-stopping root has nothing to pop → `PerformNativeBack`, and the
+    /// frontend performs its platform default (minimize / suspend / no-op).
     NavigateBack,
     FieldVisibilityChanged {
         field_id: String,
@@ -163,6 +164,13 @@ pub enum DeviceLinkRole {
 pub enum ActionResult {
     UpdateScreen(ScreenModel),
     NavigateTo(ScreenModel),
+    /// The back gesture reached a back-stopping root: there is no screen to
+    /// pop, so the frontend performs the platform's native back default
+    /// (Android `moveTaskToBack` / minimize; iOS suspend / no-op; desktop
+    /// no-op). Core owns the "nothing to pop" decision; the frontend owns
+    /// only the native mechanism. Retires the frontend `can_go_back` gate on
+    /// its system-back handler (ADR-044 Amendment 2a).
+    PerformNativeBack,
     ValidationError {
         component_id: String,
         message: String,

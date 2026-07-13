@@ -322,7 +322,9 @@ impl ContentManager {
             }
         }
 
-        self.cache.save_manifest(&remote)?;
+        if self.can_cache_manifest(&remote, &applied) {
+            self.cache.save_manifest(&remote)?;
+        }
         // best-effort: see check_for_updates rationale
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.record_check_time();
@@ -343,15 +345,15 @@ impl ContentManager {
 
     /// Find which content types have updates available
     fn find_updates(&self, remote: &ContentManifest) -> Vec<ContentType> {
-        let cached = self.cache.get_manifest();
+        let cached = self.trusted_cached_manifest();
         let mut updates = Vec::new();
 
         if let Some(remote_entry) = &remote.content.networks {
-            let needs_update = cached
-                .as_ref()
-                .and_then(|c| c.content.networks.as_ref())
-                .map(|local| local.version != remote_entry.version)
-                .unwrap_or(true);
+            let needs_update = needs_update(
+                cached.as_ref(),
+                ContentType::Networks,
+                &remote_entry.version,
+            );
 
             if needs_update && self.is_compatible(&remote_entry.min_app_version) {
                 updates.push(ContentType::Networks);
@@ -360,11 +362,8 @@ impl ContentManager {
 
         // Check locales
         if let Some(remote_entry) = &remote.content.locales {
-            let needs_update = cached
-                .as_ref()
-                .and_then(|c| c.content.locales.as_ref())
-                .map(|local| local.version != remote_entry.version)
-                .unwrap_or(true);
+            let needs_update =
+                needs_update(cached.as_ref(), ContentType::Locales, &remote_entry.version);
 
             if needs_update && self.is_compatible(&remote_entry.min_app_version) {
                 updates.push(ContentType::Locales);
@@ -373,11 +372,8 @@ impl ContentManager {
 
         // Check help
         if let Some(remote_entry) = &remote.content.help {
-            let needs_update = cached
-                .as_ref()
-                .and_then(|c| c.content.help.as_ref())
-                .map(|local| local.version != remote_entry.version)
-                .unwrap_or(true);
+            let needs_update =
+                needs_update(cached.as_ref(), ContentType::Help, &remote_entry.version);
 
             if needs_update && self.is_compatible(&remote_entry.min_app_version) {
                 updates.push(ContentType::Help);
@@ -386,11 +382,8 @@ impl ContentManager {
 
         // Check themes
         if let Some(remote_entry) = &remote.content.themes {
-            let needs_update = cached
-                .as_ref()
-                .and_then(|c| c.content.themes.as_ref())
-                .map(|local| local.version != remote_entry.version)
-                .unwrap_or(true);
+            let needs_update =
+                needs_update(cached.as_ref(), ContentType::Themes, &remote_entry.version);
 
             if needs_update && self.is_compatible(&remote_entry.min_app_version) {
                 updates.push(ContentType::Themes);
@@ -403,7 +396,47 @@ impl ContentManager {
     /// Check if content is compatible with current app version
     fn is_compatible(&self, min_version: &str) -> bool {
         let app_version = option_env!("CARGO_PKG_VERSION").unwrap_or("0.1.0");
-        version_compare(app_version, min_version).is_ge()
+        matches!(
+            version_compare(app_version, min_version),
+            Some(std::cmp::Ordering::Equal | std::cmp::Ordering::Greater)
+        )
+    }
+
+    fn trusted_cached_manifest(&self) -> Option<ContentManifest> {
+        self.cache.get_manifest().filter(|manifest| {
+            super::integrity::verify_manifest_signature(manifest, &self.config.publisher_public_key)
+                .is_ok()
+        })
+    }
+
+    fn can_cache_manifest(&self, remote: &ContentManifest, applied: &[ContentType]) -> bool {
+        let cached = self.trusted_cached_manifest();
+        [
+            ContentType::Networks,
+            ContentType::Locales,
+            ContentType::Help,
+            ContentType::Themes,
+        ]
+        .into_iter()
+        .all(|content_type| {
+            let remote_version = manifest_version(remote, content_type);
+            let cached_version = cached
+                .as_ref()
+                .and_then(|manifest| manifest_version(manifest, content_type));
+
+            match (remote_version, cached_version) {
+                (None, None) => true,
+                (None, Some(_)) => false,
+                (Some(remote), None) => {
+                    parse_exact_version(remote).is_some() && applied.contains(&content_type)
+                }
+                (Some(remote), Some(local)) => match version_compare(remote, local) {
+                    Some(std::cmp::Ordering::Equal) => true,
+                    Some(std::cmp::Ordering::Greater) => applied.contains(&content_type),
+                    Some(std::cmp::Ordering::Less) | None => false,
+                },
+            }
+        })
     }
 
     /// Apply a single content update
@@ -520,22 +553,70 @@ impl ContentManager {
     }
 }
 
-/// Simple version comparison (semver-like)
 #[cfg(feature = "content-updates")]
-fn version_compare(a: &str, b: &str) -> std::cmp::Ordering {
-    let parse = |s: &str| -> Vec<u32> { s.split('.').filter_map(|p| p.parse().ok()).collect() };
-
-    let a_parts = parse(a);
-    let b_parts = parse(b);
-
-    for (av, bv) in a_parts.iter().zip(b_parts.iter()) {
-        match av.cmp(bv) {
-            std::cmp::Ordering::Equal => continue,
-            other => return other,
-        }
+fn manifest_version(manifest: &ContentManifest, content_type: ContentType) -> Option<&str> {
+    match content_type {
+        ContentType::Networks => manifest
+            .content
+            .networks
+            .as_ref()
+            .map(|entry| entry.version.as_str()),
+        ContentType::Locales => manifest
+            .content
+            .locales
+            .as_ref()
+            .map(|entry| entry.version.as_str()),
+        ContentType::Help => manifest
+            .content
+            .help
+            .as_ref()
+            .map(|entry| entry.version.as_str()),
+        ContentType::Themes => manifest
+            .content
+            .themes
+            .as_ref()
+            .map(|entry| entry.version.as_str()),
     }
+}
 
-    a_parts.len().cmp(&b_parts.len())
+#[cfg(feature = "content-updates")]
+fn needs_update(
+    cached: Option<&ContentManifest>,
+    content_type: ContentType,
+    remote_version: &str,
+) -> bool {
+    let Some(remote) = parse_exact_version(remote_version) else {
+        return false;
+    };
+    let Some(local_version) = cached.and_then(|manifest| manifest_version(manifest, content_type))
+    else {
+        return true;
+    };
+    let Some(local) = parse_exact_version(local_version) else {
+        return false;
+    };
+
+    remote > local
+}
+
+#[cfg(feature = "content-updates")]
+fn parse_exact_version(version: &str) -> Option<[u32; 3]> {
+    let mut parts = version.split('.');
+    let parsed = [
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    ];
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(parsed)
+}
+
+/// Compare exact three-component numeric versions.
+#[cfg(feature = "content-updates")]
+fn version_compare(a: &str, b: &str) -> Option<std::cmp::Ordering> {
+    Some(parse_exact_version(a)?.cmp(&parse_exact_version(b)?))
 }
 
 /// Bundled networks - compiled into the binary (matches networks.json format)
@@ -760,6 +841,34 @@ mod tests {
         let status = block_on(manager.check_for_updates());
 
         assert!(matches!(status, UpdateStatus::UpToDate));
+    }
+
+    #[test]
+    fn test_manager_ignores_untrusted_cached_rollback_anchor() {
+        let temp = TempDir::new().unwrap();
+        let trusted_signer = SigningKeyPair::generate();
+        let untrusted_signer = SigningKeyPair::generate();
+        let poisoned_cache = signed_networks_manifest(&untrusted_signer, "999.0.0");
+        ContentCache::new(temp.path())
+            .unwrap()
+            .save_manifest(&poisoned_cache)
+            .unwrap();
+        let remote = signed_networks_manifest(&trusted_signer, "1.0.0");
+        let config = ContentConfig {
+            storage_path: temp.path().to_path_buf(),
+            content_url: serve_http(vec![serde_json::to_vec(&remote).unwrap()]),
+            publisher_public_key: trusted_signer.public_key(),
+            ..Default::default()
+        };
+        let manager =
+            ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
+
+        let status = block_on(manager.check_for_updates());
+
+        assert!(matches!(
+            status,
+            UpdateStatus::UpdatesAvailable(types) if types == vec![ContentType::Networks]
+        ));
     }
 
     // Scenario: Preserve the cached version when a content download fails

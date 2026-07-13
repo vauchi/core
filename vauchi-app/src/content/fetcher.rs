@@ -32,8 +32,8 @@ pub struct ContentFetcher {
     agent: Agent,
     base_url: String,
     max_content_size: u64,
-    /// Publisher key for manifest signature verification (Tracker #145).
-    publisher_public_key: Option<vauchi_core::crypto::signing::PublicKey>,
+    /// Publisher key for manifest signature verification.
+    publisher_public_key: vauchi_core::crypto::signing::PublicKey,
 }
 
 #[cfg(feature = "content-updates")]
@@ -93,10 +93,7 @@ impl ContentFetcher {
 
         let manifest: ContentManifest = serde_json::from_str(&body)?;
 
-        // Verify manifest signature if publisher key is configured (Tracker #145)
-        if let Some(ref pub_key) = self.publisher_public_key {
-            super::integrity::verify_manifest_signature(&manifest, pub_key)?;
-        }
+        super::integrity::verify_manifest_signature(&manifest, &self.publisher_public_key)?;
 
         Ok(manifest)
     }

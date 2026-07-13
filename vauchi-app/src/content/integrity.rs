@@ -91,9 +91,6 @@ pub fn compute_checksum(data: &[u8]) -> String {
 /// * `Ok(())` if the signature is valid
 /// * `Err(IntegrityError)` if the signature is missing, malformed, or invalid
 ///
-/// # Note
-/// This function is available for future use once the CI signing infrastructure is in place.
-/// Currently no code path gates updates on manifest signatures.
 pub fn verify_manifest_signature(
     manifest: &super::types::ContentManifest,
     public_key: &vauchi_core::crypto::signing::PublicKey,
@@ -103,16 +100,7 @@ pub fn verify_manifest_signature(
         .as_ref()
         .ok_or(IntegrityError::MissingSignature)?;
 
-    // Decode hex signature (128 hex chars = 64 bytes)
-    let sig_bytes: Vec<u8> = (0..sig_hex.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&sig_hex[i..i + 2], 16))
-        .collect::<Result<Vec<u8>, _>>()
-        .map_err(|_| IntegrityError::InvalidSignatureFormat)?;
-
-    if sig_bytes.len() != 64 {
-        return Err(IntegrityError::InvalidSignatureFormat);
-    }
+    let sig_bytes = hex::decode(sig_hex).map_err(|_| IntegrityError::InvalidSignatureFormat)?;
 
     let signature = vauchi_core::crypto::signing::Signature::from_bytes(
         sig_bytes
@@ -262,6 +250,25 @@ mod tests {
         let err = verify_manifest_signature(&manifest, &public_key)
             .expect_err("missing signature must be rejected");
         assert!(matches!(err, IntegrityError::MissingSignature));
+    }
+
+    #[test]
+    fn test_verify_manifest_signature_rejects_odd_length_hex() {
+        use crate::content::types::{ContentIndex, ContentManifest};
+        use vauchi_core::crypto::signing::SigningKeyPair;
+
+        let manifest = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-07-13T00:00:00Z".to_string(),
+            base_url: "https://cdn.vauchi.app/v1".to_string(),
+            content: ContentIndex::default(),
+            signature: Some("a".to_string()),
+        };
+
+        let error = verify_manifest_signature(&manifest, &SigningKeyPair::generate().public_key())
+            .expect_err("odd-length hex must be rejected without panicking");
+
+        assert!(matches!(error, IntegrityError::InvalidSignatureFormat));
     }
 
     // Trace: codebase-review-tracker item #24

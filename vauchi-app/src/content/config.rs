@@ -6,6 +6,12 @@
 
 use std::path::PathBuf;
 use std::time::Duration;
+use vauchi_core::crypto::signing::PublicKey;
+
+const PRODUCTION_PUBLISHER_PUBLIC_KEY: [u8; 32] = [
+    149, 18, 255, 58, 48, 37, 240, 241, 30, 161, 195, 217, 252, 234, 187, 13, 89, 153, 62, 43, 189,
+    135, 252, 19, 184, 228, 36, 89, 216, 200, 184, 45,
+];
 
 /// Configuration for the content update system
 #[derive(Debug, Clone)]
@@ -31,11 +37,10 @@ pub struct ContentConfig {
     /// Proxy URL (optional SOCKS5 proxy)
     pub proxy_url: Option<String>,
 
-    /// Publisher's Ed25519 public key for manifest signature verification (Tracker #145).
+    /// Publisher's Ed25519 public key for manifest signature verification.
     ///
-    /// When set, fetched manifests are verified against this key before use.
-    /// When `None`, manifest signatures are not checked (backward-compatible).
-    pub publisher_public_key: Option<vauchi_core::crypto::signing::PublicKey>,
+    /// Custom content origins must explicitly replace the production key.
+    pub publisher_public_key: PublicKey,
 }
 
 impl Default for ContentConfig {
@@ -48,7 +53,7 @@ impl Default for ContentConfig {
             timeout: Duration::from_secs(30),
             max_content_size: 5 * 1024 * 1024, // 5 MB
             proxy_url: None,
-            publisher_public_key: None,
+            publisher_public_key: PublicKey::from_bytes(PRODUCTION_PUBLISHER_PUBLIC_KEY),
         }
     }
 }

@@ -26,9 +26,15 @@
 
 use zeroize::ZeroizeOnDrop;
 
-fn assert_zeroize_on_drop<T: ZeroizeOnDrop>() {}
+fn assert_zeroize_on_drop<T: ZeroizeOnDrop>() {
+    assert!(
+        std::mem::needs_drop::<T>(),
+        "{} claims ZeroizeOnDrop but has no drop glue",
+        std::any::type_name::<T>()
+    );
+}
 
-#[allow(dead_code)]
+#[test]
 fn secret_type_contract() {
     assert_zeroize_on_drop::<vauchi_core::crypto::SymmetricKey>();
     assert_zeroize_on_drop::<vauchi_core::crypto::signing::SigningKeyPair>();
@@ -40,4 +46,6 @@ fn secret_type_contract() {
     assert_zeroize_on_drop::<vauchi_core::identifiers::MailboxToken>();
     assert_zeroize_on_drop::<vauchi_core::sync::device_sync::ContactSyncData>();
     assert_zeroize_on_drop::<vauchi_core::exchange::escrow::EscrowKeys>();
+    assert_zeroize_on_drop::<vauchi_core::crypto::shamir::Share>();
+    assert_zeroize_on_drop::<vauchi_core::BackupKeyShard>();
 }

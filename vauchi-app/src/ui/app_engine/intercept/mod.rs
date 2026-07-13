@@ -8,6 +8,12 @@
 //! (settings, card, contact_detail, recovery, contact_lifecycle,
 //! annotations); all are dispatched from `dispatch.rs`/`mod.rs`.
 
+mod card;
+mod contact_detail;
+mod contact_lifecycle;
+mod recovery;
+mod settings;
+
 use super::AppEngine;
 use super::AppScreen;
 use crate::i18n::Locale;

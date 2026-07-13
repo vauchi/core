@@ -7,7 +7,7 @@
 //! `Vauchi` recovery API (ADR-002 — logic unchanged, moved verbatim).
 //! `impl AppEngine` methods, dispatched from `dispatch.rs`.
 
-use super::AppEngine;
+use super::super::AppEngine;
 use crate::ui::action::ActionResult;
 
 impl AppEngine {
@@ -19,7 +19,9 @@ impl AppEngine {
     /// advances the engine to ShowGeneratedClaim (success) or attaches
     /// a validation error to the input (failure). Returns `UpdateScreen`
     /// so the rendered screen reflects the new engine state.
-    pub(super) fn intercept_create_claim_action(&mut self) -> Option<ActionResult> {
+    pub(in crate::ui::app_engine) fn intercept_create_claim_action(
+        &mut self,
+    ) -> Option<ActionResult> {
         let old_key = match self.engine.engine_output() {
             Some(crate::ui::EngineOutput::Recovery { old_key_input }) => {
                 old_key_input.trim().to_string()
@@ -45,7 +47,9 @@ impl AppEngine {
     /// the engine to the ConfirmVoucher step (success) or attaches a
     /// validation error to the input (failure). Returns `UpdateScreen` so
     /// the rendered screen reflects the new engine state.
-    pub(super) fn intercept_verify_claim_action(&mut self) -> Option<ActionResult> {
+    pub(in crate::ui::app_engine) fn intercept_verify_claim_action(
+        &mut self,
+    ) -> Option<ActionResult> {
         let claim_input = match self.engine.engine_output() {
             Some(crate::ui::EngineOutput::RecoveryHelp { claim_input }) => {
                 claim_input.trim().to_string()
@@ -79,7 +83,9 @@ impl AppEngine {
     /// token, no relay round-trip). Stores the base64 voucher payload on
     /// the engine so the ShowVoucher screen can render it for the user
     /// to share.
-    pub(super) fn intercept_create_voucher_action(&mut self) -> Option<ActionResult> {
+    pub(in crate::ui::app_engine) fn intercept_create_voucher_action(
+        &mut self,
+    ) -> Option<ActionResult> {
         let claim_input = match self.engine.engine_output() {
             Some(crate::ui::EngineOutput::RecoveryHelp { claim_input }) => {
                 claim_input.trim().to_string()

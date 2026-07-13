@@ -6,15 +6,18 @@
 //! visibility/edit/delete, and exit-preview. Split out of `intercept.rs`
 //! (cohesion). `impl AppEngine` methods, dispatched from `mod.rs`/`dispatch.rs`.
 
-use super::AppEngine;
-use super::AppScreen;
+use super::super::AppEngine;
+use super::super::AppScreen;
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::form_dialog::FormDialogType;
 use crate::ui::my_info_entry_detail::EntryContactInfo;
 
 impl AppEngine {
     /// Intercept "edit_avatar" action on MyInfo to navigate to AvatarEditor.
-    pub(super) fn intercept_edit_avatar(&mut self, action: &UserAction) -> Option<ActionResult> {
+    pub(in crate::ui::app_engine) fn intercept_edit_avatar(
+        &mut self,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
         if !matches!(self.screen, AppScreen::MyInfo) {
             return None;
         }
@@ -28,7 +31,10 @@ impl AppEngine {
     }
 
     /// Intercept add-field actions on MyInfo and Onboarding to open FormDialog.
-    pub(super) fn intercept_add_field(&mut self, action: &UserAction) -> Option<ActionResult> {
+    pub(in crate::ui::app_engine) fn intercept_add_field(
+        &mut self,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
         let action_id = match action {
             UserAction::ActionPressed { action_id } => action_id.as_str(),
             UserAction::ListItemSelected { item_id, .. } => item_id.as_str(),
@@ -52,7 +58,7 @@ impl AppEngine {
     }
 
     /// Intercept entry detail actions before delegating to engine.
-    pub(super) fn intercept_entry_detail_action(
+    pub(in crate::ui::app_engine) fn intercept_entry_detail_action(
         &mut self,
         field_id: &str,
         action: &UserAction,
@@ -205,7 +211,10 @@ impl AppEngine {
     ///
     /// Clears `preview_as_contact`, invalidates the MyInfo cache, and rebuilds
     /// MyInfo in normal edit mode.
-    pub(super) fn intercept_exit_preview(&mut self, action: &UserAction) -> Option<ActionResult> {
+    pub(in crate::ui::app_engine) fn intercept_exit_preview(
+        &mut self,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
         let UserAction::ActionPressed { action_id } = action else {
             return None;
         };

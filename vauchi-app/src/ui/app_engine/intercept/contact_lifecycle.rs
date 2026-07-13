@@ -7,14 +7,14 @@
 //! `intercept.rs` (cohesion). `impl AppEngine` methods, dispatched from
 //! `dispatch.rs`.
 
-use super::AppEngine;
-use super::AppScreen;
+use super::super::AppEngine;
+use super::super::AppScreen;
 use crate::ui::action::{ActionResult, UserAction};
 
 impl AppEngine {
     /// Intercept delete/archive actions on ContactDetail, perform the side effect,
     /// store undo state, and return a ShowToast with the undo action ID.
-    pub(super) fn intercept_contact_delete_archive(
+    pub(in crate::ui::app_engine) fn intercept_contact_delete_archive(
         &mut self,
         contact_id: &str,
         action: &UserAction,
@@ -33,7 +33,7 @@ impl AppEngine {
                 // which surfaces ShowAlert on failure
                 #[allow(clippy::let_underscore_must_use)]
                 let _ = self.vauchi.archive_contact(contact_id);
-                self.pending_contact_undo = Some(super::PendingContactUndo::Archive);
+                self.pending_contact_undo = Some(super::super::PendingContactUndo::Archive);
                 self.engine_cache.remove(&AppScreen::Contacts);
                 self.navigate_back();
                 Some(ActionResult::ShowToast {
@@ -58,7 +58,7 @@ impl AppEngine {
     /// the merge preview screen.
     ///
     /// Returns `None` if there are no pairs at all.
-    pub(super) fn intercept_merge_action(&mut self) -> Option<ActionResult> {
+    pub(in crate::ui::app_engine) fn intercept_merge_action(&mut self) -> Option<ActionResult> {
         let pairs = self.vauchi.find_duplicates().unwrap_or_default();
         if pairs.is_empty() {
             return None;
@@ -126,7 +126,9 @@ impl AppEngine {
     /// non-blocking toast so the user knows the action took effect.
     ///
     /// Returns `None` when no pairs exist or no selection is recorded.
-    pub(super) fn intercept_dismiss_duplicate_action(&mut self) -> Option<ActionResult> {
+    pub(in crate::ui::app_engine) fn intercept_dismiss_duplicate_action(
+        &mut self,
+    ) -> Option<ActionResult> {
         let pairs = self.vauchi.find_duplicates().unwrap_or_default();
         if pairs.is_empty() {
             return None;
@@ -173,7 +175,7 @@ impl AppEngine {
     /// renderer); the intercept reads the engine's pending fields, calls
     /// the storage API, then rebuilds the engine with the fresh list so
     /// the user sees the updated screen without leaving it.
-    pub(super) fn intercept_decoy_contacts_action(
+    pub(in crate::ui::app_engine) fn intercept_decoy_contacts_action(
         &mut self,
         action: &UserAction,
     ) -> Option<ActionResult> {

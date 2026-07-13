@@ -7,8 +7,8 @@
 //! Split out of `intercept.rs` (cohesion). These are `impl AppEngine`
 //! methods, dispatched from `mod.rs`/`dispatch.rs`.
 
-use super::AppEngine;
-use super::AppScreen;
+use super::super::AppEngine;
+use super::super::AppScreen;
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::form_dialog::FormDialogType;
 
@@ -16,7 +16,7 @@ impl AppEngine {
     /// Persist a consent toggle on the Privacy screen by flipping the
     /// stored grant for the toggled `ConsentType`. The `GdprEngine` flips
     /// its in-memory display in parallel; this owns durability.
-    pub(super) fn persist_consent_toggle(&mut self, action: &UserAction) {
+    pub(in crate::ui::app_engine) fn persist_consent_toggle(&mut self, action: &UserAction) {
         if self.screen != AppScreen::Privacy {
             return;
         }
@@ -52,7 +52,7 @@ impl AppEngine {
     }
 
     /// Persist settings toggle changes to Vauchi config (fixes HIGH-4).
-    pub(super) fn persist_settings_toggle(&mut self, action: &UserAction) {
+    pub(in crate::ui::app_engine) fn persist_settings_toggle(&mut self, action: &UserAction) {
         if self.screen != AppScreen::Settings {
             return;
         }
@@ -151,7 +151,7 @@ impl AppEngine {
     }
 
     /// Intercept settings item selection to route to proper sub-screens.
-    pub(super) fn intercept_settings_action(
+    pub(in crate::ui::app_engine) fn intercept_settings_action(
         &mut self,
         action: &UserAction,
     ) -> Option<ActionResult> {

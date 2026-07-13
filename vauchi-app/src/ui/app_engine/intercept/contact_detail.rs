@@ -7,7 +7,7 @@
 //! optimistic in-memory state. Split out of `intercept.rs` (cohesion).
 //! `impl AppEngine` methods, dispatched from `dispatch.rs`.
 
-use super::AppEngine;
+use super::super::AppEngine;
 use crate::ui::action::{ActionResult, UserAction};
 
 impl AppEngine {
@@ -16,7 +16,7 @@ impl AppEngine {
     /// When the user toggles the "proposal_trusted" item in the "trust_permissions"
     /// SettingsGroup, we load the contact, flip the flag, save it, then let the
     /// engine update its own local state.
-    pub(super) fn intercept_proposal_trust_toggle(
+    pub(in crate::ui::app_engine) fn intercept_proposal_trust_toggle(
         &mut self,
         contact_id: &str,
         action: &UserAction,
@@ -57,7 +57,7 @@ impl AppEngine {
     /// persist to storage. Mirror of `intercept_proposal_trust_toggle`,
     /// added 2026-04-28 for the Pair 3 (ContactDetail) Pure Humble UI
     /// retirement work.
-    pub(super) fn intercept_recovery_trust_toggle(
+    pub(in crate::ui::app_engine) fn intercept_recovery_trust_toggle(
         &mut self,
         contact_id: &str,
         action: &UserAction,
@@ -88,7 +88,7 @@ impl AppEngine {
     }
 
     /// Intercept hide/unhide toggle on ContactDetail and persist to storage.
-    pub(super) fn intercept_hide_toggle(
+    pub(in crate::ui::app_engine) fn intercept_hide_toggle(
         &mut self,
         contact_id: &str,
         action: &UserAction,

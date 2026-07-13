@@ -9,12 +9,66 @@
 # Pure extraction — byte-identical to the deleted block. Included as
 # `local: ci/package.yml` from core/.gitlab-ci.yml.
 #
-# Contents (only runs on stable/rc tag pipelines):
-#   - package:xcframework    — Swift package
-#   - package:android-maven  — Android AAR
-#   - package:cabi-windows   — Windows CABI zip
-#   - package:sbom           — CycloneDX SBOM
-#   - package:slsa-provenance — SLSA L2 provenance bundle
+# Contents:
+#   - test:packaging-matrix   — MR/main smoke test of packaging scripts in their
+#                               target environments (Linux + macOS)
+#   - package:xcframework     — Swift package (tags only)
+#   - package:android         — Android AAR (tags only)
+#   - package:cabi-windows    — Windows CABI zip (tags only)
+#   - package:sbom            — CycloneDX SBOM (tags only)
+#   - package:slsa-provenance — SLSA L2 provenance bundle (tags only)
+
+# ============================================================
+# Packaging Script Environment Matrix (MR + main)
+# ============================================================
+# The packaging scripts have high fix-commit density (see
+# _private/scripts/git_hotspot_analyzer.py --rank-by fix_ratio).
+# Running them in their target environments on every packaging change
+# catches environment-specific breakage before release tags, when the
+# real package:* jobs run. Uses --release-only for speed and dev
+# versions to skip cosign signing.
+
+test:packaging-matrix:
+  stage: test
+  needs: []
+  tags:
+    - $RUNNER_OS
+    - self-hosted
+  parallel:
+    matrix:
+      - RUNNER_OS: [linux, macos]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "scripts/build-bindings.sh"
+          - "scripts/package-xcframework.sh"
+          - "scripts/package-android.sh"
+          - "ci/package.yml"
+          - ".gitlab-ci.yml"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - |
+      set -euo pipefail
+      case "$RUNNER_OS" in
+        linux)
+          echo "=== Linux matrix: build-bindings --android + package-android ==="
+          ./scripts/build-bindings.sh --android --release-only
+          ./scripts/package-android.sh "dev-${CI_COMMIT_SHORT_SHA}"
+          ;;
+        macos)
+          echo "=== macOS matrix: build-bindings --apple + package-xcframework ==="
+          # package-xcframework.sh needs both device and simulator slices,
+          # so we cannot use --release-only here.
+          ./scripts/build-bindings.sh --apple
+          ./scripts/package-xcframework.sh "dev-${CI_COMMIT_SHORT_SHA}"
+          ;;
+        *)
+          echo "ERROR: unsupported RUNNER_OS '$RUNNER_OS'" >&2
+          exit 1
+          ;;
+      esac
 
 # ============================================================
 # Package Stage (Tags only)

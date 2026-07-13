@@ -29,6 +29,7 @@ mod help_catalog;
 mod factory_filter_tests;
 mod intercept;
 mod intercept_annotations;
+mod intercept_settings;
 mod link_exchange;
 mod link_responder;
 mod multi_stage_exchange;

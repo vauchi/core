@@ -252,6 +252,7 @@ mod tests {
         assert!(matches!(err, IntegrityError::MissingSignature));
     }
 
+    // @internal
     #[test]
     fn test_verify_manifest_signature_rejects_odd_length_hex() {
         use crate::content::types::{ContentIndex, ContentManifest};

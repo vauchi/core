@@ -792,6 +792,7 @@ mod tests {
     }
 
     // Scenario: Reject a manifest without a publisher signature
+    // @scenario: remote_content :: Reject a manifest without a publisher signature
     #[test]
     fn test_manager_rejects_unsigned_manifest() {
         let temp = TempDir::new().unwrap();
@@ -819,6 +820,7 @@ mod tests {
     }
 
     // Scenario: Reject a signed content downgrade
+    // @scenario: remote_content :: Reject a signed content downgrade
     #[test]
     fn test_manager_rejects_signed_content_downgrade() {
         let temp = TempDir::new().unwrap();
@@ -843,6 +845,7 @@ mod tests {
         assert!(matches!(status, UpdateStatus::UpToDate));
     }
 
+    // @internal
     #[test]
     fn test_manager_ignores_untrusted_cached_rollback_anchor() {
         let temp = TempDir::new().unwrap();
@@ -872,6 +875,7 @@ mod tests {
     }
 
     // Scenario: Preserve the cached version when a content download fails
+    // @scenario: remote_content :: Preserve the cached version when a content download fails
     #[test]
     fn test_manager_does_not_advance_manifest_after_failed_download() {
         let temp = TempDir::new().unwrap();
@@ -901,6 +905,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_content_versions_require_exact_numeric_triplets() {
         assert_eq!(parse_exact_version("1.2.3"), Some([1, 2, 3]));

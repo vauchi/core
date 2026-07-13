@@ -141,7 +141,6 @@ mod tests {
             label: "Contacts".into(),
             icon: "person.2".into(),
             badge_count: 3,
-            is_home: false,
         }];
         let json = tabs_to_json(&tabs);
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -168,7 +167,6 @@ mod tests {
                 label: "A".into(),
                 icon: "".into(),
                 badge_count: 0,
-                is_home: false,
             },
             TabInfo {
                 id: "b".into(),
@@ -176,7 +174,6 @@ mod tests {
                 label: "B".into(),
                 icon: "".into(),
                 badge_count: 0,
-                is_home: false,
             },
         ];
         let json = tabs_to_json(&tabs);

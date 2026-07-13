@@ -164,21 +164,14 @@ fn find_peer_scan(screen: &ScreenModel) -> Option<&Component> {
 
 // The active screen is a fixed (non-scrolling) layout so the own-QR
 // never reflows while a live element updates — a moving QR breaks the
-// peer camera's lock.
+// peer camera's lock. Poll ownership moved to core via `on_wakeup`
+// (ADR-044 Am2a); no `requires_*` boolean crosses the wire.
 // @internal
 #[test]
 fn active_screen_layout_is_fixed() {
     let screen = engine_with_qr(ProtocolState::Advertising, "payload").current_screen();
     assert_eq!(screen.screen_id, SCREEN_ID);
     assert_eq!(screen.layout, ScreenLayout::Fixed);
-    assert!(
-        screen.requires_poll,
-        "multi_stage_exchange must ask the shell for poll ticks (I4)"
-    );
-    assert!(
-        !screen.requires_animated_qr,
-        "multi_stage_exchange advances via poll, not animated QR frames"
-    );
 }
 
 // The peer-scan preview and the buttons share one `Row`; the buttons

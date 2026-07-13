@@ -135,36 +135,11 @@ pub struct ScreenModel {
     /// `2026-05-01-screen-id-metadata-in-core`.
     #[serde(default)]
     pub presentation_kind: ScreenPresentationKind,
-    /// Whether this screen offers a back affordance — engine nav state
-    /// (`AppEngine::can_go_back`) stamped at the render boundary, so frontends
-    /// gate their system-back handler on the rendered screen instead of a
-    /// separate `can_go_back()` query (ADR-043 Am4). Absent == false (most
-    /// screens are roots / back-stoppers).
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub can_go_back: bool,
-    /// Whether this screen is the entry/bootstrap onboarding screen.
-    /// Frontends use this flag to offer quit/import-backup shortcuts here
-    /// instead of hardcoding domain `screen_id`s like `"welcome"` or
-    /// `"identity_check"` (ADR-043/044 Humble UI).
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub is_bootstrap: bool,
     /// Whether the renderer scrolls the content or renders a fixed,
     /// non-scrolling layout. See [`ScreenLayout`]. Omitted on the wire
     /// when `Scroll` (the default) so only fixed-layout screens carry it.
     #[serde(default, skip_serializing_if = "ScreenLayout::is_scroll")]
     pub layout: ScreenLayout,
-    /// Whether the screen needs an animated-QR frame-cycle timer while
-    /// visible. Core owns the decision; frontends start/stop the timer based
-    /// on this flag instead of matching domain `screen_id`s
-    /// (`2026-07-06-mobile-domain-shell-violations` I4).
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub requires_animated_qr: bool,
-    /// Whether the screen needs a periodic poll tick while visible (e.g.
-    /// the multi-stage exchange engine). Core owns the decision; frontends
-    /// start/stop the poll loop based on this flag instead of matching
-    /// domain `screen_id`s.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub requires_poll: bool,
     /// Which native hardware wrapper should host this screen, if any.
     /// `None` means render through the standard core screen renderer.
     /// Core owns the decision; frontends stop matching domain `screen_id`s
@@ -182,13 +157,6 @@ pub struct ScreenModel {
     /// `NavigateTo` before per-screen dispatch. Empty on most screens.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nav_actions: Vec<ScreenAction>,
-}
-
-/// serde `skip_serializing_if` predicate for `bool` fields defaulting to
-/// `false` — keeps the wire JSON (and golden fixtures) free of the field on
-/// the common case.
-fn is_false(value: &bool) -> bool {
-    !*value
 }
 
 fn default_schema_version() -> u16 {
@@ -214,11 +182,7 @@ impl Default for ScreenModel {
             parent_screen_id: None,
             nav_tab_id: None,
             presentation_kind: ScreenPresentationKind::Page,
-            can_go_back: false,
-            is_bootstrap: false,
             layout: ScreenLayout::Scroll,
-            requires_animated_qr: false,
-            requires_poll: false,
             native_wrapper_hint: NativeWrapperHint::None,
             nav_actions: Vec::new(),
         }
@@ -249,11 +213,7 @@ impl ScreenModel {
             parent_screen_id: None,
             nav_tab_id: None,
             presentation_kind: ScreenPresentationKind::Page,
-            can_go_back: false,
-            is_bootstrap: false,
             layout: ScreenLayout::Scroll,
-            requires_animated_qr: false,
-            requires_poll: false,
             native_wrapper_hint: NativeWrapperHint::None,
             nav_actions: Vec::new(),
         }
@@ -471,73 +431,6 @@ mod tests {
         assert_eq!(m.parent_screen_id, None);
     }
 
-    // Lifecycle hints for hardware-timer ownership (I4 of
-    // `2026-07-06-mobile-domain-shell-violations`). Core tells the shell
-    // which screens need animated-QR frame cycling or poll ticks, so
-    // frontends stop branching on domain `screen_id`s.
-
-    // @internal
-    #[test]
-    fn lifecycle_hints_default_to_false() {
-        let m = ScreenModel::new("test", "Title", vec![], vec![]);
-        assert!(
-            !m.requires_animated_qr,
-            "requires_animated_qr must default to false"
-        );
-        assert!(!m.requires_poll, "requires_poll must default to false");
-    }
-
-    // @internal
-    #[test]
-    fn lifecycle_hints_roundtrip_on_the_wire() {
-        let mut m = ScreenModel::new("test", "Title", vec![], vec![]);
-        m.requires_animated_qr = true;
-        m.requires_poll = true;
-        let json = serde_json::to_string(&m).unwrap();
-        assert!(
-            json.contains("\"requires_animated_qr\":true"),
-            "requires_animated_qr must serialize when true: {json}"
-        );
-        assert!(
-            json.contains("\"requires_poll\":true"),
-            "requires_poll must serialize when true: {json}"
-        );
-        let restored: ScreenModel = serde_json::from_str(&json).unwrap();
-        assert!(restored.requires_animated_qr);
-        assert!(restored.requires_poll);
-    }
-
-    // @internal
-    #[test]
-    fn lifecycle_hints_omitted_when_false() {
-        let m = ScreenModel::new("test", "Title", vec![], vec![]);
-        let json = serde_json::to_string(&m).unwrap();
-        assert!(
-            !json.contains("requires_animated_qr"),
-            "false requires_animated_qr must be omitted from wire JSON: {json}"
-        );
-        assert!(
-            !json.contains("requires_poll"),
-            "false requires_poll must be omitted from wire JSON: {json}"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn legacy_json_without_lifecycle_hints_parses_as_false() {
-        let legacy = r#"{
-            "screen_id": "test",
-            "title": "Test Screen",
-            "subtitle": null,
-            "components": [],
-            "actions": [],
-            "progress": null
-        }"#;
-        let m: ScreenModel = serde_json::from_str(legacy).expect("legacy JSON must parse");
-        assert!(!m.requires_animated_qr);
-        assert!(!m.requires_poll);
-    }
-
     // Native wrapper hints (I5/A2 of
     // `2026-07-06-mobile-domain-shell-violations`). Core tells the shell
     // which screens render inside a dedicated hardware wrapper instead of
@@ -662,12 +555,6 @@ pub struct TabInfo {
     /// Badge count (e.g., pending contact updates). Zero means no badge.
     #[serde(default)]
     pub badge_count: u32,
-    /// Whether this tab is the home / primary tab ("My Card").
-    ///
-    /// Frontends use this flag to identify the home tab instead of
-    /// hardcoding the domain screen id (ADR-043/044 Wire Humble).
-    #[serde(default)]
-    pub is_home: bool,
 }
 
 /// Visual style for a screen action.

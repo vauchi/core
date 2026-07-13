@@ -55,7 +55,6 @@ use std::path::{Path, PathBuf};
 const HUMBLE_ALLOWLIST: &[&str] = &[
     "advance_qr_frame_json",
     "boot",
-    "can_go_back",
     "current_screen_json",
     "current_tab_id",
     "dispatch_domain_command",
@@ -279,15 +278,18 @@ fn humble_allowlist_size_matches_plan() {
     // Android WorkManager) is a lifecycle entry point the frontend cannot
     // fold into `handle_action_json`. It replaces the retired
     // `UserAction::Heartbeat` pulse with a core-owned schedule boundary.
+    //
+    // ADR-044 Am2a field retirement (2026-07-13, 23 -> 22): frontends now
+    // read the Back affordance from `ScreenModel.nav_actions`, so the
+    // `can_go_back()` binding query is retired.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        23,
-        "Humble allow-list size drifted from the 23 expected after \
-         adding `on_wakeup` (ADR-044 Am2a Option C) and retiring \
-         `UserAction::Heartbeat`. Edits to this list require an ADR amendment \
-         (ADR-021/043 for the Humble engine framing — incl. Amendment 3 \
-         for the linchpin promotions — or ADR-048's G1-G5 gates for \
-         retirements)."
+        22,
+        "Humble allow-list size drifted from the 22 expected after \
+         ADR-044 Am2a retired `can_go_back`. Edits to this list require an \
+         ADR amendment (ADR-021/043 for the Humble engine framing — incl. \
+         Amendment 3 for the linchpin promotions — or ADR-048's G1-G5 gates \
+         for retirements)."
     );
 }
 

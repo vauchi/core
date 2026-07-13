@@ -173,27 +173,3 @@ fn bfs_reaches_all_onboarding_screens() {
         "BFS screen set drifted"
     );
 }
-
-/// The bootstrap screen carries a UI-shaped flag so frontends can offer
-/// quit/import-backup shortcuts without hardcoding domain `screen_id`s.
-/// `identity_check` is the bootstrap entry; subsequent onboarding screens
-/// are not.
-// @internal
-#[test]
-fn identity_check_is_bootstrap_and_later_onboarding_screens_are_not() {
-    let mut engine = OnboardingEngine::new();
-    assert_eq!(engine.current_step(), Step::IdentityCheck);
-    assert!(
-        engine.current_screen().is_bootstrap,
-        "identity_check must be the bootstrap screen"
-    );
-
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "create_new".into(),
-    });
-    assert_eq!(engine.current_step(), Step::DefaultName);
-    assert!(
-        !engine.current_screen().is_bootstrap,
-        "default_name must not be a bootstrap screen"
-    );
-}

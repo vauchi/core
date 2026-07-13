@@ -141,9 +141,10 @@ impl AppEngine {
         ) {
             screen.presentation_kind = self.screen.presentation_kind();
         }
-        // Back affordance from engine nav state (frontends read it off the screen).
-        screen.can_go_back = self.can_go_back();
-        if screen.can_go_back && !screen.nav_actions.iter().any(|a| a.id == ACTION_GO_BACK) {
+        // Back affordance from engine nav state: stamp a reserved `go_back`
+        // nav action so frontends render Back from data, never from a
+        // per-concept boolean (ADR-044 Am2a).
+        if self.can_go_back() && !screen.nav_actions.iter().any(|a| a.id == ACTION_GO_BACK) {
             let label = self.t("nav.back");
             screen.nav_actions.insert(
                 0,

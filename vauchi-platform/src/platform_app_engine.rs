@@ -597,19 +597,6 @@ impl PlatformAppEngine {
         screen_envelope_to_json(&model, &pending_commands)
     }
 
-    /// Whether a back step exists in core's nav-history stack.
-    ///
-    /// Frontends drive their back affordance / `BackHandler` from this
-    /// instead of inferring "is this a core-driven screen?" from a
-    /// frontend-side screen-id map (ADR-043: no constructed nav targets).
-    /// Tier-0 of the CoreScreenIdMap rework.
-    pub fn can_go_back(&self) -> Result<bool, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        Ok(engine.can_go_back())
-    }
-
     /// Returns the canonical screen-id of the parent tab the active
     /// screen belongs to under the given layout, or `None` for
     /// transient overlays (Lock, FormDialog).

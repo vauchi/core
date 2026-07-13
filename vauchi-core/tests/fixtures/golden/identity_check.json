@@ -132,6 +132,5 @@
       "ring_offset": 2
     }
   },
-  "presentation_kind": "Page",
-  "is_bootstrap": true
+  "presentation_kind": "Page"
 }

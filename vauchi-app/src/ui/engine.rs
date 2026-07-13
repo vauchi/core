@@ -64,9 +64,9 @@ pub trait WorkflowEngine: Send {
     /// straight out of the whole flow — or, at an `is_root` screen like
     /// `Exchange`, does nothing (the back-trap this hook fixes).
     ///
-    /// When `true`, `AppEngine::can_go_back` reports BACK as available
-    /// even at an AppScreen root, and `AppEngine::navigate_back` routes
-    /// the press to [`Self::navigate_back_within`] first. Default `false`.
+    /// When `true`, `AppEngine::can_go_back` reports a back step is
+    /// available even at an AppScreen root, and `AppEngine::navigate_back`
+    /// routes the press to [`Self::navigate_back_within`] first. Default `false`.
     fn can_navigate_back_within(&self) -> bool {
         false
     }

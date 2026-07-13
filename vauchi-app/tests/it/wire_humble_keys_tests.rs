@@ -50,6 +50,13 @@ const FORBIDDEN_KEYS: &[&str] = &[
     "available_groups",  // Component::FieldList field → "available_scopes"
     "Groups",            // UiFieldVisibility::Groups variant tag → "Scopes"
     "GroupViewSelected", // UserAction variant tag → "VariantSelected"
+    // ADR-044 Amendment 2a (2026-07-13): boolean-family retirement.
+    // These fields leaked domain/navigational semantics into frontends.
+    "can_go_back",
+    "is_bootstrap",
+    "requires_animated_qr",
+    "requires_poll",
+    "is_home",
 ];
 
 /// Wire icon-token *field* names — the object keys whose string VALUE is
@@ -513,7 +520,6 @@ fn no_forbidden_keys_in_screen_surface() {
         label: "Contacts".to_string(),
         icon: "person.2".to_string(),
         badge_count: 0,
-        is_home: false,
     };
     assert_no_forbidden_keys(&serde_json::to_value(&tab).unwrap(), "TabInfo");
 
@@ -692,7 +698,6 @@ fn no_domain_icon_values_in_render_surface() {
         label: "Contacts".to_string(),
         icon: "person.2".to_string(),
         badge_count: 0,
-        is_home: false,
     };
     assert_no_domain_icon_values(&serde_json::to_value(&tab).unwrap(), "TabInfo");
 }

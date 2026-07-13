@@ -2,15 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Back navigation as a typed `UserAction` + `can_go_back` as `ScreenModel`
-//! data (allowlist-reduction #2, core half).
+//! Back navigation as a typed `UserAction` + the Back affordance as a
+//! reserved `nav_actions` item (allowlist-reduction #2, core half).
 //!
 //! Symmetric with `navigate_to_tab_tests.rs`: the OS back gesture forwards
 //! `UserAction::NavigateBack` through `handle_action` instead of the binding
-//! calling `navigate_back_json`, and the back *affordance* state rides on the
-//! rendered `ScreenModel.can_go_back` instead of a separate `can_go_back()`
-//! query. Together these let the `navigate_back_json` + `can_go_back` binding
-//! surface retire once both frontends migrate (ADR-043 Amendment 4).
+//! calling `navigate_back_json`, and the back *affordance* state rides on
+//! `ScreenModel.nav_actions` instead of a separate `can_go_back()` query.
+//! Together these let the `navigate_back_json` + `can_go_back` binding surface
+//! retire once both frontends migrate (ADR-043 Amendment 4 / ADR-044 Am2a).
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
@@ -75,41 +75,6 @@ fn navigate_back_at_root_returns_perform_native_back() {
         *engine.current_app_screen(),
         AppScreen::MyInfo,
         "the engine must stay put — no phantom navigation on native back"
-    );
-}
-
-/// `ScreenModel.can_go_back` mirrors `AppEngine::can_go_back()` on every
-/// rendered screen — so the frontend reads its back affordance off the screen
-/// it already has, no separate query.
-// @internal
-#[test]
-fn screen_model_can_go_back_mirrors_engine_for_root_and_sub_screen() {
-    let mut engine = engine_with_identity();
-
-    // A bottom-nav tab root is a back-stopper even with history behind it.
-    engine.navigate_to(AppScreen::Contacts);
-    let tab = engine.current_screen();
-    assert_eq!(
-        tab.can_go_back,
-        engine.can_go_back(),
-        "ScreenModel.can_go_back must mirror engine.can_go_back() at a tab root"
-    );
-    assert!(
-        !tab.can_go_back,
-        "a bottom-nav tab root offers no back even with nav history"
-    );
-
-    // A non-root sub-screen with history offers back.
-    engine.navigate_to(AppScreen::Settings);
-    let sub = engine.current_screen();
-    assert_eq!(
-        sub.can_go_back,
-        engine.can_go_back(),
-        "ScreenModel.can_go_back must mirror engine.can_go_back() at a sub-screen"
-    );
-    assert!(
-        sub.can_go_back,
-        "a non-root sub-screen with history must offer back"
     );
 }
 

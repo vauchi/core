@@ -398,28 +398,6 @@ fn navigate_back_returns_previous_screen() {
     assert_eq!(envelope["screen"]["screen_id"], "my_info");
 }
 
-// @internal
-#[test]
-fn can_go_back_plumbs_nav_history_through_boundary() {
-    let (engine, _dir) = create_engine();
-    // Fresh engine, no navigation has occurred: no back step.
-    assert!(
-        !engine.can_go_back().expect("can_go_back"),
-        "a freshly constructed engine has no back step"
-    );
-
-    drive_onboarding(&engine);
-    // Navigate to a non-root (Settings); a root like Exchange would
-    // report no back step under the screen-aware `can_go_back` rule.
-    engine
-        .navigate_to_json_for_test(r#""Settings""#.into())
-        .expect("navigate to settings");
-    assert!(
-        engine.can_go_back().expect("can_go_back"),
-        "after forward navigation to a non-root a back step exists"
-    );
-}
-
 // ============================================================================
 // Notification boundary (CC-05)
 // ============================================================================

@@ -16,10 +16,6 @@
         "$ref": "#/definitions/ScreenAction"
       }
     },
-    "can_go_back": {
-      "description": "Whether this screen offers a back affordance — engine nav state (`AppEngine::can_go_back`) stamped at the render boundary, so frontends gate their system-back handler on the rendered screen instead of a separate `can_go_back()` query (ADR-043 Am4). Absent == false (most screens are roots / back-stoppers).",
-      "type": "boolean"
-    },
     "components": {
       "type": "array",
       "items": {
@@ -32,10 +28,6 @@
       "items": {
         "type": "string"
       }
-    },
-    "is_bootstrap": {
-      "description": "Whether this screen is the entry/bootstrap onboarding screen. Frontends use this flag to offer quit/import-backup shortcuts here instead of hardcoding domain `screen_id`s like `\"welcome\"` or `\"identity_check\"` (ADR-043/044 Humble UI).",
-      "type": "boolean"
     },
     "layout": {
       "description": "Whether the renderer scrolls the content or renders a fixed, non-scrolling layout. See [`ScreenLayout`]. Omitted on the wire when `Scroll` (the default) so only fixed-layout screens carry it.",
@@ -92,14 +84,6 @@
           "type": "null"
         }
       ]
-    },
-    "requires_animated_qr": {
-      "description": "Whether the screen needs an animated-QR frame-cycle timer while visible. Core owns the decision; frontends start/stop the timer based on this flag instead of matching domain `screen_id`s (`2026-07-06-mobile-domain-shell-violations` I4).",
-      "type": "boolean"
-    },
-    "requires_poll": {
-      "description": "Whether the screen needs a periodic poll tick while visible (e.g. the multi-stage exchange engine). Core owns the decision; frontends start/stop the poll loop based on this flag instead of matching domain `screen_id`s.",
-      "type": "boolean"
     },
     "schema_version": {
       "description": "Schema version — shells ignore components from higher versions.",

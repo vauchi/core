@@ -39,29 +39,42 @@ impl AppEngine {
     /// update link, tab navigation, system back, the settings gear, and the
     /// demo-contact dismiss banner. Returns `None` when the action is not
     /// one of these reserved chrome affordances.
+    /// Relay catch-up sync (when the `network-http` transport is compiled in)
+    /// followed by a re-render of the current screen. Shared by the `sync_now`
+    /// chrome action and the `AppForegrounded` lifecycle event so core owns the
+    /// "sync on resume" decision exactly once (ADR-021).
+    pub(super) fn sync_and_rerender(&mut self) -> ActionResult {
+        #[cfg(feature = "network-http")]
+        {
+            use std::time::{SystemTime, UNIX_EPOCH};
+            use vauchi_core::api::VauchiSyncOutcome;
+            self.sync_chrome_status = match self.vauchi.sync() {
+                Ok(VauchiSyncOutcome::Ok { .. }) => SyncChromeStatus::Synced {
+                    unix_ts: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0),
+                },
+                Ok(_) => self.sync_chrome_status,
+                Err(_) => SyncChromeStatus::Failed,
+            };
+        }
+        ActionResult::UpdateScreen(self.current_screen())
+    }
+
     pub(super) fn intercept_global_chrome(&mut self, action: &UserAction) -> Option<ActionResult> {
         // Handle sync_now from the chrome Indicator emitted by
         // apply_sync_chrome_overlay. Updates sync_chrome_status with
         // the outcome so the chip reflects the new state on next
         // render. No-op in builds without network-http feature.
+        // The explicit sync-now chrome action and the OS foreground event
+        // (ADR-044 Am2a Family-A) share one consequence: relay catch-up +
+        // re-render. Core owns the "sync on resume" decision (ADR-021),
+        // retiring the frontend's ON_RESUME/becameActive branch.
         if matches!(action, UserAction::ActionPressed { action_id } if action_id == ACTION_SYNC_NOW)
+            || matches!(action, UserAction::AppForegrounded)
         {
-            #[cfg(feature = "network-http")]
-            {
-                use std::time::{SystemTime, UNIX_EPOCH};
-                use vauchi_core::api::VauchiSyncOutcome;
-                self.sync_chrome_status = match self.vauchi.sync() {
-                    Ok(VauchiSyncOutcome::Ok { .. }) => SyncChromeStatus::Synced {
-                        unix_ts: SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .map(|d| d.as_secs())
-                            .unwrap_or(0),
-                    },
-                    Ok(_) => self.sync_chrome_status,
-                    Err(_) => SyncChromeStatus::Failed,
-                };
-            }
-            return Some(ActionResult::UpdateScreen(self.current_screen()));
+            return Some(self.sync_and_rerender());
         }
 
         // Handle backup reminder toast action

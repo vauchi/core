@@ -47,6 +47,16 @@ pub enum UserAction {
     /// back-stopping root has nothing to pop → `PerformNativeBack`, and the
     /// frontend performs its platform default (minimize / suspend / no-op).
     NavigateBack,
+    /// The app returned to the foreground (Android `ON_RESUME`, iOS
+    /// `scenePhase == .active` / `applicationDidBecomeActive`). The frontend
+    /// forwards the raw event and core owns the consequence — a relay
+    /// catch-up sync plus a re-render covering state that changed while
+    /// backgrounded. Retires the frontend's `ON_RESUME -> sync()` /
+    /// `becameActive -> re-fetch` decision (ADR-021; ADR-044 Am2a Family-A).
+    /// Note: clearing an unsubmitted local input buffer on *background* stays
+    /// frontend-local (core cannot own a half-typed field); only the
+    /// foreground consequence is core's.
+    AppForegrounded,
     FieldVisibilityChanged {
         field_id: String,
         group_id: Option<String>,

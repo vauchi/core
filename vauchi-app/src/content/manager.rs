@@ -630,6 +630,64 @@ pub enum ContentError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
+    use tempfile::TempDir;
+    use vauchi_core::crypto::signing::SigningKeyPair;
+
+    fn signed_networks_manifest(keypair: &SigningKeyPair, version: &str) -> ContentManifest {
+        let mut manifest = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-07-13T00:00:00Z".to_string(),
+            base_url: "https://cdn.vauchi.app/v1/".to_string(),
+            content: super::super::types::ContentIndex {
+                networks: Some(super::super::types::ContentEntry {
+                    version: version.to_string(),
+                    path: "networks.json".to_string(),
+                    checksum: super::super::integrity::compute_checksum(b"expected content"),
+                    size_bytes: 16,
+                    min_app_version: "0.1.0".to_string(),
+                    max_app_version: None,
+                }),
+                ..super::super::types::ContentIndex::default()
+            },
+            signature: None,
+        };
+
+        let canonical = serde_json::to_vec(&serde_json::to_value(&manifest).unwrap()).unwrap();
+        manifest.signature = Some(hex::encode(keypair.sign(&canonical).as_bytes()));
+        manifest
+    }
+
+    fn serve_http(responses: Vec<Vec<u8>>) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+
+        thread::spawn(move || {
+            for body in responses {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0_u8; 2048];
+                let _ = stream.read(&mut request).unwrap();
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                )
+                .unwrap();
+                stream.write_all(&body).unwrap();
+            }
+        });
+
+        format!("http://{address}")
+    }
+
+    fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+            .block_on(future)
+    }
 
     #[test]
     fn test_bundled_networks_not_empty() {
@@ -650,5 +708,87 @@ mod tests {
     fn test_bundled_unknown_locale() {
         let locale = bundled_locale("zz");
         assert!(locale.is_none());
+    }
+
+    // Scenario: Reject a manifest without a publisher signature
+    #[test]
+    fn test_manager_rejects_unsigned_manifest() {
+        let temp = TempDir::new().unwrap();
+        let unsigned = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-07-13T00:00:00Z".to_string(),
+            base_url: "https://cdn.vauchi.app/v1/".to_string(),
+            content: super::super::types::ContentIndex::default(),
+            signature: None,
+        };
+        let config = ContentConfig {
+            storage_path: temp.path().to_path_buf(),
+            content_url: serve_http(vec![serde_json::to_vec(&unsigned).unwrap()]),
+            ..Default::default()
+        };
+        let manager =
+            ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
+
+        let status = block_on(manager.check_for_updates());
+
+        assert!(
+            matches!(status, UpdateStatus::CheckFailed(message) if message.contains("signature")),
+            "unsigned manifests must fail closed"
+        );
+    }
+
+    // Scenario: Reject a signed content downgrade
+    #[test]
+    fn test_manager_rejects_signed_content_downgrade() {
+        let temp = TempDir::new().unwrap();
+        let keypair = SigningKeyPair::generate();
+        let cached = signed_networks_manifest(&keypair, "1.1.0");
+        ContentCache::new(temp.path())
+            .unwrap()
+            .save_manifest(&cached)
+            .unwrap();
+        let remote = signed_networks_manifest(&keypair, "1.0.0");
+        let config = ContentConfig {
+            storage_path: temp.path().to_path_buf(),
+            content_url: serve_http(vec![serde_json::to_vec(&remote).unwrap()]),
+            publisher_public_key: keypair.public_key(),
+            ..Default::default()
+        };
+        let manager =
+            ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
+
+        let status = block_on(manager.check_for_updates());
+
+        assert!(matches!(status, UpdateStatus::UpToDate));
+    }
+
+    // Scenario: Preserve the cached version when a content download fails
+    #[test]
+    fn test_manager_does_not_advance_manifest_after_failed_download() {
+        let temp = TempDir::new().unwrap();
+        let keypair = SigningKeyPair::generate();
+        let remote = signed_networks_manifest(&keypair, "1.1.0");
+        let config = ContentConfig {
+            storage_path: temp.path().to_path_buf(),
+            content_url: serve_http(vec![
+                serde_json::to_vec(&remote).unwrap(),
+                b"tampered content".to_vec(),
+            ]),
+            publisher_public_key: keypair.public_key(),
+            ..Default::default()
+        };
+        let manager =
+            ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
+
+        let result = block_on(manager.apply_updates()).unwrap();
+
+        assert!(matches!(
+            result,
+            ApplyResult::Applied { ref failed, .. } if failed.len() == 1
+        ));
+        assert!(
+            manager.cache().get_manifest().is_none(),
+            "a failed content download must remain retryable"
+        );
     }
 }

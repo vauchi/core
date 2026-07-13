@@ -23,6 +23,14 @@ fn test_config_default() {
     assert_eq!(config.timeout, Duration::from_secs(30));
     assert_eq!(config.max_content_size, 5 * 1024 * 1024);
     assert!(config.proxy_url.is_none());
+    assert_eq!(
+        config.publisher_public_key.as_bytes(),
+        &[
+            149, 18, 255, 58, 48, 37, 240, 241, 30, 161, 195, 217, 252, 234, 187, 13, 89, 153, 62,
+            43, 189, 135, 252, 19, 184, 228, 36, 89, 216, 200, 184, 45,
+        ],
+        "the production publisher key must be present by default",
+    );
 }
 
 // @internal

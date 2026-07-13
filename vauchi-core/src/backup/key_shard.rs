@@ -24,9 +24,10 @@
 //! 4. Later, guardians decrypt their shares: [`open_share_for_guardian`].
 //! 5. Reconstruct the key from any threshold of shares: [`reconstruct_backup_key`].
 
+use std::fmt;
 use thiserror::Error;
 use x25519_dalek::{PublicKey, StaticSecret};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::BackupError;
 use crate::crypto::SymmetricKey;
@@ -40,7 +41,7 @@ const SHARD_VERSION: u8 = 1;
 ///
 /// Represents one `(index, value)` share of the Shamir split. The `value`
 /// field is zeroized on drop.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct BackupKeyShard {
     /// Non-zero byte index (x-coordinate).
     pub index: u8,
@@ -48,14 +49,15 @@ pub struct BackupKeyShard {
     pub value: [u8; 32],
 }
 
-impl Zeroize for BackupKeyShard {
-    fn zeroize(&mut self) {
-        self.index.zeroize();
-        self.value.zeroize();
+impl fmt::Debug for BackupKeyShard {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("BackupKeyShard")
+            .field("index", &self.index)
+            .field("value", &"[REDACTED]")
+            .finish()
     }
 }
-
-impl ZeroizeOnDrop for BackupKeyShard {}
 
 impl BackupKeyShard {
     /// Serializes the shard to a compact byte representation.
@@ -144,7 +146,7 @@ impl From<KeyShardError> for BackupError {
 ///
 /// This type wraps a [`SymmetricKey`] and provides conversion to/from raw bytes
 /// for Shamir splitting. The key is zeroized on drop.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 pub struct BackupKey {
     key: SymmetricKey,
 }
@@ -192,8 +194,6 @@ impl BackupKey {
         self.key.as_bytes()
     }
 }
-
-impl ZeroizeOnDrop for BackupKey {}
 
 /// Parameters for a guardian backup shard setup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -257,8 +257,8 @@ pub fn split_backup_key(
 /// Returns [`KeyShardError::Shamir`] if shares are insufficient or malformed.
 pub fn reconstruct_backup_key(shards: &[BackupKeyShard]) -> Result<BackupKey, KeyShardError> {
     let shares: Vec<Share> = shards.iter().map(|s| s.to_share()).collect();
-    let secret = shamir::reconstruct(&shares)?;
-    BackupKey::from_bytes(&secret)
+    let secret = Zeroizing::new(shamir::reconstruct(&shares)?);
+    BackupKey::from_bytes(secret.as_slice())
 }
 
 /// Seals a key shard for a guardian using their X25519 public key.
@@ -272,7 +272,7 @@ pub fn seal_share_for_guardian(
     shard: &BackupKeyShard,
     guardian_pk: &PublicKey,
 ) -> Result<Vec<u8>, KeyShardError> {
-    let plaintext = shard.to_bytes();
+    let plaintext = Zeroizing::new(shard.to_bytes());
     sealed_box::seal(&plaintext, guardian_pk).map_err(|e| KeyShardError::SealedBox(e.to_string()))
 }
 
@@ -285,8 +285,10 @@ pub fn open_share_for_guardian(
     sealed: &[u8],
     guardian_sk: &StaticSecret,
 ) -> Result<BackupKeyShard, KeyShardError> {
-    let plaintext = sealed_box::open(sealed, guardian_sk)
-        .map_err(|e| KeyShardError::SealedBox(e.to_string()))?;
+    let plaintext = Zeroizing::new(
+        sealed_box::open(sealed, guardian_sk)
+            .map_err(|e| KeyShardError::SealedBox(e.to_string()))?,
+    );
     BackupKeyShard::from_bytes(&plaintext)
 }
 
@@ -315,6 +317,20 @@ mod tests {
         let bytes = shard.to_bytes();
         let parsed = BackupKeyShard::from_bytes(&bytes).unwrap();
         assert_eq!(shard, parsed);
+    }
+
+    // @internal
+    #[test]
+    fn backup_key_shard_debug_redacts_value() {
+        let shard = BackupKeyShard {
+            index: 1,
+            value: [0xAB; 32],
+        };
+
+        let debug = format!("{shard:?}");
+
+        assert_eq!(debug, "BackupKeyShard { index: 1, value: \"[REDACTED]\" }");
+        assert!(!debug.contains("171"));
     }
 
     // @internal

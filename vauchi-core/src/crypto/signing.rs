@@ -21,6 +21,7 @@ pub struct SigningKeyPair {
 // Manual marker (not derived): dalek's SigningKey zeroizes itself on
 // drop but does not expose `Zeroize`, so the derive cannot apply. The
 // impl states the wrapper-level guarantee the VRS01 contract asserts.
+// nosemgrep: vauchi-no-manual-zeroize-on-drop — dalek field owns its drop zeroization
 impl zeroize::ZeroizeOnDrop for SigningKeyPair {}
 
 impl SigningKeyPair {

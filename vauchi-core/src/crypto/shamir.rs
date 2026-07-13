@@ -29,6 +29,7 @@
 
 use rand_core::OsRng;
 use rand_core::RngCore;
+use std::fmt;
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -65,7 +66,7 @@ pub enum ShamirError {
 ///
 /// `index` is a non-zero byte identifier (the x-coordinate).
 /// `value` is the 32-byte y-coordinate `f(index)`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct Share {
     /// Non-zero byte identifier for this share (x-coordinate).
     pub index: u8,
@@ -73,14 +74,15 @@ pub struct Share {
     pub value: [u8; 32],
 }
 
-impl Zeroize for Share {
-    fn zeroize(&mut self) {
-        self.index.zeroize();
-        self.value.zeroize();
+impl fmt::Debug for Share {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Share")
+            .field("index", &self.index)
+            .field("value", &"[REDACTED]")
+            .finish()
     }
 }
-
-impl ZeroizeOnDrop for Share {}
 
 /// Splits a 32-byte secret into `count` shares with a `threshold`.
 ///
@@ -154,12 +156,17 @@ pub fn reconstruct(shares: &[Share]) -> Result<[u8; 32], ShamirError> {
 
     for (byte_pos, secret_byte) in secret.iter_mut().enumerate() {
         // Collect (x_i, y_i) pairs for this byte position
-        let points: Vec<(u8, u8)> = shares
+        let mut points: Vec<(u8, u8)> = shares
             .iter()
             .map(|s| (s.index, s.value[byte_pos]))
             .collect();
 
-        *secret_byte = lagrange_interpolate_at_zero(&points)?;
+        let interpolation = lagrange_interpolate_at_zero(&points);
+        for (index, value) in &mut points {
+            index.zeroize();
+            value.zeroize();
+        }
+        *secret_byte = interpolation?;
     }
 
     Ok(secret)
@@ -340,6 +347,13 @@ fn gf_poly_mul_scalar(scalar: u16, poly: u16) -> u16 {
 mod tests {
     use super::*;
 
+    fn duplicate_share(share: &Share) -> Share {
+        Share {
+            index: share.index,
+            value: share.value,
+        }
+    }
+
     // @internal
     #[test]
     fn round_trip_2_of_3() {
@@ -354,7 +368,8 @@ mod tests {
         let reconstructed = reconstruct(&shares[1..3]).unwrap();
         assert_eq!(reconstructed, secret);
 
-        let reconstructed = reconstruct(&[shares[0].clone(), shares[2].clone()]).unwrap();
+        let reconstructed =
+            reconstruct(&[duplicate_share(&shares[0]), duplicate_share(&shares[2])]).unwrap();
         assert_eq!(reconstructed, secret);
     }
 
@@ -506,7 +521,7 @@ mod tests {
         let shares2 = split(&secret2, 2, 3).unwrap();
 
         // Mix one share from each set
-        let mixed = vec![shares1[0].clone(), shares2[1].clone()];
+        let mixed = vec![duplicate_share(&shares1[0]), duplicate_share(&shares2[1])];
         let result = reconstruct(&mixed).unwrap();
         assert_ne!(result, secret1);
         assert_ne!(result, secret2);
@@ -529,12 +544,25 @@ mod tests {
 
     // @internal
     #[test]
-    fn share_zeroizes_on_drop() {
+    fn share_manual_zeroize_clears_fields() {
         let secret = [0xABu8; 32];
         let mut shares = split(&secret, 2, 3).unwrap();
-        // Zeroize manually and verify
         shares[0].zeroize();
         assert_eq!(shares[0].index, 0);
         assert_eq!(shares[0].value, [0u8; 32]);
+    }
+
+    // @internal
+    #[test]
+    fn share_debug_redacts_value() {
+        let share = Share {
+            index: 1,
+            value: [0xAB; 32],
+        };
+
+        let debug = format!("{share:?}");
+
+        assert_eq!(debug, "Share { index: 1, value: \"[REDACTED]\" }");
+        assert!(!debug.contains("171"));
     }
 }

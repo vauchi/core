@@ -34,6 +34,7 @@ fn assert_zeroize_on_drop<T: ZeroizeOnDrop>() {
     );
 }
 
+// @internal
 #[test]
 fn secret_type_contract() {
     assert_zeroize_on_drop::<vauchi_core::crypto::SymmetricKey>();

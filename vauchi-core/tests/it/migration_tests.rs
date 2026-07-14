@@ -63,7 +63,6 @@ const PENDING_UPDATES_COLUMNS_V1: &[&str] = &[
 
 const CONTACT_RATCHETS_COLUMNS_V1: &[&str] = &[
     "contact_id",
-    "peer_device_id",
     "ratchet_state_encrypted",
     "is_initiator",
     "updated_at",

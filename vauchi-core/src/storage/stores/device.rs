@@ -300,26 +300,40 @@ impl DeviceStore<'_> {
             .map_err(|error| StorageError::Serialization(error.to_string()))?;
         let encrypted = crate::crypto::encrypt(self.key, &json)
             .map_err(|error| StorageError::Encryption(error.to_string()))?;
-        self.conn.execute(
-            "INSERT INTO contact_device_registries (contact_id, broadcast_encrypted, version, updated_at)
-             VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT(contact_id) DO UPDATE SET
-                broadcast_encrypted = excluded.broadcast_encrypted,
-                version = excluded.version,
-                updated_at = excluded.updated_at",
-            params![contact_id, encrypted, stored_version, self.now_secs() as i64],
-        )?;
-        for removed in previously_active.iter().filter(|old| {
-            !broadcast
-                .active_devices()
-                .iter()
-                .any(|current| current.device_id == old.device_id)
-        }) {
+        self.conn
+            .execute_batch("SAVEPOINT save_contact_device_registry")?;
+        let mutation_result = (|| -> Result<(), StorageError> {
             self.conn.execute(
-                "DELETE FROM contact_ratchets WHERE contact_id = ?1 AND peer_device_id = ?2",
-                params![contact_id, removed.device_id.as_slice()],
+                "INSERT INTO contact_device_registries (contact_id, broadcast_encrypted, version, updated_at)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(contact_id) DO UPDATE SET
+                    broadcast_encrypted = excluded.broadcast_encrypted,
+                    version = excluded.version,
+                    updated_at = excluded.updated_at",
+                params![contact_id, encrypted, stored_version, self.now_secs() as i64],
             )?;
+            for removed in previously_active.iter().filter(|old| {
+                !broadcast
+                    .active_devices()
+                    .iter()
+                    .any(|current| current.device_id == old.device_id)
+            }) {
+                self.conn.execute(
+                    "DELETE FROM contact_ratchets WHERE contact_id = ?1 AND peer_device_id = ?2",
+                    params![contact_id, removed.device_id.as_slice()],
+                )?;
+            }
+            Ok(())
+        })();
+        if let Err(error) = mutation_result {
+            self.conn.execute_batch(
+                "ROLLBACK TO save_contact_device_registry;
+                 RELEASE save_contact_device_registry;",
+            )?;
+            return Err(error);
         }
+        self.conn
+            .execute_batch("RELEASE save_contact_device_registry")?;
         Ok(())
     }
 

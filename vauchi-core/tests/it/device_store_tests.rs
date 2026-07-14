@@ -228,3 +228,80 @@ fn test_contact_device_registry_version_above_sqlite_range_is_rejected() {
             .is_none()
     );
 }
+
+// @internal
+#[test]
+fn test_contact_device_registry_prune_failure_rolls_back_registry() {
+    let storage = test_storage();
+    let signing = SigningKeyPair::from_seed(&[31u8; 32]);
+    let contact = Contact::from_exchange(
+        *signing.public_key().as_bytes(),
+        ContactCard::new("Atomic registry"),
+        SymmetricKey::generate(),
+        0,
+    );
+    storage.contacts().save_contact(&contact).unwrap();
+
+    let seed = [37u8; 32];
+    let primary = DeviceInfo::derive(&seed, 0, "Phone".into(), 1);
+    let secondary = DeviceInfo::derive(&seed, 1, "Laptop".into(), 1);
+    let secondary_id = *secondary.device_id();
+    let mut registry = DeviceRegistry::new(primary.to_registered(&seed), &signing);
+    registry
+        .add_device(secondary.to_registered(&seed), &signing)
+        .unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let current = RegistryBroadcast::new(&registry, &signing, now);
+    storage
+        .device()
+        .save_contact_device_registry(contact.id(), &current, signing.public_key().as_bytes(), 60)
+        .unwrap();
+
+    let ratchet = DoubleRatchetState::initialize_initiator(
+        &SymmetricKey::generate(),
+        *X3DHKeyPair::generate().public_key(),
+    )
+    .unwrap();
+    storage
+        .ratchets()
+        .save_ratchet_state_for_device(contact.id(), &secondary_id, &ratchet, true)
+        .unwrap();
+    storage
+        .connection()
+        .execute_batch(
+            "CREATE TRIGGER reject_ratchet_prune
+             BEFORE DELETE ON contact_ratchets
+             BEGIN
+                 SELECT RAISE(ABORT, 'forced prune failure');
+             END;",
+        )
+        .unwrap();
+
+    registry
+        .revoke_device(&secondary_id, &signing, now + 1)
+        .unwrap();
+    let pruned = RegistryBroadcast::new(&registry, &signing, now + 1);
+    let error = storage
+        .device()
+        .save_contact_device_registry(contact.id(), &pruned, signing.public_key().as_bytes(), 60)
+        .unwrap_err();
+    assert_eq!(error.to_string(), "Database error: forced prune failure");
+
+    let retained = storage
+        .device()
+        .load_contact_device_registry(contact.id())
+        .unwrap()
+        .unwrap();
+    assert_eq!(retained.version(), current.version());
+    assert_eq!(retained.active_device_count(), 2);
+    assert!(
+        storage
+            .ratchets()
+            .load_ratchet_state_for_device(contact.id(), &secondary_id)
+            .unwrap()
+            .is_some()
+    );
+}

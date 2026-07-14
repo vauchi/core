@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use vauchi_core::Vauchi;
 use vauchi_core::api::VauchiEvent;
 use vauchi_core::contact::{Contact, Group};
-use vauchi_core::contact_card::ContactCard;
+use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::DeletionState;
@@ -545,6 +545,61 @@ fn apply_sync_card_updated_dispatches_own_card_updated_event() {
         ),
         "CardUpdated sync must dispatch OwnCardUpdated(['email']), got {got:?}"
     );
+}
+
+// @scenario: sync_updates :: Own-card field removals converge across linked devices
+#[test]
+fn apply_sync_legacy_empty_card_update_removes_own_card_field() {
+    let wb = make_vauchi();
+    wb.add_own_field(ContactField::new(
+        FieldType::Email,
+        "email",
+        "alice@example.com",
+        now(),
+    ))
+    .unwrap();
+
+    wb.apply_sync_items(vec![SyncItem::CardUpdated {
+        field_label: "email".to_string(),
+        new_value: String::new(),
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        card.fields().iter().all(|field| field.label() != "email"),
+        "legacy empty CardUpdated must remove the field, not retain an empty value"
+    );
+}
+
+// @scenario: sync_updates :: Own-card field removals converge across linked devices
+#[test]
+fn apply_sync_card_field_removed_removes_field_and_dispatches_event() {
+    let wb = make_vauchi();
+    wb.add_own_field(ContactField::new(
+        FieldType::Custom,
+        "status",
+        "available",
+        now(),
+    ))
+    .unwrap();
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::CardFieldRemoved {
+        field_label: "status".to_string(),
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(card.fields().iter().all(|field| field.label() != "status"));
+    let got = events.lock().unwrap();
+    assert!(matches!(
+        got.as_slice(),
+        [VauchiEvent::OwnCardUpdated { changed_fields }]
+            if changed_fields == &["status".to_string()]
+    ));
 }
 
 // @internal

@@ -235,6 +235,16 @@ fn test_sync_item_serialization() {
     assert_eq!(item.timestamp(), restored.timestamp());
 }
 
+// @scenario: sync_updates :: Own-card field removals converge across linked devices
+#[test]
+fn card_field_removed_sync_item_deserializes() {
+    let json = r#"{"CardFieldRemoved":{"field_label":"email","timestamp":5001}}"#;
+
+    let restored = SyncItem::from_json(json).expect("explicit field removal must be supported");
+
+    assert_eq!(restored.timestamp(), 5001);
+}
+
 /// Test version vector for causality tracking
 // @scenario: device_management :: Device registry version tracking
 // @internal

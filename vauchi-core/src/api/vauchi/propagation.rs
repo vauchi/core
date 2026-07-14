@@ -508,7 +508,11 @@ impl Vauchi {
                                 .find(|f| f.label() == field_label)
                                 .map(|f| f.id().to_string());
 
-                            if let Some(id) = field_id {
+                            if new_value.is_empty() {
+                                if let Some(id) = field_id {
+                                    card.remove_field(&id).map_err(VauchiError::from)?;
+                                }
+                            } else if let Some(id) = field_id {
                                 card.update_field_value(&id, new_value, self.clock.unix_seconds())
                                     .map_err(VauchiError::from)?;
                             } else {
@@ -529,6 +533,23 @@ impl Vauchi {
                         None => Err(VauchiError::IdentityNotInitialized),
                     }
                 }
+                SyncItem::CardFieldRemoved {
+                    ref field_label, ..
+                } => match self.storage.contacts().load_own_card()? {
+                    Some(mut card) => {
+                        if let Some(field_id) = card
+                            .fields()
+                            .iter()
+                            .find(|field| field.label() == field_label)
+                            .map(|field| field.id().to_string())
+                        {
+                            card.remove_field(&field_id).map_err(VauchiError::from)?;
+                            self.storage.contacts().save_own_card(&card)?;
+                        }
+                        Ok(())
+                    }
+                    None => Err(VauchiError::IdentityNotInitialized),
+                },
                 SyncItem::VisibilityChanged {
                     ref contact_id,
                     ref field_id,
@@ -751,6 +772,9 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
             contact_id: contact_id.clone(),
         }),
         SyncItem::CardUpdated { field_label, .. } => Some(VauchiEvent::OwnCardUpdated {
+            changed_fields: vec![field_label.clone()],
+        }),
+        SyncItem::CardFieldRemoved { field_label, .. } => Some(VauchiEvent::OwnCardUpdated {
             changed_fields: vec![field_label.clone()],
         }),
         SyncItem::VisibilityChanged {

@@ -611,9 +611,8 @@ impl Vauchi {
         let removed = manager.remove_field_from_own_card(label)?;
         if removed {
             self.mark_own_card_repropagate()?;
-            self.record_sync_item(crate::sync::SyncItem::CardUpdated {
+            self.record_sync_item(crate::sync::SyncItem::CardFieldRemoved {
                 field_label: label.to_string(),
-                new_value: String::new(), // empty = removal
                 timestamp: self.now_timestamp(),
             });
         }

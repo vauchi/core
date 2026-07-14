@@ -640,6 +640,53 @@ fn test_conflict_resolution_rejects_older() {
     assert!(applied.is_empty());
 }
 
+/// A field update and removal share one LWW conflict key (ADR-020).
+// @scenario: sync_updates :: Own-card field removals converge across linked devices
+#[test]
+fn card_field_removal_conflicts_with_updates_for_the_same_field() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry = create_test_registry(&master_seed, &device_b);
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
+
+    orchestrator
+        .record_local_change(SyncItem::CardUpdated {
+            field_label: "email".to_string(),
+            new_value: "local@example.com".to_string(),
+            timestamp: 2000,
+        })
+        .unwrap();
+
+    let stale = orchestrator
+        .process_incoming(
+            vec![SyncItem::CardFieldRemoved {
+                field_label: "email".to_string(),
+                timestamp: 1000,
+            }],
+            &[0x99u8; 32],
+        )
+        .unwrap();
+    assert!(
+        stale.is_empty(),
+        "older removal must lose to the field update"
+    );
+
+    let newer = orchestrator
+        .process_incoming(
+            vec![SyncItem::CardFieldRemoved {
+                field_label: "email".to_string(),
+                timestamp: 3000,
+            }],
+            &[0x99u8; 32],
+        )
+        .unwrap();
+    assert!(matches!(
+        newer.as_slice(),
+        [SyncItem::CardFieldRemoved { field_label, .. }] if field_label == "email"
+    ));
+}
+
 /// Scenario: Bidirectional sync
 /// "When I add a phone number on Device A
 ///  And I add an email on Device B

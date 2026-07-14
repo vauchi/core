@@ -5,8 +5,12 @@
 //! Tests for api::vauchi
 //! Extracted from vauchi.rs
 
+use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::api::*;
 use vauchi_core::contact_card::FieldType;
+use vauchi_core::crypto::SigningKeyPair;
+use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
+use vauchi_core::sync::SyncItem;
 use vauchi_core::*;
 
 fn create_test_vauchi() -> Vauchi {
@@ -99,6 +103,22 @@ fn test_vauchi_remove_own_field() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
+    const SEED: [u8; 32] = [11u8; 32];
+    let signing = SigningKeyPair::from_seed(&SEED);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
+        &signing,
+    );
+    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet_id = *tablet.device_id();
+    registry
+        .add_device_unsigned(tablet.to_registered(&SEED))
+        .unwrap();
+    wb.storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+
     let field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0);
     wb.add_own_field(field).unwrap();
 
@@ -107,6 +127,17 @@ fn test_vauchi_remove_own_field() {
 
     let card = wb.own_card().unwrap().unwrap();
     assert!(!card.fields().iter().any(|f| f.label() == "phone"));
+
+    let orchestrator = DeviceSyncOrchestrator::load(
+        wb.storage(),
+        wb.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap();
+    assert!(matches!(
+        orchestrator.pending_for_device(&tablet_id).last(),
+        Some(SyncItem::CardFieldRemoved { field_label, .. }) if field_label == "phone"
+    ));
 }
 
 // @internal

@@ -566,6 +566,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::ContactAdded { contact_data, .. } => format!("contact:{}", contact_data.id),
             SyncItem::ContactRemoved { contact_id, .. } => format!("contact:{}", contact_id),
             SyncItem::CardUpdated { field_label, .. } => format!("field:{}", field_label),
+            SyncItem::CardFieldRemoved { field_label, .. } => format!("field:{}", field_label),
             SyncItem::VisibilityChanged { contact_id, .. } => format!("visibility:{}", contact_id),
             SyncItem::LabelChange { label_id, .. } => format!("label:{}", label_id),
             SyncItem::GroupChanged { group_data, .. } => {

@@ -551,6 +551,14 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
+    /// Own contact card field was removed.
+    CardFieldRemoved {
+        /// Field label that was removed.
+        field_label: String,
+        /// Timestamp of removal.
+        timestamp: u64,
+    },
+
     /// Visibility setting for a contact changed.
     VisibilityChanged {
         /// Contact ID whose visibility changed.
@@ -715,6 +723,7 @@ impl SyncItem {
             SyncItem::ContactAdded { timestamp, .. } => *timestamp,
             SyncItem::ContactRemoved { timestamp, .. } => *timestamp,
             SyncItem::CardUpdated { timestamp, .. } => *timestamp,
+            SyncItem::CardFieldRemoved { timestamp, .. } => *timestamp,
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,
             SyncItem::LabelChange { timestamp, .. } => *timestamp,
             SyncItem::GroupChanged { timestamp, .. } => *timestamp,

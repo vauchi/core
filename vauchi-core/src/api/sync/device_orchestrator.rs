@@ -15,8 +15,8 @@ use crate::identity::device::{DeviceInfo, DeviceRegistry};
 use crate::storage::Storage;
 use crate::sync::device_sync::{
     ContactDeviceRegistrySyncData, ContactExchangeLocation, DeviceLinkIntent, DeviceSyncError,
-    DeviceSyncPayload, FieldStamp, InterDeviceSyncState, PlaceSyncData, SyncItem, TagSyncData,
-    VersionVector,
+    DeviceSyncPayload, FieldStamp, GroupSyncData, InterDeviceSyncState, PlaceSyncData, SyncItem,
+    TagSyncData, VersionVector,
 };
 
 /// Domain separation for device-to-device encryption key derivation.
@@ -236,11 +236,14 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .collect();
 
         // Load owner-private groups and their ADR-054 presentation state.
-        let groups = self
+        let groups: Vec<GroupSyncData> = self
             .storage
             .labels()
             .load_all_groups()
-            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+            .iter()
+            .map(GroupSyncData::from_group)
+            .collect();
 
         // Load named places + per-contact exchange locations (ADR-051)
         let places: Vec<PlaceSyncData> = self
@@ -375,7 +378,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             for group in &payload.groups {
                 self.storage
                     .labels()
-                    .save_group(group)
+                    .save_group(&group.to_group())
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
 
@@ -565,6 +568,9 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::CardUpdated { field_label, .. } => format!("field:{}", field_label),
             SyncItem::VisibilityChanged { contact_id, .. } => format!("visibility:{}", contact_id),
             SyncItem::LabelChange { label_id, .. } => format!("label:{}", label_id),
+            SyncItem::GroupChanged { group_data, .. } => {
+                format!("label:{}", group_data.id)
+            }
             SyncItem::ContactTrustChanged { contact_id, .. } => {
                 format!("trust:{}", contact_id)
             }

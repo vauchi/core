@@ -12,12 +12,12 @@ use std::sync::{Arc, Mutex};
 
 use vauchi_core::Vauchi;
 use vauchi_core::api::VauchiEvent;
-use vauchi_core::contact::Contact;
+use vauchi_core::contact::{Contact, Group};
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::DeletionState;
-use vauchi_core::sync::{ImportedContactSyncData, SyncItem};
+use vauchi_core::sync::{GroupSyncData, ImportedContactSyncData, SyncItem};
 
 fn make_vauchi() -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
@@ -297,6 +297,44 @@ fn apply_sync_label_change_creates_then_updates_with_fields() {
         updated.visible_fields(),
         &HashSet::from(["email".to_string(), "phone".to_string()])
     );
+}
+
+// @scenario: sync_updates :: Group presentation state converges across linked devices
+#[test]
+fn apply_sync_group_changed_replaces_complete_state() {
+    let wb = make_vauchi();
+    let mut stale = Group::new("group-work".into(), "Old Work", 1);
+    stale.add_contact("old-contact", 2);
+    stale.add_visible_field("old-field", 3);
+    wb.storage().labels().save_group(&stale).unwrap();
+
+    let mut incoming = Group::new("group-work".into(), "Work", 10);
+    incoming.add_contact("contact-bob", 11);
+    incoming.add_visible_field("field-email", 12);
+    incoming
+        .set_display_name_override(Some("Alice at Work"), 13)
+        .unwrap();
+    incoming
+        .set_bio_override(Some("Professional profile"), 14)
+        .unwrap();
+
+    wb.apply_sync_items(vec![SyncItem::GroupChanged {
+        group_data: GroupSyncData::from_group(&incoming),
+        timestamp: incoming.modified_at(),
+    }])
+    .unwrap();
+
+    let synced = wb.storage().labels().load_group("group-work").unwrap();
+    assert_eq!(synced.name(), "Work");
+    assert_eq!(synced.contacts(), &HashSet::from(["contact-bob".into()]));
+    assert_eq!(
+        synced.visible_fields(),
+        &HashSet::from(["field-email".into()])
+    );
+    assert_eq!(synced.display_name_override(), Some("Alice at Work"));
+    assert_eq!(synced.bio_override(), Some("Professional profile"));
+    assert_eq!(synced.created_at(), 10);
+    assert_eq!(synced.modified_at(), 14);
 }
 
 // @internal

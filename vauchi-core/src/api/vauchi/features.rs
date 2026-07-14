@@ -387,9 +387,7 @@ impl Vauchi {
         label_id: &str,
         contact_id: &str,
     ) -> VauchiResult<()> {
-        self.storage
-            .labels()
-            .add_contact_to_group(label_id, contact_id)?;
+        self.add_contact_to_group(label_id, contact_id)?;
         self.repropagate_to_contact(contact_id)
     }
 
@@ -401,9 +399,7 @@ impl Vauchi {
         label_id: &str,
         contact_id: &str,
     ) -> VauchiResult<()> {
-        self.storage
-            .labels()
-            .remove_contact_from_group(label_id, contact_id)?;
+        self.remove_contact_from_group(label_id, contact_id)?;
         self.repropagate_to_contact(contact_id)
     }
 
@@ -419,6 +415,7 @@ impl Vauchi {
             .map(|g| g.contacts().iter().cloned().collect())
             .unwrap_or_default();
         self.storage.labels().delete_group(label_id)?;
+        self.record_group_deletion(label_id);
         for contact_id in &members {
             self.repropagate_to_contact(contact_id)?;
         }
@@ -434,9 +431,7 @@ impl Vauchi {
         field_id: &str,
         is_visible: bool,
     ) -> VauchiResult<()> {
-        self.storage
-            .labels()
-            .set_group_field_visibility(label_id, field_id, is_visible)?;
+        self.set_group_field_visibility(label_id, field_id, is_visible)?;
 
         // Re-propagate to all contacts in this label
         let label = self.storage.labels().load_group(label_id)?;

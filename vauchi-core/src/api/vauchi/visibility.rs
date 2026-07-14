@@ -8,6 +8,24 @@ use super::super::error::{VauchiError, VauchiResult};
 use super::Vauchi;
 
 impl Vauchi {
+    fn record_group_change(&self, group: &crate::contact::Group) {
+        self.record_sync_item(crate::sync::SyncItem::GroupChanged {
+            group_data: crate::sync::GroupSyncData::from_group(group),
+            timestamp: group.modified_at(),
+        });
+    }
+
+    pub(crate) fn record_group_deletion(&self, group_id: &str) {
+        self.record_sync_item(crate::sync::SyncItem::LabelChange {
+            label_id: group_id.to_string(),
+            label_name: String::new(),
+            contacts: Vec::new(),
+            visible_fields: Vec::new(),
+            is_deleted: true,
+            timestamp: self.clock.unix_seconds(),
+        });
+    }
+
     // === Visibility Labels ===
 
     /// Lists all visibility labels.
@@ -17,12 +35,16 @@ impl Vauchi {
 
     /// Creates a new visibility label.
     pub fn create_group(&self, name: &str) -> VauchiResult<crate::contact::Group> {
-        Ok(self.storage.labels().create_group(name)?)
+        let group = self.storage.labels().create_group(name)?;
+        self.record_group_change(&group);
+        Ok(group)
     }
 
     /// Renames a visibility label.
     pub fn rename_group(&self, label_id: &str, new_name: &str) -> VauchiResult<()> {
-        Ok(self.storage.labels().rename_group(label_id, new_name)?)
+        self.storage.labels().rename_group(label_id, new_name)?;
+        self.record_group_change(&self.storage.labels().load_group(label_id)?);
+        Ok(())
     }
 
     /// Sets or clears the per-group display name override.
@@ -40,6 +62,7 @@ impl Vauchi {
             .set_display_name_override(name_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         self.storage.labels().save_group(&label)?;
+        self.record_group_change(&label);
         Ok(())
     }
 
@@ -57,6 +80,7 @@ impl Vauchi {
             .set_bio_override(bio_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         self.storage.labels().save_group(&label)?;
+        self.record_group_change(&label);
         Ok(())
     }
 
@@ -75,6 +99,7 @@ impl Vauchi {
             .set_avatar_override(avatar_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         self.storage.labels().save_group(&label)?;
+        self.record_group_change(&label);
         Ok(())
     }
 
@@ -114,6 +139,8 @@ impl Vauchi {
             }
         }
 
+        self.record_group_deletion(label_id);
+
         Ok(())
     }
 
@@ -140,18 +167,20 @@ impl Vauchi {
 
     /// Adds a contact to a visibility label.
     pub fn add_contact_to_group(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
-        Ok(self
-            .storage
+        self.storage
             .labels()
-            .add_contact_to_group(label_id, contact_id)?)
+            .add_contact_to_group(label_id, contact_id)?;
+        self.record_group_change(&self.storage.labels().load_group(label_id)?);
+        Ok(())
     }
 
     /// Removes a contact from a visibility label.
     pub fn remove_contact_from_group(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
-        Ok(self
-            .storage
+        self.storage
             .labels()
-            .remove_contact_from_group(label_id, contact_id)?)
+            .remove_contact_from_group(label_id, contact_id)?;
+        self.record_group_change(&self.storage.labels().load_group(label_id)?);
+        Ok(())
     }
 
     /// Gets all labels that contain a specific contact.
@@ -172,10 +201,11 @@ impl Vauchi {
         field_id: &str,
         is_visible: bool,
     ) -> VauchiResult<()> {
-        Ok(self
-            .storage
+        self.storage
             .labels()
-            .set_group_field_visibility(label_id, field_id, is_visible)?)
+            .set_group_field_visibility(label_id, field_id, is_visible)?;
+        self.record_group_change(&self.storage.labels().load_group(label_id)?);
+        Ok(())
     }
 
     /// Sets a per-contact visibility override for a field.

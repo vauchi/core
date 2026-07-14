@@ -12,7 +12,11 @@
 
 use std::collections::HashSet;
 
+use vauchi_core::Vauchi;
+use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::contact::{Group, GroupManager};
+use vauchi_core::crypto::SigningKeyPair;
+use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
 use vauchi_core::sync::SyncItem;
 
 // =============================================================================
@@ -25,12 +29,113 @@ fn now() -> u64 {
         .as_secs()
 }
 
+fn tiny_png() -> Vec<u8> {
+    let image = image::RgbaImage::from_pixel(1, 1, image::Rgba([255, 0, 0, 255]));
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    image
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .expect("encode test PNG");
+    bytes.into_inner()
+}
+
 // =============================================================================
 // Test 5: Label Sync Across Devices
 // =============================================================================
 // Traces to: visibility_labels.feature
 // - @local-only: Labels sync across my own devices only
 // - @local-only: Labels are not shared with contacts
+
+// @scenario: device_management :: Group presentation changes sync to linked devices
+// @scenario: sync_updates :: Group presentation state converges across linked devices
+#[test]
+fn group_mutations_journal_complete_state_for_linked_devices() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    const SEED: [u8; 32] = [7u8; 32];
+    let signing = SigningKeyPair::from_seed(&SEED);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
+        &signing,
+    );
+    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet_id = *tablet.device_id();
+    registry
+        .add_device_unsigned(tablet.to_registered(&SEED))
+        .unwrap();
+    vauchi
+        .storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+
+    let created = vauchi.create_group("Work").unwrap();
+    vauchi
+        .add_contact_to_group(created.id(), "contact-bob")
+        .unwrap();
+    vauchi
+        .set_group_field_visibility(created.id(), "field-email", true)
+        .unwrap();
+    vauchi
+        .set_group_display_name_override(created.id(), Some("Alice at Work"))
+        .unwrap();
+    vauchi
+        .set_group_bio_override(created.id(), Some("Professional profile"))
+        .unwrap();
+    vauchi
+        .set_group_avatar_override(created.id(), Some(&tiny_png()))
+        .unwrap();
+    let expected = vauchi.get_group(created.id()).unwrap();
+
+    let orchestrator = DeviceSyncOrchestrator::load(
+        vauchi.storage(),
+        vauchi.identity().unwrap().create_device_info(0),
+        registry.clone(),
+    )
+    .unwrap();
+    let queued: Vec<_> = orchestrator
+        .pending_for_device(&tablet_id)
+        .iter()
+        .filter_map(|item| match item {
+            SyncItem::GroupChanged { group_data, .. } => Some(group_data),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(queued.len(), 6, "every group mutation must be journaled");
+    let queued = queued.last().unwrap();
+
+    assert_eq!(queued.id, expected.id());
+    assert_eq!(queued.name, "Work");
+    assert_eq!(queued.contact_ids, ["contact-bob"]);
+    assert_eq!(queued.visible_fields, ["field-email"]);
+    assert_eq!(
+        queued.display_name_override.as_deref(),
+        Some("Alice at Work")
+    );
+    assert_eq!(queued.bio_override.as_deref(), Some("Professional profile"));
+    assert_eq!(
+        queued.avatar_override.as_deref(),
+        expected.avatar_override()
+    );
+    assert_eq!(queued.created_at, expected.created_at());
+    assert_eq!(queued.modified_at, expected.modified_at());
+
+    vauchi.delete_group(expected.id()).unwrap();
+    let orchestrator = DeviceSyncOrchestrator::load(
+        vauchi.storage(),
+        vauchi.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap();
+    assert!(matches!(
+        orchestrator.pending_for_device(&tablet_id).last(),
+        Some(SyncItem::LabelChange {
+            label_id,
+            is_deleted: true,
+            ..
+        }) if label_id == expected.id()
+    ));
+}
 
 /// Tests that labels sync across the user's own devices via SyncItem::LabelChange.
 ///

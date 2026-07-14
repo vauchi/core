@@ -223,6 +223,54 @@ impl TagSyncData {
     }
 }
 
+/// Serializable owner-private group state for linked-device sync (ADR-054).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GroupSyncData {
+    pub id: String,
+    pub name: String,
+    pub contact_ids: Vec<String>,
+    pub visible_fields: Vec<String>,
+    pub display_name_override: Option<String>,
+    pub bio_override: Option<String>,
+    pub avatar_override: Option<Vec<u8>>,
+    pub created_at: u64,
+    pub modified_at: u64,
+}
+
+impl GroupSyncData {
+    pub fn from_group(group: &Group) -> Self {
+        let mut contact_ids: Vec<String> = group.contacts().iter().cloned().collect();
+        contact_ids.sort();
+        let mut visible_fields: Vec<String> = group.visible_fields().iter().cloned().collect();
+        visible_fields.sort();
+        GroupSyncData {
+            id: group.id().to_string(),
+            name: group.name().to_string(),
+            contact_ids,
+            visible_fields,
+            display_name_override: group.display_name_override().map(str::to_string),
+            bio_override: group.bio_override().map(str::to_string),
+            avatar_override: group.avatar_override().map(<[u8]>::to_vec),
+            created_at: group.created_at(),
+            modified_at: group.modified_at(),
+        }
+    }
+
+    pub fn to_group(&self) -> Group {
+        Group::from_storage(
+            self.id.clone(),
+            self.name.clone(),
+            self.contact_ids.iter().cloned().collect(),
+            self.visible_fields.iter().cloned().collect(),
+            self.display_name_override.clone(),
+            self.bio_override.clone(),
+            self.avatar_override.clone(),
+            self.created_at,
+            self.modified_at,
+        )
+    }
+}
+
 /// Serializable form of an owner-private named [`Place`] for device sync.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaceSyncData {
@@ -327,7 +375,7 @@ pub struct DeviceSyncPayload {
     /// `#[serde(default)]` preserves compatibility with payloads created
     /// before linked-device group convergence was implemented.
     #[serde(default)]
-    pub groups: Vec<Group>,
+    pub groups: Vec<GroupSyncData>,
     /// Owner-private named places (ADR-051). `#[serde(default)]` for back-compat.
     #[serde(default)]
     pub places: Vec<PlaceSyncData>,
@@ -398,7 +446,7 @@ impl DeviceSyncPayload {
     /// Attaches owner-private groups to this payload, preserving stable ids,
     /// membership, field visibility, presentation overrides, and timestamps.
     #[must_use]
-    pub fn with_groups(mut self, groups: Vec<Group>) -> Self {
+    pub fn with_groups(mut self, groups: Vec<GroupSyncData>) -> Self {
         self.groups = groups;
         self
     }
@@ -536,6 +584,12 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
+    /// Complete owner-private group state changed on a linked device.
+    GroupChanged {
+        group_data: GroupSyncData,
+        timestamp: u64,
+    },
+
     /// A contact's recovery trust status changed.
     ContactTrustChanged {
         /// Contact ID whose trust status changed.
@@ -654,6 +708,7 @@ impl SyncItem {
             SyncItem::CardUpdated { timestamp, .. } => *timestamp,
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,
             SyncItem::LabelChange { timestamp, .. } => *timestamp,
+            SyncItem::GroupChanged { timestamp, .. } => *timestamp,
             SyncItem::ContactTrustChanged { timestamp, .. } => *timestamp,
             SyncItem::DeletionScheduled { timestamp, .. } => *timestamp,
             SyncItem::DeletionCancelled { timestamp, .. } => *timestamp,

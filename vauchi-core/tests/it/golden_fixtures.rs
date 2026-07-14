@@ -20,6 +20,16 @@ fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/golden")
 }
 
+fn init_fixture_i18n() {
+    let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
+    vauchi_app::i18n::init(&locales_dir).expect("golden fixtures require sibling locales/ repo");
+    assert_eq!(
+        vauchi_app::i18n::get_string(vauchi_app::i18n::Locale::English, "onboarding.name_title"),
+        "What's your name?",
+        "golden fixtures must load production English locale strings from {locales_dir:?}"
+    );
+}
+
 fn screen_to_json(screen: &ScreenModel) -> String {
     serde_json::to_string_pretty(screen).expect("ScreenModel serialization failed")
 }
@@ -50,6 +60,7 @@ fn assert_fixture_fresh(screen: &ScreenModel, filename: &str) {
 /// Walk through all 6 onboarding screens, collecting each ScreenModel.
 /// Returns `(screen_id, ScreenModel)` pairs in order.
 fn walk_all_screens() -> Vec<(String, ScreenModel)> {
+    init_fixture_i18n();
     let mut engine = OnboardingEngine::new();
     let mut screens = Vec::new();
 

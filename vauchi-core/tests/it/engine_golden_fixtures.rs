@@ -18,12 +18,24 @@ fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/golden")
 }
 
+fn init_fixture_i18n() {
+    let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
+    vauchi_app::i18n::init(&locales_dir).expect("golden fixtures require sibling locales/ repo");
+    assert_eq!(
+        vauchi_app::i18n::get_string(vauchi_app::i18n::Locale::English, "contacts.title"),
+        "Contacts",
+        "golden fixtures must load production English locale strings from {locales_dir:?}"
+    );
+}
+
 fn screen_to_json(screen: &ScreenModel) -> String {
     serde_json::to_string_pretty(screen).expect("ScreenModel serialization failed")
 }
 
-fn assert_fixture_fresh(screen: &ScreenModel, filename: &str) {
-    let json = screen_to_json(screen);
+fn assert_fixture_fresh(filename: &str, screen: impl FnOnce() -> ScreenModel) {
+    init_fixture_i18n();
+    let screen = screen();
+    let json = screen_to_json(&screen);
     let path = fixtures_dir().join(filename);
 
     if path.exists() {
@@ -140,6 +152,7 @@ fn sample_delivery_items() -> Vec<DeliveryItem> {
 // @internal
 #[test]
 fn home_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = MyInfoEngine::new(MyInfoProgress {
         completed_steps: 3,
         total_steps: 6,
@@ -155,59 +168,66 @@ fn home_fixture_is_fresh() {
             contact_count: 0,
         }],
     );
-    assert_fixture_fresh(&engine.current_screen(), "home.json");
+    assert_fixture_fresh("home.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn home_empty_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = MyInfoEngine::new(MyInfoProgress {
         completed_steps: 6,
         total_steps: 6,
     });
-    assert_fixture_fresh(&engine.current_screen(), "home_empty.json");
+    assert_fixture_fresh("home_empty.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn contact_list_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = ContactListEngine::new(sample_contacts());
-    assert_fixture_fresh(&engine.current_screen(), "contact_list.json");
+    assert_fixture_fresh("contact_list.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn settings_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = SettingsEngine::new(sample_settings_config());
-    assert_fixture_fresh(&engine.current_screen(), "settings.json");
+    assert_fixture_fresh("settings.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn help_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = HelpEngine::new(sample_help_items());
-    assert_fixture_fresh(&engine.current_screen(), "help.json");
+    assert_fixture_fresh("help.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn delivery_status_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = DeliveryStatusEngine::new(sample_delivery_items());
-    assert_fixture_fresh(&engine.current_screen(), "delivery_status.json");
+    assert_fixture_fresh("delivery_status.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn delivery_empty_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = DeliveryStatusEngine::new(vec![]);
-    assert_fixture_fresh(&engine.current_screen(), "delivery_empty.json");
+    assert_fixture_fresh("delivery_empty.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn lock_screen_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = LockScreenEngine::new(5);
-    assert_fixture_fresh(&engine.current_screen(), "lock_screen.json");
+    assert_fixture_fresh("lock_screen.json", || engine.current_screen());
 }
 
 // ── ContactEditEngine fixtures ───────────────────────────────────
@@ -243,23 +263,26 @@ fn sample_edit_groups() -> Vec<String> {
 // @internal
 #[test]
 fn contact_edit_fields_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
-    assert_fixture_fresh(&engine.current_screen(), "contact_edit_fields.json");
+    assert_fixture_fresh("contact_edit_fields.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn contact_edit_visibility_fixture_is_fresh() {
+    init_fixture_i18n();
     let mut engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    assert_fixture_fresh(&engine.current_screen(), "contact_edit_visibility.json");
+    assert_fixture_fresh("contact_edit_visibility.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn contact_edit_preview_fixture_is_fresh() {
+    init_fixture_i18n();
     let mut engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -267,7 +290,7 @@ fn contact_edit_preview_fixture_is_fresh() {
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    assert_fixture_fresh(&engine.current_screen(), "contact_edit_preview.json");
+    assert_fixture_fresh("contact_edit_preview.json", || engine.current_screen());
 }
 
 // ── Phase 3 sample data builders ─────────────────────────────────
@@ -295,29 +318,33 @@ fn sample_duress_config() -> DuressConfig {
 // @internal
 #[test]
 fn device_linking_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = DeviceLinkingEngine::new("vauchi://link?token=abc123".to_string());
-    assert_fixture_fresh(&engine.current_screen(), "device_linking.json");
+    assert_fixture_fresh("device_linking.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn backup_choose_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
-    assert_fixture_fresh(&engine.current_screen(), "backup_choose.json");
+    assert_fixture_fresh("backup_choose.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn duress_overview_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = DuressPinEngine::new(sample_duress_config(), vauchi_app::i18n::Locale::English);
-    assert_fixture_fresh(&engine.current_screen(), "duress_overview.json");
+    assert_fixture_fresh("duress_overview.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn emergency_shred_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
-    assert_fixture_fresh(&engine.current_screen(), "emergency_shred.json");
+    assert_fixture_fresh("emergency_shred.json", || engine.current_screen());
 }
 
 // ── Phase 4: single-screen nav/setup engines (screenshot catalog,
@@ -326,66 +353,74 @@ fn emergency_shred_fixture_is_fresh() {
 // @internal
 #[test]
 fn more_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = MoreEngine::new(vauchi_app::i18n::Locale::English);
-    assert_fixture_fresh(&engine.current_screen(), "more.json");
+    assert_fixture_fresh("more.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn support_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = SupportEngine::new();
-    assert_fixture_fresh(&engine.current_screen(), "support.json");
+    assert_fixture_fresh("support.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn recovery_help_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = RecoveryHelpEngine::new();
-    assert_fixture_fresh(&engine.current_screen(), "recovery_help.json");
+    assert_fixture_fresh("recovery_help.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn change_password_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = ChangePasswordEngine::new(true);
-    assert_fixture_fresh(&engine.current_screen(), "change_password.json");
+    assert_fixture_fresh("change_password.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn set_password_fixture_is_fresh() {
+    init_fixture_i18n();
     // Setup mode (no password yet): 2-field "Set Password" form. Distinct
     // wire shape from change_password.json — desktop/TUI renderers need it.
     let engine = ChangePasswordEngine::new(false);
-    assert_fixture_fresh(&engine.current_screen(), "set_password.json");
+    assert_fixture_fresh("set_password.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn contact_limit_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = ContactLimitEngine::new(150, 150);
-    assert_fixture_fresh(&engine.current_screen(), "contact_limit.json");
+    assert_fixture_fresh("contact_limit.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn archived_contacts_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = ArchivedContactsEngine::new(vec![
         ("c1".into(), "Alice".into()),
         ("c2".into(), "Bob".into()),
     ]);
-    assert_fixture_fresh(&engine.current_screen(), "archived_contacts.json");
+    assert_fixture_fresh("archived_contacts.json", || engine.current_screen());
 }
 
 // @internal
 #[test]
 fn privacy_settings_fixture_is_fresh() {
+    init_fixture_i18n();
     let engine = GdprEngine::new(
         None,
         "2 contacts, 1 group".into(),
         vauchi_app::i18n::Locale::English,
     );
-    assert_fixture_fresh(&engine.current_screen(), "privacy_settings.json");
+    assert_fixture_fresh("privacy_settings.json", || engine.current_screen());
 }
 
 // ── Regenerate all fixtures (run with --ignored) ─────────────────
@@ -394,6 +429,7 @@ fn privacy_settings_fixture_is_fresh() {
 #[test]
 #[ignore]
 fn regenerate_all_engine_fixtures() {
+    init_fixture_i18n();
     let dir = fixtures_dir();
     fs::create_dir_all(&dir).unwrap();
 

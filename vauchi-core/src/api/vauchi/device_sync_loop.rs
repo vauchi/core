@@ -333,4 +333,50 @@ mod tests {
         assert_eq!(applied, 0, "undecryptable blob applies nothing");
         assert_eq!(b.contact_count().unwrap(), 0);
     }
+
+    // @scenario: release_privacy_multidevice_certification.feature:Every active device can exchange and update
+    #[test]
+    fn received_peer_card_update_is_queued_for_linked_devices() {
+        let mut receiver = Vauchi::in_memory().unwrap();
+        receiver.create_identity("Bob").unwrap();
+        let identity = receiver.identity().unwrap();
+        let current_device = identity.create_device_info(NOW);
+
+        let sibling_seed = [0x33u8; 32];
+        let sibling = DeviceInfo::derive(&sibling_seed, 1, "Bob tablet".into(), NOW);
+        let mut registry = identity.initial_device_registry();
+        registry
+            .add_device_unsigned(sibling.to_registered(&sibling_seed))
+            .unwrap();
+        receiver
+            .storage()
+            .device()
+            .save_device_registry(&registry)
+            .unwrap();
+
+        let mut alice = contact_sync_data(0xAA, "Alice").to_contact().unwrap();
+        alice.update_card(ContactCard::new("Alice Updated"), NOW + 1);
+        let alice_id = alice.id().to_string();
+        receiver.storage().contacts().save_contact(&alice).unwrap();
+
+        receiver
+            .record_received_contact_card_update(&alice_id)
+            .unwrap();
+
+        let orchestrator =
+            DeviceSyncOrchestrator::load(receiver.storage(), current_device, registry).unwrap();
+        let pending = orchestrator.pending_for_device(sibling.device_id());
+        assert_eq!(pending.len(), 1);
+        let SyncItem::ContactCardUpdated {
+            contact_id,
+            card_json,
+            ..
+        } = &pending[0]
+        else {
+            panic!("received peer card must queue ContactCardUpdated");
+        };
+        assert_eq!(contact_id, &alice_id);
+        let card: ContactCard = serde_json::from_str(card_json).unwrap();
+        assert_eq!(card.display_name(), "Alice Updated");
+    }
 }

@@ -280,13 +280,16 @@ impl<'a, T: Transport> SyncController<'a, T> {
                         continue;
                     }
                 };
-            let sender_device_id = self
-                .storage
-                .device()
-                .load_device_info()
-                .ok()
-                .flatten()
-                .map(|info| info.0);
+            let sender_device_id = match self.sender_device_id_for(&update.contact_id) {
+                Ok(device_id) => device_id,
+                Err(error) => {
+                    result.failed += 1;
+                    result
+                        .errors
+                        .push((update.contact_id.clone(), error.to_string()));
+                    continue;
+                }
+            };
             match self.relay.send_raw_update_for_device(
                 self.storage.clock().unix_seconds(),
                 &recipient_id,
@@ -405,13 +408,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
                         continue;
                     }
                 };
-            let sender_device_id = self
-                .storage
-                .device()
-                .load_device_info()
-                .ok()
-                .flatten()
-                .map(|info| info.0);
+            let sender_device_id = self.sender_device_id_for(contact_id)?;
             match self.relay.send_raw_update_for_device(
                 self.storage.clock().unix_seconds(),
                 &recipient_id,
@@ -435,6 +432,26 @@ impl<'a, T: Transport> SyncController<'a, T> {
         }
 
         Ok(result)
+    }
+
+    fn sender_device_id_for(&self, contact_id: &str) -> VauchiResult<Option<[u8; 32]>> {
+        if self
+            .storage
+            .device()
+            .load_contact_active_devices(contact_id)?
+            .is_empty()
+        {
+            return Ok(None);
+        }
+        self.storage
+            .device()
+            .load_device_info()?
+            .map(|info| Some(info.0))
+            .ok_or_else(|| {
+                VauchiError::InvalidState(
+                    "local device info is required for a device-scoped sender token".into(),
+                )
+            })
     }
 
     /// Gets the sync state for a contact.

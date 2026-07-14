@@ -9,7 +9,9 @@ use std::sync::Arc;
 use vauchi_core::api::*;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
 use vauchi_core::exchange::X3DHKeyPair;
-use vauchi_core::network::{MockTransport, RelayClientConfig, TransportConfig};
+use vauchi_core::identity::RegistryBroadcast;
+use vauchi_core::network::anonymous::{compute_anonymous_id, current_epoch};
+use vauchi_core::network::{MessagePayload, MockTransport, RelayClientConfig, TransportConfig};
 use vauchi_core::*;
 
 fn create_test_storage() -> Storage {
@@ -583,6 +585,10 @@ fn test_sync_send_clears_pending_update_on_relay_accept() {
     let contact = Contact::from_exchange(peer_pk, ContactCard::new("Peer"), shared.clone(), 0);
     let contact_id = contact.id().to_string();
     storage.contacts().save_contact(&contact).unwrap();
+    storage
+        .device()
+        .save_device_info(&[0x55; 32], 0, "Local", 0)
+        .unwrap();
 
     // Role-correct ratchet + a queued update carrying a real ratchet message.
     let peer_dh = X3DHKeyPair::generate();
@@ -630,6 +636,18 @@ fn test_sync_send_clears_pending_update_on_relay_accept() {
         result.sent, 1,
         "a device-scoped pending update must not require a legacy controller ratchet"
     );
+    let sent = controller.relay().connection().transport().sent_messages();
+    let MessagePayload::EncryptedUpdate(envelope) = &sent[0].payload else {
+        panic!("expected encrypted update")
+    };
+    assert_eq!(
+        envelope.sender_id,
+        hex::encode(compute_anonymous_id(
+            shared.as_bytes(),
+            current_epoch(storage.clock().unix_seconds())
+        )),
+        "a peer without an ADR-0064 registry can resolve only the legacy token"
+    );
     assert_eq!(
         storage
             .pending()
@@ -638,5 +656,87 @@ fn test_sync_send_clears_pending_update_on_relay_accept() {
             .len(),
         0,
         "a successfully-sent update must be cleared so it is not re-sent every sync"
+    );
+}
+
+// @scenario: multi_device_sync :: Modern sends require a device-scoped token
+#[test]
+fn test_sync_send_does_not_downgrade_modern_peer_without_local_device_info() {
+    use vauchi_core::storage::{PendingUpdate, UpdateStatus};
+
+    let storage = create_test_storage();
+    let peer_signing = SigningKeyPair::from_seed(&[0x61; 32]);
+    let shared = SymmetricKey::generate();
+    let contact = Contact::from_exchange(
+        *peer_signing.public_key().as_bytes(),
+        ContactCard::new("Modern peer"),
+        shared.clone(),
+        0,
+    );
+    let contact_id = contact.id().to_string();
+    storage.contacts().save_contact(&contact).unwrap();
+
+    let peer_seed = [0x62; 32];
+    let peer_device = DeviceInfo::derive(&peer_seed, 0, "Peer phone".into(), 1);
+    let peer_registry = DeviceRegistry::new(peer_device.to_registered(&peer_seed), &peer_signing);
+    let broadcast = RegistryBroadcast::new(
+        &peer_registry,
+        &peer_signing,
+        storage.clock().unix_seconds(),
+    );
+    storage
+        .device()
+        .save_contact_device_registry(
+            &contact_id,
+            &broadcast,
+            peer_signing.public_key().as_bytes(),
+            60,
+        )
+        .unwrap();
+
+    let peer_dh = X3DHKeyPair::generate();
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared, *peer_dh.public_key()).unwrap();
+    let message = ratchet.encrypt(b"device-scoped update").unwrap();
+    storage
+        .pending()
+        .queue_update(&PendingUpdate {
+            id: "modern-no-local-device".into(),
+            contact_id: contact_id.clone(),
+            update_type: "card_delta".into(),
+            payload: serde_json::to_vec(&message).unwrap(),
+            created_at: 0,
+            retry_count: 0,
+            status: UpdateStatus::Pending,
+            target_relay_url: None,
+        })
+        .unwrap();
+
+    let relay = create_test_relay();
+    let events = Arc::new(EventDispatcher::new());
+    let mut controller = SyncController::new(relay, &storage, SyncConfig::default(), events);
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+    let result = controller
+        .sync(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+
+    assert_eq!(result.sent, 0);
+    assert_eq!(result.failed, 1);
+    assert_eq!(
+        result.errors,
+        vec![(
+            contact_id.clone(),
+            "invalid state: local device info is required for a device-scoped sender token".into()
+        )]
+    );
+    assert_eq!(
+        storage
+            .pending()
+            .get_pending_updates(&contact_id)
+            .unwrap()
+            .len(),
+        1
     );
 }

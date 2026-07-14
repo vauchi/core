@@ -493,6 +493,27 @@ impl Vauchi {
                     .delete_contact(contact_id)
                     .map(|_| ())
                     .map_err(|e| e.into()),
+                SyncItem::ContactCardUpdated {
+                    ref contact_id,
+                    ref card_json,
+                    timestamp,
+                } => match self.storage.contacts().load_contact(contact_id)? {
+                    Some(mut contact) => {
+                        let card: crate::contact_card::ContactCard =
+                            serde_json::from_str(card_json).map_err(|error| {
+                                VauchiError::InvalidState(format!(
+                                    "invalid device-synced contact card: {error}"
+                                ))
+                            })?;
+                        contact.update_card(card, timestamp);
+                        self.storage
+                            .contacts()
+                            .save_contact(&contact)
+                            .map_err(|e| e.into())
+                    }
+                    // A peer update cannot recreate an owner-removed contact.
+                    None => Ok(()),
+                },
                 SyncItem::CardUpdated {
                     ref field_label,
                     ref new_value,
@@ -740,6 +761,10 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
         }
         SyncItem::ContactRemoved { contact_id, .. } => Some(VauchiEvent::ContactRemoved {
             contact_id: contact_id.clone(),
+        }),
+        SyncItem::ContactCardUpdated { contact_id, .. } => Some(VauchiEvent::ContactUpdated {
+            contact_id: contact_id.clone(),
+            changed_fields: vec!["card".to_string()],
         }),
         SyncItem::CardUpdated { field_label, .. } => Some(VauchiEvent::OwnCardUpdated {
             changed_fields: vec![field_label.clone()],

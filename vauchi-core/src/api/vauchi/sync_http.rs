@@ -398,6 +398,18 @@ impl Vauchi {
 
         // 3. Route + apply each contact blob, build per-blob ACK envelopes.
         let outcomes = process_received_blobs(identity, &self.storage, contacts, update_blobs);
+
+        // 3b. Persist peer-card fan-out before acknowledging the relay blob.
+        // If queue persistence fails, return without ACK so the relay retries.
+        // A retry is classified as `replay`; rebuilding the snapshot in that
+        // case closes the apply-then-queue crash window without re-emitting an
+        // IncomingUpdate event.
+        for outcome in &outcomes {
+            if let Some(contact_id) = outcome.device_fanout_contact_id.as_deref() {
+                self.record_received_contact_card_update(contact_id)?;
+            }
+        }
+
         let received = outcomes.iter().filter(|o| o.decrypted).count();
         let rejected = outcomes
             .iter()

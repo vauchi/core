@@ -186,6 +186,22 @@ fn test_sync_item_contact_removed() {
     assert_eq!(item.timestamp(), 4000);
 }
 
+// @scenario: release_privacy_multidevice_certification.feature:Every active device can exchange and update
+#[test]
+fn contact_card_updated_wire_roundtrip_preserves_snapshot() {
+    let item = SyncItem::ContactCardUpdated {
+        contact_id: "contact-789".to_string(),
+        card_json: serde_json::to_string(&ContactCard::new("Alice Updated")).unwrap(),
+        timestamp: 5000,
+    };
+
+    let encoded = serde_json::to_vec(&item).unwrap();
+    let decoded: SyncItem = serde_json::from_slice(&encoded).unwrap();
+
+    assert_eq!(decoded, item);
+    assert_eq!(decoded.timestamp(), 5000);
+}
+
 /// Test InterDeviceSyncState for tracking sync with other own devices
 // @scenario: device_management :: Changes sync between devices
 // @internal

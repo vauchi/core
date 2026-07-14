@@ -411,6 +411,20 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
+    /// A peer's contact card was updated on this identity's other device.
+    ///
+    /// This is deliberately distinct from [`SyncItem::ContactAdded`]: a peer
+    /// card update may update an existing contact, but it must never recreate a
+    /// contact the owner removed on this device.
+    ContactCardUpdated {
+        /// Existing exchanged contact whose peer card changed.
+        contact_id: String,
+        /// Complete verified peer card as JSON.
+        card_json: String,
+        /// Timestamp when this device accepted the peer update.
+        timestamp: u64,
+    },
+
     /// Own contact card field was updated.
     CardUpdated {
         /// Field label that was updated.
@@ -579,6 +593,7 @@ impl SyncItem {
         match self {
             SyncItem::ContactAdded { timestamp, .. } => *timestamp,
             SyncItem::ContactRemoved { timestamp, .. } => *timestamp,
+            SyncItem::ContactCardUpdated { timestamp, .. } => *timestamp,
             SyncItem::CardUpdated { timestamp, .. } => *timestamp,
             SyncItem::CardFieldRemoved { timestamp, .. } => *timestamp,
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,

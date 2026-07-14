@@ -77,6 +77,10 @@ pub struct BlobOutcome {
     /// `IncomingUpdate` per applied update — without it the contacts list
     /// never re-renders the synced tile (2026-06-30, ADR-021/043).
     pub contact_id: Option<String>,
+    /// Existing contact whose verified card must be queued for linked devices.
+    /// Set for an accepted card delta and for its replay retry; alerts and
+    /// reciprocity confirmations never populate it.
+    pub device_fanout_contact_id: Option<String>,
     /// `Some` when the applied blob was a verified safety alert (not a card
     /// delta). Drives an `Emergency`/`DuressAlertReceived` event instead of an
     /// `IncomingUpdate` (2026-07-04-coercion-safety-alerts-never-received).
@@ -108,42 +112,58 @@ pub fn process_received_blobs(
 
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext) in blobs {
-        let (token_resolved, decrypted, reject_reason, applied_contact_id, alert) =
-            match token_to_contact.get(&mailbox_token_hex) {
-                Some(contact_id) => {
-                    match process_single_card_update(identity, storage, contact_id, &ciphertext) {
-                        Ok(ReceiveOutcome::CardDelta) => {
-                            (true, true, None, Some(contact_id.clone()), None)
+        let (
+            token_resolved,
+            decrypted,
+            reject_reason,
+            applied_contact_id,
+            device_fanout_contact_id,
+            alert,
+        ) = match token_to_contact.get(&mailbox_token_hex) {
+            Some(contact_id) => {
+                match process_single_card_update(identity, storage, contact_id, &ciphertext) {
+                    Ok(ReceiveOutcome::CardDelta) => (
+                        true,
+                        true,
+                        None,
+                        Some(contact_id.clone()),
+                        Some(contact_id.clone()),
+                        None,
+                    ),
+                    Ok(ReceiveOutcome::Alert(a)) => {
+                        (true, true, None, Some(contact_id.clone()), None, Some(a))
+                    }
+                    // P3: the signature is verified in
+                    // `process_single_card_update`; match the carried token
+                    // against the contact's derived `expected_their_token`
+                    // and, on a match, resolve to Confirmed (RelaySync). A
+                    // mismatch leaves Pending (fail-safe) — a valid signature
+                    // over a wrong token never confirms. On confirm, surface
+                    // it like a card update so the frontend reloads and the
+                    // reciprocity banner clears.
+                    Ok(ReceiveOutcome::ReciprocityConfirm { sender_id, token }) => {
+                        if resolve_reciprocity_confirm(identity, storage, &sender_id, &token) {
+                            (true, true, None, Some(sender_id), None, None)
+                        } else {
+                            (true, true, None, None, None, None)
                         }
-                        Ok(ReceiveOutcome::Alert(a)) => {
-                            (true, true, None, Some(contact_id.clone()), Some(a))
-                        }
-                        // P3: the signature is verified in
-                        // `process_single_card_update`; match the carried token
-                        // against the contact's derived `expected_their_token`
-                        // and, on a match, resolve to Confirmed (RelaySync). A
-                        // mismatch leaves Pending (fail-safe) — a valid signature
-                        // over a wrong token never confirms. On confirm, surface
-                        // it like a card update so the frontend reloads and the
-                        // reciprocity banner clears.
-                        Ok(ReceiveOutcome::ReciprocityConfirm { sender_id, token }) => {
-                            if resolve_reciprocity_confirm(identity, storage, &sender_id, &token) {
-                                (true, true, None, Some(sender_id), None)
-                            } else {
-                                (true, true, None, None, None)
-                            }
-                        }
-                        Err(e) => (true, false, Some(reject_category(&e)), None, None),
+                    }
+                    Err(e) => {
+                        let reason = reject_category(&e);
+                        let retry_fanout = (reason == "replay").then(|| contact_id.clone());
+                        (true, false, Some(reason), None, retry_fanout, None)
                     }
                 }
-                None => (false, false, None, None, None),
-            };
+            }
+            None => (false, false, None, None, None, None),
+        };
         outcomes.push(BlobOutcome {
             message_id,
             token_resolved,
             decrypted,
             reject_reason,
             contact_id: applied_contact_id,
+            device_fanout_contact_id,
             alert,
         });
     }
@@ -379,6 +399,7 @@ mod tests {
             decrypted,
             reject_reason: if decrypted { None } else { Some("decrypt") },
             contact_id: contact_id.map(str::to_string),
+            device_fanout_contact_id: contact_id.map(str::to_string),
             alert: None,
         }
     }
@@ -395,6 +416,7 @@ mod tests {
                 decrypted: false,
                 reject_reason: None,
                 contact_id: None, // unresolved token
+                device_fanout_contact_id: None,
                 alert: None,
             },
         ];

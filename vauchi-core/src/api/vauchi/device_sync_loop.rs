@@ -153,6 +153,49 @@ impl Vauchi {
         Ok(sent)
     }
 
+    /// Queue an accepted peer-card update for this identity's other devices.
+    ///
+    /// The contact update has already passed peer authentication and delta
+    /// validation before this seam. Only the verified card is copied; the
+    /// receiving device's relationship keys and owner-private contact state
+    /// remain local and unchanged.
+    pub(super) fn record_received_contact_card_update(&self, contact_id: &str) -> VauchiResult<()> {
+        let Some(contact) = self.storage.contacts().load_contact(contact_id)? else {
+            return Ok(());
+        };
+        if !contact.is_exchanged() {
+            return Ok(());
+        }
+
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let Some(registry) = self.storage.device().load_device_registry()? else {
+            return Ok(());
+        };
+        if registry.device_count() <= 1 {
+            return Ok(());
+        }
+
+        let card_json = serde_json::to_string(contact.card())
+            .map_err(|error| VauchiError::Serialization(error.to_string()))?;
+        let item = SyncItem::ContactCardUpdated {
+            contact_id: contact_id.to_string(),
+            card_json,
+            timestamp: self.clock.unix_seconds(),
+        };
+        let mut orchestrator = DeviceSyncOrchestrator::load(
+            &self.storage,
+            identity.create_device_info(self.clock.unix_seconds()),
+            registry,
+        )
+        .map_err(VauchiError::DeviceSync)?;
+        orchestrator
+            .record_local_change(item)
+            .map_err(VauchiError::DeviceSync)
+    }
+
     /// Decrypt + apply one inbound device-sync blob.
     ///
     /// The envelope's `sender_id` is the shared identity, not the sending

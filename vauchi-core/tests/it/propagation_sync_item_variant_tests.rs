@@ -467,6 +467,60 @@ fn apply_sync_contact_removed_dispatches_contact_removed_event() {
     );
 }
 
+// @scenario: release_privacy_multidevice_certification.feature:Every active device can exchange and update
+#[test]
+fn apply_sync_contact_card_updated_preserves_relationship_state() {
+    let mut wb = make_vauchi();
+    let bob_id = added_contact(&mut wb, "Bob");
+    let before = wb.get_contact(&bob_id).unwrap().unwrap();
+    let shared_key = *before.shared_key().unwrap().as_bytes();
+    let mut updated = ContactCard::new("Bob Updated");
+    updated
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@updated.example",
+            now(),
+        ))
+        .unwrap();
+
+    wb.apply_sync_items(vec![SyncItem::ContactCardUpdated {
+        contact_id: bob_id.clone(),
+        card_json: serde_json::to_string(&updated).unwrap(),
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let after = wb.get_contact(&bob_id).unwrap().unwrap();
+    assert_eq!(after.display_name(), "Bob Updated");
+    assert_eq!(*after.shared_key().unwrap().as_bytes(), shared_key);
+    assert!(
+        after
+            .card()
+            .fields()
+            .iter()
+            .any(|field| field.value() == "bob@updated.example")
+    );
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Every active device can exchange and update
+#[test]
+fn apply_sync_contact_card_updated_does_not_resurrect_removed_contact() {
+    let wb = make_vauchi();
+    let missing_id = "removed-contact";
+    let card = ContactCard::new("Removed Bob");
+
+    wb.apply_sync_items(vec![SyncItem::ContactCardUpdated {
+        contact_id: missing_id.to_string(),
+        card_json: serde_json::to_string(&card).unwrap(),
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    assert!(wb.get_contact(missing_id).unwrap().is_none());
+    assert_eq!(wb.contact_count().unwrap(), 0);
+}
+
 // @internal
 #[test]
 fn apply_sync_card_updated_dispatches_own_card_updated_event() {

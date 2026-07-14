@@ -167,6 +167,11 @@ fn test_receive_routes_via_mailbox_token_fast_path() {
     assert_eq!(outcomes.len(), 1);
     assert!(outcomes[0].token_resolved, "token must resolve to Bob");
     assert!(outcomes[0].decrypted, "blob must decrypt via the fast path");
+    assert_eq!(
+        outcomes[0].device_fanout_contact_id.as_deref(),
+        Some(bob_link.peer_contact_id.as_str()),
+        "verified card deltas must be marked for linked-device fan-out"
+    );
 
     // The applied blob carries the resolved contact id, and the receive
     // phase turns it into an IncomingUpdate so the frontend invalidates and

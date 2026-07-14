@@ -220,3 +220,92 @@ fn test_prepare_card_update_fans_out_to_contact_devices() {
         );
     }
 }
+
+// @scenario: multi_device_sync :: Fan-out queue failure rolls back send state
+#[test]
+fn test_propagate_card_update_queue_failure_rolls_back_all_device_state() {
+    let wb = setup_with_card("Alice");
+    let alice_identity = wb.identity().unwrap();
+    let signing = (1u32..=100_000)
+        .map(|value| {
+            let mut seed = [0u8; 32];
+            seed[..4].copy_from_slice(&value.to_le_bytes());
+            SigningKeyPair::from_seed(&seed)
+        })
+        .find(|candidate| candidate.public_key().as_bytes() > alice_identity.signing_public_key())
+        .expect("a lexicographically larger test identity");
+    let contact = Contact::from_exchange(
+        *signing.public_key().as_bytes(),
+        ContactCard::new("Bob"),
+        SymmetricKey::from_bytes([43u8; 32]),
+        0,
+    );
+    let contact_id = contact.id().to_string();
+    wb.add_contact(contact).unwrap();
+
+    let device_seed = [54u8; 32];
+    let first = DeviceInfo::derive(&device_seed, 0, "Bob phone".into(), 1);
+    let second = DeviceInfo::derive(&device_seed, 1, "Bob laptop".into(), 1);
+    let device_ids = [*first.device_id(), *second.device_id()];
+    let mut registry = DeviceRegistry::new(first.to_registered(&device_seed), &signing);
+    registry
+        .add_device(second.to_registered(&device_seed), &signing)
+        .unwrap();
+    let broadcast =
+        RegistryBroadcast::new(&registry, &signing, wb.storage().clock().unix_seconds());
+    wb.storage()
+        .device()
+        .save_contact_device_registry(&contact_id, &broadcast, signing.public_key().as_bytes(), 60)
+        .unwrap();
+    wb.storage()
+        .connection()
+        .execute_batch(
+            "CREATE TRIGGER reject_pending_fanout
+             BEFORE INSERT ON pending_updates
+             BEGIN
+                 SELECT RAISE(ABORT, 'forced queue failure');
+             END;",
+        )
+        .unwrap();
+
+    let empty = ContactCard::new("Alice");
+    let current = wb.storage().contacts().load_own_card().unwrap().unwrap();
+    let error = wb.propagate_card_update(&empty, &current).unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "storage error: Database error: forced queue failure"
+    );
+    assert_eq!(
+        wb.storage()
+            .pending()
+            .count_pending_updates(&contact_id)
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        wb.storage()
+            .contacts()
+            .last_sent_delta_version(&contact_id)
+            .unwrap(),
+        0
+    );
+    assert!(
+        wb.storage()
+            .contacts()
+            .load_contact(&contact_id)
+            .unwrap()
+            .unwrap()
+            .cek()
+            .is_none()
+    );
+    for device_id in device_ids {
+        assert!(
+            wb.storage()
+                .ratchets()
+                .load_ratchet_state_for_device(&contact_id, &device_id)
+                .unwrap()
+                .is_none()
+        );
+    }
+}

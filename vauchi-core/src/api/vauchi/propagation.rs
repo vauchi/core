@@ -34,32 +34,33 @@ impl Vauchi {
         let mut queued = 0;
 
         for contact in contacts {
-            let encrypted =
-                match self.prepare_card_updates_for_contact(contact.id(), old_card, new_card) {
-                    Ok(data) => data,
-                    // Expected skips: blocked, no ratchet, empty delta, not exchanged
-                    Err(VauchiError::ContactBlocked(_))
-                    | Err(VauchiError::NotFound(_))
-                    | Err(VauchiError::InvalidState(_)) => continue,
-                    Err(e) => return Err(e),
-                };
-
-            let now = self.clock.unix_seconds();
-
-            for (_, payload) in encrypted {
-                let update = PendingUpdate {
-                    id: self.rng.uuid_v4(),
-                    contact_id: contact.id().to_string(),
-                    update_type: "card_delta".to_string(),
-                    payload,
-                    created_at: now,
-                    retry_count: 0,
-                    status: UpdateStatus::Pending,
-                    target_relay_url: contact.relay_url().map(String::from),
-                };
-                self.storage.pending().queue_update(&update)?;
+            let queue_result = self.storage.with_savepoint(|| -> VauchiResult<()> {
+                let encrypted =
+                    self.prepare_card_updates_for_contact(contact.id(), old_card, new_card)?;
+                let now = self.clock.unix_seconds();
+                for (_, payload) in encrypted {
+                    let update = PendingUpdate {
+                        id: self.rng.uuid_v4(),
+                        contact_id: contact.id().to_string(),
+                        update_type: "card_delta".to_string(),
+                        payload,
+                        created_at: now,
+                        retry_count: 0,
+                        status: UpdateStatus::Pending,
+                        target_relay_url: contact.relay_url().map(String::from),
+                    };
+                    self.storage.pending().queue_update(&update)?;
+                }
+                Ok(())
+            });
+            match queue_result {
+                Ok(()) => queued += 1,
+                // Expected skips: blocked, no ratchet, empty delta, not exchanged
+                Err(VauchiError::ContactBlocked(_))
+                | Err(VauchiError::NotFound(_))
+                | Err(VauchiError::InvalidState(_)) => continue,
+                Err(error) => return Err(error),
             }
-            queued += 1;
         }
 
         Ok(queued)
@@ -87,33 +88,30 @@ impl Vauchi {
             .unwrap_or_else(|| ContactCard::new(identity.display_name()));
         let empty_card = ContactCard::new(identity.display_name());
 
-        let encrypted =
-            self.prepare_card_updates_for_contact(contact_id, &empty_card, &our_card)?;
-
-        // Load contact to get relay_url for per-contact relay routing
-        let relay_url = self
-            .storage
-            .contacts()
-            .load_contact(contact_id)?
-            .and_then(|c| c.relay_url().map(String::from));
-
-        let now = self.clock.unix_seconds();
-
-        for (_, payload) in encrypted {
-            let update = PendingUpdate {
-                id: self.rng.uuid_v4(),
-                contact_id: contact_id.to_string(),
-                update_type: "card_delta".to_string(),
-                payload,
-                created_at: now,
-                retry_count: 0,
-                status: UpdateStatus::Pending,
-                target_relay_url: relay_url.clone(),
-            };
-            self.storage.pending().queue_update(&update)?;
-        }
-
-        Ok(())
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            let encrypted =
+                self.prepare_card_updates_for_contact(contact_id, &empty_card, &our_card)?;
+            let relay_url = self
+                .storage
+                .contacts()
+                .load_contact(contact_id)?
+                .and_then(|contact| contact.relay_url().map(String::from));
+            let now = self.clock.unix_seconds();
+            for (_, payload) in encrypted {
+                let update = PendingUpdate {
+                    id: self.rng.uuid_v4(),
+                    contact_id: contact_id.to_string(),
+                    update_type: "card_delta".to_string(),
+                    payload,
+                    created_at: now,
+                    retry_count: 0,
+                    status: UpdateStatus::Pending,
+                    target_relay_url: relay_url.clone(),
+                };
+                self.storage.pending().queue_update(&update)?;
+            }
+            Ok(())
+        })
     }
 
     /// Prepares an encrypted card update for a single contact.
@@ -248,9 +246,7 @@ impl Vauchi {
         let prepared =
             self.encrypt_payload_for_contact_devices(identity, &contact, &payload_bytes)?;
 
-        // Save CEK, ratchet state, and sent version atomically
-        self.storage.begin_transaction()?;
-        let save_result = (|| -> VauchiResult<()> {
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
             contact.set_cek(new_cek);
             self.storage.contacts().save_contact(&contact)?;
             for (peer_device_id, _, ratchet, is_initiator) in &prepared {
@@ -265,14 +261,7 @@ impl Vauchi {
                 .contacts()
                 .record_sent_delta_version(contact_id, next_version)?;
             Ok(())
-        })();
-        match save_result {
-            Ok(()) => self.storage.commit()?,
-            Err(e) => {
-                self.storage.rollback();
-                return Err(e);
-            }
-        }
+        })?;
 
         Ok(prepared
             .into_iter()
@@ -413,32 +402,31 @@ impl Vauchi {
                 Err(error) => return Err(error),
             };
 
-            // Set CEK on contact and re-save (re-encrypts card at rest with CEK)
-            contact.set_cek(cek);
-            self.storage.contacts().save_contact(&contact)?;
-
-            // Queue for delivery
-            let now = self.clock.unix_seconds();
-
-            for (device_id, encrypted, ratchet, is_initiator) in prepared {
-                self.storage.ratchets().save_ratchet_state_for_device(
-                    contact.id(),
-                    &device_id,
-                    &ratchet,
-                    is_initiator,
-                )?;
-                let update = PendingUpdate {
-                    id: self.rng.uuid_v4(),
-                    contact_id: contact.id().to_string(),
-                    update_type: "cek_migration".to_string(),
-                    payload: encrypted,
-                    created_at: now,
-                    retry_count: 0,
-                    status: UpdateStatus::Pending,
-                    target_relay_url: contact.relay_url().map(String::from),
-                };
-                self.storage.pending().queue_update(&update)?;
-            }
+            self.storage.with_savepoint(|| -> VauchiResult<()> {
+                contact.set_cek(cek);
+                self.storage.contacts().save_contact(&contact)?;
+                let now = self.clock.unix_seconds();
+                for (device_id, encrypted, ratchet, is_initiator) in prepared {
+                    self.storage.ratchets().save_ratchet_state_for_device(
+                        contact.id(),
+                        &device_id,
+                        &ratchet,
+                        is_initiator,
+                    )?;
+                    let update = PendingUpdate {
+                        id: self.rng.uuid_v4(),
+                        contact_id: contact.id().to_string(),
+                        update_type: "cek_migration".to_string(),
+                        payload: encrypted,
+                        created_at: now,
+                        retry_count: 0,
+                        status: UpdateStatus::Pending,
+                        target_relay_url: contact.relay_url().map(String::from),
+                    };
+                    self.storage.pending().queue_update(&update)?;
+                }
+                Ok(())
+            })?;
             migrated += 1;
         }
 

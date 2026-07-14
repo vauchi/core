@@ -630,47 +630,42 @@ impl Vauchi {
             nonce: delta.nonce,
         };
 
-        contact.set_cek(new_cek);
-        self.storage.contacts().save_contact(&contact)?;
         let payload_bytes = VersionedPayload::encode_cek(&wrapped);
 
         let prepared =
             self.encrypt_payload_for_contact_devices(identity, &contact, &payload_bytes)?;
 
-        // Save each independent session and queue each copy for delivery.
-        let now = self.clock.unix_seconds();
-        for (device_id, encrypted, ratchet, is_initiator) in prepared {
-            self.storage.ratchets().save_ratchet_state_for_device(
-                contact_id,
-                &device_id,
-                &ratchet,
-                is_initiator,
-            )?;
-            let update = PendingUpdate {
-                id: self.rng.uuid_v4(),
-                contact_id: contact_id.to_string(),
-                update_type: "card_delta".to_string(),
-                payload: encrypted,
-                created_at: now,
-                retry_count: 0,
-                status: UpdateStatus::Pending,
-                target_relay_url: None,
-            };
-            self.storage.pending().queue_update(&update)?;
-        }
-
-        // Record the visible-field baseline this send established, so a later
-        // revocation can diff against it (fix C).
-        self.storage
-            .contacts()
-            .save_last_sent_visible_fields(contact_id, &new_visible)?;
-        // Record the display name this send carried, so a later rename diffs
-        // against it and emits a `DisplayNameChanged` exactly once.
-        self.storage
-            .contacts()
-            .save_last_sent_display_name(contact_id, own_card.display_name())?;
-
-        Ok(())
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            contact.set_cek(new_cek);
+            self.storage.contacts().save_contact(&contact)?;
+            let now = self.clock.unix_seconds();
+            for (device_id, encrypted, ratchet, is_initiator) in prepared {
+                self.storage.ratchets().save_ratchet_state_for_device(
+                    contact_id,
+                    &device_id,
+                    &ratchet,
+                    is_initiator,
+                )?;
+                let update = PendingUpdate {
+                    id: self.rng.uuid_v4(),
+                    contact_id: contact_id.to_string(),
+                    update_type: "card_delta".to_string(),
+                    payload: encrypted,
+                    created_at: now,
+                    retry_count: 0,
+                    status: UpdateStatus::Pending,
+                    target_relay_url: None,
+                };
+                self.storage.pending().queue_update(&update)?;
+            }
+            self.storage
+                .contacts()
+                .save_last_sent_visible_fields(contact_id, &new_visible)?;
+            self.storage
+                .contacts()
+                .save_last_sent_display_name(contact_id, own_card.display_name())?;
+            Ok(())
+        })
     }
 
     /// Runs the owed own-card repropagation pass.

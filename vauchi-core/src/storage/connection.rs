@@ -173,6 +173,36 @@ impl Storage {
         let _ = self.conn.execute_batch("ROLLBACK");
     }
 
+    /// Runs a fallible operation inside a nestable SQLite savepoint.
+    pub(crate) fn with_savepoint<T, E>(
+        &self,
+        operation: impl FnOnce() -> Result<T, E>,
+    ) -> Result<T, E>
+    where
+        E: From<StorageError>,
+    {
+        self.conn
+            .execute_batch("SAVEPOINT vauchi_atomic_operation")
+            .map_err(StorageError::from)?;
+        match operation() {
+            Ok(value) => {
+                self.conn
+                    .execute_batch("RELEASE vauchi_atomic_operation")
+                    .map_err(StorageError::from)?;
+                Ok(value)
+            }
+            Err(error) => {
+                self.conn
+                    .execute_batch(
+                        "ROLLBACK TO vauchi_atomic_operation;
+                         RELEASE vauchi_atomic_operation;",
+                    )
+                    .map_err(StorageError::from)?;
+                Err(error)
+            }
+        }
+    }
+
     /// Removes `.pre-migration-v*.bak` files left by migration backups (F4 audit fix).
     ///
     /// Called on startup after migrations succeed. These backups are created by

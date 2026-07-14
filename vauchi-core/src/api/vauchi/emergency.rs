@@ -167,25 +167,28 @@ impl Vauchi {
                     Err(VauchiError::NotFound(_)) | Err(VauchiError::InvalidState(_)) => continue,
                     Err(error) => return Err(error),
                 };
-            for (device_id, encrypted, ratchet, is_initiator) in prepared {
-                self.storage.ratchets().save_ratchet_state_for_device(
-                    contact_id,
-                    &device_id,
-                    &ratchet,
-                    is_initiator,
-                )?;
-                let update = PendingUpdate {
-                    id: self.rng.uuid_v4(),
-                    contact_id: contact_id.to_string(),
-                    update_type: "card_delta".to_string(), // Indistinguishable (ADR-032)
-                    payload: encrypted,
-                    created_at: now,
-                    retry_count: 0,
-                    status: UpdateStatus::Pending,
-                    target_relay_url: None,
-                };
-                self.storage.pending().queue_update(&update)?;
-            }
+            self.storage.with_savepoint(|| -> VauchiResult<()> {
+                for (device_id, encrypted, ratchet, is_initiator) in prepared {
+                    self.storage.ratchets().save_ratchet_state_for_device(
+                        contact_id,
+                        &device_id,
+                        &ratchet,
+                        is_initiator,
+                    )?;
+                    let update = PendingUpdate {
+                        id: self.rng.uuid_v4(),
+                        contact_id: contact_id.to_string(),
+                        update_type: "card_delta".to_string(), // Indistinguishable (ADR-032)
+                        payload: encrypted,
+                        created_at: now,
+                        retry_count: 0,
+                        status: UpdateStatus::Pending,
+                        target_relay_url: None,
+                    };
+                    self.storage.pending().queue_update(&update)?;
+                }
+                Ok(())
+            })?;
             sent += 1;
         }
 

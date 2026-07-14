@@ -304,6 +304,7 @@ impl AppEngine {
                 format!("Retry scheduled for {rescheduled} messages")
             },
             undo_action_id: None,
+            undo_label: None,
         }
     }
 }

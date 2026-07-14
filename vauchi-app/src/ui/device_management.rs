@@ -120,6 +120,8 @@ impl DeviceManagementEngine {
                 ),
                 confirm_text: self.t("action.revoke"),
                 cancel_text: self.t("action.cancel"),
+                confirm_action_id: format!("confirm_revoke_device:{index}"),
+                cancel_action_id: format!("cancel_revoke_device:{index}"),
                 destructive: true,
                 a11y: Some(A11y {
                     label: Some(get_string_with_args(
@@ -198,12 +200,14 @@ impl WorkflowEngine for DeviceManagementEngine {
                             return ActionResult::ShowToast {
                                 message: self.t("devices.cannot_revoke_current"),
                                 undo_action_id: None,
+                                undo_label: None,
                             };
                         }
                         if !device.is_active {
                             return ActionResult::ShowToast {
                                 message: self.t("devices.already_revoked_toast"),
                                 undo_action_id: None,
+                                undo_label: None,
                             };
                         }
                         self.pending_revoke_index = Some(idx);

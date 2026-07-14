@@ -139,6 +139,8 @@ impl TagsEngine {
                 ),
                 confirm_text: self.t("action.delete"),
                 cancel_text: self.t("action.cancel"),
+                confirm_action_id: "confirm_delete_tag".into(),
+                cancel_action_id: "cancel_delete_tag".into(),
                 destructive: true,
                 a11y: None,
             });

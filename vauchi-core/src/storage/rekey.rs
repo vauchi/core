@@ -54,6 +54,7 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     // V14 high-priority
     ("own_card", "card_json_encrypted"),
     ("device_registry", "registry_json_encrypted"),
+    ("contact_device_registries", "broadcast_encrypted"),
     ("device_sync_state", "state_json_encrypted"),
     ("visibility_labels", "contacts_json_encrypted"),
     ("visibility_labels", "visible_fields_json_encrypted"),
@@ -227,6 +228,9 @@ impl Storage {
 
             self.rekey_device_registry(old_key, &new_key)?;
             report(&mut completed, "device_registry");
+
+            self.rekey_contact_device_registries(old_key, &new_key)?;
+            report(&mut completed, "contact_device_registries");
 
             self.rekey_device_sync_state(old_key, &new_key)?;
             report(&mut completed, "device_sync_state");
@@ -580,16 +584,19 @@ impl Storage {
     ) -> Result<(), StorageError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT contact_id, ratchet_state_encrypted FROM contact_ratchets")
+            .prepare(
+                "SELECT contact_id, peer_device_id, ratchet_state_encrypted
+                 FROM contact_ratchets",
+            )
             .map_err(|e| StorageError::Migration(format!("Read ratchets: {}", e)))?;
 
-        let rows: Vec<(String, Vec<u8>)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        let rows: Vec<(String, Vec<u8>, Vec<u8>)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
             .map_err(|e| StorageError::Migration(format!("Query ratchets: {}", e)))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| StorageError::Migration(format!("Collect ratchets: {}", e)))?;
 
-        for (contact_id, ratchet_enc) in &rows {
+        for (contact_id, peer_device_id, ratchet_enc) in &rows {
             // Decrypt with old per-contact key
             let mut old_info = b"vauchi-ratchet-storage-v1:".to_vec();
             old_info.extend_from_slice(contact_id.as_bytes());
@@ -609,10 +616,16 @@ impl Storage {
             let new_enc = encrypt(&new_ratchet_key, &plain).map_err(|e| {
                 StorageError::Migration(format!("Encrypt ratchet {}: {}", contact_id, e))
             })?;
-            self.conn.execute(
-                "UPDATE contact_ratchets SET ratchet_state_encrypted = ?1 WHERE contact_id = ?2",
-                params![new_enc, contact_id],
-            ).map_err(|e| StorageError::Migration(format!("Update ratchet {}: {}", contact_id, e)))?;
+            self.conn
+                .execute(
+                    "UPDATE contact_ratchets
+                 SET ratchet_state_encrypted = ?1
+                 WHERE contact_id = ?2 AND peer_device_id = ?3",
+                    params![new_enc, contact_id, peer_device_id],
+                )
+                .map_err(|e| {
+                    StorageError::Migration(format!("Update ratchet {}: {}", contact_id, e))
+                })?;
         }
         Ok(())
     }
@@ -671,6 +684,42 @@ impl Storage {
                     params![new_enc],
                 )
                 .map_err(|e| StorageError::Migration(format!("Update registry: {}", e)))?;
+        }
+        Ok(())
+    }
+
+    /// Re-encrypt every retained contact device-registry broadcast.
+    fn rekey_contact_device_registries(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT contact_id, broadcast_encrypted FROM contact_device_registries")
+            .map_err(|e| StorageError::Migration(format!("Read contact registries: {}", e)))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+            })
+            .map_err(|e| StorageError::Migration(format!("Query contact registries: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect contact registries: {}", e)))?;
+        drop(stmt);
+
+        for (contact_id, encrypted) in rows {
+            let plain = decrypt(old_key, &encrypted).map_err(|e| {
+                StorageError::Migration(format!("Decrypt contact registry {}: {}", contact_id, e))
+            })?;
+            let reencrypted = encrypt(new_key, &plain).map_err(|e| {
+                StorageError::Migration(format!("Encrypt contact registry {}: {}", contact_id, e))
+            })?;
+            self.conn
+                .execute(
+                    "UPDATE contact_device_registries SET broadcast_encrypted = ?1 WHERE contact_id = ?2",
+                    params![reencrypted, contact_id],
+                )
+                .map_err(|e| StorageError::Migration(format!("Update contact registry: {}", e)))?;
         }
         Ok(())
     }

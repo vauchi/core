@@ -35,6 +35,24 @@ fn anonymous_sender_hex(shared_key: Option<&[u8; 32]>, now: u64) -> Option<Strin
     })
 }
 
+/// Generates the rotating sender token scoped to this concrete sending device.
+fn anonymous_sender_hex_for_device(
+    shared_key: Option<&[u8; 32]>,
+    sender_device_id: Option<&[u8; 32]>,
+    now: u64,
+) -> Option<String> {
+    match (shared_key, sender_device_id) {
+        (Some(key), Some(device_id)) => Some(hex::encode(
+            super::anonymous::compute_anonymous_id_for_device(
+                key,
+                super::anonymous::current_epoch(now),
+                device_id,
+            ),
+        )),
+        _ => anonymous_sender_hex(shared_key, now),
+    }
+}
+
 /// Configuration for the relay client.
 #[derive(Debug, Clone)]
 pub struct RelayClientConfig {
@@ -217,11 +235,24 @@ impl<T: Transport> RelayClient<T> {
         update_id: &str,
         shared_key: Option<&[u8; 32]>,
     ) -> Result<MessageId, NetworkError> {
+        self.send_raw_update_for_device(now, recipient_id, ratchet_msg, update_id, shared_key, None)
+    }
+
+    /// Sends a pre-encrypted update with a sender token scoped to this device.
+    pub fn send_raw_update_for_device(
+        &mut self,
+        now: u64,
+        recipient_id: &str,
+        ratchet_msg: &RatchetMessage,
+        update_id: &str,
+        shared_key: Option<&[u8; 32]>,
+        sender_device_id: Option<&[u8; 32]>,
+    ) -> Result<MessageId, NetworkError> {
         if self.in_flight.len() >= self.config.max_pending_messages {
             return Err(NetworkError::SendFailed("Too many pending messages".into()));
         }
 
-        let anon_id_hex = anonymous_sender_hex(shared_key, now);
+        let anon_id_hex = anonymous_sender_hex_for_device(shared_key, sender_device_id, now);
         let envelope =
             self.create_update_envelope(recipient_id, ratchet_msg, anon_id_hex.as_deref(), now);
         let message_id = envelope.message_id.clone();

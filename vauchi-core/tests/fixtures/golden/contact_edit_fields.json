@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "screen_id": "edit_fields",
   "title": "Edit Contact",
   "subtitle": null,
@@ -20,6 +20,7 @@
     {
       "FieldList": {
         "id": "fields",
+        "title": "Contact fields",
         "fields": [
           {
             "id": "f1",

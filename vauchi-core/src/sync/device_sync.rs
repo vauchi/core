@@ -286,12 +286,10 @@ impl ContactExchangeLocation {
     }
 }
 
-/// Why a device is being linked, deciding what the sync payload may carry.
+/// Why a device is being linked.
 ///
-/// Ratchet sessions transfer only on `ReplaceDevice`: cloning a live
-/// session to a device that stays *additional* lets both advance the same
-/// DH chain, which diverges undecryptably at the contact (ADR-035
-/// limitation; per-device sessions are ADR-064).
+/// Both modes establish fresh per-device sessions. No mode copies a live
+/// ratchet chain between devices (ADR-064).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceLinkIntent {
     /// The new device joins alongside the existing ones.
@@ -301,21 +299,15 @@ pub enum DeviceLinkIntent {
     ReplaceDevice,
 }
 
-/// Serializable ratchet state for one contact, used during device linking.
+/// A contact's identity-signed active-device registry.
 ///
-/// The ratchet state is serialized to plaintext before inclusion in the payload
-/// because the `DeviceSyncPayload` itself is transported inside the encrypted
-/// device-link response. The receiving device re-encrypts the state under its
-/// own storage key before persisting it.
+/// This is safe to copy between owner devices; each receiving owner device
+/// uses it to bootstrap fresh pairwise sessions. Live ratchet state is never
+/// copied for concurrent operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContactRatchetSyncData {
-    /// Contact's unique ID (public key fingerprint).
+pub struct ContactDeviceRegistrySyncData {
     pub contact_id: String,
-    /// Serialized ratchet state (sensitive — protected by the enclosing payload
-    /// encryption during transit).
-    pub ratchet_state: crate::crypto::ratchet::SerializedRatchetState,
-    /// Whether this side was the ratchet initiator for this contact.
-    pub is_initiator: bool,
+    pub broadcast_json: String,
 }
 
 /// Payload for syncing all contacts during device linking.
@@ -338,11 +330,9 @@ pub struct DeviceSyncPayload {
     /// Per-contact exchange locations (ADR-051). `#[serde(default)]` back-compat.
     #[serde(default)]
     pub exchange_locations: Vec<ContactExchangeLocation>,
-    /// Per-contact ratchet states so a replacement device can resume encrypted
-    /// communication with existing contacts. `#[serde(default)]` for back-compat
-    /// with payloads from older devices that predate ratchet-state sync.
+    /// Verified peer topology needed to establish this device's own sessions.
     #[serde(default)]
-    pub ratchet_states: Vec<ContactRatchetSyncData>,
+    pub contact_device_registries: Vec<ContactDeviceRegistrySyncData>,
     /// Version number for conflict resolution.
     pub version: u64,
 }
@@ -357,7 +347,7 @@ impl DeviceSyncPayload {
             tags: Vec::new(),
             places: Vec::new(),
             exchange_locations: Vec::new(),
-            ratchet_states: Vec::new(),
+            contact_device_registries: Vec::new(),
             version: 0,
         }
     }
@@ -387,7 +377,7 @@ impl DeviceSyncPayload {
             tags: Vec::new(),
             places: Vec::new(),
             exchange_locations: Vec::new(),
-            ratchet_states: Vec::new(),
+            contact_device_registries: Vec::new(),
             version,
         }
     }
@@ -413,10 +403,13 @@ impl DeviceSyncPayload {
         self
     }
 
-    /// Attaches ratchet states to this payload (builder style).
+    /// Attaches signed peer registries to the encrypted owner-device payload.
     #[must_use]
-    pub fn with_ratchet_states(mut self, states: Vec<ContactRatchetSyncData>) -> Self {
-        self.ratchet_states = states;
+    pub fn with_contact_device_registries(
+        mut self,
+        registries: Vec<ContactDeviceRegistrySyncData>,
+    ) -> Self {
+        self.contact_device_registries = registries;
         self
     }
 

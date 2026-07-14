@@ -361,8 +361,16 @@ fn test_sync_controller_remove_nonexistent_ratchet() {
 
 // @internal
 #[test]
-fn test_sync_controller_sync_contact_no_ratchet() {
+fn test_sync_controller_sync_contact_without_pending_payload_is_noop() {
     let storage = create_test_storage();
+    let contact = Contact::from_exchange(
+        [0x71; 32],
+        ContactCard::new("No pending"),
+        SymmetricKey::generate(),
+        0,
+    );
+    let contact_id = contact.id().to_string();
+    storage.contacts().save_contact(&contact).unwrap();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
@@ -372,8 +380,8 @@ fn test_sync_controller_sync_contact_no_ratchet() {
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
 
-    let result = controller.sync_contact("contact-1");
-    assert!(matches!(result, Err(VauchiError::InvalidState(_))));
+    let result = controller.sync_contact(&contact_id);
+    assert_eq!(result.unwrap().total(), 0);
 }
 
 // @internal
@@ -583,7 +591,7 @@ fn test_sync_send_clears_pending_update_on_relay_accept() {
     let msg = ratchet.encrypt(b"card-delta").unwrap();
     storage
         .ratchets()
-        .save_ratchet_state(&contact_id, &ratchet, true)
+        .save_ratchet_state_for_device(&contact_id, &[0x44; 32], &ratchet, true)
         .unwrap();
     let update = PendingUpdate {
         id: "u1".to_string(),
@@ -614,12 +622,14 @@ fn test_sync_send_clears_pending_update_on_relay_accept() {
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
-    controller.register_ratchet(&contact_id, ratchet);
     let result = controller
         .sync(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
 
-    assert_eq!(result.sent, 1, "the queued update must be sent");
+    assert_eq!(
+        result.sent, 1,
+        "a device-scoped pending update must not require a legacy controller ratchet"
+    );
     assert_eq!(
         storage
             .pending()

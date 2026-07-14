@@ -16,8 +16,8 @@ use rusqlite::{Connection, params};
 
 use super::super::{Storage, StorageError};
 use crate::clock::Clock;
-use crate::crypto::SymmetricKey;
-use crate::identity::device::DeviceRegistry;
+use crate::crypto::{PublicKey, SymmetricKey};
+use crate::identity::device::{BroadcastDevice, DeviceRegistry, MAX_DEVICES, RegistryBroadcast};
 
 /// Scoped persistence view for the device domain: this device's info record and
 /// the device registry.
@@ -238,5 +238,137 @@ impl DeviceStore<'_> {
             |row| row.get(0),
         )?;
         Ok(count > 0)
+    }
+
+    /// Verifies and atomically retains a contact's newest signed device registry.
+    ///
+    /// Invalid signatures, replayed versions, stale timestamps, and excessive
+    /// future clock skew are rejected without replacing the last trusted value.
+    pub fn save_contact_device_registry(
+        &self,
+        contact_id: &str,
+        broadcast: &RegistryBroadcast,
+        contact_signing_key: &[u8; 32],
+        max_age_secs: u64,
+    ) -> Result<(), StorageError> {
+        if broadcast.active_device_count() == 0 || broadcast.active_device_count() > MAX_DEVICES {
+            return Err(StorageError::InvalidData(format!(
+                "contact device registry must contain 1..={MAX_DEVICES} active devices"
+            )));
+        }
+        let mut unique_ids = std::collections::HashSet::new();
+        if !broadcast
+            .active_devices()
+            .iter()
+            .all(|device| unique_ids.insert(device.device_id))
+        {
+            return Err(StorageError::InvalidData(
+                "contact device registry contains duplicate device IDs".into(),
+            ));
+        }
+        let previously_active = self.load_contact_active_devices(contact_id)?;
+        let last_version = self
+            .conn
+            .query_row(
+                "SELECT version FROM contact_device_registries WHERE contact_id = ?1",
+                params![contact_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .or_else(|error| match error {
+                rusqlite::Error::QueryReturnedNoRows => Ok(0),
+                other => Err(other),
+            })? as u64;
+
+        broadcast
+            .verify_with_freshness(
+                &PublicKey::from_bytes(*contact_signing_key),
+                last_version,
+                self.now_secs(),
+                max_age_secs,
+            )
+            .map_err(|error| StorageError::InvalidData(error.to_string()))?;
+
+        let json = serde_json::to_vec(broadcast)
+            .map_err(|error| StorageError::Serialization(error.to_string()))?;
+        let encrypted = crate::crypto::encrypt(self.key, &json)
+            .map_err(|error| StorageError::Encryption(error.to_string()))?;
+        self.conn.execute(
+            "INSERT INTO contact_device_registries (contact_id, broadcast_encrypted, version, updated_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(contact_id) DO UPDATE SET
+                broadcast_encrypted = excluded.broadcast_encrypted,
+                version = excluded.version,
+                updated_at = excluded.updated_at",
+            params![contact_id, encrypted, broadcast.version() as i64, self.now_secs() as i64],
+        )?;
+        for removed in previously_active.iter().filter(|old| {
+            !broadcast
+                .active_devices()
+                .iter()
+                .any(|current| current.device_id == old.device_id)
+        }) {
+            self.conn.execute(
+                "DELETE FROM contact_ratchets WHERE contact_id = ?1 AND peer_device_id = ?2",
+                params![contact_id, removed.device_id.as_slice()],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Loads the last verified signed registry retained for a contact.
+    pub fn load_contact_device_registry(
+        &self,
+        contact_id: &str,
+    ) -> Result<Option<RegistryBroadcast>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT broadcast_encrypted FROM contact_device_registries WHERE contact_id = ?1",
+            params![contact_id],
+            |row| row.get::<_, Vec<u8>>(0),
+        );
+        match result {
+            Ok(encrypted) => {
+                let json = crate::crypto::decrypt(self.key, &encrypted)
+                    .map_err(|error| StorageError::Encryption(error.to_string()))?;
+                serde_json::from_slice(&json)
+                    .map(Some)
+                    .map_err(|error| StorageError::Serialization(error.to_string()))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(StorageError::Database(error)),
+        }
+    }
+
+    /// Returns the contact devices that core currently authorizes as targets.
+    pub fn load_contact_active_devices(
+        &self,
+        contact_id: &str,
+    ) -> Result<Vec<BroadcastDevice>, StorageError> {
+        Ok(self
+            .load_contact_device_registry(contact_id)?
+            .map(|registry| registry.active_devices().to_vec())
+            .unwrap_or_default())
+    }
+
+    /// Lists all verified contact registries for encrypted owner-device sync.
+    pub fn list_contact_device_registries(
+        &self,
+    ) -> Result<Vec<(String, RegistryBroadcast)>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT contact_id, broadcast_encrypted FROM contact_device_registries ORDER BY contact_id",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows.into_iter()
+            .map(|(contact_id, encrypted)| {
+                let json = crate::crypto::decrypt(self.key, &encrypted)
+                    .map_err(|error| StorageError::Encryption(error.to_string()))?;
+                let registry = serde_json::from_slice(&json)
+                    .map_err(|error| StorageError::Serialization(error.to_string()))?;
+                Ok((contact_id, registry))
+            })
+            .collect()
     }
 }

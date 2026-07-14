@@ -439,7 +439,7 @@ impl AppEngine {
     ///
     /// Returns `Some(ShowToast { .. })` if a backup reminder is due, `None` otherwise.
     /// Frontends should call this after initialization or after unlocking.
-    /// The toast `undo_action_id` is `"backup_now"` — pressing it navigates to Backup.
+    /// The toast action id is `"backup_now"` — pressing it navigates to Backup.
     pub fn drain_backup_reminder(&mut self) -> Option<ActionResult> {
         if self.pending_backup_reminder {
             self.pending_backup_reminder = false;
@@ -455,6 +455,7 @@ impl AppEngine {
                 message: "You haven't backed up in a while. Back up now to protect your identity."
                     .into(),
                 undo_action_id: Some("backup_now".into()),
+                undo_label: Some(self.t("backup.wizard.create")),
             })
         } else {
             None

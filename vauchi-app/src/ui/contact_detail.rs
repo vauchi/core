@@ -64,6 +64,12 @@ pub struct ContactDetailEngine {
     personal_note: String,
     /// Per-field private notes (never shared). Keyed by field_id, plain UTF-8.
     field_notes: HashMap<String, String>,
+    /// Component currently in edit mode. This presentation transition is
+    /// core-owned so every renderer receives the same declarative state.
+    editing_component_id: Option<String>,
+    /// Core-owned draft for `editing_component_id`. Frontends report raw text;
+    /// Save commits this value and Cancel discards it.
+    editing_value: Option<String>,
     /// Computed trust level display string (read-only).
     trust_level: String,
     /// Trust level enum used to gate `verify_fingerprint` action via
@@ -125,6 +131,8 @@ impl ContactDetailEngine {
             view_mode: ContactViewMode::TheirInfo,
             personal_note,
             field_notes: HashMap::new(),
+            editing_component_id: None,
+            editing_value: None,
             trust_level: String::new(),
             trust_level_enum: TrustLevel::Standard,
             reciprocity_status: String::new(),
@@ -161,6 +169,8 @@ impl ContactDetailEngine {
             view_mode: ContactViewMode::TheirInfo,
             personal_note,
             field_notes: HashMap::new(),
+            editing_component_id: None,
+            editing_value: None,
             trust_level: String::new(),
             trust_level_enum: TrustLevel::Standard,
             reciprocity_status: String::new(),
@@ -485,8 +495,20 @@ impl ContactDetailEngine {
         components.push(Component::EditableText {
             id: "personal_note".into(),
             label: self.t("contact_detail.private_note_label"),
-            value: self.personal_note.clone(),
-            editing: false,
+            value: if self.editing_component_id.as_deref() == Some("personal_note") {
+                self.editing_value
+                    .clone()
+                    .unwrap_or_else(|| self.personal_note.clone())
+            } else {
+                self.personal_note.clone()
+            },
+            edit_text: self.t("action.edit"),
+            save_text: self.t("action.save"),
+            cancel_text: self.t("action.cancel"),
+            edit_action_id: "edit_personal_note".into(),
+            save_action_id: "save_personal_note".into(),
+            cancel_action_id: "cancel_personal_note".into(),
+            editing: self.editing_component_id.as_deref() == Some("personal_note"),
             validation_error: None,
             a11y: Some(A11y {
                 label: Some(self.t("contact_detail.personal_note_a11y")),
@@ -615,6 +637,7 @@ impl ContactDetailEngine {
         for field in &self.fields {
             components.push(Component::FieldList {
                 id: format!("field_{}", field.id),
+                title: contact_fields_a11y.clone(),
                 fields: vec![field.clone()],
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_scopes: vec![],
@@ -625,11 +648,22 @@ impl ContactDetailEngine {
                 }),
             });
             let note_value = self.field_notes.get(&field.id).cloned().unwrap_or_default();
+            let component_id = format!("field_note:{}", field.id);
             components.push(Component::EditableText {
-                id: format!("field_note:{}", field.id),
+                id: component_id.clone(),
                 label: self.t("contact_detail.private_field_note_label"),
-                value: note_value,
-                editing: false,
+                value: if self.editing_component_id.as_deref() == Some(component_id.as_str()) {
+                    self.editing_value.clone().unwrap_or(note_value)
+                } else {
+                    note_value
+                },
+                edit_text: self.t("action.edit"),
+                save_text: self.t("action.save"),
+                cancel_text: self.t("action.cancel"),
+                edit_action_id: format!("edit_field_note:{}", field.id),
+                save_action_id: format!("save_field_note:{}", field.id),
+                cancel_action_id: format!("cancel_field_note:{}", field.id),
+                editing: self.editing_component_id.as_deref() == Some(component_id.as_str()),
                 validation_error: None,
                 a11y: Some(A11y {
                     label: Some(self.t("contact_detail.private_field_note_a11y")),
@@ -706,6 +740,7 @@ impl ContactDetailEngine {
             // My fields — show which groups grant visibility
             components.push(Component::FieldList {
                 id: "my_fields".into(),
+                title: self.t("fields.a11y_contact_fields"),
                 fields: shared.my_fields.clone(),
                 visibility_mode: VisibilityMode::PerGroup,
                 available_scopes: shared.visible_groups.clone(),
@@ -729,6 +764,8 @@ impl ContactDetailEngine {
             ),
             confirm_text: self.t("action.delete"),
             cancel_text: self.t("action.cancel"),
+            confirm_action_id: "confirm_delete_contact".into(),
+            cancel_action_id: "cancel_delete_contact".into(),
             destructive: true,
             a11y: Some(A11y {
                 label: Some(self.t("contact_detail.confirm_deletion_a11y")),
@@ -864,6 +901,64 @@ impl WorkflowEngine for ContactDetailEngine {
                     contact_id: self.contact.id.clone(),
                 }
             }
+            UserAction::ActionPressed { action_id } if action_id == "edit_personal_note" => {
+                self.editing_component_id = Some("personal_note".into());
+                self.editing_value = Some(self.personal_note.clone());
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if self.editing_component_id.as_deref() == Some(component_id.as_str()) => {
+                self.editing_value = Some(value);
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ActionPressed { action_id } if action_id == "save_personal_note" => {
+                if self.editing_component_id.as_deref() == Some("personal_note")
+                    && let Some(value) = self.editing_value.take()
+                {
+                    self.personal_note = value;
+                }
+                self.editing_component_id = None;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ActionPressed { action_id } if action_id == "cancel_personal_note" => {
+                self.editing_component_id = None;
+                self.editing_value = None;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ActionPressed { action_id }
+                if action_id.starts_with("edit_field_note:") =>
+            {
+                let field_id = action_id.trim_start_matches("edit_field_note:");
+                if self.fields.iter().any(|field| field.id == field_id) {
+                    let component_id = format!("field_note:{field_id}");
+                    self.editing_component_id = Some(component_id);
+                    self.editing_value =
+                        Some(self.field_notes.get(field_id).cloned().unwrap_or_default());
+                }
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ActionPressed { action_id }
+                if action_id.starts_with("save_field_note:") =>
+            {
+                let field_id = action_id.trim_start_matches("save_field_note:");
+                let component_id = format!("field_note:{field_id}");
+                if self.editing_component_id.as_deref() == Some(component_id.as_str())
+                    && let Some(value) = self.editing_value.take()
+                {
+                    self.field_notes.insert(field_id.into(), value);
+                }
+                self.editing_component_id = None;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ActionPressed { action_id }
+                if action_id.starts_with("cancel_field_note:") =>
+            {
+                self.editing_component_id = None;
+                self.editing_value = None;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
             UserAction::ActionPressed { action_id } if action_id == "delete_contact" => {
                 self.pending_delete = true;
                 ActionResult::UpdateScreen(self.build_screen())
@@ -880,6 +975,7 @@ impl WorkflowEngine for ContactDetailEngine {
                 ActionResult::ShowToast {
                     message: "Contact archived".into(),
                     undo_action_id: Some(format!("undo_archive_contact:{}", self.contact.id)),
+                    undo_label: Some(self.t("action.undo")),
                 }
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),

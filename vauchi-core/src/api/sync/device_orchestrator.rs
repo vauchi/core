@@ -14,7 +14,7 @@ use crate::crypto::{HKDF, SymmetricKey, encryption};
 use crate::identity::device::{DeviceInfo, DeviceRegistry};
 use crate::storage::Storage;
 use crate::sync::device_sync::{
-    ContactExchangeLocation, ContactRatchetSyncData, DeviceLinkIntent, DeviceSyncError,
+    ContactDeviceRegistrySyncData, ContactExchangeLocation, DeviceLinkIntent, DeviceSyncError,
     DeviceSyncPayload, FieldStamp, InterDeviceSyncState, PlaceSyncData, SyncItem, TagSyncData,
     VersionVector,
 };
@@ -204,12 +204,11 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
     /// Creates a full sync payload for a newly linked device.
     ///
-    /// This includes all contacts and the user's own contact card. Ratchet
-    /// sessions are cloned only for [`DeviceLinkIntent::ReplaceDevice`] —
-    /// see the enum docs for why an additional device must not carry them.
+    /// This includes contacts, the owner's card, and signed peer-device
+    /// registries. Ratchet sessions are never cloned (ADR-064).
     pub fn create_full_sync_payload(
         &self,
-        intent: DeviceLinkIntent,
+        _intent: DeviceLinkIntent,
     ) -> Result<DeviceSyncPayload, DeviceSyncError> {
         // Load contacts from storage
         let contacts = self
@@ -253,29 +252,17 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .map(|(id, loc)| ContactExchangeLocation::from_parts(id, loc))
             .collect();
 
-        // Load ratchet states for exchanged contacts so a replacement device can
-        // resume encrypted communication without an in-person re-exchange.
-        let mut ratchet_states = Vec::new();
-        if intent == DeviceLinkIntent::ReplaceDevice {
-            for contact in &contacts {
-                if !contact.is_exchanged() {
-                    continue;
-                }
-                let contact_id = contact.id();
-                if let Some((ratchet, is_initiator)) = self
-                    .storage
-                    .ratchets()
-                    .load_ratchet_state(contact_id)
-                    .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
-                {
-                    ratchet_states.push(ContactRatchetSyncData {
-                        contact_id: contact_id.to_string(),
-                        ratchet_state: ratchet.serialize(),
-                        is_initiator,
-                    });
-                }
-            }
-        }
+        let contact_device_registries = self
+            .storage
+            .device()
+            .list_contact_device_registries()
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+            .into_iter()
+            .map(|(contact_id, broadcast)| ContactDeviceRegistrySyncData {
+                contact_id,
+                broadcast_json: broadcast.to_json(),
+            })
+            .collect();
 
         // Get current version
         let version = self.version_vector.get(self.current_device.device_id());
@@ -284,7 +271,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .with_tags(tags)
             .with_places(places)
             .with_exchange_locations(exchange_locations)
-            .with_ratchet_states(ratchet_states))
+            .with_contact_device_registries(contact_device_registries))
     }
 
     /// Applies a full sync payload received during device linking.
@@ -325,6 +312,48 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
 
+            // Retain signed peer topology, never a live ratchet chain. The
+            // newly linked device will independently bootstrap its own pair
+            // sessions when it sends or receives.
+            for registry_data in &payload.contact_device_registries {
+                let contact = self
+                    .storage
+                    .contacts()
+                    .load_contact(&registry_data.contact_id)
+                    .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+                    .ok_or_else(|| {
+                        DeviceSyncError::Deserialization(format!(
+                            "registry references missing contact {}",
+                            registry_data.contact_id
+                        ))
+                    })?;
+                let public_key = contact.public_key().ok_or_else(|| {
+                    DeviceSyncError::Deserialization(
+                        "device registry references imported contact".into(),
+                    )
+                })?;
+                let broadcast =
+                    crate::identity::RegistryBroadcast::from_json(&registry_data.broadcast_json)
+                        .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+                let already_current = self
+                    .storage
+                    .device()
+                    .load_contact_device_registry(&registry_data.contact_id)
+                    .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+                    .is_some_and(|stored| stored.version() >= broadcast.version());
+                if !already_current {
+                    self.storage
+                        .device()
+                        .save_contact_device_registry(
+                            &registry_data.contact_id,
+                            &broadcast,
+                            public_key,
+                            u64::MAX,
+                        )
+                        .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+                }
+            }
+
             // Restore owner-private tags (ADR-051), preserving their ids.
             for tag_data in &payload.tags {
                 self.storage
@@ -345,19 +374,6 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             for loc in &payload.exchange_locations {
                 self.storage
                     .save_exchange_location(&loc.contact_id, &loc.location())
-                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-            }
-
-            // Restore ratchet states for exchanged contacts so this device can
-            // send to and decrypt from existing contacts.
-            for ratchet_data in &payload.ratchet_states {
-                let state = crate::crypto::ratchet::DoubleRatchetState::deserialize(
-                    ratchet_data.ratchet_state.clone(),
-                )
-                .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
-                self.storage
-                    .ratchets()
-                    .save_ratchet_state(&ratchet_data.contact_id, &state, ratchet_data.is_initiator)
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
 

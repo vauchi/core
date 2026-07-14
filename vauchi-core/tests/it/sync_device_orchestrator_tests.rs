@@ -848,13 +848,11 @@ fn save_ratchet_for(storage: &Storage, contact_id: &str) {
         .unwrap();
 }
 
-/// An add-device link must not clone live ratchet sessions: two devices
-/// advancing the same ratchet diverge at the contact (ADR-035 limitation),
-/// so only an explicit replacement transfers them.
+/// An add-device link carries contact state without any live ratchet chain.
 // @scenario: device_management :: New device receives full state
 // @internal
 #[test]
-fn add_device_sync_payload_excludes_ratchet_states() {
+fn add_device_sync_payload_carries_contacts_without_ratchets() {
     let storage = create_test_storage();
     let master_seed = [0x42u8; 32];
     let device_a = create_test_device(&master_seed, 0, "Device A");
@@ -870,18 +868,14 @@ fn add_device_sync_payload_excludes_ratchet_states() {
         .unwrap();
 
     assert_eq!(payload.contact_count(), 1);
-    assert!(
-        payload.ratchet_states.is_empty(),
-        "add-device payload must not clone ratchet sessions"
-    );
 }
 
-/// A replacement link transfers ratchet state so the new device resumes
-/// encrypted communication with existing contacts (sequential replacement).
+/// Replacement also establishes fresh pair sessions; it must not inherit a
+/// chain that could still advance on the source device.
 // @scenario: device_management :: New device receives full state
 // @internal
 #[test]
-fn replacement_sync_payload_includes_ratchet_states() {
+fn replacement_sync_payload_carries_contacts_without_ratchets() {
     let storage = create_test_storage();
     let master_seed = [0x42u8; 32];
     let device_a = create_test_device(&master_seed, 0, "Device A");
@@ -896,7 +890,5 @@ fn replacement_sync_payload_includes_ratchet_states() {
         .create_full_sync_payload(DeviceLinkIntent::ReplaceDevice)
         .unwrap();
 
-    assert_eq!(payload.ratchet_states.len(), 1);
-    assert_eq!(payload.ratchet_states[0].contact_id, contact.id());
-    assert!(payload.ratchet_states[0].is_initiator);
+    assert_eq!(payload.contact_count(), 1);
 }

@@ -475,6 +475,8 @@ impl DeviceReplacementEngine {
                 warning: self.t("device.remove_device_warning"),
                 confirm_text: self.t("device.remove_device_title"),
                 cancel_text: self.t("action.cancel"),
+                confirm_action_id: "confirm_remove".into(),
+                cancel_action_id: "cancel_remove".into(),
                 destructive: true,
                 a11y: Some(A11y {
                     label: Some(self.t("device.confirm_removal_a11y")),

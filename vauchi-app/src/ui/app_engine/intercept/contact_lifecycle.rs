@@ -39,6 +39,7 @@ impl AppEngine {
                 Some(ActionResult::ShowToast {
                     message: "Contact archived".into(),
                     undo_action_id: Some(format!("undo_archive_contact:{contact_id}")),
+                    undo_label: Some(self.t("action.undo")),
                 })
             }
             _ => None,
@@ -166,6 +167,7 @@ impl AppEngine {
         Some(ActionResult::ShowToast {
             message: "Duplicate dismissed".into(),
             undo_action_id: None,
+            undo_label: None,
         })
     }
 

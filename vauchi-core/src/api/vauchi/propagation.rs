@@ -11,6 +11,8 @@ use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
 use super::Vauchi;
 
+type PreparedDevicePayload = ([u8; 32], Vec<u8>, crate::crypto::DoubleRatchetState, bool);
+
 impl Vauchi {
     // === Card Propagation Operations ===
 
@@ -33,7 +35,7 @@ impl Vauchi {
 
         for contact in contacts {
             let encrypted =
-                match self.prepare_card_update_for_contact(contact.id(), old_card, new_card) {
+                match self.prepare_card_updates_for_contact(contact.id(), old_card, new_card) {
                     Ok(data) => data,
                     // Expected skips: blocked, no ratchet, empty delta, not exchanged
                     Err(VauchiError::ContactBlocked(_))
@@ -44,17 +46,19 @@ impl Vauchi {
 
             let now = self.clock.unix_seconds();
 
-            let update = PendingUpdate {
-                id: self.rng.uuid_v4(),
-                contact_id: contact.id().to_string(),
-                update_type: "card_delta".to_string(),
-                payload: encrypted,
-                created_at: now,
-                retry_count: 0,
-                status: UpdateStatus::Pending,
-                target_relay_url: contact.relay_url().map(String::from),
-            };
-            self.storage.pending().queue_update(&update)?;
+            for (_, payload) in encrypted {
+                let update = PendingUpdate {
+                    id: self.rng.uuid_v4(),
+                    contact_id: contact.id().to_string(),
+                    update_type: "card_delta".to_string(),
+                    payload,
+                    created_at: now,
+                    retry_count: 0,
+                    status: UpdateStatus::Pending,
+                    target_relay_url: contact.relay_url().map(String::from),
+                };
+                self.storage.pending().queue_update(&update)?;
+            }
             queued += 1;
         }
 
@@ -83,7 +87,8 @@ impl Vauchi {
             .unwrap_or_else(|| ContactCard::new(identity.display_name()));
         let empty_card = ContactCard::new(identity.display_name());
 
-        let encrypted = self.prepare_card_update_for_contact(contact_id, &empty_card, &our_card)?;
+        let encrypted =
+            self.prepare_card_updates_for_contact(contact_id, &empty_card, &our_card)?;
 
         // Load contact to get relay_url for per-contact relay routing
         let relay_url = self
@@ -94,17 +99,19 @@ impl Vauchi {
 
         let now = self.clock.unix_seconds();
 
-        let update = PendingUpdate {
-            id: self.rng.uuid_v4(),
-            contact_id: contact_id.to_string(),
-            update_type: "card_delta".to_string(),
-            payload: encrypted,
-            created_at: now,
-            retry_count: 0,
-            status: UpdateStatus::Pending,
-            target_relay_url: relay_url,
-        };
-        self.storage.pending().queue_update(&update)?;
+        for (_, payload) in encrypted {
+            let update = PendingUpdate {
+                id: self.rng.uuid_v4(),
+                contact_id: contact_id.to_string(),
+                update_type: "card_delta".to_string(),
+                payload,
+                created_at: now,
+                retry_count: 0,
+                status: UpdateStatus::Pending,
+                target_relay_url: relay_url.clone(),
+            };
+            self.storage.pending().queue_update(&update)?;
+        }
 
         Ok(())
     }
@@ -126,6 +133,31 @@ impl Vauchi {
         old_card: &ContactCard,
         new_card: &ContactCard,
     ) -> VauchiResult<Vec<u8>> {
+        if self
+            .storage
+            .device()
+            .load_contact_active_devices(contact_id)?
+            .len()
+            > 1
+        {
+            return Err(VauchiError::InvalidState(
+                "contact has multiple active devices; use fan-out preparation".into(),
+            ));
+        }
+        self.prepare_card_updates_for_contact(contact_id, old_card, new_card)?
+            .into_iter()
+            .next()
+            .map(|(_, payload)| payload)
+            .ok_or_else(|| VauchiError::NotFound("active peer device".into()))
+    }
+
+    /// Prepares one independently-ratcheted copy for every active peer device.
+    pub fn prepare_card_updates_for_contact(
+        &self,
+        contact_id: &str,
+        old_card: &ContactCard,
+        new_card: &ContactCard,
+    ) -> VauchiResult<Vec<([u8; 32], Vec<u8>)>> {
         use crate::crypto::cek::ContentEncryptionKey;
         use crate::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 
@@ -213,37 +245,22 @@ impl Vauchi {
         };
         let payload_bytes = VersionedPayload::encode_cek(&wrapped);
 
-        // Load ratchet and encrypt
-        let (mut ratchet, is_initiator) =
-            self.storage
-                .ratchets()
-                .load_ratchet_state(contact_id)?
-                .ok_or_else(|| VauchiError::NotFound("ratchet state".into()))?;
-
-        let ratchet_msg = ratchet.encrypt(&payload_bytes).map_err(|e| match e {
-            // A fresh responder has no sending chain until it decrypts the
-            // initiator's first message. DEFER (skippable InvalidState →
-            // `propagate_card_update` and `run_owed_repropagation` both
-            // `continue`) so the CLI `card add` path never surfaces this
-            // transient state as a hard crypto error; the armed repropagate
-            // marker retries once the first inbound message bootstraps the
-            // chain (2026-06-10 e2e smoke_card_update).
-            crate::crypto::ratchet::RatchetError::NoSendingChain => VauchiError::InvalidState(
-                "responder awaiting initiator's first message; deferring send".into(),
-            ),
-            other => VauchiError::Crypto(format!("{:?}", other)),
-        })?;
-        let encrypted = serde_json::to_vec(&ratchet_msg)
-            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+        let prepared =
+            self.encrypt_payload_for_contact_devices(identity, &contact, &payload_bytes)?;
 
         // Save CEK, ratchet state, and sent version atomically
         self.storage.begin_transaction()?;
         let save_result = (|| -> VauchiResult<()> {
             contact.set_cek(new_cek);
             self.storage.contacts().save_contact(&contact)?;
-            self.storage
-                .ratchets()
-                .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
+            for (peer_device_id, _, ratchet, is_initiator) in &prepared {
+                self.storage.ratchets().save_ratchet_state_for_device(
+                    contact_id,
+                    peer_device_id,
+                    ratchet,
+                    *is_initiator,
+                )?;
+            }
             self.storage
                 .contacts()
                 .record_sent_delta_version(contact_id, next_version)?;
@@ -257,7 +274,72 @@ impl Vauchi {
             }
         }
 
-        Ok(encrypted)
+        Ok(prepared
+            .into_iter()
+            .map(|(device_id, encrypted, _, _)| (device_id, encrypted))
+            .collect())
+    }
+
+    /// Encrypts one payload independently for every active peer device.
+    pub(crate) fn encrypt_payload_for_contact_devices(
+        &self,
+        identity: &crate::identity::Identity,
+        contact: &crate::contact::Contact,
+        payload: &[u8],
+    ) -> VauchiResult<Vec<PreparedDevicePayload>> {
+        let contact_id = contact.id();
+        let ex = contact
+            .kind()
+            .exchanged_data()
+            .ok_or_else(|| VauchiError::InvalidState("contact not exchanged".into()))?;
+        let peer_devices = self
+            .storage
+            .device()
+            .load_contact_active_devices(contact_id)?;
+        let targets: Vec<Option<crate::identity::BroadcastDevice>> = if peer_devices.is_empty() {
+            vec![None]
+        } else {
+            peer_devices.into_iter().map(Some).collect()
+        };
+        let mut prepared = Vec::with_capacity(targets.len());
+        for target in targets {
+            let peer_device_id = target
+                .as_ref()
+                .map(|device| device.device_id)
+                .unwrap_or([0; 32]);
+            let existing = self
+                .storage
+                .ratchets()
+                .load_ratchet_state_for_device(contact_id, &peer_device_id)?;
+            let (mut ratchet, is_initiator) = match (existing, target.as_ref()) {
+                (Some(session), _) => session,
+                (None, Some(device)) => {
+                    crate::exchange::ratchet_bootstrap::bootstrap_device_pair_ratchet(
+                        &ex.shared_key,
+                        identity.signing_public_key(),
+                        identity.device_id(),
+                        identity.device_info().exchange_keypair(),
+                        &ex.public_key,
+                        &device.device_id,
+                        &device.exchange_public_key,
+                    )
+                    .map_err(|error| {
+                        VauchiError::Crypto(format!("device-pair ratchet: {error:?}"))
+                    })?
+                }
+                (None, None) => return Err(VauchiError::NotFound("ratchet state".into())),
+            };
+            let ratchet_msg = ratchet.encrypt(payload).map_err(|error| match error {
+                crate::crypto::ratchet::RatchetError::NoSendingChain => VauchiError::InvalidState(
+                    "responder awaiting initiator's first message; deferring send".into(),
+                ),
+                other => VauchiError::Crypto(format!("{other:?}")),
+            })?;
+            let encrypted = serde_json::to_vec(&ratchet_msg)
+                .map_err(|error| VauchiError::Serialization(error.to_string()))?;
+            prepared.push((peer_device_id, encrypted, ratchet, is_initiator));
+        }
+        Ok(prepared)
     }
 
     // === CEK Migration ===
@@ -295,13 +377,6 @@ impl Vauchi {
                 continue;
             }
 
-            // Skip contacts without ratchet (can't send updates)
-            let (mut ratchet, is_initiator) =
-                match self.storage.ratchets().load_ratchet_state(contact.id())? {
-                    Some(r) => r,
-                    None => continue,
-                };
-
             // Generate a new CEK for this contact
             let cek = ContentEncryptionKey::generate();
 
@@ -328,17 +403,15 @@ impl Vauchi {
             };
             let payload_bytes = VersionedPayload::encode_cek(&wrapped);
 
-            // Ratchet-encrypt
-            let ratchet_msg = ratchet
-                .encrypt(&payload_bytes)
-                .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
-            let encrypted = serde_json::to_vec(&ratchet_msg)
-                .map_err(|e| VauchiError::Serialization(e.to_string()))?;
-
-            // Save updated ratchet state
-            self.storage
-                .ratchets()
-                .save_ratchet_state(contact.id(), &ratchet, is_initiator)?;
+            let prepared = match self.encrypt_payload_for_contact_devices(
+                identity,
+                &contact,
+                &payload_bytes,
+            ) {
+                Ok(prepared) => prepared,
+                Err(VauchiError::NotFound(_)) | Err(VauchiError::InvalidState(_)) => continue,
+                Err(error) => return Err(error),
+            };
 
             // Set CEK on contact and re-save (re-encrypts card at rest with CEK)
             contact.set_cek(cek);
@@ -347,17 +420,25 @@ impl Vauchi {
             // Queue for delivery
             let now = self.clock.unix_seconds();
 
-            let update = PendingUpdate {
-                id: self.rng.uuid_v4(),
-                contact_id: contact.id().to_string(),
-                update_type: "cek_migration".to_string(),
-                payload: encrypted,
-                created_at: now,
-                retry_count: 0,
-                status: UpdateStatus::Pending,
-                target_relay_url: contact.relay_url().map(String::from),
-            };
-            self.storage.pending().queue_update(&update)?;
+            for (device_id, encrypted, ratchet, is_initiator) in prepared {
+                self.storage.ratchets().save_ratchet_state_for_device(
+                    contact.id(),
+                    &device_id,
+                    &ratchet,
+                    is_initiator,
+                )?;
+                let update = PendingUpdate {
+                    id: self.rng.uuid_v4(),
+                    contact_id: contact.id().to_string(),
+                    update_type: "cek_migration".to_string(),
+                    payload: encrypted,
+                    created_at: now,
+                    retry_count: 0,
+                    status: UpdateStatus::Pending,
+                    target_relay_url: contact.relay_url().map(String::from),
+                };
+                self.storage.pending().queue_update(&update)?;
+            }
             migrated += 1;
         }
 

@@ -148,12 +148,6 @@ impl Vauchi {
                 Some(pk) => *pk,
                 None => continue,
             };
-            let (mut ratchet, is_initiator) =
-                match self.storage.ratchets().load_ratchet_state(contact_id)? {
-                    Some(r) => r,
-                    None => continue,
-                };
-
             // Random nonce → the receiver's replay check dedupes re-sends.
             let nonce: [u8; 32] = crate::crypto::random_bytes();
             let alert = SafetyAlertPayload::new(
@@ -167,27 +161,31 @@ impl Vauchi {
             )
             .map_err(|e| VauchiError::Serialization(format!("{e:?}")))?;
             let payload = VersionedPayload::encode_alert(&alert);
-            let ratchet_msg = ratchet
-                .encrypt(&payload)
-                .map_err(|e| VauchiError::Crypto(format!("{e:?}")))?;
-            let encrypted = serde_json::to_vec(&ratchet_msg)
-                .map_err(|e| VauchiError::Serialization(e.to_string()))?;
-
-            self.storage
-                .ratchets()
-                .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
-
-            let update = PendingUpdate {
-                id: self.rng.uuid_v4(),
-                contact_id: contact_id.to_string(),
-                update_type: "card_delta".to_string(), // Indistinguishable (ADR-032)
-                payload: encrypted,
-                created_at: now,
-                retry_count: 0,
-                status: UpdateStatus::Pending,
-                target_relay_url: None,
-            };
-            self.storage.pending().queue_update(&update)?;
+            let prepared =
+                match self.encrypt_payload_for_contact_devices(identity, &contact, &payload) {
+                    Ok(prepared) => prepared,
+                    Err(VauchiError::NotFound(_)) | Err(VauchiError::InvalidState(_)) => continue,
+                    Err(error) => return Err(error),
+                };
+            for (device_id, encrypted, ratchet, is_initiator) in prepared {
+                self.storage.ratchets().save_ratchet_state_for_device(
+                    contact_id,
+                    &device_id,
+                    &ratchet,
+                    is_initiator,
+                )?;
+                let update = PendingUpdate {
+                    id: self.rng.uuid_v4(),
+                    contact_id: contact_id.to_string(),
+                    update_type: "card_delta".to_string(), // Indistinguishable (ADR-032)
+                    payload: encrypted,
+                    created_at: now,
+                    retry_count: 0,
+                    status: UpdateStatus::Pending,
+                    target_relay_url: None,
+                };
+                self.storage.pending().queue_update(&update)?;
+            }
             sent += 1;
         }
 

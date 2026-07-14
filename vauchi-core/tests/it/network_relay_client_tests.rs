@@ -284,6 +284,47 @@ fn test_relay_client_send_raw_update() {
     assert_eq!(client.in_flight_count(), 1);
 }
 
+// @scenario: multi_device_sync :: Relay sender tokens distinguish linked devices
+#[test]
+fn test_send_raw_update_scopes_anonymous_sender_to_device() {
+    let key = [7u8; 32];
+    let device_id = [9u8; 32];
+    let now = 3_600;
+    let mut client = RelayClient::new(
+        MockTransport::new(),
+        create_test_config(),
+        "stable-id-must-not-leak".into(),
+    );
+    client.connect().unwrap();
+    let (mut ratchet, _) = create_test_ratchet();
+    let message = ratchet.encrypt(b"device update").unwrap();
+
+    client
+        .send_raw_update_for_device(
+            now,
+            "mailbox-token",
+            &message,
+            "device-update",
+            Some(&key),
+            Some(&device_id),
+        )
+        .unwrap();
+
+    let sent = client.connection().transport().sent_messages();
+    let MessagePayload::EncryptedUpdate(update) = &sent[0].payload else {
+        panic!("expected encrypted update")
+    };
+    assert_eq!(
+        update.sender_id.as_str(),
+        hex::encode(compute_anonymous_id_for_device(
+            &key,
+            current_epoch(now),
+            &device_id
+        ))
+    );
+    assert_ne!(update.sender_id.as_str(), "stable-id-must-not-leak");
+}
+
 // @scenario: message_delivery :: See delivery status for updates
 #[test]
 fn test_process_result_default() {

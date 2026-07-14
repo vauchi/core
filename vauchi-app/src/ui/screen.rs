@@ -7,9 +7,10 @@ use serde::{Deserialize, Serialize};
 use super::component::{A11y, Component};
 use crate::theme::DesignTokens;
 
-/// Current schema version. Increment when adding new Component types.
+/// Current schema version. Increment for any breaking ScreenModel wire-contract
+/// change, including required fields on an existing Component variant.
 /// Shells use this to detect unsupported components and degrade gracefully.
-pub const CURRENT_SCHEMA_VERSION: u16 = 3;
+pub const CURRENT_SCHEMA_VERSION: u16 = 4;
 
 /// How the frontend should present this screen. Replaces frontend-side
 /// substring checks on `screen_id` (e.g. windows

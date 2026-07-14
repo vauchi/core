@@ -121,6 +121,7 @@ pub(super) fn build_field_preview_screen(
             name_component,
             Component::FieldList {
                 id: "preview_fields".into(),
+                title: t("exchange.preview.fields_a11y"),
                 fields,
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_scopes: vec![],

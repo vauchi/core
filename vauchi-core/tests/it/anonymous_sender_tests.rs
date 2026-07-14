@@ -5,7 +5,8 @@
 //! Tests for network::anonymous (anonymous sender IDs)
 
 use vauchi_core::network::anonymous::{
-    AnonymousSender, SenderIndex, compute_anonymous_id, current_epoch, resolve_sender,
+    AnonymousSender, SenderIndex, compute_anonymous_id, compute_anonymous_id_for_device,
+    current_epoch, resolve_sender, resolve_sender_device,
 };
 use vauchi_core::{Contact, ContactCard, SymmetricKey};
 
@@ -47,6 +48,61 @@ fn test_different_keys_different_ids() {
     let id1 = compute_anonymous_id(&key1, 100);
     let id2 = compute_anonymous_id(&key2, 100);
     assert_ne!(id1, id2);
+}
+
+// @internal
+#[test]
+fn device_scoped_ids_rotate_and_do_not_expose_a_stable_device_token() {
+    let key = [0xABu8; 32];
+
+    let first_device_id = [1; 32];
+    let second_device_id = [2; 32];
+    let first_device = compute_anonymous_id_for_device(&key, 100, &first_device_id);
+    let second_device = compute_anonymous_id_for_device(&key, 100, &second_device_id);
+    let first_device_next_epoch = compute_anonymous_id_for_device(&key, 101, &first_device_id);
+
+    assert_ne!(first_device, second_device);
+    assert_ne!(first_device, first_device_next_epoch);
+    assert_ne!(first_device, compute_anonymous_id(&key, 100));
+}
+
+// @internal
+#[test]
+fn device_scoped_sender_resolution_returns_contact_and_device() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Alice", key);
+    let contacts = vec![contact];
+    let epoch = 1000;
+    let device_id = [2; 32];
+    let token = compute_anonymous_id_for_device(
+        contacts[0].shared_key().unwrap().as_bytes(),
+        epoch - 1,
+        &device_id,
+    );
+
+    let known_device_ids = [[1; 32], device_id, [3; 32]];
+    let (resolved_contact, resolved_device_id) =
+        resolve_sender_device(&contacts, &known_device_ids, &token, epoch).unwrap();
+
+    assert_eq!(resolved_contact.display_name(), "Alice");
+    assert_eq!(resolved_device_id, device_id);
+}
+
+// @internal
+#[test]
+fn device_scoped_sender_resolution_keeps_legacy_peer_compatibility() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Alice", key);
+    let contacts = vec![contact];
+    let epoch = 1000;
+    let legacy_token = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), epoch);
+
+    let known_device_ids = [[1; 32], [2; 32], [3; 32]];
+    let (resolved_contact, resolved_device_id) =
+        resolve_sender_device(&contacts, &known_device_ids, &legacy_token, epoch).unwrap();
+
+    assert_eq!(resolved_contact.display_name(), "Alice");
+    assert_eq!(resolved_device_id, [0; 32]);
 }
 
 // @scenario: anonymous_sender :: Outgoing messages use anonymous sender ID

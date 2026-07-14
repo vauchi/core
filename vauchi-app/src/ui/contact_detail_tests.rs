@@ -455,6 +455,7 @@ fn test_archive_action_returns_show_toast_with_undo() {
         ActionResult::ShowToast {
             message: "Contact archived".into(),
             undo_action_id: Some("undo_archive_contact:c1".into()),
+            undo_label: Some("Undo".into()),
         }
     );
 }

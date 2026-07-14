@@ -12,23 +12,29 @@ use super::AppEngine;
 use super::AppScreen;
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::contact_detail_rules::ContactTag;
+use crate::ui::{Component, ScreenModel};
 use vauchi_core::SearchFacets;
 
+fn editable_text_value(screen: &ScreenModel, component_id: &str) -> Option<String> {
+    screen
+        .components
+        .iter()
+        .find_map(|component| match component {
+            Component::EditableText { id, value, .. } if id == component_id => Some(value.clone()),
+            _ => None,
+        })
+}
+
 impl AppEngine {
-    /// Intercept personal note edits on the ContactDetail screen and persist them.
-    ///
-    /// When the user changes the `personal_note` EditableText component, the note
-    /// is saved immediately as raw UTF-8 bytes via `Vauchi::save_personal_notes`.
-    pub(super) fn intercept_personal_note_change(
-        &mut self,
-        contact_id: &str,
-        action: &UserAction,
-    ) -> Option<ActionResult> {
-        if let UserAction::TextChanged {
-            component_id,
-            value,
-        } = action
-            && component_id == "personal_note"
+    /// Persist the core-owned personal-note draft only when Save is pressed.
+    /// TextChanged first updates the live ContactDetail engine; Cancel therefore
+    /// discards the draft without touching storage.
+    pub(super) fn persist_personal_note_save(&mut self, contact_id: &str, action: &UserAction) {
+        if matches!(
+            action,
+            UserAction::ActionPressed { action_id } if action_id == "save_personal_note"
+        ) && let Some(value) =
+            editable_text_value(&self.engine.current_screen(), "personal_note")
         {
             // Encryption handled at the storage layer (save_personal_notes encrypts
             // with the storage encryption key). Legacy plaintext rows are self-healed
@@ -39,32 +45,17 @@ impl AppEngine {
             {
                 let _ = e; // Silently ignore — UI already shows the field unchanged
             }
-            // No invalidate_screen: this screen IS current (never cached
-            // while displayed) and navigate-away re-caches the live
-            // engine, so eviction was a no-op — while a rebuild would
-            // wipe transient state (in-progress add-tag query) on every
-            // keystroke now that invalidate_screen rebuilds the current
-            // engine.
-            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
-        None
     }
 
-    /// Intercept per-field note edits on the ContactDetail screen and persist them.
-    ///
-    /// When the user changes a `field_note:{field_id}` EditableText component,
-    /// the note is saved immediately as raw UTF-8 bytes via
-    /// `Vauchi::save_contact_field_note`.
-    pub(super) fn intercept_field_note_change(
-        &mut self,
-        contact_id: &str,
-        action: &UserAction,
-    ) -> Option<ActionResult> {
-        if let UserAction::TextChanged {
-            component_id,
-            value,
-        } = action
-            && let Some(field_id) = component_id.strip_prefix("field_note:")
+    /// Persist the core-owned per-field draft only when its Save is pressed.
+    pub(super) fn persist_field_note_save(&mut self, contact_id: &str, action: &UserAction) {
+        if let UserAction::ActionPressed { action_id } = action
+            && let Some(field_id) = action_id.strip_prefix("save_field_note:")
+            && let Some(value) = editable_text_value(
+                &self.engine.current_screen(),
+                &format!("field_note:{field_id}"),
+            )
         {
             if let Err(e) =
                 self.vauchi
@@ -72,10 +63,7 @@ impl AppEngine {
             {
                 let _ = e;
             }
-            // No invalidate_screen — see intercept_personal_note_change.
-            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
-        None
     }
 
     /// Intercept add-tag typing, tag commit, and tag removal on the

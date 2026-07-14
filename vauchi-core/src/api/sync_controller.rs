@@ -212,15 +212,10 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
         let total = ready_updates.len();
         for (idx, update) in ready_updates.into_iter().enumerate() {
-            // The pending payload was already ratchet-encrypted by
-            // `prepare_card_update_for_contact`; the send must NOT re-encrypt
-            // it (double-encrypting makes the recipient decrypt to a serialized
-            // RatchetMessage instead of the versioned payload — `bad_payload`,
-            // 2026-06-28-sync-delivery-sent-not-received). Skip only when the
-            // contact has no ratchet at all.
-            if !self.ratchets.contains_key(&update.contact_id) {
-                continue;
-            }
+            // The pending payload is already encrypted and its matching
+            // per-device ratchet was persisted atomically before queueing.
+            // Do not gate on the legacy contact-only controller map: a modern
+            // contact may have only `(contact, peer_device)` sessions.
 
             // Load contact's shared key for anonymous sender ID and mailbox token.
             // ADR-029 forbids stable (non-rotating) recipient_ids: if we can't
@@ -285,12 +280,20 @@ impl<'a, T: Transport> SyncController<'a, T> {
                         continue;
                     }
                 };
-            match self.relay.send_raw_update(
+            let sender_device_id = self
+                .storage
+                .device()
+                .load_device_info()
+                .ok()
+                .flatten()
+                .map(|info| info.0);
+            match self.relay.send_raw_update_for_device(
                 self.storage.clock().unix_seconds(),
                 &recipient_id,
                 &ratchet_msg,
                 &update.id,
                 shared_key.as_ref(),
+                sender_device_id.as_ref(),
             ) {
                 Ok(msg_id) => {
                     result.sent += 1;
@@ -352,14 +355,8 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
         let mut result = SyncResult::default();
 
-        // Pre-built pending payloads are already ratchet-encrypted; the send
-        // below must not re-encrypt (see the per-update loop above).
-        if !self.ratchets.contains_key(contact_id) {
-            return Err(VauchiError::InvalidState(format!(
-                "No ratchet for contact {}",
-                contact_id
-            )));
-        }
+        // Pre-built pending payloads already prove encryption succeeded. Their
+        // sessions may exist only in the per-device store, not this legacy map.
 
         // Load contact's shared key for anonymous sender ID and mailbox token.
         // ADR-029 forbids stable (non-rotating) recipient_ids: if we can't
@@ -408,12 +405,20 @@ impl<'a, T: Transport> SyncController<'a, T> {
                         continue;
                     }
                 };
-            match self.relay.send_raw_update(
+            let sender_device_id = self
+                .storage
+                .device()
+                .load_device_info()
+                .ok()
+                .flatten()
+                .map(|info| info.0);
+            match self.relay.send_raw_update_for_device(
                 self.storage.clock().unix_seconds(),
                 &recipient_id,
                 &ratchet_msg,
                 &update.id,
                 shared_key.as_ref(),
+                sender_device_id.as_ref(),
             ) {
                 Ok(_) => {
                     result.sent += 1;

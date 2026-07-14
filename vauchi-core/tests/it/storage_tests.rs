@@ -268,6 +268,76 @@ fn test_storage_save_load_ratchet_state() {
 
 // @internal
 #[test]
+fn ratchet_states_are_isolated_by_peer_device_id() {
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
+    use vauchi_core::exchange::X3DHKeyPair;
+
+    let storage = create_test_storage();
+    let contact = create_test_contact("Alice");
+    storage.contacts().save_contact(&contact).unwrap();
+
+    let first_secret = SymmetricKey::generate();
+    let first_dh = X3DHKeyPair::generate();
+    let first =
+        DoubleRatchetState::initialize_initiator(&first_secret, *first_dh.public_key()).unwrap();
+
+    let second_secret = SymmetricKey::generate();
+    let second_dh = X3DHKeyPair::generate();
+    let second =
+        DoubleRatchetState::initialize_initiator(&second_secret, *second_dh.public_key()).unwrap();
+    let first_device_id = [1; 32];
+    let second_device_id = [2; 32];
+
+    storage
+        .ratchets()
+        .save_ratchet_state_for_device(contact.id(), &first_device_id, &first, true)
+        .unwrap();
+    storage
+        .ratchets()
+        .save_ratchet_state_for_device(contact.id(), &second_device_id, &second, false)
+        .unwrap();
+
+    let (loaded_first, first_is_initiator) = storage
+        .ratchets()
+        .load_ratchet_state_for_device(contact.id(), &first_device_id)
+        .unwrap()
+        .unwrap();
+    let (loaded_second, second_is_initiator) = storage
+        .ratchets()
+        .load_ratchet_state_for_device(contact.id(), &second_device_id)
+        .unwrap()
+        .unwrap();
+
+    assert!(first_is_initiator);
+    assert!(!second_is_initiator);
+    assert_eq!(loaded_first.our_public_key(), first.our_public_key());
+    assert_eq!(loaded_second.our_public_key(), second.our_public_key());
+
+    assert!(
+        storage
+            .ratchets()
+            .delete_ratchet_state_for_device(contact.id(), &first_device_id)
+            .unwrap()
+    );
+    assert!(
+        storage
+            .ratchets()
+            .load_ratchet_state_for_device(contact.id(), &first_device_id)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        storage
+            .ratchets()
+            .load_ratchet_state_for_device(contact.id(), &second_device_id)
+            .unwrap()
+            .is_some()
+    );
+}
+
+// @internal
+#[test]
 fn test_storage_ratchet_state_encryption() {
     use vauchi_core::crypto::SymmetricKey;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;

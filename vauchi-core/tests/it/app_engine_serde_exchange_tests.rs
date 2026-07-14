@@ -153,9 +153,11 @@ fn entry_detail_delete_returns_show_toast_with_undo() {
         ActionResult::ShowToast {
             message,
             undo_action_id,
+            undo_label,
         } => {
             assert!(message.contains("deleted"), "toast should mention deletion");
             assert!(undo_action_id.is_some(), "should have undo action_id");
+            assert_eq!(undo_label.as_deref(), Some("Undo"));
             let undo_id = undo_action_id.unwrap();
             assert!(
                 undo_id.contains(&field_id),

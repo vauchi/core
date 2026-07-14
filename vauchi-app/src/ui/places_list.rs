@@ -116,6 +116,8 @@ impl PlacesEngine {
                 ),
                 confirm_text: self.t("action.delete"),
                 cancel_text: self.t("action.cancel"),
+                confirm_action_id: "confirm_delete_place".into(),
+                cancel_action_id: "cancel_delete_place".into(),
                 destructive: true,
                 a11y: None,
             });

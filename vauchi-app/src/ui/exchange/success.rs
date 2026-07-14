@@ -88,6 +88,7 @@ pub fn build_exchange_success_screen(
             .collect();
         components.push(Component::FieldList {
             id: "received_fields".into(),
+            title: t("fields.a11y_contact_fields"),
             fields,
             visibility_mode: VisibilityMode::ReadOnly,
             available_scopes: Vec::new(),

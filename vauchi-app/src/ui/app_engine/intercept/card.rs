@@ -196,6 +196,7 @@ impl AppEngine {
                 return Some(ActionResult::ShowToast {
                     message: "Field deleted".into(),
                     undo_action_id: Some(format!("undo_delete_field:{field_id}")),
+                    undo_label: Some(self.t("action.undo")),
                 });
             }
             UserAction::ActionPressed { action_id } if action_id == "back" => {

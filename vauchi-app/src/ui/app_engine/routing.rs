@@ -186,10 +186,12 @@ impl AppEngine {
             Event::HardwareUnavailable { transport } => Some(ActionResult::ShowToast {
                 message: format!("{} is not available on this device", transport),
                 undo_action_id: None,
+                undo_label: None,
             }),
             Event::PermissionDenied { transport } => Some(ActionResult::ShowToast {
                 message: format!("{} access was denied", transport),
                 undo_action_id: None,
+                undo_label: None,
             }),
             Event::HardwareError { transport, error } => Some(ActionResult::ShowAlert {
                 title: format!("{} error", transport),
@@ -296,6 +298,7 @@ impl AppEngine {
                         Some(ActionResult::ShowToast {
                             message: format_import_toast(result.imported, result.skipped),
                             undo_action_id: None,
+                            undo_label: None,
                         })
                     }
                     Err(e) => Some(ActionResult::ShowAlert {
@@ -560,6 +563,7 @@ impl AppEngine {
                     ActionResult::ShowToast {
                         message: "Contact archived".into(),
                         undo_action_id: Some(format!("undo_archive_contact:{contact_id}")),
+                        undo_label: Some(self.t("action.undo")),
                     }
                 }
                 Err(e) => ActionResult::ShowAlert {
@@ -571,6 +575,7 @@ impl AppEngine {
                 Ok(()) => ActionResult::ShowToast {
                     message: "Contact unarchived".into(),
                     undo_action_id: None,
+                    undo_label: None,
                 },
                 Err(e) => ActionResult::ShowAlert {
                     title: self.t("contacts.unarchive_failed_title"),
@@ -581,6 +586,7 @@ impl AppEngine {
                 Ok(()) => ActionResult::ShowToast {
                     message: "Contact hidden".into(),
                     undo_action_id: Some(format!("undo_hide_contact:{contact_id}")),
+                    undo_label: Some(self.t("action.undo")),
                 },
                 Err(e) => ActionResult::ShowAlert {
                     title: self.t("contacts.hide_failed_title"),
@@ -591,6 +597,7 @@ impl AppEngine {
                 Ok(()) => ActionResult::ShowToast {
                     message: "Contact unhidden".into(),
                     undo_action_id: None,
+                    undo_label: None,
                 },
                 Err(e) => ActionResult::ShowAlert {
                     title: self.t("contacts.unhide_failed_title"),
@@ -602,6 +609,7 @@ impl AppEngine {
                 Ok(()) => ActionResult::ShowToast {
                     message: "Contact deleted".into(),
                     undo_action_id: Some(format!("undo_delete_contact:{contact_id}")),
+                    undo_label: Some(self.t("action.undo")),
                 },
                 Err(e) => ActionResult::ShowAlert {
                     title: self.t("contacts.delete_failed_title"),
@@ -613,6 +621,7 @@ impl AppEngine {
                     Ok(()) => ActionResult::ShowToast {
                         message: "Contact restored".into(),
                         undo_action_id: None,
+                        undo_label: None,
                     },
                     Err(e) => ActionResult::ShowAlert {
                         title: self.t("contacts.restore_failed_title"),

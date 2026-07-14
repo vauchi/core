@@ -84,6 +84,10 @@ fn contact_edit_renders_german() {
     let engine = ContactEditEngine::new(contact, vec![]).with_locale(Locale::German);
     let screen = engine.current_screen();
     assert_eq!(screen.title, "Kontakt bearbeiten");
+    assert!(screen.components.iter().any(|component| matches!(
+        component,
+        vauchi_app::ui::Component::FieldList { title, .. } if title == "Kontaktfelder"
+    )));
 }
 
 // English stays exactly as before (regression pin) — one representative check.

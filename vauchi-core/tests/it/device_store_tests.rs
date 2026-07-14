@@ -8,7 +8,13 @@
 //! `DeviceStore` owns `device_info` and `device_registry`; sync state is split
 //! out into `SyncStore`.
 
-use vauchi_core::{DeviceStore, Storage, SymmetricKey};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
+use vauchi_core::crypto::DoubleRatchetState;
+use vauchi_core::identity::{DeviceInfo, DeviceRegistry, RegistryBroadcast};
+use vauchi_core::{DeviceStore, SigningKeyPair, Storage, SymmetricKey, X3DHKeyPair};
 
 fn test_storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
@@ -59,4 +65,119 @@ fn test_device_store_clear_info_wipes_row() {
     storage.device().clear_device_info().unwrap();
 
     assert!(!storage.device().has_device_info().unwrap());
+}
+
+// @internal
+#[test]
+fn test_contact_device_registry_accepts_only_newer_identity_signed_broadcasts() {
+    let storage = test_storage();
+    let signing = SigningKeyPair::from_seed(&[7u8; 32]);
+    let contact = Contact::from_exchange(
+        *signing.public_key().as_bytes(),
+        ContactCard::new("Grandson"),
+        SymmetricKey::generate(),
+        0,
+    );
+    storage.contacts().save_contact(&contact).unwrap();
+
+    let seed = [11u8; 32];
+    let primary = DeviceInfo::derive(&seed, 0, "Phone".into(), 1);
+    let mut registry = DeviceRegistry::new(primary.to_registered(&seed), &signing);
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let first = RegistryBroadcast::new(&registry, &signing, now);
+    storage
+        .device()
+        .save_contact_device_registry(contact.id(), &first, signing.public_key().as_bytes(), 60)
+        .unwrap();
+    assert_eq!(
+        storage
+            .device()
+            .load_contact_active_devices(contact.id())
+            .unwrap()
+            .len(),
+        1
+    );
+
+    let attacker = SigningKeyPair::from_seed(&[99u8; 32]);
+    let forged = RegistryBroadcast::new(&registry, &attacker, now);
+    assert!(
+        storage
+            .device()
+            .save_contact_device_registry(
+                contact.id(),
+                &forged,
+                signing.public_key().as_bytes(),
+                60,
+            )
+            .is_err()
+    );
+    assert!(
+        storage
+            .device()
+            .save_contact_device_registry(
+                contact.id(),
+                &first,
+                signing.public_key().as_bytes(),
+                60,
+            )
+            .is_err(),
+        "replayed registry version must be rejected"
+    );
+
+    let second = DeviceInfo::derive(&seed, 1, "Laptop".into(), 1);
+    registry
+        .add_device(second.to_registered(&seed), &signing)
+        .unwrap();
+    let newer = RegistryBroadcast::new(&registry, &signing, now);
+    storage
+        .device()
+        .save_contact_device_registry(contact.id(), &newer, signing.public_key().as_bytes(), 60)
+        .unwrap();
+    assert_eq!(
+        storage
+            .device()
+            .load_contact_active_devices(contact.id())
+            .unwrap()
+            .len(),
+        2
+    );
+
+    let revoked_id = *second.device_id();
+    let ratchet = DoubleRatchetState::initialize_initiator(
+        &SymmetricKey::generate(),
+        *X3DHKeyPair::generate().public_key(),
+    )
+    .unwrap();
+    storage
+        .ratchets()
+        .save_ratchet_state_for_device(contact.id(), &revoked_id, &ratchet, true)
+        .unwrap();
+    registry
+        .revoke_device(&revoked_id, &signing, now + 1)
+        .unwrap();
+    let pruned = RegistryBroadcast::new(&registry, &signing, now + 1);
+    storage
+        .device()
+        .save_contact_device_registry(contact.id(), &pruned, signing.public_key().as_bytes(), 60)
+        .unwrap();
+    assert!(
+        storage
+            .ratchets()
+            .load_ratchet_state_for_device(contact.id(), &revoked_id)
+            .unwrap()
+            .is_none(),
+        "revoked peer sessions must be pruned"
+    );
+
+    storage.delete_contact(contact.id()).unwrap();
+    assert!(
+        storage
+            .device()
+            .load_contact_device_registry(contact.id())
+            .unwrap()
+            .is_none()
+    );
 }

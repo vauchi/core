@@ -151,6 +151,8 @@ impl GroupDetailEngine {
                 ),
                 confirm_text: self.t("group_detail.delete_group_button"),
                 cancel_text: self.t("action.cancel"),
+                confirm_action_id: "confirm_delete_group".into(),
+                cancel_action_id: "cancel_delete_group".into(),
                 destructive: true,
                 a11y: None,
             });

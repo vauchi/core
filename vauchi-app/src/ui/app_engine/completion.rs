@@ -371,11 +371,13 @@ impl AppEngine {
                         Err(_) => ActionResult::ShowToast {
                             message: "Export failed: could not serialize data.".into(),
                             undo_action_id: None,
+                            undo_label: None,
                         },
                     },
                     Err(_) => ActionResult::ShowToast {
                         message: "Export failed: could not read data.".into(),
                         undo_action_id: None,
+                        undo_label: None,
                     },
                 }
             }
@@ -393,11 +395,13 @@ impl AppEngine {
                             message: "Identity deletion scheduled. You have 7 days to cancel."
                                 .into(),
                             undo_action_id: None,
+                            undo_label: None,
                         }
                     }
                     Err(_) => ActionResult::ShowToast {
                         message: "Could not schedule deletion.".into(),
                         undo_action_id: None,
+                        undo_label: None,
                     },
                 }
             }
@@ -411,11 +415,13 @@ impl AppEngine {
                         ActionResult::ShowToast {
                             message: "Identity deletion cancelled.".into(),
                             undo_action_id: None,
+                            undo_label: None,
                         }
                     }
                     Err(_) => ActionResult::ShowToast {
                         message: "Could not cancel deletion.".into(),
                         undo_action_id: None,
+                        undo_label: None,
                     },
                 }
             }
@@ -447,6 +453,7 @@ impl AppEngine {
                     None => ActionResult::ShowToast {
                         message: "Could not execute deletion.".into(),
                         undo_action_id: None,
+                        undo_label: None,
                     },
                 }
             }
@@ -458,6 +465,7 @@ impl AppEngine {
                 Err(_) => ActionResult::ShowToast {
                     message: "Emergency wipe failed.".into(),
                     undo_action_id: None,
+                    undo_label: None,
                 },
             },
             None => {
@@ -694,6 +702,7 @@ impl AppEngine {
             return ActionResult::ShowToast {
                 message,
                 undo_action_id: None,
+                undo_label: None,
             };
         }
         let screen = self.navigate_back();

@@ -323,6 +323,7 @@ fn test_component_toggle_list_roundtrip() {
 fn test_component_field_list_roundtrip() {
     let component = Component::FieldList {
         id: "fields".into(),
+        title: "Kontaktfelder".into(),
         fields: vec![Field {
             id: "email".into(),
             field_type: "email".into(),
@@ -342,12 +343,14 @@ fn test_component_field_list_roundtrip() {
     match restored {
         Component::FieldList {
             id,
+            title,
             fields,
             visibility_mode,
             available_scopes,
             ..
         } => {
             assert_eq!(id, "fields");
+            assert_eq!(title, "Kontaktfelder");
             assert_eq!(fields.len(), 1);
             assert_eq!(fields[0].id, "email");
             assert_eq!(fields[0].value, "alice@example.com");
@@ -358,6 +361,26 @@ fn test_component_field_list_roundtrip() {
             assert_eq!(visibility_mode, VisibilityMode::PerGroup);
             assert_eq!(available_scopes, vec!["friends", "family"]);
         }
+        other => panic!("Expected FieldList, got {:?}", other),
+    }
+}
+
+// @internal
+#[test]
+fn test_component_field_list_missing_title_defaults_for_old_wire_payload() {
+    let json = r#"{
+        "FieldList": {
+            "id": "fields",
+            "fields": [],
+            "visibility_mode": "ReadOnly",
+            "available_scopes": [],
+            "a11y": null
+        }
+    }"#;
+
+    let restored: Component = serde_json::from_str(json).unwrap();
+    match restored {
+        Component::FieldList { title, .. } => assert!(title.is_empty()),
         other => panic!("Expected FieldList, got {:?}", other),
     }
 }
@@ -564,6 +587,8 @@ fn test_component_inline_confirm_roundtrip() {
         warning: "This permanently deletes your identity".into(),
         confirm_text: "Delete Forever".into(),
         cancel_text: "Cancel".into(),
+        confirm_action_id: "opaque/confirm#7".into(),
+        cancel_action_id: "opaque/cancel#8".into(),
         destructive: true,
         a11y: None,
     };
@@ -576,13 +601,17 @@ fn test_component_inline_confirm_roundtrip() {
             warning,
             confirm_text,
             cancel_text,
+            confirm_action_id,
+            cancel_action_id,
             destructive,
-            ..
+            a11y: _,
         } => {
             assert_eq!(id, "confirm-1");
             assert_eq!(warning, "This permanently deletes your identity");
             assert_eq!(confirm_text, "Delete Forever");
             assert_eq!(cancel_text, "Cancel");
+            assert_eq!(confirm_action_id, "opaque/confirm#7");
+            assert_eq!(cancel_action_id, "opaque/cancel#8");
             assert!(destructive);
         }
         other => panic!("Expected InlineConfirm, got {:?}", other),
@@ -597,6 +626,8 @@ fn test_component_inline_confirm_non_destructive_roundtrip() {
         warning: "Are you sure?".into(),
         confirm_text: "Yes".into(),
         cancel_text: "No".into(),
+        confirm_action_id: "confirm_choice".into(),
+        cancel_action_id: "cancel_choice".into(),
         destructive: false,
         a11y: None,
     };
@@ -631,6 +662,12 @@ fn test_component_editable_text_display_mode_roundtrip() {
         id: "edit-name".into(),
         label: "Display Name".into(),
         value: "Alice".into(),
+        edit_text: "Edit".into(),
+        save_text: "Save".into(),
+        cancel_text: "Cancel".into(),
+        edit_action_id: "opaque/edit#1".into(),
+        save_action_id: "opaque/save#2".into(),
+        cancel_action_id: "opaque/cancel#3".into(),
         editing: false,
         validation_error: None,
         a11y: None,
@@ -644,13 +681,26 @@ fn test_component_editable_text_display_mode_roundtrip() {
             id,
             label,
             value,
+            edit_text,
+            save_text,
+            cancel_text,
+            edit_action_id,
+            save_action_id,
+            cancel_action_id,
             editing,
             validation_error,
-            ..
+            a11y: _,
+            info_key: _,
         } => {
             assert_eq!(id, "edit-name");
             assert_eq!(label, "Display Name");
             assert_eq!(value, "Alice");
+            assert_eq!(edit_text, "Edit");
+            assert_eq!(save_text, "Save");
+            assert_eq!(cancel_text, "Cancel");
+            assert_eq!(edit_action_id, "opaque/edit#1");
+            assert_eq!(save_action_id, "opaque/save#2");
+            assert_eq!(cancel_action_id, "opaque/cancel#3");
             assert!(!editing);
             assert!(validation_error.is_none());
         }
@@ -665,6 +715,12 @@ fn test_component_editable_text_editing_with_error_roundtrip() {
         id: "edit-name".into(),
         label: "Display Name".into(),
         value: "".into(),
+        edit_text: "Edit".into(),
+        save_text: "Save".into(),
+        cancel_text: "Cancel".into(),
+        edit_action_id: "edit_name".into(),
+        save_action_id: "save_name".into(),
+        cancel_action_id: "cancel_name".into(),
         editing: true,
         validation_error: Some("Name cannot be empty".into()),
         a11y: None,
@@ -700,6 +756,7 @@ fn test_action_result_show_toast_roundtrip() {
     let result = ActionResult::ShowToast {
         message: "Contact deleted".into(),
         undo_action_id: Some("undo-delete-alice".into()),
+        undo_label: Some("Rückgängig".into()),
     };
     let json = serde_json::to_string(&result).unwrap();
     let restored: ActionResult = serde_json::from_str(&json).unwrap();
@@ -707,9 +764,11 @@ fn test_action_result_show_toast_roundtrip() {
         ActionResult::ShowToast {
             message,
             undo_action_id,
+            undo_label,
         } => {
             assert_eq!(message, "Contact deleted");
             assert_eq!(undo_action_id.as_deref(), Some("undo-delete-alice"));
+            assert_eq!(undo_label.as_deref(), Some("Rückgängig"));
         }
         other => panic!("Expected ShowToast, got {:?}", other),
     }
@@ -721,6 +780,7 @@ fn test_action_result_show_toast_without_undo_roundtrip() {
     let result = ActionResult::ShowToast {
         message: "Changes saved".into(),
         undo_action_id: None,
+        undo_label: None,
     };
     let json = serde_json::to_string(&result).unwrap();
     let restored: ActionResult = serde_json::from_str(&json).unwrap();
@@ -728,11 +788,32 @@ fn test_action_result_show_toast_without_undo_roundtrip() {
         ActionResult::ShowToast {
             message,
             undo_action_id,
+            undo_label,
         } => {
             assert_eq!(message, "Changes saved");
             assert!(undo_action_id.is_none());
+            assert!(undo_label.is_none());
         }
         other => panic!("Expected ShowToast, got {:?}", other),
+    }
+}
+
+// @internal
+#[test]
+fn test_action_result_show_toast_pre_label_wire_compatibility() {
+    let json = r#"{"ShowToast":{"message":"Archived","undo_action_id":"undo-1"}}"#;
+    let restored: ActionResult = serde_json::from_str(json).unwrap();
+    match restored {
+        ActionResult::ShowToast {
+            message,
+            undo_action_id,
+            undo_label,
+        } => {
+            assert_eq!(message, "Archived");
+            assert_eq!(undo_action_id.as_deref(), Some("undo-1"));
+            assert!(undo_label.is_none());
+        }
+        other => panic!("Expected ShowToast, got {other:?}"),
     }
 }
 

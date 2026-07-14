@@ -59,6 +59,11 @@ pub enum Component {
     },
     FieldList {
         id: String,
+        /// Core-resolved section label. Renderers use this verbatim for
+        /// native group accessibility; terminal layouts may also show it as
+        /// the panel title. An empty value only occurs on legacy payloads.
+        #[serde(default)]
+        title: String,
         fields: Vec<Field>,
         visibility_mode: VisibilityMode,
         available_scopes: Vec<String>,
@@ -196,12 +201,17 @@ pub enum Component {
         #[serde(default)]
         a11y: Option<A11y>,
     },
-    /// An inline confirmation for irrevocable actions (expands in place).
+    /// Visible inline confirmation choices for irrevocable actions.
     InlineConfirm {
         id: String,
         warning: String,
+        /// Core-owned button copy; render verbatim.
         confirm_text: String,
         cancel_text: String,
+        /// Opaque action ids the renderer forwards verbatim. A frontend must
+        /// never derive these from `id` or button text.
+        confirm_action_id: String,
+        cancel_action_id: String,
         /// If true, render confirm button in destructive/red style.
         destructive: bool,
         #[serde(default)]
@@ -212,6 +222,14 @@ pub enum Component {
         id: String,
         label: String,
         value: String,
+        /// Core-owned action copy; render verbatim.
+        edit_text: String,
+        save_text: String,
+        cancel_text: String,
+        /// Opaque transition action ids owned by the workflow engine.
+        edit_action_id: String,
+        save_action_id: String,
+        cancel_action_id: String,
         /// When true, render as editable input. When false, render as static text with edit button.
         editing: bool,
         validation_error: Option<String>,

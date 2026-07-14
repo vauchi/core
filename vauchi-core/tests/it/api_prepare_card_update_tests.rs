@@ -9,7 +9,8 @@
 
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{X3DH, X3DHKeyPair};
-use vauchi_core::{Contact, ContactField, FieldType, SymmetricKey, Vauchi};
+use vauchi_core::identity::{DeviceInfo, DeviceRegistry, RegistryBroadcast};
+use vauchi_core::{Contact, ContactField, FieldType, SigningKeyPair, SymmetricKey, Vauchi};
 
 /// Helper: create Vauchi with identity and one Visible own-card field —
 /// fields default hidden (field-centric model), and a fully hidden card
@@ -161,4 +162,61 @@ fn test_prepare_card_update_rejects_blocked_contact() {
         "Error must indicate contact is blocked, got: {:?}",
         err
     );
+}
+
+// @scenario: multi_device_sync :: One contact update fans out to every active device
+#[test]
+fn test_prepare_card_update_fans_out_to_contact_devices() {
+    let wb = setup_with_card("Alice");
+    let alice_identity = wb.identity().unwrap();
+    let signing = (1u32..=100_000)
+        .map(|value| {
+            let mut seed = [0u8; 32];
+            seed[..4].copy_from_slice(&value.to_le_bytes());
+            SigningKeyPair::from_seed(&seed)
+        })
+        .find(|candidate| candidate.public_key().as_bytes() > alice_identity.signing_public_key())
+        .expect("a lexicographically larger test identity");
+    let relationship = SymmetricKey::from_bytes([33u8; 32]);
+    let contact = Contact::from_exchange(
+        *signing.public_key().as_bytes(),
+        ContactCard::new("Bob"),
+        relationship,
+        0,
+    );
+    let contact_id = contact.id().to_string();
+    wb.add_contact(contact).unwrap();
+
+    let device_seed = [44u8; 32];
+    let first = DeviceInfo::derive(&device_seed, 0, "Bob phone".into(), 1);
+    let second = DeviceInfo::derive(&device_seed, 1, "Bob laptop".into(), 1);
+    let mut registry = DeviceRegistry::new(first.to_registered(&device_seed), &signing);
+    registry
+        .add_device(second.to_registered(&device_seed), &signing)
+        .unwrap();
+    let now = wb.storage().clock().unix_seconds();
+    let broadcast = RegistryBroadcast::new(&registry, &signing, now);
+    wb.storage()
+        .device()
+        .save_contact_device_registry(&contact_id, &broadcast, signing.public_key().as_bytes(), 60)
+        .unwrap();
+
+    let empty = ContactCard::new("Alice");
+    let current = wb.storage().contacts().load_own_card().unwrap().unwrap();
+    let updates = wb
+        .prepare_card_updates_for_contact(&contact_id, &empty, &current)
+        .unwrap();
+
+    assert_eq!(updates.len(), 2);
+    assert_ne!(updates[0].0, updates[1].0);
+    assert_ne!(updates[0].1, updates[1].1);
+    for (device_id, _) in updates {
+        assert!(
+            wb.storage()
+                .ratchets()
+                .load_ratchet_state_for_device(&contact_id, &device_id)
+                .unwrap()
+                .is_some()
+        );
+    }
 }

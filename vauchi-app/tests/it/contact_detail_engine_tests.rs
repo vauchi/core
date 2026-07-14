@@ -72,6 +72,33 @@ fn delete_contact_shows_inline_confirm() {
     );
 }
 
+// @scenario: contact_detail.feature - Delete imported contact shows InlineConfirm
+// @internal
+#[test]
+fn inline_confirm_carries_core_owned_action_ids() {
+    let mut engine = imported_engine();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "delete_contact".into(),
+    });
+
+    let component = engine
+        .current_screen()
+        .components
+        .into_iter()
+        .find(|component| matches!(component, Component::InlineConfirm { .. }))
+        .expect("delete flow must emit InlineConfirm");
+    let Component::InlineConfirm {
+        confirm_action_id,
+        cancel_action_id,
+        ..
+    } = component
+    else {
+        unreachable!()
+    };
+    assert_eq!(confirm_action_id, "confirm_delete_contact");
+    assert_eq!(cancel_action_id, "cancel_delete_contact");
+}
+
 // @scenario: contact_detail.feature - Confirm delete completes engine
 // @internal
 #[test]
@@ -171,6 +198,94 @@ fn contact_detail_personal_note_has_a11y() {
     }
 }
 
+// @scenario: contact_detail.feature - Edit private note
+// @internal
+#[test]
+fn editable_text_carries_core_owned_action_ids() {
+    let engine = exchanged_engine();
+    let component = engine
+        .current_screen()
+        .components
+        .into_iter()
+        .find(|component| {
+            matches!(component, Component::EditableText { id, .. } if id == "personal_note")
+        })
+        .expect("contact detail must emit personal-note EditableText");
+    let Component::EditableText {
+        edit_action_id,
+        save_action_id,
+        cancel_action_id,
+        ..
+    } = component
+    else {
+        unreachable!()
+    };
+    assert_eq!(edit_action_id, "edit_personal_note");
+    assert_eq!(save_action_id, "save_personal_note");
+    assert_eq!(cancel_action_id, "cancel_personal_note");
+}
+
+// @scenario: contact_detail.feature - Edit private note
+// @internal
+#[test]
+fn editable_text_mode_is_driven_by_core_actions() {
+    let mut engine = exchanged_engine();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit_personal_note".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("edit action must update the core screen")
+    };
+    assert!(screen.components.iter().any(|component| matches!(
+        component,
+        Component::EditableText { id, editing: true, .. } if id == "personal_note"
+    )));
+
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: "personal_note".into(),
+        value: "draft that will be cancelled".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("text change must update the core-owned draft")
+    };
+    assert!(screen.components.iter().any(|component| matches!(
+        component,
+        Component::EditableText { id, value, editing: true, .. }
+            if id == "personal_note" && value == "draft that will be cancelled"
+    )));
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel_personal_note".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("cancel action must update the core screen")
+    };
+    assert!(screen.components.iter().any(|component| matches!(
+        component,
+        Component::EditableText { id, value, editing: false, .. }
+            if id == "personal_note" && value.is_empty()
+    )));
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit_personal_note".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "personal_note".into(),
+        value: "saved by core".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "save_personal_note".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("save action must update the core screen")
+    };
+    assert!(screen.components.iter().any(|component| matches!(
+        component,
+        Component::EditableText { id, value, editing: false, .. }
+            if id == "personal_note" && value == "saved by core"
+    )));
+}
+
 // @scenario: accessibility :: ContactDetail delete InlineConfirm has populated a11y
 //
 // Verifies that the delete confirmation InlineConfirm carries an Alert role
@@ -227,6 +342,7 @@ fn archive_contact_still_uses_show_toast() {
         ActionResult::ShowToast {
             message: "Contact archived".into(),
             undo_action_id: Some("undo_archive_contact:c1".into()),
+            undo_label: Some("Undo".into()),
         },
         "archive_contact must still return ShowToast with undo"
     );

@@ -141,13 +141,13 @@ fn cancel_delete_tag_keeps_the_tag() {
     );
 }
 
-// A personal-note keystroke persists the note but must NOT rebuild the
-// live ContactDetail engine — the in-progress add-tag query is transient
-// engine state that a rebuild wipes mid-typing
+// A personal-note draft and save must NOT rebuild the live ContactDetail
+// engine — the in-progress add-tag query is transient engine state that a
+// rebuild wipes mid-typing
 // (2026-07-01-android-contacts-list-stale-after-mutation residual).
 // @internal
 #[test]
-fn note_keystroke_preserves_in_progress_tag_query() {
+fn note_save_preserves_in_progress_tag_query() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Me").unwrap();
     vauchi
@@ -164,9 +164,20 @@ fn note_keystroke_preserves_in_progress_tag_query() {
         component_id: "add_tag".into(),
         value: "cli".into(),
     });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit_personal_note".into(),
+    });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "personal_note".into(),
         value: "met at conf".into(),
+    });
+    assert_eq!(
+        engine.vauchi().load_personal_notes(&cid).unwrap(),
+        None,
+        "typing updates the core draft but not storage before Save"
+    );
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "save_personal_note".into(),
     });
 
     let tag_query = engine.current_screen().components.iter().find_map(|c| {
@@ -181,11 +192,27 @@ fn note_keystroke_preserves_in_progress_tag_query() {
     assert_eq!(
         tag_query,
         Some("cli".to_string()),
-        "the in-progress add-tag query must survive a note keystroke"
+        "the in-progress add-tag query must survive a note save"
     );
     assert_eq!(
         engine.vauchi().load_personal_notes(&cid).unwrap(),
         Some(b"met at conf".to_vec()),
-        "the note keystroke must still persist"
+        "Save must persist the core-owned note draft"
+    );
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit_personal_note".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "personal_note".into(),
+        value: "discard me".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel_personal_note".into(),
+    });
+    assert_eq!(
+        engine.vauchi().load_personal_notes(&cid).unwrap(),
+        Some(b"met at conf".to_vec()),
+        "Cancel must leave the last saved note untouched"
     );
 }

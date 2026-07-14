@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "screen_id": "device_link_instructions",
   "title": "Link this device",
   "subtitle": "Use your other signed-in device to invite this one.",

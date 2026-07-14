@@ -63,6 +63,7 @@ const PENDING_UPDATES_COLUMNS_V1: &[&str] = &[
 
 const CONTACT_RATCHETS_COLUMNS_V1: &[&str] = &[
     "contact_id",
+    "peer_device_id",
     "ratchet_state_encrypted",
     "is_initiator",
     "updated_at",
@@ -602,6 +603,44 @@ fn test_migration_v56_adds_group_presentation_columns() {
 
 // @internal
 #[test]
+fn migration_v59_preserves_legacy_ratchet_as_zero_device_id() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+    run_migrations_up_to(&conn, &key, 58);
+
+    conn.execute(
+        "INSERT INTO contacts (
+            id, public_key, display_name, card_encrypted, shared_key_encrypted,
+            exchange_timestamp
+         ) VALUES ('alice', zeroblob(32), 'Alice', X'01', X'02', 1000)",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO contact_ratchets (
+            contact_id, ratchet_state_encrypted, is_initiator, updated_at
+         ) VALUES ('alice', X'AABB', 1, 1000)",
+        [],
+    )
+    .unwrap();
+
+    run_migrations_up_to(&conn, &key, 59);
+
+    let (device_id, state, is_initiator): (Vec<u8>, Vec<u8>, i64) = conn
+        .query_row(
+            "SELECT peer_device_id, ratchet_state_encrypted, is_initiator
+             FROM contact_ratchets WHERE contact_id = 'alice'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .unwrap();
+    assert_eq!(device_id, vec![0; 32]);
+    assert_eq!(state, vec![0xAA, 0xBB]);
+    assert_eq!(is_initiator, 1);
+}
+
+// @internal
+#[test]
 fn test_migration_v19_adds_password_columns() {
     let conn = Connection::open_in_memory().unwrap();
     let key = SymmetricKey::generate();
@@ -781,8 +820,8 @@ fn test_schema_version_after_all_migrations() {
 
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(
-        version, 58,
-        "Schema version should be 58 after all migrations, got {}",
+        version, 60,
+        "Schema version should be 60 after all migrations, got {}",
         version
     );
 }

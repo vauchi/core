@@ -67,37 +67,35 @@ impl Vauchi {
             if self.storage.pending().count_pending_updates(&contact_id)? > 0 {
                 continue;
             }
-            let (mut ratchet, is_initiator) =
-                match self.storage.ratchets().load_ratchet_state(&contact_id)? {
-                    Some(r) => r,
-                    None => continue,
-                };
-
             let confirm = ReciprocityConfirmPayload::new(*our_token, identity, &recipient_pk);
             let payload = VersionedPayload::encode_reciprocity(&confirm);
-            let ratchet_msg = ratchet
-                .encrypt(&payload)
-                .map_err(|e| VauchiError::Crypto(format!("{e:?}")))?;
-            let encrypted = serde_json::to_vec(&ratchet_msg)
-                .map_err(|e| VauchiError::Serialization(e.to_string()))?;
-
-            self.storage
-                .ratchets()
-                .save_ratchet_state(&contact_id, &ratchet, is_initiator)?;
-
-            let update = PendingUpdate {
-                id: self.rng.uuid_v4(),
-                contact_id: contact_id.clone(),
-                // Indistinguishable from a card update on the wire (ADR-032),
-                // like the safety-alert send path.
-                update_type: "card_delta".to_string(),
-                payload: encrypted,
-                created_at: now,
-                retry_count: 0,
-                status: UpdateStatus::Pending,
-                target_relay_url: None,
-            };
-            self.storage.pending().queue_update(&update)?;
+            let prepared =
+                match self.encrypt_payload_for_contact_devices(identity, contact, &payload) {
+                    Ok(prepared) => prepared,
+                    Err(VauchiError::NotFound(_)) | Err(VauchiError::InvalidState(_)) => continue,
+                    Err(error) => return Err(error),
+                };
+            for (device_id, encrypted, ratchet, is_initiator) in prepared {
+                self.storage.ratchets().save_ratchet_state_for_device(
+                    &contact_id,
+                    &device_id,
+                    &ratchet,
+                    is_initiator,
+                )?;
+                let update = PendingUpdate {
+                    id: self.rng.uuid_v4(),
+                    contact_id: contact_id.clone(),
+                    // Indistinguishable from a card update on the wire (ADR-032),
+                    // like the safety-alert send path.
+                    update_type: "card_delta".to_string(),
+                    payload: encrypted,
+                    created_at: now,
+                    retry_count: 0,
+                    status: UpdateStatus::Pending,
+                    target_relay_url: None,
+                };
+                self.storage.pending().queue_update(&update)?;
+            }
             queued += 1;
         }
 

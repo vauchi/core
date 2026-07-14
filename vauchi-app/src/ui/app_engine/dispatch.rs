@@ -77,8 +77,11 @@ impl AppEngine {
             return Some(self.sync_and_rerender());
         }
 
-        // Handle backup reminder toast action
-        if matches!(action, UserAction::ActionPressed { action_id } if action_id == "backup_now") {
+        // Handle backup reminder toast action. Toast buttons report
+        // `UndoPressed` for wire compatibility even when their core-owned
+        // label describes a different immediate action.
+        if matches!(action, UserAction::ActionPressed { action_id } | UserAction::UndoPressed { action_id } if action_id == "backup_now")
+        {
             return Some(ActionResult::NavigateTo(
                 self.navigate_to(AppScreen::Backup),
             ));
@@ -232,12 +235,8 @@ impl AppEngine {
 
         if let AppScreen::ContactDetail { contact_id } = &self.screen {
             let contact_id = contact_id.clone();
-            if let Some(result) = self.intercept_personal_note_change(&contact_id, action) {
-                return Some(result);
-            }
-            if let Some(result) = self.intercept_field_note_change(&contact_id, action) {
-                return Some(result);
-            }
+            self.persist_personal_note_save(&contact_id, action);
+            self.persist_field_note_save(&contact_id, action);
             if let Some(result) = self.intercept_tag_action(&contact_id, action) {
                 return Some(result);
             }
@@ -367,6 +366,7 @@ impl AppEngine {
             return Some(ActionResult::ShowToast {
                 message: "Contact unarchived".into(),
                 undo_action_id: None,
+                undo_label: None,
             });
         }
 

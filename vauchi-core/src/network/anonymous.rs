@@ -60,6 +60,22 @@ pub fn compute_anonymous_id(shared_key: &[u8; 32], epoch: u64) -> [u8; 32] {
     *HKDF::derive_key(None, shared_key, &info)
 }
 
+/// Computes a rotating anonymous ID scoped to one sender device.
+///
+/// The device ID is inside HKDF input and never appears on the wire. The
+/// resulting token remains 32 rotating opaque bytes, preserving ADR-029 while
+/// allowing the recipient to select the ADR-064 per-device ratchet session.
+pub fn compute_anonymous_id_for_device(
+    shared_key: &[u8; 32],
+    epoch: u64,
+    device_id: &[u8; 32],
+) -> [u8; 32] {
+    let mut info = b"Vauchi_AnonymousSender_Device_v1".to_vec();
+    info.extend_from_slice(&epoch.to_le_bytes());
+    info.extend_from_slice(device_id);
+    *HKDF::derive_key(None, shared_key, &info)
+}
+
 /// Returns the current epoch (unix_timestamp / 3600).
 ///
 /// `now` is the current Unix-epoch seconds — production callers route
@@ -93,6 +109,50 @@ pub fn resolve_sender<'a>(
             let prev_candidate = compute_anonymous_id(shared_key.as_bytes(), epoch - 1);
             if bool::from(prev_candidate.ct_eq(anonymous_id)) {
                 return Some(contact);
+            }
+        }
+    }
+    None
+}
+
+/// Resolves a rotating token to a contact and sender-device ID.
+///
+/// `known_device_ids` is bounded by the linked-device registry cap. The
+/// legacy token is checked after device-scoped candidates and maps to device
+/// all-zero device ID for pre-ADR-064 peers.
+pub fn resolve_sender_device<'a>(
+    contacts: &'a [Contact],
+    known_device_ids: &[[u8; 32]],
+    anonymous_id: &[u8; 32],
+    epoch: u64,
+) -> Option<(&'a Contact, [u8; 32])> {
+    for contact in contacts {
+        let Some(shared_key) = contact.shared_key() else {
+            continue;
+        };
+        for &device_id in known_device_ids {
+            let candidate =
+                compute_anonymous_id_for_device(shared_key.as_bytes(), epoch, &device_id);
+            if bool::from(candidate.ct_eq(anonymous_id)) {
+                return Some((contact, device_id));
+            }
+            if epoch > 0 {
+                let previous =
+                    compute_anonymous_id_for_device(shared_key.as_bytes(), epoch - 1, &device_id);
+                if bool::from(previous.ct_eq(anonymous_id)) {
+                    return Some((contact, device_id));
+                }
+            }
+        }
+
+        let legacy = compute_anonymous_id(shared_key.as_bytes(), epoch);
+        if bool::from(legacy.ct_eq(anonymous_id)) {
+            return Some((contact, [0; 32]));
+        }
+        if epoch > 0 {
+            let previous_legacy = compute_anonymous_id(shared_key.as_bytes(), epoch - 1);
+            if bool::from(previous_legacy.ct_eq(anonymous_id)) {
+                return Some((contact, [0; 32]));
             }
         }
     }

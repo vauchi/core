@@ -529,12 +529,21 @@ impl Vauchi {
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
 
-        // Skip contacts without ratchet (not yet synced)
-        let (mut ratchet, is_initiator) =
-            match self.storage.ratchets().load_ratchet_state(contact_id)? {
-                Some(r) => r,
-                None => return Ok(()),
-            };
+        // Legacy peers need their original session; device-aware peers can
+        // bootstrap pair sessions from the verified registry below.
+        if self
+            .storage
+            .device()
+            .load_contact_active_devices(contact_id)?
+            .is_empty()
+            && self
+                .storage
+                .ratchets()
+                .load_ratchet_state(contact_id)?
+                .is_none()
+        {
+            return Ok(());
+        }
 
         // The fields currently visible to this contact (effective, group-aware)
         // — also the new last-sent baseline.
@@ -625,32 +634,30 @@ impl Vauchi {
         self.storage.contacts().save_contact(&contact)?;
         let payload_bytes = VersionedPayload::encode_cek(&wrapped);
 
-        // Encrypt with ratchet
-        let ratchet_msg = ratchet
-            .encrypt(&payload_bytes)
-            .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
-        let encrypted = serde_json::to_vec(&ratchet_msg)
-            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+        let prepared =
+            self.encrypt_payload_for_contact_devices(identity, &contact, &payload_bytes)?;
 
-        // Save updated ratchet state
-        self.storage
-            .ratchets()
-            .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
-
-        // Queue for delivery
+        // Save each independent session and queue each copy for delivery.
         let now = self.clock.unix_seconds();
-
-        let update = PendingUpdate {
-            id: self.rng.uuid_v4(),
-            contact_id: contact_id.to_string(),
-            update_type: "card_delta".to_string(),
-            payload: encrypted,
-            created_at: now,
-            retry_count: 0,
-            status: UpdateStatus::Pending,
-            target_relay_url: None,
-        };
-        self.storage.pending().queue_update(&update)?;
+        for (device_id, encrypted, ratchet, is_initiator) in prepared {
+            self.storage.ratchets().save_ratchet_state_for_device(
+                contact_id,
+                &device_id,
+                &ratchet,
+                is_initiator,
+            )?;
+            let update = PendingUpdate {
+                id: self.rng.uuid_v4(),
+                contact_id: contact_id.to_string(),
+                update_type: "card_delta".to_string(),
+                payload: encrypted,
+                created_at: now,
+                retry_count: 0,
+                status: UpdateStatus::Pending,
+                target_relay_url: None,
+            };
+            self.storage.pending().queue_update(&update)?;
+        }
 
         // Record the visible-field baseline this send established, so a later
         // revocation can diff against it (fix C).

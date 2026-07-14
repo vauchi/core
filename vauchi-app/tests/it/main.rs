@@ -27,6 +27,7 @@ mod avatar_editor_tests;
 mod avatar_editor_wiring_tests;
 mod avatar_i18n_tests;
 mod backup_recovery_confirm_replace_tests;
+mod backup_reminder_toast_tests;
 mod batch2_i18n_tests;
 mod batch3_i18n_tests;
 mod ble_exchange_app_engine_tests;

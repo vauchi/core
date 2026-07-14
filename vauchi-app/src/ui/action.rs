@@ -241,6 +241,10 @@ pub enum ActionResult {
     ShowToast {
         message: String,
         undo_action_id: Option<String>,
+        /// Core-resolved label for `undo_action_id`. Both fields are present
+        /// for an actionable toast and absent for an informational toast.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        undo_label: Option<String>,
     },
     /// Backup export completed — frontend should save or share the data.
     ///

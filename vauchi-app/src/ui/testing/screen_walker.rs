@@ -412,6 +412,8 @@ mod tests {
             warning: "warn".into(),
             confirm_text: "OK".into(),
             cancel_text: "Cancel".into(),
+            confirm_action_id: format!("confirm_{id}"),
+            cancel_action_id: format!("cancel_{id}"),
             destructive: false,
             a11y: None,
         }

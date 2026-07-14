@@ -21,7 +21,7 @@ use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::ratchet::RatchetMessage;
 use crate::identity::Identity;
 use crate::network::GeoLocation;
-use crate::network::anonymous::resolve_sender_id;
+use crate::network::anonymous::{current_epoch, resolve_sender_device};
 use crate::storage::{Storage, StorageError};
 use crate::sync::delta::{CardDelta, FieldChange, PAYLOAD_VERSION_CEK, VersionedPayload};
 use crate::sync::safety_alert::AlertKind;
@@ -139,10 +139,40 @@ pub fn process_card_updates(
     // fingerprints pass through unchanged via the fallback path.
     let contacts = storage.contacts().list_contacts().unwrap_or_default();
 
+    let known_device_ids: Vec<[u8; 32]> = contacts
+        .iter()
+        .flat_map(|contact| {
+            storage
+                .device()
+                .load_contact_active_devices(contact.id())
+                .unwrap_or_default()
+        })
+        .map(|device| device.device_id)
+        .collect();
+
     for (sender_id, ciphertext) in updates {
-        let resolved_id = resolve_sender_id(&contacts, &sender_id, storage.clock().unix_seconds())
-            .unwrap_or(sender_id);
-        match process_single_card_update(identity, storage, &resolved_id, &ciphertext) {
+        let resolved = hex::decode(&sender_id)
+            .ok()
+            .filter(|bytes| bytes.len() == 32)
+            .and_then(|bytes| {
+                let mut token = [0u8; 32];
+                token.copy_from_slice(&bytes);
+                resolve_sender_device(
+                    &contacts,
+                    &known_device_ids,
+                    &token,
+                    current_epoch(storage.clock().unix_seconds()),
+                )
+                .map(|(contact, device_id)| (contact.id().to_string(), device_id))
+            });
+        let (resolved_id, peer_device_id) = resolved.unwrap_or((sender_id, [0; 32]));
+        match process_single_card_update_for_device(
+            identity,
+            storage,
+            &resolved_id,
+            &peer_device_id,
+            &ciphertext,
+        ) {
             Ok(ReceiveOutcome::CardDelta) => {
                 result.processed += 1;
                 // Collect display name for the updated contact
@@ -176,6 +206,17 @@ pub fn process_single_card_update(
     sender_id: &str,
     ciphertext: &[u8],
 ) -> Result<ReceiveOutcome, CardUpdateError> {
+    process_single_card_update_for_device(identity, storage, sender_id, &[0; 32], ciphertext)
+}
+
+/// Device-aware receive path used after rotating anonymous-token resolution.
+fn process_single_card_update_for_device(
+    identity: &Identity,
+    storage: &Storage,
+    sender_id: &str,
+    peer_device_id: &[u8; 32],
+    ciphertext: &[u8],
+) -> Result<ReceiveOutcome, CardUpdateError> {
     // 1. Reject updates from revoked senders
     if storage.contacts().is_sender_revoked(sender_id)? {
         return Err(CardUpdateError::SenderRevoked);
@@ -192,10 +233,37 @@ pub fn process_single_card_update(
     }
 
     // 3. Load ratchet state and decrypt
-    let (mut ratchet, is_initiator) = storage
+    let existing = storage
         .ratchets()
-        .load_ratchet_state(sender_id)?
-        .ok_or(CardUpdateError::NoRatchetState)?;
+        .load_ratchet_state_for_device(sender_id, peer_device_id)?;
+    let (mut ratchet, is_initiator) = match existing {
+        Some(session) => session,
+        None if *peer_device_id != [0; 32] => {
+            let peer_device = storage
+                .device()
+                .load_contact_active_devices(sender_id)?
+                .into_iter()
+                .find(|device| &device.device_id == peer_device_id)
+                .ok_or(CardUpdateError::NoRatchetState)?;
+            let relationship_key = contact
+                .shared_key()
+                .ok_or(CardUpdateError::NoRatchetState)?;
+            let peer_identity = contact
+                .public_key()
+                .ok_or(CardUpdateError::NoRatchetState)?;
+            crate::exchange::ratchet_bootstrap::bootstrap_device_pair_ratchet(
+                relationship_key,
+                identity.signing_public_key(),
+                identity.device_id(),
+                identity.device_info().exchange_keypair(),
+                peer_identity,
+                peer_device_id,
+                &peer_device.exchange_public_key,
+            )
+            .map_err(|_| CardUpdateError::NoRatchetState)?
+        }
+        None => return Err(CardUpdateError::NoRatchetState),
+    };
 
     let ratchet_msg: RatchetMessage =
         serde_json::from_slice(ciphertext).map_err(|_| CardUpdateError::InvalidRatchetMessage)?;
@@ -224,9 +292,12 @@ pub fn process_single_card_update(
         // Persist the advanced ratchet + the nonce atomically. No card is touched.
         storage.begin_transaction()?;
         let alert_txn = (|| -> Result<(), CardUpdateError> {
-            storage
-                .ratchets()
-                .save_ratchet_state(sender_id, &ratchet, is_initiator)?;
+            storage.ratchets().save_ratchet_state_for_device(
+                sender_id,
+                peer_device_id,
+                &ratchet,
+                is_initiator,
+            )?;
             storage
                 .replay()
                 .save_replay_nonce(sender_id, alert.nonce(), alert.timestamp())?;
@@ -267,9 +338,12 @@ pub fn process_single_card_update(
         // Persist the advanced ratchet (decrypt consumed a message). No card,
         // no nonce store — the token match + Confirmed transition are app-layer.
         storage.begin_transaction()?;
-        let confirm_txn = storage
-            .ratchets()
-            .save_ratchet_state(sender_id, &ratchet, is_initiator);
+        let confirm_txn = storage.ratchets().save_ratchet_state_for_device(
+            sender_id,
+            peer_device_id,
+            &ratchet,
+            is_initiator,
+        );
         match confirm_txn {
             Ok(()) => storage.commit()?,
             Err(e) => {
@@ -356,9 +430,12 @@ pub fn process_single_card_update(
     // state advances past a message that was never applied.
     storage.begin_transaction()?;
     let txn_result = (|| -> Result<(), CardUpdateError> {
-        storage
-            .ratchets()
-            .save_ratchet_state(sender_id, &ratchet, is_initiator)?;
+        storage.ratchets().save_ratchet_state_for_device(
+            sender_id,
+            peer_device_id,
+            &ratchet,
+            is_initiator,
+        )?;
         storage
             .replay()
             .save_replay_nonce(sender_id, &delta.nonce, delta.timestamp)?;

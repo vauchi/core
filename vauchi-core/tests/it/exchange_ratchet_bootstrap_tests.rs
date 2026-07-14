@@ -9,7 +9,107 @@
 use proptest::prelude::*;
 use vauchi_core::crypto::*;
 use vauchi_core::exchange::key_order::{is_initiator, sorted_pair};
-use vauchi_core::exchange::ratchet_bootstrap::{RatchetBootstrapError, bootstrap_exchange_ratchet};
+use vauchi_core::exchange::ratchet_bootstrap::{
+    RatchetBootstrapError, bootstrap_device_pair_ratchet, bootstrap_exchange_ratchet,
+};
+
+// @scenario: multi_device_sync :: Each local/peer device pair has an independent channel
+#[test]
+fn device_pair_bootstrap_is_symmetric_and_bidirectional() {
+    let relationship = SymmetricKey::from_bytes([3u8; 32]);
+    let alice_key = X3DHKeyPair::from_bytes([4u8; 32]);
+    let bob_key = X3DHKeyPair::from_bytes([5u8; 32]);
+    let alice_identity = [10u8; 32];
+    let bob_identity = [20u8; 32];
+    let alice_device = [11u8; 32];
+    let bob_device = [21u8; 32];
+
+    let (mut alice, alice_initiates) = bootstrap_device_pair_ratchet(
+        &relationship,
+        &alice_identity,
+        &alice_device,
+        &alice_key,
+        &bob_identity,
+        &bob_device,
+        bob_key.public_key(),
+    )
+    .unwrap();
+    let (mut bob, bob_initiates) = bootstrap_device_pair_ratchet(
+        &relationship,
+        &bob_identity,
+        &bob_device,
+        &bob_key,
+        &alice_identity,
+        &alice_device,
+        alice_key.public_key(),
+    )
+    .unwrap();
+
+    assert_ne!(alice_initiates, bob_initiates);
+    let message = alice.encrypt(b"hello from phone").unwrap();
+    assert_eq!(bob.decrypt(&message).unwrap(), b"hello from phone");
+    let reply = bob.encrypt(b"hello from laptop").unwrap();
+    assert_eq!(alice.decrypt(&reply).unwrap(), b"hello from laptop");
+}
+
+// @scenario: multi_device_sync :: Alice A1/A2/A3 and Bob B1/B2/B3 converge independently
+#[test]
+fn six_devices_establish_nine_independent_bidirectional_ratchets() {
+    let relationship = SymmetricKey::from_bytes([71u8; 32]);
+    let alice_identity = [21u8; 32];
+    let bob_identity = [201u8; 32];
+    let alice: Vec<_> = (0..3u8)
+        .map(|index| ([index + 1; 32], X3DHKeyPair::from_bytes([index + 31; 32])))
+        .collect();
+    let bob: Vec<_> = (0..3u8)
+        .map(|index| {
+            (
+                [index + 101; 32],
+                X3DHKeyPair::from_bytes([index + 131; 32]),
+            )
+        })
+        .collect();
+    let mut wire_messages = Vec::new();
+
+    for (alice_id, alice_key) in &alice {
+        for (bob_id, bob_key) in &bob {
+            let (mut alice_session, _) = bootstrap_device_pair_ratchet(
+                &relationship,
+                &alice_identity,
+                alice_id,
+                alice_key,
+                &bob_identity,
+                bob_id,
+                bob_key.public_key(),
+            )
+            .unwrap();
+            let (mut bob_session, _) = bootstrap_device_pair_ratchet(
+                &relationship,
+                &bob_identity,
+                bob_id,
+                bob_key,
+                &alice_identity,
+                alice_id,
+                alice_key.public_key(),
+            )
+            .unwrap();
+            let plaintext = format!("{}→{}", alice_id[0], bob_id[0]);
+            let message = alice_session.encrypt(plaintext.as_bytes()).unwrap();
+            assert_eq!(bob_session.decrypt(&message).unwrap(), plaintext.as_bytes());
+            wire_messages.push(serde_json::to_vec(&message).unwrap());
+            let reply = bob_session.encrypt(b"received").unwrap();
+            assert_eq!(alice_session.decrypt(&reply).unwrap(), b"received");
+        }
+    }
+
+    assert_eq!(wire_messages.len(), 9);
+    let unique: std::collections::HashSet<_> = wire_messages.iter().collect();
+    assert_eq!(
+        unique.len(),
+        9,
+        "every device pair must have independent wire state"
+    );
+}
 
 // @internal
 #[test]

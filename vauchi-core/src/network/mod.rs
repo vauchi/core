@@ -120,8 +120,8 @@ pub use multi_relay::{
 };
 
 pub use anonymous::{
-    AnonymousSender, SenderIndex, compute_anonymous_id, current_epoch, resolve_sender,
-    resolve_sender_id,
+    AnonymousSender, SenderIndex, compute_anonymous_id, compute_anonymous_id_for_device,
+    current_epoch, resolve_sender, resolve_sender_device, resolve_sender_id,
 };
 
 pub use pinning::{PinnedCertificate, verify_pin};

@@ -289,6 +289,13 @@
                 "string",
                 "null"
               ]
+            },
+            "undo_label": {
+              "description": "Core-resolved label for `undo_action_id`. Both fields are present for an actionable toast and absent for an informational toast.",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         }
@@ -1801,6 +1808,11 @@
                 "id": {
                   "type": "string"
                 },
+                "title": {
+                  "description": "Core-resolved section label. Renderers use this verbatim for native group accessibility; terminal layouts may also show it as the panel title. An empty value only occurs on legacy payloads.",
+                  "default": "",
+                  "type": "string"
+                },
                 "visibility_mode": {
                   "$ref": "#/definitions/VisibilityMode"
                 }
@@ -2247,7 +2259,7 @@
           "additionalProperties": false
         },
         {
-          "description": "An inline confirmation for irrevocable actions (expands in place).",
+          "description": "Visible inline confirmation choices for irrevocable actions.",
           "type": "object",
           "required": [
             "InlineConfirm"
@@ -2256,7 +2268,9 @@
             "InlineConfirm": {
               "type": "object",
               "required": [
+                "cancel_action_id",
                 "cancel_text",
+                "confirm_action_id",
                 "confirm_text",
                 "destructive",
                 "id",
@@ -2274,10 +2288,18 @@
                     }
                   ]
                 },
+                "cancel_action_id": {
+                  "type": "string"
+                },
                 "cancel_text": {
                   "type": "string"
                 },
+                "confirm_action_id": {
+                  "description": "Opaque action ids the renderer forwards verbatim. A frontend must never derive these from `id` or button text.",
+                  "type": "string"
+                },
                 "confirm_text": {
+                  "description": "Core-owned button copy; render verbatim.",
                   "type": "string"
                 },
                 "destructive": {
@@ -2305,9 +2327,15 @@
             "EditableText": {
               "type": "object",
               "required": [
+                "cancel_action_id",
+                "cancel_text",
+                "edit_action_id",
+                "edit_text",
                 "editing",
                 "id",
                 "label",
+                "save_action_id",
+                "save_text",
                 "value"
               ],
               "properties": {
@@ -2321,6 +2349,20 @@
                       "type": "null"
                     }
                   ]
+                },
+                "cancel_action_id": {
+                  "type": "string"
+                },
+                "cancel_text": {
+                  "type": "string"
+                },
+                "edit_action_id": {
+                  "description": "Opaque transition action ids owned by the workflow engine.",
+                  "type": "string"
+                },
+                "edit_text": {
+                  "description": "Core-owned action copy; render verbatim.",
+                  "type": "string"
                 },
                 "editing": {
                   "description": "When true, render as editable input. When false, render as static text with edit button.",
@@ -2336,6 +2378,12 @@
                   ]
                 },
                 "label": {
+                  "type": "string"
+                },
+                "save_action_id": {
+                  "type": "string"
+                },
+                "save_text": {
                   "type": "string"
                 },
                 "validation_error": {
@@ -3645,7 +3693,7 @@
         },
         "schema_version": {
           "description": "Schema version — shells ignore components from higher versions.",
-          "default": 3,
+          "default": 4,
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0

@@ -306,6 +306,8 @@ impl BackupRecoveryEngine {
                 warning: self.t("backup.wizard.replace_warning"),
                 confirm_text: self.t("backup.replace_button"),
                 cancel_text: self.t("action.cancel"),
+                confirm_action_id: "confirm_replace".into(),
+                cancel_action_id: "cancel_replace".into(),
                 destructive: true,
                 a11y: Some(A11y {
                     label: Some(self.t("backup.wizard.replace_a11y")),

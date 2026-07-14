@@ -7,7 +7,10 @@
 //! `contact_detail.*` (locales!110). Exact German assertions per CC-03.
 
 use vauchi_app::i18n::{Locale, load_locale_from_bytes};
-use vauchi_app::ui::{ContactDetailEngine, ContactNotFoundEngine, Field, Item, WorkflowEngine};
+use vauchi_app::ui::{
+    ActionResult, ContactDetailEngine, ContactNotFoundEngine, Field, Item, UserAction,
+    WorkflowEngine,
+};
 
 fn load_german() {
     let bytes = std::fs::read("../../locales/de.json")
@@ -44,6 +47,31 @@ fn contact_detail_renders_german() {
             .label,
         "Bearbeiten"
     );
+}
+
+// @scenario: contact-detail :: actionable toast copy is resolved by core
+// @internal
+#[test]
+fn contact_detail_archive_toast_undo_label_renders_german() {
+    load_german();
+    let mut engine = ContactDetailEngine::new(sample_contact(), Vec::<Field>::new(), String::new())
+        .with_locale(Locale::German);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "archive_contact".into(),
+    });
+
+    match result {
+        ActionResult::ShowToast {
+            undo_action_id,
+            undo_label,
+            ..
+        } => {
+            assert!(undo_action_id.is_some());
+            assert_eq!(undo_label.as_deref(), Some("Rückgängig"));
+        }
+        other => panic!("expected actionable ShowToast, got {other:?}"),
+    }
 }
 
 // English stays exactly as before (regression pin).

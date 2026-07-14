@@ -356,6 +356,7 @@ impl MyInfoEngine {
         for field in &preview.my_fields {
             components.push(Component::FieldList {
                 id: format!("preview_field_{}", field.id),
+                title: self.t("my_info.preview.fields_a11y_label"),
                 fields: vec![field.clone()],
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_scopes: vec![],

@@ -95,6 +95,7 @@ impl AppEngine {
                         ActionResult::ShowToast {
                             message: "Contacts merged".into(),
                             undo_action_id: None,
+                            undo_label: None,
                         }
                     }
                     Err(e) => ActionResult::ShowAlert {

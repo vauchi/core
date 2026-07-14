@@ -774,6 +774,8 @@ impl SettingsEngine {
                 warning: self.t("settings.emergency_wipe_confirm_warning"),
                 confirm_text: self.t("shred.wipe.wipe_all"),
                 cancel_text: self.t("action.cancel"),
+                confirm_action_id: "confirm_emergency_wipe".into(),
+                cancel_action_id: "cancel_emergency_wipe".into(),
                 destructive: true,
                 a11y: Some(A11y {
                     label: Some(self.t("settings.emergency_wipe_confirm_a11y")),

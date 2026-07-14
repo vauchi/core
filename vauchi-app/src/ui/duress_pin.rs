@@ -160,6 +160,8 @@ impl DuressPinEngine {
                 warning: self.t("resistance.duress.disable_warning"),
                 confirm_text: self.t("resistance.duress.disable_button"),
                 cancel_text: self.t("action.cancel"),
+                confirm_action_id: "confirm_disable".into(),
+                cancel_action_id: "cancel_disable".into(),
                 destructive: true,
                 a11y: Some(A11y {
                     label: Some(self.t("resistance.duress.disable_a11y")),

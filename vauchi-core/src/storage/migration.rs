@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 58] = [
+const MIGRATIONS: [Migration; 60] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -562,7 +562,58 @@ const MIGRATIONS: [Migration; 58] = [
         name: "ux_exchange_defaults",
         action: MigrationAction::Sql(MIGRATION_V58_EXCHANGE_DEFAULTS),
     },
+    Migration {
+        version: 59,
+        name: "per_device_ratchet_sessions",
+        action: MigrationAction::Sql(MIGRATION_V59_PER_DEVICE_RATCHETS),
+    },
+    Migration {
+        version: 60,
+        name: "contact_device_registries",
+        action: MigrationAction::Sql(MIGRATION_V60_CONTACT_DEVICE_REGISTRIES),
+    },
 ];
+
+/// Migration v60: retain each contact's latest identity-signed active-device set.
+///
+/// The broadcast is encrypted at rest and versioned outside the ciphertext so
+/// rollback checks can happen before an atomic replacement. Contact deletion
+/// cascades, preventing a re-added contact from inheriting stale topology.
+const MIGRATION_V60_CONTACT_DEVICE_REGISTRIES: &str = "
+    CREATE TABLE contact_device_registries (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        broadcast_encrypted BLOB NOT NULL,
+        version INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+";
+
+/// Migration v59: dimension ratchet sessions by the peer's device ID.
+///
+/// Existing one-session-per-contact rows become the legacy all-zero-device-ID
+/// session. The ratchet wire format is unchanged; ADR-064 carries the device
+/// dimension in rotating anonymous-token derivation.
+const MIGRATION_V59_PER_DEVICE_RATCHETS: &str = "
+    ALTER TABLE contact_ratchets RENAME TO contact_ratchets_legacy;
+    CREATE TABLE contact_ratchets (
+        contact_id TEXT NOT NULL REFERENCES contacts(id),
+        peer_device_id BLOB NOT NULL DEFAULT X'0000000000000000000000000000000000000000000000000000000000000000',
+        ratchet_state_encrypted BLOB NOT NULL,
+        is_initiator INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (contact_id, peer_device_id)
+    );
+    INSERT INTO contact_ratchets (
+        contact_id,
+        peer_device_id,
+        ratchet_state_encrypted,
+        is_initiator,
+        updated_at
+    )
+    SELECT contact_id, zeroblob(32), ratchet_state_encrypted, is_initiator, updated_at
+    FROM contact_ratchets_legacy;
+    DROP TABLE contact_ratchets_legacy;
+";
 
 /// Migration v58: last-used exchange defaults (groups + mode) on ux_state.
 ///

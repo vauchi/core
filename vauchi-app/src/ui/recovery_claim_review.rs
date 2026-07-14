@@ -364,6 +364,8 @@ impl RecoveryClaimReviewEngine {
                 ),
                 confirm_text: self.t("recovery.accept_anyway_button"),
                 cancel_text: self.t("action.cancel"),
+                confirm_action_id: "confirm_accept".into(),
+                cancel_action_id: "cancel".into(),
                 destructive: true,
                 a11y: None,
             }],

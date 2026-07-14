@@ -625,6 +625,8 @@ impl WorkflowEngine for FormDialogEngine {
                 warning: self.t("form.discard_warning"),
                 confirm_text: self.t("form.discard_button"),
                 cancel_text: self.t("form.keep_editing_button"),
+                confirm_action_id: "confirm_discard".into(),
+                cancel_action_id: "cancel_discard".into(),
                 destructive: false,
                 a11y: Some(A11y {
                     label: Some(self.t("form.confirm_discard_a11y")),

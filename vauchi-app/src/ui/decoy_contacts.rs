@@ -120,6 +120,8 @@ impl DecoyContactsEngine {
                 warning: self.t("decoy_contacts.remove_warning"),
                 confirm_text: self.t("decoy_contacts.remove_button"),
                 cancel_text: self.t("action.cancel"),
+                confirm_action_id: "confirm_delete_decoy".into(),
+                cancel_action_id: "cancel_delete_decoy".into(),
                 destructive: true,
                 a11y: None,
             });

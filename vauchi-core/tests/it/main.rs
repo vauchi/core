@@ -378,6 +378,7 @@ mod security_hardening_tests;
 mod security_tests;
 mod settings_engine_tests;
 mod settings_flags_tests;
+mod six_device_convergence_tests;
 mod sleeper_tests;
 mod smk_boot_tests;
 mod snapshot_tests;

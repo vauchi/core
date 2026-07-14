@@ -168,6 +168,7 @@ impl ContactEditEngine {
                 Component::Divider,
                 Component::FieldList {
                     id: "fields".into(),
+                    title: self.t("fields.a11y_contact_fields"),
                     fields,
                     visibility_mode: VisibilityMode::ShowHide,
                     available_scopes: self.available_groups.clone(),

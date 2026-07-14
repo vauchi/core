@@ -425,6 +425,14 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
+    /// The identity's signed active-device registry expanded or changed.
+    DeviceRegistryChanged {
+        /// Complete identity-signed registry as JSON.
+        registry_json: String,
+        /// Timestamp when the registry mutation committed.
+        timestamp: u64,
+    },
+
     /// Own contact card field was updated.
     CardUpdated {
         /// Field label that was updated.
@@ -594,6 +602,7 @@ impl SyncItem {
             SyncItem::ContactAdded { timestamp, .. } => *timestamp,
             SyncItem::ContactRemoved { timestamp, .. } => *timestamp,
             SyncItem::ContactCardUpdated { timestamp, .. } => *timestamp,
+            SyncItem::DeviceRegistryChanged { timestamp, .. } => *timestamp,
             SyncItem::CardUpdated { timestamp, .. } => *timestamp,
             SyncItem::CardFieldRemoved { timestamp, .. } => *timestamp,
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,

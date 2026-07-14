@@ -514,6 +514,35 @@ impl Vauchi {
                     // A peer update cannot recreate an owner-removed contact.
                     None => Ok(()),
                 },
+                SyncItem::DeviceRegistryChanged {
+                    ref registry_json, ..
+                } => {
+                    let registry = crate::identity::DeviceRegistry::from_json(registry_json)
+                        .map_err(|error| VauchiError::InvalidState(error.to_string()))?;
+                    let identity = self
+                        .identity
+                        .as_ref()
+                        .ok_or(VauchiError::IdentityNotInitialized)?;
+                    if registry.device_count() > crate::identity::MAX_DEVICES
+                        || registry.find_device(identity.device_id()).is_none()
+                        || !registry.verify(&identity.signing_keypair().public_key())
+                    {
+                        Err(VauchiError::InvalidState(
+                            "invalid owner device registry update".to_string(),
+                        ))
+                    } else {
+                        let current_version = self
+                            .storage
+                            .device()
+                            .load_device_registry()?
+                            .map(|current| current.version())
+                            .unwrap_or(0);
+                        if registry.version() > current_version {
+                            self.storage.device().save_device_registry(&registry)?;
+                        }
+                        Ok(())
+                    }
+                }
                 SyncItem::CardUpdated {
                     ref field_label,
                     ref new_value,
@@ -766,6 +795,7 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
             contact_id: contact_id.clone(),
             changed_fields: vec!["card".to_string()],
         }),
+        SyncItem::DeviceRegistryChanged { .. } => None,
         SyncItem::CardUpdated { field_label, .. } => Some(VauchiEvent::OwnCardUpdated {
             changed_fields: vec![field_label.clone()],
         }),

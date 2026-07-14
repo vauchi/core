@@ -1037,3 +1037,42 @@ fn expanded_registry_is_queued_for_devices_linked_earlier() {
         "the pre-existing tablet must receive the expanded registry"
     );
 }
+
+// @scenario: release_privacy_multidevice_certification.feature:Every active device can exchange and update
+#[test]
+fn device_registry_sync_accepts_newer_signed_state_and_rejects_forgery() {
+    let mut wb = Vauchi::in_memory().unwrap();
+    wb.create_identity("Alice").unwrap();
+    let identity = wb.identity().unwrap();
+    let seed = *identity.master_seed();
+    let second = DeviceInfo::derive(&seed, 1, "Alice tablet".into(), 2);
+    let mut expanded = identity.initial_device_registry();
+    expanded
+        .add_device(second.to_registered(&seed), identity.signing_keypair())
+        .unwrap();
+
+    let applied = wb
+        .apply_sync_items(vec![SyncItem::DeviceRegistryChanged {
+            registry_json: expanded.to_json(),
+            timestamp: 2,
+        }])
+        .unwrap();
+    assert_eq!(applied, 1);
+    assert_eq!(wb.list_devices().unwrap().len(), 2);
+
+    let attacker = SigningKeyPair::from_seed(&[0x99u8; 32]);
+    let third = DeviceInfo::derive(&seed, 2, "Forged laptop".into(), 3);
+    let mut forged = expanded;
+    forged
+        .add_device(third.to_registered(&seed), &attacker)
+        .unwrap();
+    let applied = wb
+        .apply_sync_items(vec![SyncItem::DeviceRegistryChanged {
+            registry_json: forged.to_json(),
+            timestamp: 3,
+        }])
+        .unwrap();
+
+    assert_eq!(applied, 0);
+    assert_eq!(wb.list_devices().unwrap().len(), 2);
+}

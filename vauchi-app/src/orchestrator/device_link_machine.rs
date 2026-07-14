@@ -41,10 +41,12 @@ use std::path::PathBuf;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 
+use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::{
     DeviceLinkInitiator, DeviceLinkJoinInvitation, DeviceLinkRequest, ProximityProof,
 };
+use vauchi_core::identity::Identity;
 use vauchi_core::storage::Storage;
 
 use super::device_link_relay::{ClaimPayload, DeviceLinkBroker};
@@ -406,8 +408,21 @@ impl DeviceLinkInitiatorMachine {
             };
 
         if let Some(ctx) = &self.persistence {
-            let save = Storage::open(&ctx.storage_path, ctx.storage_key.clone())
-                .and_then(|s| s.device().save_device_registry(&registry));
+            let save = (|| -> Result<(), String> {
+                let storage = Storage::open(&ctx.storage_path, ctx.storage_key.clone())
+                    .map_err(|error| error.to_string())?;
+                let (identity_bytes, _) = storage
+                    .identity()
+                    .load_identity()
+                    .map_err(|error| error.to_string())?
+                    .ok_or_else(|| "identity missing while finalizing device link".to_string())?;
+                let identity = Identity::from_storage_bytes(&identity_bytes, now)
+                    .map_err(|error| error.to_string())?;
+                DeviceSyncOrchestrator::persist_device_registry_change(
+                    &storage, &identity, &registry, now,
+                )
+                .map_err(|error| error.to_string())
+            })();
             if let Err(e) = save {
                 self.state = State::Failed;
                 return InitiatorEvent::Failed {

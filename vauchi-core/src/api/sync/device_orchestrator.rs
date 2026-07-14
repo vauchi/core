@@ -112,6 +112,89 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     /// Queues the SyncItem for all other linked devices and increments
     /// the local version vector.
     pub fn record_local_change(&mut self, item: SyncItem) -> Result<(), DeviceSyncError> {
+        self.stage_local_change(item);
+
+        // Persist device states + version vector atomically (#105).
+        // A transaction ensures either all state is saved or none, preventing
+        // inconsistency if the process crashes mid-write.
+        self.storage
+            .begin_transaction()
+            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+
+        let result = self.persist_staged_state();
+        match result {
+            Ok(()) => self
+                .storage
+                .commit()
+                .map_err(|e| DeviceSyncError::Serialization(e.to_string())),
+            Err(error) => {
+                self.storage.rollback();
+                Err(error)
+            }
+        }
+    }
+
+    /// Atomically persist an expanded signed owner registry and queue it for
+    /// every other active device, including devices linked before the newest
+    /// one existed.
+    pub fn persist_device_registry_change(
+        storage: &'a Storage,
+        identity: &crate::identity::Identity,
+        registry: &DeviceRegistry,
+        timestamp: u64,
+    ) -> Result<(), DeviceSyncError> {
+        if !registry.verify(&identity.signing_keypair().public_key()) {
+            return Err(DeviceSyncError::Deserialization(
+                "owner device registry signature is invalid".to_string(),
+            ));
+        }
+        if let Some(current) = storage
+            .device()
+            .load_device_registry()
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+            && registry.version() <= current.version()
+        {
+            return Err(DeviceSyncError::Deserialization(format!(
+                "owner device registry version {} is not newer than {}",
+                registry.version(),
+                current.version()
+            )));
+        }
+
+        let mut orchestrator = Self::load(
+            storage,
+            identity.create_device_info(timestamp),
+            registry.clone(),
+        )?;
+        let item = SyncItem::DeviceRegistryChanged {
+            registry_json: registry.to_json(),
+            timestamp,
+        };
+
+        storage
+            .begin_transaction()
+            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+        let result = (|| {
+            storage
+                .device()
+                .save_device_registry(registry)
+                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            orchestrator.stage_local_change(item);
+            orchestrator.persist_staged_state()
+        })();
+
+        match result {
+            Ok(()) => storage
+                .commit()
+                .map_err(|e| DeviceSyncError::Serialization(e.to_string())),
+            Err(error) => {
+                storage.rollback();
+                Err(error)
+            }
+        }
+    }
+
+    fn stage_local_change(&mut self, item: SyncItem) {
         // Track the last-write stamp for conflict resolution: this device
         // originated the change, so stamp it with our device id (ADR-020).
         let key = Self::conflict_key(&item);
@@ -129,44 +212,23 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         for state in self.device_states.values_mut() {
             state.queue_item(item.clone());
         }
+    }
 
-        // Persist device states + version vector atomically (#105).
-        // A transaction ensures either all state is saved or none, preventing
-        // inconsistency if the process crashes mid-write.
-        self.storage
-            .begin_transaction()
-            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-
-        let result = (|| {
-            for state in self.device_states.values() {
-                self.storage
-                    .sync()
-                    .save_device_sync_state(state)
-                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-            }
+    fn persist_staged_state(&self) -> Result<(), DeviceSyncError> {
+        for state in self.device_states.values() {
             self.storage
                 .sync()
-                .save_version_vector(&self.version_vector)
+                .save_device_sync_state(state)
                 .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-            self.storage
-                .sync()
-                .save_field_timestamps(&self.field_timestamps)
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-            Ok(())
-        })();
-
-        match result {
-            Ok(()) => {
-                self.storage
-                    .commit()
-                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-                Ok(())
-            }
-            Err(e) => {
-                self.storage.rollback();
-                Err(e)
-            }
         }
+        self.storage
+            .sync()
+            .save_version_vector(&self.version_vector)
+            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+        self.storage
+            .sync()
+            .save_field_timestamps(&self.field_timestamps)
+            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))
     }
 
     /// Returns pending sync items for a specific device.
@@ -568,6 +630,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::ContactCardUpdated { contact_id, .. } => {
                 format!("contact_card:{}", contact_id)
             }
+            SyncItem::DeviceRegistryChanged { .. } => "device_registry".to_string(),
             SyncItem::CardUpdated { field_label, .. } => format!("field:{}", field_label),
             SyncItem::CardFieldRemoved { field_label, .. } => format!("field:{}", field_label),
             SyncItem::VisibilityChanged { contact_id, .. } => format!("visibility:{}", contact_id),

@@ -7,6 +7,7 @@
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
+use crate::crypto::SigningKeyPair;
 use crate::identity::{DeviceInfo, DeviceRegistry, Identity};
 
 use super::super::ExchangeError;
@@ -206,8 +207,12 @@ impl DeviceLinkInitiator {
         );
 
         let mut updated_registry = self.registry.clone();
+        let signing_key = SigningKeyPair::from_seed(&self.master_seed);
         updated_registry
-            .add_device_unsigned(new_device_info.to_registered(&self.master_seed))
+            .add_device(
+                new_device_info.to_registered(&self.master_seed),
+                &signing_key,
+            )
             .map_err(|_| ExchangeError::CryptoError)?;
 
         let response = match sync_payload_json {
@@ -449,8 +454,12 @@ impl DeviceLinkInitiatorRestored {
         );
 
         let mut updated_registry = self.registry.clone();
+        let signing_key = SigningKeyPair::from_seed(&self.master_seed);
         updated_registry
-            .add_device_unsigned(new_device_info.to_registered(&self.master_seed))
+            .add_device(
+                new_device_info.to_registered(&self.master_seed),
+                &signing_key,
+            )
             .map_err(|_| ExchangeError::CryptoError)?;
 
         let response = match sync_payload_json {

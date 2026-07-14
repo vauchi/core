@@ -113,6 +113,10 @@ fn test_build_response_succeeds_after_proximity_verified() {
     assert_eq!(response.display_name(), "Alice");
     assert_eq!(new_device.device_name(), "My Phone");
     assert_eq!(updated_registry.device_count(), 2);
+    assert!(
+        updated_registry
+            .verify(&vauchi_core::crypto::SigningKeyPair::from_seed(&master_seed).public_key())
+    );
 }
 
 // @internal

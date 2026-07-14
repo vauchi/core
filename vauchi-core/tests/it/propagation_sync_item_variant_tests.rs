@@ -17,6 +17,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::DeletionState;
+use vauchi_core::sync::device_sync::TagSyncData;
 use vauchi_core::sync::{GroupSyncData, ImportedContactSyncData, SyncItem};
 
 fn make_vauchi() -> Vauchi {
@@ -335,6 +336,39 @@ fn apply_sync_group_changed_replaces_complete_state() {
     assert_eq!(synced.bio_override(), Some("Professional profile"));
     assert_eq!(synced.created_at(), 10);
     assert_eq!(synced.modified_at(), 14);
+}
+
+// @scenario: contact-annotations.feature - Tags sync to my other linked devices
+#[test]
+fn apply_sync_tag_change_and_deletion_converges() {
+    let wb = make_vauchi();
+    let tag_data = TagSyncData {
+        id: "tag-work".into(),
+        name: "work".into(),
+        contact_ids: vec!["contact-bob".into()],
+        created_at: 10,
+    };
+    wb.apply_sync_items(vec![SyncItem::TagChanged {
+        tag_data,
+        timestamp: 11,
+    }])
+    .unwrap();
+
+    let synced = wb
+        .storage()
+        .tags()
+        .get_tag("tag-work")
+        .unwrap()
+        .expect("tag synced");
+    assert_eq!(synced.name, "work");
+    assert!(synced.contains("contact-bob"));
+
+    wb.apply_sync_items(vec![SyncItem::TagDeleted {
+        tag_id: "tag-work".into(),
+        timestamp: 12,
+    }])
+    .unwrap();
+    assert!(wb.storage().tags().get_tag("tag-work").unwrap().is_none());
 }
 
 // @internal

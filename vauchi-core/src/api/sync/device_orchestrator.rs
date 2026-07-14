@@ -571,6 +571,8 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::GroupChanged { group_data, .. } => {
                 format!("label:{}", group_data.id)
             }
+            SyncItem::TagChanged { tag_data, .. } => format!("tag:{}", tag_data.id),
+            SyncItem::TagDeleted { tag_id, .. } => format!("tag:{}", tag_id),
             SyncItem::ContactTrustChanged { contact_id, .. } => {
                 format!("trust:{}", contact_id)
             }

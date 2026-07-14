@@ -8,7 +8,7 @@ use super::super::error::{VauchiError, VauchiResult};
 use super::Vauchi;
 
 impl Vauchi {
-    fn record_group_change(&self, group: &crate::contact::Group) {
+    pub(crate) fn record_group_change(&self, group: &crate::contact::Group) {
         self.record_sync_item(crate::sync::SyncItem::GroupChanged {
             group_data: crate::sync::GroupSyncData::from_group(group),
             timestamp: group.modified_at(),

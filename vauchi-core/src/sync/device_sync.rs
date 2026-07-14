@@ -187,7 +187,7 @@ impl ImportedContactSyncData {
 /// Tags are owner-private and never leave the owner's devices; the device-sync
 /// payload itself is encrypted device-to-device, so the name travels in
 /// plaintext inside that envelope (like `card_json`).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TagSyncData {
     /// Stable tag id (preserved across devices).
     pub id: String,
@@ -590,6 +590,15 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
+    /// Complete owner-private tag state changed on a linked device.
+    TagChanged {
+        tag_data: TagSyncData,
+        timestamp: u64,
+    },
+
+    /// An owner-private tag was deleted on a linked device.
+    TagDeleted { tag_id: String, timestamp: u64 },
+
     /// A contact's recovery trust status changed.
     ContactTrustChanged {
         /// Contact ID whose trust status changed.
@@ -709,6 +718,8 @@ impl SyncItem {
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,
             SyncItem::LabelChange { timestamp, .. } => *timestamp,
             SyncItem::GroupChanged { timestamp, .. } => *timestamp,
+            SyncItem::TagChanged { timestamp, .. } => *timestamp,
+            SyncItem::TagDeleted { timestamp, .. } => *timestamp,
             SyncItem::ContactTrustChanged { timestamp, .. } => *timestamp,
             SyncItem::DeletionScheduled { timestamp, .. } => *timestamp,
             SyncItem::DeletionCancelled { timestamp, .. } => *timestamp,

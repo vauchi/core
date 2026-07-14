@@ -7,7 +7,11 @@
 //! Covers autocomplete-or-create, per-contact tag listing, suggestions, and
 //! validation. See `ADR-051`.
 
+use vauchi_core::api::sync::DeviceSyncOrchestrator;
+use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
+use vauchi_core::sync::SyncItem;
 use vauchi_core::{ContactField, FieldType, Vauchi};
 
 /// Vauchi with an identity.
@@ -25,6 +29,25 @@ fn add_contact(wb: &Vauchi, name: &str) -> String {
     let (_, their_ephemeral_pub) = X3DH::initiate(&their_ephemeral, our_x3dh.public_key()).unwrap();
     wb.accept_relay_exchange(their_identity.public_key(), &their_ephemeral_pub, name)
         .unwrap()
+}
+
+fn install_linked_registry(wb: &Vauchi) -> (DeviceRegistry, [u8; 32]) {
+    const SEED: [u8; 32] = [9u8; 32];
+    let signing = SigningKeyPair::from_seed(&SEED);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
+        &signing,
+    );
+    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet_id = *tablet.device_id();
+    registry
+        .add_device_unsigned(tablet.to_registered(&SEED))
+        .unwrap();
+    wb.storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+    (registry, tablet_id)
 }
 
 // @scenario: contact-annotations.feature - Create a new tag on a contact
@@ -88,6 +111,41 @@ fn add_tag_to_contact_creates_and_applies() {
         .map(|t| t.name)
         .collect();
     assert_eq!(on_bob, vec!["climbing-gym"]);
+}
+
+// @scenario: contact-annotations.feature - Tags sync to my other linked devices
+// @scenario: sync_updates :: Tag state converges across linked devices
+#[test]
+fn tag_mutations_journal_complete_state_for_linked_devices() {
+    let wb = setup();
+    let bob = add_contact(&wb, "Bob");
+    let (registry, tablet_id) = install_linked_registry(&wb);
+
+    let tag = wb.add_tag_to_contact(&bob, "work").unwrap();
+    wb.remove_tag_from_contact(&tag.id, &bob).unwrap();
+    assert!(wb.delete_tag(&tag.id).unwrap());
+
+    let orchestrator = DeviceSyncOrchestrator::load(
+        wb.storage(),
+        wb.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap();
+    let pending = orchestrator.pending_for_device(&tablet_id);
+    assert!(matches!(
+        pending.first(),
+        Some(SyncItem::TagChanged { tag_data, .. })
+            if tag_data.id == tag.id && tag_data.contact_ids == [bob]
+    ));
+    assert!(matches!(
+        pending.get(1),
+        Some(SyncItem::TagChanged { tag_data, .. })
+            if tag_data.id == tag.id && tag_data.contact_ids.is_empty()
+    ));
+    assert!(matches!(
+        pending.get(2),
+        Some(SyncItem::TagDeleted { tag_id, .. }) if tag_id == &tag.id
+    ));
 }
 
 // @scenario: contact-annotations.feature - Adding a tag autocompletes an existing one

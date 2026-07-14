@@ -575,6 +575,17 @@ impl Vauchi {
                     .labels()
                     .save_group(&group_data.to_group())
                     .map_err(|e| e.into()),
+                SyncItem::TagChanged { ref tag_data, .. } => self
+                    .storage
+                    .tags()
+                    .save_tag(&tag_data.to_tag())
+                    .map_err(|e| e.into()),
+                SyncItem::TagDeleted { ref tag_id, .. } => self
+                    .storage
+                    .tags()
+                    .delete_tag(tag_id)
+                    .map(|_| ())
+                    .map_err(|e| e.into()),
                 SyncItem::ContactTrustChanged {
                     ref contact_id,
                     recovery_trusted,
@@ -756,6 +767,7 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
         SyncItem::GroupChanged { group_data, .. } => Some(VauchiEvent::LabelSyncCompleted {
             label_id: group_data.id.clone(),
         }),
+        SyncItem::TagChanged { .. } | SyncItem::TagDeleted { .. } => None,
         SyncItem::ContactTrustChanged { contact_id, .. } => Some(VauchiEvent::ContactUpdated {
             contact_id: contact_id.clone(),
             changed_fields: vec!["recovery_trusted".to_string()],

@@ -44,5 +44,5 @@ vauchi-cabi/src/lib.rs 1606
 vauchi-app/src/ui/exchange/mod.rs 2832
 vauchi-app/src/ui/app_engine/ble_handshake.rs 1079
 vauchi-core/tests/it/app_engine_navigation_tests.rs 1224
-vauchi-core/tests/it/migration_tests.rs 1241
+vauchi-core/tests/it/migration_tests.rs 1280
 vauchi-core/tests/it/ble_handshake_tests.rs 1275

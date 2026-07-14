@@ -429,8 +429,8 @@ pub enum SyncItem {
     DeviceRegistryChanged {
         /// Complete identity-signed registry as JSON.
         registry_json: String,
-        /// Timestamp when the registry mutation committed.
-        timestamp: u64,
+        /// Signed monotonic registry version used for conflict ordering.
+        version: u64,
     },
 
     /// Own contact card field was updated.
@@ -602,7 +602,7 @@ impl SyncItem {
             SyncItem::ContactAdded { timestamp, .. } => *timestamp,
             SyncItem::ContactRemoved { timestamp, .. } => *timestamp,
             SyncItem::ContactCardUpdated { timestamp, .. } => *timestamp,
-            SyncItem::DeviceRegistryChanged { timestamp, .. } => *timestamp,
+            SyncItem::DeviceRegistryChanged { version, .. } => *version,
             SyncItem::CardUpdated { timestamp, .. } => *timestamp,
             SyncItem::CardFieldRemoved { timestamp, .. } => *timestamp,
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,

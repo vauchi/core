@@ -1054,7 +1054,7 @@ fn device_registry_sync_accepts_newer_signed_state_and_rejects_forgery() {
     let applied = wb
         .apply_sync_items(vec![SyncItem::DeviceRegistryChanged {
             registry_json: expanded.to_json(),
-            timestamp: 2,
+            version: expanded.version(),
         }])
         .unwrap();
     assert_eq!(applied, 1);
@@ -1069,10 +1069,41 @@ fn device_registry_sync_accepts_newer_signed_state_and_rejects_forgery() {
     let applied = wb
         .apply_sync_items(vec![SyncItem::DeviceRegistryChanged {
             registry_json: forged.to_json(),
-            timestamp: 3,
+            version: forged.version(),
         }])
         .unwrap();
 
     assert_eq!(applied, 0);
     assert_eq!(wb.list_devices().unwrap().len(), 2);
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Every active device can exchange and update
+#[test]
+fn same_second_registry_expansions_order_by_signed_version() {
+    let storage = create_test_storage();
+    let seed = [0x73u8; 32];
+    let current = create_test_device(&seed, 1, "Alice tablet");
+    let registry = create_test_registry(&seed, &current);
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, current, registry);
+    let sender = [0x11u8; 32];
+
+    let applied = orchestrator
+        .process_incoming(
+            vec![
+                SyncItem::DeviceRegistryChanged {
+                    registry_json: "registry-v2".to_string(),
+                    version: 2,
+                },
+                SyncItem::DeviceRegistryChanged {
+                    registry_json: "registry-v3".to_string(),
+                    version: 3,
+                },
+            ],
+            &sender,
+        )
+        .unwrap();
+
+    assert_eq!(applied.len(), 2);
+    assert_eq!(applied[0].timestamp(), 2);
+    assert_eq!(applied[1].timestamp(), 3);
 }

@@ -41,7 +41,7 @@ use std::path::PathBuf;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 
-use vauchi_core::api::sync::DeviceSyncOrchestrator;
+use vauchi_core::api::DeviceSyncOrchestrator;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::{
     DeviceLinkInitiator, DeviceLinkJoinInvitation, DeviceLinkRequest, ProximityProof,

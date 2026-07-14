@@ -168,7 +168,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         )?;
         let item = SyncItem::DeviceRegistryChanged {
             registry_json: registry.to_json(),
-            timestamp,
+            version: registry.version(),
         };
 
         storage

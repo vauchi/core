@@ -266,8 +266,13 @@ impl DeviceStore<'_> {
                 "contact device registry contains duplicate device IDs".into(),
             ));
         }
+        let stored_version = i64::try_from(broadcast.version()).map_err(|_| {
+            StorageError::InvalidData(
+                "contact device registry version exceeds storage range".into(),
+            )
+        })?;
         let previously_active = self.load_contact_active_devices(contact_id)?;
-        let last_version = self
+        let last_stored_version = self
             .conn
             .query_row(
                 "SELECT version FROM contact_device_registries WHERE contact_id = ?1",
@@ -277,7 +282,10 @@ impl DeviceStore<'_> {
             .or_else(|error| match error {
                 rusqlite::Error::QueryReturnedNoRows => Ok(0),
                 other => Err(other),
-            })? as u64;
+            })?;
+        let last_version = u64::try_from(last_stored_version).map_err(|_| {
+            StorageError::InvalidData("stored contact device registry version is negative".into())
+        })?;
 
         broadcast
             .verify_with_freshness(
@@ -299,7 +307,7 @@ impl DeviceStore<'_> {
                 broadcast_encrypted = excluded.broadcast_encrypted,
                 version = excluded.version,
                 updated_at = excluded.updated_at",
-            params![contact_id, encrypted, broadcast.version() as i64, self.now_secs() as i64],
+            params![contact_id, encrypted, stored_version, self.now_secs() as i64],
         )?;
         for removed in previously_active.iter().filter(|old| {
             !broadcast

@@ -181,3 +181,50 @@ fn test_contact_device_registry_accepts_only_newer_identity_signed_broadcasts() 
             .is_none()
     );
 }
+
+// @internal
+#[test]
+fn test_contact_device_registry_version_above_sqlite_range_is_rejected() {
+    let storage = test_storage();
+    let signing = SigningKeyPair::from_seed(&[17u8; 32]);
+    let contact = Contact::from_exchange(
+        *signing.public_key().as_bytes(),
+        ContactCard::new("Version boundary"),
+        SymmetricKey::generate(),
+        0,
+    );
+    storage.contacts().save_contact(&contact).unwrap();
+
+    let seed = [23u8; 32];
+    let primary = DeviceInfo::derive(&seed, 0, "Phone".into(), 1);
+    let registry = DeviceRegistry::new(primary.to_registered(&seed), &signing);
+    let mut registry_json: serde_json::Value = serde_json::from_str(&registry.to_json()).unwrap();
+    registry_json["version"] = serde_json::json!(u64::MAX);
+    let oversized = DeviceRegistry::from_json(&registry_json.to_string()).unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let broadcast = RegistryBroadcast::new(&oversized, &signing, now);
+
+    let error = storage
+        .device()
+        .save_contact_device_registry(
+            contact.id(),
+            &broadcast,
+            signing.public_key().as_bytes(),
+            60,
+        )
+        .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "Invalid data: contact device registry version exceeds storage range"
+    );
+    assert!(
+        storage
+            .device()
+            .load_contact_device_registry(contact.id())
+            .unwrap()
+            .is_none()
+    );
+}

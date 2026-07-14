@@ -270,6 +270,52 @@ impl ExchangeSession {
         }
     }
 
+    /// Restores a QR exchange started by an earlier process invocation.
+    ///
+    /// The caller must persist the original QR and its ephemeral secret in
+    /// restricted local storage, then delete both after completion or expiry.
+    /// The pair is validated against the identity, signature, expiry, and
+    /// X25519 public key before the session is restored to `DisplayingQr`.
+    /// Reusing this exact ephemeral is required for both peers to derive the
+    /// same forward-secret channel when `start` and `complete` are separate
+    /// CLI commands.
+    pub fn resume_qr(
+        identity: Identity,
+        our_card: ContactCard,
+        proximity: impl ProximityVerifier + 'static,
+        ephemeral_secret: [u8; 32],
+        our_qr: ExchangeQR,
+        clock: Arc<dyn crate::clock::Clock>,
+    ) -> Result<Self, ExchangeError> {
+        if !our_qr.verify_signature() {
+            return Err(ExchangeError::InvalidSignature);
+        }
+        if our_qr.is_expired(clock.unix_seconds()) {
+            return Err(ExchangeError::QRExpired);
+        }
+        if our_qr.public_key() != identity.signing_public_key() {
+            return Err(ExchangeError::InvalidState(
+                "pending QR belongs to a different identity".into(),
+            ));
+        }
+
+        let our_x3dh = X3DHKeyPair::from_bytes(ephemeral_secret);
+        if our_qr.exchange_key() != our_x3dh.public_key() {
+            return Err(ExchangeError::InvalidState(
+                "pending QR does not match its ephemeral secret".into(),
+            ));
+        }
+
+        let our_audio_challenge = Some(*our_qr.audio_challenge());
+        let our_relay_url = our_qr.relay_url().map(String::from);
+        let mut session = Self::new_qr(identity, our_card, proximity, clock);
+        session.our_x3dh = our_x3dh;
+        session.our_audio_challenge = our_audio_challenge;
+        session.our_relay_url = our_relay_url;
+        session.state = ExchangeState::DisplayingQr { our_qr };
+        Ok(session)
+    }
+
     /// Test-only constructor that accepts a specific X3DH keypair for deterministic testing.
     #[cfg(any(test, feature = "testing"))]
     pub fn new_qr_with_x3dh(
@@ -649,6 +695,16 @@ impl ExchangeSession {
         }
     }
 
+    /// Returns the ephemeral QR secret needed to resume this pending session.
+    ///
+    /// The secret is wrapped in [`zeroize::Zeroizing`] and is available only
+    /// while the QR session still retains its displayed QR. Callers persisting
+    /// it must use restricted local storage and remove it after completion or
+    /// expiry.
+    pub fn qr_resume_secret(&self) -> Option<zeroize::Zeroizing<[u8; 32]>> {
+        self.qr().map(|_| self.our_x3dh.secret_bytes())
+    }
+
     /// Returns the NFC handshake session (only for NFC transport).
     pub fn nfc_handshake(&self) -> Option<&NfcHandshakeSession> {
         self.nfc_handshake.as_ref()
@@ -880,18 +936,16 @@ impl ExchangeSession {
             Event::HardwareError { transport, error } => {
                 self.handle_hardware_error(transport, error)
             }
-            Event::HardwareUnavailable { transport } => {
-                self.handle_hardware_unavailable(transport)
-            }
-            Event::PermissionDenied { transport } => {
-                self.handle_permission_denied(transport)
-            }
+            Event::HardwareUnavailable { transport } => self.handle_hardware_unavailable(transport),
+            Event::PermissionDenied { transport } => self.handle_permission_denied(transport),
             Event::DirectPayloadReceived { data } => {
                 let payload_str =
                     String::from_utf8(data).map_err(|_| ExchangeError::InvalidQRFormat)?;
                 self.handle_direct_payload_received(payload_str)
             }
-            Event::DirectCardReceived { ciphertext } => self.handle_direct_card_received(ciphertext),
+            Event::DirectCardReceived { ciphertext } => {
+                self.handle_direct_card_received(ciphertext)
+            }
             Event::AudioSamplesRecorded { .. } => {
                 // Audio proximity response — trigger proximity check.
                 // Decoding lives in ProximityRunner; the session just
@@ -952,10 +1006,7 @@ impl ExchangeSession {
     }
 
     /// Handles hardware unavailable by logging and attempting transport fallback.
-    fn handle_hardware_unavailable(
-        &mut self,
-        transport: String,
-    ) -> Result<(), ExchangeError> {
+    fn handle_hardware_unavailable(&mut self, transport: String) -> Result<(), ExchangeError> {
         self.debug_event(ExchangeDebugEvent::ExchangeFailed {
             error: format!("{} hardware unavailable", transport),
         });
@@ -964,10 +1015,7 @@ impl ExchangeSession {
     }
 
     /// Handles permission denied by logging and attempting transport fallback.
-    fn handle_permission_denied(
-        &mut self,
-        transport: String,
-    ) -> Result<(), ExchangeError> {
+    fn handle_permission_denied(&mut self, transport: String) -> Result<(), ExchangeError> {
         self.debug_event(ExchangeDebugEvent::ExchangeFailed {
             error: format!("{} permission denied", transport),
         });

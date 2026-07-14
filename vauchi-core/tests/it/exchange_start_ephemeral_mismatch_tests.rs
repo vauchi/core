@@ -75,6 +75,7 @@ fn resume_against(
     identity: Identity,
     card: ContactCard,
     resume_secret: [u8; 32],
+    own_start_qr: vauchi_core::exchange::ExchangeQR,
     peer_start_qr: vauchi_core::exchange::ExchangeQR,
     peer_card: ContactCard,
 ) -> vauchi_core::Contact {
@@ -83,9 +84,10 @@ fn resume_against(
         card,
         MockProximityVerifier::success(),
         resume_secret,
+        own_start_qr,
         SystemClock::shared(),
-    );
-    session.apply(ExchangeEvent::StartQR).unwrap();
+    )
+    .unwrap();
     session
         .apply(ExchangeEvent::ProcessQR(peer_start_qr))
         .unwrap();
@@ -186,13 +188,15 @@ fn cli_resumed_start_complete_matches_shared_secret_and_mailbox_token() {
         owned_identity_copy(&alice),
         alice_card.clone(),
         alice_resume_secret,
-        bob_start_qr,
+        alice_start_qr.clone(),
+        bob_start_qr.clone(),
         bob_card.clone(),
     );
     let alice_at_bob = resume_against(
         owned_identity_copy(&bob),
         bob_card,
         bob_resume_secret,
+        bob_start_qr.clone(),
         alice_start_qr,
         alice_card,
     );

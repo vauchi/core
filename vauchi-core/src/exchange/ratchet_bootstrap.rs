@@ -54,7 +54,7 @@ pub fn bootstrap_device_pair_ratchet(
     } else {
         (their_identity, their_device_id, our_identity, our_device_id)
     };
-    let mut ikm = Vec::with_capacity(64);
+    let mut ikm = zeroize::Zeroizing::new(Vec::with_capacity(64));
     ikm.extend_from_slice(&*dh);
     ikm.extend_from_slice(relationship_key.as_bytes());
     let mut info = b"vauchi-device-pair-ratchet-v1".to_vec();

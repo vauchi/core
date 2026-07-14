@@ -56,13 +56,11 @@ impl AppEngine {
                 &self.engine.current_screen(),
                 &format!("field_note:{field_id}"),
             )
-        {
-            if let Err(e) =
+            && let Err(e) =
                 self.vauchi
                     .save_contact_field_note(contact_id, field_id, value.as_bytes())
-            {
-                let _ = e;
-            }
+        {
+            let _ = e;
         }
     }
 

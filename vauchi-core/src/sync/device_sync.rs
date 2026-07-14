@@ -12,8 +12,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::contact::Contact;
-use crate::contact::ImportSource;
+use crate::contact::{Contact, Group, ImportSource};
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::identifiers::IdentityKey;
@@ -324,6 +323,11 @@ pub struct DeviceSyncPayload {
     /// payloads from older devices that predate tags.
     #[serde(default)]
     pub tags: Vec<TagSyncData>,
+    /// Owner-private groups and presentation overrides (ADR-054).
+    /// `#[serde(default)]` preserves compatibility with payloads created
+    /// before linked-device group convergence was implemented.
+    #[serde(default)]
+    pub groups: Vec<Group>,
     /// Owner-private named places (ADR-051). `#[serde(default)]` for back-compat.
     #[serde(default)]
     pub places: Vec<PlaceSyncData>,
@@ -345,6 +349,7 @@ impl DeviceSyncPayload {
             imported_contacts: Vec::new(),
             own_card_json: String::new(),
             tags: Vec::new(),
+            groups: Vec::new(),
             places: Vec::new(),
             exchange_locations: Vec::new(),
             contact_device_registries: Vec::new(),
@@ -375,6 +380,7 @@ impl DeviceSyncPayload {
             imported_contacts: imported,
             own_card_json,
             tags: Vec::new(),
+            groups: Vec::new(),
             places: Vec::new(),
             exchange_locations: Vec::new(),
             contact_device_registries: Vec::new(),
@@ -386,6 +392,14 @@ impl DeviceSyncPayload {
     #[must_use]
     pub fn with_tags(mut self, tags: Vec<TagSyncData>) -> Self {
         self.tags = tags;
+        self
+    }
+
+    /// Attaches owner-private groups to this payload, preserving stable ids,
+    /// membership, field visibility, presentation overrides, and timestamps.
+    #[must_use]
+    pub fn with_groups(mut self, groups: Vec<Group>) -> Self {
+        self.groups = groups;
         self
     }
 

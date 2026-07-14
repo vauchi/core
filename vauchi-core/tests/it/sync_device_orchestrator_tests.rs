@@ -5,7 +5,7 @@
 //! Tests for sync::device_orchestrator
 //! Extracted from device_orchestrator.rs
 
-use vauchi_core::contact::Contact;
+use vauchi_core::contact::{Contact, Group};
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::{DoubleRatchetState, SigningKeyPair, SymmetricKey, X3DHKeyPair};
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
@@ -31,6 +31,15 @@ fn create_test_contact(name: &str) -> Contact {
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
     Contact::from_exchange(public_key, card, shared_key, 0)
+}
+
+fn tiny_png() -> Vec<u8> {
+    let image = image::RgbaImage::from_pixel(1, 1, image::Rgba([255, 0, 0, 255]));
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    image
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .expect("encode test PNG");
+    bytes.into_inner()
 }
 
 // ============================================================
@@ -213,6 +222,58 @@ fn test_orchestrator_syncs_tags_round_trip() {
         .expect("tag synced with its original id");
     assert_eq!(synced.name, "berlin-trip");
     assert!(synced.contains(contact.id()), "membership synced");
+}
+
+// @scenario: device_management :: Linked device preserves group presentation state
+// @scenario: sync_updates :: Group presentation state converges across linked devices
+#[test]
+fn test_orchestrator_syncs_groups_round_trip() {
+    let master_seed = [0x42u8; 32];
+
+    let storage_a = create_test_storage();
+    let device_a = create_test_device(&master_seed, 0, "Device A");
+    let registry_a = create_test_registry(&master_seed, &device_a);
+    let contact = create_test_contact("Bob");
+    storage_a.contacts().save_contact(&contact).unwrap();
+
+    let mut group = Group::new("group-work".into(), "Work", 10);
+    group.add_contact(contact.id(), 11);
+    group.add_visible_field("field-email", 12);
+    group
+        .set_display_name_override(Some("Alice at Work"), 13)
+        .unwrap();
+    group
+        .set_bio_override(Some("Professional profile"), 14)
+        .unwrap();
+    group.set_avatar_override(Some(&tiny_png()), 15).unwrap();
+    let expected_avatar = group.avatar_override().unwrap().to_vec();
+    storage_a.labels().save_group(&group).unwrap();
+
+    let orchestrator_a = DeviceSyncOrchestrator::new(&storage_a, device_a, registry_a);
+    let payload = orchestrator_a
+        .create_full_sync_payload(DeviceLinkIntent::AddDevice)
+        .unwrap();
+    assert_eq!(payload.groups.len(), 1, "group included in sync payload");
+    let payload = DeviceSyncPayload::from_json(&payload.to_json()).unwrap();
+
+    let storage_b = create_test_storage();
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry_b = create_test_registry(&master_seed, &device_b);
+    let mut orchestrator_b = DeviceSyncOrchestrator::new(&storage_b, device_b, registry_b);
+    orchestrator_b.apply_full_sync(payload).unwrap();
+
+    let synced = storage_b
+        .labels()
+        .load_group("group-work")
+        .expect("group synced with original id");
+    assert_eq!(synced.name(), "Work");
+    assert_eq!(synced.created_at(), 10);
+    assert_eq!(synced.modified_at(), 15);
+    assert!(synced.contains_contact(contact.id()));
+    assert!(synced.is_field_visible("field-email"));
+    assert_eq!(synced.display_name_override(), Some("Alice at Work"));
+    assert_eq!(synced.bio_override(), Some("Professional profile"));
+    assert_eq!(synced.avatar_override(), Some(expected_avatar.as_slice()));
 }
 
 // @scenario: contact-annotations.feature - Tags sync to my other linked devices

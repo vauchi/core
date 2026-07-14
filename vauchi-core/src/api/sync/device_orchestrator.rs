@@ -235,6 +235,13 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .map(TagSyncData::from_tag)
             .collect();
 
+        // Load owner-private groups and their ADR-054 presentation state.
+        let groups = self
+            .storage
+            .labels()
+            .load_all_groups()
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+
         // Load named places + per-contact exchange locations (ADR-051)
         let places: Vec<PlaceSyncData> = self
             .storage
@@ -269,6 +276,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
         Ok(DeviceSyncPayload::new(&contacts, &own_card, version)
             .with_tags(tags)
+            .with_groups(groups)
             .with_places(places)
             .with_exchange_locations(exchange_locations)
             .with_contact_device_registries(contact_device_registries))
@@ -359,6 +367,15 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                 self.storage
                     .tags()
                     .save_tag(&tag_data.to_tag())
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+
+            // Restore owner-private groups (ADR-054), preserving their stable
+            // ids, membership, visibility, presentation, and timestamps.
+            for group in &payload.groups {
+                self.storage
+                    .labels()
+                    .save_group(group)
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
 

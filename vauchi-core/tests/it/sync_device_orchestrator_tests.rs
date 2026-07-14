@@ -1000,3 +1000,40 @@ fn replacement_sync_payload_carries_contacts_without_ratchets() {
 
     assert_eq!(payload.contact_count(), 1);
 }
+
+// @scenario: release_privacy_multidevice_certification.feature:Every active device can exchange and update
+#[test]
+fn expanded_registry_is_queued_for_devices_linked_earlier() {
+    let storage = create_test_storage();
+    let master_seed = [0x63u8; 32];
+    let signing_key = SigningKeyPair::from_seed(&master_seed);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Alice phone".into(), 1);
+    let device_a = identity.create_device_info(1);
+    let device_b = create_test_device(&master_seed, 1, "Alice tablet");
+    let device_c = create_test_device(&master_seed, 2, "Alice laptop");
+
+    let mut previous = create_test_registry(&master_seed, &device_a);
+    previous
+        .add_device(device_b.to_registered(&master_seed), &signing_key)
+        .unwrap();
+    storage.device().save_device_registry(&previous).unwrap();
+
+    let mut expanded = previous;
+    expanded
+        .add_device(device_c.to_registered(&master_seed), &signing_key)
+        .unwrap();
+    DeviceSyncOrchestrator::persist_device_registry_change(&storage, &identity, &expanded, 2)
+        .unwrap();
+
+    let stored = storage.device().load_device_registry().unwrap().unwrap();
+    assert_eq!(stored.active_count(), 3);
+    let orchestrator = DeviceSyncOrchestrator::load(&storage, device_a, stored).unwrap();
+    assert!(
+        orchestrator
+            .pending_for_device(device_b.device_id())
+            .iter()
+            .any(|item| matches!(item, SyncItem::DeviceRegistryChanged { .. })),
+        "the pre-existing tablet must receive the expanded registry"
+    );
+}

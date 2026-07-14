@@ -16,12 +16,8 @@ impl Vauchi {
     }
 
     pub(crate) fn record_group_deletion(&self, group_id: &str) {
-        self.record_sync_item(crate::sync::SyncItem::LabelChange {
-            label_id: group_id.to_string(),
-            label_name: String::new(),
-            contacts: Vec::new(),
-            visible_fields: Vec::new(),
-            is_deleted: true,
+        self.record_sync_item(crate::sync::SyncItem::GroupDeleted {
+            group_id: group_id.to_string(),
             timestamp: self.clock.unix_seconds(),
         });
     }

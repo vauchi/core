@@ -566,18 +566,17 @@ impl Vauchi {
         }
         let ts = self.now_timestamp();
         for label in &changed_labels {
-            // Look up the current value for the changed field
-            let value = card
-                .fields()
-                .iter()
-                .find(|f| f.label() == label)
-                .map(|f| f.value().to_string())
-                .unwrap_or_default();
-            self.record_sync_item(crate::sync::SyncItem::CardUpdated {
-                field_label: label.clone(),
-                new_value: value,
-                timestamp: ts,
-            });
+            match card.fields().iter().find(|field| field.label() == label) {
+                Some(field) => self.record_sync_item(crate::sync::SyncItem::CardUpdated {
+                    field_label: label.clone(),
+                    new_value: field.value().to_string(),
+                    timestamp: ts,
+                }),
+                None => self.record_sync_item(crate::sync::SyncItem::CardFieldRemoved {
+                    field_label: label.clone(),
+                    timestamp: ts,
+                }),
+            }
         }
         Ok(changed_labels)
     }

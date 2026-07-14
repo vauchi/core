@@ -14,10 +14,10 @@ use std::collections::HashSet;
 
 use vauchi_core::Vauchi;
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
-use vauchi_core::contact::{Group, GroupManager};
+use vauchi_core::contact::GroupManager;
 use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
-use vauchi_core::sync::SyncItem;
+use vauchi_core::sync::{GroupSyncData, SyncItem};
 
 // =============================================================================
 // =============================================================================
@@ -129,15 +129,11 @@ fn group_mutations_journal_complete_state_for_linked_devices() {
     .unwrap();
     assert!(matches!(
         orchestrator.pending_for_device(&tablet_id).last(),
-        Some(SyncItem::LabelChange {
-            label_id,
-            is_deleted: true,
-            ..
-        }) if label_id == expected.id()
+        Some(SyncItem::GroupDeleted { group_id, .. }) if group_id == expected.id()
     ));
 }
 
-/// Tests that labels sync across the user's own devices via SyncItem::LabelChange.
+/// Tests that groups sync across the user's own devices without entering contact data.
 ///
 /// Feature: visibility_labels.feature
 /// Scenarios:
@@ -170,137 +166,59 @@ fn test_label_sync_across_devices() {
     family.add_visible_field("home-address", 0);
     family.add_visible_field("personal-phone", 0);
 
-    let friends = device_a_manager.get_group_mut(&friends_id).unwrap();
-    friends.add_visible_field("personal-email", 0);
-
     let timestamp = now();
-
-    let family_label = device_a_manager.get_group(&family_id).unwrap();
-    let family_sync = SyncItem::LabelChange {
-        label_id: family_label.id().to_string(),
-        label_name: family_label.name().to_string(),
-        contacts: family_label.contacts().iter().cloned().collect(),
-        visible_fields: family_label.visible_fields().iter().cloned().collect(),
-        is_deleted: false,
+    let family_data = GroupSyncData::from_group(device_a_manager.get_group(&family_id).unwrap());
+    let family_sync = SyncItem::GroupChanged {
+        group_data: family_data.clone(),
         timestamp,
     };
 
-    // Friends label sync item (used for deletion test below)
-    let friends_label = device_a_manager.get_group(&friends_id).unwrap();
-    let _friends_sync = SyncItem::LabelChange {
-        label_id: friends_label.id().to_string(),
-        label_name: friends_label.name().to_string(),
-        contacts: friends_label.contacts().iter().cloned().collect(),
-        visible_fields: friends_label.visible_fields().iter().cloned().collect(),
-        is_deleted: false,
-        timestamp,
-    };
-
-    if let SyncItem::LabelChange {
-        label_id,
-        label_name,
-        contacts,
-        visible_fields,
-        is_deleted,
+    if let SyncItem::GroupChanged {
+        group_data,
         timestamp: ts,
     } = &family_sync
     {
-        assert_eq!(label_id, &family_id);
-        assert_eq!(label_name, "Family");
-        assert_eq!(contacts.len(), 2);
-        assert!(contacts.contains(&"bob-id".to_string()));
-        assert!(contacts.contains(&"carol-id".to_string()));
-        assert_eq!(visible_fields.len(), 2);
-        assert!(visible_fields.contains(&"home-address".to_string()));
-        assert!(visible_fields.contains(&"personal-phone".to_string()));
-        assert!(!is_deleted);
+        assert_eq!(group_data.id, family_id);
+        assert_eq!(group_data.name, "Family");
+        assert_eq!(group_data.contact_ids, ["bob-id", "carol-id"]);
+        assert_eq!(
+            group_data.visible_fields,
+            ["home-address", "personal-phone"]
+        );
         assert_eq!(*ts, timestamp);
     } else {
-        panic!("Expected LabelChange variant");
+        panic!("Expected GroupChanged variant");
     }
 
-    // Simulate Device B receiving the sync and reconstructing labels
+    let reconstructed = family_data.to_group();
+    assert_eq!(reconstructed.name(), "Family");
+    assert_eq!(reconstructed.contact_count(), 2);
+    assert!(reconstructed.contains_contact("bob-id"));
+    assert!(reconstructed.contains_contact("carol-id"));
+    assert!(reconstructed.is_field_visible("home-address"));
+    assert!(reconstructed.is_field_visible("personal-phone"));
 
-    // Apply Family sync - simulate Device B receiving and applying it
-    if let SyncItem::LabelChange {
-        label_id,
-        label_name,
-        contacts,
-        visible_fields,
-        is_deleted: false,
-        ..
-    } = family_sync
-    {
-        // Create label from sync data (as Device B would)
-        let label = Group::from_storage(
-            label_id,
-            label_name,
-            contacts.into_iter().collect(),
-            visible_fields.into_iter().collect(),
-            None,
-            None,
-            None,
-            timestamp,
-            timestamp,
-        );
-
-        assert_eq!(label.name(), "Family");
-        assert_eq!(label.contact_count(), 2);
-        assert!(label.contains_contact("bob-id"));
-        assert!(label.contains_contact("carol-id"));
-        assert!(label.is_field_visible("home-address"));
-        assert!(label.is_field_visible("personal-phone"));
-    }
-
-    let deleted_sync = SyncItem::LabelChange {
-        label_id: friends_id.clone(),
-        label_name: "Close Friends".to_string(),
-        contacts: vec![],
-        visible_fields: vec![],
-        is_deleted: true,
+    let deleted_sync = SyncItem::GroupDeleted {
+        group_id: friends_id.clone(),
         timestamp: timestamp + 1,
     };
+    assert!(matches!(
+        deleted_sync,
+        SyncItem::GroupDeleted { group_id, .. } if group_id == friends_id
+    ));
 
-    if let SyncItem::LabelChange {
-        label_id,
-        is_deleted,
-        ..
-    } = &deleted_sync
-    {
-        assert_eq!(label_id, &friends_id);
-        assert!(is_deleted, "is_deleted should be true for deletion");
-    }
-
-    let sync_item = SyncItem::LabelChange {
-        label_id: "test-id".to_string(),
-        label_name: "Test".to_string(),
-        contacts: vec![],
-        visible_fields: vec![],
-        is_deleted: false,
-        timestamp: 12345,
-    };
-
-    assert_eq!(sync_item.timestamp(), 12345);
-
-    // Test conflict resolution for labels
-
-    // Device A updates label at timestamp 1000
-    let item_a = SyncItem::LabelChange {
-        label_id: family_id.clone(),
-        label_name: "Family Members".to_string(),
-        contacts: vec!["bob-id".to_string()],
-        visible_fields: vec!["home-address".to_string()],
-        is_deleted: false,
+    let mut older_data = family_data.clone();
+    older_data.name = "Family Members".to_string();
+    older_data.contact_ids = vec!["bob-id".to_string()];
+    let item_a = SyncItem::GroupChanged {
+        group_data: older_data,
         timestamp: 1000,
     };
-
-    // Device B updates same label at timestamp 2000 (later)
-    let item_b = SyncItem::LabelChange {
-        label_id: family_id.clone(),
-        label_name: "Close Family".to_string(),
-        contacts: vec!["bob-id".to_string(), "carol-id".to_string()],
-        visible_fields: vec!["home-address".to_string(), "birthday".to_string()],
-        is_deleted: false,
+    let mut newer_data = family_data;
+    newer_data.name = "Close Family".to_string();
+    newer_data.visible_fields.push("birthday".to_string());
+    let item_b = SyncItem::GroupChanged {
+        group_data: newer_data,
         timestamp: 2000,
     };
 
@@ -309,20 +227,17 @@ fn test_label_sync_across_devices() {
 
     let resolved = SyncItem::resolve_conflict(&item_a, &item_b, &device_a_id, &device_b_id);
 
-    if let SyncItem::LabelChange {
-        label_name,
-        contacts,
-        visible_fields,
+    if let SyncItem::GroupChanged {
+        group_data,
         timestamp: ts,
-        ..
     } = resolved
     {
-        assert_eq!(label_name, "Close Family");
-        assert_eq!(contacts.len(), 2);
-        assert_eq!(visible_fields.len(), 2);
+        assert_eq!(group_data.name, "Close Family");
+        assert_eq!(group_data.contact_ids.len(), 2);
+        assert_eq!(group_data.visible_fields.len(), 3);
         assert_eq!(ts, 2000);
     } else {
-        panic!("Expected LabelChange variant");
+        panic!("Expected GroupChanged variant");
     }
 
     // Verify labels are local-only (not transmitted to contacts)

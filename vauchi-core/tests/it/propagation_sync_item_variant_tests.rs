@@ -247,59 +247,6 @@ fn apply_sync_proposal_trust_changed_for_unknown_contact_is_skipped() {
     assert_eq!(applied, 1, "unknown contact is a non-fatal skip");
 }
 
-// ============================================================
-// LabelChange — re-apply visible_fields branch (line 624-629)
-// ============================================================
-
-// @internal
-#[test]
-fn apply_sync_label_change_creates_then_updates_with_fields() {
-    let wb = make_vauchi();
-    let bob = make_exchanged_contact("Bob");
-    let bob_id = bob.id().to_string();
-    wb.add_contact(bob).unwrap();
-
-    let create = vec![SyncItem::LabelChange {
-        label_id: "label-friends".to_string(),
-        label_name: "Friends".to_string(),
-        contacts: vec![],
-        visible_fields: vec![],
-        is_deleted: false,
-        timestamp: now(),
-    }];
-    wb.apply_sync_items(create).unwrap();
-    let created = wb
-        .storage()
-        .labels()
-        .load_group("label-friends")
-        .expect("incoming label id must be preserved");
-    assert_eq!(created.name(), "Friends");
-
-    // Now update the label with contacts AND visible_fields — this
-    // exercises the "re-apply field visibility" loop (line 624-629).
-    let update = vec![SyncItem::LabelChange {
-        label_id: "label-friends".to_string(),
-        label_name: "Close Friends".to_string(),
-        contacts: vec![bob_id.clone()],
-        visible_fields: vec!["email".to_string(), "phone".to_string()],
-        is_deleted: false,
-        timestamp: now(),
-    }];
-    let applied = wb.apply_sync_items(update).unwrap();
-    assert_eq!(applied, 1);
-    let updated = wb
-        .storage()
-        .labels()
-        .load_group("label-friends")
-        .expect("updated group keeps incoming id");
-    assert_eq!(updated.name(), "Close Friends");
-    assert_eq!(updated.contacts(), &HashSet::from([bob_id]));
-    assert_eq!(
-        updated.visible_fields(),
-        &HashSet::from(["email".to_string(), "phone".to_string()])
-    );
-}
-
 // @scenario: sync_updates :: Group presentation state converges across linked devices
 #[test]
 fn apply_sync_group_changed_replaces_complete_state() {
@@ -373,7 +320,7 @@ fn apply_sync_tag_change_and_deletion_converges() {
 
 // @internal
 #[test]
-fn apply_sync_label_change_with_is_deleted_removes_label() {
+fn apply_sync_group_deleted_removes_group() {
     let wb = make_vauchi();
     // Create directly so the deletion branch starts with a persisted group.
     let label = wb.storage().labels().create_group("ToBeDeleted").unwrap();
@@ -384,12 +331,8 @@ fn apply_sync_label_change_with_is_deleted_removes_label() {
     );
 
     let applied = wb
-        .apply_sync_items(vec![SyncItem::LabelChange {
-            label_id: real_label_id.clone(),
-            label_name: String::new(),
-            contacts: vec![],
-            visible_fields: vec![],
-            is_deleted: true,
+        .apply_sync_items(vec![SyncItem::GroupDeleted {
+            group_id: real_label_id.clone(),
             timestamp: now(),
         }])
         .unwrap();
@@ -547,9 +490,9 @@ fn apply_sync_card_updated_dispatches_own_card_updated_event() {
     );
 }
 
-// @scenario: sync_updates :: Own-card field removals converge across linked devices
+// @internal
 #[test]
-fn apply_sync_legacy_empty_card_update_removes_own_card_field() {
+fn apply_sync_empty_card_update_does_not_delete_own_card_field() {
     let wb = make_vauchi();
     wb.add_own_field(ContactField::new(
         FieldType::Email,
@@ -559,18 +502,23 @@ fn apply_sync_legacy_empty_card_update_removes_own_card_field() {
     ))
     .unwrap();
 
-    wb.apply_sync_items(vec![SyncItem::CardUpdated {
+    let result = wb.apply_sync_items(vec![SyncItem::CardUpdated {
         field_label: "email".to_string(),
         new_value: String::new(),
         timestamp: now(),
-    }])
-    .unwrap();
+    }]);
+    assert!(
+        result.is_err(),
+        "an empty email update must fail validation"
+    );
 
     let card = wb.own_card().unwrap().unwrap();
-    assert!(
-        card.fields().iter().all(|field| field.label() != "email"),
-        "legacy empty CardUpdated must remove the field, not retain an empty value"
-    );
+    let email = card
+        .fields()
+        .iter()
+        .find(|field| field.label() == "email")
+        .expect("only CardFieldRemoved may delete a field");
+    assert_eq!(email.value(), "alice@example.com");
 }
 
 // @scenario: sync_updates :: Own-card field removals converge across linked devices
@@ -630,16 +578,13 @@ fn apply_sync_visibility_changed_dispatches_visibility_changed_event() {
 
 // @internal
 #[test]
-fn apply_sync_label_change_dispatches_label_sync_completed_event() {
+fn apply_sync_group_changed_dispatches_label_sync_completed_event() {
     let wb = make_vauchi();
     let events = capture_events(&wb);
+    let group = Group::new("group-friends".to_string(), "Friends", now());
 
-    wb.apply_sync_items(vec![SyncItem::LabelChange {
-        label_id: "label-friends".to_string(),
-        label_name: "Friends".to_string(),
-        contacts: vec![],
-        visible_fields: vec![],
-        is_deleted: false,
+    wb.apply_sync_items(vec![SyncItem::GroupChanged {
+        group_data: GroupSyncData::from_group(&group),
         timestamp: now(),
     }])
     .unwrap();
@@ -648,9 +593,9 @@ fn apply_sync_label_change_dispatches_label_sync_completed_event() {
     assert!(
         matches!(
             got.as_slice(),
-            [VauchiEvent::LabelSyncCompleted { label_id }] if label_id == "label-friends"
+            [VauchiEvent::LabelSyncCompleted { label_id }] if label_id == "group-friends"
         ),
-        "LabelChange sync must dispatch LabelSyncCompleted, got {got:?}"
+        "GroupChanged sync must dispatch LabelSyncCompleted, got {got:?}"
     );
 }
 

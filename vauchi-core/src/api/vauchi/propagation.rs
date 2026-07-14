@@ -508,11 +508,7 @@ impl Vauchi {
                                 .find(|f| f.label() == field_label)
                                 .map(|f| f.id().to_string());
 
-                            if new_value.is_empty() {
-                                if let Some(id) = field_id {
-                                    card.remove_field(&id).map_err(VauchiError::from)?;
-                                }
-                            } else if let Some(id) = field_id {
+                            if let Some(id) = field_id {
                                 card.update_field_value(&id, new_value, self.clock.unix_seconds())
                                     .map_err(VauchiError::from)?;
                             } else {
@@ -560,41 +556,15 @@ impl Vauchi {
                     .labels()
                     .save_contact_override(contact_id, field_id, is_visible)
                     .map_err(|e| e.into()),
-                SyncItem::LabelChange {
-                    ref label_id,
-                    ref label_name,
-                    ref contacts,
-                    ref visible_fields,
-                    is_deleted,
-                    timestamp,
-                } => {
-                    if is_deleted {
-                        self.storage
-                            .labels()
-                            .delete_group(label_id)
-                            .map_err(|e| e.into())
-                    } else {
-                        let group = crate::contact::Group::from_storage(
-                            label_id.clone(),
-                            label_name.clone(),
-                            contacts.iter().cloned().collect(),
-                            visible_fields.iter().cloned().collect(),
-                            None,
-                            None,
-                            None,
-                            timestamp,
-                            timestamp,
-                        );
-                        self.storage
-                            .labels()
-                            .save_group(&group)
-                            .map_err(|e| e.into())
-                    }
-                }
                 SyncItem::GroupChanged { ref group_data, .. } => self
                     .storage
                     .labels()
                     .save_group(&group_data.to_group())
+                    .map_err(|e| e.into()),
+                SyncItem::GroupDeleted { ref group_id, .. } => self
+                    .storage
+                    .labels()
+                    .delete_group(group_id)
                     .map_err(|e| e.into()),
                 SyncItem::TagChanged { ref tag_data, .. } => self
                     .storage
@@ -785,11 +755,11 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
             contact_id: contact_id.clone(),
             field: field_id.clone(),
         }),
-        SyncItem::LabelChange { label_id, .. } => Some(VauchiEvent::LabelSyncCompleted {
-            label_id: label_id.clone(),
-        }),
         SyncItem::GroupChanged { group_data, .. } => Some(VauchiEvent::LabelSyncCompleted {
             label_id: group_data.id.clone(),
+        }),
+        SyncItem::GroupDeleted { group_id, .. } => Some(VauchiEvent::LabelSyncCompleted {
+            label_id: group_id.clone(),
         }),
         SyncItem::TagChanged { .. } | SyncItem::TagDeleted { .. } => None,
         SyncItem::ContactTrustChanged { contact_id, .. } => Some(VauchiEvent::ContactUpdated {

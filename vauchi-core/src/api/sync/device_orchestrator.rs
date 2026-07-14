@@ -568,10 +568,10 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::CardUpdated { field_label, .. } => format!("field:{}", field_label),
             SyncItem::CardFieldRemoved { field_label, .. } => format!("field:{}", field_label),
             SyncItem::VisibilityChanged { contact_id, .. } => format!("visibility:{}", contact_id),
-            SyncItem::LabelChange { label_id, .. } => format!("label:{}", label_id),
             SyncItem::GroupChanged { group_data, .. } => {
-                format!("label:{}", group_data.id)
+                format!("group:{}", group_data.id)
             }
+            SyncItem::GroupDeleted { group_id, .. } => format!("group:{}", group_id),
             SyncItem::TagChanged { tag_data, .. } => format!("tag:{}", tag_data.id),
             SyncItem::TagDeleted { tag_id, .. } => format!("tag:{}", tag_id),
             SyncItem::ContactTrustChanged { contact_id, .. } => {

@@ -84,6 +84,48 @@ fn test_vauchi_update_own_card() {
     assert!(loaded.fields().iter().any(|f| f.label() == "email"));
 }
 
+// @scenario: sync_updates :: Removing MyInfo through a complete-card edit syncs as deletion
+#[test]
+fn test_vauchi_update_own_card_journals_field_removal() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    const SEED: [u8; 32] = [12u8; 32];
+    let signing = SigningKeyPair::from_seed(&SEED);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
+        &signing,
+    );
+    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet_id = *tablet.device_id();
+    registry
+        .add_device_unsigned(tablet.to_registered(&SEED))
+        .unwrap();
+    wb.storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+
+    let field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0);
+    let field_id = field.id().to_string();
+    wb.add_own_field(field).unwrap();
+
+    let mut card = wb.own_card().unwrap().unwrap();
+    card.remove_field(&field_id).unwrap();
+    wb.update_own_card(&card).unwrap();
+
+    let orchestrator = DeviceSyncOrchestrator::load(
+        wb.storage(),
+        wb.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap();
+    assert!(matches!(
+        orchestrator.pending_for_device(&tablet_id).last(),
+        Some(SyncItem::CardFieldRemoved { field_label, .. }) if field_label == "phone"
+    ));
+}
+
 // @internal
 #[test]
 fn test_vauchi_add_own_field() {

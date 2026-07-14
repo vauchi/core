@@ -551,10 +551,10 @@ fn test_conflict_visibility_changed() {
     assert_eq!(applied.len(), 1, "Different contact_id should not conflict");
 }
 
-/// Test conflict resolution with LabelChange items
+/// Test conflict resolution across group update and deletion forms.
 // @scenario: device_management :: Conflict resolution between devices
 #[test]
-fn test_conflict_label_change() {
+fn test_conflict_group_change_and_deletion() {
     let storage = create_test_storage();
     let master_seed = [0x42u8; 32];
 
@@ -563,27 +563,32 @@ fn test_conflict_label_change() {
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
 
-    let items = vec![SyncItem::LabelChange {
-        label_id: "label-1".to_string(),
-        label_name: "Work".to_string(),
-        contacts: vec![],
-        visible_fields: vec![],
-        is_deleted: false,
+    let items = vec![SyncItem::GroupChanged {
+        group_data: GroupSyncData {
+            id: "group-1".to_string(),
+            name: "Work".to_string(),
+            contact_ids: vec![],
+            visible_fields: vec![],
+            display_name_override: None,
+            bio_override: None,
+            avatar_override: None,
+            created_at: 1000,
+            modified_at: 2000,
+        },
         timestamp: 2000,
     }];
     let applied = orchestrator.process_incoming(items, &[0x99u8; 32]).unwrap();
     assert_eq!(applied.len(), 1);
 
-    let stale = vec![SyncItem::LabelChange {
-        label_id: "label-1".to_string(),
-        label_name: "Office".to_string(),
-        contacts: vec![],
-        visible_fields: vec![],
-        is_deleted: false,
+    let stale = vec![SyncItem::GroupDeleted {
+        group_id: "group-1".to_string(),
         timestamp: 1000,
     }];
     let rejected = orchestrator.process_incoming(stale, &[0x99u8; 32]).unwrap();
-    assert!(rejected.is_empty(), "Stale label change should be rejected");
+    assert!(
+        rejected.is_empty(),
+        "stale deletion must share the update conflict key"
+    );
 }
 
 /// Test conflict resolution with ContactTrustChanged items

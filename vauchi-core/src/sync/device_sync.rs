@@ -446,27 +446,14 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
-    /// A visibility label was created, updated, or deleted.
-    LabelChange {
-        /// The label's unique ID.
-        label_id: String,
-        /// The label's display name.
-        label_name: String,
-        /// Contact IDs assigned to this label.
-        contacts: Vec<String>,
-        /// Field IDs visible to contacts in this label.
-        visible_fields: Vec<String>,
-        /// Whether the label was deleted.
-        is_deleted: bool,
-        /// Timestamp of the change.
-        timestamp: u64,
-    },
-
     /// Complete owner-private group state changed on a linked device.
     GroupChanged {
         group_data: GroupSyncData,
         timestamp: u64,
     },
+
+    /// An owner-private group was deleted on a linked device.
+    GroupDeleted { group_id: String, timestamp: u64 },
 
     /// Complete owner-private tag state changed on a linked device.
     TagChanged {
@@ -595,8 +582,8 @@ impl SyncItem {
             SyncItem::CardUpdated { timestamp, .. } => *timestamp,
             SyncItem::CardFieldRemoved { timestamp, .. } => *timestamp,
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,
-            SyncItem::LabelChange { timestamp, .. } => *timestamp,
             SyncItem::GroupChanged { timestamp, .. } => *timestamp,
+            SyncItem::GroupDeleted { timestamp, .. } => *timestamp,
             SyncItem::TagChanged { timestamp, .. } => *timestamp,
             SyncItem::TagDeleted { timestamp, .. } => *timestamp,
             SyncItem::ContactTrustChanged { timestamp, .. } => *timestamp,

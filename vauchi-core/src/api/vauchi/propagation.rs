@@ -545,7 +545,7 @@ impl Vauchi {
                     ref contacts,
                     ref visible_fields,
                     is_deleted,
-                    ..
+                    timestamp,
                 } => {
                     if is_deleted {
                         self.storage
@@ -553,32 +553,21 @@ impl Vauchi {
                             .delete_group(label_id)
                             .map_err(|e| e.into())
                     } else {
-                        // Create or update label
-                        match self.storage.labels().load_group(label_id) {
-                            Ok(_existing) => {
-                                // Update existing: rename, re-assign contacts and
-                                // fields. Each call propagates so divergent state
-                                // surfaces instead of being silently dropped.
-                                self.storage.labels().rename_group(label_id, label_name)?;
-                                for cid in contacts {
-                                    self.storage.labels().add_contact_to_group(label_id, cid)?;
-                                }
-                                for fid in visible_fields {
-                                    self.storage
-                                        .labels()
-                                        .set_group_field_visibility(label_id, fid, true)?;
-                                }
-                                Ok(())
-                            }
-                            Err(_) => {
-                                // Create new label
-                                self.storage
-                                    .labels()
-                                    .create_group(label_name)
-                                    .map(|_| ())
-                                    .map_err(|e| e.into())
-                            }
-                        }
+                        let group = crate::contact::Group::from_storage(
+                            label_id.clone(),
+                            label_name.clone(),
+                            contacts.iter().cloned().collect(),
+                            visible_fields.iter().cloned().collect(),
+                            None,
+                            None,
+                            None,
+                            timestamp,
+                            timestamp,
+                        );
+                        self.storage
+                            .labels()
+                            .save_group(&group)
+                            .map_err(|e| e.into())
                     }
                 }
                 SyncItem::ContactTrustChanged {

@@ -7,6 +7,7 @@
 //! `DeletionScheduled`, `DeletionCancelled`, `ImportedContactRemoved`,
 //! and the visibility-changed/personal-note/proposal-trust paths.
 
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use vauchi_core::Vauchi;
@@ -266,6 +267,12 @@ fn apply_sync_label_change_creates_then_updates_with_fields() {
         timestamp: now(),
     }];
     wb.apply_sync_items(create).unwrap();
+    let created = wb
+        .storage()
+        .labels()
+        .load_group("label-friends")
+        .expect("incoming label id must be preserved");
+    assert_eq!(created.name(), "Friends");
 
     // Now update the label with contacts AND visible_fields — this
     // exercises the "re-apply field visibility" loop (line 624-629).
@@ -279,16 +286,24 @@ fn apply_sync_label_change_creates_then_updates_with_fields() {
     }];
     let applied = wb.apply_sync_items(update).unwrap();
     assert_eq!(applied, 1);
+    let updated = wb
+        .storage()
+        .labels()
+        .load_group("label-friends")
+        .expect("updated group keeps incoming id");
+    assert_eq!(updated.name(), "Close Friends");
+    assert_eq!(updated.contacts(), &HashSet::from([bob_id]));
+    assert_eq!(
+        updated.visible_fields(),
+        &HashSet::from(["email".to_string(), "phone".to_string()])
+    );
 }
 
 // @internal
 #[test]
 fn apply_sync_label_change_with_is_deleted_removes_label() {
     let wb = make_vauchi();
-    // The LabelChange (is_deleted=false) arm creates the label via
-    // create_group(label_name), which assigns its own internal ID
-    // (UUID). To exercise the is_deleted branch we need the real ID.
-    // First create directly so we know the ID.
+    // Create directly so the deletion branch starts with a persisted group.
     let label = wb.storage().labels().create_group("ToBeDeleted").unwrap();
     let real_label_id = label.id().to_string();
     assert!(

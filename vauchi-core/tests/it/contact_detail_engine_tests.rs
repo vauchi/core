@@ -141,7 +141,7 @@ fn contact_detail_shows_empty_note_when_no_note_saved() {
 #[cfg(feature = "network-rustls")]
 // @internal
 #[test]
-fn contact_detail_text_changed_saves_personal_note() {
+fn contact_detail_explicit_save_persists_personal_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
@@ -156,19 +156,31 @@ fn contact_detail_text_changed_saves_personal_note() {
         contact_id: dave_id.clone(),
     });
 
-    // Simulate typing a note
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit_personal_note".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "edit_personal_note should return UpdateScreen, got {result:?}"
+    );
+
     let result = engine.handle_action(UserAction::TextChanged {
         component_id: "personal_note".into(),
         value: "Colleague at Acme Corp".into(),
     });
-
-    // Must return UpdateScreen (not an error or navigation)
     assert!(
         matches!(result, ActionResult::UpdateScreen(_)),
         "TextChanged on personal_note should return UpdateScreen, got {result:?}"
     );
 
-    // The note must be persisted — verify by reloading the screen
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "save_personal_note".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "save_personal_note should return UpdateScreen, got {result:?}"
+    );
+
     let new_screen = engine.navigate_to(AppScreen::ContactDetail {
         contact_id: dave_id,
     });
@@ -304,11 +316,11 @@ fn contact_detail_shows_empty_field_note_when_none_saved() {
     }
 }
 
-/// @scenario: contacts_management :: Editing a field note via TextChanged persists it
+/// @scenario: contacts_management :: Explicitly saving a field note persists it
 #[cfg(feature = "network-rustls")]
 // @internal
 #[test]
-fn contact_detail_text_changed_saves_field_note() {
+fn contact_detail_explicit_save_persists_field_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
@@ -333,7 +345,14 @@ fn contact_detail_text_changed_saves_field_note() {
 
     let component_id = format!("field_note:{field_id}");
 
-    // Simulate typing a field note
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: format!("edit_field_note:{field_id}"),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "edit_field_note should return UpdateScreen, got {result:?}"
+    );
+
     let result = engine.handle_action(UserAction::TextChanged {
         component_id: component_id.clone(),
         value: "Prefers text messages".into(),
@@ -344,7 +363,14 @@ fn contact_detail_text_changed_saves_field_note() {
         "TextChanged on field_note should return UpdateScreen, got {result:?}"
     );
 
-    // Reload the screen — saved note must appear
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: format!("save_field_note:{field_id}"),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "save_field_note should return UpdateScreen, got {result:?}"
+    );
+
     let new_screen = engine.navigate_to(AppScreen::ContactDetail {
         contact_id: dave_id,
     });

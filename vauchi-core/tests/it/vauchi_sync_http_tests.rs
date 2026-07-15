@@ -293,6 +293,81 @@ fn test_relay_transport_with_ohttp_key_sends_no_direct_ohttp_request() {
     );
 }
 
+// @feature: release_privacy_multidevice_certification
+// @rg-8 @fail-closed
+#[test]
+fn test_relay_transport_rejects_custom_relay_without_outer_hop() {
+    let application_relay = MockRelay::start();
+    let dir = tempfile::tempdir().expect("temp dir");
+    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+        .with_storage_key(SymmetricKey::generate())
+        .with_relay_url(application_relay.url());
+    let vauchi = Vauchi::new(config).expect("create Vauchi");
+    let transport = vauchi.build_relay_transport(&application_relay.url(), 1_000);
+
+    let error = transport
+        .exchange_offer("opaque-offer", Some(60))
+        .expect_err("same-hop custom relay must fail closed");
+
+    assert_eq!(
+        error.to_string(),
+        "Connection failed: OHTTP not configured and direct connections are disabled"
+    );
+    assert!(application_relay.received().is_empty());
+    assert_eq!(transport.direct_fallback_count(), 0);
+}
+
+// @feature: release_privacy_multidevice_certification
+// @rg-8 @fail-closed
+#[test]
+fn test_relay_transport_rejects_explicit_same_outer_hop() {
+    let application_relay = MockRelay::start();
+    let dir = tempfile::tempdir().expect("temp dir");
+    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+        .with_storage_key(SymmetricKey::generate())
+        .with_relay_url(application_relay.url())
+        .with_ohttp_relay_url(application_relay.url());
+    let vauchi = Vauchi::new(config).expect("create Vauchi");
+    let transport = vauchi.build_relay_transport(&application_relay.url(), 1_000);
+
+    let error = transport
+        .exchange_offer("opaque-offer", Some(60))
+        .expect_err("same application and outer relay must fail closed");
+
+    assert_eq!(
+        error.to_string(),
+        "Connection failed: OHTTP not configured and direct connections are disabled"
+    );
+    assert!(application_relay.received().is_empty());
+    assert_eq!(transport.direct_fallback_count(), 0);
+}
+
+// @feature: release_privacy_multidevice_certification
+// @rg-8 @fail-closed
+#[test]
+#[cfg(feature = "testing")]
+fn test_relay_transport_rejects_mismatched_application_target() {
+    let configured_application_relay = MockRelay::start();
+    let outer_relay = MockRelay::start();
+    let caller_application_relay = MockRelay::start();
+    let (mut vauchi, _dir) = vauchi_with_split_relays(&configured_application_relay, &outer_relay);
+    vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
+    let transport = vauchi.build_relay_transport(&caller_application_relay.url(), 1_000);
+
+    let error = transport
+        .exchange_offer("opaque-offer", Some(60))
+        .expect_err("mismatched application relay must fail closed");
+
+    assert_eq!(
+        error.to_string(),
+        "Connection failed: OHTTP not configured and direct connections are disabled"
+    );
+    assert!(configured_application_relay.received().is_empty());
+    assert!(caller_application_relay.received().is_empty());
+    assert!(outer_relay.received().is_empty());
+    assert_eq!(transport.direct_fallback_count(), 0);
+}
+
 // @scenario: sync_privacy:OHTTP key cache persistence
 /// Storage roundtrip: save an OHTTP key via storage, load it back, verify bytes match.
 // @internal

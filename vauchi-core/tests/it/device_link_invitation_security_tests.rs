@@ -6,7 +6,7 @@
 //! @scenario: Weaker transport cannot bypass OHTTP
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use vauchi_core::exchange::DeviceLinkJoinInvitation;
+use vauchi_core::exchange::{DeviceLinkJoinInvitation, JoinInvitationError};
 
 fn invitation_with_relay(relay_url: &str) -> String {
     let qr = URL_SAFE_NO_PAD.encode("whatever");
@@ -34,7 +34,8 @@ fn test_parse_url_untrusted_relay_rejects_unsafe_endpoints() {
         let result = DeviceLinkJoinInvitation::parse_url(&invitation_with_relay(relay_url));
         match result {
             Err(error) => {
-                assert_eq!(error.to_string(), "invalid relay URL in invitation");
+                assert!(matches!(&error, JoinInvitationError::UnsupportedUrl));
+                assert_eq!(error.to_string(), "unsupported invitation URL");
                 assert!(
                     !error.to_string().contains(relay_url),
                     "parse error must not echo an attacker-controlled relay URL"
@@ -59,7 +60,7 @@ fn test_parse_url_oversized_unknown_parameter_rejects_whole_invitation() {
     );
 
     match DeviceLinkJoinInvitation::parse_url(&oversized) {
-        Err(error) => assert_eq!(error.to_string(), "invitation URL exceeds size limit"),
+        Err(error) => assert!(matches!(error, JoinInvitationError::UnsupportedUrl)),
         Ok(_) => panic!("oversized invitation must be rejected before retaining its raw URL"),
     }
 }
@@ -71,7 +72,7 @@ fn test_parse_url_oversized_relay_rejects_before_network_use() {
     let result = DeviceLinkJoinInvitation::parse_url(&invitation_with_relay(&oversized_relay));
 
     match result {
-        Err(error) => assert_eq!(error.to_string(), "invalid relay URL in invitation"),
+        Err(error) => assert!(matches!(error, JoinInvitationError::UnsupportedUrl)),
         Ok(invitation) => panic!(
             "oversized invitation relay must be rejected, accepted {} bytes",
             invitation.relay_url.map_or(0, |url| url.len())

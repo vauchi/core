@@ -195,9 +195,10 @@ impl AppEngine {
             return Err("foreign relay invitation lacks outer OHTTP metadata".to_string());
         }
         let connect_timeout_ms = self.vauchi.config().relay.connect_timeout_ms;
-        Ok(self
-            .vauchi
-            .build_relay_transport(connect_timeout_ms.max(10_000)))
+        Ok(self.vauchi.build_relay_transport(
+            &self.vauchi.config().relay.server_url,
+            connect_timeout_ms.max(10_000),
+        ))
     }
 
     /// Route `ActionResult::DeviceLinkJoinStart` into the responder machine.

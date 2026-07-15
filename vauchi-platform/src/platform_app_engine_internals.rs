@@ -75,8 +75,8 @@ impl PlatformAppEngine {
         vauchi: &Vauchi,
         sender_id: &str,
     ) -> (crate::MobileRelaySender, crate::MobileRelaySender) {
-        let purge_t = vauchi.build_relay_transport(10_000);
-        let rev_t = vauchi.build_relay_transport(10_000);
+        let purge_t = vauchi.build_relay_transport(&self.relay_url, 10_000);
+        let rev_t = vauchi.build_relay_transport(&self.relay_url, 10_000);
         (
             crate::MobileRelaySender::from_transport(purge_t, self.relay_url.clone(), sender_id),
             crate::MobileRelaySender::from_transport(rev_t, self.relay_url.clone(), sender_id),

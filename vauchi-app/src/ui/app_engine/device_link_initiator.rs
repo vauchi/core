@@ -189,9 +189,10 @@ impl AppEngine {
         let identity_id = hex::encode(identity.signing_public_key());
 
         let connect_timeout_ms = self.vauchi.config().relay.connect_timeout_ms;
-        let transport = self
-            .vauchi
-            .build_relay_transport(connect_timeout_ms.max(10_000));
+        let transport = self.vauchi.build_relay_transport(
+            &self.vauchi.config().relay.server_url,
+            connect_timeout_ms.max(10_000),
+        );
 
         let storage_key = self
             .vauchi

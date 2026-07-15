@@ -328,7 +328,10 @@ impl Vauchi {
     /// Uses OHTTP when available (ADR-037) to prevent the relay from
     /// correlating the client's IP with the guardian hash.
     fn create_guardian_transport(&self) -> HttpTransport {
-        self.build_relay_transport(self.config.relay.connect_timeout_ms)
+        self.build_relay_transport(
+            &self.config.relay.server_url,
+            self.config.relay.connect_timeout_ms,
+        )
     }
 
     /// Broadcasts pre-computed identity-revocation deliveries to the relay.

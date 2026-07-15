@@ -845,11 +845,17 @@ impl Vauchi {
     /// Build a fail-closed `HttpTransport` for application relay actions.
     ///
     /// The outer endpoint is derived internally so callers cannot accidentally
-    /// send OHTTP straight to the application relay. Construction performs no
-    /// network I/O: it uses the in-memory key, a fresh validated storage-cache
-    /// entry, or the validated bundled key. Without one, action methods return
-    /// their existing fail-closed error before sending a request.
-    pub fn build_relay_transport(&self, timeout_ms: u64) -> HttpTransport {
+    /// send OHTTP straight to the application relay. The application-relay URL
+    /// parameter is retained for patch-compatible Rust consumers but is
+    /// intentionally never used for outer-hop routing. Construction performs
+    /// no network I/O: it uses the in-memory key, a fresh validated
+    /// storage-cache entry, or the validated bundled key. Without one, action
+    /// methods return their existing fail-closed error before sending a request.
+    pub fn build_relay_transport(
+        &self,
+        _application_relay_url: &str,
+        timeout_ms: u64,
+    ) -> HttpTransport {
         #[cfg(feature = "testing")]
         if self.config.ohttp.allow_direct {
             return HttpTransport::new(HttpTransportConfig::for_testing(

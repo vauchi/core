@@ -9,10 +9,9 @@
 //! deserialize with `serde_json`, so every type derives both `Serialize`
 //! and `Deserialize`.
 //!
-//! Deserialization applies size limits as a defence-in-depth layer: the
-//! relay performs its own validation, but rejecting oversized input during
-//! parsing prevents large allocations and keeps the error path consistent
-//! for malformed clients.
+//! Deserialization rejects oversized field values as a defence-in-depth
+//! layer alongside relay validation. Transport-level body limits remain
+//! responsible for bounding input buffering.
 
 use serde::de::{self, Deserializer, Error as DeError, Visitor};
 use serde::{Deserialize, Serialize};

@@ -131,11 +131,11 @@ if $BUILD_IOS; then
         # Previously disabled due to target discovery issues — resolved in modern versions.
         # RUSTC_WRAPPER inherited from environment (set by CI .self-hosted template).
 
-        # Set iOS deployment target to match Rust's default (10.0) to prevent
-        # ___chkstk_darwin linker errors. Without this, the cc crate picks up
-        # the Xcode SDK version (e.g. 26.2), causing clang to emit stack probe
-        # calls that don't exist at the Rust-side deployment target.
-        export IPHONEOS_DEPLOYMENT_TARGET="10.0"
+        # Keep C dependencies aligned with Rust's iOS 10.0 target without
+        # leaking an iOS deployment mode into host-side build dependencies.
+        export CFLAGS_aarch64_apple_ios="${CFLAGS_aarch64_apple_ios:+${CFLAGS_aarch64_apple_ios} }-miphoneos-version-min=10.0"
+        export CFLAGS_aarch64_apple_ios_sim="${CFLAGS_aarch64_apple_ios_sim:+${CFLAGS_aarch64_apple_ios_sim} }-mios-simulator-version-min=10.0"
+        export CFLAGS_x86_64_apple_ios="${CFLAGS_x86_64_apple_ios:+${CFLAGS_x86_64_apple_ios} }-mios-simulator-version-min=10.0"
 
         # Show toolchain info for debugging
         echo "Active Rust toolchain:"

@@ -681,7 +681,10 @@ impl Vauchi {
             self.storage.ohttp_cache().load_ohttp_key(relay_url)?
             && self.is_ohttp_key_fresh(fetched_at)
         {
-            return Ok(cached_bytes);
+            if OhttpClient::new(cached_bytes.clone()).is_ok() {
+                return Ok(cached_bytes);
+            }
+            self.storage.ohttp_cache().clear_ohttp_key(relay_url)?;
         }
 
         // 2. Fetch the live key when permitted: allow_direct (dev), or the
@@ -725,6 +728,7 @@ impl Vauchi {
     fn fetch_and_cache_ohttp_key(&self, relay_url: &str) -> VauchiResult<Vec<u8>> {
         let transport = self.create_bootstrap_transport_direct();
         let key_bytes = transport.fetch_ohttp_key().map_err(VauchiError::Network)?;
+        OhttpClient::new(key_bytes.clone()).map_err(VauchiError::Network)?;
         self.storage
             .ohttp_cache()
             .save_ohttp_key(relay_url, &key_bytes)?;

@@ -21,6 +21,10 @@ fn test_parse_url_untrusted_relay_rejects_unsafe_endpoints() {
     let unsafe_relay_urls = [
         "http://relay.example.com",
         "https://127.0.0.1",
+        "https://127.1",
+        "https://2130706433",
+        "https://0x7f000001",
+        "https://0177.0.0.1",
         "https://user:secret@relay.example.com",
         "https://relay.example.com#fragment",
         "https://",
@@ -41,6 +45,22 @@ fn test_parse_url_untrusted_relay_rejects_unsafe_endpoints() {
                 invitation.relay_url
             ),
         }
+    }
+}
+
+// @rg-8 @fail-closed
+#[test]
+fn test_parse_url_oversized_unknown_parameter_rejects_whole_invitation() {
+    let oversized = format!(
+        "vauchi://device-link?qr={}&code={}&future={}",
+        URL_SAFE_NO_PAD.encode("whatever"),
+        URL_SAFE_NO_PAD.encode("123456"),
+        "A".repeat(8_193)
+    );
+
+    match DeviceLinkJoinInvitation::parse_url(&oversized) {
+        Err(error) => assert_eq!(error.to_string(), "invitation URL exceeds size limit"),
+        Ok(_) => panic!("oversized invitation must be rejected before retaining its raw URL"),
     }
 }
 

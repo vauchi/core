@@ -8,7 +8,7 @@ ROOT=$(CDPATH='' cd -- "$(dirname "$0")/../.." && pwd)
 PIPELINE="$ROOT/.gitlab-ci.yml"
 RULESET="$ROOT/.gitlab/sast-ruleset.toml"
 BUILD="$ROOT/ci/build.yml"
-EXPECTED_REF=ci-templates-v2026.07.7
+EXPECTED_REF=656362e5fc3780f8e905a611e8435f1800f744c0
 failed=0
 
 fail() {
@@ -52,11 +52,13 @@ if grep -Fq '../scripts' "$PIPELINE"; then
     fail "security jobs mutate a shared sibling scripts checkout"
 fi
 
-clones=$(grep -Fc 'https://gitlab.com/vauchi/scripts.git' "$PIPELINE" || true)
-isolated_targets=$(grep -Fc 'https://gitlab.com/vauchi/scripts.git "${VAUCHI_CI_SCRIPTS_DIR}"' "$PIPELINE" || true)
 isolated_dirs=$(grep -Fc 'VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)' "$PIPELINE" || true)
-[ "$isolated_targets" -eq "$clones" ] || fail "a scripts clone targets a shared directory"
-[ "$isolated_dirs" -eq "$clones" ] || fail "a scripts clone has no job-local directory"
+remotes=$(grep -Fc 'git -C "${VAUCHI_CI_SCRIPTS_DIR}" remote add origin https://gitlab.com/vauchi/scripts.git' "$PIPELINE" || true)
+fetches=$(grep -Fc 'git -C "${VAUCHI_CI_SCRIPTS_DIR}" fetch --depth=1 origin "${VAUCHI_SCRIPTS_REF}"' "$PIPELINE" || true)
+checkouts=$(grep -Fc 'git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach "${VAUCHI_SCRIPTS_REF}"' "$PIPELINE" || true)
+[ "$remotes" -eq "$isolated_dirs" ] || fail "a scripts fetch targets a shared directory"
+[ "$fetches" -eq "$isolated_dirs" ] || fail "a scripts checkout does not fetch the exact commit"
+[ "$checkouts" -eq "$isolated_dirs" ] || fail "a scripts checkout can follow a mutable ref"
 
 [ "$failed" -eq 0 ] || exit 1
 echo "PASS: core security policy uses immutable scripts provenance"

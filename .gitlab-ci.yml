@@ -37,7 +37,8 @@
 # Include shared templates
 include:
   - project: 'vauchi/scripts'
-    ref: ci-templates-v2026.07.7
+    # Released as ci-templates-v2026.07.7; pin the commit because tags are not protected.
+    ref: 656362e5fc3780f8e905a611e8435f1800f744c0
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -85,7 +86,7 @@ include:
   - local: ci/prebuild.yml
 
 variables:
-  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.7"
+  VAUCHI_SCRIPTS_REF: "656362e5fc3780f8e905a611e8435f1800f744c0"
 
 # Cosign pinned version + checksum (used by update:swift-bindings and publish:maven)
 # Single source of truth for cosign binary integrity — update BOTH values together.
@@ -198,8 +199,10 @@ lint:cross-cutting-blocking:
     - |
       VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)
       export VAUCHI_CI_SCRIPTS_DIR
-      git clone --depth=1 --branch "${VAUCHI_SCRIPTS_REF}" \
-        https://gitlab.com/vauchi/scripts.git "${VAUCHI_CI_SCRIPTS_DIR}"
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" init
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" remote add origin https://gitlab.com/vauchi/scripts.git
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" fetch --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach "${VAUCHI_SCRIPTS_REF}"
     - !reference [.clone-locales, before_script]
   script:
     # lint:workspace-version-alignment
@@ -346,8 +349,10 @@ metric:audit-mobile-surface:
     - |
       VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)
       export VAUCHI_CI_SCRIPTS_DIR
-      git clone --depth=1 --branch "${VAUCHI_SCRIPTS_REF}" \
-        https://gitlab.com/vauchi/scripts.git "${VAUCHI_CI_SCRIPTS_DIR}"
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" init
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" remote add origin https://gitlab.com/vauchi/scripts.git
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" fetch --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach "${VAUCHI_SCRIPTS_REF}"
   script:
     - |
       set -euo pipefail

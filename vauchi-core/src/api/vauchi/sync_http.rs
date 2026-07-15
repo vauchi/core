@@ -926,6 +926,55 @@ fn merge_pins(target: &mut Vec<PinnedCertificate>, source: &[PinnedCertificate])
 mod tests {
     use super::*;
 
+    // @scenario: sync_privacy :: sync adapter never inherits direct fallback
+    #[test]
+    fn sync_adapter_never_inherits_direct_fallback() {
+        use crate::api::VauchiConfig;
+        use crate::network::{
+            MessageEnvelope, MessagePayload, NetworkError, OhttpClient, PROTOCOL_VERSION,
+            RegisterMailbox, Transport,
+        };
+
+        let dir = tempfile::tempdir().expect("tempdir must succeed");
+        let mut config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+            .with_relay_url("http://127.0.0.1:1");
+        config.ohttp.allow_direct = true;
+        let bundled_key = config
+            .ohttp
+            .bundled_gateway_key
+            .clone()
+            .expect("default config must bundle an OHTTP key");
+        let client = OhttpClient::new(bundled_key).expect("bundled OHTTP key must be valid");
+        let vauchi = Vauchi::new(config).expect("Vauchi::new must succeed");
+
+        let mut adapter = vauchi
+            .create_ohttp_adapter(&client)
+            .expect("adapter construction must succeed");
+        adapter.clear_ohttp();
+        adapter
+            .send(&MessageEnvelope {
+                version: PROTOCOL_VERSION,
+                message_id: "register".to_string().into(),
+                timestamp: 0,
+                payload: MessagePayload::RegisterMailbox(RegisterMailbox {
+                    tokens: vec!["t".repeat(64)],
+                }),
+            })
+            .expect("mailbox registration is local-only");
+
+        let error = adapter
+            .receive()
+            .expect_err("missing OHTTP must fail before direct networking");
+        assert!(
+            matches!(
+                error,
+                NetworkError::ConnectionFailed(ref message)
+                    if message == "OHTTP not configured and direct connections are disabled"
+            ),
+            "unexpected fail-closed error: {error:?}"
+        );
+    }
+
     // =========================================================================
     // W-4: http_relay_url() scheme conversion
     // =========================================================================

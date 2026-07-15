@@ -402,12 +402,8 @@ impl MobileRelaySender {
     ///
     /// The transport should be constructed via `Vauchi::build_relay_transport`
     /// so that shred requests flow through OHTTP when a gateway key is
-    /// cached (ADR-037). A panic-wipe triggered before the first
-    /// successful `connect()` falls back to direct HTTP — this is the
-    /// narrow availability trade-off tracked by problem record
-    /// `_private/docs/problems/2026-04-17-ohttp-allow-direct-fallback/`:
-    /// the shred must complete even when OHTTP is unreachable, but once
-    /// a key is cached the transport fails closed.
+    /// available (ADR-037). If OHTTP is unavailable, relay notification fails
+    /// closed while local shred still completes independently.
     pub(crate) fn from_transport(
         transport: vauchi_core::network::HttpTransport,
         relay_url: String,

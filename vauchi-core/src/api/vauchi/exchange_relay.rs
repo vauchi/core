@@ -392,6 +392,6 @@ impl Vauchi {
     /// coordinating an exchange learns who met whom. ADR-037 therefore
     /// requires OHTTP here as well.
     fn create_relay_transport(&self) -> HttpTransport {
-        self.build_relay_transport(self.http_relay_url(), self.config.relay.connect_timeout_ms)
+        self.build_relay_transport(self.config.relay.connect_timeout_ms)
     }
 }

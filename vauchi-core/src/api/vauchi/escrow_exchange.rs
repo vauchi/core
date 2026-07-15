@@ -28,8 +28,7 @@ impl Vauchi {
     /// code-based relay exchange. Network failures surface as
     /// [`VauchiError::Network`].
     pub fn escrow_exchange(&self, message: &EscrowMessage) -> VauchiResult<EscrowResponse> {
-        let transport =
-            self.build_relay_transport(self.http_relay_url(), self.config.relay.connect_timeout_ms);
+        let transport = self.build_relay_transport(self.config.relay.connect_timeout_ms);
         transport.escrow(message).map_err(VauchiError::Network)
     }
 

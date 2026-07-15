@@ -842,33 +842,53 @@ impl Vauchi {
         }
     }
 
-    /// Build an `HttpTransport` to the given relay URL with OHTTP wired
-    /// from the cached gateway key, if one is available.
+    /// Build a fail-closed `HttpTransport` for application relay actions.
     ///
-    /// Used by call sites outside the sync path (device link, exchange,
-    /// guardian, shred) that need a transport to a relay endpoint while
-    /// still honoring ADR-037's IP-privacy guarantee. `allow_direct` is
-    /// true only when `connect()` has not yet succeeded — once a key is
-    /// cached, the transport fails closed on OHTTP failure instead of
-    /// silently leaking the client's source IP.
-    pub fn build_relay_transport(&self, relay_url: String, timeout_ms: u64) -> HttpTransport {
+    /// The outer endpoint is derived internally so callers cannot accidentally
+    /// send OHTTP straight to the application relay. Construction performs no
+    /// network I/O: it uses the in-memory key, a fresh validated storage-cache
+    /// entry, or the validated bundled key. Without one, action methods return
+    /// their existing fail-closed error before sending a request.
+    pub fn build_relay_transport(&self, timeout_ms: u64) -> HttpTransport {
+        let relay_url = self.http_relay_url();
         let pinned_certs =
             self.ohttp_endpoint_pins(&relay_url, self.config.relay.pinned_certs.clone());
         let mut transport = HttpTransport::new(HttpTransportConfig {
             relay_url,
             timeout_ms,
             proxy: self.config.relay.proxy.clone(),
-            allow_direct: self.ohttp_key.is_none(),
+            allow_direct: false,
             pinned_certs,
         });
 
-        if let Some(ref cached) = self.ohttp_key
-            && let Ok(client) = OhttpClient::new(cached.encoded_config().to_vec())
-        {
+        if let Some(client) = self.offline_ohttp_client() {
             transport.set_ohttp(client);
         }
 
         transport
+    }
+
+    /// Resolve an OHTTP client without performing network I/O.
+    fn offline_ohttp_client(&self) -> Option<OhttpClient> {
+        if let Some(ref client) = self.ohttp_key
+            && let Ok(copy) = OhttpClient::new(client.encoded_config().to_vec())
+        {
+            return Some(copy);
+        }
+
+        let endpoint = self.http_relay_url();
+        if let Ok(Some((bytes, fetched_at))) = self.storage.ohttp_cache().load_ohttp_key(&endpoint)
+            && self.is_ohttp_key_fresh(fetched_at)
+            && let Ok(client) = OhttpClient::new(bytes)
+        {
+            return Some(client);
+        }
+
+        self.config
+            .ohttp
+            .bundled_gateway_key
+            .clone()
+            .and_then(|bytes| OhttpClient::new(bytes).ok())
     }
 
     /// OHTTP-relay base URL for `/v2/ohttp` + the `/v2/ohttp-key` bootstrap,

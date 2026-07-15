@@ -183,20 +183,21 @@ impl AppEngine {
             .then(|| self.engine.current_screen())
     }
 
-    /// Build an HTTP transport for the device-link responder. Uses the
-    /// explicit relay URL from the invitation if present, otherwise the
-    /// app's configured default relay.
+    /// Build a fail-closed transport for the device-link responder.
+    ///
+    /// A foreign invitation relay cannot be used until the invitation also
+    /// carries its distinct outer OHTTP endpoint, gateway key, and pin set.
     fn build_device_link_transport(
         &self,
         relay_url: Option<&str>,
     ) -> Result<HttpTransport, String> {
-        let relay_url = relay_url
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| self.vauchi.config().relay.server_url.clone());
+        if relay_url.is_some() {
+            return Err("foreign relay invitation lacks outer OHTTP metadata".to_string());
+        }
         let connect_timeout_ms = self.vauchi.config().relay.connect_timeout_ms;
         Ok(self
             .vauchi
-            .build_relay_transport(relay_url, connect_timeout_ms.max(10_000)))
+            .build_relay_transport(connect_timeout_ms.max(10_000)))
     }
 
     /// Route `ActionResult::DeviceLinkJoinStart` into the responder machine.
@@ -312,6 +313,32 @@ mod tests {
         app.start_device_link_responder(&url, "Other Name".to_string())
             .expect("second start is idempotent");
         assert!(app.device_link_responder.is_some());
+    }
+
+    // @scenario: device_sync:Foreign relay invitation fails closed
+    #[test]
+    fn start_responder_rejects_relay_without_outer_ohttp_metadata() {
+        let mut app = fresh_app_engine();
+        let identity = Identity::create("Alice", 0);
+        let registry = create_test_registry(&identity);
+        let initiator = DeviceLinkInitiator::new([0x11u8; 32], &identity, registry, NOW);
+        let url = DeviceLinkJoinInvitation {
+            qr_data: initiator.qr().to_data_string(),
+            broker_code: "BROKER42".to_string(),
+            relay_url: Some("https://foreign-relay.example".to_string()),
+        }
+        .to_url();
+        let _ = app.open_device_link_invitation(&url);
+
+        let error = app
+            .start_device_link_responder(&url, "New Device".to_string())
+            .expect_err("foreign relay without an outer OHTTP endpoint must fail closed");
+
+        assert!(
+            error.contains("outer OHTTP metadata"),
+            "failure should explain the privacy requirement, got: {error}"
+        );
+        assert!(app.device_link_responder.is_none());
     }
 
     // @internal

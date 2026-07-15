@@ -243,7 +243,7 @@ fn test_relay_transport_without_ohttp_key_sends_no_application_request() {
     let application_relay = MockRelay::start();
     let outer_relay = MockRelay::start();
     let (vauchi, _dir) = vauchi_with_split_relays(&application_relay, &outer_relay);
-    let transport = vauchi.build_relay_transport(application_relay.url(), 1_000);
+    let transport = vauchi.build_relay_transport(1_000);
 
     let _ = transport.exchange_offer("opaque-offer", Some(60));
 
@@ -269,7 +269,7 @@ fn test_relay_transport_with_ohttp_key_sends_no_direct_ohttp_request() {
     let outer_relay = MockRelay::start();
     let (mut vauchi, _dir) = vauchi_with_split_relays(&application_relay, &outer_relay);
     vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
-    let transport = vauchi.build_relay_transport(application_relay.url(), 1_000);
+    let transport = vauchi.build_relay_transport(1_000);
 
     let _ = transport.exchange_offer("opaque-offer", Some(60));
 

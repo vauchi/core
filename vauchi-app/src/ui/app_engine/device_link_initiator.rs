@@ -188,11 +188,10 @@ impl AppEngine {
             identity.create_device_link_initiator(registry, self.vauchi.clock().unix_seconds());
         let identity_id = hex::encode(identity.signing_public_key());
 
-        let relay_url = self.vauchi.config().relay.server_url.clone();
         let connect_timeout_ms = self.vauchi.config().relay.connect_timeout_ms;
         let transport = self
             .vauchi
-            .build_relay_transport(relay_url, connect_timeout_ms.max(10_000));
+            .build_relay_transport(connect_timeout_ms.max(10_000));
 
         let storage_key = self
             .vauchi

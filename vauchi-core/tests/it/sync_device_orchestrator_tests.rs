@@ -687,6 +687,76 @@ fn card_field_removal_conflicts_with_updates_for_the_same_field() {
     ));
 }
 
+/// A same-device remove+add pair (the CLI `card edit` shape) must apply
+/// in order within one batch; the equal-stamp dedup must not drop the
+/// re-add half and silently lose the edit (ADR-020).
+// @scenario: sync_updates :: Own-card field removals converge across linked devices
+#[test]
+fn same_timestamp_remove_and_readd_both_apply_in_one_batch() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry = create_test_registry(&master_seed, &device_b);
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
+
+    orchestrator
+        .record_local_change(SyncItem::CardUpdated {
+            field_label: "phone".to_string(),
+            new_value: "old".to_string(),
+            timestamp: 1000,
+        })
+        .unwrap();
+
+    // CLI `card edit` shape: remove + re-add in one batch with one
+    // timestamp from one sender. The edit's re-add half must not be
+    // rejected as a duplicate of its own removal half.
+    let applied = orchestrator
+        .process_incoming(
+            vec![
+                SyncItem::CardFieldRemoved {
+                    field_label: "phone".to_string(),
+                    timestamp: 2000,
+                },
+                SyncItem::CardUpdated {
+                    field_label: "phone".to_string(),
+                    new_value: "new".to_string(),
+                    timestamp: 2000,
+                },
+            ],
+            &[0x99u8; 32],
+        )
+        .unwrap();
+
+    assert_eq!(
+        applied.len(),
+        2,
+        "remove+add edit pair must apply in order, got {applied:?}"
+    );
+
+    // Redelivery of the same batch (retry/duplicate) must still dedup:
+    // every item's stamp now equals the persisted stamp.
+    let redelivered = orchestrator
+        .process_incoming(
+            vec![
+                SyncItem::CardFieldRemoved {
+                    field_label: "phone".to_string(),
+                    timestamp: 2000,
+                },
+                SyncItem::CardUpdated {
+                    field_label: "phone".to_string(),
+                    new_value: "new".to_string(),
+                    timestamp: 2000,
+                },
+            ],
+            &[0x99u8; 32],
+        )
+        .unwrap();
+    assert!(
+        redelivered.is_empty(),
+        "redelivered batch must dedup, got {redelivered:?}"
+    );
+}
+
 /// Scenario: Bidirectional sync
 /// "When I add a phone number on Device A
 ///  And I add an email on Device B

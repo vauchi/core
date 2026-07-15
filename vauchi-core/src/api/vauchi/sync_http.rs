@@ -985,7 +985,8 @@ mod tests {
 
         let dir = tempfile::tempdir().expect("tempdir must succeed");
         let mut config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
-            .with_relay_url("http://127.0.0.1:1");
+            .with_relay_url("http://127.0.0.1:1")
+            .with_ohttp_relay_url("http://127.0.0.1:2");
         config.ohttp.allow_direct = true;
         let bundled_key = config
             .ohttp

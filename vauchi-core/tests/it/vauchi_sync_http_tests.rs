@@ -14,14 +14,14 @@ use vauchi_core::api::{Vauchi, VauchiConfig, VauchiSyncOutcome};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::OhttpClient;
 
-use crate::common::mock_relay::MockRelay;
+use crate::common::mock_relay::{CannedResponse, MockRelay};
 
 /// Build a valid OHTTP key using the ohttp crate's server-side KeyConfig.
 ///
 /// Uses the same cipher suite as the unit tests in `ohttp_client.rs`.
 /// Only available because dev-dependencies include the `server` feature of `ohttp`.
 #[cfg(feature = "testing")]
-fn make_test_ohttp_client() -> OhttpClient {
+fn make_test_ohttp_key() -> Vec<u8> {
     use ohttp::{KeyConfig, SymmetricSuite, hpke};
     let config = KeyConfig::new(
         0,
@@ -32,8 +32,13 @@ fn make_test_ohttp_client() -> OhttpClient {
         )],
     )
     .expect("KeyConfig::new must succeed");
-    let encoded = config.encode().expect("encode must succeed");
-    OhttpClient::new(encoded).expect("OhttpClient::new must succeed with valid config")
+    config.encode().expect("encode must succeed")
+}
+
+#[cfg(feature = "testing")]
+fn make_test_ohttp_client() -> OhttpClient {
+    OhttpClient::new(make_test_ohttp_key())
+        .expect("OhttpClient::new must succeed with valid config")
 }
 
 fn vauchi_with_split_relays(
@@ -419,6 +424,98 @@ fn test_ohttp_cache_roundtrip_via_storage() {
         "loaded bytes must match saved bytes"
     );
     assert!(fetched_at > 0, "fetched_at timestamp must be non-zero");
+}
+
+// @feature: release_privacy_multidevice_certification
+// @rg-8 @fail-closed
+#[test]
+#[cfg(feature = "testing")]
+fn test_connect_replaces_invalid_fresh_ohttp_cache() {
+    let application_relay = MockRelay::start();
+    let outer_relay = MockRelay::start();
+    let valid_key = make_test_ohttp_key();
+    outer_relay.queue(
+        "ohttp-key",
+        CannedResponse {
+            status: 200,
+            headers: vec![("Content-Type".into(), "application/ohttp-keys".into())],
+            body: valid_key.clone(),
+        },
+    );
+    let (mut vauchi, _dir) = vauchi_with_split_relays(&application_relay, &outer_relay);
+    vauchi
+        .storage()
+        .ohttp_cache()
+        .save_ohttp_key(&outer_relay.url(), b"invalid-key")
+        .expect("save invalid cache fixture");
+    vauchi
+        .create_identity("Test User")
+        .expect("create identity");
+
+    vauchi
+        .connect()
+        .expect("invalid cache must be evicted and refetched");
+
+    let (cached, _) = vauchi
+        .storage()
+        .ohttp_cache()
+        .load_ohttp_key(&outer_relay.url())
+        .expect("load replacement cache")
+        .expect("replacement cache exists");
+    assert_eq!(cached, valid_key);
+    assert_eq!(
+        outer_relay
+            .received()
+            .iter()
+            .map(|request| (request.method.as_str(), request.path.as_str()))
+            .collect::<Vec<_>>(),
+        vec![("GET", "/v2/ohttp-key")]
+    );
+    assert!(application_relay.received().is_empty());
+}
+
+// @feature: release_privacy_multidevice_certification
+// @rg-8 @fail-closed
+#[test]
+fn test_connect_never_caches_malformed_fetched_ohttp_key() {
+    let application_relay = MockRelay::start();
+    let outer_relay = MockRelay::start();
+    outer_relay.queue(
+        "ohttp-key",
+        CannedResponse {
+            status: 200,
+            headers: vec![("Content-Type".into(), "application/ohttp-keys".into())],
+            body: b"invalid-key".to_vec(),
+        },
+    );
+    let dir = tempfile::tempdir().expect("temp dir");
+    let mut config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+        .with_storage_key(SymmetricKey::generate())
+        .with_relay_url(application_relay.url())
+        .with_ohttp_relay_url(outer_relay.url());
+    config.ohttp.bundled_gateway_key = None;
+    let mut vauchi = Vauchi::new(config).expect("create Vauchi");
+    vauchi
+        .create_identity("Test User")
+        .expect("create identity");
+
+    let error = vauchi
+        .connect()
+        .expect_err("malformed fetched key must fail closed");
+
+    assert_eq!(
+        error.to_string(),
+        "network error: Connection failed: no OHTTP key available: cache expired, no bundled key, fetch failed/disabled"
+    );
+    assert!(
+        vauchi
+            .storage()
+            .ohttp_cache()
+            .load_ohttp_key(&outer_relay.url())
+            .expect("load cache")
+            .is_none()
+    );
+    assert!(application_relay.received().is_empty());
 }
 
 // @scenario: sync_privacy:OHTTP sync gate checks

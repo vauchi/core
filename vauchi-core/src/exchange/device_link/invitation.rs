@@ -17,7 +17,7 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD as B64};
 
 const MAX_INVITATION_URL_LENGTH: usize = 8 * 1024;
-const MAX_ENCODED_RELAY_LENGTH: usize = ((crate::relay_url::MAX_URL_LENGTH * 4 + 2) / 3) * 3;
+const MAX_ENCODED_RELAY_LENGTH: usize = (crate::relay_url::MAX_URL_LENGTH * 4).div_ceil(3) * 3;
 
 /// Join invitation: public rendezvous data that lets a fresh device claim
 /// the initiator's relay slot and decrypt the join response.

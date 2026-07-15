@@ -10,7 +10,8 @@
 
 #![cfg(feature = "network-http")]
 
-use vauchi_core::api::{Vauchi, VauchiSyncOutcome};
+use vauchi_core::api::{Vauchi, VauchiConfig, VauchiSyncOutcome};
+use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::OhttpClient;
 
 use crate::common::mock_relay::MockRelay;
@@ -33,6 +34,18 @@ fn make_test_ohttp_client() -> OhttpClient {
     .expect("KeyConfig::new must succeed");
     let encoded = config.encode().expect("encode must succeed");
     OhttpClient::new(encoded).expect("OhttpClient::new must succeed with valid config")
+}
+
+fn vauchi_with_split_relays(
+    application_relay: &MockRelay,
+    outer_relay: &MockRelay,
+) -> (Vauchi, tempfile::TempDir) {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+        .with_storage_key(SymmetricKey::generate())
+        .with_relay_url(application_relay.url())
+        .with_ohttp_relay_url(outer_relay.url());
+    (Vauchi::new(config).expect("create Vauchi"), dir)
 }
 
 // @scenario: sync_privacy:OHTTP sync gate checks
@@ -228,7 +241,8 @@ fn test_ohttp_config_defaults() {
 #[test]
 fn test_relay_transport_without_ohttp_key_sends_no_application_request() {
     let application_relay = MockRelay::start();
-    let vauchi = Vauchi::in_memory().unwrap();
+    let outer_relay = MockRelay::start();
+    let (vauchi, _dir) = vauchi_with_split_relays(&application_relay, &outer_relay);
     let transport = vauchi.build_relay_transport(application_relay.url(), 1_000);
 
     let _ = transport.exchange_offer("opaque-offer", Some(60));
@@ -252,7 +266,8 @@ fn test_relay_transport_without_ohttp_key_sends_no_application_request() {
 #[cfg(feature = "testing")]
 fn test_relay_transport_with_ohttp_key_sends_no_direct_ohttp_request() {
     let application_relay = MockRelay::start();
-    let mut vauchi = Vauchi::in_memory().unwrap();
+    let outer_relay = MockRelay::start();
+    let (mut vauchi, _dir) = vauchi_with_split_relays(&application_relay, &outer_relay);
     vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
     let transport = vauchi.build_relay_transport(application_relay.url(), 1_000);
 
@@ -266,6 +281,15 @@ fn test_relay_transport_with_ohttp_key_sends_no_direct_ohttp_request() {
             .iter()
             .map(|request| &request.path)
             .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        outer_relay
+            .received()
+            .iter()
+            .map(|request| request.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["/v2/ohttp"],
+        "cached OHTTP request must use the distinct outer relay"
     );
 }
 

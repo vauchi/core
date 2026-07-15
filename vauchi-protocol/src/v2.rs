@@ -687,54 +687,26 @@ pub struct V2Response {
     pub status: String,
     #[serde(default, deserialize_with = "deserialize_optional_error")]
     pub error: Option<String>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_optional_blob_id"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_blob_id")]
     pub blob_id: Option<String>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_blobs"
-    )]
+    #[serde(default, deserialize_with = "deserialize_blobs")]
     pub blobs: Option<Vec<FetchedBlob>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub acknowledged: Option<bool>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_optional_code"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_code")]
     pub code: Option<String>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_optional_payload"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_payload")]
     pub payload: Option<String>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_optional_response"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_response")]
     pub response: Option<String>,
     /// Number of blobs deleted by a purge request.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub blobs_deleted: Option<usize>,
     /// Recovery proofs returned by a query.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_proofs"
-    )]
+    #[serde(default, deserialize_with = "deserialize_proofs")]
     pub proofs: Option<Vec<V2RecoveryProof>>,
     /// Guardian entries returned by a query.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_guardians"
-    )]
+    #[serde(default, deserialize_with = "deserialize_guardians")]
     pub guardians: Option<Vec<V2GuardianEntry>>,
 }
 

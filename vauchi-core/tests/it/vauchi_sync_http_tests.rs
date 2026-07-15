@@ -13,6 +13,8 @@
 use vauchi_core::api::{Vauchi, VauchiSyncOutcome};
 use vauchi_core::network::OhttpClient;
 
+use crate::common::mock_relay::MockRelay;
+
 /// Build a valid OHTTP key using the ohttp crate's server-side KeyConfig.
 ///
 /// Uses the same cipher suite as the unit tests in `ohttp_client.rs`.
@@ -216,6 +218,54 @@ fn test_ohttp_config_defaults() {
     assert!(
         !cfg.allow_direct,
         "allow_direct must be false in production defaults"
+    );
+}
+
+// @scenario: sync_privacy:Application actions fail closed before OHTTP bootstrap
+/// An application-action transport built before OHTTP bootstrap must not reach
+/// the application relay over its direct JSON endpoint.
+// @internal
+#[test]
+fn test_relay_transport_without_ohttp_key_sends_no_application_request() {
+    let application_relay = MockRelay::start();
+    let vauchi = Vauchi::in_memory().unwrap();
+    let transport = vauchi.build_relay_transport(application_relay.url(), 1_000);
+
+    let _ = transport.exchange_offer("opaque-offer", Some(60));
+
+    let requests = application_relay.received();
+    assert!(
+        requests.is_empty(),
+        "missing OHTTP key must fail closed before contacting the application relay; got paths: {:?}",
+        requests
+            .iter()
+            .map(|request| &request.path)
+            .collect::<Vec<_>>()
+    );
+}
+
+// @scenario: sync_privacy:Application actions use the distinct outer OHTTP hop
+/// A cached OHTTP key must not cause the client to send `/v2/ohttp` directly to
+/// the application relay. The distinct outer relay is the only valid peer.
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn test_relay_transport_with_ohttp_key_sends_no_direct_ohttp_request() {
+    let application_relay = MockRelay::start();
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
+    let transport = vauchi.build_relay_transport(application_relay.url(), 1_000);
+
+    let _ = transport.exchange_offer("opaque-offer", Some(60));
+
+    let requests = application_relay.received();
+    assert!(
+        requests.is_empty(),
+        "cached OHTTP key must not bypass the outer relay; got paths: {:?}",
+        requests
+            .iter()
+            .map(|request| &request.path)
+            .collect::<Vec<_>>()
     );
 }
 

@@ -22,6 +22,7 @@
 //! 6. Returns combined `VauchiSyncOutcome`.
 
 use std::time::Duration;
+use url::{Origin, Url};
 
 /// Recommended interval (seconds) between scheduled sync ticks.
 ///
@@ -270,7 +271,7 @@ impl Vauchi {
         }
 
         // 2. Obtain OHTTP key bytes (cached → bundled → direct fetch)
-        let relay_url = self.http_relay_url();
+        let relay_url = self.distinct_ohttp_route().ok_or_else(ohttp_route_error)?;
         let key_bytes = self.resolve_ohttp_key(&relay_url)?;
 
         // 3-4. Validate and store
@@ -620,7 +621,7 @@ impl Vauchi {
     fn create_ohttp_adapter(&self, ohttp_key: &OhttpClient) -> VauchiResult<HttpTransportAdapter> {
         let adapter_ohttp =
             OhttpClient::new(ohttp_key.encoded_config().to_vec()).map_err(VauchiError::Network)?;
-        let relay_url = self.http_relay_url();
+        let relay_url = self.distinct_ohttp_route().ok_or_else(ohttp_route_error)?;
         let pinned_certs = self.ohttp_endpoint_pins(&relay_url, self.resolve_pins());
         let mut transport = HttpTransport::new(HttpTransportConfig {
             relay_url,
@@ -689,7 +690,7 @@ impl Vauchi {
         //    over the stale bundle survives gateway key rotation (problem
         //    2026-05-25-relay-ohttp-forward-hop-502); on failure/not-permitted
         //    fall through to the bundled offline bootstrap.
-        let via_ohttp_relay = self.http_relay_url() != self.config.relay.server_url;
+        let via_ohttp_relay = self.distinct_ohttp_route().is_some();
         if (self.config.ohttp.allow_direct || via_ohttp_relay)
             && let Ok(fetched) = self.fetch_and_cache_ohttp_key(relay_url)
         {
@@ -846,14 +847,14 @@ impl Vauchi {
     ///
     /// The outer endpoint is derived internally so callers cannot accidentally
     /// send OHTTP straight to the application relay. The application-relay URL
-    /// parameter is retained for patch-compatible Rust consumers but is
-    /// intentionally never used for outer-hop routing. Construction performs
+    /// parameter is retained for patch-compatible Rust consumers and checked
+    /// against the configured application origin. Construction performs
     /// no network I/O: it uses the in-memory key, a fresh validated
     /// storage-cache entry, or the validated bundled key. Without one, action
     /// methods return their existing fail-closed error before sending a request.
     pub fn build_relay_transport(
         &self,
-        _application_relay_url: &str,
+        application_relay_url: &str,
         timeout_ms: u64,
     ) -> HttpTransport {
         #[cfg(feature = "testing")]
@@ -864,7 +865,9 @@ impl Vauchi {
             ));
         }
 
-        let relay_url = self.http_relay_url();
+        let route = self.action_ohttp_route(application_relay_url);
+        let route_valid = route.is_some();
+        let relay_url = route.unwrap_or_else(|| self.http_relay_url());
         let pinned_certs =
             self.ohttp_endpoint_pins(&relay_url, self.config.relay.pinned_certs.clone());
         let mut transport = HttpTransport::new(HttpTransportConfig {
@@ -875,7 +878,7 @@ impl Vauchi {
             pinned_certs,
         });
 
-        if let Some(client) = self.offline_ohttp_client() {
+        if route_valid && let Some(client) = self.offline_ohttp_client() {
             transport.set_ohttp(client);
         }
 
@@ -914,6 +917,41 @@ impl Vauchi {
             self.config.relay.ohttp_relay_url.as_deref(),
         )
     }
+
+    fn distinct_ohttp_route(&self) -> Option<String> {
+        let application_origin = http_origin(&self.config.relay.server_url)?;
+        let outer = self.http_relay_url();
+        let outer_origin = http_origin(&outer)?;
+        (application_origin != outer_origin).then_some(outer)
+    }
+
+    fn action_ohttp_route(&self, application_relay_url: &str) -> Option<String> {
+        let configured_origin = http_origin(&self.config.relay.server_url)?;
+        let requested_origin = http_origin(application_relay_url)?;
+        (configured_origin == requested_origin)
+            .then(|| self.distinct_ohttp_route())
+            .flatten()
+    }
+}
+
+fn http_origin(url: &str) -> Option<Origin> {
+    let parsed = Url::parse(url).ok()?;
+    if !matches!(parsed.scheme(), "http" | "https")
+        || parsed.host().is_none()
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.fragment().is_some()
+        || parsed.query().is_some()
+    {
+        return None;
+    }
+    Some(parsed.origin())
+}
+
+fn ohttp_route_error() -> VauchiError {
+    VauchiError::Network(crate::network::NetworkError::ConnectionFailed(
+        "OHTTP outer relay must use a distinct valid origin".into(),
+    ))
 }
 
 /// Merge `source` pins into `target`, skipping duplicates.

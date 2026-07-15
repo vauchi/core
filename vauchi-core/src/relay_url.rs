@@ -10,6 +10,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use thiserror::Error;
+use url::{Host, Url};
 
 /// Maximum allowed relay URL length in bytes.
 const MAX_URL_LENGTH: usize = 1024;
@@ -62,77 +63,46 @@ pub fn validate_relay_url(url: &str) -> Result<(), RelayUrlError> {
         ));
     }
 
-    // Scheme must be https://
-    let rest = if let Some(r) = url.strip_prefix("https://") {
-        r
-    } else if url.contains("://") {
-        // Has a scheme, but not https — insecure (http, ws, wss, ftp, etc.)
-        return Err(RelayUrlError::InsecureScheme);
-    } else {
-        // No scheme at all — malformed
-        return Err(RelayUrlError::InvalidFormat(
-            "URL must start with https://".to_string(),
-        ));
-    };
+    let parsed =
+        Url::parse(url).map_err(|error| RelayUrlError::InvalidFormat(error.to_string()))?;
 
-    if rest.is_empty() {
-        return Err(RelayUrlError::InvalidFormat("URL has no host".to_string()));
+    if parsed.scheme() != "https" {
+        return Err(RelayUrlError::InsecureScheme);
     }
 
-    // No userinfo (user:pass@ before host)
-    // authority = [userinfo@]host[:port]
-    let authority = rest.split('/').next().unwrap_or(rest);
-    if authority.contains('@') {
+    if !parsed.username().is_empty() || parsed.password().is_some() {
         return Err(RelayUrlError::InvalidFormat(
             "URL must not contain userinfo".to_string(),
         ));
     }
 
-    // No fragment
-    if url.contains('#') {
+    if parsed.fragment().is_some() {
         return Err(RelayUrlError::InvalidFormat(
             "URL must not contain a fragment".to_string(),
         ));
     }
 
-    // Extract host (strip port if present)
-    let host = if authority.starts_with('[') {
-        // IPv6: [::1]:port
-        let end = authority
-            .find(']')
-            .ok_or_else(|| RelayUrlError::InvalidFormat("Unclosed IPv6 bracket".to_string()))?;
-        &authority[1..end]
-    } else {
-        // hostname or IPv4: strip :port
-        authority.split(':').next().unwrap_or(authority)
-    };
-
-    if host.is_empty() {
-        return Err(RelayUrlError::InvalidFormat(
-            "URL has empty host".to_string(),
-        ));
-    }
-
-    // Check for private/loopback hosts
+    let host = parsed
+        .host()
+        .ok_or_else(|| RelayUrlError::InvalidFormat("URL has no host".to_string()))?;
     check_host_not_private(host)?;
 
     Ok(())
 }
 
 /// Rejects localhost, loopback, private RFC1918, link-local, and zero addresses.
-fn check_host_not_private(host: &str) -> Result<(), RelayUrlError> {
-    // Direct hostname checks
-    if host == "localhost" || host.ends_with(".localhost") {
-        return Err(RelayUrlError::PrivateHost);
-    }
-
-    // Try parsing as IP address
-    // Strip brackets for IPv6 (url crate may return "[::1]")
-    let ip_str = host.trim_start_matches('[').trim_end_matches(']');
-    if let Ok(ip) = ip_str.parse::<IpAddr>()
-        && is_private_ip(&ip)
-    {
-        return Err(RelayUrlError::PrivateHost);
+fn check_host_not_private(host: Host<&str>) -> Result<(), RelayUrlError> {
+    match host {
+        Host::Domain(domain) if domain == "localhost" || domain.ends_with(".localhost") => {
+            return Err(RelayUrlError::PrivateHost);
+        }
+        Host::Ipv4(address) if is_private_ip(&IpAddr::V4(address)) => {
+            return Err(RelayUrlError::PrivateHost);
+        }
+        Host::Ipv6(address) if is_private_ip(&IpAddr::V6(address)) => {
+            return Err(RelayUrlError::PrivateHost);
+        }
+        _ => {}
     }
 
     Ok(())

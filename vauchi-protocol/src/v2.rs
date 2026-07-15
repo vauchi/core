@@ -53,9 +53,15 @@ const MAX_GUARDIAN_ENTRY_B64_LEN: usize = 512;
 /// Maximum generic string length (1 MiB; generous upper bound for status/error text).
 const MAX_STRING_LEN: usize = 1024 * 1024;
 
-/// Maximum number of items in response vectors
-/// (slightly above operational limits to allow growth without silent truncation).
-const MAX_RESPONSE_VEC_LEN: usize = 2000;
+/// Maximum number of blobs in a V2 response
+/// (slightly above the mailbox-token operational limit).
+const MAX_BLOBS_LEN: usize = 2000;
+
+/// Maximum number of recovery proofs in a query response.
+const MAX_RECOVERY_PROOFS_LEN: usize = 50;
+
+/// Maximum number of guardian entries in a query response.
+const MAX_GUARDIANS_LEN: usize = 10;
 
 // =========================================================================
 // Bounded deserialization helpers
@@ -197,6 +203,54 @@ where
     }
 
     deserializer.deserialize_seq(BoundedVecVisitor {
+        max_items,
+        marker: PhantomData,
+    })
+}
+
+fn deserialize_option_bounded_vec<'de, D, T>(
+    deserializer: D,
+    max_items: usize,
+) -> Result<Option<Vec<T>>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    struct OptionBoundedVecVisitor<T> {
+        max_items: usize,
+        marker: PhantomData<T>,
+    }
+
+    impl<'de, T> Visitor<'de> for OptionBoundedVecVisitor<T>
+    where
+        T: Deserialize<'de>,
+    {
+        type Value = Option<Vec<T>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            write!(
+                formatter,
+                "null or a list of at most {} items",
+                self.max_items
+            )
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            deserialize_bounded_vec(deserializer, self.max_items).map(Some)
+        }
+    }
+
+    deserializer.deserialize_option(OptionBoundedVecVisitor {
         max_items,
         marker: PhantomData,
     })
@@ -403,21 +457,21 @@ fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Option<Vec<FetchedBlob>>
 where
     D: Deserializer<'de>,
 {
-    deserialize_bounded_vec(deserializer, MAX_RESPONSE_VEC_LEN).map(Some)
+    deserialize_option_bounded_vec(deserializer, MAX_BLOBS_LEN)
 }
 
 fn deserialize_proofs<'de, D>(deserializer: D) -> Result<Option<Vec<V2RecoveryProof>>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    deserialize_bounded_vec(deserializer, MAX_RESPONSE_VEC_LEN).map(Some)
+    deserialize_option_bounded_vec(deserializer, MAX_RECOVERY_PROOFS_LEN)
 }
 
 fn deserialize_guardians<'de, D>(deserializer: D) -> Result<Option<Vec<V2GuardianEntry>>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    deserialize_bounded_vec(deserializer, MAX_RESPONSE_VEC_LEN).map(Some)
+    deserialize_option_bounded_vec(deserializer, MAX_GUARDIANS_LEN)
 }
 
 // =========================================================================
@@ -830,12 +884,23 @@ mod tests {
                     created_at: 0,
                     mailbox_token: None,
                 };
-                MAX_RESPONSE_VEC_LEN + 1
+                MAX_BLOBS_LEN + 1
             ])
             .unwrap()
         );
         let err = serde_json::from_str::<V2Response>(&json).unwrap_err();
         assert!(err.to_string().contains("too many items"));
+    }
+
+    // @internal
+    #[test]
+    fn v2_response_accepts_null_vectors() {
+        // Legacy relays/clients may explicitly send null for optional vectors.
+        let json = r#"{"status":"ok","blobs":null,"proofs":null,"guardians":null}"#;
+        let resp: V2Response = serde_json::from_str(json).expect("null vectors accepted");
+        assert!(resp.blobs.is_none());
+        assert!(resp.proofs.is_none());
+        assert!(resp.guardians.is_none());
     }
 
     // @internal

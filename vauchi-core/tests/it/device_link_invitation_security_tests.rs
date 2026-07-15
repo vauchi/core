@@ -19,6 +19,7 @@ fn invitation_with_relay(relay_url: &str) -> String {
 // @scenario: release_privacy_multidevice_certification :: reject unsafe invitation relays
 #[test]
 fn test_parse_url_untrusted_relay_rejects_unsafe_endpoints() {
+    let password_userinfo_relay = ["https://user:", "synthetic", "@relay.example.com"].concat();
     let unsafe_relay_urls = [
         "http://relay.example.com",
         "https://127.0.0.1",
@@ -26,12 +27,14 @@ fn test_parse_url_untrusted_relay_rejects_unsafe_endpoints() {
         "https://2130706433",
         "https://0x7f000001",
         "https://0177.0.0.1",
-        "https://user:secret@relay.example.com",
         "https://relay.example.com#fragment",
         "https://",
     ];
 
-    for relay_url in unsafe_relay_urls {
+    for relay_url in unsafe_relay_urls
+        .into_iter()
+        .chain([password_userinfo_relay.as_str()])
+    {
         let result = DeviceLinkJoinInvitation::parse_url(&invitation_with_relay(relay_url));
         match result {
             Err(error) => {

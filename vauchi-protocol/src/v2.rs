@@ -53,10 +53,6 @@ const MAX_GUARDIAN_ENTRY_B64_LEN: usize = 512;
 /// Maximum generic string length (1 MiB; generous upper bound for status/error text).
 const MAX_STRING_LEN: usize = 1024 * 1024;
 
-/// Maximum number of blobs in a V2 response
-/// (slightly above the mailbox-token operational limit).
-const MAX_BLOBS_LEN: usize = 2000;
-
 /// Maximum number of recovery proofs in a query response.
 const MAX_RECOVERY_PROOFS_LEN: usize = 50;
 
@@ -453,13 +449,6 @@ where
     deserialize_optional_bounded_string(deserializer, MAX_ID_HEX_LEN)
 }
 
-fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Option<Vec<FetchedBlob>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_option_bounded_vec(deserializer, MAX_BLOBS_LEN)
-}
-
 fn deserialize_proofs<'de, D>(deserializer: D) -> Result<Option<Vec<V2RecoveryProof>>, D::Error>
 where
     D: Deserializer<'de>,
@@ -689,7 +678,7 @@ pub struct V2Response {
     pub error: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_blob_id")]
     pub blob_id: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_blobs")]
+    #[serde(default)]
     pub blobs: Option<Vec<FetchedBlob>>,
     #[serde(default)]
     pub acknowledged: Option<bool>,
@@ -842,26 +831,6 @@ mod tests {
         );
         let err = serde_json::from_str::<V2GuardianEntry>(&json).unwrap_err();
         assert!(err.to_string().contains("too long"));
-    }
-
-    // @internal
-    #[test]
-    fn v2_response_limits_blobs() {
-        let json = format!(
-            "{{\"status\":\"ok\",\"blobs\":{}}}",
-            serde_json::to_string(&vec![
-                FetchedBlob {
-                    blob_id: "a".repeat(64),
-                    ciphertext: "SGVsbG8=".to_string(),
-                    created_at: 0,
-                    mailbox_token: None,
-                };
-                MAX_BLOBS_LEN + 1
-            ])
-            .unwrap()
-        );
-        let err = serde_json::from_str::<V2Response>(&json).unwrap_err();
-        assert!(err.to_string().contains("too many items"));
     }
 
     // @internal

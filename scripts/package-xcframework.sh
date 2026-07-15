@@ -319,9 +319,12 @@ echo "Save this checksum for Package.swift binaryTarget!"
 # Write checksum to file for CI
 echo "$CHECKSUM" > "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256"
 
-# Sign checksum with cosign (T1-5: required in CI, optional locally)
-# GitLab masked file variables store base64-encoded content — decode if needed.
-if [[ -n "${COSIGN_KEY:-}" ]]; then
+# Sign checksum with cosign (T1-5: required for CI releases, optional locally).
+# Development packages are smoke-test artifacts and must never consume release
+# signing material, even when a protected branch exposes the variable.
+if [[ "$VERSION" == dev-* ]]; then
+    echo -e "${YELLOW}Development package — skipping checksum signing${NC}"
+elif [[ -n "${COSIGN_KEY:-}" ]]; then
     # GitLab file-type variable: env holds a path to a staged file. The
     # nell runner has been observed to drop staging intermittently — env
     # is set but file is missing. Retry to absorb the staging race; if
@@ -382,11 +385,11 @@ if [[ -n "${COSIGN_KEY:-}" ]]; then
         trap - EXIT INT TERM
     fi
     echo -e "${GREEN}Checksum signed${NC}"
-elif [[ -n "${CI:-}" ]] && [[ "$VERSION" != dev-* ]]; then
+elif [[ -n "${CI:-}" ]]; then
     echo -e "${RED}ERROR: COSIGN_KEY is required in CI for release signing${NC}"
     exit 1
 else
-    echo -e "${YELLOW}COSIGN_KEY not set — skipping checksum signing (local/dev build)${NC}"
+    echo -e "${YELLOW}COSIGN_KEY not set — skipping checksum signing (local build)${NC}"
 fi
 
 # Ensure all dist artifacts are world-readable — shell runners may have restrictive

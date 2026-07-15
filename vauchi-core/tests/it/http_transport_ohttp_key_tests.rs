@@ -12,6 +12,8 @@
 
 use vauchi_core::network::http_transport::{HttpTransport, HttpTransportConfig};
 
+use crate::common::mock_relay::{CannedResponse, MockRelay};
+
 // @scenario: sync:OHTTP key fetch
 #[test]
 fn test_fetch_ohttp_key_builds_correct_url() {
@@ -36,4 +38,47 @@ fn test_fetch_ohttp_key_empty_response_is_error() {
     // the right error type. Can't test with real relay.
     let transport = HttpTransport::new(HttpTransportConfig::for_testing("http://localhost:1", 100));
     assert!(transport.fetch_ohttp_key().is_err());
+}
+
+// @feature: release_privacy_multidevice_certification
+// @rg-8 @fail-closed
+#[test]
+fn test_fetch_ohttp_key_rejects_wrong_content_type() {
+    let relay = MockRelay::start();
+    relay.queue("ohttp-key", CannedResponse::ok_json(b"encoded-key"));
+    let transport = HttpTransport::new(HttpTransportConfig::for_testing(relay.url(), 1_000));
+
+    let error = transport
+        .fetch_ohttp_key()
+        .expect_err("wrong OHTTP key content type must fail closed");
+
+    assert_eq!(
+        error.to_string(),
+        "Invalid message format: OHTTP key response must use application/ohttp-keys"
+    );
+}
+
+// @feature: release_privacy_multidevice_certification
+// @rg-8 @fail-closed
+#[test]
+fn test_fetch_ohttp_key_rejects_oversized_response() {
+    let relay = MockRelay::start();
+    relay.queue(
+        "ohttp-key",
+        CannedResponse {
+            status: 200,
+            headers: vec![("Content-Type".into(), "application/ohttp-keys".into())],
+            body: vec![0; 65_537],
+        },
+    );
+    let transport = HttpTransport::new(HttpTransportConfig::for_testing(relay.url(), 1_000));
+
+    let error = transport
+        .fetch_ohttp_key()
+        .expect_err("oversized OHTTP key response must fail closed");
+
+    assert_eq!(
+        error.to_string(),
+        "Invalid message format: OHTTP key response exceeds 65536 bytes"
+    );
 }

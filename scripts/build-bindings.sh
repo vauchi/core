@@ -51,9 +51,9 @@ for _ndk_search in "$HOME/Library/Android/sdk/ndk" /opt/android-sdk/ndk /opt/and
 done
 NDK_HOME="${ANDROID_NDK_HOME:-${NDK_DEFAULT:-}}"
 
-echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
-echo -e "${YELLOW}║     Vauchi UniFFI Bindings Build       ║${NC}"
-echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}"
+printf '%b\n' "${YELLOW}╔════════════════════════════════════════╗${NC}"
+printf '%b\n' "${YELLOW}║     Vauchi UniFFI Bindings Build       ║${NC}"
+printf '%b\n' "${YELLOW}╚════════════════════════════════════════╝${NC}"
 echo ""
 echo "Project root: $PROJECT_ROOT"
 echo "Bindings output: $BINDINGS_DIR"
@@ -107,7 +107,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            echo -e "${RED}Unknown option: $1${NC}"
+            printf '%b\n' "${RED}Unknown option: $1${NC}"
             exit 1
             ;;
     esac
@@ -122,10 +122,10 @@ fi
 # === iOS Build ===
 if $BUILD_IOS; then
     echo ""
-    echo -e "${BLUE}=== Building iOS Bindings ===${NC}"
+    printf '%b\n' "${BLUE}=== Building iOS Bindings ===${NC}"
 
     if [[ "$(uname)" != "Darwin" ]]; then
-        echo -e "${YELLOW}SKIPPED: iOS build requires macOS${NC}"
+        printf '%b\n' "${YELLOW}SKIPPED: iOS build requires macOS${NC}"
     else
         # sccache works with cross-compilation targets since sccache 0.8+.
         # Previously disabled due to target discovery issues — resolved in modern versions.
@@ -157,12 +157,12 @@ if $BUILD_IOS; then
         # Cargo 1.64+ shares dep compilation across --target flags in a single invocation.
         TARGET_FLAGS=""
         for t in $IOS_TARGETS; do TARGET_FLAGS="$TARGET_FLAGS --target $t"; done
-        echo -e "${YELLOW}Building iOS targets: $IOS_TARGETS${NC}"
+        printf '%b\n' "${YELLOW}Building iOS targets: $IOS_TARGETS${NC}"
         cargo build -p vauchi-platform $TARGET_FLAGS --release
-        echo -e "${GREEN}iOS build complete ($(echo $IOS_TARGETS | wc -w | tr -d ' ') targets)${NC}"
+        printf '%b\n' "${GREEN}iOS build complete ($(echo $IOS_TARGETS | wc -w | tr -d ' ') targets)${NC}"
 
         # Generate Swift bindings
-        echo -e "${YELLOW}Generating Swift bindings...${NC}"
+        printf '%b\n' "${YELLOW}Generating Swift bindings...${NC}"
         mkdir -p "$IOS_GENERATED_DIR"
 
         cargo run -p vauchi-platform --bin uniffi-bindgen -- generate \
@@ -173,7 +173,7 @@ if $BUILD_IOS; then
         # Strip trailing whitespace from generated Swift (UniFFI emits `/* ` with trailing space)
         sed -i.bak 's/[[:space:]]*$//' "$IOS_GENERATED_DIR/vauchi_platform.swift"
         rm -f "$IOS_GENERATED_DIR/vauchi_platform.swift.bak"
-        echo -e "${GREEN}Swift bindings generated at: $IOS_GENERATED_DIR${NC}"
+        printf '%b\n' "${GREEN}Swift bindings generated at: $IOS_GENERATED_DIR${NC}"
 
         # Package libraries
         mkdir -p "$IOS_LIBS_DIR"
@@ -181,14 +181,14 @@ if $BUILD_IOS; then
 
         if ! $RELEASE_ONLY; then
             # Create universal library for simulators (ARM64 + x86_64)
-            echo -e "${YELLOW}Creating universal simulator library...${NC}"
+            printf '%b\n' "${YELLOW}Creating universal simulator library...${NC}"
             lipo -create \
                 target/aarch64-apple-ios-sim/release/libvauchi_platform.a \
                 target/x86_64-apple-ios/release/libvauchi_platform.a \
                 -output "$IOS_LIBS_DIR/libvauchi_platform_sim.a"
         fi
 
-        echo -e "${GREEN}iOS libraries:${NC}"
+        printf '%b\n' "${GREEN}iOS libraries:${NC}"
         ls -lh "$IOS_LIBS_DIR/"
     fi
 fi
@@ -196,10 +196,10 @@ fi
 # === macOS Build ===
 if $BUILD_MACOS; then
     echo ""
-    echo -e "${BLUE}=== Building macOS Bindings ===${NC}"
+    printf '%b\n' "${BLUE}=== Building macOS Bindings ===${NC}"
 
     if [[ "$(uname)" != "Darwin" ]]; then
-        echo -e "${YELLOW}SKIPPED: macOS build requires macOS${NC}"
+        printf '%b\n' "${YELLOW}SKIPPED: macOS build requires macOS${NC}"
     else
         # sccache works with cross-compilation targets since sccache 0.8+.
         # RUSTC_WRAPPER inherited from environment.
@@ -219,16 +219,16 @@ if $BUILD_MACOS; then
         # Multi-target build: dependencies compiled once, cross-compiled per target
         TARGET_FLAGS=""
         for t in $MACOS_TARGETS; do TARGET_FLAGS="$TARGET_FLAGS --target $t"; done
-        echo -e "${YELLOW}Building macOS targets: $MACOS_TARGETS${NC}"
+        printf '%b\n' "${YELLOW}Building macOS targets: $MACOS_TARGETS${NC}"
         cargo build -p vauchi-platform $TARGET_FLAGS --release
-        echo -e "${GREEN}macOS build complete${NC}"
+        printf '%b\n' "${GREEN}macOS build complete${NC}"
 
         # Package libraries
         mkdir -p "$MACOS_LIBS_DIR"
 
         if ! $RELEASE_ONLY; then
             # Create universal macOS library (ARM64 + x86_64)
-            echo -e "${YELLOW}Creating universal macOS library...${NC}"
+            printf '%b\n' "${YELLOW}Creating universal macOS library...${NC}"
             lipo -create \
                 target/aarch64-apple-darwin/release/libvauchi_platform.a \
                 target/x86_64-apple-darwin/release/libvauchi_platform.a \
@@ -238,7 +238,7 @@ if $BUILD_MACOS; then
                 "$MACOS_LIBS_DIR/libvauchi_platform_macos.a"
         fi
 
-        echo -e "${GREEN}macOS libraries:${NC}"
+        printf '%b\n' "${GREEN}macOS libraries:${NC}"
         ls -lh "$MACOS_LIBS_DIR/"
     fi
 fi
@@ -246,7 +246,7 @@ fi
 # === Android Build ===
 if $BUILD_ANDROID; then
     echo ""
-    echo -e "${BLUE}=== Building Android Bindings ===${NC}"
+    printf '%b\n' "${BLUE}=== Building Android Bindings ===${NC}"
 
     # Find NDK
     if [[ ! -d "$NDK_HOME" ]]; then
@@ -264,7 +264,7 @@ if $BUILD_ANDROID; then
     fi
 
     if [[ ! -d "$NDK_HOME" ]]; then
-        echo -e "${RED}Error: Android NDK not found${NC}"
+        printf '%b\n' "${RED}Error: Android NDK not found${NC}"
         echo "Set ANDROID_NDK_HOME environment variable or install NDK via Android Studio"
         exit 1
     fi
@@ -279,7 +279,7 @@ if $BUILD_ANDROID; then
     fi
 
     if [[ ! -d "$NDK_TOOLCHAIN" ]]; then
-        echo -e "${RED}Error: NDK toolchain not found at $NDK_TOOLCHAIN${NC}"
+        printf '%b\n' "${RED}Error: NDK toolchain not found at $NDK_TOOLCHAIN${NC}"
         exit 1
     fi
 
@@ -310,26 +310,26 @@ if $BUILD_ANDROID; then
     # 2026-04-22-ci-pipeline-health-audit.
     TARGET_FLAGS=""
     for t in $ANDROID_TARGETS; do TARGET_FLAGS="$TARGET_FLAGS --target $t"; done
-    echo -e "${YELLOW}Building Android targets: $ANDROID_TARGETS${NC}"
+    printf '%b\n' "${YELLOW}Building Android targets: $ANDROID_TARGETS${NC}"
     RUSTFLAGS="-Cstrip=none" cargo build -p vauchi-platform $TARGET_FLAGS --release
-    echo -e "${GREEN}Android build complete ($(echo $ANDROID_TARGETS | wc -w | tr -d ' ') targets, metadata preserved)${NC}"
+    printf '%b\n' "${GREEN}Android build complete ($(echo $ANDROID_TARGETS | wc -w | tr -d ' ') targets, metadata preserved)${NC}"
 
     # Generate Kotlin bindings from the cross-compiled aarch64 .so BEFORE
     # stripping. Strip happens after so UniFFI sees the metadata sections.
-    echo -e "${YELLOW}Generating Kotlin bindings from cross-compiled aarch64-linux-android .so...${NC}"
+    printf '%b\n' "${YELLOW}Generating Kotlin bindings from cross-compiled aarch64-linux-android .so...${NC}"
     mkdir -p "$ANDROID_KOTLIN_DIR"
     cargo run -p vauchi-platform --bin uniffi-bindgen --release -- generate \
         --library target/aarch64-linux-android/release/libvauchi_platform.so \
         --language kotlin \
         --out-dir "$ANDROID_KOTLIN_DIR"
-    echo -e "${GREEN}Kotlin bindings generated at: $ANDROID_KOTLIN_DIR${NC}"
+    printf '%b\n' "${GREEN}Kotlin bindings generated at: $ANDROID_KOTLIN_DIR${NC}"
 
     # Copy native libraries into jniLibs, then strip via the NDK's
     # llvm-strip to restore the release-profile size reduction. llvm-strip
     # defaults to stripping debug + unreferenced symbols but preserves the
     # UniFFI metadata sections — matching what release-profile strip=true
     # would have done on the cross-compile.
-    echo -e "${YELLOW}Copying + stripping native libraries for distribution...${NC}"
+    printf '%b\n' "${YELLOW}Copying + stripping native libraries for distribution...${NC}"
     mkdir -p "$ANDROID_JNI_DIR/arm64-v8a"
     cp target/aarch64-linux-android/release/libvauchi_platform.so "$ANDROID_JNI_DIR/arm64-v8a/"
     "$NDK_TOOLCHAIN/llvm-strip" "$ANDROID_JNI_DIR/arm64-v8a/libvauchi_platform.so"
@@ -339,31 +339,31 @@ if $BUILD_ANDROID; then
         "$NDK_TOOLCHAIN/llvm-strip" "$ANDROID_JNI_DIR/x86_64/libvauchi_platform.so"
     fi
 
-    echo -e "${GREEN}Android libraries (stripped, ready for aar):${NC}"
+    printf '%b\n' "${GREEN}Android libraries (stripped, ready for aar):${NC}"
     ls -lh "$ANDROID_JNI_DIR"/*/libvauchi_platform.so
 fi
 
 # === Summary ===
 echo ""
-echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
-echo -e "${YELLOW}║           Build Complete               ║${NC}"
-echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}"
+printf '%b\n' "${YELLOW}╔════════════════════════════════════════╗${NC}"
+printf '%b\n' "${YELLOW}║           Build Complete               ║${NC}"
+printf '%b\n' "${YELLOW}╚════════════════════════════════════════╝${NC}"
 echo ""
 
 if $BUILD_IOS && [[ "$(uname)" == "Darwin" ]]; then
-    echo -e "${GREEN}iOS:${NC}"
+    printf '%b\n' "${GREEN}iOS:${NC}"
     echo "  Swift bindings: $IOS_GENERATED_DIR/"
     echo "  Libraries:      $IOS_LIBS_DIR/"
 fi
 
 if $BUILD_MACOS && [[ "$(uname)" == "Darwin" ]]; then
-    echo -e "${GREEN}macOS:${NC}"
+    printf '%b\n' "${GREEN}macOS:${NC}"
     echo "  Libraries:      $MACOS_LIBS_DIR/"
     echo "  (Swift bindings shared with iOS)"
 fi
 
 if $BUILD_ANDROID; then
-    echo -e "${GREEN}Android:${NC}"
+    printf '%b\n' "${GREEN}Android:${NC}"
     echo "  Kotlin bindings: $ANDROID_KOTLIN_DIR/"
     echo "  JNI libraries:   $ANDROID_JNI_DIR/"
 fi
@@ -371,33 +371,33 @@ fi
 # === Local Install (copy to sibling repos for local development) ===
 if [[ -z "${CI:-}" ]]; then
     echo ""
-    echo -e "${BLUE}=== Local Install ===${NC}"
+    printf '%b\n' "${BLUE}=== Local Install ===${NC}"
 
     if $BUILD_IOS && [[ -d "$LOCAL_IOS_DIR" ]]; then
-        echo -e "${YELLOW}Copying iOS bindings to $LOCAL_IOS_DIR/...${NC}"
+        printf '%b\n' "${YELLOW}Copying iOS bindings to $LOCAL_IOS_DIR/...${NC}"
         mkdir -p "$LOCAL_IOS_DIR/Vauchi/Generated"
         mkdir -p "$LOCAL_IOS_DIR/Vauchi/Libs"
         cp -r "$IOS_GENERATED_DIR/"* "$LOCAL_IOS_DIR/Vauchi/Generated/" 2>/dev/null || true
         cp -r "$IOS_LIBS_DIR/"* "$LOCAL_IOS_DIR/Vauchi/Libs/" 2>/dev/null || true
-        echo -e "${GREEN}  Installed to $LOCAL_IOS_DIR/Vauchi/${NC}"
+        printf '%b\n' "${GREEN}  Installed to $LOCAL_IOS_DIR/Vauchi/${NC}"
     fi
 
     if $BUILD_MACOS && [[ -d "$LOCAL_MACOS_DIR" ]]; then
-        echo -e "${YELLOW}Copying macOS bindings to $LOCAL_MACOS_DIR/...${NC}"
+        printf '%b\n' "${YELLOW}Copying macOS bindings to $LOCAL_MACOS_DIR/...${NC}"
         mkdir -p "$LOCAL_MACOS_DIR/Vauchi/Generated"
         mkdir -p "$LOCAL_MACOS_DIR/Vauchi/Libs"
         # macOS shares Swift bindings with iOS (same UniFFI output)
         cp -r "$IOS_GENERATED_DIR/"* "$LOCAL_MACOS_DIR/Vauchi/Generated/" 2>/dev/null || true
         cp -r "$MACOS_LIBS_DIR/"* "$LOCAL_MACOS_DIR/Vauchi/Libs/" 2>/dev/null || true
-        echo -e "${GREEN}  Installed to $LOCAL_MACOS_DIR/Vauchi/${NC}"
+        printf '%b\n' "${GREEN}  Installed to $LOCAL_MACOS_DIR/Vauchi/${NC}"
     fi
 
     if $BUILD_ANDROID && [[ -d "$LOCAL_ANDROID_DIR" ]]; then
-        echo -e "${YELLOW}Copying Android bindings to $LOCAL_ANDROID_DIR/...${NC}"
+        printf '%b\n' "${YELLOW}Copying Android bindings to $LOCAL_ANDROID_DIR/...${NC}"
         mkdir -p "$LOCAL_ANDROID_DIR/app/src/main/jniLibs"
         mkdir -p "$LOCAL_ANDROID_DIR/app/src/local-bindings/kotlin"
         cp -r "$ANDROID_JNI_DIR/"* "$LOCAL_ANDROID_DIR/app/src/main/jniLibs/" 2>/dev/null || true
         cp -r "$ANDROID_KOTLIN_DIR/"* "$LOCAL_ANDROID_DIR/app/src/local-bindings/kotlin/" 2>/dev/null || true
-        echo -e "${GREEN}  Installed to $LOCAL_ANDROID_DIR/app/src/{main/jniLibs,local-bindings/kotlin}/${NC}"
+        printf '%b\n' "${GREEN}  Installed to $LOCAL_ANDROID_DIR/app/src/{main/jniLibs,local-bindings/kotlin}/${NC}"
     fi
 fi

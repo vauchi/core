@@ -588,6 +588,10 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         sender_device_id: &[u8; 32],
     ) -> Result<Vec<SyncItem>, DeviceSyncError> {
         let mut applied = Vec::new();
+        // Conflict keys already touched by this batch: an equal stamp on a
+        // later item of the same batch is the next ordered write (e.g. the
+        // re-add half of a remove+add edit), not a redelivered duplicate.
+        let mut batch_keys = std::collections::HashSet::new();
 
         for item in items {
             let key = Self::conflict_key(&item);
@@ -600,13 +604,19 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
             // LWW + device-id tie-break (ADR-020): apply iff the incoming
             // (timestamp, device_id) is lexicographically greater than the
-            // local stamp. An equal stamp (same write echoed back) is rejected.
+            // local stamp. An equal stamp is rejected as an echoed duplicate
+            // unless this batch itself set that stamp — one sender's batch is
+            // an ordered log, so equal-stamp successors must apply in order.
             let local = self.field_timestamps.get(&key).copied();
-            if local.is_none_or(|local| incoming > local) {
-                self.field_timestamps.insert(key, incoming);
+            let apply = local.is_none_or(|local| {
+                incoming > local || (incoming == local && batch_keys.contains(&key))
+            });
+            if apply {
+                self.field_timestamps.insert(key.clone(), incoming);
+                batch_keys.insert(key);
                 applied.push(item);
             }
-            // Older-or-equal incoming is rejected (not added to applied).
+            // Older-or-echoed incoming is rejected (not added to applied).
         }
 
         // Persist the updated timestamps so the LWW gate survives a reload

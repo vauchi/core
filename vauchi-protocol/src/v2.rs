@@ -715,6 +715,7 @@ impl V2Response {
 mod tests {
     use super::*;
 
+    // @internal
     #[test]
     fn v2_send_request_accepts_valid_input() {
         let json = r#"{"recipient_id":"aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899","ciphertext":"SGVsbG8="}"#;
@@ -723,6 +724,7 @@ mod tests {
         assert_eq!(req.ciphertext, "SGVsbG8=");
     }
 
+    // @internal
     #[test]
     fn v2_send_request_rejects_oversized_ciphertext() {
         let json = format!(
@@ -734,6 +736,7 @@ mod tests {
         assert!(err.to_string().contains("too long"));
     }
 
+    // @internal
     #[test]
     fn v2_fetch_request_rejects_too_many_tokens() {
         let tokens: Vec<String> = (0..MAX_MAILBOX_TOKENS + 1)
@@ -747,6 +750,7 @@ mod tests {
         assert!(err.to_string().contains("too many items"));
     }
 
+    // @internal
     #[test]
     fn v2_fetch_request_rejects_oversized_token() {
         let json = format!(
@@ -757,6 +761,7 @@ mod tests {
         assert!(err.to_string().contains("too long"));
     }
 
+    // @internal
     #[test]
     fn v2_recovery_store_request_limits_proof_data() {
         let json = format!(
@@ -768,6 +773,7 @@ mod tests {
         assert!(err.to_string().contains("too long"));
     }
 
+    // @internal
     #[test]
     fn v2_recovery_query_request_limits_key_hashes() {
         let hashes: Vec<String> = (0..MAX_RECOVERY_QUERY_HASHES + 1)
@@ -781,6 +787,7 @@ mod tests {
         assert!(err.to_string().contains("too many items"));
     }
 
+    // @internal
     #[test]
     fn v2_guardian_store_request_limits_entries() {
         let entries: Vec<V2GuardianEntry> = (0..MAX_GUARDIAN_ENTRIES + 1)
@@ -800,6 +807,7 @@ mod tests {
         assert!(err.to_string().contains("too many items"));
     }
 
+    // @internal
     #[test]
     fn v2_guardian_entry_limits_data() {
         let json = format!(
@@ -810,6 +818,7 @@ mod tests {
         assert!(err.to_string().contains("too long"));
     }
 
+    // @internal
     #[test]
     fn v2_response_limits_blobs() {
         let json = format!(
@@ -829,6 +838,7 @@ mod tests {
         assert!(err.to_string().contains("too many items"));
     }
 
+    // @internal
     #[test]
     fn v2_response_limits_optional_strings() {
         let json = format!(

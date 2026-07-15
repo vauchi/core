@@ -612,8 +612,8 @@ impl Vauchi {
     // Helpers
     // =====================================================================
 
-    /// Create an `HttpTransportAdapter` with OHTTP encryption from the
-    /// cached key, or direct mode if OHTTP is unavailable and direct is allowed.
+    /// Create a fail-closed `HttpTransportAdapter` with OHTTP encryption from
+    /// the cached key.
     ///
     /// Constructs a fresh `OhttpClient` from the cached encoded config bytes
     /// because `OhttpClient` is not `Clone` (it wraps single-use HPKE state).
@@ -626,7 +626,7 @@ impl Vauchi {
             relay_url,
             timeout_ms: self.config.relay.connect_timeout_ms,
             proxy: self.config.relay.proxy.clone(),
-            allow_direct: self.config.ohttp.allow_direct,
+            allow_direct: false,
             pinned_certs,
         });
         transport.set_ohttp(adapter_ohttp);

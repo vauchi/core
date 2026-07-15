@@ -128,6 +128,23 @@ fn ipv4_loopback_range_rejected() {
     assert!(matches!(err, RelayUrlError::PrivateHost));
 }
 
+// @rg-8 @fail-closed
+#[test]
+fn alternate_ipv4_loopback_forms_rejected() {
+    for url in [
+        "https://127.1",
+        "https://2130706433",
+        "https://0x7f000001",
+        "https://0177.0.0.1",
+    ] {
+        let err = validate_relay_url(url).expect_err("loopback aliases must be rejected");
+        assert!(
+            matches!(err, RelayUrlError::PrivateHost),
+            "unexpected error for {url}: {err}"
+        );
+    }
+}
+
 // @internal
 #[test]
 fn ipv4_private_10_rejected() {

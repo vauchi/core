@@ -13,7 +13,7 @@ use thiserror::Error;
 use url::{Host, Url};
 
 /// Maximum allowed relay URL length in bytes.
-const MAX_URL_LENGTH: usize = 1024;
+pub(crate) const MAX_URL_LENGTH: usize = 1024;
 
 /// Errors from relay URL validation.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]

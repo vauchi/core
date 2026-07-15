@@ -16,6 +16,9 @@
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD as B64};
 
+const MAX_INVITATION_URL_LENGTH: usize = 8 * 1024;
+const MAX_ENCODED_RELAY_LENGTH: usize = ((crate::relay_url::MAX_URL_LENGTH * 4 + 2) / 3) * 3;
+
 /// Join invitation: public rendezvous data that lets a fresh device claim
 /// the initiator's relay slot and decrypt the join response.
 ///
@@ -69,6 +72,10 @@ impl DeviceLinkJoinInvitation {
     /// Parse a join invitation from a URL produced by [`Self::to_url`] or
     /// from a future `https://vauchi.app/dl#...` universal-link form.
     pub fn parse_url(url: &str) -> Result<Self, JoinInvitationError> {
+        if url.len() > MAX_INVITATION_URL_LENGTH {
+            return Err(JoinInvitationError::UnsupportedUrl);
+        }
+
         let rest = if let Some(rest) = strip_invitation_prefix(url) {
             rest
         } else {
@@ -101,7 +108,7 @@ impl DeviceLinkJoinInvitation {
 
         let qr_data = decode_required_param(qr_raw, "qr")?;
         let broker_code = decode_required_param(code_raw, "code")?;
-        let relay_url = decode_optional_param(relay_raw, "relay")?;
+        let relay_url = decode_relay_url(relay_raw)?;
 
         Ok(Self {
             qr_data,
@@ -140,18 +147,25 @@ fn decode_required_param(
     decode_value(value, name)
 }
 
-/// Decode an optional invitation parameter; `None` stays `None`.
-fn decode_optional_param(
-    value: Option<&str>,
-    name: &'static str,
-) -> Result<Option<String>, JoinInvitationError> {
-    value.map(|v| decode_value(v, name)).transpose()
+fn decode_relay_url(value: Option<&str>) -> Result<Option<String>, JoinInvitationError> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.len() > MAX_ENCODED_RELAY_LENGTH {
+        return Err(JoinInvitationError::UnsupportedUrl);
+    }
+
+    let relay_url =
+        decode_value(value, "relay").map_err(|_| JoinInvitationError::UnsupportedUrl)?;
+    crate::relay_url::validate_relay_url(&relay_url)
+        .map_err(|_| JoinInvitationError::UnsupportedUrl)?;
+    Ok(Some(relay_url))
 }
 
 fn decode_value(value: &str, name: &'static str) -> Result<String, JoinInvitationError> {
     let value = percent_decode(value);
     let bytes = B64
-        .decode(&value)
+        .decode(value)
         .map_err(|e| JoinInvitationError::InvalidBase64(name, e.to_string()))?;
     String::from_utf8(bytes).map_err(|_| JoinInvitationError::InvalidUtf8(name))
 }
@@ -164,7 +178,7 @@ fn decode_value(value: &str, name: &'static str) -> Result<String, JoinInvitatio
 /// Decoding operates on bytes (not on `char`) so a percent-encoded UTF-8
 /// sequence is reconstructed correctly rather than reinterpreted as a
 /// Unicode scalar value.
-fn percent_decode(value: &str) -> String {
+fn percent_decode(value: &str) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(value.len());
     let mut chars = value.chars().peekable();
     while let Some(c) = chars.next() {
@@ -189,8 +203,7 @@ fn percent_decode(value: &str) -> String {
             push_char_bytes(&mut bytes, c);
         }
     }
-    // Safety: we only ever append complete UTF-8 byte sequences.
-    String::from_utf8(bytes).expect("percent_decode output is valid UTF-8")
+    bytes
 }
 
 fn push_char_bytes(buf: &mut Vec<u8>, c: char) {

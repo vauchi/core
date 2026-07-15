@@ -26,7 +26,7 @@ use super::x3dh::X3DHKeyPair;
 use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
 #[cfg(feature = "network-rustls")]
-use crate::network::relay_url::validate_relay_url;
+use crate::relay_url::validate_relay_url;
 use crate::text::normalize_text;
 
 /// Protocol version for QR codes.

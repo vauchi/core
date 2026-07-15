@@ -109,6 +109,7 @@ pub mod platform;
 pub use platform::{Command, Event, FilePickPurpose, Orientation};
 
 pub mod recovery;
+pub mod relay_url;
 pub use recovery::{
     ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProgress,
     RecoveryProof, RecoveryRateLimiter, RecoveryReminder, RecoveryResponse, RecoveryRevocation,

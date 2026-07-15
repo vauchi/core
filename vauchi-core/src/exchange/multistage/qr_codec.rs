@@ -430,8 +430,7 @@ fn parse_ini2(body: &str) -> Result<StageQr, QrCodecError> {
 
         // SSRF prevention: validate relay URL at parse time
         #[cfg(feature = "network-rustls")]
-        crate::network::relay_url::validate_relay_url(url)
-            .map_err(|_| QrCodecError::InvalidFieldCount)?;
+        crate::relay_url::validate_relay_url(url).map_err(|_| QrCodecError::InvalidFieldCount)?;
 
         Some(url.to_string())
     } else {

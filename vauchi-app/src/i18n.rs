@@ -584,9 +584,12 @@ mod tests {
     fn test_init_with_nonexistent_dir() {
         let _guard = store_guard();
         reset_store();
-        let result = init(Path::new("/tmp/nonexistent-vauchi-i18n-test"));
-        // Should succeed with empty store (dir doesn't exist = no files)
-        result.expect("expected success");
+        let parent = TempDir::new().expect("temporary parent");
+        let nonexistent = parent.path().join("missing");
+
+        init(&nonexistent).expect("nonexistent resource directory");
+
+        assert_eq!(get_string(Locale::English, "app.name"), "Vauchi");
     }
 
     #[test]

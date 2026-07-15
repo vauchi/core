@@ -4,12 +4,13 @@
 
 //! Tests for `Vauchi::escrow_exchange` — the core-owned relay escrow
 //! round-trip primitive (ADR-049 Phase 1 T2a). Drives a real `Vauchi`
-//! (no OHTTP key → direct path) against the in-process `MockRelay`. Each
-//! test gets an isolated temp storage dir so parallel runs don't collide
-//! on the default `./vauchi_data` path.
+//! through the explicit testing-only direct seam against the in-process
+//! `MockRelay`. Production action transports remain fail-closed. Each test
+//! gets an isolated temp storage dir so parallel runs don't collide.
 
 #![cfg(feature = "network-http")]
 
+use vauchi_core::api::VauchiConfig;
 use vauchi_core::api::vauchi::VauchiBuilder;
 use vauchi_core::{Command, Event, VauchiError};
 use vauchi_protocol::escrow::{EscrowMessage, EscrowResponse};
@@ -19,9 +20,10 @@ use crate::common::mock_relay::{CannedResponse, MockRelay};
 fn vauchi_pointing_at(mock: &MockRelay) -> (vauchi_core::Vauchi, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
     let db_path = dir.path().join("vauchi.db");
+    let mut config = VauchiConfig::with_storage_path(&db_path).with_relay_url(mock.url());
+    config.ohttp.allow_direct = true;
     let mut wb = VauchiBuilder::new()
-        .relay_url(mock.url())
-        .storage_path(db_path.to_str().expect("utf-8 path"))
+        .config(config)
         .build()
         .expect("build vauchi");
     wb.create_identity("Alice").expect("create identity");

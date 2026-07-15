@@ -850,6 +850,14 @@ impl Vauchi {
     /// entry, or the validated bundled key. Without one, action methods return
     /// their existing fail-closed error before sending a request.
     pub fn build_relay_transport(&self, timeout_ms: u64) -> HttpTransport {
+        #[cfg(feature = "testing")]
+        if self.config.ohttp.allow_direct {
+            return HttpTransport::new(HttpTransportConfig::for_testing(
+                self.config.relay.server_url.clone(),
+                timeout_ms,
+            ));
+        }
+
         let relay_url = self.http_relay_url();
         let pinned_certs =
             self.ohttp_endpoint_pins(&relay_url, self.config.relay.pinned_certs.clone());

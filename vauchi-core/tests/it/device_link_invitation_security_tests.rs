@@ -82,6 +82,28 @@ fn test_parse_url_oversized_relay_rejects_before_network_use() {
 
 // @rg-8 @fail-closed
 #[test]
+fn test_parse_url_invalid_percent_bytes_return_errors_without_panicking() {
+    let invalid_qr = format!(
+        "vauchi://device-link?qr=%FF&code={}",
+        URL_SAFE_NO_PAD.encode("123456")
+    );
+    let result = DeviceLinkJoinInvitation::parse_url(&invalid_qr);
+    assert!(matches!(
+        result,
+        Err(JoinInvitationError::InvalidBase64("qr", _))
+    ));
+
+    let invalid_relay = format!(
+        "vauchi://device-link?qr={}&code={}&relay=%FF",
+        URL_SAFE_NO_PAD.encode("whatever"),
+        URL_SAFE_NO_PAD.encode("123456")
+    );
+    let result = DeviceLinkJoinInvitation::parse_url(&invalid_relay);
+    assert!(matches!(result, Err(JoinInvitationError::UnsupportedUrl)));
+}
+
+// @rg-8 @fail-closed
+#[test]
 fn test_parse_url_public_https_relay_preserves_value() {
     let relay_url = "https://relay.example.com";
     let invitation = DeviceLinkJoinInvitation::parse_url(&invitation_with_relay(relay_url))

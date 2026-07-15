@@ -320,13 +320,39 @@ fn test_relay_transport_rejects_custom_relay_without_outer_hop() {
 // @feature: release_privacy_multidevice_certification
 // @rg-8 @fail-closed
 #[test]
+fn test_connect_rejects_custom_relay_without_outer_hop() {
+    let application_relay = MockRelay::start();
+    let dir = tempfile::tempdir().expect("temp dir");
+    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+        .with_storage_key(SymmetricKey::generate())
+        .with_relay_url(application_relay.url());
+    let mut vauchi = Vauchi::new(config).expect("create Vauchi");
+    vauchi
+        .create_identity("Test User")
+        .expect("create identity");
+
+    let error = vauchi
+        .connect()
+        .expect_err("same-hop OHTTP bootstrap must fail closed");
+
+    assert_eq!(
+        error.to_string(),
+        "network error: Connection failed: OHTTP outer relay must use a distinct valid origin"
+    );
+    assert!(application_relay.received().is_empty());
+    assert!(!vauchi.has_ohttp_key());
+}
+
+// @feature: release_privacy_multidevice_certification
+// @rg-8 @fail-closed
+#[test]
 fn test_relay_transport_rejects_explicit_same_outer_hop() {
     let application_relay = MockRelay::start();
     let dir = tempfile::tempdir().expect("temp dir");
     let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
         .with_storage_key(SymmetricKey::generate())
         .with_relay_url(application_relay.url())
-        .with_ohttp_relay_url(application_relay.url());
+        .with_ohttp_relay_url(format!("{}/gateway", application_relay.url()));
     let vauchi = Vauchi::new(config).expect("create Vauchi");
     let transport = vauchi.build_relay_transport(&application_relay.url(), 1_000);
 

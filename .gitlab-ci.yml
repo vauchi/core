@@ -37,7 +37,7 @@
 # Include shared templates
 include:
   - project: 'vauchi/scripts'
-    ref: ci-templates-v2026.07.6
+    ref: ci-templates-v2026.07.7
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -85,7 +85,7 @@ include:
   - local: ci/prebuild.yml
 
 variables:
-  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.6"
+  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.7"
 
 # Cosign pinned version + checksum (used by update:swift-bindings and publish:maven)
 # Single source of truth for cosign binary integrity — update BOTH values together.
@@ -125,6 +125,17 @@ check:auto-tag-order:
   needs: []
   script:
     - sh ci/tests/auto-tag-order.test.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+check:security-provenance:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  script:
+    - sh ci/tests/security-provenance.test.sh
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -185,27 +196,25 @@ lint:cross-cutting-blocking:
   before_script:
     - apk add --no-cache bash git python3 ripgrep jq findutils
     - |
-      if [ ! -d ../scripts ]; then
-        git clone --depth=1 --branch "${VAUCHI_SCRIPTS_REF}" https://gitlab.com/vauchi/scripts.git ../scripts
-      else
-        git -C ../scripts pull --ff-only 2>/dev/null || true
-      fi
+      VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)
+      export VAUCHI_CI_SCRIPTS_DIR
+      git clone --depth=1 --branch "${VAUCHI_SCRIPTS_REF}" \
+        https://gitlab.com/vauchi/scripts.git "${VAUCHI_CI_SCRIPTS_DIR}"
     - !reference [.clone-locales, before_script]
   script:
     # lint:workspace-version-alignment
-    - bash ../scripts/scripts/check-workspace-versions.sh Cargo.toml
+    - bash "${VAUCHI_CI_SCRIPTS_DIR}/scripts/check-workspace-versions.sh" Cargo.toml
     # lint:locale-key-coverage
     - bash ../locales/scripts/check-locale-key-coverage.sh
         vauchi-app/src ../locales '*.rs'
     # lint:adr-046
-    - bash ../scripts/scripts/check-aead.sh .
+    - bash "${VAUCHI_CI_SCRIPTS_DIR}/scripts/check-aead.sh" .
     # lint:core-purity
     - |
       set -eu
-      SCRIPT=../scripts/scripts/audit-mobile-surface.sh
+      SCRIPT="${VAUCHI_CI_SCRIPTS_DIR}/scripts/audit-mobile-surface.sh"
       if [ ! -f "$SCRIPT" ]; then
-        echo "audit-mobile-surface.sh not yet on scripts/main — skipping."
-        echo "(Will activate automatically once the introducing MR merges.)"
+        echo "audit-mobile-surface.sh is absent from the pinned scripts revision — skipping."
         exit 0
       fi
       WS=$(mktemp -d)
@@ -214,11 +223,10 @@ lint:cross-cutting-blocking:
     # lint:crypto-hygiene
     - |
       set -eu
-      SCRIPT=../scripts/scripts/audit-crypto-hygiene.sh
-      BASELINE=../scripts/scripts/audit-crypto-hygiene.baseline.json
+      SCRIPT="${VAUCHI_CI_SCRIPTS_DIR}/scripts/audit-crypto-hygiene.sh"
+      BASELINE="${VAUCHI_CI_SCRIPTS_DIR}/scripts/audit-crypto-hygiene.baseline.json"
       if [ ! -f "$SCRIPT" ] || [ ! -f "$BASELINE" ]; then
-        echo "audit-crypto-hygiene not yet on scripts/main — skipping."
-        echo "(Will activate automatically once the introducing MR merges.)"
+        echo "audit-crypto-hygiene is absent from the pinned scripts revision — skipping."
         exit 0
       fi
       WS=$(mktemp -d)
@@ -227,11 +235,10 @@ lint:cross-cutting-blocking:
     # lint:test-hygiene
     - |
       set -eu
-      SCRIPT=../scripts/scripts/audit-test-hygiene.sh
-      BASELINE=../scripts/scripts/audit-test-hygiene.baseline.json
+      SCRIPT="${VAUCHI_CI_SCRIPTS_DIR}/scripts/audit-test-hygiene.sh"
+      BASELINE="${VAUCHI_CI_SCRIPTS_DIR}/scripts/audit-test-hygiene.baseline.json"
       if [ ! -f "$SCRIPT" ] || [ ! -f "$BASELINE" ]; then
-        echo "audit-test-hygiene not yet on scripts/main — skipping."
-        echo "(Will activate automatically once the introducing MR merges.)"
+        echo "audit-test-hygiene is absent from the pinned scripts revision — skipping."
         exit 0
       fi
       WS=$(mktemp -d)
@@ -327,7 +334,7 @@ lint:cabi-header:
 #
 # The audit script lives in the scripts repo and is cloned the same
 # way as `lint:cross-cutting-blocking`. If the script is not yet on
-# scripts/main (e.g. pre-merge of the introducing MR), the job no-ops cleanly.
+# the pinned scripts revision, the job no-ops cleanly.
 metric:audit-mobile-surface:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
@@ -337,18 +344,16 @@ metric:audit-mobile-surface:
   before_script:
     - apk add --no-cache bash git python3
     - |
-      if [ ! -d ../scripts ]; then
-        git clone --depth=1 --branch "${VAUCHI_SCRIPTS_REF}" https://gitlab.com/vauchi/scripts.git ../scripts
-      else
-        git -C ../scripts pull --ff-only 2>/dev/null || true
-      fi
+      VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)
+      export VAUCHI_CI_SCRIPTS_DIR
+      git clone --depth=1 --branch "${VAUCHI_SCRIPTS_REF}" \
+        https://gitlab.com/vauchi/scripts.git "${VAUCHI_CI_SCRIPTS_DIR}"
   script:
     - |
       set -euo pipefail
-      SCRIPT=../scripts/scripts/audit-mobile-surface.sh
+      SCRIPT="${VAUCHI_CI_SCRIPTS_DIR}/scripts/audit-mobile-surface.sh"
       if [ ! -f "$SCRIPT" ]; then
-        echo "audit-mobile-surface.sh not yet on scripts/main — skipping."
-        echo "(Will activate automatically once the introducing MR merges.)"
+        echo "audit-mobile-surface.sh is absent from the pinned scripts revision — skipping."
         exit 0
       fi
 
@@ -807,6 +812,10 @@ semgrep-sast:
           - ".gitlab-ci.yml"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
+
+security:sast-severity:
+  extends: .security-sast-severity-gate
+  rules: !reference [semgrep-sast, rules]
 
 # Refine secret_detection from security.yml: gate on lint
 secret_detection:

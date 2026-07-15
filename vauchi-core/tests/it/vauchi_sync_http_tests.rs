@@ -300,6 +300,7 @@ fn test_relay_transport_with_ohttp_key_sends_no_direct_ohttp_request() {
 
 // @feature: release_privacy_multidevice_certification
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: reject missing outer relay
 #[test]
 fn test_relay_transport_rejects_custom_relay_without_outer_hop() {
     let application_relay = MockRelay::start();
@@ -324,6 +325,7 @@ fn test_relay_transport_rejects_custom_relay_without_outer_hop() {
 
 // @feature: release_privacy_multidevice_certification
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: reject same-hop bootstrap
 #[test]
 fn test_connect_rejects_custom_relay_without_outer_hop() {
     let application_relay = MockRelay::start();
@@ -350,6 +352,7 @@ fn test_connect_rejects_custom_relay_without_outer_hop() {
 
 // @feature: release_privacy_multidevice_certification
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: reject same-origin outer relay
 #[test]
 fn test_relay_transport_rejects_explicit_same_outer_hop() {
     let application_relay = MockRelay::start();
@@ -375,6 +378,7 @@ fn test_relay_transport_rejects_explicit_same_outer_hop() {
 
 // @feature: release_privacy_multidevice_certification
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: reject mismatched action relay
 #[test]
 #[cfg(feature = "testing")]
 fn test_relay_transport_rejects_mismatched_application_target() {
@@ -428,6 +432,7 @@ fn test_ohttp_cache_roundtrip_via_storage() {
 
 // @feature: release_privacy_multidevice_certification
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: replace invalid cached OHTTP keys
 #[test]
 #[cfg(feature = "testing")]
 fn test_connect_replaces_invalid_fresh_ohttp_cache() {
@@ -476,6 +481,7 @@ fn test_connect_replaces_invalid_fresh_ohttp_cache() {
 
 // @feature: release_privacy_multidevice_certification
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: reject malformed fetched OHTTP keys
 #[test]
 fn test_connect_never_caches_malformed_fetched_ohttp_key() {
     let application_relay = MockRelay::start();

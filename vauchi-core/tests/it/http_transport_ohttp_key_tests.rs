@@ -42,6 +42,7 @@ fn test_fetch_ohttp_key_empty_response_is_error() {
 
 // @feature: release_privacy_multidevice_certification
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: reject mislabeled OHTTP keys
 #[test]
 fn test_fetch_ohttp_key_rejects_wrong_content_type() {
     let relay = MockRelay::start();
@@ -60,6 +61,7 @@ fn test_fetch_ohttp_key_rejects_wrong_content_type() {
 
 // @feature: release_privacy_multidevice_certification
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: bound OHTTP key bootstrap
 #[test]
 fn test_fetch_ohttp_key_rejects_oversized_response() {
     let relay = MockRelay::start();

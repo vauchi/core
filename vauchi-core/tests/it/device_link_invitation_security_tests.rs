@@ -16,6 +16,7 @@ fn invitation_with_relay(relay_url: &str) -> String {
 }
 
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: reject unsafe invitation relays
 #[test]
 fn test_parse_url_untrusted_relay_rejects_unsafe_endpoints() {
     let unsafe_relay_urls = [
@@ -50,6 +51,7 @@ fn test_parse_url_untrusted_relay_rejects_unsafe_endpoints() {
 }
 
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: bound complete invitations
 #[test]
 fn test_parse_url_oversized_unknown_parameter_rejects_whole_invitation() {
     let oversized = format!(
@@ -66,6 +68,7 @@ fn test_parse_url_oversized_unknown_parameter_rejects_whole_invitation() {
 }
 
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: bound invitation relay metadata
 #[test]
 fn test_parse_url_oversized_relay_rejects_before_network_use() {
     let oversized_relay = format!("https://relay.example.com/{}", "a".repeat(1024));
@@ -81,6 +84,7 @@ fn test_parse_url_oversized_relay_rejects_before_network_use() {
 }
 
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: reject invalid percent encoding
 #[test]
 fn test_parse_url_invalid_percent_bytes_return_errors_without_panicking() {
     let invalid_qr = format!(
@@ -103,6 +107,7 @@ fn test_parse_url_invalid_percent_bytes_return_errors_without_panicking() {
 }
 
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: preserve valid invitation relays
 #[test]
 fn test_parse_url_public_https_relay_preserves_value() {
     let relay_url = "https://relay.example.com";

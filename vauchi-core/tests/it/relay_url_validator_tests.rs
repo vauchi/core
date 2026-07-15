@@ -129,6 +129,7 @@ fn ipv4_loopback_range_rejected() {
 }
 
 // @rg-8 @fail-closed
+// @scenario: release_privacy_multidevice_certification :: reject loopback aliases
 #[test]
 fn alternate_ipv4_loopback_forms_rejected() {
     for url in [

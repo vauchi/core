@@ -28,6 +28,10 @@ use crate::version::{APP_COMPAT_VERSION, VersionPolicy};
 /// Default retry delay when the server doesn't specify Retry-After.
 const DEFAULT_RATE_LIMIT_RETRY_SECS: u64 = 10;
 
+/// OHTTP key configurations are small. Bound bootstrap responses so an
+/// untrusted outer relay cannot exhaust client memory before key validation.
+const MAX_OHTTP_KEY_RESPONSE_BYTES: usize = 64 * 1024;
+
 /// Verify and parse a signed pin-config response.
 ///
 /// **Wire format**: `[64-byte Ed25519 signature][N * 32-byte SPKI fingerprints]`
@@ -270,10 +274,34 @@ impl HttpTransport {
         if let (Some(p), Ok(mut stored)) = (policy, self.last_version_policy.lock()) {
             *stored = Some(p);
         }
-        let body = resp
-            .into_body()
+        let content_type = resp
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.split(';').next())
+            .map(str::trim);
+        if !content_type.is_some_and(|value| value.eq_ignore_ascii_case("application/ohttp-keys")) {
+            return Err(NetworkError::InvalidMessage(
+                "OHTTP key response must use application/ohttp-keys".into(),
+            ));
+        }
+
+        let mut response_body = resp.into_body();
+        let body = response_body
+            .with_config()
+            .limit((MAX_OHTTP_KEY_RESPONSE_BYTES + 1) as u64)
             .read_to_vec()
-            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+            .map_err(|error| match error {
+                ureq::Error::BodyExceedsLimit(_) => NetworkError::InvalidMessage(format!(
+                    "OHTTP key response exceeds {MAX_OHTTP_KEY_RESPONSE_BYTES} bytes"
+                )),
+                other => NetworkError::ConnectionFailed(other.to_string()),
+            })?;
+        if body.len() > MAX_OHTTP_KEY_RESPONSE_BYTES {
+            return Err(NetworkError::InvalidMessage(format!(
+                "OHTTP key response exceeds {MAX_OHTTP_KEY_RESPONSE_BYTES} bytes"
+            )));
+        }
         if body.is_empty() {
             return Err(NetworkError::InvalidMessage(
                 "empty OHTTP key response".into(),

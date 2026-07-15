@@ -17,7 +17,7 @@
 #     / rc:security:audit — full rc-tag pipeline
 
 # ============================================================
-# Auto-Tag Stage (main branch only)
+# Final Tag Stage (main branch only)
 # ============================================================
 # When Cargo.toml version is bumped and merged to main,
 # automatically create a v{version} tag to trigger the release pipeline.
@@ -39,9 +39,11 @@ auto-tag:version:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  stage: auto-tag
+  # Stable/dev tags are externally visible release inputs. Keep this job in
+  # the final stage without a `needs` DAG shortcut so every blocking main job
+  # must pass before a tag can exist.
+  stage: tag
   resource_group: auto-tag
-  needs: []
   variables:
     GIT_STRATEGY: clone
     GIT_DEPTH: "50"

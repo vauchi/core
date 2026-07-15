@@ -106,7 +106,6 @@ variables:
       fi
 
 stages:
-  - auto-tag
   - lint
   - test
   - security
@@ -117,6 +116,7 @@ stages:
   - publish
   - trigger
   - deploy
+  - tag
 
 check:auto-tag-order:
   stage: lint

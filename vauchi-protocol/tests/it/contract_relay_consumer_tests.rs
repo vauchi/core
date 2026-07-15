@@ -204,6 +204,48 @@ fn v2_response_roundtrip() {
 
 // @internal
 #[test]
+fn v2_response_serializes_absent_fields_as_null() {
+    let json = serde_json::to_value(V2Response::new("ok")).unwrap();
+
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "status": "ok",
+            "error": null,
+            "blob_id": null,
+            "blobs": null,
+            "acknowledged": null,
+            "code": null,
+            "payload": null,
+            "response": null,
+            "blobs_deleted": null,
+            "proofs": null,
+            "guardians": null,
+        })
+    );
+}
+
+// @internal
+#[test]
+fn v2_response_accepts_more_than_two_thousand_blobs() {
+    let blobs = vec![
+        FetchedBlob {
+            blob_id: "a".repeat(64),
+            ciphertext: "dGVzdA==".into(),
+            created_at: 12345,
+            mailbox_token: None,
+        };
+        2001
+    ];
+    let json = serde_json::json!({"status": "ok", "blobs": blobs});
+
+    let parsed: V2Response = serde_json::from_value(json).unwrap();
+
+    assert_eq!(parsed.blobs.unwrap().len(), 2001);
+}
+
+// @internal
+#[test]
 fn v2_response_with_blobs_roundtrip() {
     let mut resp = V2Response::new("ok");
     resp.blobs = Some(vec![FetchedBlob {

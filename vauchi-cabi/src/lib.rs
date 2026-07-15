@@ -245,6 +245,14 @@ mod tests {
     use super::*;
     use std::ffi::CString;
 
+    /// Create a temporary directory and return its path as a C string.
+    /// The `TempDir` is returned so it stays alive for the duration of the test.
+    fn temp_dir_cstring() -> (CString, tempfile::TempDir) {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = CString::new(tmp.path().to_str().unwrap()).unwrap();
+        (dir, tmp)
+    }
+
     // ── Lifecycle tests (Task 12) ───────────────────────────────────
 
     #[test]
@@ -1407,7 +1415,7 @@ mod tests {
     fn config_new_returns_non_null() {
         // SAFETY: Calling FFI with valid C strings.
         unsafe {
-            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let (dir, _tmp) = temp_dir_cstring();
             let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
             assert!(
@@ -1432,7 +1440,7 @@ mod tests {
     fn config_new_with_null_relay_uses_default() {
         // SAFETY: Calling FFI with null relay_url (should use default).
         unsafe {
-            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let (dir, _tmp) = temp_dir_cstring();
             let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
             assert!(
                 !config.is_null(),
@@ -1455,7 +1463,7 @@ mod tests {
     fn config_set_storage_key_valid_32_bytes() {
         // SAFETY: Calling FFI with valid config and 32-byte key.
         unsafe {
-            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let (dir, _tmp) = temp_dir_cstring();
             let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
 
@@ -1471,7 +1479,7 @@ mod tests {
     fn config_set_storage_key_rejects_wrong_length() {
         // SAFETY: Calling FFI with valid config and wrong-length key.
         unsafe {
-            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let (dir, _tmp) = temp_dir_cstring();
             let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
 
@@ -1487,7 +1495,7 @@ mod tests {
     fn config_set_storage_key_rejects_all_zeros() {
         // SAFETY: Calling FFI with valid config and all-zeros key.
         unsafe {
-            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let (dir, _tmp) = temp_dir_cstring();
             let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
 
@@ -1513,7 +1521,7 @@ mod tests {
     fn config_set_storage_key_null_key_returns_false() {
         // SAFETY: Calling FFI with null key pointer.
         unsafe {
-            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let (dir, _tmp) = temp_dir_cstring();
             let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
 

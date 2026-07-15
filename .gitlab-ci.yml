@@ -37,7 +37,7 @@
 # Include shared templates
 include:
   - project: 'vauchi/scripts'
-    ref: ci-templates-v2026.07.2
+    ref: ci-templates-v2026.07.6
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -85,7 +85,7 @@ include:
   - local: ci/prebuild.yml
 
 variables:
-  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.4"
+  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.6"
 
 # Cosign pinned version + checksum (used by update:swift-bindings and publish:maven)
 # Single source of truth for cosign binary integrity — update BOTH values together.
@@ -366,9 +366,9 @@ metric:audit-mobile-surface:
       # Run the same script against origin/main via a worktree.
       # GitLab CI's default clone is shallow — fetch main explicitly
       # before the worktree add, matching `lint:semver`'s pattern.
-      # A missing origin/main (first-push edge case) skips the diff
-      # and leaves only the absolute HEAD counters in the log.
-      git fetch --depth=1 origin main 2>/dev/null || true
+      # A failed refresh must fail the job rather than compare against a
+      # potentially stale local reference.
+      git fetch --depth=1 origin main
       if ! git rev-parse origin/main >/dev/null 2>&1; then
         echo "origin/main not available — skipping delta."
         exit 0

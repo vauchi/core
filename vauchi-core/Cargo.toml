@@ -77,7 +77,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = "3.9"
-postcard = { version = "1.1", features = ["alloc"] }
+postcard = { version = "1.1", default-features = false, features = ["alloc"] }
 
 # Error handling
 thiserror = "2.0"

@@ -64,6 +64,7 @@ test:packaging-matrix:
   script:
     - |
       set -euo pipefail
+      sh ci/tests/build-bindings-environment.test.sh
       case "$RUNNER_OS" in
         linux)
           echo "=== Linux matrix: build-bindings --android + package-android ==="

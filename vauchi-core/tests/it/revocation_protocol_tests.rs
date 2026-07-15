@@ -573,6 +573,7 @@ fn test_gdpr_deletion_revocation_shreds_at_recipient() {
 fn test_broadcast_identity_revocations_transmits_to_relay() {
     use crate::common::mock_relay::{CannedResponse, MockRelay};
     use base64::Engine;
+    use vauchi_core::api::VauchiConfig;
     use vauchi_core::api::vauchi::VauchiBuilder;
 
     let mock = MockRelay::start();
@@ -582,9 +583,11 @@ fn test_broadcast_identity_revocations_transmits_to_relay() {
     );
 
     let dir = tempfile::tempdir().expect("temp dir");
+    let db_path = dir.path().join("vauchi.db");
+    let mut config = VauchiConfig::with_storage_path(&db_path).with_relay_url(mock.url());
+    config.ohttp.allow_direct = true;
     let mut wb = VauchiBuilder::new()
-        .relay_url(mock.url())
-        .storage_path(dir.path().join("vauchi.db").to_str().expect("utf-8 path"))
+        .config(config)
         .build()
         .expect("build vauchi");
     wb.create_identity("Alice").expect("create identity");

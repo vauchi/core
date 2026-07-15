@@ -21,6 +21,7 @@
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
+use vauchi_core::api::VauchiConfig;
 use vauchi_core::api::vauchi::VauchiBuilder;
 use vauchi_protocol::escrow::EscrowResponse;
 
@@ -35,9 +36,10 @@ fn canned(resp: &EscrowResponse) -> CannedResponse {
 fn onboarded_engine_at(mock: &MockRelay) -> (AppEngine, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
     let db_path = dir.path().join("vauchi.db");
+    let mut config = VauchiConfig::with_storage_path(&db_path).with_relay_url(mock.url());
+    config.ohttp.allow_direct = true;
     let vauchi = VauchiBuilder::new()
-        .relay_url(mock.url())
-        .storage_path(db_path.to_str().expect("utf-8 path"))
+        .config(config)
         .build()
         .expect("build vauchi");
     let mut engine = AppEngine::new(vauchi);

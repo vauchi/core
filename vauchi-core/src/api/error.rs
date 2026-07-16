@@ -102,5 +102,69 @@ pub enum VauchiError {
     ContactLimitReached(usize),
 }
 
+impl VauchiError {
+    /// True when local storage cannot be read with the configured key:
+    /// a field failed authenticated decryption, the database file is not
+    /// readable as SQLite, or stored bytes fail to parse after decryption.
+    /// Hosts branch on this — never on error text — to offer their native
+    /// start-fresh recovery hint (ADR-045 Amendment 1).
+    pub fn is_unreadable_storage(&self) -> bool {
+        false
+    }
+}
+
 /// Result type for Vauchi operations.
 pub type VauchiResult<T> = Result<T, VauchiError>;
+
+// INLINE_TEST_REQUIRED: constructing rusqlite::Error values (SQLITE_NOTADB)
+// is only possible inside the crate — rusqlite is a private dependency not
+// visible to tests/it.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn not_a_database_error() -> rusqlite::Error {
+        rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_NOTADB),
+            Some("file is not a database".into()),
+        )
+    }
+
+    // @internal
+    #[test]
+    fn field_decryption_failure_is_unreadable_storage() {
+        let err = VauchiError::Storage(StorageError::Encryption(
+            "Decryption failed: data may be corrupted or wrong key".into(),
+        ));
+        assert!(err.is_unreadable_storage());
+    }
+
+    // @internal
+    #[test]
+    fn not_a_database_file_is_unreadable_storage() {
+        let err = VauchiError::Storage(StorageError::Database(not_a_database_error()));
+        assert!(err.is_unreadable_storage());
+    }
+
+    // @internal
+    #[test]
+    fn corrupt_stored_bytes_are_unreadable_storage() {
+        let err = VauchiError::Storage(StorageError::InvalidData("truncated row".into()));
+        assert!(err.is_unreadable_storage());
+    }
+
+    // @internal
+    #[test]
+    fn other_errors_are_not_unreadable_storage() {
+        let cases = [
+            VauchiError::Storage(StorageError::DiskFull),
+            VauchiError::Storage(StorageError::NotFound("key".into())),
+            VauchiError::ContactNotFound("id".into()),
+            VauchiError::Network(NetworkError::NotConnected),
+            VauchiError::Crypto("exchange decrypt failed".into()),
+        ];
+        for err in cases {
+            assert!(!err.is_unreadable_storage(), "false positive for {err:?}");
+        }
+    }
+}

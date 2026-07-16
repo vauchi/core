@@ -92,8 +92,16 @@ pub enum UiFieldVisibility {
 /// (ADR-043/044 — copy never derives from the discriminant in a
 /// renderer).
 pub fn visibility_label(visibility: &UiFieldVisibility, locale: Locale) -> String {
-    let _ = (visibility, locale);
-    String::new()
+    use crate::i18n::get_string;
+    match visibility {
+        UiFieldVisibility::Shown => get_string(locale, "visibility.visible"),
+        UiFieldVisibility::Hidden => get_string(locale, "visibility.hidden"),
+        UiFieldVisibility::Scopes(scopes) if scopes.is_empty() => {
+            get_string(locale, "visibility.no_groups")
+        }
+        UiFieldVisibility::Scopes(scopes) => scopes.join(", "),
+        _ => get_string(locale, "visibility.unknown"),
+    }
 }
 
 /// One alternate look at a `Component::Preview` — a per-variant view

@@ -109,7 +109,16 @@ impl VauchiError {
     /// Hosts branch on this — never on error text — to offer their native
     /// start-fresh recovery hint (ADR-045 Amendment 1).
     pub fn is_unreadable_storage(&self) -> bool {
-        false
+        let Self::Storage(storage_err) = self else {
+            return false;
+        };
+        match storage_err {
+            StorageError::Encryption(_) | StorageError::InvalidData(_) => true,
+            StorageError::Database(rusqlite::Error::SqliteFailure(ffi_err, _)) => {
+                ffi_err.code == rusqlite::ErrorCode::NotADatabase
+            }
+            _ => false,
+        }
     }
 }
 

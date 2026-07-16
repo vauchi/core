@@ -872,6 +872,72 @@ fn test_bidirectional_field_additions() {
     assert_eq!(applied_on_a.len(), 1); // email from B
 }
 
+/// Visibility overrides are per (contact, field): two overrides for the
+/// same contact but different fields are independent changes. A
+/// per-contact conflict key would drop the older-timestamped one as
+/// stale under reordered delivery, silently diverging the devices.
+// @internal
+#[test]
+fn visibility_changes_for_distinct_fields_apply_under_reorder() {
+    let storage_a = create_test_storage();
+    let storage_b = create_test_storage();
+    let master_seed = [0x42u8; 32];
+    let signing_key = SigningKeyPair::from_seed(&master_seed);
+
+    let device_a = create_test_device(&master_seed, 0, "Device A");
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+
+    let device_b_for_a = create_test_device(&master_seed, 1, "Device B");
+    let mut registry_a = create_test_registry(&master_seed, &device_a);
+    registry_a
+        .add_device(device_b_for_a.to_registered(&master_seed), &signing_key)
+        .unwrap();
+
+    let device_a_for_b = create_test_device(&master_seed, 0, "Device A");
+    let mut registry_b = create_test_registry(&master_seed, &device_b);
+    registry_b
+        .add_device(device_a_for_b.to_registered(&master_seed), &signing_key)
+        .unwrap();
+
+    let mut orchestrator_a = DeviceSyncOrchestrator::new(&storage_a, device_a, registry_a);
+    let mut orchestrator_b = DeviceSyncOrchestrator::new(&storage_b, device_b, registry_b);
+
+    let email_change = SyncItem::VisibilityChanged {
+        contact_id: "contact-bob".to_string(),
+        field_id: "field-email".to_string(),
+        is_visible: true,
+        timestamp: 1000,
+    };
+    let phone_change = SyncItem::VisibilityChanged {
+        contact_id: "contact-bob".to_string(),
+        field_id: "field-phone".to_string(),
+        is_visible: false,
+        timestamp: 1001,
+    };
+    orchestrator_a
+        .record_local_change(email_change.clone())
+        .unwrap();
+    orchestrator_a
+        .record_local_change(phone_change.clone())
+        .unwrap();
+
+    // Reordered delivery: the newer phone change arrives first.
+    let applied_first = orchestrator_b
+        .process_incoming(vec![phone_change], &[0x99u8; 32])
+        .unwrap();
+    let applied_second = orchestrator_b
+        .process_incoming(vec![email_change], &[0x99u8; 32])
+        .unwrap();
+
+    assert_eq!(applied_first.len(), 1, "newer field change applies");
+    assert_eq!(
+        applied_second.len(),
+        1,
+        "older timestamp for a DIFFERENT field must still apply; \
+         a per-contact conflict key would drop it as stale"
+    );
+}
+
 /// Scenario: Offline changes are queued
 /// Changes made while offline should be stored for later sync
 // @scenario: device_management :: Offline changes sync when reconnected

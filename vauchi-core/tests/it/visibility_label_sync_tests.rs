@@ -133,6 +133,64 @@ fn group_mutations_journal_complete_state_for_linked_devices() {
     ));
 }
 
+/// A per-contact visibility override set on one device must be journaled
+/// for the other linked devices. Otherwise the sibling device keeps
+/// computing the field hidden for that contact and its repropagation
+/// emits an explicit removal — the field vanishes from the contact's
+/// view (RG-5/RG-10 certification defect found by the six-device
+/// wire-inspection E2E).
+// @internal
+#[test]
+fn contact_visibility_override_is_journaled_for_linked_devices() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    const SEED: [u8; 32] = [11u8; 32];
+    let signing = SigningKeyPair::from_seed(&SEED);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
+        &signing,
+    );
+    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet_id = *tablet.device_id();
+    registry
+        .add_device_unsigned(tablet.to_registered(&SEED))
+        .unwrap();
+    vauchi
+        .storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+
+    vauchi
+        .set_contact_visibility_override("contact-bob", "field-email", true)
+        .unwrap();
+
+    let orchestrator = DeviceSyncOrchestrator::load(
+        vauchi.storage(),
+        vauchi.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap();
+    assert!(
+        orchestrator
+            .pending_for_device(&tablet_id)
+            .iter()
+            .any(|item| matches!(
+                item,
+                SyncItem::VisibilityChanged {
+                    contact_id,
+                    field_id,
+                    is_visible: true,
+                    ..
+                } if contact_id == "contact-bob" && field_id == "field-email"
+            )),
+        "set_contact_visibility_override must journal SyncItem::VisibilityChanged \
+         for linked devices, got {:?}",
+        orchestrator.pending_for_device(&tablet_id)
+    );
+}
+
 /// Tests that groups sync across the user's own devices without entering contact data.
 ///
 /// Feature: visibility_labels.feature

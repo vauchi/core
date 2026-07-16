@@ -86,7 +86,7 @@ pub use component::{
     A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, IndicatorKind,
     InfoItem, InputType, Item, ListItemAction, ListItemActionKind, PreviewVariant, QrMode,
     ScanQuality, Section, SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem,
-    UiFieldVisibility, VisibilityMode,
+    UiFieldVisibility, VisibilityMode, visibility_label,
 };
 pub use contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary, SharedInfoView,

@@ -14,6 +14,8 @@
 use serde::{Deserialize, Serialize};
 use vauchi_core::FieldType;
 
+use crate::i18n::Locale;
+
 use super::A11y;
 
 /// A contact field as displayed in the UI.
@@ -81,6 +83,17 @@ pub enum UiFieldVisibility {
     Shown,
     Hidden,
     Scopes(Vec<String>),
+}
+
+/// Resolve the display copy for a field's visibility state.
+///
+/// Frontends render the result verbatim (`Field.visibility_label`);
+/// the `UiFieldVisibility` discriminant selects only native color
+/// (ADR-043/044 — copy never derives from the discriminant in a
+/// renderer).
+pub fn visibility_label(visibility: &UiFieldVisibility, locale: Locale) -> String {
+    let _ = (visibility, locale);
+    String::new()
 }
 
 /// One alternate look at a `Component::Preview` — a per-variant view

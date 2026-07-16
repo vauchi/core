@@ -176,13 +176,11 @@ fn apply_sync_personal_note_changed_persists_note() {
         .unwrap();
 
     assert_eq!(applied, 1);
-    let note_bytes = wb
-        .storage()
-        .contacts()
-        .load_personal_notes(&bob_id)
-        .unwrap();
-    let note = String::from_utf8(note_bytes.unwrap_or_default()).unwrap();
-    assert_eq!(note, "met at conference");
+    // Notes are encrypted at rest (ADR-021): the contract is that the
+    // synced note decrypts through the public read path, not that the raw
+    // stored bytes equal the plaintext.
+    let note = wb.read_personal_note(&bob_id).unwrap();
+    assert_eq!(note.as_deref(), Some("met at conference"));
 }
 
 // ============================================================

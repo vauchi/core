@@ -22,6 +22,9 @@ impl Vauchi {
     ///
     /// Encrypts the plaintext note using the contact's shared key.
     /// Frontends MUST use this instead of calling crypto::encrypt directly.
+    ///
+    /// The change is journaled for linked devices — otherwise the note
+    /// stays device-local and the owner-private state diverges (RG-10).
     pub fn add_personal_note(&self, contact_id: &str, note_text: &str) -> VauchiResult<()> {
         use crate::crypto::encrypt;
 
@@ -38,6 +41,11 @@ impl Vauchi {
         self.storage
             .contacts()
             .save_personal_notes(contact_id, &encrypted)?;
+        self.record_sync_item(crate::sync::SyncItem::PersonalNoteChanged {
+            contact_id: contact_id.to_string(),
+            note: note_text.to_string(),
+            timestamp: self.now_timestamp(),
+        });
         Ok(())
     }
 

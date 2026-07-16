@@ -400,6 +400,7 @@ mod sync_card_update_tests;
 mod sync_correctness_tests;
 mod sync_delta_tests;
 mod sync_device_conflict_tests;
+mod sync_device_convergence_tests;
 mod sync_device_orchestrator_tests;
 mod sync_device_sync_tests;
 mod sync_progress_tests;

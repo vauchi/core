@@ -207,16 +207,25 @@ impl Vauchi {
     /// Sets a per-contact visibility override for a field.
     ///
     /// Per-contact overrides take precedence over label-based visibility.
+    /// The override is journaled for linked devices — otherwise a sibling
+    /// device keeps computing the field hidden for this contact and its
+    /// repropagation emits an explicit field removal.
     pub fn set_contact_visibility_override(
         &self,
         contact_id: &str,
         field_id: &str,
         is_visible: bool,
     ) -> VauchiResult<()> {
-        Ok(self
-            .storage
+        self.storage
             .labels()
-            .save_contact_override(contact_id, field_id, is_visible)?)
+            .save_contact_override(contact_id, field_id, is_visible)?;
+        self.record_sync_item(crate::sync::SyncItem::VisibilityChanged {
+            contact_id: contact_id.to_string(),
+            field_id: field_id.to_string(),
+            is_visible,
+            timestamp: self.now_timestamp(),
+        });
+        Ok(())
     }
 
     /// Removes a per-contact visibility override.

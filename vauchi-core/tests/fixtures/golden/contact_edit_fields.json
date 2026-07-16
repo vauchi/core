@@ -33,6 +33,7 @@
                 "Family"
               ]
             },
+            "visibility_label": "Family",
             "a11y": {
               "label": "Mobile: +1-555-0100",
               "hint": "Visible to specific groups",
@@ -51,6 +52,7 @@
                 "Work"
               ]
             },
+            "visibility_label": "Friends, Work",
             "a11y": {
               "label": "Work: alice@example.com",
               "hint": "Visible to specific groups",

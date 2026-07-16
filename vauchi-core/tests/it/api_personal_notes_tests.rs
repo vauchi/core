@@ -89,3 +89,79 @@ fn test_delete_note_clears() {
     let note = wb.read_personal_note(&contact_id).unwrap();
     assert!(note.is_none(), "Deleted note must return None");
 }
+
+// @scenario: sync_updates :: Personal notes converge across linked devices
+#[test]
+fn note_mutations_journal_for_linked_devices() {
+    let (wb, contact_id) = setup_with_contact();
+    let (registry, tablet_id) = install_linked_registry(&wb);
+
+    wb.add_personal_note(&contact_id, "met at conference")
+        .unwrap();
+
+    let orchestrator = vauchi_core::api::sync::DeviceSyncOrchestrator::load(
+        wb.storage(),
+        wb.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap();
+    let pending = orchestrator.pending_for_device(&tablet_id);
+    assert!(
+        pending.iter().any(|item| matches!(
+            item,
+            vauchi_core::sync::SyncItem::PersonalNoteChanged {
+                contact_id: id,
+                note,
+                ..
+            } if id == &contact_id && note == "met at conference"
+        )),
+        "add_personal_note must journal PersonalNoteChanged for linked devices, \
+         got {pending:?}"
+    );
+}
+
+// @scenario: sync_updates :: Personal notes converge across linked devices
+#[test]
+fn applied_synced_note_is_readable() {
+    let (wb, contact_id) = setup_with_contact();
+
+    let applied = wb
+        .apply_sync_items(vec![vauchi_core::sync::SyncItem::PersonalNoteChanged {
+            contact_id: contact_id.clone(),
+            note: "synced from my tablet".to_string(),
+            timestamp: 1000,
+        }])
+        .unwrap();
+    assert_eq!(applied, 1);
+
+    let note = wb.read_personal_note(&contact_id).unwrap();
+    assert_eq!(
+        note.as_deref(),
+        Some("synced from my tablet"),
+        "a note received via device sync must decrypt through read_personal_note"
+    );
+}
+
+/// Copies the helper from api_tags_tests.rs: registers a second device so
+/// record_sync_item has a peer to journal for.
+fn install_linked_registry(wb: &Vauchi) -> (vauchi_core::identity::DeviceRegistry, [u8; 32]) {
+    use vauchi_core::crypto::SigningKeyPair;
+    use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
+
+    const SEED: [u8; 32] = [9u8; 32];
+    let signing = SigningKeyPair::from_seed(&SEED);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
+        &signing,
+    );
+    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet_id = *tablet.device_id();
+    registry
+        .add_device_unsigned(tablet.to_registered(&SEED))
+        .unwrap();
+    wb.storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+    (registry, tablet_id)
+}

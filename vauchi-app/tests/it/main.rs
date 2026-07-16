@@ -111,6 +111,7 @@ mod recovery_claim_review_i18n_tests;
 mod recovery_help_i18n_tests;
 mod recovery_status_i18n_tests;
 mod render_context_tests;
+mod result_routing_wiring_tests;
 mod settings_more_parity_tests;
 mod settings_profile_i18n_tests;
 mod settings_render_context_tests;

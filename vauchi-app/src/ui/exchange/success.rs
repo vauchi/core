@@ -82,6 +82,10 @@ pub fn build_exchange_success_screen(
                 label: label.clone(),
                 value: value.clone(),
                 icon: icon_for_field_type(field_type).to_string(),
+                visibility_label: crate::ui::component::visibility_label(
+                    &UiFieldVisibility::Shown,
+                    locale,
+                ),
                 visibility: UiFieldVisibility::Shown,
                 a11y: None,
             })

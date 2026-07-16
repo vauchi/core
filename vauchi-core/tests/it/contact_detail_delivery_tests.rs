@@ -31,6 +31,7 @@ fn sample_fields() -> Vec<Field> {
         value: "+41-44-111-2233".into(),
         icon: "phone".into(),
 
+        visibility_label: String::new(),
         visibility: UiFieldVisibility::Shown,
         a11y: None,
     }]

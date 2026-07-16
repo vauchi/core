@@ -73,6 +73,10 @@ impl AppEngine {
                                 field_type: field_type_str,
                                 label: f.label().to_string(),
                                 value: f.value().to_string(),
+                                visibility_label: crate::ui::component::visibility_label(
+                                    &UiFieldVisibility::Shown,
+                                    render_context.resolved_locale(),
+                                ),
                                 visibility: UiFieldVisibility::Shown,
                                 a11y: None,
                             }
@@ -121,7 +125,11 @@ impl AppEngine {
                         .collect();
 
                     // Build shared info (my card as seen by this contact)
-                    let shared_info = Self::build_shared_info(vauchi, contact_id);
+                    let shared_info = Self::build_shared_info(
+                        vauchi,
+                        contact_id,
+                        render_context.resolved_locale(),
+                    );
 
                     let trust_level = contact.trust_level().to_string();
                     let trust_level_enum = contact.trust_level();

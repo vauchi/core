@@ -92,6 +92,7 @@ pub(super) fn build_field_preview_screen(
                     },
                     role: None,
                 }),
+                visibility_label: crate::ui::component::visibility_label(&visibility, locale),
                 visibility,
             }
         })

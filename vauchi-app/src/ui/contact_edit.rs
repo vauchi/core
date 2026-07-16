@@ -114,6 +114,7 @@ impl ContactEditEngine {
                 },
                 role: None,
             }),
+            visibility_label: crate::ui::component::visibility_label(&visibility, self.locale),
             visibility,
         }
     }

@@ -204,6 +204,7 @@ fn sample_field() -> Field {
         label: "Phone".to_string(),
         value: "+1234567890".to_string(),
         icon: "phone".to_string(),
+        visibility_label: String::new(),
         visibility: UiFieldVisibility::Shown,
         a11y: None,
     }
@@ -214,6 +215,7 @@ fn sample_field() -> Field {
 /// deny-list scan can see (and reject) that tag.
 fn sample_scoped_field() -> Field {
     Field {
+        visibility_label: String::new(),
         visibility: UiFieldVisibility::Scopes(vec!["work".to_string()]),
         ..sample_field()
     }

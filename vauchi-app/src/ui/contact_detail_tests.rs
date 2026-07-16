@@ -32,6 +32,7 @@ fn sample_fields() -> Vec<Field> {
         label: "Mobile".into(),
         value: "+41 79 123 45 67".into(),
         icon: crate::ui::component::icon_for_field_type("Phone").into(),
+        visibility_label: String::new(),
         visibility: UiFieldVisibility::Shown,
         a11y: None,
     }]
@@ -47,6 +48,7 @@ fn sample_shared_info() -> SharedInfoView {
                 label: "Work Email".into(),
                 value: "bob@work.com".into(),
                 icon: crate::ui::component::icon_for_field_type("Email").into(),
+                visibility_label: String::new(),
                 visibility: UiFieldVisibility::Shown,
                 a11y: None,
             },
@@ -56,6 +58,7 @@ fn sample_shared_info() -> SharedInfoView {
                 label: "Personal".into(),
                 value: "+41 79 999 88 77".into(),
                 icon: crate::ui::component::icon_for_field_type("Phone").into(),
+                visibility_label: String::new(),
                 visibility: UiFieldVisibility::Hidden,
                 a11y: None,
             },

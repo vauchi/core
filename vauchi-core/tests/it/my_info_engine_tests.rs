@@ -162,6 +162,7 @@ fn sample_shared_info_view() -> SharedInfoView {
                 value: "+41 79 123 45 67".into(),
                 icon: "phone".into(),
 
+                visibility_label: String::new(),
                 visibility: UiFieldVisibility::Shown,
                 a11y: None,
             },
@@ -172,6 +173,7 @@ fn sample_shared_info_view() -> SharedInfoView {
                 value: "me@example.com".into(),
                 icon: "envelope".into(),
 
+                visibility_label: String::new(),
                 visibility: UiFieldVisibility::Hidden,
                 a11y: None,
             },

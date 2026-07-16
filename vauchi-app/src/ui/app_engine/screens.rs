@@ -76,7 +76,11 @@ impl AppEngine {
                         .flatten()
                         .map(|c| c.display_name().to_string())
                         .unwrap_or_else(|| contact_id.to_string());
-                    let shared_info = Self::build_shared_info(vauchi, contact_id);
+                    let shared_info = Self::build_shared_info(
+                        vauchi,
+                        contact_id,
+                        render_context.resolved_locale(),
+                    );
                     let mut engine = MyInfoEngine::new(MyInfoProgress::default()).with_view_mode(
                         crate::ui::my_info::MyInfoViewMode::PreviewAs { contact_name },
                     );
@@ -666,7 +670,11 @@ impl AppEngine {
     }
 
     /// Builds a SharedInfoView for a contact — my fields as visible to them.
-    pub(super) fn build_shared_info(vauchi: &Vauchi, contact_id: &str) -> Option<SharedInfoView> {
+    pub(super) fn build_shared_info(
+        vauchi: &Vauchi,
+        contact_id: &str,
+        locale: crate::i18n::Locale,
+    ) -> Option<SharedInfoView> {
         let own_card = vauchi.own_card().ok()??;
 
         // Determine the display name this contact sees
@@ -688,17 +696,19 @@ impl AppEngine {
                     .get_effective_field_visibility(contact_id, f.id())
                     .unwrap_or(true);
                 let field_type_str = format!("{:?}", f.field_type());
+                let visibility = if is_visible {
+                    UiFieldVisibility::Shown
+                } else {
+                    UiFieldVisibility::Hidden
+                };
                 Field {
                     id: f.id().to_string(),
                     icon: crate::ui::component::icon_for_field_type(&field_type_str).into(),
                     field_type: field_type_str,
                     label: f.label().to_string(),
                     value: f.value().to_string(),
-                    visibility: if is_visible {
-                        UiFieldVisibility::Shown
-                    } else {
-                        UiFieldVisibility::Hidden
-                    },
+                    visibility_label: crate::ui::component::visibility_label(&visibility, locale),
+                    visibility,
                     a11y: None,
                 }
             })

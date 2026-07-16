@@ -41,6 +41,11 @@ pub struct Field {
     #[serde(default)]
     pub icon: String,
     pub visibility: UiFieldVisibility,
+    /// Core-resolved localized display copy for `visibility` (see
+    /// [`visibility_label`]). Frontends render this verbatim; the
+    /// `visibility` discriminant selects only native color.
+    #[serde(default)]
+    pub visibility_label: String,
     #[serde(default)]
     pub a11y: Option<A11y>,
 }
@@ -100,7 +105,6 @@ pub fn visibility_label(visibility: &UiFieldVisibility, locale: Locale) -> Strin
             get_string(locale, "visibility.no_groups")
         }
         UiFieldVisibility::Scopes(scopes) => scopes.join(", "),
-        _ => get_string(locale, "visibility.unknown"),
     }
 }
 
@@ -186,6 +190,7 @@ mod build_visible_fields_tests {
             label: id.into(),
             value: format!("value-{id}"),
             icon: icon_for_field_type("text").into(),
+            visibility_label: String::new(),
             visibility,
             a11y: None,
         }

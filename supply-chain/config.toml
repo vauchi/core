@@ -238,6 +238,18 @@ criteria = "safe-to-deploy"
 version = "4.1.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.defmt]]
+version = "1.1.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.defmt-macros]]
+version = "1.1.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.defmt-parser]]
+version = "1.0.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.der]]
 version = "0.8.1"
 criteria = "safe-to-deploy"
@@ -260,6 +272,14 @@ criteria = "safe-to-run"
 
 [[exemptions.env_filter]]
 version = "0.1.4"
+criteria = "safe-to-deploy"
+
+[[exemptions.env_filter]]
+version = "2.0.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.env_logger]]
+version = "0.11.11"
 criteria = "safe-to-deploy"
 
 [[exemptions.fancy-regex]]
@@ -416,6 +436,14 @@ criteria = "safe-to-deploy"
 
 [[exemptions.itertools]]
 version = "0.13.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.jiff]]
+version = "0.2.32"
+criteria = "safe-to-deploy"
+
+[[exemptions.jiff-static]]
+version = "0.2.32"
 criteria = "safe-to-deploy"
 
 [[exemptions.jni-sys]]

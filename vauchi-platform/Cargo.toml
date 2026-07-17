@@ -69,12 +69,12 @@ crc32fast = "1.4"
 # QR code generation (replaces ZXing on Android, used for all platforms)
 qrcode = { version = "0.14", default-features = false }
 
-# Native log backends for the mobile bridge (logging.rs). Mobile-only —
-# excluded from macOS/Linux/Windows targets by [target.'cfg(...)'].
+# Native log backends for the mobile/desktop bridge (logging.rs).
+# Excluded from Linux/Windows targets by [target.'cfg(...)'].
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.14"
 
-[target.'cfg(target_os = "ios")'.dependencies]
+[target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
 oslog = "0.2"
 
 [[bin]]

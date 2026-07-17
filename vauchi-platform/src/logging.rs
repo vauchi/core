@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Rust -> native log bridge (Android Logcat / iOS os_log).
+//! Rust -> native log bridge (Android Logcat / iOS+macOS os_log).
 //!
 //! Permanent replacement for the temporary `android_logger`/`oslog`
 //! bridges used to diagnose the BLE handshake failure
@@ -60,7 +60,7 @@ fn install() {
     );
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 fn install() {
     // Double-init would return Err; LOG_INIT already prevents that, but
     // oslog's own init() can also be called independently by a test
@@ -70,7 +70,7 @@ fn install() {
         .init();
 }
 
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
+#[cfg(not(any(target_os = "android", target_os = "ios", target_os = "macos")))]
 fn install() {}
 
 // INLINE_TEST_REQUIRED: LogInit and should_install() are private to this

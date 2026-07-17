@@ -567,9 +567,12 @@ impl Vauchi {
         let ts = self.now_timestamp();
         for label in &changed_labels {
             match card.fields().iter().find(|field| field.label() == label) {
-                Some(field) => self.record_sync_item(crate::sync::SyncItem::CardUpdated {
-                    field_label: label.clone(),
-                    new_value: field.value().to_string(),
+                Some(field) => self.record_sync_item(crate::sync::SyncItem::CardFieldSynced {
+                    field: field.clone(),
+                    field_visibility: card
+                        .field_visibility()
+                        .contains(field.id())
+                        .then(|| card.field_visibility().get(field.id()).clone()),
                     timestamp: ts,
                 }),
                 None => self.record_sync_item(crate::sync::SyncItem::CardFieldRemoved {
@@ -587,8 +590,6 @@ impl Vauchi {
     /// fallback, so "unruled" stays unambiguous — Decision 2,
     /// 2026-07-05-ungrouped-contacts-default-open).
     pub fn add_own_field(&self, field: ContactField) -> VauchiResult<()> {
-        let label = field.label().to_string();
-        let value = field.value().to_string();
         let field_id = field.id().to_string();
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.add_field_to_own_card(field)?;
@@ -596,9 +597,24 @@ impl Vauchi {
             self.set_own_field_public(&field_id)?;
         }
         self.mark_own_card_repropagate()?;
-        self.record_sync_item(crate::sync::SyncItem::CardUpdated {
-            field_label: label,
-            new_value: value,
+        let card = self
+            .storage
+            .contacts()
+            .load_own_card()?
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let synced_field = card
+            .fields()
+            .iter()
+            .find(|current| current.id() == field_id)
+            .cloned()
+            .ok_or_else(|| VauchiError::InvalidState("own field was not saved".into()))?;
+        let field_visibility = card
+            .field_visibility()
+            .contains(&field_id)
+            .then(|| card.field_visibility().get(&field_id).clone());
+        self.record_sync_item(crate::sync::SyncItem::CardFieldSynced {
+            field: synced_field,
+            field_visibility,
             timestamp: self.now_timestamp(),
         });
         Ok(())

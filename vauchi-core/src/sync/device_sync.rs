@@ -593,6 +593,25 @@ pub enum SyncItem {
         /// Timestamp of unarchival.
         timestamp: u64,
     },
+
+    /// Own contact-card field with its stable identity.
+    ///
+    /// New linked-device writes use this form so per-contact visibility
+    /// rules, which are keyed by field id, remain valid on every sibling.
+    ///
+    /// This is appended to preserve the declaration order of established
+    /// variants for any future non-JSON storage codec.
+    CardFieldSynced {
+        /// Complete field, including its stable identifier.
+        field: crate::contact_card::ContactField,
+        /// Explicit own-card visibility for this field, if configured.
+        ///
+        /// `None` retains the privacy-first unruled state rather than the
+        /// `VisibilityRules::get` compatibility fallback.
+        field_visibility: Option<crate::visibility::FieldVisibility>,
+        /// Timestamp of update.
+        timestamp: u64,
+    },
 }
 
 impl SyncItem {
@@ -604,6 +623,7 @@ impl SyncItem {
             SyncItem::ContactCardUpdated { timestamp, .. } => *timestamp,
             SyncItem::DeviceRegistryChanged { version, .. } => *version,
             SyncItem::CardUpdated { timestamp, .. } => *timestamp,
+            SyncItem::CardFieldSynced { timestamp, .. } => *timestamp,
             SyncItem::CardFieldRemoved { timestamp, .. } => *timestamp,
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,
             SyncItem::GroupChanged { timestamp, .. } => *timestamp,

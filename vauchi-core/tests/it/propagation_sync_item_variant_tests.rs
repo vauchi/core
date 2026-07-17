@@ -19,6 +19,7 @@ use vauchi_core::identity::Identity;
 use vauchi_core::storage::DeletionState;
 use vauchi_core::sync::device_sync::TagSyncData;
 use vauchi_core::sync::{GroupSyncData, ImportedContactSyncData, SyncItem};
+use vauchi_core::visibility::FieldVisibility;
 
 fn make_vauchi() -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
@@ -571,6 +572,67 @@ fn apply_sync_empty_card_update_does_not_delete_own_card_field() {
         .find(|field| field.label() == "email")
         .expect("only CardFieldRemoved may delete a field");
     assert_eq!(email.value(), "alice@example.com");
+}
+
+// @scenario: sync_updates :: Own-card field identity and private annotations converge across linked devices
+#[test]
+fn apply_sync_card_field_synced_replaces_same_label_with_stable_field_identity() {
+    let wb = make_vauchi();
+    let stale_field = ContactField::new(FieldType::Custom, "handle", "old-alice", now());
+    let stale_id = stale_field.id().to_string();
+    wb.add_own_field(stale_field).unwrap();
+
+    let synced_field = ContactField::new(FieldType::Custom, "handle", "alice", now())
+        .with_note("only on my linked devices".to_string());
+    let synced_id = synced_field.id().to_string();
+
+    let applied = wb
+        .apply_sync_items(vec![SyncItem::CardFieldSynced {
+            field: synced_field,
+            field_visibility: Some(FieldVisibility::Everyone),
+            timestamp: now(),
+        }])
+        .unwrap();
+
+    assert_eq!(applied, 1);
+    let card = wb.own_card().unwrap().unwrap();
+    let fields: Vec<_> = card
+        .fields()
+        .iter()
+        .filter(|field| field.label() == "handle")
+        .collect();
+    assert_eq!(
+        fields.len(),
+        1,
+        "the stale same-label field must be replaced"
+    );
+    assert_eq!(fields[0].id(), synced_id);
+    assert_ne!(fields[0].id(), stale_id);
+    assert_eq!(fields[0].value(), "alice");
+    assert_eq!(fields[0].note(), Some("only on my linked devices"));
+    assert!(card.is_field_shown(&synced_id));
+}
+
+// @scenario: sync_updates :: New fields retain the owner's privacy-first default on linked devices
+#[test]
+fn apply_sync_card_field_synced_without_visibility_keeps_field_hidden() {
+    let wb = make_vauchi();
+    let field = ContactField::new(FieldType::Custom, "private handle", "alice", now());
+    let field_id = field.id().to_string();
+
+    wb.apply_sync_items(vec![SyncItem::CardFieldSynced {
+        field,
+        field_visibility: None,
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(card.fields().iter().any(|current| current.id() == field_id));
+    assert!(
+        !card.is_field_shown(&field_id),
+        "an unruled linked-device field must remain hidden by default"
+    );
 }
 
 // @scenario: sync_updates :: Own-card field removals converge across linked devices

@@ -579,6 +579,43 @@ impl Vauchi {
                         None => Err(VauchiError::IdentityNotInitialized),
                     }
                 }
+                SyncItem::CardFieldSynced {
+                    ref field,
+                    ref field_visibility,
+                    ..
+                } => match self.storage.contacts().load_own_card()? {
+                    Some(mut card) => {
+                        if let Some(existing_id) = card
+                            .fields()
+                            .iter()
+                            .find(|existing| {
+                                existing.label() == field.label() && existing.id() != field.id()
+                            })
+                            .map(|existing| existing.id().to_string())
+                        {
+                            card.remove_field(&existing_id).map_err(VauchiError::from)?;
+                        }
+                        card.add_field(field.clone()).map_err(VauchiError::from)?;
+                        match field_visibility {
+                            Some(crate::visibility::FieldVisibility::Everyone) => {
+                                card.field_visibility_mut().set_everyone(field.id());
+                            }
+                            Some(crate::visibility::FieldVisibility::Contacts(contacts)) => {
+                                card.field_visibility_mut()
+                                    .set_contacts(field.id(), contacts.clone());
+                            }
+                            Some(crate::visibility::FieldVisibility::Nobody) => {
+                                card.field_visibility_mut().set_nobody(field.id());
+                            }
+                            None => card.field_visibility_mut().remove(field.id()),
+                        }
+                        self.storage
+                            .contacts()
+                            .save_own_card(&card)
+                            .map_err(|error| error.into())
+                    }
+                    None => Err(VauchiError::IdentityNotInitialized),
+                },
                 SyncItem::CardFieldRemoved {
                     ref field_label, ..
                 } => match self.storage.contacts().load_own_card()? {
@@ -823,6 +860,9 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
         SyncItem::DeviceRegistryChanged { .. } => None,
         SyncItem::CardUpdated { field_label, .. } => Some(VauchiEvent::OwnCardUpdated {
             changed_fields: vec![field_label.clone()],
+        }),
+        SyncItem::CardFieldSynced { field, .. } => Some(VauchiEvent::OwnCardUpdated {
+            changed_fields: vec![field.label().to_string()],
         }),
         SyncItem::CardFieldRemoved { field_label, .. } => Some(VauchiEvent::OwnCardUpdated {
             changed_fields: vec![field_label.clone()],

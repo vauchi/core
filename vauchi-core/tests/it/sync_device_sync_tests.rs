@@ -5,8 +5,9 @@
 //! Tests for sync::device_sync
 //! Extracted from device_sync.rs
 
-use vauchi_core::contact_card::ContactCard;
+use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::sync::*;
+use vauchi_core::visibility::FieldVisibility;
 use vauchi_core::*;
 
 fn create_test_contact() -> Contact {
@@ -249,6 +250,23 @@ fn test_sync_item_serialization() {
     let restored = SyncItem::from_json(&json).unwrap();
 
     assert_eq!(item.timestamp(), restored.timestamp());
+}
+
+// @scenario: sync_updates :: New own-card fields preserve identity across linked devices
+#[test]
+fn card_field_synced_roundtrips_with_stable_identity() {
+    let item = SyncItem::CardFieldSynced {
+        field: ContactField::new(FieldType::Custom, "handle", "alice", 5001)
+            .with_note("linked-device only".to_string()),
+        field_visibility: Some(FieldVisibility::Nobody),
+        timestamp: 5001,
+    };
+
+    let json = item.to_json();
+    let restored = SyncItem::from_json(&json).unwrap();
+
+    assert_eq!(restored, item);
+    assert!(json.contains("CardFieldSynced"));
 }
 
 // @scenario: sync_updates :: Own-card field removals converge across linked devices

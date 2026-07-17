@@ -139,6 +139,55 @@ fn test_vauchi_add_own_field() {
     assert!(card.fields().iter().any(|f| f.label() == "phone"));
 }
 
+// @scenario: sync_updates :: New own-card fields preserve identity across linked devices
+#[test]
+fn test_vauchi_add_own_field_journals_complete_stable_field() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    const SEED: [u8; 32] = [13u8; 32];
+    let signing = SigningKeyPair::from_seed(&SEED);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
+        &signing,
+    );
+    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet_id = *tablet.device_id();
+    registry
+        .add_device_unsigned(tablet.to_registered(&SEED))
+        .unwrap();
+    wb.storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+    let mut flags = wb.load_settings_flags().unwrap();
+    flags.new_field_default_visible = true;
+    wb.save_settings_flags(&flags).unwrap();
+
+    let field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0)
+        .with_note("my linked-device note".to_string());
+    let field_id = field.id().to_string();
+    wb.add_own_field(field).unwrap();
+
+    let orchestrator = DeviceSyncOrchestrator::load(
+        wb.storage(),
+        wb.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap();
+    assert!(matches!(
+        orchestrator.pending_for_device(&tablet_id).last(),
+        Some(SyncItem::CardFieldSynced {
+            field,
+            field_visibility: Some(vauchi_core::visibility::FieldVisibility::Everyone),
+            ..
+        })
+            if field.id() == field_id
+                && field.label() == "phone"
+                && field.note() == Some("my linked-device note")
+    ));
+}
+
 // @internal
 #[test]
 fn test_vauchi_remove_own_field() {

@@ -527,6 +527,17 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
+    /// Personal note for a contact was removed.
+    ///
+    /// This tombstone shares the note's conflict key so an older note update
+    /// cannot restore owner-private data after it was deleted.
+    PersonalNoteRemoved {
+        /// Contact whose note was removed.
+        contact_id: String,
+        /// Timestamp of change (milliseconds since UNIX epoch).
+        timestamp: u64,
+    },
+
     /// Per-field private note for a contact's shared field was created or updated.
     ///
     /// Field notes are private — never shared with the contact.
@@ -634,6 +645,7 @@ impl SyncItem {
             SyncItem::DeletionScheduled { timestamp, .. } => *timestamp,
             SyncItem::DeletionCancelled { timestamp, .. } => *timestamp,
             SyncItem::PersonalNoteChanged { timestamp, .. } => *timestamp,
+            SyncItem::PersonalNoteRemoved { timestamp, .. } => *timestamp,
             SyncItem::ContactFieldNoteChanged { timestamp, .. } => *timestamp,
             SyncItem::ProposalTrustChanged { timestamp, .. } => *timestamp,
             SyncItem::ImportedContactAdded { timestamp, .. } => *timestamp,

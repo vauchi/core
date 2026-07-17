@@ -32,7 +32,8 @@ use crate::api::sync_controller::SyncController;
 use crate::contact::Contact;
 use crate::identity::Identity;
 use crate::network::mailbox_token::{
-    batch_register_tokens, compute_self_token, current_day_epoch, token_hex,
+    batch_register_tokens_with_device_sync, compute_device_sync_token, compute_self_token,
+    current_day_epoch, token_hex,
 };
 use crate::network::{
     HttpTransportAdapter, MessagePayload, RegisterMailbox, Transport, create_envelope,
@@ -63,11 +64,12 @@ impl Vauchi {
 
         // Build padded token batches (256 per batch, shuffled). `own_pubkey`
         // keys our directional receive tokens to our identity.
-        let batches = batch_register_tokens(
+        let batches = batch_register_tokens_with_device_sync(
             self.rng.as_ref(),
             &contact_keys,
             identity.signing_public_key(),
             master_seed,
+            identity.device_id(),
             day,
             0,
         );
@@ -88,15 +90,20 @@ impl Vauchi {
 
     /// Self-token hexes for today and ±1 day (clock-drift tolerance).
     ///
-    /// These identify inbound device-sync blobs: they were sent to
-    /// `compute_self_token(master_seed, day)`, which every same-seed
-    /// device can recompute and registered for via [`Self::register_tokens`].
+    /// These identify inbound device-sync blobs sent to this device's opaque
+    /// recipient-specific mailbox, and the legacy shared mailbox while
+    /// rolling out the recipient-specific route.
     pub(super) fn self_token_hexes(&self, identity: &Identity) -> HashSet<String> {
         let day = current_day_epoch(self.clock.unix_seconds());
         let seed = identity.master_seed();
         [day.saturating_sub(1), day, day.saturating_add(1)]
             .iter()
-            .map(|d| token_hex(&compute_self_token(seed, *d)))
+            .flat_map(|d| {
+                [
+                    token_hex(&compute_self_token(seed, *d)),
+                    token_hex(&compute_device_sync_token(seed, identity.device_id(), *d)),
+                ]
+            })
             .collect()
     }
 
@@ -280,22 +287,31 @@ mod tests {
         }
     }
 
-    /// `self_token_hexes` yields exactly the today/±1-day self-tokens.
+    /// `self_token_hexes` accepts legacy and recipient-specific today/±1-day
+    /// tokens during the mailbox migration window.
     // @internal
     #[test]
-    fn self_token_hexes_covers_three_days() {
+    fn self_token_hexes_covers_legacy_and_recipient_specific_days() {
         let mut b = Vauchi::in_memory().unwrap();
         b.create_identity("Alice").unwrap();
         let identity = b.identity().unwrap();
 
         let tokens = b.self_token_hexes(identity);
-        assert_eq!(tokens.len(), 3, "today + yesterday + tomorrow");
+        assert_eq!(tokens.len(), 6, "legacy + recipient-specific today/±1 days");
 
         let day = current_day_epoch(b.clock.unix_seconds());
         let seed = identity.master_seed();
         for d in [day - 1, day, day + 1] {
-            let expected = token_hex(&compute_self_token(seed, d));
-            assert!(tokens.contains(&expected), "missing self-token for day {d}");
+            let device_token = token_hex(&compute_device_sync_token(seed, identity.device_id(), d));
+            assert!(
+                tokens.contains(&device_token),
+                "missing device-specific self-token for day {d}"
+            );
+            let legacy_token = token_hex(&compute_self_token(seed, d));
+            assert!(
+                tokens.contains(&legacy_token),
+                "missing legacy self-token for day {d}"
+            );
         }
         // Each hex token is 64 chars (32 bytes).
         assert!(tokens.iter().all(|t| t.len() == 64));

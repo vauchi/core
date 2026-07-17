@@ -604,6 +604,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
         self.relay.send_device_sync_message(
             master_seed,
+            target_device_id,
             ciphertext,
             self.storage.clock().unix_seconds(),
         )?;

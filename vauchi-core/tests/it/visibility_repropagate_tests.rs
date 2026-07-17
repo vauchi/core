@@ -9,7 +9,11 @@
 
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VauchiError,
+    api::sync::DeviceSyncOrchestrator,
+    crypto::SigningKeyPair,
     exchange::X3DHKeyPair,
+    identity::{DeviceInfo, DeviceRegistry},
+    sync::SyncItem,
 };
 
 fn create_test_vauchi() -> Vauchi {
@@ -340,6 +344,103 @@ fn test_set_contact_override_triggers_repropagate() {
     assert!(
         !pending_after.is_empty(),
         "Per-contact override should queue a re-propagation update"
+    );
+}
+
+/// A one-contact visibility change must update that contact immediately and
+/// retain the linked-device journal entry, so a sibling cannot later compute
+/// the field as hidden and revoke it.
+// @scenario: visibility_control :: Granting visibility sends update to contact
+// @scenario: device_management :: Visibility grants converge across linked devices
+#[test]
+fn test_contact_override_and_repropagate_journals_linked_device_grant() {
+    let wb = create_test_vauchi();
+    const SEED: [u8; 32] = [41u8; 32];
+    let signing = SigningKeyPair::from_seed(&SEED);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
+        &signing,
+    );
+    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet_id = *tablet.device_id();
+    registry
+        .add_device_unsigned(tablet.to_registered(&SEED))
+        .unwrap();
+    wb.storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+
+    wb.add_own_field(ContactField::new(
+        FieldType::Email,
+        "personal",
+        "alice@personal.com",
+        0,
+    ))
+    .unwrap();
+    let field_id = own_field_id(&wb, "personal");
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+
+    wb.set_contact_visibility_override_and_repropagate(&bob_id, &field_id, true)
+        .unwrap();
+
+    let orchestrator = DeviceSyncOrchestrator::load(
+        wb.storage(),
+        wb.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap();
+    assert!(
+        orchestrator
+            .pending_for_device(&tablet_id)
+            .iter()
+            .any(|item| matches!(
+                item,
+                SyncItem::VisibilityChanged {
+                    contact_id,
+                    field_id: synced_field_id,
+                    is_visible: true,
+                    ..
+                } if contact_id == &bob_id && synced_field_id == &field_id
+            ))
+    );
+}
+
+// @scenario: sync_updates :: A secondary-device card change reaches contacts
+// @internal
+#[test]
+fn synced_field_and_visibility_grant_repropagate_through_a_sibling_ratchet() {
+    let wb = create_test_vauchi();
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+    let field = ContactField::new(FieldType::Phone, "secondary-phone", "+12025550100", 10);
+    let field_id = field.id().to_string();
+
+    let applied = wb
+        .apply_sync_items(vec![
+            SyncItem::CardFieldSynced {
+                field,
+                field_visibility: None,
+                timestamp: 10,
+            },
+            SyncItem::VisibilityChanged {
+                contact_id: bob_id.clone(),
+                field_id,
+                is_visible: true,
+                timestamp: 11,
+            },
+        ])
+        .unwrap();
+    assert_eq!(applied, 2);
+
+    wb.run_owed_repropagation().unwrap();
+
+    assert!(
+        !wb.storage()
+            .pending()
+            .get_pending_updates(&bob_id)
+            .unwrap()
+            .is_empty(),
+        "a sibling's received field and visibility grant must enqueue a peer update"
     );
 }
 

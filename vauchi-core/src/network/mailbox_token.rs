@@ -22,6 +22,7 @@ use crate::identifiers::MailboxToken;
 
 const CONTACT_DOMAIN: &[u8] = b"Vauchi_Mailbox_v1";
 const DEVICE_SYNC_DOMAIN: &[u8] = b"Vauchi_DeviceSync_v1";
+const DEVICE_SYNC_RECIPIENT_DOMAIN: &[u8] = b"Vauchi_DeviceSyncRecipient_v1";
 
 /// Compute a 32-byte mailbox token for one **direction** of a contact channel.
 ///
@@ -67,6 +68,25 @@ pub fn compute_self_token(master_seed: &[u8; 32], day_epoch: u64) -> MailboxToke
     MailboxToken::from_bytes(*HKDF::derive_key(None, master_seed, &info))
 }
 
+/// Compute a daily device-sync receive token for one linked device.
+///
+/// Unlike the legacy identity-wide self token, this includes the target device
+/// id. Relay fetch is destructive, so every device needs an independent opaque
+/// mailbox; otherwise one sibling can consume an envelope encrypted for
+/// another. The device id is inside HKDF input only and is never sent to the
+/// relay.
+pub fn compute_device_sync_token(
+    master_seed: &[u8; 32],
+    recipient_device_id: &[u8; 32],
+    day_epoch: u64,
+) -> MailboxToken {
+    let mut info = Vec::with_capacity(DEVICE_SYNC_RECIPIENT_DOMAIN.len() + 32 + 8);
+    info.extend_from_slice(DEVICE_SYNC_RECIPIENT_DOMAIN);
+    info.extend_from_slice(recipient_device_id);
+    info.extend_from_slice(&day_epoch.to_be_bytes());
+    MailboxToken::from_bytes(*HKDF::derive_key(None, master_seed, &info))
+}
+
 /// Returns the current day epoch (UTC seconds / 86400).
 ///
 /// `now` is the current Unix-epoch seconds — production callers route
@@ -107,6 +127,26 @@ pub fn batch_register_tokens(
     current_day: u64,
     days_offline: u64,
 ) -> Vec<Vec<String>> {
+    padded_registration_batches(
+        rng,
+        registration_tokens(
+            contact_keys,
+            own_pubkey,
+            master_seed,
+            current_day,
+            days_offline,
+        ),
+    )
+}
+
+/// Build contact and legacy shared-device mailbox registration tokens.
+fn registration_tokens(
+    contact_keys: &[[u8; 32]],
+    own_pubkey: &[u8; 32],
+    master_seed: &[u8; 32],
+    current_day: u64,
+    days_offline: u64,
+) -> Vec<String> {
     let mut all_tokens = Vec::new();
     let start_day = current_day.saturating_sub(days_offline);
 
@@ -133,6 +173,15 @@ pub fn batch_register_tokens(
         }
     }
 
+    all_tokens
+}
+
+/// Pad, split, and shuffle real registration tokens without revealing their
+/// count or stable position to the relay.
+fn padded_registration_batches(
+    rng: &dyn crate::rng::SecureRng,
+    mut all_tokens: Vec<String>,
+) -> Vec<Vec<String>> {
     all_tokens.sort_unstable();
     all_tokens.dedup();
 
@@ -164,4 +213,46 @@ pub fn batch_register_tokens(
     }
 
     batches
+}
+
+/// Build padded registration batches for contact mailboxes plus one linked
+/// device's recipient-specific sync mailbox.
+///
+/// Device-sync envelopes are encrypted to a single target device and relay
+/// fetch consumes blobs, so this mailbox must be unique to that target. The
+/// legacy shared self-token remains registered during rollout so envelopes
+/// sent before this change can still be received. All tokens stay in the same
+/// padded, shuffled registration batches as contact mailboxes.
+pub fn batch_register_tokens_with_device_sync(
+    rng: &dyn crate::rng::SecureRng,
+    contact_keys: &[[u8; 32]],
+    own_pubkey: &[u8; 32],
+    master_seed: &[u8; 32],
+    device_id: &[u8; 32],
+    current_day: u64,
+    days_offline: u64,
+) -> Vec<Vec<String>> {
+    let start_day = current_day.saturating_sub(days_offline);
+    let mut tokens = registration_tokens(
+        contact_keys,
+        own_pubkey,
+        master_seed,
+        current_day,
+        days_offline,
+    );
+    for day in start_day..=current_day {
+        tokens.push(token_hex(&compute_device_sync_token(
+            master_seed,
+            device_id,
+            day,
+        )));
+        if day > 0 {
+            tokens.push(token_hex(&compute_device_sync_token(
+                master_seed,
+                device_id,
+                day - 1,
+            )));
+        }
+    }
+    padded_registration_batches(rng, tokens)
 }

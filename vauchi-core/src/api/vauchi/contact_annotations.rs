@@ -95,9 +95,13 @@ impl Vauchi {
         Ok(self.storage.contacts().load_personal_notes(contact_id)?)
     }
 
-    /// Deletes personal notes for a contact.
+    /// Deletes personal notes for a contact and journals a tombstone for linked devices.
     pub fn delete_personal_notes(&self, contact_id: &str) -> VauchiResult<()> {
         self.storage.contacts().delete_personal_notes(contact_id)?;
+        self.record_sync_item(crate::sync::SyncItem::PersonalNoteRemoved {
+            contact_id: contact_id.to_string(),
+            timestamp: self.now_timestamp(),
+        });
         Ok(())
     }
 

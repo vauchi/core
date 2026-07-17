@@ -13,7 +13,8 @@ use std::time::Instant;
 use super::connection::ConnectionManager;
 use super::error::NetworkError;
 use super::mailbox_token::{
-    batch_register_tokens, compute_self_token, current_day_epoch, token_hex,
+    batch_register_tokens, batch_register_tokens_with_device_sync, compute_device_sync_token,
+    current_day_epoch, token_hex,
 };
 use super::message::{
     AckStatus, EncryptedUpdate, MessageEnvelope, MessageId, MessagePayload, PurgeRequest,
@@ -23,6 +24,7 @@ use super::protocol::create_envelope;
 use super::transport::{Transport, TransportConfig};
 use crate::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
 use crate::identifiers::ContactId;
+use crate::identity::Identity;
 use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 use crate::rng::SecureRngExt;
 
@@ -298,7 +300,39 @@ impl<T: Transport> RelayClient<T> {
             day,
             days_offline,
         );
+        self.send_mailbox_registration_batches(batches, now)
+    }
 
+    /// Registers contact mailboxes plus this device's recipient-specific sync
+    /// mailbox. Use this for a linked-device sync cycle: relays may replace a
+    /// prior registration set, so the send-phase registration must not drop
+    /// the receive mailbox registered before fetch.
+    pub fn register_mailbox_tokens_with_device_sync(
+        &mut self,
+        contact_keys: &[[u8; 32]],
+        identity: &Identity,
+        days_offline: u64,
+        now: u64,
+        rng: &dyn crate::rng::SecureRng,
+    ) -> Result<MessageId, NetworkError> {
+        let day = current_day_epoch(now);
+        let batches = batch_register_tokens_with_device_sync(
+            rng,
+            contact_keys,
+            identity.signing_public_key(),
+            identity.master_seed(),
+            identity.device_id(),
+            day,
+            days_offline,
+        );
+        self.send_mailbox_registration_batches(batches, now)
+    }
+
+    fn send_mailbox_registration_batches(
+        &mut self,
+        batches: Vec<Vec<String>>,
+        now: u64,
+    ) -> Result<MessageId, NetworkError> {
         let mut last_message_id = MessageId::from(String::new());
         for tokens in batches {
             let message_id: MessageId = self.rng.uuid_v4().into();
@@ -324,10 +358,12 @@ impl<T: Transport> RelayClient<T> {
     pub fn send_device_sync_message(
         &mut self,
         master_seed: &[u8; 32],
+        target_device_id: &[u8; 32],
         ciphertext: Vec<u8>,
         now: u64,
     ) -> Result<MessageId, NetworkError> {
-        let self_token = compute_self_token(master_seed, current_day_epoch(now));
+        let device_token =
+            compute_device_sync_token(master_seed, target_device_id, current_day_epoch(now));
 
         // Device sync carries no Double Ratchet: `ciphertext` is already
         // sealed by `DeviceSyncOrchestrator::encrypt_for_device` (ECDH from
@@ -336,7 +372,7 @@ impl<T: Transport> RelayClient<T> {
         // carry a synthetic zero header that the device-sync receive path
         // ignores — it decrypts via `decrypt_from_device`, not the ratchet.
         let encrypted_update = EncryptedUpdate {
-            recipient_id: ContactId::from(token_hex(&self_token)),
+            recipient_id: ContactId::from(token_hex(&device_token)),
             sender_id: ContactId::from(self.our_identity_id.clone()),
             ratchet_header: RatchetHeader {
                 dh_public: crate::identifiers::DhPublicKey::from([0u8; 32]),

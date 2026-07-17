@@ -183,6 +183,43 @@ fn test_conflict_contact_add_then_remove() {
     );
 }
 
+/// A note tombstone and a note write are one logical value: a later deletion
+/// must prevent an out-of-order earlier write from restoring owner-private data.
+// @scenario: device_management :: Conflict resolution between devices
+#[test]
+fn test_conflict_personal_note_tombstone_rejects_stale_write() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry = create_test_registry(&master_seed, &device_b);
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
+
+    let removed = SyncItem::PersonalNoteRemoved {
+        contact_id: "contact-1".to_string(),
+        timestamp: 2000,
+    };
+    assert_eq!(
+        orchestrator
+            .process_incoming(vec![removed], &[0x99u8; 32])
+            .unwrap()
+            .len(),
+        1
+    );
+
+    let stale_write = SyncItem::PersonalNoteChanged {
+        contact_id: "contact-1".to_string(),
+        note: "must stay deleted".to_string(),
+        timestamp: 1000,
+    };
+    assert!(
+        orchestrator
+            .process_incoming(vec![stale_write], &[0x99u8; 32])
+            .unwrap()
+            .is_empty(),
+        "an older personal-note write must not supersede its tombstone"
+    );
+}
+
 /// Test: Concurrent deletion schedule and cancel for the same identity (#193).
 ///
 /// DeletionScheduled and DeletionCancelled use different conflict keys,

@@ -574,7 +574,8 @@ impl Vauchi {
                             self.storage
                                 .contacts()
                                 .save_own_card(&card)
-                                .map_err(|e| e.into())
+                                .map_err(VauchiError::from)
+                                .and_then(|()| self.mark_own_card_repropagate())
                         }
                         None => Err(VauchiError::IdentityNotInitialized),
                     }
@@ -612,7 +613,8 @@ impl Vauchi {
                         self.storage
                             .contacts()
                             .save_own_card(&card)
-                            .map_err(|error| error.into())
+                            .map_err(VauchiError::from)?;
+                        self.mark_own_card_repropagate()
                     }
                     None => Err(VauchiError::IdentityNotInitialized),
                 },
@@ -642,7 +644,8 @@ impl Vauchi {
                     .storage
                     .labels()
                     .save_contact_override(contact_id, field_id, is_visible)
-                    .map_err(|e| e.into()),
+                    .map_err(VauchiError::from)
+                    .and_then(|()| self.mark_own_card_repropagate()),
                 SyncItem::GroupChanged { ref group_data, .. } => self
                     .storage
                     .labels()
@@ -735,6 +738,11 @@ impl Vauchi {
                         .save_personal_notes(contact_id, &encrypted)
                         .map_err(|e| e.into())
                 }
+                SyncItem::PersonalNoteRemoved { ref contact_id, .. } => self
+                    .storage
+                    .contacts()
+                    .delete_personal_notes(contact_id)
+                    .map_err(|e| e.into()),
                 SyncItem::ContactFieldNoteChanged {
                     ref contact_id,
                     ref field_id,
@@ -886,7 +894,8 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
             contact_id: contact_id.clone(),
             changed_fields: vec!["recovery_trusted".to_string()],
         }),
-        SyncItem::PersonalNoteChanged { contact_id, .. } => Some(VauchiEvent::ContactUpdated {
+        SyncItem::PersonalNoteChanged { contact_id, .. }
+        | SyncItem::PersonalNoteRemoved { contact_id, .. } => Some(VauchiEvent::ContactUpdated {
             contact_id: contact_id.clone(),
             changed_fields: vec!["personal_note".to_string()],
         }),

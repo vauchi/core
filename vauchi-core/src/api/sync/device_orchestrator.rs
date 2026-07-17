@@ -660,7 +660,8 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             }
             SyncItem::DeletionScheduled { .. } => "deletion:scheduled".to_string(),
             SyncItem::DeletionCancelled { .. } => "deletion:cancelled".to_string(),
-            SyncItem::PersonalNoteChanged { contact_id, .. } => {
+            SyncItem::PersonalNoteChanged { contact_id, .. }
+            | SyncItem::PersonalNoteRemoved { contact_id, .. } => {
                 format!("personal_note:{}", contact_id)
             }
             SyncItem::ContactFieldNoteChanged {
@@ -753,8 +754,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     /// Builds device sync envelopes for all devices with pending items.
     ///
     /// Wraps each pending sync message in a serialized `EncryptedUpdate` where
-    /// `recipient_id` is the daily self-token. The relay delivers it to all
-    /// connections that registered the matching token.
+    /// `recipient_id` is a daily token unique to the target linked device.
     ///
     /// Returns a list of serialized envelopes ready to send over the wire.
     ///
@@ -763,7 +763,9 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         &self,
         identity: &crate::Identity,
     ) -> Result<Vec<Vec<u8>>, DeviceSyncError> {
-        use crate::network::mailbox_token::{compute_self_token, current_day_epoch, token_hex};
+        use crate::network::mailbox_token::{
+            compute_device_sync_token, current_day_epoch, token_hex,
+        };
 
         let devices = self.devices_with_pending();
         if devices.is_empty() {
@@ -771,9 +773,6 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         }
 
         let day = current_day_epoch(self.storage.clock().unix_seconds());
-        let self_token = compute_self_token(identity.master_seed(), day);
-        let recipient_id = token_hex(&self_token);
-
         let mut envelopes = Vec::with_capacity(devices.len());
 
         for device_id in &devices {
@@ -802,7 +801,11 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
             // Build a simple envelope struct (recipient_id = self-token)
             let envelope = SyncEnvelope {
-                recipient_id: recipient_id.clone(),
+                recipient_id: token_hex(&compute_device_sync_token(
+                    identity.master_seed(),
+                    device_id,
+                    day,
+                )),
                 ciphertext,
                 target_device_id: *device_id,
                 version: sync_msg.version,

@@ -354,6 +354,20 @@ fn test_personal_note_sync_item_roundtrip() {
     assert_eq!(item, restored);
 }
 
+/// Verify PersonalNoteRemoved serialises and deserialises correctly.
+// @scenario: device_management :: Personal note deletion syncs to linked devices
+// @internal
+#[test]
+fn test_personal_note_removed_sync_item_roundtrip() {
+    let item = SyncItem::PersonalNoteRemoved {
+        contact_id: "c1".into(),
+        timestamp: 1001,
+    };
+    let json = serde_json::to_string(&item).unwrap();
+    let restored: SyncItem = serde_json::from_str(&json).unwrap();
+    assert_eq!(item, restored);
+}
+
 /// Verify ContactFieldNoteChanged serialises and deserialises correctly.
 // @scenario: device_management :: Contact field note syncs to linked devices
 // @internal

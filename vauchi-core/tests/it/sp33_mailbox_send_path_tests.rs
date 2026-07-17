@@ -6,14 +6,15 @@
 //!
 //! Tests that the send path uses mailbox tokens as recipient_id,
 //! that the client registers mailbox tokens after connect,
-//! that device sync uses self-token EncryptedUpdate, and
+//! that device sync uses recipient-specific EncryptedUpdate routing, and
 //! that IdentityRevoked verification works correctly.
 
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::mailbox_token::{
-    compute_mailbox_token, compute_self_token, current_day_epoch, token_hex,
+    compute_device_sync_token, compute_mailbox_token, compute_self_token, current_day_epoch,
+    token_hex,
 };
 use vauchi_core::network::message::IdentityRevoked;
 use vauchi_core::network::*;
@@ -209,24 +210,70 @@ fn test_register_mailbox_tokens_with_no_contacts() {
     }
 }
 
+/// The outbound sync phase registers again after inbound fetch. That second
+/// registration must preserve the recipient-specific mailbox or the relay can
+/// replace it with a legacy-only token set and strand linked-device updates.
+// @internal
+#[test]
+fn test_register_mailbox_tokens_with_device_sync_keeps_recipient_mailbox() {
+    let transport = MockTransport::new();
+    let mut client = RelayClient::new(transport, create_test_config(), "sender-id".into());
+    client.connect().unwrap();
+
+    let identity = Identity::create("Alice", 0);
+    let master_seed = identity.master_seed();
+    let device_id = identity.device_id();
+    client
+        .register_mailbox_tokens_with_device_sync(
+            &[],
+            &identity,
+            0,
+            0,
+            &vauchi_core::rng::OsSecureRng::new(),
+        )
+        .unwrap();
+
+    let sent = client.connection().transport().sent_messages();
+    assert_eq!(sent.len(), 1);
+    let MessagePayload::RegisterMailbox(registration) = &sent[0].payload else {
+        panic!("Expected RegisterMailbox");
+    };
+    let day = current_day_epoch(0);
+    assert!(
+        registration
+            .tokens
+            .contains(&token_hex(&compute_self_token(master_seed, day,)))
+    );
+    assert!(
+        registration
+            .tokens
+            .contains(&token_hex(&compute_device_sync_token(
+                master_seed,
+                device_id,
+                day,
+            )))
+    );
+}
+
 // ============================================================
-// Task 4.3: Device sync via self-token EncryptedUpdate
+// Task 4.3: Device sync via recipient-specific EncryptedUpdate
 // ============================================================
 
 // @internal
 #[test]
-fn test_device_sync_uses_self_token_as_recipient_id() {
+fn test_device_sync_uses_target_device_token_as_recipient_id() {
     let transport = MockTransport::new();
     let mut client = RelayClient::new(transport, create_test_config(), "sender-id".into());
     client.connect().unwrap();
 
     let master_seed = [0xEE; 32];
+    let target_device_id = [0xA5; 32];
     // Device sync carries no Double Ratchet — the ciphertext is already
     // sealed by `encrypt_for_device` (ECDH from the shared master seed).
     let ciphertext = b"encrypted-sync-payload".to_vec();
 
     let msg_id = client
-        .send_device_sync_message(&master_seed, ciphertext.clone(), 0)
+        .send_device_sync_message(&master_seed, &target_device_id, ciphertext.clone(), 0)
         .unwrap();
     assert!(!msg_id.as_str().is_empty());
 
@@ -234,15 +281,19 @@ fn test_device_sync_uses_self_token_as_recipient_id() {
     assert_eq!(sent.len(), 1);
 
     if let MessagePayload::EncryptedUpdate(update) = &sent[0].payload {
-        let expected_token = token_hex(&compute_self_token(&master_seed, current_day_epoch(0)));
+        let expected_token = token_hex(&compute_device_sync_token(
+            &master_seed,
+            &target_device_id,
+            current_day_epoch(0),
+        ));
         assert_eq!(
             update.recipient_id, expected_token,
-            "Device sync recipient_id must be the self-token"
+            "Device sync recipient_id must be unique to its target device"
         );
         assert_eq!(
             update.recipient_id.as_str().len(),
             64,
-            "Self-token must be 64-char hex"
+            "Device-sync token must be 64-char hex"
         );
         // Synthetic zero ratchet header: device sync does not use the ratchet.
         assert_eq!(

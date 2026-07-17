@@ -120,6 +120,38 @@ fn note_mutations_journal_for_linked_devices() {
     );
 }
 
+/// A personal-note deletion must reach every linked device; otherwise an
+/// offline sibling can retain owner-private data after the owner removed it.
+// @scenario: sync_updates :: Personal note deletion converges across linked devices
+#[test]
+fn deleted_note_journals_tombstone_for_linked_devices() {
+    let (wb, contact_id) = setup_with_contact();
+    let (registry, tablet_id) = install_linked_registry(&wb);
+
+    wb.add_personal_note(&contact_id, "met at conference")
+        .unwrap();
+    wb.delete_personal_notes(&contact_id).unwrap();
+
+    let orchestrator = vauchi_core::api::sync::DeviceSyncOrchestrator::load(
+        wb.storage(),
+        wb.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap();
+    let pending = orchestrator.pending_for_device(&tablet_id);
+    assert!(
+        pending.iter().any(|item| matches!(
+            item,
+            vauchi_core::sync::SyncItem::PersonalNoteRemoved {
+                contact_id: id,
+                ..
+            } if id == &contact_id
+        )),
+        "delete_personal_notes must journal PersonalNoteRemoved for linked devices, \
+         got {pending:?}"
+    );
+}
+
 // @scenario: sync_updates :: Personal notes converge across linked devices
 #[test]
 fn applied_synced_note_is_readable() {
@@ -139,6 +171,26 @@ fn applied_synced_note_is_readable() {
         note.as_deref(),
         Some("synced from my tablet"),
         "a note received via device sync must decrypt through read_personal_note"
+    );
+}
+
+// @scenario: sync_updates :: Personal note deletion converges across linked devices
+#[test]
+fn applied_synced_note_tombstone_clears_local_note() {
+    let (wb, contact_id) = setup_with_contact();
+    wb.add_personal_note(&contact_id, "remove me from every device")
+        .unwrap();
+
+    let applied = wb
+        .apply_sync_items(vec![vauchi_core::sync::SyncItem::PersonalNoteRemoved {
+            contact_id: contact_id.clone(),
+            timestamp: 2000,
+        }])
+        .unwrap();
+    assert_eq!(applied, 1);
+    assert!(
+        wb.read_personal_note(&contact_id).unwrap().is_none(),
+        "a synced personal-note tombstone must erase the local encrypted note"
     );
 }
 

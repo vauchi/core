@@ -17,6 +17,7 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, OwnCardRepropagateState,
+    sync::SyncItem,
 };
 
 /// Alice's `Vauchi` plus an exchanged, ratcheted contact "Bob" (so
@@ -137,6 +138,33 @@ fn own_card_edit_sets_repropagate_marker() {
     assert_eq!(
         state.failed_attempts, 0,
         "a fresh edit resets the retry budget"
+    );
+}
+
+/// A card change received from a linked device changes the owner's peer-facing
+/// state just as a local edit does, so it must schedule downstream propagation.
+// @scenario: sync_updates :: Linked-device card update reaches contacts
+#[test]
+fn received_card_update_sets_repropagate_marker() {
+    let (wb, _bob) = alice_with_ratcheted_bob();
+
+    assert_eq!(
+        wb.apply_sync_items(vec![SyncItem::CardUpdated {
+            field_label: "mobile".to_string(),
+            new_value: "+12025550502".to_string(),
+            timestamp: 1000,
+        }])
+        .unwrap(),
+        1
+    );
+
+    assert!(
+        wb.storage()
+            .ux()
+            .load_own_card_repropagate()
+            .unwrap()
+            .needs_repropagate,
+        "a linked-device CardUpdated must schedule propagation to contacts"
     );
 }
 

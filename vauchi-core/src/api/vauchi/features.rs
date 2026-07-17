@@ -450,9 +450,7 @@ impl Vauchi {
         field_id: &str,
         is_visible: bool,
     ) -> VauchiResult<()> {
-        self.storage
-            .labels()
-            .save_contact_override(contact_id, field_id, is_visible)?;
+        self.set_contact_visibility_override(contact_id, field_id, is_visible)?;
         self.repropagate_to_contact(contact_id)
     }
 

@@ -4,7 +4,8 @@
 
 use proptest::prelude::*;
 use vauchi_core::network::mailbox_token::{
-    batch_register_tokens, compute_mailbox_token, compute_self_token, token_hex,
+    batch_register_tokens, batch_register_tokens_with_device_sync, compute_device_sync_token,
+    compute_mailbox_token, compute_self_token, token_hex,
 };
 
 // Directional tokens are keyed to the recipient. These tests assert only
@@ -51,6 +52,61 @@ fn test_self_token_deterministic_across_devices() {
     let t1 = compute_self_token(&master_seed, day);
     let t2 = compute_self_token(&master_seed, day);
     assert_eq!(t1, t2);
+}
+
+/// Device-sync delivery is one-recipient-per-fetch: two linked devices must
+/// never poll the same opaque mailbox token or one can consume the other's
+/// encrypted envelope from the relay.
+// @scenario: sync_updates :: Linked-device updates reach every device
+#[test]
+fn test_device_sync_tokens_are_deterministic_and_recipient_specific() {
+    let master_seed = [0xAAu8; 32];
+    let day = 19804u64;
+    let first_device = [0x01u8; 32];
+    let second_device = [0x02u8; 32];
+
+    assert_eq!(
+        compute_device_sync_token(&master_seed, &first_device, day),
+        compute_device_sync_token(&master_seed, &first_device, day),
+        "a device must rederive its receive mailbox token"
+    );
+    assert_ne!(
+        compute_device_sync_token(&master_seed, &first_device, day),
+        compute_device_sync_token(&master_seed, &second_device, day),
+        "different linked devices must not compete for one destructive mailbox"
+    );
+}
+
+// @internal
+#[test]
+fn test_device_sync_registration_preserves_legacy_and_own_receive_tokens() {
+    let master_seed = [0xBBu8; 32];
+    let device_id = [0x11u8; 32];
+    let day = 19804u64;
+    let batches = batch_register_tokens_with_device_sync(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &[],
+        &TEST_PUBKEY,
+        &master_seed,
+        &device_id,
+        day,
+        0,
+    );
+
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].len(), 256);
+    assert!(batches[0].contains(&token_hex(&compute_device_sync_token(
+        &master_seed,
+        &device_id,
+        day,
+    ))));
+    assert!(batches[0].contains(&token_hex(&compute_device_sync_token(
+        &master_seed,
+        &device_id,
+        day - 1,
+    ))));
+    assert!(batches[0].contains(&token_hex(&compute_self_token(&master_seed, day,))));
+    assert!(batches[0].contains(&token_hex(&compute_self_token(&master_seed, day - 1,))));
 }
 
 // @internal

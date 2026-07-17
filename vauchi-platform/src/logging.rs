@@ -81,6 +81,7 @@ fn install() {}
 mod tests {
     use super::*;
 
+    // @internal
     #[test]
     fn should_install_only_on_the_first_call() {
         let init = LogInit::new();
@@ -89,6 +90,7 @@ mod tests {
         assert!(!init.should_install());
     }
 
+    // @internal
     #[test]
     fn init_mobile_logging_does_not_panic_when_called_repeatedly() {
         init_mobile_logging();

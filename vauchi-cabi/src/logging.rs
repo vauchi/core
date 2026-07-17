@@ -28,6 +28,7 @@ pub unsafe extern "C" fn vauchi_cabi_init_logging() {
 mod tests {
     use super::*;
 
+    // @internal
     #[test]
     fn init_logging_does_not_panic_when_called_repeatedly() {
         unsafe {

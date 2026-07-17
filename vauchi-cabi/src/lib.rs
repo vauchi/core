@@ -21,6 +21,7 @@ mod app_navigation;
 mod config;
 mod exchange;
 mod i18n;
+mod logging;
 pub(crate) mod platform_event;
 mod workflow;
 
@@ -28,6 +29,7 @@ pub use app::*;
 pub use app_navigation::*;
 pub use exchange::*;
 pub use i18n::*;
+pub use logging::*;
 pub use workflow::*;
 
 use config::CabiConfig;

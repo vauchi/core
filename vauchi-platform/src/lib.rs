@@ -27,6 +27,7 @@ mod error;
 mod exchange;
 mod exchange_view;
 mod json_helpers;
+mod logging;
 mod mobile_contact_detail;
 mod mobile_contacts;
 mod mobile_import;

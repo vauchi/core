@@ -1,0 +1,108 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Core — Internal-Dev Bindings (manual, non-release channel)
+#
+# Builds the UniFFI bindings with the `dev-logging` cargo feature ON so
+# the existing vauchi-app `log::` call sites surface in Logcat / os_log —
+# for developer/QA debugging (e.g. the BLE handshake path). This is the
+# "internal-dev channel" from the dev-only logging decision: mobile
+# frontends never run cargo (ADR-025/026), so the feature must be baked
+# into the binding here, at build time.
+#
+# SAFETY — why this can never reach the store:
+#   * Jobs are `when: manual` and excluded from ALL tag pipelines, so a
+#     store/RC release (a v* tag) can never build a dev-logging binding.
+#   * Artifacts upload to the SEPARATE generic package `vauchi-internal-dev`
+#     — never to the Maven (`publish:maven`) or SPM (`publish:swift`)
+#     coordinates the store apps consume. Store bindings stay feature-off.
+#
+# Consuming: trigger the job for your platform, then download from
+#   ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/
+#     vauchi-internal-dev/${CI_COMMIT_SHA}/bindings-<apple|android>.tar.gz
+# and package/point your local app build at it. Never ship it.
+
+.internal-dev-rules: &internal-dev-rules
+  rules:
+    # Release-prep channels only build feature-off bindings — a dev-logging
+    # binding must never exist in a scheduled or tagged (release/RC/dev-tag)
+    # pipeline that feeds packaging/publish.
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_TAG
+      when: never
+    # On-demand only: QA/dev triggers it from a branch/MR pipeline.
+    - when: manual
+      allow_failure: true
+
+internal-dev:apple:
+  extends: [.macos-runner, .timeout-extended]
+  stage: internal-dev
+  needs: []
+  <<: *internal-dev-rules
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
+  script:
+    - ./scripts/build-bindings.sh --apple --dev-logging
+    - |
+      echo "Uploading INTERNAL-DEV Apple bindings for SHA ${CI_COMMIT_SHA}..."
+      echo "⚠ dev-logging ON — internal debugging only, never ship this"
+      tar czf bindings-apple.tar.gz -C target/bindings ios/ macos/
+      HTTP_CODE=$(curl -s -w '%{http_code}' -o /dev/null \
+           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file bindings-apple.tar.gz \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-internal-dev/${CI_COMMIT_SHA}/bindings-apple.tar.gz")
+      if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+        echo "✓ Internal-dev Apple bindings uploaded for SHA ${CI_COMMIT_SHA}"
+      elif [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "409" ]; then
+        echo "✓ Internal-dev Apple bindings already present for SHA ${CI_COMMIT_SHA} — skipping"
+      else
+        echo "✗ Upload failed with HTTP ${HTTP_CODE}"
+        exit 1
+      fi
+
+internal-dev:android:
+  extends: [.linux-runner, .timeout-long]
+  stage: internal-dev
+  needs: []
+  <<: *internal-dev-rules
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
+    - |
+      for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
+        if [ -d "$ndk_path" ]; then
+          export ANDROID_NDK_HOME="$ndk_path"
+          echo "Found Android NDK at: $ANDROID_NDK_HOME"
+          break
+        fi
+      done
+      if [ -z "$ANDROID_NDK_HOME" ]; then
+        echo "ERROR: Android NDK not found. Please install it or set ANDROID_NDK_HOME."
+        exit 1
+      fi
+    - rustup target add aarch64-linux-android x86_64-linux-android
+  script:
+    # No --release-only: keep the x86_64 slice so QA can run the internal
+    # build on an emulator, not just an arm64 device.
+    - ./scripts/build-bindings.sh --android --dev-logging
+    - |
+      echo "Uploading INTERNAL-DEV Android bindings for SHA ${CI_COMMIT_SHA}..."
+      echo "⚠ dev-logging ON — internal debugging only, never ship this"
+      tar czf bindings-android.tar.gz -C target/bindings android/
+      HTTP_CODE=$(curl -s -w '%{http_code}' -o /dev/null \
+           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file bindings-android.tar.gz \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-internal-dev/${CI_COMMIT_SHA}/bindings-android.tar.gz")
+      if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+        echo "✓ Internal-dev Android bindings uploaded for SHA ${CI_COMMIT_SHA}"
+      elif [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "409" ]; then
+        echo "✓ Internal-dev Android bindings already present for SHA ${CI_COMMIT_SHA} — skipping"
+      else
+        echo "✗ Upload failed with HTTP ${HTTP_CODE}"
+        exit 1
+      fi

@@ -33,6 +33,12 @@ diagnostic-yolo = ["diagnostic-scanner", "vauchi-core/diagnostic-yolo"]
 # forbids it in release builds. Required so the Argon2-heavy duress/auth
 # platform tests don't hit nextest's 180s slow-timeout; mirrors test:core.
 test-kdf = ["vauchi-core/test-kdf"]
+# Dev/debug-only native log backend (Android Logcat / iOS+macOS os_log).
+# OFF in release: a shipped binary registers no backend, so the existing
+# vauchi-app `log::` call sites are silent no-ops (the `log` facade
+# discards records when no logger is installed). Frontends enable this
+# only in their debug build config. See logging.rs and logging-rules.md.
+dev-logging = ["dep:android_logger", "dep:oslog"]
 
 [dependencies]
 # Core Vauchi library (with rustls for Android/iOS - no OpenSSL dependency)
@@ -70,12 +76,13 @@ crc32fast = "1.4"
 qrcode = { version = "0.14", default-features = false }
 
 # Native log backends for the mobile/desktop bridge (logging.rs).
-# Excluded from Linux/Windows targets by [target.'cfg(...)'].
+# Excluded from Linux/Windows targets by [target.'cfg(...)'], and gated
+# behind the `dev-logging` feature (off in release) — see [features].
 [target.'cfg(target_os = "android")'.dependencies]
-android_logger = "0.14"
+android_logger = { version = "0.14", optional = true }
 
 [target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
-oslog = "0.2"
+oslog = { version = "0.2", optional = true }
 
 [[bin]]
 name = "uniffi-bindgen"

@@ -51,7 +51,7 @@ pub fn init_mobile_logging() {
     }
 }
 
-#[cfg(target_os = "android")]
+#[cfg(all(feature = "dev-logging", target_os = "android"))]
 fn install() {
     android_logger::init_once(
         android_logger::Config::default()
@@ -60,7 +60,7 @@ fn install() {
     );
 }
 
-#[cfg(any(target_os = "ios", target_os = "macos"))]
+#[cfg(all(feature = "dev-logging", any(target_os = "ios", target_os = "macos")))]
 fn install() {
     // Double-init would return Err; LOG_INIT already prevents that, but
     // oslog's own init() can also be called independently by a test
@@ -70,7 +70,12 @@ fn install() {
         .init();
 }
 
-#[cfg(not(any(target_os = "android", target_os = "ios", target_os = "macos")))]
+// Release posture (feature off) and unsupported desktop targets: no
+// backend, so `log::` call sites stay silent — see logging-rules.md.
+#[cfg(not(all(
+    feature = "dev-logging",
+    any(target_os = "android", target_os = "ios", target_os = "macos")
+)))]
 fn install() {}
 
 // INLINE_TEST_REQUIRED: LogInit and should_install() are private to this

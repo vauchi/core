@@ -32,6 +32,8 @@ mod tests {
     // @internal
     #[test]
     fn init_logging_does_not_panic_when_called_repeatedly() {
+        // allow(zero_assertions): repeated init must not panic — there is
+        // no observable state to assert beyond that.
         unsafe {
             vauchi_cabi_init_logging();
             vauchi_cabi_init_logging();

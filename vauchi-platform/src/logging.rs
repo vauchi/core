@@ -98,6 +98,8 @@ mod tests {
     // @internal
     #[test]
     fn init_mobile_logging_does_not_panic_when_called_repeatedly() {
+        // allow(zero_assertions): repeated init must not panic — there is
+        // no observable state to assert beyond that.
         init_mobile_logging();
         init_mobile_logging();
         init_mobile_logging();

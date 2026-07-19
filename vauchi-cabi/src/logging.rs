@@ -18,6 +18,7 @@
 /// No special requirements.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_cabi_init_logging() {
+    #[cfg(feature = "dev-logging")]
     let _ = std::panic::catch_unwind(|| {
         let _ = env_logger::try_init();
     });

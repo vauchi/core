@@ -15,13 +15,17 @@ crate-type = ["cdylib", "staticlib"]
 [features]
 default = []
 secure-storage = ["vauchi-core/secure-storage-linux"]
+# Dev/debug-only stderr log backend. OFF in release: a shipped desktop
+# binary registers no backend, so vauchi-app `log::` call sites are
+# silent no-ops. The C host enables this only in its debug build config.
+dev-logging = ["dep:env_logger"]
 
 [dependencies]
 vauchi-core = { workspace = true, default-features = false, features = ["storage", "network-rustls", "network-http"] }
 vauchi-app = { workspace = true, default-features = false, features = ["network-rustls", "network-http"] }
 serde_json = "1.0"
 zeroize = "1.8"
-env_logger = "0.11"
+env_logger = { version = "0.11", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

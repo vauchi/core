@@ -248,6 +248,45 @@ impl ContactStore<'_> {
         )?;
         Ok(())
     }
+    /// Returns the last applied delta version for one of a contact's peer
+    /// devices (#42).
+    ///
+    /// Each sender device numbers deltas from its own storage, so the
+    /// stale-version floor is kept per (contact, peer device). Returns 0 when
+    /// nothing has been recorded for the pair (new contact or fresh device).
+    pub fn last_delta_version_for_device(
+        &self,
+        contact_id: &str,
+        peer_device_id: &[u8; 32],
+    ) -> Result<u32, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT last_version FROM contact_device_delta_versions
+             WHERE contact_id = ?1 AND peer_device_id = ?2",
+            params![contact_id, peer_device_id],
+            |row| row.get::<_, i64>(0),
+        );
+        match result {
+            Ok(version) => Ok(version as u32),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(0),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+    /// Records the last applied delta version for one of a contact's peer
+    /// devices (#42).
+    pub fn record_delta_version_for_device(
+        &self,
+        contact_id: &str,
+        peer_device_id: &[u8; 32],
+        version: u32,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO contact_device_delta_versions
+             (contact_id, peer_device_id, last_version)
+             VALUES (?1, ?2, ?3)",
+            params![contact_id, peer_device_id, version as i64],
+        )?;
+        Ok(())
+    }
     /// Returns the last sent delta version for a contact.
     ///
     /// Returns 0 if no version has been sent (new contact).

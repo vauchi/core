@@ -397,6 +397,7 @@ mod storage_identity_tests;
 mod storage_pragma_tests;
 mod storage_tests;
 mod support_engine_tests;
+mod sync_card_update_device_floor_tests;
 mod sync_card_update_tests;
 mod sync_correctness_tests;
 mod sync_delta_tests;

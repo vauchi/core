@@ -384,9 +384,12 @@ pub fn process_single_card_update_for_device(
     // 7b. Reject stale/downgraded delta versions (#42). A withheld or reordered
     // older delta carries an unseen nonce and so passes the replay check above;
     // the version floor is what stops it from downgrading the stored card.
+    // The floor is per (contact, peer device) because each sender device
+    // numbers deltas from its own storage — a per-contact floor would reject a
+    // fresh device's legitimate first delta as stale.
     let last_version = storage
         .contacts()
-        .last_delta_version(sender_id)
+        .last_delta_version_for_device(sender_id, peer_device_id)
         .unwrap_or(0);
     if delta.version > 0 && delta.version < last_version {
         return Err(CardUpdateError::StaleVersion {
@@ -446,9 +449,11 @@ pub fn process_single_card_update_for_device(
         storage.contacts().save_contact(&contact)?;
         // Track applied delta version so a later older delta is rejected (#42).
         if delta.version > 0 {
-            storage
-                .contacts()
-                .record_delta_version(sender_id, delta.version)?;
+            storage.contacts().record_delta_version_for_device(
+                sender_id,
+                peer_device_id,
+                delta.version,
+            )?;
         }
         Ok(())
     })();

@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 60] = [
+const MIGRATIONS: [Migration; 61] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -572,7 +572,27 @@ const MIGRATIONS: [Migration; 60] = [
         name: "contact_device_registries",
         action: MigrationAction::Sql(MIGRATION_V60_CONTACT_DEVICE_REGISTRIES),
     },
+    Migration {
+        version: 61,
+        name: "contact_device_delta_versions",
+        action: MigrationAction::Sql(MIGRATION_V61_CONTACT_DEVICE_DELTA_VERSIONS),
+    },
 ];
+
+/// Migration v61: per-device received-delta version floors (#42).
+///
+/// Each sender device numbers deltas from its own storage, so a per-contact
+/// floor rejects a fresh device's legitimate first delta as stale. The floor
+/// moves to (contact, peer device). The legacy `contacts.last_delta_version`
+/// column stays in place, unused — no retroactive data migration.
+const MIGRATION_V61_CONTACT_DEVICE_DELTA_VERSIONS: &str = "
+    CREATE TABLE contact_device_delta_versions (
+        contact_id TEXT NOT NULL,
+        peer_device_id BLOB NOT NULL,
+        last_version INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (contact_id, peer_device_id)
+    );
+";
 
 /// Migration v60: retain each contact's latest identity-signed active-device set.
 ///

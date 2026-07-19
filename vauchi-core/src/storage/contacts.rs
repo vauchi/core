@@ -21,6 +21,10 @@ impl Storage {
             "DELETE FROM contact_ratchets WHERE contact_id = ?1",
             params![id],
         )?;
+        self.conn.execute(
+            "DELETE FROM contact_device_delta_versions WHERE contact_id = ?1",
+            params![id],
+        )?;
         self.sync().forget_contact(id)?;
         self.pending().delete_pending_updates_for_contact(id)?;
         self.labels().delete_all_contact_overrides(id)?;

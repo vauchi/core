@@ -819,8 +819,8 @@ fn test_schema_version_after_all_migrations() {
 
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(
-        version, 60,
-        "Schema version should be 60 after all migrations, got {}",
+        version, 61,
+        "Schema version should be 61 after all migrations, got {}",
         version
     );
 }

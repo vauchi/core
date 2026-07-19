@@ -594,6 +594,17 @@ impl Vauchi {
             return Ok(());
         }
 
+        // Version tracking for downgrade detection (#42) — must advance like
+        // the normal propagation path's, or receivers whose floor is already
+        // ≥ 2 reject every re-propagation as StaleVersion.
+        let next_version = self
+            .storage
+            .contacts()
+            .last_sent_delta_version(contact_id)
+            .unwrap_or(0)
+            + 1;
+        delta.set_version(next_version);
+
         // Sign delta with our identity, bound to recipient
         let recipient_pk = contact.public_key().ok_or(VauchiError::InvalidState(
             "Contact has no public key".into(),
@@ -651,6 +662,9 @@ impl Vauchi {
                 };
                 self.storage.pending().queue_update(&update)?;
             }
+            self.storage
+                .contacts()
+                .record_sent_delta_version(contact_id, next_version)?;
             self.storage
                 .contacts()
                 .save_last_sent_visible_fields(contact_id, &new_visible)?;

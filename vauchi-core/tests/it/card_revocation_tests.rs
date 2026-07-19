@@ -366,3 +366,95 @@ fn renaming_own_card_propagates_the_new_name_to_contacts() {
         "the contact's stored card must adopt the renamed display name"
     );
 }
+
+// Re-propagation is the owed-convergence fallback, but it historically shipped
+// the `CardDelta::compute` default version (1) on every send. Receivers floor
+// on the last version they applied (#42), so once any send path advances a
+// receiver's floor to 2, every re-propagation is rejected as StaleVersion —
+// silently breaking hide/revoke/rename convergence. Each re-propagation must
+// stamp and record an incrementing per-contact sent version, like the normal
+// propagation path does.
+// @scenario: sync_updates :: Re-propagated deltas carry incrementing versions
+#[test]
+fn consecutive_repropagations_stamp_incrementing_delta_versions() {
+    let wb = create_test_vauchi();
+    wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+    let work = own_field_id(&wb, "work");
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+
+    let label = wb.create_group("Work").unwrap();
+    wb.set_group_field_visibility(label.id(), &work, true)
+        .unwrap();
+
+    assert_eq!(
+        wb.storage()
+            .contacts()
+            .last_sent_delta_version(&bob_id)
+            .unwrap(),
+        0,
+        "nothing sent yet — no version recorded"
+    );
+
+    // First re-propagation (granting `work`) stamps version 1.
+    wb.add_contact_to_group_and_repropagate(label.id(), &bob_id)
+        .unwrap();
+    assert_eq!(
+        wb.storage()
+            .contacts()
+            .last_sent_delta_version(&bob_id)
+            .unwrap(),
+        1,
+        "the first re-propagation must record sent version 1"
+    );
+
+    // Second re-propagation (revoking `work`) stamps version 2 — a receiver
+    // whose floor is already 1 must not reject it as stale.
+    wb.remove_contact_from_group_and_repropagate(label.id(), &bob_id)
+        .unwrap();
+    assert_eq!(
+        wb.storage()
+            .contacts()
+            .last_sent_delta_version(&bob_id)
+            .unwrap(),
+        2,
+        "the second re-propagation must record sent version 2"
+    );
+}
+
+// The `delta.is_empty()` early return sends nothing, so it must not bump the
+// sent version — otherwise gaps make the recorded floor lie about what
+// receivers actually applied.
+// @scenario: sync_updates :: Re-propagated deltas carry incrementing versions
+#[test]
+fn empty_repropagation_does_not_bump_the_sent_version() {
+    let wb = create_test_vauchi();
+    let carol_id = add_contact_with_ratchet(&wb, "Carol");
+    let label = wb.create_group("Empty").unwrap();
+
+    // First re-propagation carries only the display name (the group grants no
+    // fields): it is a real send and records version 1.
+    wb.add_contact_to_group_and_repropagate(label.id(), &carol_id)
+        .unwrap();
+    assert_eq!(
+        wb.storage()
+            .contacts()
+            .last_sent_delta_version(&carol_id)
+            .unwrap(),
+        1,
+        "the first re-propagation must record sent version 1"
+    );
+
+    // Removing Carol leaves nothing visible and nothing revoked: the delta is
+    // empty, nothing is queued, and the sent version must not move.
+    wb.remove_contact_from_group_and_repropagate(label.id(), &carol_id)
+        .unwrap();
+    assert_eq!(
+        wb.storage()
+            .contacts()
+            .last_sent_delta_version(&carol_id)
+            .unwrap(),
+        1,
+        "an empty re-propagation sends nothing and must not bump the version"
+    );
+}

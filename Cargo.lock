@@ -4676,6 +4676,7 @@ version = "0.55.4"
 dependencies = [
  "cbindgen",
  "env_logger",
+ "log",
  "serde_json",
  "tempfile",
  "vauchi-app",

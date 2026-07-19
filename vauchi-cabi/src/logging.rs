@@ -37,4 +37,18 @@ mod tests {
             vauchi_cabi_init_logging();
         }
     }
+
+    // Shipped-binary posture: with `dev-logging` off, init must register
+    // no backend, so the `log` facade's runtime max level stays `Off` and
+    // the existing vauchi-app `log::` call sites are silent no-ops. Guards
+    // env_logger against leaking into release desktop builds.
+    // @internal
+    #[cfg(not(feature = "dev-logging"))]
+    #[test]
+    fn release_build_installs_no_log_backend() {
+        unsafe {
+            vauchi_cabi_init_logging();
+        }
+        assert_eq!(log::max_level(), log::LevelFilter::Off);
+    }
 }

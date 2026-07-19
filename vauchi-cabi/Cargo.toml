@@ -25,6 +25,8 @@ env_logger = "0.11"
 
 [dev-dependencies]
 tempfile = "3"
+# Facade only — lets the feature-off test assert no backend is installed.
+log = "0.4"
 
 [build-dependencies]
 cbindgen = "0.29"

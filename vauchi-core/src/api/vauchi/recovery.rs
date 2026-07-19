@@ -11,7 +11,6 @@ use base64::Engine;
 use sha2::{Digest, Sha256};
 
 use crate::api::error::{VauchiError, VauchiResult};
-use crate::crypto::{HKDF, X3DHKeyPair};
 use crate::network::HttpTransport;
 use crate::recovery::guardian::GuardianToken;
 use crate::recovery::sealed_box;
@@ -264,11 +263,11 @@ impl Vauchi {
             ));
         }
 
-        // Re-derive our X25519 secret key from master seed (same path as Identity)
-        let exchange_seed =
-            HKDF::derive_key(None, identity.master_seed(), b"Vauchi_Exchange_Seed_v2");
-        let x3dh = X3DHKeyPair::from_bytes(*exchange_seed);
-        let our_x25519_secret = x25519_dalek::StaticSecret::from(*x3dh.secret_bytes());
+        // Guardian entries are sealed to our advertised signing key
+        // (VerifyingKey::to_montgomery); open with the matching X25519 secret,
+        // not the HKDF exchange key (problem
+        // 2026-07-13-mobile-guardian-backup-integration).
+        let our_x25519_secret = identity.signing_keypair().to_x25519_secret();
 
         // Try to decrypt each entry with our X25519 secret key
         let mut found_token = None;

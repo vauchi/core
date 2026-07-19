@@ -8,6 +8,7 @@
 //! `ed25519-dalek` cryptographic library.
 
 use ed25519_dalek::{Signer, Verifier};
+use sha2::Digest;
 use subtle::ConstantTimeEq;
 
 /// Ed25519 signing keypair for identity and message signing.
@@ -57,6 +58,30 @@ impl SigningKeyPair {
             bytes: sig.to_bytes(),
         }
     }
+
+    /// Derives the X25519 secret corresponding to this Ed25519 signing key.
+    ///
+    /// This is the libsodium `crypto_sign_ed25519_sk_to_curve25519`
+    /// construction: the X25519 scalar is `clamp(SHA-512(seed)[0..32])` — the
+    /// same clamped scalar Ed25519 signs with — so the matching public key is
+    /// [`PublicKey::to_x25519`] (`VerifyingKey::to_montgomery`). It lets a
+    /// guardian open sealed-box material addressed to its advertised *signing*
+    /// key without carrying a separate encryption key. The clamped bytes are
+    /// idempotent under x25519-dalek's own clamp, so the DH agrees with
+    /// `to_montgomery`. Guardian-backup key reuse is sanctioned by the ADR-002
+    /// amendment; the seal/open contract is proved by
+    /// `guardian_identity_key_contract_tests`.
+    pub fn to_x25519_secret(&self) -> x25519_dalek::StaticSecret {
+        let seed = zeroize::Zeroizing::new(self.inner.to_bytes());
+        let mut hash = zeroize::Zeroizing::new([0u8; 64]);
+        hash.copy_from_slice(&sha2::Sha512::new().chain_update(&*seed).finalize());
+        let mut scalar = zeroize::Zeroizing::new([0u8; 32]);
+        scalar.copy_from_slice(&hash[..32]);
+        scalar[0] &= 248;
+        scalar[31] &= 127;
+        scalar[31] |= 64;
+        x25519_dalek::StaticSecret::from(*scalar)
+    }
 }
 
 /// Ed25519 public key for verification.
@@ -85,6 +110,17 @@ impl PublicKey {
     /// Returns the raw bytes of the public key.
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.bytes
+    }
+
+    /// Maps this Ed25519 public key to its X25519 (Montgomery) form.
+    ///
+    /// Returns `None` if the bytes are not a valid Ed25519 point. The result
+    /// is the sealed-box recipient key that pairs with
+    /// [`SigningKeyPair::to_x25519_secret`] — used to address guardian entries
+    /// by a contact's advertised signing key.
+    pub fn to_x25519(&self) -> Option<x25519_dalek::PublicKey> {
+        let vk = ed25519_dalek::VerifyingKey::from_bytes(&self.bytes).ok()?;
+        Some(x25519_dalek::PublicKey::from(vk.to_montgomery().to_bytes()))
     }
 
     /// Returns a human-readable hex fingerprint of the public key.
@@ -135,4 +171,52 @@ pub fn verify_signature(public_key: &[u8; 32], message: &[u8], signature: &Signa
     };
     let sig = ed25519_dalek::Signature::from_bytes(signature.as_bytes());
     vk.verify(message, &sig).is_ok()
+}
+
+// INLINE_TEST_REQUIRED: the guardian seal/open key contract is validated
+// against crate-internal derivations (HKDF Vauchi_Exchange_Seed_v2 negative
+// case via crypto::X3DHKeyPair) and the raw x25519_dalek primitive, neither of
+// which is on the public integration-test surface. The end-to-end contract via
+// the public API lives in tests/it/guardian_identity_key_contract_tests.rs.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    // The guardian seal/open contract, reduced to its primitive: the X25519
+    // secret derived from an identity's signing key must have exactly the
+    // public key that guardian entries are sealed to (VerifyingKey::to_
+    // montgomery). Sealed-box then guarantees openability — proved end-to-end
+    // in guardian_identity_key_contract_tests.
+    #[test]
+    fn x25519_secret_public_matches_montgomery_recipient() {
+        let kp = SigningKeyPair::from_seed(&[42u8; 32]);
+        let secret_pub = x25519_dalek::PublicKey::from(&kp.to_x25519_secret());
+        let recipient = kp.public_key().to_x25519().expect("valid point");
+        assert_eq!(secret_pub.as_bytes(), recipient.as_bytes());
+    }
+
+    // The pre-fix opener derived HKDF("Vauchi_Exchange_Seed_v2"); its public key
+    // is unrelated to the seal target, which is why real identities could never
+    // open their own guardian entries. Guards against regressing to it.
+    #[test]
+    fn exchange_seed_secret_is_not_the_guardian_recipient() {
+        let seed = [7u8; 32];
+        let kp = SigningKeyPair::from_seed(&seed);
+        let recipient = kp.public_key().to_x25519().unwrap();
+        let exchange_seed =
+            crate::crypto::HKDF::derive_key(None, &seed, b"Vauchi_Exchange_Seed_v2");
+        let x3dh = crate::crypto::X3DHKeyPair::from_bytes(*exchange_seed);
+        assert_ne!(x3dh.public_key(), recipient.as_bytes());
+    }
+
+    proptest! {
+        #[test]
+        fn x25519_secret_public_matches_recipient_for_any_seed(seed: [u8; 32]) {
+            let kp = SigningKeyPair::from_seed(&seed);
+            let secret_pub = x25519_dalek::PublicKey::from(&kp.to_x25519_secret());
+            let recipient = kp.public_key().to_x25519().expect("valid point");
+            prop_assert_eq!(secret_pub.as_bytes(), recipient.as_bytes());
+        }
+    }
 }

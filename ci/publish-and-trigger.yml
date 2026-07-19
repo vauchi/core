@@ -623,6 +623,20 @@ verify:downstream-rust:
   parallel:
     matrix:
       - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/e2e, vauchi/relay, vauchi/linux-gtk]
+  # Do NOT leak core's pipeline variables into the child pipelines. Each
+  # downstream repo must resolve its OWN pinned VAUCHI_SCRIPTS_REF (and its
+  # own CARGO_HOME / runner config). Forwarding core's VAUCHI_SCRIPTS_REF made
+  # verified-fetch download a humble_check.py that mismatched the downstream's
+  # pinned checksum (cli lint:humble), and leaked an unwritable CARGO_HOME into
+  # cargo-vet on read-only runners (relay security:vet). Downstream verifies
+  # core's new code via the `branch = "main"` git dependency, so no core
+  # variable needs forwarding.
+  trigger:
+    project: $DOWNSTREAM
+    strategy: depend
+    forward:
+      yaml_variables: false
+      pipeline_variables: false
   rules:
     # Skip on the scheduled (nightly) pipeline — this fans out to 5 downstream
     # repos; changes: evaluates true on schedules so it rode along, triggering

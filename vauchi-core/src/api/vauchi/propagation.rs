@@ -586,29 +586,47 @@ impl Vauchi {
                     ..
                 } => match self.storage.contacts().load_own_card()? {
                     Some(mut card) => {
+                        let mut synced_field = field.clone();
+                        if let Some(existing) = card
+                            .fields()
+                            .iter()
+                            .find(|existing| existing.id() == synced_field.id())
+                            && synced_field.updated_at() <= existing.updated_at()
+                        {
+                            // `process_incoming` has already selected this
+                            // equal-time write by the ADR-020 device-id
+                            // tie-break. Advance its field clock so the
+                            // resolved winner also dominates delayed
+                            // re-propagation deltas on peer cards, whose V1
+                            // field payload has no originating-device stamp.
+                            let value = synced_field.value().to_string();
+                            synced_field.set_value(&value, existing.updated_at().saturating_add(1));
+                        }
                         if let Some(existing_id) = card
                             .fields()
                             .iter()
                             .find(|existing| {
-                                existing.label() == field.label() && existing.id() != field.id()
+                                existing.label() == synced_field.label()
+                                    && existing.id() != synced_field.id()
                             })
                             .map(|existing| existing.id().to_string())
                         {
                             card.remove_field(&existing_id).map_err(VauchiError::from)?;
                         }
-                        card.add_field(field.clone()).map_err(VauchiError::from)?;
+                        card.add_field(synced_field.clone())
+                            .map_err(VauchiError::from)?;
                         match field_visibility {
                             Some(crate::visibility::FieldVisibility::Everyone) => {
-                                card.field_visibility_mut().set_everyone(field.id());
+                                card.field_visibility_mut().set_everyone(synced_field.id());
                             }
                             Some(crate::visibility::FieldVisibility::Contacts(contacts)) => {
                                 card.field_visibility_mut()
-                                    .set_contacts(field.id(), contacts.clone());
+                                    .set_contacts(synced_field.id(), contacts.clone());
                             }
                             Some(crate::visibility::FieldVisibility::Nobody) => {
-                                card.field_visibility_mut().set_nobody(field.id());
+                                card.field_visibility_mut().set_nobody(synced_field.id());
                             }
-                            None => card.field_visibility_mut().remove(field.id()),
+                            None => card.field_visibility_mut().remove(synced_field.id()),
                         }
                         self.storage
                             .contacts()

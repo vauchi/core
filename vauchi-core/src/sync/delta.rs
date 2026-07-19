@@ -222,6 +222,15 @@ impl CardDelta {
                         .map_err(|e| DeltaError::ApplyError(e.to_string()))?;
                 }
                 FieldChange::Added { field } => {
+                    // Re-propagation sends the complete visible card as
+                    // `Added` changes. A delayed delta from another linked
+                    // sender device must not overwrite a causally newer
+                    // resolved field that already reached this contact.
+                    if card.fields().iter().any(|existing| {
+                        existing.id() == field.id() && existing.updated_at() > field.updated_at()
+                    }) {
+                        continue;
+                    }
                     card.add_field(field.clone())
                         .map_err(|e| DeltaError::ApplyError(e.to_string()))?;
                 }

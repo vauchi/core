@@ -210,7 +210,11 @@ pub fn process_single_card_update(
 }
 
 /// Device-aware receive path used after rotating anonymous-token resolution.
-fn process_single_card_update_for_device(
+///
+/// `peer_device_id` scopes both the ratchet session and the stale-version
+/// floor to one of the sender's devices; the legacy all-zero id addresses
+/// pre-multi-device peers.
+pub fn process_single_card_update_for_device(
     identity: &Identity,
     storage: &Storage,
     sender_id: &str,

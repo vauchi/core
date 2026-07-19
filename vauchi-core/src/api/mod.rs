@@ -150,7 +150,7 @@ pub use sync_controller::{SyncController, SyncResult};
 pub use sync::{
     CardUpdateError, CardUpdateResult, DeviceSyncOrchestrator, ReceiveOutcome, ReceivedAlert,
     SyncError, SyncManager, build_device_sync_envelopes, process_card_updates,
-    process_single_card_update,
+    process_single_card_update, process_single_card_update_for_device,
 };
 
 // App Password / Duress PIN

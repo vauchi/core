@@ -8,6 +8,7 @@
 //! on the Vauchi struct correctly orchestrate data gathering from storage,
 //! encryption, and restoration — the missing wiring layer.
 
+use proptest::prelude::*;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
@@ -442,4 +443,31 @@ fn recover_rejects_duplicate_share() {
         result.is_err(),
         "two shares from the same guardian must not reconstruct the key"
     );
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(48))]
+
+    /// `respond_to_recovery` must never panic on arbitrary bytes, and must
+    /// reject anything that is not a valid share sealed to this guardian
+    /// (DC-01/DC-02: bounded, fail-closed parse boundary).
+    #[test]
+    fn respond_to_recovery_rejects_arbitrary_input(
+        sealed in prop::collection::vec(any::<u8>(), 0..256),
+        recovering_pk: [u8; 32],
+    ) {
+        let g = guardian("Guardian");
+        prop_assert!(g.respond_to_recovery(&sealed, &recovering_pk).is_err());
+    }
+
+    /// `recover_guardian_backup` must never panic on arbitrary re-sealed shares.
+    #[test]
+    fn recover_rejects_arbitrary_shares(
+        a in prop::collection::vec(any::<u8>(), 0..256),
+        b in prop::collection::vec(any::<u8>(), 0..256),
+    ) {
+        let mut recovering = Vauchi::in_memory().unwrap();
+        recovering.create_identity("Recovering").unwrap();
+        prop_assert!(recovering.recover_guardian_backup("00", &[a, b]).is_err());
+    }
 }

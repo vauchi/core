@@ -71,3 +71,40 @@ proptest! {
         prop_assert_eq!(opened, shard);
     }
 }
+
+/// Regression guard for a deliberate design choice: the derivation is NOT
+/// replaced by ed25519-dalek's `to_scalar_bytes()`. That method returns the
+/// signing scalar reduced mod L, whereas an X25519 static secret must be the
+/// clamped expanded scalar `clamp(SHA-512(seed)[0..32])`, which is always
+/// >= 2^254 > L. The raw bytes therefore always differ, and
+/// `StaticSecret::from(to_scalar_bytes())` would re-clamp to the wrong value —
+/// so it must never be substituted. Correctness of our construction is pinned
+/// instead by `to_x25519_secret_known_answer` (external libsodium reference)
+/// and the `x25519_secret_public_matches_recipient_for_any_seed` proptest
+/// (derived public key == `VerifyingKey::to_montgomery`).
+#[test]
+fn to_scalar_bytes_is_not_the_x25519_secret() {
+    let ours = SigningKeyPair::from_seed(&[1u8; 32])
+        .to_x25519_secret()
+        .to_bytes();
+    let dalek = ed25519_dalek::SigningKey::from_bytes(&[1u8; 32]).to_scalar_bytes();
+    assert_ne!(
+        ours, dalek,
+        "to_scalar_bytes is the reduced scalar, not the clamped x25519 secret"
+    );
+}
+
+/// Known-answer test pinning the libsodium `crypto_sign_ed25519_sk_to_curve25519`
+/// output for seed `[1u8; 32]`. `expected` was computed by an independent Python
+/// reference (`clamp(SHA-512(seed)[0..32])`), so this catches a silent change in
+/// both the manual path and the dalek path at once.
+#[test]
+fn to_x25519_secret_known_answer() {
+    let secret = SigningKeyPair::from_seed(&[1u8; 32]).to_x25519_secret();
+    let expected: [u8; 32] = [
+        0x58, 0xe8, 0x6e, 0xfb, 0x75, 0xfa, 0x4e, 0x2c, 0x41, 0x0f, 0x46, 0xe1, 0x6d, 0xe9, 0xf6,
+        0xac, 0xae, 0x1a, 0x17, 0x03, 0x52, 0x86, 0x51, 0xb6, 0x9b, 0xc1, 0x76, 0xc0, 0x88, 0xbe,
+        0xf3, 0x6e,
+    ];
+    assert_eq!(secret.to_bytes(), expected);
+}

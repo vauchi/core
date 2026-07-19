@@ -8,13 +8,10 @@
 //! on the Vauchi struct correctly orchestrate data gathering from storage,
 //! encryption, and restoration — the missing wiring layer.
 
-use ed25519_dalek::SigningKey;
-use rand_core::OsRng;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::{ContactField, FieldType, ImportSource, Vauchi, VauchiConfig};
-use x25519_dalek::StaticSecret;
 
 const BACKUP_PASSWORD: &str = "correct-horse-battery-staple";
 
@@ -210,50 +207,45 @@ fn full_backup_api_import_rejects_existing_identity() {
     assert!(result.is_err(), "import should reject when identity exists");
 }
 
-// ── Guardian key shard backup E2E ──────────────────────────────────────────
+// ── Guardian key shard backup E2E (ciphertext-only re-seal flow) ────────────
+//
+// A guardian is a full Vauchi identity. It opens the share sealed to it and
+// re-seals it to the recovering party via `respond_to_recovery` — no guardian
+// secret or plaintext Shamir share ever crosses the API boundary
+// (problem 2026-07-13-mobile-guardian-backup-integration).
 
-/// A guardian keypair for testing: Ed25519 identity key plus the matching
-/// X25519 key used to open sealed shares.
-struct GuardianKeys {
-    ed25519_pk: [u8; 32],
-    x25519_sk: StaticSecret,
+/// A guardian identity that can open and re-seal shares in Core.
+fn guardian(name: &str) -> Vauchi {
+    let mut v = Vauchi::in_memory().unwrap();
+    v.create_identity(name).unwrap();
+    v
 }
 
-impl GuardianKeys {
-    fn generate() -> Self {
-        let signing_key = SigningKey::generate(&mut OsRng);
-        let ed25519_pk = signing_key.verifying_key().to_bytes();
-        let x25519_sk = StaticSecret::from(signing_key.to_scalar_bytes());
-        Self {
-            ed25519_pk,
-            x25519_sk,
-        }
-    }
+/// The Ed25519 signing key a guardian entry is addressed to.
+fn signing_pk(v: &Vauchi) -> [u8; 32] {
+    *v.identity().unwrap().signing_public_key()
 }
 
-/// End-to-end guardian backup: create identity + data, export with 2-of-3 shards,
-/// recover with any 2 guardians, verify the decrypted envelope matches.
+/// End-to-end guardian backup: export with 2-of-3 shards, two guardians
+/// re-seal their shares to a fresh recovering identity, recover, and verify the
+/// decrypted envelope matches — with no raw key material at the API boundary.
 // @scenario: backup_format_versioning :: Guardian backup round-trip with shards
 #[test]
-fn guardian_backup_with_shards_roundtrip() {
-    let v = setup_vauchi_with_data();
-    let original_public_id = v.public_id().unwrap();
+fn guardian_backup_reseal_roundtrip() {
+    let alice = setup_vauchi_with_data();
+    let original_public_id = alice.public_id().unwrap();
 
-    let guardians = [
-        GuardianKeys::generate(),
-        GuardianKeys::generate(),
-        GuardianKeys::generate(),
-    ];
-    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(|g| g.ed25519_pk).collect();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
 
-    let (backup_hex, sealed_shares) = v
+    let (backup_hex, sealed_shares) = alice
         .export_guardian_backup_with_shards(&guardian_pks, 2)
         .unwrap();
 
     assert!(!backup_hex.is_empty());
-    let backup_bytes = hex::decode(&backup_hex).unwrap();
     assert_eq!(
-        backup_bytes[0], 0x04,
+        hex::decode(&backup_hex).unwrap()[0],
+        0x04,
         "guardian backup must use v4 format byte"
     );
     assert_eq!(
@@ -262,14 +254,27 @@ fn guardian_backup_with_shards_roundtrip() {
         "expected one sealed share per guardian"
     );
 
-    // Open shares 0 and 2 with the corresponding guardian X25519 secret keys.
-    let recovery_pairs = vec![
-        (sealed_shares[0].clone(), guardians[0].x25519_sk.clone()),
-        (sealed_shares[2].clone(), guardians[2].x25519_sk.clone()),
-    ];
+    // Fresh identity on the recovering device.
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
 
-    let envelope = v
-        .recover_guardian_backup(&backup_hex, &recovery_pairs)
+    // Guardians 0 and 2 re-seal their shares to the recovering party.
+    let re0 = guardians[0]
+        .respond_to_recovery(&sealed_shares[0], &recovering_pk)
+        .unwrap();
+    let re2 = guardians[2]
+        .respond_to_recovery(&sealed_shares[2], &recovering_pk)
+        .unwrap();
+
+    // Ciphertext-only boundary: a re-seal is not the original sealed share.
+    assert_ne!(
+        re0, sealed_shares[0],
+        "re-sealing to a new recipient must produce different ciphertext"
+    );
+
+    let envelope = recovering
+        .recover_guardian_backup(&backup_hex, &[re0, re2])
         .unwrap();
 
     // Identity round-tripped.
@@ -301,42 +306,140 @@ fn guardian_backup_with_shards_roundtrip() {
 /// Recovery must fail when fewer than the threshold of shares is provided.
 // @scenario: backup_format_versioning :: Guardian backup recovery rejects insufficient shares
 #[test]
-fn guardian_backup_recovery_rejects_insufficient_shares() {
-    let v = setup_vauchi_with_data();
-    let guardians = [
-        GuardianKeys::generate(),
-        GuardianKeys::generate(),
-        GuardianKeys::generate(),
-    ];
-    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(|g| g.ed25519_pk).collect();
+fn recover_rejects_insufficient_shares() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
 
-    let (backup_hex, sealed_shares) = v
+    let (backup_hex, sealed_shares) = alice
         .export_guardian_backup_with_shards(&guardian_pks, 2)
         .unwrap();
 
-    // Only one share: reconstruction must fail.
-    let recovery_pairs = vec![(sealed_shares[0].clone(), guardians[0].x25519_sk.clone())];
-    let result = v.recover_guardian_backup(&backup_hex, &recovery_pairs);
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+
+    let re0 = guardians[0]
+        .respond_to_recovery(&sealed_shares[0], &recovering_pk)
+        .unwrap();
+
+    // One share against a 2-of-3 threshold: reconstruction must fail.
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0]);
     assert!(result.is_err(), "recovery with 1-of-2 threshold must fail");
 }
 
-/// A sealed share must not open with a different guardian's secret key.
-// @scenario: backup_format_versioning :: Guardian sealed share rejects wrong secret key
+/// A guardian cannot open a share sealed to a *different* guardian, so it
+/// cannot re-seal one it was not designated for.
+// @scenario: backup_format_versioning :: Guardian sealed share rejects wrong recipient
 #[test]
-fn guardian_backup_share_rejects_wrong_key() {
-    let v = setup_vauchi_with_data();
-    let guardians = [GuardianKeys::generate(), GuardianKeys::generate()];
-    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(|g| g.ed25519_pk).collect();
+fn respond_to_recovery_rejects_foreign_share() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
 
-    let (_backup_hex, sealed_shares) = v
+    let (_backup_hex, sealed_shares) = alice
         .export_guardian_backup_with_shards(&guardian_pks, 2)
         .unwrap();
 
-    // Use guardian 1's secret to open guardian 0's share.
-    let wrong_pair = vec![(sealed_shares[0].clone(), guardians[1].x25519_sk.clone())];
-    let result = v.recover_guardian_backup("00", &wrong_pair);
+    let recovering_pk = signing_pk(&guardian("Recovering"));
+
+    // Guardian 1 tries to respond with guardian 0's share.
+    let result = guardians[1].respond_to_recovery(&sealed_shares[0], &recovering_pk);
     assert!(
         result.is_err(),
-        "share must not open with wrong guardian key"
+        "a guardian must not open a share sealed to another identity"
+    );
+}
+
+/// The recovering party cannot open shares that guardians re-sealed to a
+/// different recipient — the re-seal is bound to the intended recovering key.
+// @scenario: backup_format_versioning :: Guardian re-seal rejects wrong recovering key
+#[test]
+fn recover_rejects_shares_resealed_to_another_party() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+
+    let (backup_hex, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let impostor_pk = signing_pk(&guardian("Impostor"));
+
+    // Guardians re-seal to the impostor, not to the recovering party.
+    let re0 = guardians[0]
+        .respond_to_recovery(&sealed_shares[0], &impostor_pk)
+        .unwrap();
+    let re2 = guardians[2]
+        .respond_to_recovery(&sealed_shares[2], &impostor_pk)
+        .unwrap();
+
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re2]);
+    assert!(
+        result.is_err(),
+        "recovering party must not open shares re-sealed to another key"
+    );
+}
+
+/// A tampered re-sealed share must be rejected (AEAD integrity).
+// @scenario: backup_format_versioning :: Guardian re-seal rejects tampered ciphertext
+#[test]
+fn recover_rejects_tampered_share() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+
+    let (backup_hex, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+
+    let mut re0 = guardians[0]
+        .respond_to_recovery(&sealed_shares[0], &recovering_pk)
+        .unwrap();
+    let re2 = guardians[2]
+        .respond_to_recovery(&sealed_shares[2], &recovering_pk)
+        .unwrap();
+
+    let last = re0.len() - 1;
+    re0[last] ^= 0xFF;
+
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re2]);
+    assert!(result.is_err(), "tampered re-sealed share must be rejected");
+}
+
+/// Two copies of the same guardian's share must not satisfy the threshold —
+/// duplicate Shamir indices carry no independent information.
+// @scenario: backup_format_versioning :: Guardian recovery rejects duplicate shares
+#[test]
+fn recover_rejects_duplicate_share() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+
+    let (backup_hex, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+
+    let re0 = guardians[0]
+        .respond_to_recovery(&sealed_shares[0], &recovering_pk)
+        .unwrap();
+    let re0_again = guardians[0]
+        .respond_to_recovery(&sealed_shares[0], &recovering_pk)
+        .unwrap();
+
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re0_again]);
+    assert!(
+        result.is_err(),
+        "two shares from the same guardian must not reconstruct the key"
     );
 }

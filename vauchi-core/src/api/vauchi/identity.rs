@@ -813,12 +813,50 @@ impl Vauchi {
         Ok((hex::encode(blob), sealed_shares))
     }
 
-    /// Recovers a v4 guardian backup from sealed shares.
+    /// Re-seals a guardian entry for a recovering party without exposing key
+    /// material.
     ///
-    /// Takes the encrypted backup blob (hex-encoded) and a vector of sealed
-    /// shares from guardians. Decrypts each share with the corresponding
-    /// guardian's X25519 secret key, reconstructs the backup key, and returns
-    /// the decrypted [`FullBackupEnvelope`].
+    /// A designated guardian calls this on receipt of a recovery request: it
+    /// opens the share sealed to this identity's own key, then re-seals the
+    /// plaintext share to `recovering_signing_pk`. The plaintext Shamir share
+    /// and this identity's secret never leave Core — the returned bytes are
+    /// ciphertext only, safe to hand back across the platform boundary
+    /// (problem 2026-07-13-mobile-guardian-backup-integration; ADR-058).
+    ///
+    /// # Arguments
+    /// * `sealed_share` - The share from
+    ///   [`Self::export_guardian_backup_with_shards`] sealed to this guardian.
+    /// * `recovering_signing_pk` - The recovering identity's Ed25519 signing
+    ///   key (a recovery claim's `new_pk`).
+    ///
+    /// # Errors
+    /// [`VauchiError::InvalidState`] if the share does not open with this
+    /// identity; [`VauchiError::Crypto`] if `recovering_signing_pk` is invalid.
+    pub fn respond_to_recovery(
+        &self,
+        sealed_share: &[u8],
+        recovering_signing_pk: &[u8; 32],
+    ) -> VauchiResult<Vec<u8>> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let our_secret = identity.signing_keypair().to_x25519_secret();
+        let shard = crate::backup::open_share_for_guardian(sealed_share, &our_secret)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let recipient = ed25519_pk_to_x25519(recovering_signing_pk)?;
+        crate::backup::seal_share_for_guardian(&shard, &recipient)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))
+    }
+
+    /// Recovers a v4 guardian backup from re-sealed shares.
+    ///
+    /// Takes the encrypted backup blob (hex-encoded) and the shares that
+    /// guardians re-sealed to this identity via [`Self::respond_to_recovery`].
+    /// Opens each with this identity's own X25519 secret — derived in Core,
+    /// never supplied by the caller — reconstructs the backup key, and returns
+    /// the decrypted [`FullBackupEnvelope`]. No guardian secret or plaintext
+    /// share ever crosses the platform boundary.
     ///
     /// **This method does not restore identity, contacts, or labels to storage.**
     /// The caller must apply the returned envelope the same way
@@ -828,7 +866,7 @@ impl Vauchi {
     ///
     /// # Arguments
     /// * `backup_data` - Hex-encoded backup blob from [`Self::export_guardian_backup_with_shards`].
-    /// * `sealed_shares` - Sealed shares, each paired with the guardian's X25519 secret key.
+    /// * `re_sealed_shares` - Shares re-sealed to this identity by guardians.
     ///
     /// # Errors
     /// Returns [`VauchiError::InvalidState`] if share decryption or key
@@ -836,11 +874,17 @@ impl Vauchi {
     pub fn recover_guardian_backup(
         &self,
         backup_data: &str,
-        sealed_shares: &[(Vec<u8>, x25519_dalek::StaticSecret)],
+        re_sealed_shares: &[Vec<u8>],
     ) -> VauchiResult<crate::backup::FullBackupEnvelope> {
-        let mut shards = Vec::with_capacity(sealed_shares.len());
-        for (sealed, sk) in sealed_shares {
-            let shard = crate::backup::open_share_for_guardian(sealed, sk)
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let our_secret = identity.signing_keypair().to_x25519_secret();
+
+        let mut shards = Vec::with_capacity(re_sealed_shares.len());
+        for sealed in re_sealed_shares {
+            let shard = crate::backup::open_share_for_guardian(sealed, &our_secret)
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
             shards.push(shard);
         }

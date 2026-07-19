@@ -97,4 +97,17 @@ mod tests {
         init_mobile_logging();
         init_mobile_logging();
     }
+
+    // The shipped-binary posture: with `dev-logging` off, init must
+    // register no backend, so the `log` facade's runtime max level stays
+    // `Off` and the existing vauchi-app `log::` call sites are silent
+    // no-ops. Guards against a native backend leaking into release builds
+    // (logging-rules.md privacy boundary).
+    // @internal
+    #[cfg(not(feature = "dev-logging"))]
+    #[test]
+    fn release_build_installs_no_log_backend() {
+        init_mobile_logging();
+        assert_eq!(log::max_level(), log::LevelFilter::Off);
+    }
 }

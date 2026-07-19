@@ -4650,7 +4650,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.55.4"
+version = "0.55.5"
 dependencies = [
  "base64",
  "hex",
@@ -4672,7 +4672,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-cabi"
-version = "0.55.4"
+version = "0.55.5"
 dependencies = [
  "cbindgen",
  "env_logger",
@@ -4686,7 +4686,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.55.4"
+version = "0.55.5"
 dependencies = [
  "argon2",
  "base64",
@@ -4744,7 +4744,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-platform"
-version = "0.55.4"
+version = "0.55.5"
 dependencies = [
  "android_logger",
  "base64",
@@ -4767,7 +4767,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.55.4"
+version = "0.55.5"
 dependencies = [
  "serde",
  "serde_json",

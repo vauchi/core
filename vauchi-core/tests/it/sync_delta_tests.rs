@@ -218,6 +218,32 @@ fn test_delta_apply_add_field() {
     assert_eq!(card.fields()[0].value(), "alice@example.com");
 }
 
+// @scenario: sync_updates :: Concurrent linked-device edits converge
+// @internal
+#[test]
+fn test_delta_apply_rejects_stale_repropagated_field() {
+    let mut card = ContactCard::new("Alice");
+    let mut current = ContactField::new(FieldType::Phone, "phone", "+12025550501", 10);
+    current.set_value("+12025550502", 20);
+    let mut stale = current.clone();
+    stale.set_value("+12025550501", 10);
+    card.add_field(current).unwrap();
+
+    let delta = CardDelta {
+        version: 2,
+        timestamp: 20,
+        changes: vec![FieldChange::Added { field: stale }],
+        nonce: [0u8; 32],
+        signature: [0u8; 64],
+        validation_summary: None,
+    };
+
+    delta.apply(&mut card, 0).unwrap();
+
+    assert_eq!(card.fields()[0].value(), "+12025550502");
+    assert_eq!(card.fields()[0].updated_at(), 20);
+}
+
 // @scenario: sync_updates :: Receive contact card update
 // @internal
 #[test]

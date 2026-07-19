@@ -613,6 +613,47 @@ fn apply_sync_card_field_synced_replaces_same_label_with_stable_field_identity()
     assert!(card.is_field_shown(&synced_id));
 }
 
+// @scenario: sync_updates :: Concurrent linked-device edits converge
+// @internal
+#[test]
+fn apply_sync_card_field_synced_advances_equal_timestamp_winner() {
+    let wb = make_vauchi();
+    let timestamp = now();
+    wb.add_own_field(ContactField::new(
+        FieldType::Phone,
+        "phone",
+        "+12025550501",
+        timestamp,
+    ))
+    .unwrap();
+    let mut winner = wb
+        .own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .find(|field| field.label() == "phone")
+        .unwrap()
+        .clone();
+    winner.set_value("+12025550502", timestamp);
+
+    wb.apply_sync_items(vec![SyncItem::CardFieldSynced {
+        field: winner,
+        field_visibility: Some(FieldVisibility::Everyone),
+        timestamp,
+    }])
+    .unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    let field = card
+        .fields()
+        .iter()
+        .find(|field| field.label() == "phone")
+        .unwrap();
+    assert_eq!(field.value(), "+12025550502");
+    assert_eq!(field.updated_at(), timestamp + 1);
+}
+
 // @scenario: sync_updates :: New fields retain the owner's privacy-first default on linked devices
 #[test]
 fn apply_sync_card_field_synced_without_visibility_keeps_field_hidden() {

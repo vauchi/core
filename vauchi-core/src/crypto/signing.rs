@@ -74,7 +74,7 @@ impl SigningKeyPair {
     pub fn to_x25519_secret(&self) -> x25519_dalek::StaticSecret {
         let seed = zeroize::Zeroizing::new(self.inner.to_bytes());
         let mut hash = zeroize::Zeroizing::new([0u8; 64]);
-        hash.copy_from_slice(&sha2::Sha512::new().chain_update(&*seed).finalize());
+        hash.copy_from_slice(&sha2::Sha512::new().chain_update(seed.as_slice()).finalize());
         let mut scalar = zeroize::Zeroizing::new([0u8; 32]);
         scalar.copy_from_slice(&hash[..32]);
         scalar[0] &= 248;
@@ -188,6 +188,7 @@ mod tests {
     // public key that guardian entries are sealed to (VerifyingKey::to_
     // montgomery). Sealed-box then guarantees openability — proved end-to-end
     // in guardian_identity_key_contract_tests.
+    // @internal
     #[test]
     fn x25519_secret_public_matches_montgomery_recipient() {
         let kp = SigningKeyPair::from_seed(&[42u8; 32]);
@@ -199,6 +200,7 @@ mod tests {
     // The pre-fix opener derived HKDF("Vauchi_Exchange_Seed_v2"); its public key
     // is unrelated to the seal target, which is why real identities could never
     // open their own guardian entries. Guards against regressing to it.
+    // @internal
     #[test]
     fn exchange_seed_secret_is_not_the_guardian_recipient() {
         let seed = [7u8; 32];
@@ -211,6 +213,7 @@ mod tests {
     }
 
     proptest! {
+        // @internal
         #[test]
         fn x25519_secret_public_matches_recipient_for_any_seed(seed: [u8; 32]) {
             let kp = SigningKeyPair::from_seed(&seed);

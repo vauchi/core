@@ -451,6 +451,7 @@ proptest! {
     /// `respond_to_recovery` must never panic on arbitrary bytes, and must
     /// reject anything that is not a valid share sealed to this guardian
     /// (DC-01/DC-02: bounded, fail-closed parse boundary).
+    // @internal
     #[test]
     fn respond_to_recovery_rejects_arbitrary_input(
         sealed in prop::collection::vec(any::<u8>(), 0..256),
@@ -461,6 +462,7 @@ proptest! {
     }
 
     /// `recover_guardian_backup` must never panic on arbitrary re-sealed shares.
+    // @internal
     #[test]
     fn recover_rejects_arbitrary_shares(
         a in prop::collection::vec(any::<u8>(), 0..256),

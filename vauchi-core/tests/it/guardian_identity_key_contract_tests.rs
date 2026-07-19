@@ -27,6 +27,7 @@ fn a_shard() -> BackupKeyShard {
         .swap_remove(0)
 }
 
+// @internal
 #[test]
 fn identity_opens_share_sealed_to_its_signing_key() {
     let guardian = SigningKeyPair::from_seed(&[9u8; 32]);
@@ -43,6 +44,7 @@ fn identity_opens_share_sealed_to_its_signing_key() {
     );
 }
 
+// @internal
 #[test]
 fn a_different_guardian_cannot_open_the_share() {
     let guardian = SigningKeyPair::from_seed(&[1u8; 32]);
@@ -58,6 +60,7 @@ fn a_different_guardian_cannot_open_the_share() {
 }
 
 proptest! {
+    // @internal
     #[test]
     fn seal_open_roundtrips_for_any_identity(seed: [u8; 32]) {
         let guardian = SigningKeyPair::from_seed(&seed);
@@ -82,6 +85,7 @@ proptest! {
 /// instead by `to_x25519_secret_known_answer` (external libsodium reference)
 /// and the `x25519_secret_public_matches_recipient_for_any_seed` proptest
 /// (derived public key == `VerifyingKey::to_montgomery`).
+// @internal
 #[test]
 fn to_scalar_bytes_is_not_the_x25519_secret() {
     let ours = SigningKeyPair::from_seed(&[1u8; 32])
@@ -94,6 +98,7 @@ fn to_scalar_bytes_is_not_the_x25519_secret() {
     );
 }
 
+// @internal
 /// Known-answer test pinning the libsodium `crypto_sign_ed25519_sk_to_curve25519`
 /// output for seed `[1u8; 32]`. `expected` was computed by an independent Python
 /// reference (`clamp(SHA-512(seed)[0..32])`), so this catches a silent change in

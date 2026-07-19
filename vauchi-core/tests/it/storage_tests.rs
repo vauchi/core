@@ -814,6 +814,80 @@ fn test_last_delta_version_nonexistent_contact() {
     assert!(result.is_err(), "expected error");
 }
 
+/// Test last_delta_version_for_device defaults to 0 (missing row = no floor)
+// @scenario: sync_updates :: Delta sync versioning
+// @internal
+#[test]
+fn test_last_delta_version_for_device_default() {
+    let storage = create_test_storage();
+    let contact = create_test_contact("Alice");
+    let contact_id = contact.id().to_string();
+    storage.contacts().save_contact(&contact).unwrap();
+
+    let version = storage
+        .contacts()
+        .last_delta_version_for_device(&contact_id, &[1; 32])
+        .unwrap();
+    assert_eq!(version, 0, "a contact with no recorded floor returns 0");
+
+    let version = storage
+        .contacts()
+        .last_delta_version_for_device("nonexistent", &[1; 32])
+        .unwrap();
+    assert_eq!(
+        version, 0,
+        "an unknown contact has no floor rows, returns 0"
+    );
+}
+
+/// Test per-device floors are independent and re-recording overwrites
+// @scenario: sync_updates :: Delta sync versioning
+// @internal
+#[test]
+fn test_delta_version_floors_are_isolated_by_peer_device() {
+    let storage = create_test_storage();
+    let contact = create_test_contact("Alice");
+    let contact_id = contact.id().to_string();
+    storage.contacts().save_contact(&contact).unwrap();
+
+    let first_device = [1; 32];
+    let second_device = [2; 32];
+
+    storage
+        .contacts()
+        .record_delta_version_for_device(&contact_id, &first_device, 2)
+        .unwrap();
+
+    assert_eq!(
+        storage
+            .contacts()
+            .last_delta_version_for_device(&contact_id, &first_device)
+            .unwrap(),
+        2
+    );
+    assert_eq!(
+        storage
+            .contacts()
+            .last_delta_version_for_device(&contact_id, &second_device)
+            .unwrap(),
+        0,
+        "a floor recorded for one device must not leak onto another device"
+    );
+
+    storage
+        .contacts()
+        .record_delta_version_for_device(&contact_id, &first_device, 3)
+        .unwrap();
+    assert_eq!(
+        storage
+            .contacts()
+            .last_delta_version_for_device(&contact_id, &first_device)
+            .unwrap(),
+        3,
+        "re-recording must overwrite the stored floor"
+    );
+}
+
 /// Test wipe_device_data clears device_info and sync state
 // @scenario: identity_management :: Identity deletion
 // @internal

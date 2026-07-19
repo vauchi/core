@@ -66,6 +66,7 @@ BUILD_ANDROID=false
 BUILD_MACOS=false
 BUILD_ALL=true
 RELEASE_ONLY=false
+DEV_LOGGING=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -94,8 +95,12 @@ while [[ $# -gt 0 ]]; do
             RELEASE_ONLY=true
             shift
             ;;
+        --dev-logging)
+            DEV_LOGGING=true
+            shift
+            ;;
         --help|-h)
-            echo "Usage: $0 [--ios] [--android] [--macos] [--apple] [--release-only]"
+            echo "Usage: $0 [--ios] [--android] [--macos] [--apple] [--release-only] [--dev-logging]"
             echo ""
             echo "Options:"
             echo "  --ios           Build iOS bindings only"
@@ -103,6 +108,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --macos         Build macOS bindings only"
             echo "  --apple         Build iOS + macOS bindings"
             echo "  --release-only  Skip simulator/Intel targets (arm64 only)"
+            echo "  --dev-logging   Enable the native log backend (internal/dev"
+            echo "                  builds only; OFF for store/release bindings)"
             echo "  (no args)       Build all platforms, all targets"
             exit 0
             ;;
@@ -117,6 +124,18 @@ if $BUILD_ALL; then
     BUILD_IOS=true
     BUILD_ANDROID=true
     BUILD_MACOS=true
+fi
+
+# dev-logging is OFF by default so store/release bindings register no
+# native log backend (logging-rules.md). Internal/dev binding jobs pass
+# --dev-logging to surface the vauchi-app log:: call sites in Logcat/
+# os_log. The generated UniFFI surface is identical either way — the
+# init_mobile_logging() export is a no-op when the feature is off — so
+# bindgen below does not take the flag.
+FEATURE_FLAGS=""
+if $DEV_LOGGING; then
+    FEATURE_FLAGS="--features dev-logging"
+    printf '%b\n' "${YELLOW}dev-logging ENABLED — internal/dev binding, not for release${NC}"
 fi
 
 # === iOS Build ===
@@ -158,7 +177,7 @@ if $BUILD_IOS; then
         TARGET_FLAGS=""
         for t in $IOS_TARGETS; do TARGET_FLAGS="$TARGET_FLAGS --target $t"; done
         printf '%b\n' "${YELLOW}Building iOS targets: $IOS_TARGETS${NC}"
-        cargo build -p vauchi-platform $TARGET_FLAGS --release
+        cargo build -p vauchi-platform $TARGET_FLAGS $FEATURE_FLAGS --release
         printf '%b\n' "${GREEN}iOS build complete ($(echo $IOS_TARGETS | wc -w | tr -d ' ') targets)${NC}"
 
         # Generate Swift bindings
@@ -220,7 +239,7 @@ if $BUILD_MACOS; then
         TARGET_FLAGS=""
         for t in $MACOS_TARGETS; do TARGET_FLAGS="$TARGET_FLAGS --target $t"; done
         printf '%b\n' "${YELLOW}Building macOS targets: $MACOS_TARGETS${NC}"
-        cargo build -p vauchi-platform $TARGET_FLAGS --release
+        cargo build -p vauchi-platform $TARGET_FLAGS $FEATURE_FLAGS --release
         printf '%b\n' "${GREEN}macOS build complete${NC}"
 
         # Package libraries
@@ -311,7 +330,7 @@ if $BUILD_ANDROID; then
     TARGET_FLAGS=""
     for t in $ANDROID_TARGETS; do TARGET_FLAGS="$TARGET_FLAGS --target $t"; done
     printf '%b\n' "${YELLOW}Building Android targets: $ANDROID_TARGETS${NC}"
-    RUSTFLAGS="-Cstrip=none" cargo build -p vauchi-platform $TARGET_FLAGS --release
+    RUSTFLAGS="-Cstrip=none" cargo build -p vauchi-platform $TARGET_FLAGS $FEATURE_FLAGS --release
     printf '%b\n' "${GREEN}Android build complete ($(echo $ANDROID_TARGETS | wc -w | tr -d ' ') targets, metadata preserved)${NC}"
 
     # Generate Kotlin bindings from the cross-compiled aarch64 .so BEFORE

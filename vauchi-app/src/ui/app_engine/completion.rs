@@ -167,8 +167,10 @@ impl AppEngine {
     }
 
     /// Persist the legacy-QR exchange result exactly once: upsert the
-    /// reciprocity-stamped contact, initialize its Double Ratchet, assign the
-    /// selected groups, snapshot the revocation baseline, and request the
+    /// reciprocity-stamped contact, initialize its Double Ratchet, and arm
+    /// the sync bootstrap via `save_exchanged_contact` (the persist seam
+    /// shared with BLE and multi-stage — consolidation Step 2c), then assign
+    /// the selected groups, snapshot the revocation baseline, and request the
     /// capture-at-exchange location. Post-exchange reciprocity resolution is
     /// handled by the stateless delta-sync tier
     /// (`queue_reciprocity_confirmations` / `resolve_reciprocity_confirm`), not
@@ -210,30 +212,23 @@ impl AppEngine {
         };
 
         let contact_id = contact.id().to_string();
-        if let Err(e) = self.vauchi.update_contact(&contact) {
-            return Err(Box::new(ActionResult::ShowAlert {
-                title: self.t("exchange.error.title"),
-                message: format!("Failed to save contact: {e}"),
-            }));
-        }
-        match ratchet {
-            Ok((ratchet, is_initiator)) => {
-                if let Err(e) =
-                    self.vauchi
-                        .save_exchange_ratchet(&contact_id, &ratchet, is_initiator)
-                {
-                    return Err(Box::new(ActionResult::ShowAlert {
-                        title: self.t("exchange.error.title"),
-                        message: format!("Failed to initialize encryption: {e}"),
-                    }));
-                }
-            }
+        let (ratchet, is_initiator) = match ratchet {
+            Ok(pair) => pair,
             Err(e) => {
                 return Err(Box::new(ActionResult::ShowAlert {
                     title: self.t("exchange.error.title"),
                     message: format!("Failed to initialize encryption: {e}"),
                 }));
             }
+        };
+        if let Err(e) = self
+            .vauchi
+            .save_exchanged_contact(&contact, &ratchet, is_initiator)
+        {
+            return Err(Box::new(ActionResult::ShowAlert {
+                title: self.t("exchange.error.title"),
+                message: format!("Failed to save contact: {e}"),
+            }));
         }
         for group_id in &groups {
             // best-effort: group assignment after exchange;

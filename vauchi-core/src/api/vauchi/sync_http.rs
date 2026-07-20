@@ -575,10 +575,11 @@ impl Vauchi {
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.run_device_sync_send(&mut ctrl, identity);
 
-        // Persist advanced ratchet states.
-        // SyncController.sync() advances ratchets via .encrypt() but
-        // does not save them. Without this, ratchet state is lost on
-        // drop, causing desync on next sync cycle.
+        // Re-persist the preloaded ratchet map. Ratchet advance happens
+        // upstream (send: propagation/features at queue time; receive:
+        // card_update) — SyncController carries this map through
+        // unchanged, so this save is defensive only, kept until the
+        // controller's ratchet plumbing is retired.
         let ratchets = ctrl.into_ratchets();
         let mut ratchet_save_errors: Vec<String> = Vec::new();
         for (contact_id, ratchet) in &ratchets {

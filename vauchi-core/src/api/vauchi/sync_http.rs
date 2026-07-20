@@ -317,37 +317,54 @@ impl Vauchi {
         // 1. Register mailbox tokens so the adapter knows what to fetch
         self.register_tokens(identity, contacts, adapter)?;
 
-        // 2. Fetch all pending blobs (collect before processing).
+        // 2. Fetch all pending blobs, classifying each ONCE at the fetch
+        //    site (`InboundBlob` is the single discriminator — Step 3 of
+        //    the consolidation plan replaced the token-set membership and
+        //    magic-prefix probes that were scattered downstream).
         //    `mailbox_token_hex` is the hex-encoded daily-rotating token the
         //    blob arrived for, populated by the relay per ADR-029 addendum
         //    2026-04-27. Blobs whose token doesn't resolve to a known
         //    contact are dropped (post-Step 2: no brute-force fallback).
-        let mut blobs: Vec<(String, String, Vec<u8>)> = Vec::new();
+        let self_tokens = self.self_token_hexes(identity);
+        let mut fetched = 0usize;
+        let mut device_blobs: Vec<(String, Vec<u8>)> = Vec::new();
+        let mut revocations: Vec<(String, crate::network::IdentityRevoked)> = Vec::new();
+        let mut update_blobs: Vec<(String, String, Vec<u8>)> = Vec::new();
         while let Some(envelope) = adapter.receive().map_err(VauchiError::Network)? {
             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
-                blobs.push((
+                fetched += 1;
+                match classify_inbound_blob(
+                    &self_tokens,
                     envelope.message_id.into_string(),
                     update.recipient_id.into_string(),
                     update.ciphertext,
-                ));
+                ) {
+                    InboundBlob::DeviceSync {
+                        message_id,
+                        ciphertext,
+                    } => device_blobs.push((message_id, ciphertext)),
+                    InboundBlob::Revocation {
+                        message_id,
+                        revocation,
+                    } => revocations.push((message_id, revocation)),
+                    InboundBlob::ContactUpdate {
+                        message_id,
+                        token,
+                        ciphertext,
+                    } => update_blobs.push((message_id, token, ciphertext)),
+                }
             }
         }
 
-        let fetched = blobs.len();
-        if blobs.is_empty() {
-            return Ok((0, fetched, 0, 0, String::new()));
+        if fetched == 0 {
+            return Ok((0, 0, 0, 0, String::new()));
         }
 
-        // 2b. Partition self-token (device-sync) blobs out of the contact
-        //     path: they are sealed for the shared identity, not a contact,
-        //     so the contact router cannot decrypt them. Apply + ACK each.
-        let self_tokens = self.self_token_hexes(identity);
-        let (device_blobs, contact_blobs): (Vec<_>, Vec<_>) = blobs
-            .into_iter()
-            .partition(|(_, token, _)| self_tokens.contains(token));
-
+        // 2b. Device-sync blobs are sealed for the shared identity, not a
+        //     contact, so the contact router cannot decrypt them. Apply +
+        //     ACK each.
         let mut device_applied = 0usize;
-        for (message_id, _token, ciphertext) in &device_blobs {
+        for (message_id, ciphertext) in &device_blobs {
             device_applied += self
                 .apply_device_sync_blob(identity, ciphertext)
                 .unwrap_or(0);
@@ -364,18 +381,11 @@ impl Vauchi {
             let _ = adapter.send(&ack);
         }
 
-        // 2c. Route signed identity-revocation blobs (magic-prefixed, not
-        //     encrypted) to process_revocation, which verifies the signature
-        //     against the stored contact and is a no-op on every failure path
-        //     (unknown/stale/forged) — so a forged or garbage revocation cannot
-        //     delete a contact. Decode once and carry the parsed revocation;
-        //     everything else stays on the encrypted-update path.
-        let mut update_blobs = Vec::with_capacity(contact_blobs.len());
-        for (message_id, token, bytes) in contact_blobs {
-            let Some(rev) = crate::network::revocation::decode_revocation_blob(&bytes) else {
-                update_blobs.push((message_id, token, bytes));
-                continue;
-            };
+        // 2c. Signed identity-revocation blobs go to process_revocation,
+        //     which verifies the signature against the stored contact and is
+        //     a no-op on every failure path (unknown/stale/forged) — so a
+        //     forged or garbage revocation cannot delete a contact.
+        for (message_id, rev) in revocations {
             // ACK (let the relay drop the blob) only when processing did not hit
             // a storage error: a transient failure must NOT be ACKed so a later
             // sync retries, while a verified no-op and a successful shred both
@@ -888,6 +898,59 @@ impl Vauchi {
         (configured_origin == requested_origin)
             .then(|| self.distinct_ohttp_route())
             .flatten()
+    }
+}
+
+/// One fetched relay blob, classified exactly once at the fetch site.
+///
+/// Step 3 of the consolidation plan: the receive loop used to re-triage
+/// inside the `EncryptedUpdate` bucket with a token-set membership check
+/// and a magic-prefix probe spread over two passes; this enum is the one
+/// discriminator, and the downstream loops only match variants.
+enum InboundBlob {
+    /// Sealed for the shared identity (self-token): device sync.
+    DeviceSync {
+        message_id: String,
+        ciphertext: Vec<u8>,
+    },
+    /// Magic-prefixed signed identity revocation (not encrypted).
+    Revocation {
+        message_id: String,
+        revocation: crate::network::IdentityRevoked,
+    },
+    /// Ratchet-encrypted contact update, routed by mailbox token.
+    ContactUpdate {
+        message_id: String,
+        token: String,
+        ciphertext: Vec<u8>,
+    },
+}
+
+/// Classification order is load-bearing: self-tokens first (device-sync
+/// blobs are not decryptable by the contact router), then the revocation
+/// magic prefix, then everything else is a contact update.
+fn classify_inbound_blob(
+    self_tokens: &std::collections::HashSet<String>,
+    message_id: String,
+    token: String,
+    ciphertext: Vec<u8>,
+) -> InboundBlob {
+    if self_tokens.contains(&token) {
+        return InboundBlob::DeviceSync {
+            message_id,
+            ciphertext,
+        };
+    }
+    match crate::network::revocation::decode_revocation_blob(&ciphertext) {
+        Some(revocation) => InboundBlob::Revocation {
+            message_id,
+            revocation,
+        },
+        None => InboundBlob::ContactUpdate {
+            message_id,
+            token,
+            ciphertext,
+        },
     }
 }
 

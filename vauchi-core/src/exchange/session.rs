@@ -792,6 +792,7 @@ impl ExchangeSession {
             ExchangeTransport::Ble => "ble",
             ExchangeTransport::Usb => "usb",
             ExchangeTransport::Audio => "audio",
+            ExchangeTransport::MultiStage => "multi_stage",
             ExchangeTransport::Link => "link",
         }
     }

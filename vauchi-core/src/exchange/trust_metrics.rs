@@ -34,11 +34,15 @@ impl TransportProximity {
             ExchangeTransport::Nfc => Self::ContactRange,
             ExchangeTransport::Ble => Self::Proximate,
             // Link mode is asynchronous and relay-mediated — no proximity
-            // attestation possible by construction. Group with Qr / Audio
-            // (transports without a built-in proximity signal).
-            ExchangeTransport::Qr | ExchangeTransport::Audio | ExchangeTransport::Link => {
-                Self::None
-            }
+            // attestation possible by construction. MultiStage is a QR
+            // screen ritual: camera-visual only, its audio verifier is a
+            // separate ProximityConfidence signal, never transport-inherent
+            // (ADR-034 — trust from exchange facts, conservatively). Group
+            // with Qr / Audio (no built-in proximity signal).
+            ExchangeTransport::Qr
+            | ExchangeTransport::Audio
+            | ExchangeTransport::MultiStage
+            | ExchangeTransport::Link => Self::None,
         }
     }
 

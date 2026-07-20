@@ -42,6 +42,12 @@ pub enum ExchangeTransport {
     Usb,
     /// Audio data channel exchange: ultrasonic or audible payload transfer.
     Audio,
+    /// Multi-stage QR family (Hover / Glance screen ritual): animated
+    /// mutual-QR bootstrap. Reader support ships ahead of any writer
+    /// (consolidation Step 2e) — decoding is fail-closed on unknown
+    /// variants, so every released reader must know this name before
+    /// the first persist path stamps it. No writer exists yet.
+    MultiStage,
     /// Asynchronous link-mode exchange: relay-mediated, initiated by sharing
     /// a `vauchi://exchange?pk=…&n=…` URL. Both sides write `Link` at finalize
     /// time — labels the exchange semantics (asynchronous, relay-mediated),

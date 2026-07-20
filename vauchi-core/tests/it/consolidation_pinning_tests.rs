@@ -250,7 +250,14 @@ fn unknown_exchange_transport_variant_fails_closed_on_decode() {
         ExchangeTransport::Ble,
         "legacy CamelCase alias must keep decoding"
     );
-    let unknown = serde_json::from_str::<ExchangeTransport>("\"multi_stage\"");
+    // Step 2e shipped reader support: `multi_stage` decodes even though
+    // no persist path writes it yet (writers ship a release later).
+    assert_eq!(
+        serde_json::from_str::<ExchangeTransport>("\"multi_stage\"").expect("reader support"),
+        ExchangeTransport::MultiStage,
+        "MultiStage readers ship ahead of writers"
+    );
+    let unknown = serde_json::from_str::<ExchangeTransport>("\"carrier_pigeon\"");
     assert!(
         unknown.is_err(),
         "an unknown transport variant must fail decode (fail closed), got {unknown:?}"

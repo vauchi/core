@@ -23,6 +23,7 @@ fn every_variant_round_trips_snake_case() {
         (ExchangeTransport::Ble, "\"ble\""),
         (ExchangeTransport::Usb, "\"usb\""),
         (ExchangeTransport::Audio, "\"audio\""),
+        (ExchangeTransport::MultiStage, "\"multi_stage\""),
         (ExchangeTransport::Link, "\"link\""),
     ];
 

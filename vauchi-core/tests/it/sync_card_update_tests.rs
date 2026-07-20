@@ -11,10 +11,7 @@ use crate::common;
 
 use common::helpers::create_vauchi_with_identity;
 use vauchi_core::SymmetricKey;
-use vauchi_core::api::{
-    CardUpdateError, process_card_updates, process_single_card_update,
-    process_single_card_update_for_device,
-};
+use vauchi_core::api::{CardUpdateError, process_card_updates, process_single_card_update};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;

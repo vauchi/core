@@ -116,15 +116,17 @@ impl Vauchi {
     #[tracing::instrument(level = "debug", skip_all, name = "vauchi.sync_inner")]
     fn sync_inner(&mut self) -> VauchiResult<VauchiSyncOutcome> {
         let identity = self.identity.as_ref().expect("identity checked in sync()");
-        let ohttp_key = self
-            .ohttp_key
-            .as_ref()
-            .expect("ohttp_key checked in sync()");
-
         // Load contacts once — shared by register_tokens, receive, and send phases.
         let contacts = self.storage.contacts().list_contacts().unwrap_or_default();
 
-        let mut adapter = self.create_ohttp_adapter(ohttp_key)?;
+        // Receive/send run over the same hardened OHTTP transport as every
+        // application-relay action (Step 4): build_relay_transport derives the
+        // outer OHTTP hop internally and fails closed without it. sync() has
+        // already returned NotConnected unless self.ohttp_key is Some.
+        let mut adapter = HttpTransportAdapter::new(self.build_relay_transport(
+            &self.config.relay.server_url,
+            self.config.relay.connect_timeout_ms,
+        ));
 
         // Connect adapter (relay health check)
         adapter
@@ -576,27 +578,6 @@ impl Vauchi {
     // Helpers
     // =====================================================================
 
-    /// Create a fail-closed `HttpTransportAdapter` with OHTTP encryption from
-    /// the cached key.
-    ///
-    /// Constructs a fresh `OhttpClient` from the cached encoded config bytes
-    /// because `OhttpClient` is not `Clone` (it wraps single-use HPKE state).
-    fn create_ohttp_adapter(&self, ohttp_key: &OhttpClient) -> VauchiResult<HttpTransportAdapter> {
-        let adapter_ohttp =
-            OhttpClient::new(ohttp_key.encoded_config().to_vec()).map_err(VauchiError::Network)?;
-        let relay_url = self.distinct_ohttp_route().ok_or_else(ohttp_route_error)?;
-        let pinned_certs = self.ohttp_endpoint_pins(&relay_url, self.resolve_pins());
-        let mut transport = HttpTransport::new(HttpTransportConfig {
-            relay_url,
-            timeout_ms: self.config.relay.connect_timeout_ms,
-            proxy: self.config.relay.proxy.clone(),
-            allow_direct: false,
-            pinned_certs,
-        });
-        transport.set_ohttp(adapter_ohttp);
-        Ok(HttpTransportAdapter::new(transport))
-    }
-
     /// Update sync timing after a successful sync (C1 + C2).
     ///
     /// Computes the C2 deadline using a jittered sync interval. If the last
@@ -708,6 +689,16 @@ impl Vauchi {
     /// bundled pins — no remote fetch is attempted.
     ///
     /// Returns at minimum the bundled pins — cache/network failures are non-fatal.
+    //
+    // Vestigial since inception: this rotation entry point's only production
+    // caller (`create_ohttp_adapter`) discarded its result — the sync path's
+    // `relay_url` is always the distinct OHTTP host, so `ohttp_endpoint_pins`
+    // returns `ohttp_pinned_certs` and ignores these rotated pins. Step 4's fold
+    // removed that caller; the machinery is retained (still exercised by inline
+    // tests) pending a wire-vs-retire decision — see
+    // `backlog/2026-07-21-vestigial-pin-rotation` and the 2026-05-25
+    // relay-ohttp-forward-hop record's "all three OHTTP sites" intent.
+    #[allow(dead_code)]
     pub(crate) fn resolve_pins(&self) -> Vec<PinnedCertificate> {
         let mut pins = self.config.relay.pinned_certs.clone();
 

@@ -759,6 +759,99 @@ mod tests {
         );
     }
 
+    // @scenario: ble_exchange :: Persisted ratchets from both roles form a working channel
+    #[test]
+    fn two_device_ble_exchange_persisted_ratchets_interoperate() {
+        // Consolidation Step-1 pin (U3): the BLE persist path hand-rolls
+        // its ratchet init instead of calling
+        // `ratchet_bootstrap::bootstrap_exchange_ratchet`. This drives the
+        // REAL two-device flow and proves the two persisted states form a
+        // working bidirectional channel with complementary roles — the
+        // contract the planned helper substitution must preserve. Recipe
+        // equivalence itself is pinned in core
+        // `tests/it/consolidation_pinning_tests.rs`.
+        let mut va = Vauchi::in_memory().expect("vauchi alice");
+        va.create_identity("Alice").expect("alice identity");
+        let mut alice = AppEngine::new(va);
+
+        let mut vb = Vauchi::in_memory().expect("vauchi bob");
+        vb.create_identity("Bob").expect("bob identity");
+        let mut bob = AppEngine::new(vb);
+
+        let alice_token = alice
+            .vauchi
+            .identity()
+            .expect("alice identity")
+            .signing_public_key()
+            .to_vec();
+        let bob_token = bob
+            .vauchi
+            .identity()
+            .expect("bob identity")
+            .signing_public_key()
+            .to_vec();
+
+        alice.start_ble_handshake_on_discovery(&bob_token);
+        bob.start_ble_handshake_on_discovery(&alice_token);
+
+        let ea = alice.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
+            device_id: "bob".into(),
+        });
+        alice.apply_ble_machine_event(ea);
+        let eb = bob.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
+            device_id: "alice".into(),
+        });
+        bob.apply_ble_machine_event(eb);
+
+        for _ in 0..50 {
+            let a = pump(&mut alice, &mut bob);
+            let b = pump(&mut bob, &mut alice);
+            if a + b == 0 {
+                break;
+            }
+        }
+
+        let alices_bob = alice.vauchi.list_contacts().expect("alice contacts");
+        let bobs_alice = bob.vauchi.list_contacts().expect("bob contacts");
+        assert_eq!(alices_bob.len(), 1, "alice persisted bob");
+        assert_eq!(bobs_alice.len(), 1, "bob persisted alice");
+
+        let (ra, a_init) = alice
+            .vauchi
+            .storage()
+            .ratchets()
+            .load_ratchet_state(alices_bob[0].id())
+            .expect("alice load ok")
+            .expect("alice persisted a ratchet");
+        let (rb, b_init) = bob
+            .vauchi
+            .storage()
+            .ratchets()
+            .load_ratchet_state(bobs_alice[0].id())
+            .expect("bob load ok")
+            .expect("bob persisted a ratchet");
+        assert_ne!(a_init, b_init, "exactly one side is the ratchet initiator");
+
+        let (mut init_side, mut resp_side) = if a_init { (ra, rb) } else { (rb, ra) };
+        let m1 = init_side.encrypt(b"probe-1").expect("initiator encrypts");
+        assert_eq!(
+            resp_side.decrypt(&m1).expect("responder decrypts"),
+            b"probe-1".to_vec()
+        );
+        let m2 = resp_side.encrypt(b"probe-2").expect("responder replies");
+        assert_eq!(
+            init_side.decrypt(&m2).expect("initiator decrypts"),
+            b"probe-2".to_vec()
+        );
+        let m3 = init_side
+            .encrypt(b"probe-3")
+            .expect("initiator crosses ratchet step");
+        assert_eq!(
+            resp_side.decrypt(&m3).expect("responder decrypts m3"),
+            b"probe-3".to_vec()
+        );
+    }
+
     // @scenario: ble_exchange :: A peripheral responder (no discovery) persists the contact
     #[test]
     fn responder_built_on_connect_without_discovery_persists() {

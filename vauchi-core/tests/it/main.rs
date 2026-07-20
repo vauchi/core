@@ -90,6 +90,7 @@ mod concurrency_tests;
 mod consent_api_tests;
 mod consent_status_tests;
 mod consent_storage_tests;
+mod consolidation_pinning_tests;
 mod contact_backup_tests;
 mod contact_card_bio_tests;
 mod contact_card_coverage_tests;

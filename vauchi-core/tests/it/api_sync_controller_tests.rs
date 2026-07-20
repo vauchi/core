@@ -31,12 +31,6 @@ fn create_test_relay() -> RelayClient<MockTransport> {
     RelayClient::new(transport, config, "test-identity".into())
 }
 
-fn create_test_ratchet() -> DoubleRatchetState {
-    let bob_dh = X3DHKeyPair::generate();
-    let shared_secret = SymmetricKey::generate();
-    DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap()
-}
-
 // @internal
 #[test]
 fn test_sync_controller_connect_disconnect() {
@@ -58,27 +52,6 @@ fn test_sync_controller_connect_disconnect() {
         .disconnect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
     assert!(!controller.is_connected());
-}
-
-// @internal
-#[test]
-fn test_sync_controller_ratchet_management() {
-    let storage = create_test_storage();
-    let relay = create_test_relay();
-    let events = Arc::new(EventDispatcher::new());
-    let config = SyncConfig::default();
-
-    let mut controller = SyncController::new(relay, &storage, config, events);
-
-    let ratchet = create_test_ratchet();
-    controller.register_ratchet("contact-1", ratchet);
-
-    assert!(controller.has_ratchet("contact-1"));
-    assert!(!controller.has_ratchet("contact-2"));
-
-    let removed = controller.remove_ratchet("contact-1");
-    assert!(removed.is_some(), "expected Some value");
-    assert!(!controller.has_ratchet("contact-1"));
 }
 
 // @internal
@@ -343,24 +316,6 @@ fn test_sync_controller_relay_accessors() {
     let _om = controller.offline_manager();
 }
 
-// @scenario: sync_updates :: Ratchet removal for non-existent contact
-// @internal
-#[test]
-fn test_sync_controller_remove_nonexistent_ratchet() {
-    let storage = create_test_storage();
-    let relay = create_test_relay();
-    let events = Arc::new(EventDispatcher::new());
-    let config = SyncConfig::default();
-
-    let mut controller = SyncController::new(relay, &storage, config, events);
-
-    let removed = controller.remove_ratchet("nonexistent");
-    assert!(
-        removed.is_none(),
-        "Removing non-existent ratchet should return None"
-    );
-}
-
 // @internal
 #[test]
 fn test_sync_controller_sync_contact_without_pending_payload_is_noop() {
@@ -410,10 +365,6 @@ fn test_sync_controller_sync_contact_with_ratchet() {
     let contact = vauchi_core::contact::Contact::from_exchange(public_key, card, shared_key, 0);
     let contact_id = contact.id().to_string();
     storage.contacts().save_contact(&contact).unwrap();
-
-    // Register ratchet under the same contact_id.
-    let ratchet = create_test_ratchet();
-    controller.register_ratchet(&contact_id, ratchet);
 
     // Should succeed (no pending updates).
     let result = controller.sync_contact(&contact_id).unwrap();
@@ -493,11 +444,7 @@ fn sync_skips_update_when_load_contact_returns_none_adr029() {
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
 
-    // Ratchet registered, but contact NOT saved to storage —
-    // load_contact will return Ok(None).
-    let ratchet = create_test_ratchet();
-    controller.register_ratchet("contact-adr029", ratchet);
-
+    // Contact NOT saved to storage — load_contact will return Ok(None).
     let update = PendingUpdate {
         id: "u-adr029-1".to_string(),
         contact_id: "contact-adr029".to_string(),
@@ -554,9 +501,6 @@ fn sync_contact_errors_when_load_contact_returns_none_adr029() {
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
-
-    let ratchet = create_test_ratchet();
-    controller.register_ratchet("contact-adr029-b", ratchet);
 
     let result = controller.sync_contact("contact-adr029-b");
     assert!(

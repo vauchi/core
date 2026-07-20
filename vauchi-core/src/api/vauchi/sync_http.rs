@@ -503,8 +503,8 @@ impl Vauchi {
     /// Send phase: delegate to SyncController for outgoing updates + ACKs.
     ///
     /// Moves the adapter into a `RelayClient` which is wrapped by a
-    /// `SyncController`. Contact ratchets are loaded from storage and
-    /// registered on the controller before calling `sync()`.
+    /// `SyncController`. Pending payloads are pre-encrypted at queue time
+    /// (propagation/features), so no ratchet state is loaded here.
     #[tracing::instrument(level = "debug", skip_all, name = "sync.send_phase")]
     fn run_send_phase(
         &self,
@@ -535,21 +535,6 @@ impl Vauchi {
         // health check runs again. This is fine for correctness.
         ctrl.connect(self.rng.as_ref())?;
 
-        // Load ratchet states for all contacts, preserving is_initiator for save-back
-        let mut initiator_flags: std::collections::HashMap<String, bool> =
-            std::collections::HashMap::new();
-        for contact in contacts {
-            if !contact.is_exchanged() || contact.is_blocked() {
-                continue;
-            }
-            if let Ok(Some((ratchet, is_initiator))) =
-                self.storage.ratchets().load_ratchet_state(contact.id())
-            {
-                initiator_flags.insert(contact.id().to_string(), is_initiator);
-                ctrl.register_ratchet(contact.id(), ratchet);
-            }
-        }
-
         // Register mailbox tokens on the relay client for outbound routing
         let contact_keys: Vec<[u8; 32]> = contacts
             .iter()
@@ -574,37 +559,6 @@ impl Vauchi {
         // connection (best-effort; never fails the contact-card cycle).
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.run_device_sync_send(&mut ctrl, identity);
-
-        // Re-persist the preloaded ratchet map. Ratchet advance happens
-        // upstream (send: propagation/features at queue time; receive:
-        // card_update) — SyncController carries this map through
-        // unchanged, so this save is defensive only, kept until the
-        // controller's ratchet plumbing is retired.
-        let ratchets = ctrl.into_ratchets();
-        let mut ratchet_save_errors: Vec<String> = Vec::new();
-        for (contact_id, ratchet) in &ratchets {
-            let is_initiator = initiator_flags
-                .get(contact_id.as_str())
-                .copied()
-                .unwrap_or(false);
-            if let Err(e) =
-                self.storage
-                    .ratchets()
-                    .save_ratchet_state(contact_id, ratchet, is_initiator)
-            {
-                // Ratchet save failure causes desync on next cycle —
-                // collect and surface via SyncResult instead of dropping
-                ratchet_save_errors.push(format!("{contact_id}: {e}"));
-            }
-        }
-        if !ratchet_save_errors.is_empty() {
-            tracing::error!(
-                target: "vauchi.sync.send",
-                count = ratchet_save_errors.len(),
-                "ratchet state save failed for {} contact(s); next cycle will desync",
-                ratchet_save_errors.len(),
-            );
-        }
 
         Ok(result)
     }

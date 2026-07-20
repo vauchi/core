@@ -265,18 +265,46 @@ fn unknown_exchange_transport_variant_fails_closed_on_decode() {
 }
 
 // ---------------------------------------------------------------------------
-// U6 — a traffic-free sync cycle does not mutate registered ratchets
+// U6 — a traffic-free sync cycle does not mutate stored ratchets
 // ---------------------------------------------------------------------------
 
 // @internal
 #[test]
-fn sync_cycle_without_traffic_does_not_mutate_registered_ratchets() {
-    // `sync_http.rs` re-saves every ratchet handed back by
-    // `into_ratchets()` after the send phase. This pins the claim that
-    // the controller never advances them (advance happens upstream at
-    // queue/receive time), so the re-save — and the map itself — can be
-    // removed in consolidation Step 3 without changing stored state.
+fn sync_cycle_without_traffic_does_not_mutate_stored_ratchets() {
+    // Step 3 deleted the controller's pass-through ratchet map and the
+    // send-phase re-save loop on the strength of the original form of
+    // this pin. The invariant it proved still needs guarding at the
+    // storage layer: ratchet advance happens upstream (queue/receive
+    // time), so a traffic-free send cycle must leave persisted ratchet
+    // rows byte-identical.
     let storage = Storage::in_memory(SymmetricKey::generate()).expect("storage");
+
+    let mut snapshots = Vec::new();
+    for (name, key_byte) in [("Ann", 0xA1u8), ("Ben", 0xB2u8)] {
+        let contact = vauchi_core::contact::Contact::from_exchange(
+            [key_byte; 32],
+            vauchi_core::contact_card::ContactCard::new(name),
+            SymmetricKey::generate(),
+            0,
+        );
+        storage
+            .contacts()
+            .save_contact(&contact)
+            .expect("persist contact row (ratchet rows are FK-bound to it)");
+        let peer_dh = X3DHKeyPair::generate();
+        let ratchet = DoubleRatchetState::initialize_initiator(
+            &SymmetricKey::generate(),
+            *peer_dh.public_key(),
+        )
+        .expect("ratchet init");
+        storage
+            .ratchets()
+            .save_ratchet_state(contact.id(), &ratchet, true)
+            .expect("persist ratchet row");
+        let snapshot = serde_json::to_vec(&ratchet.serialize()).expect("snapshot");
+        snapshots.push((contact.id().to_string(), snapshot));
+    }
+
     let relay = RelayClient::new(
         MockTransport::new(),
         RelayClientConfig {
@@ -292,32 +320,20 @@ fn sync_cycle_without_traffic_does_not_mutate_registered_ratchets() {
     let mut controller = SyncController::new(relay, &storage, SyncConfig::default(), events);
     controller.connect(&OsSecureRng::new()).expect("connect");
 
-    let mut snapshots = Vec::new();
-    for contact in ["contact-a", "contact-b"] {
-        let peer_dh = X3DHKeyPair::generate();
-        let ratchet = DoubleRatchetState::initialize_initiator(
-            &SymmetricKey::generate(),
-            *peer_dh.public_key(),
-        )
-        .expect("ratchet init");
-        let snapshot = serde_json::to_vec(&ratchet.serialize()).expect("snapshot");
-        snapshots.push((contact.to_string(), snapshot));
-        controller.register_ratchet(contact, ratchet);
-    }
-
     let result = controller.sync(&OsSecureRng::new()).expect("sync runs");
     assert_eq!(result.sent, 0, "no pending updates were queued");
 
-    let after = controller.into_ratchets();
-    assert_eq!(after.len(), 2, "both ratchets come back out");
     for (contact, before_bytes) in snapshots {
-        let ratchet = after
-            .get(&contact)
-            .unwrap_or_else(|| panic!("ratchet for {contact} survives the cycle"));
+        let (ratchet, is_initiator) = storage
+            .ratchets()
+            .load_ratchet_state(&contact)
+            .expect("load ok")
+            .unwrap_or_else(|| panic!("ratchet row for {contact} survives the cycle"));
+        assert!(is_initiator, "role flag survives the cycle for {contact}");
         let after_bytes = serde_json::to_vec(&ratchet.serialize()).expect("serialize after");
         assert_eq!(
             after_bytes, before_bytes,
-            "sync must not mutate the ratchet state for {contact}"
+            "sync must not mutate the stored ratchet state for {contact}"
         );
     }
 }

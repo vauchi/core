@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::api::sync::{DeviceSyncOrchestrator, SyncManager};
-use crate::crypto::ratchet::DoubleRatchetState;
 use crate::network::delivery::{
     DeliveryAckStatus, DeliveryService, OfflineManager, RetryScheduler,
 };
@@ -67,8 +66,6 @@ pub struct SyncController<'a, T: Transport> {
     storage: &'a Storage,
     config: SyncConfig,
     events: Arc<EventDispatcher>,
-    /// Ratchet states per contact for encryption
-    ratchets: HashMap<String, DoubleRatchetState>,
     /// Connection state tracking
     last_connection_state: ConnectionState,
 }
@@ -90,7 +87,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
             storage,
             config,
             events,
-            ratchets: HashMap::new(),
             last_connection_state: ConnectionState::Disconnected,
         }
     }
@@ -117,23 +113,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
     /// Returns the current connection state.
     pub fn connection_state(&self) -> ConnectionState {
         self.relay.connection().state()
-    }
-
-    /// Registers a ratchet state for a contact.
-    ///
-    /// The ratchet is used for end-to-end encryption of updates to this contact.
-    pub fn register_ratchet(&mut self, contact_id: &str, ratchet: DoubleRatchetState) {
-        self.ratchets.insert(contact_id.to_string(), ratchet);
-    }
-
-    /// Removes a ratchet state for a contact.
-    pub fn remove_ratchet(&mut self, contact_id: &str) -> Option<DoubleRatchetState> {
-        self.ratchets.remove(contact_id)
-    }
-
-    /// Checks if a ratchet exists for a contact.
-    pub fn has_ratchet(&self, contact_id: &str) -> bool {
-        self.ratchets.contains_key(contact_id)
     }
 
     /// Runs a sync cycle.
@@ -493,14 +472,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
     /// Returns a mutable reference to the underlying relay client.
     pub fn relay_mut(&mut self) -> &mut RelayClient<T> {
         &mut self.relay
-    }
-
-    /// Returns the ratchet states, consuming the controller.
-    ///
-    /// Use after `sync()` to persist advanced ratchet states
-    /// that were modified during encryption.
-    pub fn into_ratchets(self) -> HashMap<String, DoubleRatchetState> {
-        self.ratchets
     }
 
     /// Returns a reference to the sync manager.

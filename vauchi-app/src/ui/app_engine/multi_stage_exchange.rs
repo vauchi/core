@@ -104,7 +104,7 @@ impl AppEngine {
         let payload = match self.build_multi_stage_payload() {
             Some(p) => p,
             None => {
-                log::warn!("multi-stage: cannot start session — no identity / card");
+                tracing::warn!("multi-stage: cannot start session — no identity / card");
                 return;
             }
         };
@@ -384,7 +384,7 @@ impl AppEngine {
             Some(h) => {
                 let built = h.machine.build_exchange_ratchet(&our_identity, &peer_pk);
                 if built.is_none() {
-                    log::warn!(
+                    tracing::warn!(
                         "multi-stage: build_exchange_ratchet returned None despite an \
                          active session — contact saved WITHOUT a ratchet; incoming \
                          card updates will not decrypt"
@@ -408,7 +408,7 @@ impl AppEngine {
             None => self.vauchi.update_contact(&contact),
         };
         if let Err(e) = persisted {
-            log::warn!("multi-stage: failed to persist exchanged contact: {e}");
+            tracing::warn!("multi-stage: failed to persist exchanged contact: {e}");
             return;
         }
 

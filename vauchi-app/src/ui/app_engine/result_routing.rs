@@ -172,7 +172,7 @@ impl AppEngine {
     fn persist_exchange_defaults(&self, mode: ExchangeMode, group_ids: Vec<String>) {
         let defaults = vauchi_core::types::ExchangeDefaults { group_ids, mode };
         if let Err(e) = self.vauchi.storage().ux().save_exchange_defaults(&defaults) {
-            log::warn!("exchange defaults not persisted: {e}");
+            tracing::warn!("exchange defaults not persisted: {e}");
         }
     }
 

@@ -204,7 +204,7 @@ impl AppEngine {
             return;
         }
         let Some((identity_key, x3dh, card)) = self.build_ble_session_inputs() else {
-            log::warn!("BLE: cannot start handshake — no identity / card");
+            tracing::warn!("BLE: cannot start handshake — no identity / card");
             return;
         };
         let role = decide_ble_role(&identity_key, peer_token);
@@ -235,7 +235,7 @@ impl AppEngine {
             return;
         }
         let Some((identity_key, x3dh, card)) = self.build_ble_session_inputs() else {
-            log::warn!("BLE: cannot start responder handshake — no identity / card");
+            tracing::warn!("BLE: cannot start responder handshake — no identity / card");
             return;
         };
         // Glance displayer: require the nonce this device showed in its QR, so
@@ -305,7 +305,7 @@ impl AppEngine {
             return;
         }
         let Some((identity_key, x3dh, card)) = self.build_ble_session_inputs() else {
-            log::warn!("BLE: cannot start Glance scanner handshake — no identity / card");
+            tracing::warn!("BLE: cannot start Glance scanner handshake — no identity / card");
             return;
         };
         self.ensure_ble_handshake_session(
@@ -426,7 +426,7 @@ impl AppEngine {
             .as_ref()
             .and_then(|h| h.machine.session_key().cloned())
         else {
-            log::warn!("BLE: completion without a session key — contact not created");
+            tracing::warn!("BLE: completion without a session key — contact not created");
             return None;
         };
         let identity = self.vauchi.identity()?;
@@ -447,7 +447,7 @@ impl AppEngine {
             match DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key) {
                 Ok(r) => r,
                 Err(e) => {
-                    log::warn!("BLE: ratchet init (initiator) failed: {e:?}");
+                    tracing::warn!("BLE: ratchet init (initiator) failed: {e:?}");
                     return None;
                 }
             }
@@ -476,7 +476,7 @@ impl AppEngine {
             .vauchi
             .save_exchanged_contact(&contact, &ratchet, is_initiator)
         {
-            log::warn!("BLE: failed to persist exchanged contact/ratchet: {e}");
+            tracing::warn!("BLE: failed to persist exchanged contact/ratchet: {e}");
             return None;
         }
         // G4: file the new contact into the groups chosen in the exchange

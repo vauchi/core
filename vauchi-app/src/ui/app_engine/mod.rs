@@ -729,7 +729,7 @@ impl AppEngine {
         let rows = match self.vauchi.activity_log_poll(self.last_poll_time, now) {
             Ok(rows) => rows,
             Err(e) => {
-                log::warn!("poll_notifications: activity_log_poll failed: {e}");
+                tracing::warn!("poll_notifications: activity_log_poll failed: {e}");
                 return Vec::new();
             }
         };
@@ -839,7 +839,7 @@ impl AppEngine {
         match ActivityLogWriter::write(self.vauchi.storage(), &events, now) {
             Ok(entries) => entries,
             Err(e) => {
-                log::error!("drain_events_to_log: ActivityLogWriter::write failed: {e}");
+                tracing::error!("drain_events_to_log: ActivityLogWriter::write failed: {e}");
                 Vec::new()
             }
         }

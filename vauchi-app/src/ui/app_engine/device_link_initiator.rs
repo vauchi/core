@@ -60,7 +60,7 @@ impl AppEngine {
             match self.build_device_link_initiator() {
                 Ok(parts) => parts,
                 Err(e) => {
-                    log::warn!("device-link: cannot start initiator: {e}");
+                    tracing::warn!("device-link: cannot start initiator: {e}");
                     return;
                 }
             };

@@ -49,7 +49,7 @@ use crate::orchestrator::ble_handshake_machine::{
 use vauchi_core::Contact;
 use vauchi_core::Event;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::crypto::{DoubleRatchetState, X3DHKeyPair};
+use vauchi_core::crypto::X3DHKeyPair;
 use vauchi_core::exchange::{BleCardPayload, BleExchangeResult};
 
 /// Wraps the machine on `AppEngine`. Same shape as
@@ -437,24 +437,25 @@ impl AppEngine {
         let their_exchange_key = result.remote_card.exchange_key;
         let now = self.vauchi.clock().unix_seconds();
 
-        // Ratchet role convention matches
-        // `ExchangeSession::build_exchange_ratchet`: the lexicographically
-        // smaller identity is the ratchet initiator. This coincides with
-        // the BLE connect tiebreak (the advertised token *is* the identity
-        // signing key), but is derived independently from the identities
-        // so the two stay correct even if the token source ever changes.
-        let is_initiator = our_identity < their_identity;
-        let ratchet = if is_initiator {
-            match DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key) {
-                Ok(r) => r,
+        // Role + init via the shared seam (consolidation Step 2a): the
+        // helper owns the smaller-identity-initiates rule and the
+        // role-correct key selection, so BLE can no longer drift from the
+        // QR/multi-stage sessions. Equivalence + interop pinned by
+        // `consolidation_pinning_tests` and the interop test below.
+        let (ratchet, is_initiator) =
+            match vauchi_core::exchange::ratchet_bootstrap::bootstrap_exchange_ratchet(
+                &shared_key,
+                &our_identity,
+                &their_identity,
+                Some(their_exchange_key),
+                Some(our_x3dh),
+            ) {
+                Ok(pair) => pair,
                 Err(e) => {
-                    tracing::warn!("BLE: ratchet init (initiator) failed: {e:?}");
+                    tracing::warn!("BLE: ratchet init failed: {e:?}");
                     return None;
                 }
-            }
-        } else {
-            DoubleRatchetState::initialize_responder(&shared_key, our_x3dh)
-        };
+            };
 
         let card = result.remote_card.to_contact_card(now);
         let mut contact = Contact::from_exchange_full(

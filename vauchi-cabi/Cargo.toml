@@ -15,22 +15,24 @@ crate-type = ["cdylib", "staticlib"]
 [features]
 default = []
 secure-storage = ["vauchi-core/secure-storage-linux"]
-# Dev/debug-only stderr log backend. OFF in release: a shipped desktop
-# binary registers no backend, so vauchi-app `log::` call sites are
-# silent no-ops. The C host enables this only in its debug build config.
-dev-logging = ["dep:env_logger"]
+# Dev/debug-only stderr tracing subscriber. OFF in release: a shipped
+# desktop binary installs no subscriber, so vauchi-app `tracing::` events
+# are dropped. The C host enables this only in its debug build config.
+dev-logging = ["dep:tracing-subscriber"]
 
 [dependencies]
 vauchi-core = { workspace = true, default-features = false, features = ["storage", "network-rustls", "network-http"] }
 vauchi-app = { workspace = true, default-features = false, features = ["network-rustls", "network-http"] }
 serde_json = "1.0"
 zeroize = "1.8"
-env_logger = { version = "0.11", optional = true }
+# Dev-only stderr sink for the canonical `tracing` facade (ADR-067).
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "std"], optional = true }
 
 [dev-dependencies]
 tempfile = "3"
-# Facade only — lets the feature-off test assert no backend is installed.
-log = "0.4"
+# Facade only — lets the guard tests assert subscriber presence/absence
+# via tracing::level_filters::LevelFilter::current().
+tracing = "0.1"
 
 [build-dependencies]
 cbindgen = "0.29"

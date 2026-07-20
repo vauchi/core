@@ -2,17 +2,19 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Rust -> native log bridge for Windows (C#/P-Invoke) and Linux-Qt (C++).
+//! Rust -> stderr `tracing` bridge for Windows (C#/P-Invoke) and Linux-Qt
+//! (C++).
 //!
-//! Routes the existing `log::warn!`/`log::error!` call sites in
-//! `vauchi-app` (BLE/exchange/sync failure paths) to stderr. These
-//! consumers have no Rust `main()` of their own to call
-//! `env_logger::init()` from directly, so the backend install is exposed
-//! as a C ABI call the host app makes at startup — mirrors
-//! `vauchi-platform`'s `init_mobile_logging()` for the UniFFI consumers.
+//! Routes `vauchi-app`'s `tracing::warn!`/`tracing::error!` call sites —
+//! the canonical client logging facade per ADR-067 — to stderr. These
+//! consumers have no Rust `main()` to install a subscriber, so the install
+//! is exposed as a C ABI call the host makes at startup — mirrors
+//! `vauchi-platform`'s `init_mobile_logging()`. Dev-only: installs a
+//! subscriber solely under the `dev-logging` cargo feature; a release
+//! binary installs none, so events are dropped.
 
-/// Install the stderr log backend. Safe to call more than once — only the
-/// first call takes effect.
+/// Install the stderr `tracing` subscriber. Safe to call more than once —
+/// only the first call takes effect.
 ///
 /// # Safety
 /// No special requirements.
@@ -20,7 +22,16 @@
 pub unsafe extern "C" fn vauchi_cabi_init_logging() {
     #[cfg(feature = "dev-logging")]
     let _ = std::panic::catch_unwind(|| {
-        let _ = env_logger::try_init();
+        use tracing_subscriber::prelude::*;
+        // Info default (matches the mobile os_log/Logcat backends and
+        // logging-rules.md's "Info level only"); RUST_LOG overrides.
+        // try_init is a no-op if a subscriber is already installed.
+        let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+        let _ = tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
+            .with(filter)
+            .try_init();
     });
 }
 
@@ -41,10 +52,10 @@ mod tests {
         }
     }
 
-    // Shipped-binary posture: with `dev-logging` off, init must register
-    // no backend, so the `log` facade's runtime max level stays `Off` and
-    // the existing vauchi-app `log::` call sites are silent no-ops. Guards
-    // env_logger against leaking into release desktop builds.
+    // Shipped-binary posture: with `dev-logging` off, init installs no
+    // subscriber, so `tracing`'s global max level stays `OFF` and
+    // vauchi-app's `tracing::` events are dropped. Relies on nextest
+    // process-per-test isolation for the global dispatcher.
     // @internal
     #[cfg(not(feature = "dev-logging"))]
     #[test]
@@ -52,6 +63,28 @@ mod tests {
         unsafe {
             vauchi_cabi_init_logging();
         }
-        assert_eq!(log::max_level(), log::LevelFilter::Off);
+        assert_eq!(
+            tracing::level_filters::LevelFilter::current(),
+            tracing::level_filters::LevelFilter::OFF
+        );
+    }
+
+    // Dev-logging posture: with `dev-logging` on, init installs the stderr
+    // subscriber at Info (fmt layer + "info" EnvFilter default), so
+    // vauchi-app's `tracing::warn!` failure-path events surface. Relies on
+    // nextest process-per-test isolation for the global dispatcher.
+    // @internal
+    #[cfg(feature = "dev-logging")]
+    #[test]
+    fn dev_logging_build_installs_backend_at_info() {
+        unsafe {
+            vauchi_cabi_init_logging();
+        }
+        assert!(
+            tracing::level_filters::LevelFilter::current()
+                >= tracing::level_filters::LevelFilter::INFO,
+            "dev-logging subscriber must surface Info/Warn, got {:?}",
+            tracing::level_filters::LevelFilter::current()
+        );
     }
 }

@@ -651,8 +651,8 @@ int32_t vauchi_i18n_init(const char *resource_dir);
 int32_t vauchi_i18n_is_initialized(void);
 
 /**
- * Install the stderr log backend. Safe to call more than once — only the
- * first call takes effect.
+ * Install the stderr `tracing` subscriber. Safe to call more than once —
+ * only the first call takes effect.
  *
  * # Safety
  * No special requirements.

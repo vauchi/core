@@ -470,13 +470,6 @@ user-id = 1139
 user-login = "Manishearth"
 user-name = "Manish Goregaokar"
 
-[[publisher.lock_api]]
-version = "0.4.14"
-when = "2025-10-03"
-user-id = 2915
-user-login = "Amanieu"
-user-name = "Amanieu d'Antras"
-
 [[publisher.log]]
 version = "0.4.33"
 when = "2026-06-20"
@@ -539,13 +532,6 @@ when = "2025-10-21"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
-
-[[publisher.parking_lot_core]]
-version = "0.9.12"
-when = "2025-10-03"
-user-id = 2915
-user-login = "Amanieu"
-user-name = "Amanieu d'Antras"
 
 [[publisher.password-hash]]
 version = "0.5.0"
@@ -686,13 +672,6 @@ when = "2020-01-11"
 user-id = 189
 user-login = "BurntSushi"
 user-name = "Andrew Gallant"
-
-[[publisher.scopeguard]]
-version = "1.2.0"
-when = "2023-07-17"
-user-id = 2915
-user-login = "Amanieu"
-user-name = "Amanieu d'Antras"
 
 [[publisher.semver]]
 version = "1.0.28"

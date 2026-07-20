@@ -551,6 +551,27 @@ test:app:
       junit: target/nextest/ci/junit.xml
     expire_in: 1 week
 
+# Exercises the `dev-logging` feature ON path (the native tracing
+# subscriber the mobile/desktop bridge installs). Every other test job runs
+# with the feature OFF, so only the no-subscriber release posture is
+# covered. On Linux only the cabi (stderr fmt) sink compiles; the
+# target-gated tracing-oslog / paranoid-android sinks are exercised by
+# their own binding builds. The vauchi-platform leg is compile-coverage
+# for the feature on a non-mobile target.
+test:dev-logging:
+  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+  script:
+    - cargo nextest run --profile ci -p vauchi-cabi --features vauchi-cabi/dev-logging
+    - cargo nextest run --profile ci -p vauchi-platform --features vauchi-platform/dev-logging
+
 # Layer 1 ScreenModel reachability gate — catches orphan handler arms
 # (declared but no affordance emits the action_id) and orphan
 # affordances (emitted ScreenActions nothing handles). Today pins

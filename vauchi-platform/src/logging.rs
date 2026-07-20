@@ -2,16 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Rust -> native log bridge (Android Logcat / iOS+macOS os_log).
+//! Rust -> native `tracing` bridge (Android Logcat / iOS+macOS os_log).
 //!
-//! Permanent replacement for the temporary `android_logger`/`oslog`
-//! bridges used to diagnose the BLE handshake failure
-//! (`2026-06-08-magic-audio-proximity-driver`, which explicitly deferred
-//! this). Routes the existing `log::warn!`/`log::error!` call sites in
-//! `vauchi-app` (BLE/exchange/sync failure paths) to the platform's native
-//! log viewer. Info level only, per `.claude/rules/logging-rules.md` — the
-//! existing call sites already log only error-type context, never
-//! card/key/token content.
+//! Routes `vauchi-app`'s `tracing::warn!`/`tracing::error!` call sites —
+//! the canonical client logging facade per ADR-067 — to the platform's
+//! native log viewer. Dev-only: the `tracing` subscriber is installed
+//! solely under the `dev-logging` cargo feature; a release/store binary
+//! installs none, so events are dropped (`LevelFilter::OFF`). Info level
+//! by default; `RUST_LOG` overrides. Error-type context only, never
+//! card/key/token content (`logging-rules.md`).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -27,7 +26,7 @@ impl LogInit {
     }
 
     /// Returns `true` exactly once — the first caller performs the actual
-    /// platform install; every later call (app relaunch, Activity
+    /// subscriber install; every later call (app relaunch, Activity
     /// recreation) is a safe no-op.
     fn should_install(&self) -> bool {
         !self.done.swap(true, Ordering::SeqCst)
@@ -36,42 +35,47 @@ impl LogInit {
 
 static LOG_INIT: LogInit = LogInit::new();
 
-/// Install the platform log backend. Safe to call on every app
+/// Install the platform `tracing` subscriber. Safe to call on every app
 /// launch/Activity recreation — only the first call takes effect.
 #[uniffi::export]
 pub fn init_mobile_logging() {
     if LOG_INIT.should_install() {
         install();
-        // Deterministic per-launch confirmation the backend actually
-        // installed — distinct from the platform-side startup banner
-        // (that only proves the UniFFI layer loaded, not that this log::
-        // backend registered). Its absence in the native log viewer is
-        // itself the failure signal.
-        log::info!("mobile logging bridge active");
+        // Deterministic per-launch confirmation the subscriber installed —
+        // its absence in the native log viewer is itself the signal that
+        // this binding has no dev-logging backend (a release/store build).
+        // A no-op without a subscriber, so it never leaks in production.
+        tracing::info!("mobile logging bridge active");
     }
-}
-
-#[cfg(all(feature = "dev-logging", target_os = "android"))]
-fn install() {
-    android_logger::init_once(
-        android_logger::Config::default()
-            .with_max_level(log::LevelFilter::Info)
-            .with_tag("Vauchi"),
-    );
 }
 
 #[cfg(all(feature = "dev-logging", any(target_os = "ios", target_os = "macos")))]
 fn install() {
-    // Double-init would return Err; LOG_INIT already prevents that, but
-    // oslog's own init() can also be called independently by a test
-    // harness, so stay defensive rather than unwrap.
-    let _ = oslog::OsLogger::new("app.vauchi.rust")
-        .level_filter(log::LevelFilter::Info)
-        .init();
+    use tracing_subscriber::prelude::*;
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    // try_init returns Err (ignored) if a global subscriber is already
+    // installed — LOG_INIT prevents that here, but a test harness may also
+    // install one, so stay defensive rather than expect().
+    let _ = tracing_subscriber::registry()
+        .with(tracing_oslog::OsLogger::new("app.vauchi.rust", "default"))
+        .with(filter)
+        .try_init();
+}
+
+#[cfg(all(feature = "dev-logging", target_os = "android"))]
+fn install() {
+    use tracing_subscriber::prelude::*;
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let _ = tracing_subscriber::registry()
+        .with(paranoid_android::layer("Vauchi"))
+        .with(filter)
+        .try_init();
 }
 
 // Release posture (feature off) and unsupported desktop targets: no
-// backend, so `log::` call sites stay silent — see logging-rules.md.
+// subscriber, so `tracing` events are dropped — see logging-rules.md.
 #[cfg(not(all(
     feature = "dev-logging",
     any(target_os = "android", target_os = "ios", target_os = "macos")
@@ -105,16 +109,21 @@ mod tests {
         init_mobile_logging();
     }
 
-    // The shipped-binary posture: with `dev-logging` off, init must
-    // register no backend, so the `log` facade's runtime max level stays
-    // `Off` and the existing vauchi-app `log::` call sites are silent
-    // no-ops. Guards against a native backend leaking into release builds
-    // (logging-rules.md privacy boundary).
+    // Shipped-binary posture: with `dev-logging` off, init installs no
+    // subscriber, so `tracing`'s global max level stays `OFF` and
+    // vauchi-app's `tracing::` events are dropped. Guards a native
+    // subscriber against leaking into release builds (logging-rules.md).
+    // Relies on nextest process-per-test isolation for the global
+    // dispatcher — do not install another subscriber elsewhere in this
+    // crate's `#[cfg(test)]` tree.
     // @internal
     #[cfg(not(feature = "dev-logging"))]
     #[test]
     fn release_build_installs_no_log_backend() {
         init_mobile_logging();
-        assert_eq!(log::max_level(), log::LevelFilter::Off);
+        assert_eq!(
+            tracing::level_filters::LevelFilter::current(),
+            tracing::level_filters::LevelFilter::OFF
+        );
     }
 }

@@ -38,7 +38,7 @@ test-kdf = ["vauchi-core/test-kdf"]
 # vauchi-app `log::` call sites are silent no-ops (the `log` facade
 # discards records when no logger is installed). Frontends enable this
 # only in their debug build config. See logging.rs and logging-rules.md.
-dev-logging = ["dep:android_logger", "dep:oslog"]
+dev-logging = ["dep:tracing-subscriber", "dep:tracing-oslog", "dep:paranoid-android"]
 
 [dependencies]
 # Core Vauchi library (with rustls for Android/iOS - no OpenSSL dependency)
@@ -65,9 +65,14 @@ base64 = "0.22"
 # Hex encoding for public IDs
 hex = "0.4"
 
-# Log facade — call sites live in vauchi-app (BLE/exchange/sync failure
-# paths); this crate only wires the platform backend (see logging.rs).
-log = "0.4"
+# tracing facade — call sites live in vauchi-app (BLE/exchange/sync
+# failure paths, canonical per ADR-067); this crate only wires the native
+# subscriber (see logging.rs) plus the startup confirmation line.
+tracing = "0.1"
+
+# Dev-only native tracing subscriber (composes the per-platform sink layer
+# below with an Info EnvFilter). Off in release — see [features].
+tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "env-filter"], optional = true }
 
 # CRC32 checksums for multipart QR codec
 crc32fast = "1.4"
@@ -75,14 +80,14 @@ crc32fast = "1.4"
 # QR code generation (replaces ZXing on Android, used for all platforms)
 qrcode = { version = "0.14", default-features = false }
 
-# Native log backends for the mobile/desktop bridge (logging.rs).
+# Native tracing sink layers for the mobile bridge (logging.rs).
 # Excluded from Linux/Windows targets by [target.'cfg(...)'], and gated
 # behind the `dev-logging` feature (off in release) — see [features].
 [target.'cfg(target_os = "android")'.dependencies]
-android_logger = { version = "0.14", optional = true }
+paranoid-android = { version = "0.2", optional = true }
 
 [target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
-oslog = { version = "0.2", optional = true }
+tracing-oslog = { version = "0.3", optional = true }
 
 [[bin]]
 name = "uniffi-bindgen"

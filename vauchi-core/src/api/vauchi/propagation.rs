@@ -156,8 +156,7 @@ impl Vauchi {
         old_card: &ContactCard,
         new_card: &ContactCard,
     ) -> VauchiResult<Vec<([u8; 32], Vec<u8>)>> {
-        use crate::crypto::cek::ContentEncryptionKey;
-        use crate::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
+        use crate::sync::delta::CardDelta;
 
         let identity = self
             .identity
@@ -190,7 +189,7 @@ impl Vauchi {
         }
 
         // Only exchanged contacts have public keys for signing
-        let ex = contact
+        contact
             .kind()
             .exchanged_data()
             .ok_or_else(|| VauchiError::InvalidState("contact not exchanged".into()))?;
@@ -202,7 +201,7 @@ impl Vauchi {
         // ungranted fields to grouped contacts
         // (2026-06-08-sync-card-update-not-group-filtered, G4). unwrap_or(false)
         // fails closed on storage error (privacy > completeness).
-        let mut delta = delta.filter_with(|fid| {
+        let delta = delta.filter_with(|fid| {
             self.get_effective_field_visibility(contact_id, fid)
                 .unwrap_or(false)
         });
@@ -212,25 +211,59 @@ impl Vauchi {
             ));
         }
 
+        let prepared =
+            self.seal_and_persist_card_delta(identity, &mut contact, delta, |_| Ok(()))?;
+
+        Ok(prepared
+            .into_iter()
+            .map(|(device_id, encrypted, _, _)| (device_id, encrypted))
+            .collect())
+    }
+
+    /// Stamps the next sent-version, signs, CEK-wraps, and per-device
+    /// encrypts a visibility-filtered card delta, then persists the CEK,
+    /// the advanced per-device ratchets, and the version floor in one
+    /// savepoint. `extra_persist` runs inside that same savepoint for
+    /// caller-specific writes (queueing pending updates, sent baselines).
+    ///
+    /// The single version-stamping site for both delta build paths —
+    /// this stamping drifting apart between edit propagation (here) and
+    /// repropagation (`features.rs`) produced the 2026-07-19
+    /// delta-version-floor bug.
+    ///
+    /// Always emits CEK format (version 0x02): receivers reject legacy raw
+    /// deltas, and a freshly-exchanged contact has no CEK yet, so one is
+    /// generated per delta (2026-06-29-card-update-duplicate-message-paths).
+    pub(crate) fn seal_and_persist_card_delta(
+        &self,
+        identity: &crate::identity::Identity,
+        contact: &mut crate::contact::Contact,
+        mut delta: crate::sync::delta::CardDelta,
+        extra_persist: impl FnOnce(&[PreparedDevicePayload]) -> VauchiResult<()>,
+    ) -> VauchiResult<Vec<PreparedDevicePayload>> {
+        use crate::crypto::cek::ContentEncryptionKey;
+        use crate::sync::delta::{CekWrappedPayload, VersionedPayload};
+
+        let contact_id = contact.id().to_string();
+
         // Version tracking for downgrade detection (#42)
         let next_version = self
             .storage
             .contacts()
-            .last_sent_delta_version(contact_id)
+            .last_sent_delta_version(&contact_id)
             .unwrap_or(0)
             + 1;
         delta.set_version(next_version);
 
         // Sign delta with our identity, bound to recipient
-        let public_key = ex.public_key;
-        delta.sign(identity, &public_key);
+        let recipient_pk = *contact
+            .public_key()
+            .ok_or_else(|| VauchiError::InvalidState("Contact has no public key".into()))?;
+        delta.sign(identity, &recipient_pk);
 
-        // Serialize delta
         let delta_bytes =
             serde_json::to_vec(&delta).map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
-        // Always use CEK format (version 0x02) — process_card_update rejects
-        // legacy payloads, so contacts without CEK need one generated.
         let new_cek = ContentEncryptionKey::generate();
         let cek_ciphertext = new_cek
             .encrypt(&delta_bytes)
@@ -244,14 +277,14 @@ impl Vauchi {
         let payload_bytes = VersionedPayload::encode_cek(&wrapped);
 
         let prepared =
-            self.encrypt_payload_for_contact_devices(identity, &contact, &payload_bytes)?;
+            self.encrypt_payload_for_contact_devices(identity, contact, &payload_bytes)?;
 
         self.storage.with_savepoint(|| -> VauchiResult<()> {
             contact.set_cek(new_cek);
-            self.storage.contacts().save_contact(&contact)?;
+            self.storage.contacts().save_contact(contact)?;
             for (peer_device_id, _, ratchet, is_initiator) in &prepared {
                 self.storage.ratchets().save_ratchet_state_for_device(
-                    contact_id,
+                    &contact_id,
                     peer_device_id,
                     ratchet,
                     *is_initiator,
@@ -259,14 +292,12 @@ impl Vauchi {
             }
             self.storage
                 .contacts()
-                .record_sent_delta_version(contact_id, next_version)?;
+                .record_sent_delta_version(&contact_id, next_version)?;
+            extra_persist(&prepared)?;
             Ok(())
         })?;
 
-        Ok(prepared
-            .into_iter()
-            .map(|(device_id, encrypted, _, _)| (device_id, encrypted))
-            .collect())
+        Ok(prepared)
     }
 
     /// Encrypts one payload independently for every active peer device.

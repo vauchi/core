@@ -501,9 +501,8 @@ impl Vauchi {
     /// Sends a "full card" delta so the contact receives the card as filtered
     /// by their current visibility rules. Skips if the contact has no ratchet.
     pub(crate) fn repropagate_to_contact(&self, contact_id: &str) -> VauchiResult<()> {
-        use crate::crypto::cek::ContentEncryptionKey;
         use crate::storage::{PendingUpdate, UpdateStatus};
-        use crate::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
+        use crate::sync::delta::CardDelta;
 
         let identity = self
             .identity
@@ -594,67 +593,19 @@ impl Vauchi {
             return Ok(());
         }
 
-        // Version tracking for downgrade detection (#42) — must advance like
-        // the normal propagation path's, or receivers whose floor is already
-        // ≥ 2 reject every re-propagation as StaleVersion.
-        let next_version = self
-            .storage
-            .contacts()
-            .last_sent_delta_version(contact_id)
-            .unwrap_or(0)
-            + 1;
-        delta.set_version(next_version);
-
-        // Sign delta with our identity, bound to recipient
-        let recipient_pk = contact.public_key().ok_or(VauchiError::InvalidState(
-            "Contact has no public key".into(),
-        ))?;
-        delta.sign(identity, recipient_pk);
-
-        // Serialize delta
-        let delta_bytes =
-            serde_json::to_vec(&delta).map_err(|e| VauchiError::Serialization(e.to_string()))?;
-
-        // Always CEK-wrap (v0x02). A freshly-exchanged contact has no CEK yet
-        // (`Contact::from_exchange` sets `cek: None`), and the receiver only
-        // accepts CEK-wrapped payloads — shipping a raw delta to a cek-less
-        // contact is a `bad_payload` the peer rejects, which broke the FIRST
-        // device-to-device card update. Generate a CEK when absent, mirroring
-        // `prepare_card_update_for_contact`
-        // (2026-06-29-card-update-duplicate-message-paths: CEK-less first send).
-        let new_cek = ContentEncryptionKey::generate();
-        let cek_ciphertext = new_cek
-            .encrypt(&delta_bytes)
-            .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
-
-        let wrapped = CekWrappedPayload {
-            cek: new_cek.to_bytes(),
-            cek_ciphertext,
-            signature: delta.signature,
-            nonce: delta.nonce,
-        };
-
-        let payload_bytes = VersionedPayload::encode_cek(&wrapped);
-
-        let prepared =
-            self.encrypt_payload_for_contact_devices(identity, &contact, &payload_bytes)?;
-
-        self.storage.with_savepoint(|| -> VauchiResult<()> {
-            contact.set_cek(new_cek);
-            self.storage.contacts().save_contact(&contact)?;
-            let now = self.clock.unix_seconds();
-            for (device_id, encrypted, ratchet, is_initiator) in prepared {
-                self.storage.ratchets().save_ratchet_state_for_device(
-                    contact_id,
-                    &device_id,
-                    &ratchet,
-                    is_initiator,
-                )?;
+        // Stamp/sign/wrap/encrypt/persist through the shared seam
+        // (`seal_and_persist_card_delta`) so the version floor advances
+        // exactly like the normal propagation path's — receivers whose
+        // floor is already ≥ 2 reject drifted re-propagations as
+        // StaleVersion (the 2026-07-19 delta-version-floor bug).
+        let now = self.clock.unix_seconds();
+        self.seal_and_persist_card_delta(identity, &mut contact, delta, |prepared| {
+            for (_, encrypted, _, _) in prepared {
                 let update = PendingUpdate {
                     id: self.rng.uuid_v4(),
                     contact_id: contact_id.to_string(),
                     update_type: "card_delta".to_string(),
-                    payload: encrypted,
+                    payload: encrypted.clone(),
                     created_at: now,
                     retry_count: 0,
                     status: UpdateStatus::Pending,
@@ -664,15 +615,13 @@ impl Vauchi {
             }
             self.storage
                 .contacts()
-                .record_sent_delta_version(contact_id, next_version)?;
-            self.storage
-                .contacts()
                 .save_last_sent_visible_fields(contact_id, &new_visible)?;
             self.storage
                 .contacts()
                 .save_last_sent_display_name(contact_id, own_card.display_name())?;
             Ok(())
-        })
+        })?;
+        Ok(())
     }
 
     /// Runs the owed own-card repropagation pass.

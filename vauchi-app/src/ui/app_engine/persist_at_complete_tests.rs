@@ -19,17 +19,22 @@ use vauchi_core::clock::SystemClock;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::{
-    ExchangeEvent, ExchangeSession, ManualConfirmationVerifier, ProximityConfidence,
+    ExchangeEvent, ExchangeSession, ManualConfirmationVerifier, ProximityConfidence, key_order,
 };
 use vauchi_core::identity::Identity;
+use vauchi_core::types::ExchangeTransport;
 
 /// Drives a real QR `ExchangeSession` to `Complete` with confirmation-escrow
 /// tokens available, mirroring the engine-level `qr_session_at_complete`
 /// helper (kept local — the engine test mod is private to `exchange/`).
-fn qr_session_at_complete() -> (ExchangeSession, String) {
+/// Also returns Alice's signing public key so tests can check the persisted
+/// ratchet role against the canonical key-order rule.
+fn qr_session_at_complete() -> (ExchangeSession, String, [u8; 32]) {
     let clock = SystemClock::shared();
+    let alice_identity = Identity::create("Alice", 0);
+    let alice_signing_key = *alice_identity.signing_public_key();
     let mut alice = ExchangeSession::new_qr(
-        Identity::create("Alice", 0),
+        alice_identity,
         ContactCard::new("Alice"),
         ManualConfirmationVerifier::new(),
         clock.clone(),
@@ -67,7 +72,7 @@ fn qr_session_at_complete() -> (ExchangeSession, String) {
         .expect("escrow tokens available at Complete")
         .0
         .to_string();
-    (alice, gate)
+    (alice, gate, alice_signing_key)
 }
 
 fn config_no_groups() -> ExchangeConfig {
@@ -88,20 +93,20 @@ fn config_no_groups() -> ExchangeConfig {
 
 /// An `AppEngine` sitting on the Exchange screen whose active engine is a
 /// legacy `ExchangeEngine` with a session already at `Complete`.
-fn app_with_exchange_at_complete() -> (AppEngine, String) {
+fn app_with_exchange_at_complete() -> (AppEngine, String, [u8; 32]) {
     let vauchi = Vauchi::in_memory().expect("in-memory vauchi");
     let mut app = AppEngine::new(vauchi);
-    let (session, gate) = qr_session_at_complete();
+    let (session, gate, own_signing_key) = qr_session_at_complete();
     let engine = ExchangeEngine::with_session(config_no_groups(), session, SystemClock::shared());
     app.engine = Box::new(engine);
     app.screen = AppScreen::Exchange;
-    (app, gate)
+    (app, gate, own_signing_key)
 }
 
 // @internal
 #[test]
 fn persist_at_complete_saves_contact_before_done() {
-    let (mut app, gate) = app_with_exchange_at_complete();
+    let (mut app, gate, _) = app_with_exchange_at_complete();
     let gate_hash = hex::decode(&gate).expect("escrow gate is hex");
 
     assert_eq!(
@@ -140,7 +145,7 @@ fn persist_at_complete_saves_contact_before_done() {
 // @internal
 #[test]
 fn done_after_persist_at_complete_does_not_resurrect_deleted_contact() {
-    let (mut app, gate) = app_with_exchange_at_complete();
+    let (mut app, gate, _) = app_with_exchange_at_complete();
     let gate_hash = hex::decode(&gate).expect("escrow gate is hex");
 
     let _ = app.handle_hardware_event(Event::RelayEscrowReady { gate_hash });
@@ -162,5 +167,80 @@ fn done_after_persist_at_complete_does_not_resurrect_deleted_contact() {
         app.vauchi().list_contacts().expect("list").len(),
         0,
         "Done must not resurrect a deleted contact — persist-once guard",
+    );
+}
+
+// Shape-(d) characterization (consolidation Step 2c): the legacy QR
+// completion persists an Exchanged contact stamped `Qr` and a ratchet row
+// whose role flag follows the canonical key-order rule — the same contract
+// `save_exchanged_contact` gives the BLE and multi-stage paths, so routing
+// this path through that seam cannot change what is persisted.
+// @internal
+#[test]
+fn persist_at_complete_stores_qr_stamped_contact_and_role_correct_ratchet() {
+    let (mut app, gate, own_signing_key) = app_with_exchange_at_complete();
+    let gate_hash = hex::decode(&gate).expect("escrow gate is hex");
+
+    let _ = app.handle_hardware_event(Event::RelayEscrowReady { gate_hash });
+
+    let contacts = app.vauchi().list_contacts().expect("list");
+    assert_eq!(contacts.len(), 1, "persist-at-Complete saved the contact");
+    let contact = &contacts[0];
+    assert_eq!(
+        contact.exchange_transport(),
+        Some(ExchangeTransport::Qr),
+        "legacy QR persist stamps its transport",
+    );
+    assert!(
+        contact.kind().exchanged_data().is_some(),
+        "legacy QR persists an Exchanged (live) contact, not an import",
+    );
+
+    let peer_signing_key = contact
+        .public_key()
+        .expect("exchange contact carries the peer identity key");
+    let (_, is_initiator) = app
+        .vauchi()
+        .storage()
+        .ratchets()
+        .load_ratchet_state(contact.id())
+        .expect("load ok")
+        .expect("legacy QR persist saves a ratchet row");
+    assert_eq!(
+        is_initiator,
+        key_order::is_initiator(&own_signing_key, peer_signing_key),
+        "persisted role flag must match the canonical role rule",
+    );
+}
+
+// Routing the legacy QR persist through `save_exchanged_contact` (Step 2c)
+// must arm the own-card repropagate marker — the sync bootstrap BLE and
+// multi-stage already get. Without it a QR responder that edits first can
+// never propagate (2026-06-28-sync-delivery-sent-not-received).
+// @internal
+#[test]
+fn persist_at_complete_arms_own_card_repropagation() {
+    let (mut app, gate, _) = app_with_exchange_at_complete();
+    let gate_hash = hex::decode(&gate).expect("escrow gate is hex");
+    assert!(
+        !app.vauchi()
+            .storage()
+            .ux()
+            .load_own_card_repropagate()
+            .expect("load")
+            .needs_repropagate,
+        "a fresh instance owes no repropagation",
+    );
+
+    let _ = app.handle_hardware_event(Event::RelayEscrowReady { gate_hash });
+
+    assert!(
+        app.vauchi()
+            .storage()
+            .ux()
+            .load_own_card_repropagate()
+            .expect("load")
+            .needs_repropagate,
+        "legacy QR persist must arm the same sync bootstrap as BLE and multi-stage",
     );
 }

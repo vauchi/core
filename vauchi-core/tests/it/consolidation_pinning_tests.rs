@@ -183,6 +183,24 @@ fn link_persisted_ratchet_interoperates_with_helper_built_peer() {
         "persisted role flag must match the canonical role rule"
     );
 
+    // Shape-(c) characterization (consolidation Step 1): Link persists an
+    // Exchanged (live) contact stamped `Link`, via `add_contact` +
+    // `save_exchange_ratchet` behind the never-rekey guard (pinned by
+    // `complete_link_exchange_tests::v2_completion_is_idempotent_and_keeps_the_existing_channel`).
+    let contact = alice
+        .get_contact(&contact_id)
+        .expect("get ok")
+        .expect("link contact exists");
+    assert_eq!(
+        contact.exchange_transport(),
+        Some(ExchangeTransport::Link),
+        "Link persist stamps its transport"
+    );
+    assert!(
+        contact.kind().exchanged_data().is_some(),
+        "Link v2 persists an Exchanged (live) contact, not an import"
+    );
+
     // Bob's side of the same channel, built with the shared helper.
     let shared = derive_link_shared_key(&bob_x3dh, alice_x3dh.public_key())
         .expect("bob derives the commutative link key");

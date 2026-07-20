@@ -831,6 +831,20 @@ mod tests {
             .expect("bob load ok")
             .expect("bob persisted a ratchet");
         assert_ne!(a_init, b_init, "exactly one side is the ratchet initiator");
+        // Shape-(a) characterization (consolidation Step 1): BLE persists
+        // via `from_exchange_full` + `save_exchanged_contact` — transport
+        // stamped `Ble`, role flag equal to the canonical smaller-identity
+        // rule the shared helper encodes.
+        assert_eq!(
+            alices_bob[0].exchange_transport(),
+            Some(vauchi_core::types::ExchangeTransport::Ble),
+            "BLE persist stamps its transport"
+        );
+        assert_eq!(
+            a_init,
+            alice_token < bob_token,
+            "persisted role flag matches the canonical smaller-identity rule"
+        );
 
         let (mut init_side, mut resp_side) = if a_init { (ra, rb) } else { (rb, ra) };
         let m1 = init_side.encrypt(b"probe-1").expect("initiator encrypts");

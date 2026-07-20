@@ -57,10 +57,11 @@ pub(super) const ACTION_SYNC_NOW: &str = "sync_now";
 ///
 /// State source is the engine's own bookkeeping (set after each
 /// `Vauchi::sync()` call from the `sync_now` handler), not the
-/// `SyncController::connection_state()` — the design doc walks
-/// through why: `Vauchi` does not field a `SyncController` today,
-/// and the user-facing "Synced 15:47" / "Sync failed" model maps
-/// cleanly onto the existing `VauchiSyncOutcome` return value.
+/// send-phase worker's `connection_state()` — the design doc walks
+/// through why: `Vauchi` does not field a long-lived sync worker
+/// (`SendPhase` is per-cycle), and the user-facing "Synced 15:47" /
+/// "Sync failed" model maps cleanly onto the existing
+/// `VauchiSyncOutcome` return value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SyncChromeStatus {
     /// No sync attempt has been made in this session.

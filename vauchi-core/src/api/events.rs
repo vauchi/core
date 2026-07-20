@@ -253,7 +253,7 @@ pub type EventCallback = Arc<dyn Fn(VauchiEvent) + Send + Sync>;
 ///
 /// Uses interior mutability (`Mutex`) so that `add_handler` and `remove_handler`
 /// take `&self` instead of `&mut self`. This allows handler registration even
-/// when the dispatcher is shared via `Arc` (e.g., with `SyncController`).
+/// when the dispatcher is shared via `Arc` (e.g., with `SendPhase`).
 pub struct EventDispatcher {
     handlers: Mutex<Vec<(HandlerId, EventCallback)>>,
     next_id: AtomicU64,

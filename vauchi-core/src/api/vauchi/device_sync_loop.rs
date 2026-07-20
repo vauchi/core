@@ -27,8 +27,8 @@ use std::collections::HashSet;
 
 use super::Vauchi;
 use crate::api::error::{VauchiError, VauchiResult};
+use crate::api::send_phase::SendPhase;
 use crate::api::sync::DeviceSyncOrchestrator;
-use crate::api::sync_controller::SyncController;
 use crate::contact::Contact;
 use crate::identity::Identity;
 use crate::network::mailbox_token::{
@@ -109,13 +109,13 @@ impl Vauchi {
 
     /// Flush queued device-sync items to every linked device.
     ///
-    /// Reuses the already-connected `SyncController` from the send phase.
+    /// Reuses the already-connected `SendPhase` worker.
     /// Best-effort per device: a send failure leaves that device's queue
     /// intact for the next cycle and does not abort the others. Returns the
     /// number of devices a non-empty batch was successfully sent to.
     pub(super) fn run_device_sync_send<T: Transport>(
         &self,
-        ctrl: &mut SyncController<'_, T>,
+        ctrl: &mut SendPhase<'_, T>,
         identity: &Identity,
     ) -> VauchiResult<usize> {
         // Gate: a sync target requires ≥2 registered devices.

@@ -5,7 +5,7 @@
 //! HTTP Transport Adapter
 //!
 //! Adapts the stateless [`HttpTransport`] (v2 relay API) to the stateful
-//! `Transport` trait used by `RelayClient` and `SyncController`.
+//! `Transport` trait used by `RelayClient` and `SendPhase`.
 //!
 //! The adapter translates between the `Transport` trait's `send()`/`receive()`
 //! interface and the HTTP request/response model:

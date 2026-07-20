@@ -19,7 +19,8 @@
 //!   decode — adding a variant requires tolerant readers to ship
 //!   before any writer.
 //! - U6: a sync cycle with no traffic does not mutate registered
-//!   ratchet state — pins `SyncController`'s pass-through ratchet map
+//!   ratchet state — originally pinned `SyncController`'s pass-through
+//!   ratchet map (deleted by Step 3; the pin now guards stored rows)
 //!   as a no-op so its planned removal is provably safe.
 
 use std::sync::Arc;
@@ -317,7 +318,7 @@ fn sync_cycle_without_traffic_does_not_mutate_stored_ratchets() {
         "test-identity".into(),
     );
     let events = Arc::new(EventDispatcher::new());
-    let mut controller = SyncController::new(relay, &storage, SyncConfig::default(), events);
+    let mut controller = SendPhase::new(relay, &storage, SyncConfig::default(), events);
     controller.connect(&OsSecureRng::new()).expect("connect");
 
     let result = controller.sync(&OsSecureRng::new()).expect("sync runs");

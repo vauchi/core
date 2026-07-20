@@ -67,7 +67,7 @@ impl Vauchi {
     ///
     /// Returns the handler ID which can be used with `remove_event_handler()`.
     /// No longer requires `&mut self` — registration works even when the
-    /// dispatcher is shared with SyncController.
+    /// dispatcher is shared with the send-phase worker (`SendPhase`).
     pub fn add_event_handler(&self, handler: EventCallback) -> crate::api::events::HandlerId {
         self.events.add_handler(handler)
     }

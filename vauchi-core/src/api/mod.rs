@@ -43,7 +43,7 @@
 //! - `config` - Configuration types
 //! - `events` - Event system for callbacks
 //! - `contact_manager` - High-level contact operations
-//! - `sync_controller` - Sync and network orchestration
+//! - `send_phase` - Per-cycle relay send worker for `Vauchi::sync()`
 //! - `vauchi` - Main Vauchi orchestrator
 
 pub mod app_password;
@@ -96,9 +96,9 @@ pub mod shred;
 mod shred;
 
 #[cfg(feature = "testing")]
-pub mod sync_controller;
+pub mod send_phase;
 #[cfg(not(feature = "testing"))]
-mod sync_controller;
+mod send_phase;
 
 #[cfg(feature = "testing")]
 pub mod vauchi;
@@ -143,8 +143,8 @@ pub use events::{EventCallback, EventDispatcher, EventOrigin, HandlerId, VauchiE
 // Contact Manager
 pub use contact_manager::ContactManager;
 
-// Sync Controller
-pub use sync_controller::{SyncController, SyncResult};
+// Send phase
+pub use send_phase::{SendPhase, SyncResult};
 
 // Sync Application Services
 pub use sync::{

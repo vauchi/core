@@ -25,7 +25,7 @@
 //! `batch_register_tokens`, so the relay may return self-token blobs in
 //! the same fetch response — this function returns `TokenUnresolved`
 //! for them and the receive loop ACKs them as `Stored`. A separate path
-//! (`sync_controller::process_device_sync` /
+//! (`send_phase::process_device_sync` /
 //! `sync::device_orchestrator::DeviceSyncOrchestrator`) is responsible
 //! for device-sync; this module's `token_to_contact_map` intentionally
 //! omits self-tokens.

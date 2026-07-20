@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tests for api::sync_controller
-//! Extracted from sync_controller.rs
+//! Tests for `api::send_phase` (the send-phase worker of `Vauchi::sync()`,
+//! formerly `SyncController` — retired by consolidation Step 3)
 
 use std::sync::Arc;
 use vauchi_core::api::*;
@@ -33,13 +33,13 @@ fn create_test_relay() -> RelayClient<MockTransport> {
 
 // @internal
 #[test]
-fn test_sync_controller_connect_disconnect() {
+fn test_send_phase_connect_disconnect() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
 
     assert!(!controller.is_connected());
 
@@ -56,13 +56,13 @@ fn test_sync_controller_connect_disconnect() {
 
 // @internal
 #[test]
-fn test_sync_controller_sync_not_connected() {
+fn test_send_phase_sync_not_connected() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
 
     let result = controller.sync(&vauchi_core::rng::OsSecureRng::new());
     assert!(matches!(result, Err(VauchiError::Network(_))));
@@ -70,13 +70,13 @@ fn test_sync_controller_sync_not_connected() {
 
 // @internal
 #[test]
-fn test_sync_controller_sync_empty() {
+fn test_send_phase_sync_empty() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
@@ -92,13 +92,13 @@ fn test_sync_controller_sync_empty() {
 
 // @internal
 #[test]
-fn test_sync_controller_get_sync_state() {
+fn test_send_phase_get_sync_state() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let controller = SyncController::new(relay, &storage, config, events);
+    let controller = SendPhase::new(relay, &storage, config, events);
 
     // No pending updates = synced
     let state = controller.get_sync_state("contact-1").unwrap();
@@ -107,33 +107,33 @@ fn test_sync_controller_get_sync_state() {
 
 // @internal
 #[test]
-fn test_sync_controller_pending_count() {
+fn test_send_phase_pending_count() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let controller = SyncController::new(relay, &storage, config, events);
+    let controller = SendPhase::new(relay, &storage, config, events);
 
     assert_eq!(controller.pending_count().unwrap(), 0);
 }
 
 // @internal
 #[test]
-fn test_sync_controller_in_flight_count() {
+fn test_send_phase_in_flight_count() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let controller = SyncController::new(relay, &storage, config, events);
+    let controller = SendPhase::new(relay, &storage, config, events);
 
     assert_eq!(controller.in_flight_count(), 0);
 }
 
 // @internal
 #[test]
-fn test_sync_controller_auto_sync_config() {
+fn test_send_phase_auto_sync_config() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
@@ -142,7 +142,7 @@ fn test_sync_controller_auto_sync_config() {
         auto_sync: true,
         ..Default::default()
     };
-    let controller = SyncController::new(relay, &storage, config, events.clone());
+    let controller = SendPhase::new(relay, &storage, config, events.clone());
     assert!(controller.is_auto_sync_enabled());
 
     let relay2 = create_test_relay();
@@ -150,7 +150,7 @@ fn test_sync_controller_auto_sync_config() {
         auto_sync: false,
         ..Default::default()
     };
-    let controller2 = SyncController::new(relay2, &storage, config2, events);
+    let controller2 = SendPhase::new(relay2, &storage, config2, events);
     assert!(!controller2.is_auto_sync_enabled());
 }
 
@@ -213,7 +213,7 @@ fn test_sync_result_total_empty() {
 // @scenario: sync_updates :: Batch size limiting
 // @internal
 #[test]
-fn test_sync_controller_batch_size_config() {
+fn test_send_phase_batch_size_config() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
@@ -223,7 +223,7 @@ fn test_sync_controller_batch_size_config() {
         ..Default::default()
     };
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
@@ -245,7 +245,7 @@ fn test_sync_contact_not_connected() {
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
 
     // Not connected — should fail
     let result = controller.sync_contact("contact-1");
@@ -255,7 +255,7 @@ fn test_sync_contact_not_connected() {
 // @scenario: sync_updates :: Connection state tracking
 // @internal
 #[test]
-fn test_sync_controller_connection_state() {
+fn test_send_phase_connection_state() {
     use vauchi_core::network::ConnectionState;
 
     let storage = create_test_storage();
@@ -263,7 +263,7 @@ fn test_sync_controller_connection_state() {
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
 
     assert_eq!(controller.connection_state(), ConnectionState::Disconnected);
 
@@ -281,13 +281,13 @@ fn test_sync_controller_connection_state() {
 // @scenario: sync_updates :: Sync status across contacts
 // @internal
 #[test]
-fn test_sync_controller_sync_status() {
+fn test_send_phase_sync_status() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let controller = SyncController::new(relay, &storage, config, events);
+    let controller = SendPhase::new(relay, &storage, config, events);
 
     let status = controller.sync_status().unwrap();
     assert!(status.is_empty());
@@ -296,13 +296,13 @@ fn test_sync_controller_sync_status() {
 // @scenario: sync_updates :: Relay accessor methods
 // @internal
 #[test]
-fn test_sync_controller_relay_accessors() {
+fn test_send_phase_relay_accessors() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
 
     let _relay = controller.relay();
     assert!(!controller.is_connected());
@@ -318,7 +318,7 @@ fn test_sync_controller_relay_accessors() {
 
 // @internal
 #[test]
-fn test_sync_controller_sync_contact_without_pending_payload_is_noop() {
+fn test_send_phase_sync_contact_without_pending_payload_is_noop() {
     let storage = create_test_storage();
     let contact = Contact::from_exchange(
         [0x71; 32],
@@ -332,7 +332,7 @@ fn test_sync_controller_sync_contact_without_pending_payload_is_noop() {
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
@@ -343,13 +343,13 @@ fn test_sync_controller_sync_contact_without_pending_payload_is_noop() {
 
 // @internal
 #[test]
-fn test_sync_controller_sync_contact_with_ratchet() {
+fn test_send_phase_sync_contact_with_ratchet() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
@@ -394,13 +394,13 @@ fn create_test_registry(master_seed: &[u8; 32], device: &DeviceInfo) -> DeviceRe
 
 // @internal
 #[test]
-fn test_sync_controller_process_device_sync() {
+fn test_send_phase_process_device_sync() {
     let storage = create_test_storage();
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let controller = SyncController::new(relay, &storage, config, events);
+    let controller = SendPhase::new(relay, &storage, config, events);
 
     let master_seed = [0x42u8; 32];
     let device = create_test_device(&master_seed, 0, "Test Device");
@@ -439,7 +439,7 @@ fn sync_skips_update_when_load_contact_returns_none_adr029() {
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
@@ -497,7 +497,7 @@ fn sync_contact_errors_when_load_contact_returns_none_adr029() {
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
 
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
@@ -568,7 +568,7 @@ fn test_sync_send_clears_pending_update_on_relay_accept() {
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
     let config = SyncConfig::default();
-    let mut controller = SyncController::new(relay, &storage, config, events);
+    let mut controller = SendPhase::new(relay, &storage, config, events);
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
@@ -658,7 +658,7 @@ fn test_sync_send_does_not_downgrade_modern_peer_without_local_device_info() {
 
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
-    let mut controller = SyncController::new(relay, &storage, SyncConfig::default(), events);
+    let mut controller = SendPhase::new(relay, &storage, SyncConfig::default(), events);
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();

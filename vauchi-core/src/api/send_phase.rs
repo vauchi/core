@@ -2,9 +2,16 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Sync Controller
+//! Send phase of `Vauchi::sync()`.
 //!
-//! Orchestrates synchronization and network operations.
+//! Drains pending, pre-encrypted updates through the relay, processes
+//! ACKs and timeouts, and flushes device-sync batches over the same
+//! connection. Constructed per cycle by `run_send_phase`
+//! (`api/vauchi/sync_http.rs`) — deliberately NOT an orchestrator:
+//! delta building, visibility filtering, encryption, and ratchet
+//! persistence live upstream in `propagation.rs`/`features.rs` (send)
+//! and `api/sync/card_update.rs` (receive). ADR-017 amendment
+//! 2026-07-20 records the retirement of the orchestration claim.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -50,14 +57,10 @@ impl SyncResult {
     }
 }
 
-/// Controls synchronization and network operations.
-///
-/// The SyncController orchestrates:
-/// - Connection management
-/// - Processing pending updates
-/// - Handling acknowledgments
-/// - Retry logic for failed updates
-pub struct SyncController<'a, T: Transport> {
+/// Per-cycle send-phase worker: relay connection lifecycle, draining
+/// pre-built pending updates, ACK/timeout bookkeeping, and retry/offline
+/// scheduling on reconnect.
+pub struct SendPhase<'a, T: Transport> {
     relay: RelayClient<T>,
     sync_manager: SyncManager<'a>,
     delivery_service: DeliveryService,
@@ -70,15 +73,15 @@ pub struct SyncController<'a, T: Transport> {
     last_connection_state: ConnectionState,
 }
 
-impl<'a, T: Transport> SyncController<'a, T> {
-    /// Creates a new SyncController.
+impl<'a, T: Transport> SendPhase<'a, T> {
+    /// Creates a new send-phase worker.
     pub fn new(
         relay: RelayClient<T>,
         storage: &'a Storage,
         config: SyncConfig,
         events: Arc<EventDispatcher>,
     ) -> Self {
-        SyncController {
+        SendPhase {
             relay,
             sync_manager: SyncManager::new(storage),
             delivery_service: DeliveryService::new(),
@@ -193,9 +196,8 @@ impl<'a, T: Transport> SyncController<'a, T> {
         let total = ready_updates.len();
         for (idx, update) in ready_updates.into_iter().enumerate() {
             // The pending payload is already encrypted and its matching
-            // per-device ratchet was persisted atomically before queueing.
-            // Do not gate on the legacy contact-only controller map: a modern
-            // contact may have only `(contact, peer_device)` sessions.
+            // per-device ratchet was persisted atomically before queueing —
+            // no ratchet state is needed (or held) here.
 
             // Load contact's shared key for anonymous sender ID and mailbox token.
             // ADR-029 forbids stable (non-rotating) recipient_ids: if we can't

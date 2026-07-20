@@ -18,7 +18,7 @@
 //! 2. Creates an ephemeral `HttpTransportAdapter` with OHTTP key.
 //! 3. Connects the adapter (health check).
 //! 4. Receive phase: register tokens, fetch blobs, decrypt + apply.
-//! 5. Send phase: delegates to `SyncController` for outbound updates + ACKs.
+//! 5. Send phase: delegates to `SendPhase` for outbound updates + ACKs.
 //! 6. Returns combined `VauchiSyncOutcome`.
 
 use std::time::Duration;
@@ -41,7 +41,7 @@ use super::ohttp_key_error::should_refetch_key_and_retry;
 use super::receive_routing::{incoming_update_events, process_received_blobs};
 use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
-use crate::api::sync_controller::SyncController;
+use crate::api::send_phase::SendPhase;
 use crate::contact::Contact;
 use crate::network::{
     AckStatus, Acknowledgment, HttpTransport, HttpTransportAdapter, HttpTransportConfig,
@@ -151,7 +151,7 @@ impl Vauchi {
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.queue_reciprocity_confirmations();
 
-        // Send phase — adapter moves into RelayClient → SyncController
+        // Send phase — adapter moves into RelayClient → SendPhase
         let send_result = self.run_send_phase(identity, &contacts, adapter)?;
 
         let mut errors: Vec<String> = Vec::new();
@@ -500,10 +500,10 @@ impl Vauchi {
     // Send phase
     // =====================================================================
 
-    /// Send phase: delegate to SyncController for outgoing updates + ACKs.
+    /// Send phase: delegate to `SendPhase` for outgoing updates + ACKs.
     ///
     /// Moves the adapter into a `RelayClient` which is wrapped by a
-    /// `SyncController`. Pending payloads are pre-encrypted at queue time
+    /// `SendPhase`. Pending payloads are pre-encrypted at queue time
     /// (propagation/features), so no ratchet state is loaded here.
     #[tracing::instrument(level = "debug", skip_all, name = "sync.send_phase")]
     fn run_send_phase(
@@ -511,7 +511,7 @@ impl Vauchi {
         identity: &crate::identity::Identity,
         contacts: &[Contact],
         adapter: HttpTransportAdapter,
-    ) -> VauchiResult<crate::api::sync_controller::SyncResult> {
+    ) -> VauchiResult<crate::api::send_phase::SyncResult> {
         let our_id = hex::encode(identity.signing_public_key());
 
         // Build RelayClient wrapping the adapter
@@ -521,8 +521,7 @@ impl Vauchi {
         );
         let relay = RelayClient::new(adapter, relay_config, our_id).with_rng(self.rng.clone());
 
-        // Build SyncController
-        let mut ctrl = SyncController::new(
+        let mut ctrl = SendPhase::new(
             relay,
             &self.storage,
             self.config.sync.clone(),
@@ -530,7 +529,7 @@ impl Vauchi {
         );
 
         // Connect the relay (adapter is already connected from receive phase)
-        // SyncController.connect() calls relay.connect() which calls
+        // SendPhase.connect() calls relay.connect() which calls
         // adapter.connect() — but the adapter is already connected, so the
         // health check runs again. This is fine for correctness.
         ctrl.connect(self.rng.as_ref())?;

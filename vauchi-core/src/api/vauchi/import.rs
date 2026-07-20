@@ -215,7 +215,6 @@ impl Vauchi {
         card_bytes: &[u8],
         our_x3dh: &crate::exchange::X3DHKeyPair,
     ) -> VauchiResult<String> {
-        use crate::crypto::DoubleRatchetState;
         use crate::exchange::ExchangeError;
         use crate::exchange::link_mode::{
             LinkCardPayload, derive_link_shared_key, parse_card_payload_versioned,
@@ -283,18 +282,23 @@ impl Vauchi {
         );
         self.add_contact(contact)?;
 
-        // Deterministic Double Ratchet role (decision (b)): smaller identity
-        // key = initiator. The initiator keys off the peer's X3DH public; the
-        // responder off our retained keypair. Persisted with the chosen role
-        // via `save_exchange_ratchet`, which never guesses it.
-        let is_initiator = our_identity < identity_pubkey;
-        let ratchet = if is_initiator {
-            DoubleRatchetState::initialize_initiator(&shared_key, x3dh_pubkey)
-                .map_err(|e| VauchiError::Crypto(e.to_string()))?
-        } else {
-            let our_dh = crate::exchange::X3DHKeyPair::from_bytes(*our_x3dh.secret_bytes());
-            DoubleRatchetState::initialize_responder(&shared_key, our_dh)
-        };
+        // Deterministic role + init via the shared seam (consolidation
+        // Step 2b): the helper owns the smaller-identity rule and the
+        // role-correct key selection. This runs only on the genuinely-new
+        // contact branch — the never-rekey guard above stays OUTSIDE the
+        // seam (rekeying an in-flight channel would desync it; pinned by
+        // v2_completion_is_idempotent_and_keeps_the_existing_channel).
+        let (ratchet, is_initiator) =
+            crate::exchange::ratchet_bootstrap::bootstrap_exchange_ratchet(
+                &shared_key,
+                &our_identity,
+                &identity_pubkey,
+                Some(x3dh_pubkey),
+                Some(crate::exchange::X3DHKeyPair::from_bytes(
+                    *our_x3dh.secret_bytes(),
+                )),
+            )
+            .map_err(|e| VauchiError::Crypto(format!("link ratchet bootstrap: {e:?}")))?;
         self.save_exchange_ratchet(&contact_id, &ratchet, is_initiator)?;
 
         Ok(contact_id)

@@ -147,6 +147,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
             ));
         }
 
+        tracing::info!("[Sync] started");
         let mut result = SyncResult::default();
 
         match self.relay.process_incoming() {
@@ -345,6 +346,11 @@ impl<'a, T: Transport> SyncController<'a, T> {
             });
         }
 
+        tracing::info!(
+            "[Sync] complete: {} sent, {} acknowledged",
+            result.sent,
+            result.acknowledged
+        );
         Ok(result)
     }
 

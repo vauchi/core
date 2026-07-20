@@ -250,6 +250,7 @@ impl NfcExchangeFlow {
         match self.session.confirm_send_success() {
             Ok(result) => {
                 self.step = NfcStep::Complete;
+                tracing::info!("[Exchange] NFC exchange complete");
                 NfcHardwareOutcome::Complete {
                     card_bytes: result
                         .remote_card
@@ -279,6 +280,7 @@ impl NfcExchangeFlow {
         match self.session.process_encrypted_card(data) {
             Ok(result) => {
                 self.step = NfcStep::Complete;
+                tracing::info!("[Exchange] NFC exchange complete");
                 NfcHardwareOutcome::Complete {
                     card_bytes: result
                         .remote_card

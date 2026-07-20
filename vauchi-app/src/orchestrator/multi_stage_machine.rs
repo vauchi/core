@@ -454,6 +454,9 @@ impl MultiStageMachine {
         let result = match event {
             Event::HardwareError { transport, error } => {
                 let reason = format!("{transport}: {error}");
+                tracing::warn!(
+                    "[Exchange] hardware error before handshake: {reason} — check the transport and retry"
+                );
                 self.phase = MultiStagePhase::Failed {
                     reason: reason.clone(),
                 };
@@ -461,6 +464,9 @@ impl MultiStageMachine {
             }
             Event::PermissionDenied { transport } => {
                 let reason = format!("permission_denied:{transport}");
+                tracing::warn!(
+                    "[Exchange] blocked before handshake: {reason} — grant the {transport} permission"
+                );
                 self.phase = MultiStagePhase::Failed {
                     reason: reason.clone(),
                 };
@@ -469,6 +475,9 @@ impl MultiStageMachine {
             Event::HardwareUnavailable { transport } => match transport.as_str() {
                 "camera" | "microphone" => {
                     let reason = format!("hardware_unavailable:{transport}");
+                    tracing::warn!(
+                        "[Exchange] {transport} unavailable before handshake: {reason} — device may be busy or overheated; retry"
+                    );
                     self.phase = MultiStagePhase::Failed {
                         reason: reason.clone(),
                     };

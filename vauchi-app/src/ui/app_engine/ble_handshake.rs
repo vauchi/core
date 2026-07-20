@@ -208,6 +208,7 @@ impl AppEngine {
             return;
         };
         let role = decide_ble_role(&identity_key, peer_token);
+        tracing::info!("[Exchange] BLE peer discovered — starting handshake");
         // `None`: radio-only discovery has no OOB peer. The Glance scanner path
         // (which forces Initiator + supplies the scanned binding) lands in the
         // engine/orchestration step of Slice B.
@@ -505,6 +506,7 @@ impl AppEngine {
         // multi-stage path. The Event::LocationResult reply is consumed in
         // handle_hardware_event.
         self.request_exchange_location(contact_id.clone());
+        tracing::info!("[Exchange] contact persisted (ble)");
         Some((contact_id, group_names))
     }
 }

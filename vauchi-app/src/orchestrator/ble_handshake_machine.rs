@@ -583,6 +583,7 @@ impl BleHandshakeMachine {
     }
 
     fn mark_failed(&mut self, reason: String) -> (BleMachineEvent, Vec<Command>) {
+        tracing::warn!("[Exchange] BLE handshake failed: {reason}");
         self.phase = BleMachinePhase::Failed {
             reason: reason.clone(),
         };

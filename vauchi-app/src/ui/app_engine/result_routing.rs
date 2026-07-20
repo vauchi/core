@@ -150,6 +150,7 @@ impl AppEngine {
     /// can assign the new contact + show the group on the success screen
     /// (2026-06-04-exchange-terminal-screens), then navigate to `target`.
     fn start_exchange_to(&mut self, target: AppScreen, mode: ExchangeMode) -> ActionResult {
+        tracing::info!("[Exchange] started: {}", mode.display_name());
         self.pending_exchange_groups = self.current_exchange_groups();
         // M2 S1: the committed (groups, mode) pair becomes the last-used
         // default, so the next exchange skips the group gate.

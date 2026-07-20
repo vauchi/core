@@ -251,6 +251,7 @@ impl AppEngine {
         self.request_exchange_location(contact_id.clone());
 
         self.legacy_exchange_persisted = Some(contact_id);
+        tracing::info!("[Exchange] contact persisted (qr)");
         Ok(())
     }
 
@@ -270,6 +271,7 @@ impl AppEngine {
         let target = if cancelled {
             AppScreen::Exchange
         } else {
+            tracing::info!("[Exchange] multi-stage exchange complete");
             AppScreen::Contacts
         };
         let screen = self.navigate_to_internal(target);

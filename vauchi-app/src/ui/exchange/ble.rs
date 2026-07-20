@@ -262,6 +262,7 @@ impl BleExchangeFlow {
         if let Event::HardwareError { transport, error } = event
             && transport.eq_ignore_ascii_case("ble")
         {
+            tracing::warn!("[Exchange] BLE hardware error: {error} — retrying via fallback");
             return BleHardwareOutcome::FailedWithFallback {
                 reason: error.clone(),
             };
@@ -269,6 +270,9 @@ impl BleExchangeFlow {
         if let Event::HardwareUnavailable { transport } = event
             && transport.eq_ignore_ascii_case("ble")
         {
+            tracing::warn!(
+                "[Exchange] BLE unavailable — check Bluetooth is on; retrying via fallback"
+            );
             return BleHardwareOutcome::FailedWithFallback {
                 reason: "Bluetooth not available".into(),
             };
@@ -276,6 +280,9 @@ impl BleExchangeFlow {
         if let Event::PermissionDenied { transport } = event
             && transport.eq_ignore_ascii_case("ble")
         {
+            tracing::warn!(
+                "[Exchange] BLE blocked: permission denied — grant Nearby-Devices/Bluetooth; retrying via fallback"
+            );
             return BleHardwareOutcome::FailedWithFallback {
                 reason: "Bluetooth permission denied".into(),
             };

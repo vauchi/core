@@ -991,30 +991,33 @@ mod tests {
     use super::*;
 
     // @scenario: sync_privacy :: sync adapter never inherits direct fallback
+    //
+    // Step 4: the sync receive adapter is built through the hardened
+    // `build_relay_transport` (the single OHTTP transport constructor).
+    // With OHTTP unavailable and production `allow_direct = false`, it must
+    // fail closed rather than dial the application relay directly.
     #[test]
     fn sync_adapter_never_inherits_direct_fallback() {
         use crate::api::VauchiConfig;
         use crate::network::{
-            MessageEnvelope, MessagePayload, NetworkError, OhttpClient, PROTOCOL_VERSION,
-            RegisterMailbox, Transport,
+            MessageEnvelope, MessagePayload, NetworkError, PROTOCOL_VERSION, RegisterMailbox,
+            Transport,
         };
 
         let dir = tempfile::tempdir().expect("tempdir must succeed");
-        let mut config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+        let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
             .with_relay_url("http://127.0.0.1:1")
             .with_ohttp_relay_url("http://127.0.0.1:2");
-        config.ohttp.allow_direct = true;
-        let bundled_key = config
-            .ohttp
-            .bundled_gateway_key
-            .clone()
-            .expect("default config must bundle an OHTTP key");
-        let client = OhttpClient::new(bundled_key).expect("bundled OHTTP key must be valid");
+        assert!(
+            !config.ohttp.allow_direct,
+            "test premise: production default disables direct connections"
+        );
         let vauchi = Vauchi::new(config).expect("Vauchi::new must succeed");
 
-        let mut adapter = vauchi
-            .create_ohttp_adapter(&client)
-            .expect("adapter construction must succeed");
+        let server_url = vauchi.config.relay.server_url.clone();
+        let timeout = vauchi.config.relay.connect_timeout_ms;
+        let mut adapter =
+            HttpTransportAdapter::new(vauchi.build_relay_transport(&server_url, timeout));
         adapter.clear_ohttp();
         adapter
             .send(&MessageEnvelope {

@@ -173,6 +173,9 @@ impl From<&Contact> for MobileContact {
             Some(ExchangeTransport::Ble) => "ble",
             Some(ExchangeTransport::Usb) => "usb",
             Some(ExchangeTransport::Audio) => "audio",
+            Some(ExchangeTransport::Link) => "link",
+            // Unknown future variants (enum is non_exhaustive): "qr" is
+            // the least-claiming presentation fallback.
             _ => "qr",
         }
         .to_string();

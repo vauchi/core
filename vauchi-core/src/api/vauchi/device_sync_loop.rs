@@ -239,9 +239,12 @@ impl Vauchi {
                     Ok(p) => p,
                     Err(_) => continue, // not from this device — try the next key
                 };
-            let items: Vec<SyncItem> = match serde_json::from_slice(&plaintext) {
-                Ok(i) => i,
-                Err(_) => return Ok(0), // decrypted but malformed — drop
+            // Tolerant per-item decode: a newer sibling's unknown variant
+            // must not drop the known items sharing its batch (Release A,
+            // readers-before-writers).
+            let items: Vec<SyncItem> = match crate::sync::decode_sync_items_tolerantly(&plaintext) {
+                Ok(decoded) => decoded.known,
+                Err(_) => return Ok(0), // decrypted but not an item array — drop
             };
             // The decrypting device IS the sender — use its id for the
             // ADR-020 tie-break (no wire field needed).

@@ -698,6 +698,62 @@ impl SyncItem {
     }
 }
 
+/// Upper bound on items per owner-sync batch — reject absurd arrays
+/// before element decoding (DC-01).
+const MAX_SYNC_ITEMS_PER_BATCH: usize = 10_000;
+
+/// Result of tolerantly decoding a batch of [`SyncItem`]s.
+///
+/// Release A of the readers-before-writers rollout
+/// (`backlog/2026-07-21-per-device-ratchet-registry-dormant` §Progress):
+/// known items survive unknown or malformed siblings emitted by a newer
+/// linked device, instead of the whole batch failing on the first one.
+#[derive(Debug)]
+pub struct DecodedSyncItems {
+    /// Items this binary understands, in batch order.
+    pub known: Vec<SyncItem>,
+    /// Externally tagged variants this binary does not know.
+    pub unknown_count: usize,
+    /// Known variants whose fields failed to decode.
+    pub malformed_count: usize,
+}
+
+impl DecodedSyncItems {
+    /// True when at least one batch element could not be decoded.
+    pub fn has_skipped(&self) -> bool {
+        self.unknown_count > 0 || self.malformed_count > 0
+    }
+}
+
+/// Decodes an owner-sync item batch, skipping (and counting) elements
+/// this binary cannot represent. The outer value must be a JSON array
+/// within [`MAX_SYNC_ITEMS_PER_BATCH`]; anything else fails closed.
+pub fn decode_sync_items_tolerantly(bytes: &[u8]) -> Result<DecodedSyncItems, DeviceSyncError> {
+    let values: Vec<serde_json::Value> = serde_json::from_slice(bytes)
+        .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+    if values.len() > MAX_SYNC_ITEMS_PER_BATCH {
+        return Err(DeviceSyncError::Deserialization(format!(
+            "sync batch exceeds {MAX_SYNC_ITEMS_PER_BATCH} items"
+        )));
+    }
+    let mut decoded = DecodedSyncItems {
+        known: Vec::with_capacity(values.len()),
+        unknown_count: 0,
+        malformed_count: 0,
+    };
+    for value in values {
+        match serde_json::from_value::<SyncItem>(value) {
+            Ok(item) => decoded.known.push(item),
+            // The unknown/malformed split is diagnostic only — both are
+            // skipped. serde has no typed unknown-variant error, so the
+            // stable message prefix is the only available classifier.
+            Err(e) if e.to_string().starts_with("unknown variant") => decoded.unknown_count += 1,
+            Err(_) => decoded.malformed_count += 1,
+        }
+    }
+    Ok(decoded)
+}
+
 /// Tracks synchronization state with another device.
 ///
 /// Each device maintains one InterDeviceSyncState per other linked device
@@ -755,8 +811,36 @@ impl InterDeviceSyncState {
     }
 
     /// Deserializes sync state from JSON.
+    ///
+    /// Tolerant on the pending queue: an unknown or malformed pending
+    /// item (written by a newer build) is skipped instead of failing the
+    /// whole state restore — losing one future-variant item is strictly
+    /// better than losing every pending item with it.
     pub fn from_json(json: &str) -> Result<Self, DeviceSyncError> {
-        serde_json::from_str(json).map_err(|e| DeviceSyncError::Deserialization(e.to_string()))
+        #[derive(Deserialize)]
+        struct TolerantState {
+            #[serde(with = "bytes_array_32")]
+            device_id: [u8; 32],
+            pending_items: Vec<serde_json::Value>,
+            last_sync_version: u64,
+        }
+        let raw: TolerantState = serde_json::from_str(json)
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+        if raw.pending_items.len() > MAX_SYNC_ITEMS_PER_BATCH {
+            return Err(DeviceSyncError::Deserialization(format!(
+                "pending queue exceeds {MAX_SYNC_ITEMS_PER_BATCH} items"
+            )));
+        }
+        let pending_items = raw
+            .pending_items
+            .into_iter()
+            .filter_map(|value| serde_json::from_value::<SyncItem>(value).ok())
+            .collect();
+        Ok(InterDeviceSyncState {
+            device_id: raw.device_id,
+            pending_items,
+            last_sync_version: raw.last_sync_version,
+        })
     }
 }
 

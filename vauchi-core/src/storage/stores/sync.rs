@@ -328,21 +328,32 @@ impl SyncStore<'_> {
             Ok((Some(encrypted), _, sent_count)) if !encrypted.is_empty() => {
                 let decrypted = crate::crypto::decrypt(self.key, &encrypted)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                let json = String::from_utf8(decrypted)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                let items: Vec<SyncItem> = serde_json::from_str(&json)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                Ok(Some((items, sent_count as usize)))
+                Ok(Self::decode_checkpoint_items(&decrypted, sent_count)?)
             }
-            Ok((_, plaintext, sent_count)) if !plaintext.is_empty() => {
-                let items: Vec<SyncItem> = serde_json::from_str(&plaintext)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                Ok(Some((items, sent_count as usize)))
-            }
+            Ok((_, plaintext, sent_count)) if !plaintext.is_empty() => Ok(
+                Self::decode_checkpoint_items(plaintext.as_bytes(), sent_count)?,
+            ),
             Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
+    }
+
+    /// Decodes checkpoint items tolerantly. A checkpoint holding any
+    /// item this binary cannot decode is treated as absent rather than
+    /// partially resumed: `sent_count` indexes the ORIGINAL item order,
+    /// so skipping elements would misalign the resume point. Restarting
+    /// the batch is safe — sync items are idempotent under LWW.
+    fn decode_checkpoint_items(
+        bytes: &[u8],
+        sent_count: i64,
+    ) -> Result<Option<(Vec<SyncItem>, usize)>, StorageError> {
+        let decoded = crate::sync::decode_sync_items_tolerantly(bytes)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        if decoded.has_skipped() {
+            return Ok(None);
+        }
+        Ok(Some((decoded.known, sent_count as usize)))
     }
 
     /// Clears a sync checkpoint for a target device.

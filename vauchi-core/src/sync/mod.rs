@@ -15,9 +15,10 @@ pub mod state;
 
 pub use delta::{CardDelta, DeltaError, FieldChange, ValidationSummary};
 pub use device_sync::{
-    ContactDeviceRegistrySyncData, ContactSyncData, DeviceLinkIntent, DeviceSyncError,
-    DeviceSyncPayload, FieldStamp, GroupSyncData, ImportedContactSyncData, InterDeviceSyncState,
-    SyncItem, VersionVector, validate_timestamp,
+    ContactDeviceRegistrySyncData, ContactSyncData, DecodedSyncItems, DeviceLinkIntent,
+    DeviceSyncError, DeviceSyncPayload, FieldStamp, GroupSyncData, ImportedContactSyncData,
+    InterDeviceSyncState, SyncItem, VersionVector, decode_sync_items_tolerantly,
+    validate_timestamp,
 };
 pub use merkle::MerkleTree;
 pub use state::{ReplayDetector, SyncState};

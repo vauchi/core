@@ -92,9 +92,11 @@ impl BlobOutcome {
     /// (storage failure) must NOT ACK — the blob stays on the relay and the
     /// next fetch retries it. ACKing it would turn a transient local failure
     /// into permanent silent loss (the alert/nonce transaction was rolled
-    /// back, so nothing local remembers the blob existed).
+    /// back, so nothing local remembers the blob existed). A rate-limited
+    /// genesis attempt is likewise retriable — the blob is retained until the
+    /// window resets (plan §REVISION F6).
     pub(crate) fn should_ack(&self) -> bool {
-        self.reject_reason != Some("storage")
+        !matches!(self.reject_reason, Some("storage") | Some("genesis_rate"))
     }
 }
 
@@ -255,6 +257,7 @@ fn reject_category(e: &CardUpdateError) -> &'static str {
         CardUpdateError::InvalidDelta => "bad_delta",
         CardUpdateError::SignatureInvalid => "signature",
         CardUpdateError::ReplayDetected => "replay",
+        CardUpdateError::GenesisRateLimited => "genesis_rate",
         CardUpdateError::StaleVersion { .. } => "stale",
         CardUpdateError::DeltaApplicationFailed => "delta_apply",
         CardUpdateError::Storage(_) => "storage",

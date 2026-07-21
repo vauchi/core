@@ -55,6 +55,10 @@ pub enum CardUpdateError {
     SignatureInvalid,
     /// Replay attack detected (nonce already seen).
     ReplayDetected,
+    /// A genesis decrypt attempt was rate-limited (ADR-068). Retriable — the
+    /// caller must NOT ACK the relay blob; the next fetch retries once the
+    /// window resets (plan §REVISION F6).
+    GenesisRateLimited,
     /// Delta version is older than the last applied version (downgrade, #42).
     StaleVersion { delta: u32, last: u32 },
     /// Delta application failed (invalid field changes).
@@ -268,15 +272,40 @@ pub fn process_single_card_update_for_device(
             )
             .map_err(|_| CardUpdateError::NoRatchetState)?
         }
-        None => return Err(CardUpdateError::NoRatchetState),
+        // No `[0;32]` session and no peer registry — a first-contact genesis
+        // envelope from a secondary device, or fail closed (ADR-068).
+        None => {
+            return try_receive_genesis_alert(
+                identity,
+                storage,
+                sender_id,
+                &contact,
+                ciphertext,
+                CardUpdateError::NoRatchetState,
+            );
+        }
     };
 
     let ratchet_msg: RatchetMessage =
         serde_json::from_slice(ciphertext).map_err(|_| CardUpdateError::InvalidRatchetMessage)?;
 
-    let plaintext = ratchet
-        .decrypt(&ratchet_msg)
-        .map_err(|_| CardUpdateError::DecryptionFailed)?;
+    let plaintext = match ratchet.decrypt(&ratchet_msg) {
+        Ok(plaintext) => plaintext,
+        // A failed decrypt on the legacy `[0;32]` session may be a genesis
+        // message from a sender sibling we hold no session with — try genesis
+        // before failing (plan §REVISION F8).
+        Err(_) if *peer_device_id == [0; 32] => {
+            return try_receive_genesis_alert(
+                identity,
+                storage,
+                sender_id,
+                &contact,
+                ciphertext,
+                CardUpdateError::DecryptionFailed,
+            );
+        }
+        Err(_) => return Err(CardUpdateError::DecryptionFailed),
+    };
 
     // 3b. Alerts route separately. Emergency/duress alerts reuse the card-update
     //     envelope for wire indistinguishability (ADR-032) but carry no card
@@ -482,6 +511,104 @@ pub fn process_single_card_update_for_device(
             Err(e)
         }
     }
+}
+
+/// Attempt to receive a first-contact genesis alert (ADR-068, MR B).
+///
+/// A device that holds a contact's `shared_key` but has no established session
+/// can send a safety alert sealed into a genesis envelope. This opens it
+/// statelessly from `shared_key` + the message header, verifies the inner
+/// alert's own signature (possession of `shared_key` is admission to the
+/// parser, never authority — plan §REVISION F8), and persists the durable
+/// fact + replay nonce + advanced `[0;32]` session in one transaction so an
+/// accepted alert survives any crash before surfacing. On any non-genesis or
+/// verification failure it returns `fallback`, preserving the original receive
+/// error; a rate-limited attempt returns the retriable
+/// [`CardUpdateError::GenesisRateLimited`] so the caller does not ACK the blob.
+///
+/// MR B does not persist the announced registry or create canonical per-device
+/// sessions — production receive routes everything to the `[0;32]` session;
+/// registry learning for per-device routing is deferred to that program (F4).
+fn try_receive_genesis_alert(
+    identity: &Identity,
+    storage: &Storage,
+    sender_id: &str,
+    contact: &crate::contact::Contact,
+    ciphertext: &[u8],
+    fallback: CardUpdateError,
+) -> Result<ReceiveOutcome, CardUpdateError> {
+    let (Some(shared_key), Some(peer_identity)) = (contact.shared_key(), contact.public_key())
+    else {
+        return Err(fallback);
+    };
+    let Ok(message) = serde_json::from_slice::<RatchetMessage>(ciphertext) else {
+        return Err(fallback);
+    };
+
+    // Rate-limit BEFORE deriving keys — a genesis open derives ratchet keys
+    // from shared_key ahead of any signature check (F6). A denial is retriable.
+    if !storage.genesis_limits().consume_decrypt_budget(sender_id)? {
+        return Err(CardUpdateError::GenesisRateLimited);
+    }
+
+    let Ok(opened) = crate::exchange::genesis::GenesisEnvelope::open(
+        shared_key,
+        peer_identity,
+        identity.signing_public_key(),
+        &message,
+    ) else {
+        return Err(fallback);
+    };
+
+    // Authority check: the inner payload must be a safety alert whose own
+    // sender→recipient signature verifies, independent of the envelope.
+    let alert = match VersionedPayload::decode(&opened.inner_payload) {
+        Ok(VersionedPayload::Alert(alert)) => alert,
+        _ => return Err(fallback),
+    };
+    if !alert.verify(peer_identity, identity.signing_public_key()) {
+        return Err(CardUpdateError::SignatureInvalid);
+    }
+    if storage.replay().is_replay_nonce(sender_id, alert.nonce())? {
+        return Err(CardUpdateError::ReplayDetected);
+    }
+
+    // Durable, atomic: accepting the alert burns its replay nonce, so the fact
+    // must commit with it (delivery-axis findings). The advanced responder
+    // ratchet persists under `[0;32]` so subsequent ordinary messages from
+    // this sender decrypt normally.
+    let ratchet = opened.advanced_ratchet;
+    storage.begin_transaction()?;
+    let genesis_txn = (|| -> Result<(), CardUpdateError> {
+        storage
+            .ratchets()
+            .save_ratchet_state_for_device(sender_id, &[0; 32], &ratchet, false)?;
+        storage
+            .replay()
+            .save_replay_nonce(sender_id, alert.nonce(), alert.timestamp())?;
+        storage.safety_alerts().insert_or_compare_fact(
+            sender_id,
+            alert.nonce(),
+            &opened.inner_payload,
+            storage.clock().unix_seconds(),
+        )?;
+        Ok(())
+    })();
+    match genesis_txn {
+        Ok(()) => storage.commit()?,
+        Err(e) => {
+            storage.rollback();
+            return Err(e);
+        }
+    }
+
+    Ok(ReceiveOutcome::Alert(ReceivedAlert {
+        kind: alert.kind(),
+        message: alert.message().to_string(),
+        timestamp: alert.timestamp(),
+        location: alert.location().cloned(),
+        nonce: *alert.nonce(),
+    }))
 }
 
 /// Decodes versioned payload, handling CEK-wrapped (v2) format.

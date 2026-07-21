@@ -264,29 +264,103 @@ fn duress_unlock_from_secondary_device_should_queue_alert() {
 }
 
 // @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
-/// RED (end-to-end): the recipient must surface a secondary device's emergency
-/// alert. Current code queues nothing at the sender, so the recipient never
-/// receives it. Un-ignore when the send path can establish a session for a
-/// secondary device.
+/// End-to-end: a secondary device with only `shared_key` seals a genesis
+/// alert; the recipient (holding the matching contact and shared_key, no
+/// session) opens it, surfaces the emergency, and persists a durable fact.
+/// This is the full ADR-068 send→receive path, not just sender pending state.
 // @internal
 #[test]
-#[ignore = "RED: recipient never surfaces a secondary-device alert — backlog/2026-07-21-per-device-ratchet-registry-dormant"]
 fn secondary_device_alert_should_be_surfaced_by_recipient() {
-    let (secondary, bob_id) = secondary_device_after_owner_sync();
-    let mut secondary = secondary;
+    // Alice's secondary device and Bob's device share one relationship key but
+    // neither holds a ratchet or peer registry — the exact secondary-device
+    // end-state (see `secondary_device_after_owner_sync`), mirrored on both
+    // sides so a real receive can run.
+    let mut alice_secondary = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let alice_pk = *alice_secondary.identity().unwrap().signing_public_key();
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+    let shared_bytes = [0x5au8; 32];
 
-    secondary
-        .configure_emergency_broadcast(vec![bob_id.clone()], "check on me".into(), false)
+    let bob_contact_at_alice = Contact::from_exchange(
+        bob_pk,
+        ContactCard::new("Bob"),
+        SymmetricKey::from_bytes(shared_bytes),
+        0,
+    );
+    let bob_id_at_alice = bob_contact_at_alice.id().to_string();
+    alice_secondary.add_contact(bob_contact_at_alice).unwrap();
+
+    let alice_contact_at_bob = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        SymmetricKey::from_bytes(shared_bytes),
+        0,
+    );
+    let alice_id_at_bob = alice_contact_at_bob.id().to_string();
+    bob.add_contact(alice_contact_at_bob).unwrap();
+
+    // Alice raises the alarm from the secondary device.
+    alice_secondary
+        .configure_emergency_broadcast(vec![bob_id_at_alice.clone()], "check on me".into(), false)
         .unwrap();
-    secondary.send_emergency_broadcast().unwrap();
+    let result = alice_secondary.send_emergency_broadcast().unwrap();
+    assert_eq!(result.sent, 1, "the secondary device must queue the alert");
 
-    let pending = secondary
+    let pending = alice_secondary
         .storage()
         .pending()
         .get_all_pending_updates()
         .unwrap();
-    assert!(
-        pending.iter().any(|u| u.contact_id == bob_id),
-        "a secondary-device alert must reach the wire so the recipient can surface it"
+    let blob = &pending
+        .iter()
+        .find(|u| u.contact_id == bob_id_at_alice)
+        .expect("a queued genesis alert for Bob")
+        .payload;
+
+    // Bob receives the genesis blob with no prior session for Alice.
+    let outcome = process_single_card_update(
+        bob.identity().unwrap(),
+        bob.storage(),
+        &alice_id_at_bob,
+        blob,
+    )
+    .expect("the genesis alert must be received");
+    match outcome {
+        ReceiveOutcome::Alert(a) => {
+            assert_eq!(a.kind, AlertKind::Emergency);
+            assert_eq!(a.message, "check on me");
+        }
+        other => panic!("expected an Emergency alert, got {other:?}"),
+    }
+
+    // The alert is durably recorded so it survives a crash before surfacing.
+    let facts = bob
+        .storage()
+        .safety_alerts()
+        .load_unsurfaced_facts()
+        .unwrap();
+    assert_eq!(
+        facts.len(),
+        1,
+        "the received genesis alert must persist as a durable fact"
+    );
+    assert_eq!(facts[0].contact_id, alice_id_at_bob);
+
+    // A replay of the same blob must not create a second alert or fact.
+    let replay = process_single_card_update(
+        bob.identity().unwrap(),
+        bob.storage(),
+        &alice_id_at_bob,
+        blob,
+    );
+    assert!(replay.is_err(), "replayed genesis blob must be rejected");
+    assert_eq!(
+        bob.storage()
+            .safety_alerts()
+            .load_unsurfaced_facts()
+            .unwrap()
+            .len(),
+        1,
+        "a replay must not create a second durable fact"
     );
 }

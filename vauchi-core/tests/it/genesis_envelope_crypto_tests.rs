@@ -237,3 +237,41 @@ fn genesis_open_fails_for_a_different_shared_key() {
         "expected a crypto/decrypt failure, got {err:?}"
     );
 }
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
+#[test]
+fn genesis_seal_rejects_an_oversized_payload() {
+    // An inner payload that would push the envelope past the top padding bucket
+    // is rejected at seal (F10) rather than leaking a distinguishable size class.
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
+    let shared = SymmetricKey::generate();
+    let broadcast = sender_broadcast(&alice);
+
+    let huge = SafetyAlertPayload::new(
+        AlertKind::Emergency,
+        "x".repeat(4096),
+        7_000,
+        None,
+        [9u8; 32],
+        &alice,
+        bob.signing_public_key(),
+    )
+    .expect("alert construction");
+    let payload = VersionedPayload::encode_alert(&huge);
+
+    let err = GenesisEnvelope::seal(
+        &shared,
+        &alice,
+        bob.signing_public_key(),
+        &broadcast,
+        EPOCH,
+        &payload,
+    )
+    .expect_err("an oversized genesis payload must be rejected");
+    assert!(
+        matches!(err, GenesisError::TooLarge),
+        "expected TooLarge, got {err:?}"
+    );
+}

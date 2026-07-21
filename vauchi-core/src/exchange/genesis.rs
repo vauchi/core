@@ -554,4 +554,38 @@ mod tests {
             Err(GenesisError::InvalidFormat)
         ));
     }
+
+    // @internal
+    #[test]
+    fn open_rejects_a_message_that_decrypts_but_has_a_bad_envelope_signature() {
+        // Distinct from the identity-swap black-box test (which fails at the
+        // decrypt step because the identities feed the root KDF): here the root
+        // matches, so decrypt SUCCEEDS, and only the envelope signature check
+        // (F7) can reject the message — the defense-in-depth layer on top of
+        // the header AEAD. Exercises the SignatureInvalid path directly.
+        use crate::identity::Identity;
+
+        let alice = Identity::create("Alice", 0);
+        let bob = Identity::create("Bob", 0);
+        let shared = SymmetricKey::generate();
+        let sender = alice.signing_public_key();
+        let recipient = bob.signing_public_key();
+
+        let root = genesis_root(&shared, sender, recipient);
+        let responder_public = *genesis_responder_keypair(&shared, sender, recipient).public_key();
+        let mut session = DoubleRatchetState::initialize_initiator(&root, responder_public)
+            .expect("initiator init");
+
+        // Encode an envelope carrying a deliberately-invalid signature, then
+        // encrypt it with a correctly-rooted session so decrypt will succeed.
+        let plaintext = encode_envelope(1, &[9u8; 32], &[8u8; 32], &[0u8; 64], b"bc", b"\x04inner");
+        let message = session.encrypt(&plaintext).expect("encrypt");
+
+        let err = GenesisEnvelope::open(&shared, sender, recipient, &message)
+            .expect_err("a bad envelope signature must be rejected after a successful decrypt");
+        assert!(
+            matches!(err, GenesisError::SignatureInvalid),
+            "expected SignatureInvalid, got {err:?}"
+        );
+    }
 }

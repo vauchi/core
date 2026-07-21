@@ -49,9 +49,12 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
 use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::genesis::GenesisEnvelope;
+use vauchi_core::identity::{Identity, RegistryBroadcast};
 use vauchi_core::storage::GENESIS_CONTACT_ATTEMPTS_PER_WINDOW;
 use vauchi_core::sync::DeviceLinkIntent;
-use vauchi_core::sync::safety_alert::AlertKind;
+use vauchi_core::sync::delta::VersionedPayload;
+use vauchi_core::sync::safety_alert::{AlertKind, SafetyAlertPayload};
 use vauchi_core::types::DuressSettings;
 use vauchi_core::{AuthMode, SymmetricKey, Vauchi};
 
@@ -417,5 +420,207 @@ fn genesis_decrypt_budget_exhaustion_is_retriable_not_dropped() {
     assert!(
         matches!(err, CardUpdateError::GenesisRateLimited),
         "an exhausted budget must surface as retriable GenesisRateLimited, got {err:?}"
+    );
+}
+
+/// Builds a session-less Bob holding a contact for `alice`, sharing `shared`.
+/// Returns `(bob, alice_contact_id, alice_broadcast)`.
+fn session_less_pair(
+    alice: &Identity,
+    shared_bytes: [u8; 32],
+) -> (Vauchi, String, RegistryBroadcast) {
+    let bob = create_vauchi_with_identity("Bob");
+    let alice_contact = Contact::from_exchange(
+        *alice.signing_public_key(),
+        ContactCard::new("Alice"),
+        SymmetricKey::from_bytes(shared_bytes),
+        0,
+    );
+    let alice_id = alice_contact.id().to_string();
+    bob.add_contact(alice_contact).unwrap();
+    let broadcast =
+        RegistryBroadcast::new(&alice.initial_device_registry(), alice.signing_keypair(), 0);
+    (bob, alice_id, broadcast)
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// A genesis envelope that decrypts and verifies but wraps a NON-alert inner
+/// payload must be rejected — `shared_key` admits the blob to the parser, it
+/// does not authorize an arbitrary payload (plan §REVISION F8). No fact is
+/// created.
+// @internal
+#[test]
+fn genesis_wrapping_a_non_alert_payload_is_rejected() {
+    let alice = Identity::create("Alice", 0);
+    let shared_bytes = [0x33u8; 32];
+    let (bob, alice_id, broadcast) = session_less_pair(&alice, shared_bytes);
+
+    // Seal an inner payload that is not a `VersionedPayload::Alert` (0x04).
+    let (message, _) = GenesisEnvelope::seal(
+        &SymmetricKey::from_bytes(shared_bytes),
+        &alice,
+        bob.identity().unwrap().signing_public_key(),
+        &broadcast,
+        20_100,
+        b"\x99 not a known payload",
+    )
+    .expect("seal");
+    let blob = serde_json::to_vec(&message).unwrap();
+
+    let err = process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &blob)
+        .expect_err("a genesis envelope wrapping a non-alert payload must be rejected");
+    assert!(
+        matches!(err, CardUpdateError::NoRatchetState),
+        "a non-alert genesis payload falls back to the ordinary error, got {err:?}"
+    );
+    assert!(
+        bob.storage()
+            .safety_alerts()
+            .load_unsurfaced_facts()
+            .unwrap()
+            .is_empty(),
+        "a rejected genesis must persist no durable fact"
+    );
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// A valid genesis envelope (envelope signature checks out) whose INNER alert
+/// carries an invalid sender signature must be rejected: possession of
+/// `shared_key` is admission to the parser, never authority over the alert
+/// content (plan §REVISION F8). The inner alert here is signed by a third party,
+/// not the contact.
+// @internal
+#[test]
+fn genesis_with_a_forged_inner_alert_signature_is_rejected() {
+    let alice = Identity::create("Alice", 0);
+    let mallory = Identity::create("Mallory", 0);
+    let shared_bytes = [0x44u8; 32];
+    let (bob, alice_id, broadcast) = session_less_pair(&alice, shared_bytes);
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+
+    // The inner alert is signed by Mallory, so it cannot verify against Alice's
+    // identity — but the OUTER envelope is validly signed by Alice.
+    let forged = SafetyAlertPayload::new(
+        AlertKind::Emergency,
+        "I need help".to_string(),
+        7_000,
+        None,
+        [7u8; 32],
+        &mallory,
+        &bob_pk,
+    )
+    .expect("alert construction");
+    let inner = VersionedPayload::encode_alert(&forged);
+
+    let (message, _) = GenesisEnvelope::seal(
+        &SymmetricKey::from_bytes(shared_bytes),
+        &alice,
+        &bob_pk,
+        &broadcast,
+        20_100,
+        &inner,
+    )
+    .expect("seal");
+    let blob = serde_json::to_vec(&message).unwrap();
+
+    let err = process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &blob)
+        .expect_err("a forged inner alert signature must be rejected");
+    assert!(
+        matches!(err, CardUpdateError::SignatureInvalid),
+        "a forged inner alert signature must fail closed, got {err:?}"
+    );
+    assert!(
+        bob.storage()
+            .safety_alerts()
+            .load_unsurfaced_facts()
+            .unwrap()
+            .is_empty(),
+        "a forged alert must persist no durable fact"
+    );
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// On the decrypt-failure arm (a `[0;32]` session already exists), a
+/// rate-limited genesis attempt must fall through to the ordinary
+/// `DecryptionFailed` (which is ACKed) rather than the retained
+/// `GenesisRateLimited`, so ordinary undecryptable traffic over an established
+/// session cannot pin blobs on the relay (plan §REVISION C2/F6).
+// @internal
+#[test]
+fn established_session_decrypt_failure_falls_through_when_rate_limited() {
+    let bob = create_vauchi_with_identity("Bob");
+    let alice_contact = Contact::from_exchange(
+        [0x11u8; 32],
+        ContactCard::new("Alice"),
+        SymmetricKey::from_bytes([0x55u8; 32]),
+        0,
+    );
+    let alice_id = alice_contact.id().to_string();
+    bob.add_contact(alice_contact).unwrap();
+
+    // Give Bob an established legacy [0;32] session so garbage blobs reach the
+    // decrypt-failure arm, not the no-session arm.
+    let session =
+        DoubleRatchetState::initialize_initiator(&SymmetricKey::generate(), [0x66u8; 32]).unwrap();
+    bob.storage()
+        .ratchets()
+        .save_ratchet_state_for_device(&alice_id, &[0; 32], &session, true)
+        .unwrap();
+
+    // Exhaust the per-contact budget with undecryptable blobs; each fails the
+    // session decrypt, then the speculative genesis attempt.
+    for i in 0..GENESIS_CONTACT_ATTEMPTS_PER_WINDOW {
+        let blob = non_genesis_ratchet_blob(i as u8);
+        let err =
+            process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &blob)
+                .expect_err("an undecryptable blob must not be accepted");
+        assert!(
+            matches!(err, CardUpdateError::DecryptionFailed),
+            "got {err:?}"
+        );
+    }
+
+    // Budget is now exhausted. A further undecryptable blob must STILL surface
+    // as the ACKable DecryptionFailed — not the retained GenesisRateLimited.
+    let blob = non_genesis_ratchet_blob(0xfe);
+    let err = process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &blob)
+        .expect_err("the over-budget blob must be denied");
+    assert!(
+        matches!(err, CardUpdateError::DecryptionFailed),
+        "an exhausted budget on the established-session arm must fall through to \
+         DecryptionFailed (ACKed), not GenesisRateLimited (retained), got {err:?}"
+    );
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// A malformed (non-`RatchetMessage`) blob to a session-less contact is rejected
+/// at the genesis parse boundary before any key derivation or budget charge —
+/// it falls back to the ordinary error and persists nothing.
+// @internal
+#[test]
+fn malformed_blob_to_session_less_contact_falls_back_without_charging_budget() {
+    let alice = Identity::create("Alice", 0);
+    let (bob, alice_id, _broadcast) = session_less_pair(&alice, [0x77u8; 32]);
+
+    let err = process_single_card_update(
+        bob.identity().unwrap(),
+        bob.storage(),
+        &alice_id,
+        b"this is not a ratchet message",
+    )
+    .expect_err("a malformed blob must be rejected");
+    assert!(
+        matches!(err, CardUpdateError::NoRatchetState),
+        "a malformed genesis candidate falls back to the ordinary error, got {err:?}"
+    );
+
+    // Parse failure precedes the budget charge, so a full budget remains.
+    assert_eq!(
+        bob.storage()
+            .genesis_limits()
+            .contact_attempts_in_window(&alice_id)
+            .unwrap(),
+        0,
+        "a blob rejected at the parse boundary must not consume budget"
     );
 }

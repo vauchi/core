@@ -13,7 +13,7 @@ use crate::common;
 
 use common::helpers::create_vauchi_with_identity;
 use vauchi_core::SymmetricKey;
-use vauchi_core::api::{CardUpdateError, ReceiveOutcome, process_single_card_update};
+use vauchi_core::api::{CardUpdateError, ReceiveOutcome, VauchiEvent, process_single_card_update};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
@@ -360,4 +360,63 @@ fn alert_receive_is_atomic_fact_failure_preserves_the_nonce() {
             .len(),
         1
     );
+}
+
+// @internal
+#[test]
+fn surfacing_dispatches_pending_facts_at_least_once() {
+    let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = setup_two_party();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+
+    let blob = create_alert_blob(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        AlertKind::Duress,
+        [21u8; 32],
+    );
+    // The storage-level receive persists the fact but dispatches nothing —
+    // surfacing must derive from the durable fact, not the in-memory outcome.
+    process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_contact_id,
+        &blob,
+    )
+    .expect("alert must be received");
+
+    let collected = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let sink = collected.clone();
+    alice_wb.add_event_handler(std::sync::Arc::new(move |e| {
+        sink.lock().unwrap().push(e);
+    }));
+
+    let n = alice_wb.surface_pending_safety_alerts().unwrap();
+    assert_eq!(n, 1, "one pending fact must be dispatched");
+    {
+        let events = collected.lock().unwrap();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            VauchiEvent::DuressAlertReceived {
+                contact_id,
+                message,
+                timestamp,
+                location,
+                alert_nonce,
+            } => {
+                assert_eq!(contact_id, &bob_contact_id);
+                assert_eq!(message, "help me");
+                assert_eq!(*timestamp, 1_720_000_000);
+                assert_eq!(*location, None);
+                assert_eq!(alert_nonce, &[21u8; 32]);
+            }
+            other => panic!("expected DuressAlertReceived, got {other:?}"),
+        }
+    }
+
+    // At-least-once until a presentation acknowledgement exists (platform
+    // follow-up): a second pass re-dispatches; consumers dedup on the nonce.
+    let again = alice_wb.surface_pending_safety_alerts().unwrap();
+    assert_eq!(again, 1, "facts stay pending until acknowledged");
+    assert_eq!(collected.lock().unwrap().len(), 2);
 }

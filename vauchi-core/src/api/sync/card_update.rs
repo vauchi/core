@@ -94,6 +94,8 @@ pub struct ReceivedAlert {
     pub timestamp: u64,
     /// Optional sender location.
     pub location: Option<GeoLocation>,
+    /// The alert's signed nonce — its stable identity across re-surfacing.
+    pub nonce: [u8; 32],
 }
 
 /// What a single decrypted, verified receive payload turned out to be.
@@ -330,6 +332,7 @@ pub fn process_single_card_update_for_device(
             message: alert.message().to_string(),
             timestamp: alert.timestamp(),
             location: alert.location().cloned(),
+            nonce: *alert.nonce(),
         }));
     }
 

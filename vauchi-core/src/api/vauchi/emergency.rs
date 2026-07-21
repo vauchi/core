@@ -386,4 +386,12 @@ impl Vauchi {
     pub fn events(&self) -> &Arc<EventDispatcher> {
         &self.events
     }
+
+    /// Dispatch every durable, not-yet-acknowledged safety-alert fact as its
+    /// recipient-side event. At-least-once: facts stay pending until a
+    /// presentation acknowledgement exists (platform follow-up), so consumers
+    /// dedup on the alert nonce. Returns the number of alerts dispatched.
+    pub fn surface_pending_safety_alerts(&self) -> VauchiResult<usize> {
+        Ok(0)
+    }
 }

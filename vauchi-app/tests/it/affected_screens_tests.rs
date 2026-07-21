@@ -187,6 +187,7 @@ fn emergency_events_invalidate_contacts() {
             message: "help".into(),
             timestamp: 1234567890,
             location: Some((47.0, 8.0)),
+            alert_nonce: [7u8; 32],
         },
         VauchiEvent::EmergencyBroadcastSent {
             sent_count: 3,

@@ -225,7 +225,7 @@ pub fn incoming_update_events(outcomes: &[BlobOutcome]) -> Vec<VauchiEvent> {
 /// Map a received safety alert to its recipient-side event. Emergency and
 /// duress get distinct events so the recipient can respond appropriately; the
 /// distinction only exists here (post-decryption), never on the wire (ADR-032).
-fn alert_event(contact_id: String, alert: &ReceivedAlert) -> VauchiEvent {
+pub(crate) fn alert_event(contact_id: String, alert: &ReceivedAlert) -> VauchiEvent {
     let message = alert.message.clone();
     let timestamp = alert.timestamp;
     let location = alert.location.as_ref().map(|l| (l.latitude, l.longitude));
@@ -235,12 +235,14 @@ fn alert_event(contact_id: String, alert: &ReceivedAlert) -> VauchiEvent {
             message,
             timestamp,
             location,
+            alert_nonce: alert.nonce,
         },
         AlertKind::Duress => VauchiEvent::DuressAlertReceived {
             contact_id,
             message,
             timestamp,
             location,
+            alert_nonce: alert.nonce,
         },
     }
 }

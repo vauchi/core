@@ -192,6 +192,10 @@ pub enum VauchiEvent {
         timestamp: u64,
         /// Optional location as (latitude, longitude).
         location: Option<(f64, f64)>,
+        /// The alert's signed nonce — the alert's stable identity. Surfacing
+        /// is at-least-once from durable facts, so consumers dedup on this,
+        /// never on receipt time.
+        alert_nonce: [u8; 32],
     },
 
     /// A duress alert was received from a contact — the sender entered their
@@ -208,6 +212,10 @@ pub enum VauchiEvent {
         timestamp: u64,
         /// Optional location as (latitude, longitude).
         location: Option<(f64, f64)>,
+        /// The alert's signed nonce — the alert's stable identity. Surfacing
+        /// is at-least-once from durable facts, so consumers dedup on this,
+        /// never on receipt time.
+        alert_nonce: [u8; 32],
     },
 
     /// An emergency broadcast was sent.

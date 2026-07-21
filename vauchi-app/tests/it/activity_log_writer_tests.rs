@@ -99,6 +99,7 @@ fn duress_alert_creates_log_entry() {
         message: "under duress".to_owned(),
         timestamp: NOW,
         location: None,
+        alert_nonce: [7u8; 32],
     }];
 
     let result = ActivityLogWriter::write(&storage, &events, NOW).unwrap();
@@ -126,6 +127,7 @@ fn emergency_alert_creates_log_entry() {
         message: "SOS".to_owned(),
         timestamp: NOW,
         location: Some((48.8584, 2.2945)),
+        alert_nonce: [7u8; 32],
     }];
 
     let result = ActivityLogWriter::write(&storage, &events, NOW).unwrap();
@@ -321,4 +323,37 @@ fn contact_removed_creates_log_entry() {
         }
         other => panic!("unexpected entry variant: {other:?}"),
     }
+}
+
+// The alert's identity is its signed nonce, never local receipt time:
+// surfacing is at-least-once from durable facts, so a re-dispatch at a later
+// local time must dedup instead of logging a second entry
+// (delivery-axis findings, 2026-07-21-per-device-ratchet-registry-dormant).
+// @internal
+#[test]
+fn alert_log_key_is_nonce_stable_across_redispatch() {
+    let storage = test_storage();
+    let make = || {
+        vec![VauchiEvent::DuressAlertReceived {
+            contact_id: "contact-duress".to_owned(),
+            message: "under duress".to_owned(),
+            timestamp: NOW,
+            location: None,
+            alert_nonce: [9u8; 32],
+        }]
+    };
+
+    let first = ActivityLogWriter::write(&storage, &make(), NOW).unwrap();
+    assert_eq!(first.len(), 1);
+    assert_eq!(
+        first[0].0,
+        format!("duress:contact-duress:{}", hex::encode([9u8; 32]))
+    );
+
+    let second = ActivityLogWriter::write(&storage, &make(), NOW + 999).unwrap();
+    assert_eq!(
+        second.len(),
+        0,
+        "the same alert re-dispatched at a later local time must dedup by nonce"
+    );
 }

@@ -39,6 +39,7 @@ fn drain_returns_emergency_notification_after_event() {
             message: "help".into(),
             timestamp: 1_700_000_000,
             location: None,
+            alert_nonce: [7u8; 32],
         });
 
     let notifications = engine.drain_pending_notifications();
@@ -69,6 +70,7 @@ fn drain_clears_buffer_on_second_call() {
             message: "help".into(),
             timestamp: 1_700_000_000,
             location: None,
+            alert_nonce: [7u8; 32],
         });
 
     let first = engine.drain_pending_notifications();
@@ -92,6 +94,7 @@ fn drain_writes_to_activity_log() {
             message: "help".into(),
             timestamp: 1_700_000_000,
             location: None,
+            alert_nonce: [7u8; 32],
         });
 
     let _ = engine.drain_pending_notifications();
@@ -145,6 +148,7 @@ fn drain_uses_contact_display_name() {
             message: "help".into(),
             timestamp: 1_700_000_000,
             location: None,
+            alert_nonce: [7u8; 32],
         });
 
     let notifications = engine.drain_pending_notifications();

@@ -70,6 +70,7 @@ fn app_engine_shows_notifications_from_log() {
             message: "HELP".to_string(),
             timestamp: 1700000000,
             location: None,
+            alert_nonce: [7u8; 32],
         });
 
     // Poll notifications

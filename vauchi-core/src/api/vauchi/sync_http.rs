@@ -496,6 +496,13 @@ impl Vauchi {
             self.events.dispatch(event);
         }
 
+        // 6. Surface safety alerts from their durable facts (never from the
+        //    in-memory outcomes) — a crash anywhere above cannot lose one; the
+        //    next surfacing pass re-dispatches and consumers dedup by nonce.
+        if let Err(error) = self.surface_pending_safety_alerts() {
+            tracing::warn!(?error, "sync.receive_phase: surfacing safety alerts failed");
+        }
+
         Ok((
             received + device_applied,
             fetched,

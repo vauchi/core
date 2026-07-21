@@ -106,7 +106,10 @@ fn duress_alert_creates_log_entry() {
     assert_eq!(result.len(), 1, "exactly one entry should be inserted");
 
     let (event_key, entry) = &result[0];
-    assert_eq!(event_key, &format!("duress:{contact_id}:{NOW}"));
+    assert_eq!(
+        event_key,
+        &format!("duress:{contact_id}:{}", hex::encode([7u8; 32]))
+    );
     match entry {
         ActivityLogEntry::DuressAlertReceived { contact_id: cid } => {
             assert_eq!(cid, &contact_id);
@@ -135,7 +138,10 @@ fn emergency_alert_creates_log_entry() {
     assert_eq!(result.len(), 1, "exactly one entry should be inserted");
 
     let (event_key, entry) = &result[0];
-    assert_eq!(event_key, &format!("emergency:{contact_id}:{NOW}"));
+    assert_eq!(
+        event_key,
+        &format!("emergency:{contact_id}:{}", hex::encode([7u8; 32]))
+    );
 
     match entry {
         ActivityLogEntry::EmergencyAlertReceived { contact_id: cid } => {

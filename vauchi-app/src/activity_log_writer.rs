@@ -112,15 +112,27 @@ impl ActivityLogWriter {
                 Some((key, entry))
             }
 
-            VauchiEvent::EmergencyAlertReceived { contact_id, .. } => {
-                let key = format!("emergency:{contact_id}:{now_secs}");
+            // Alert keys use the signed nonce, never local time: surfacing is
+            // at-least-once from durable facts, so a time-based key would log
+            // every re-dispatch as a new entry (delivery-axis findings,
+            // 2026-07-21-per-device-ratchet-registry-dormant).
+            VauchiEvent::EmergencyAlertReceived {
+                contact_id,
+                alert_nonce,
+                ..
+            } => {
+                let key = format!("emergency:{contact_id}:{}", hex::encode(alert_nonce));
                 let entry = ActivityLogEntry::EmergencyAlertReceived {
                     contact_id: contact_id.clone(),
                 };
                 Some((key, entry))
             }
-            VauchiEvent::DuressAlertReceived { contact_id, .. } => {
-                let key = format!("duress:{contact_id}:{now_secs}");
+            VauchiEvent::DuressAlertReceived {
+                contact_id,
+                alert_nonce,
+                ..
+            } => {
+                let key = format!("duress:{contact_id}:{}", hex::encode(alert_nonce));
                 let entry = ActivityLogEntry::DuressAlertReceived {
                     contact_id: contact_id.clone(),
                 };

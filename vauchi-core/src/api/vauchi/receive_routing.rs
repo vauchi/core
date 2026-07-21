@@ -209,42 +209,21 @@ fn resolve_reciprocity_confirm(
 /// update (ADR-021/043). Pure: storage stays in [`process_received_blobs`],
 /// dispatch stays in `run_receive_phase`. Duplicate per-contact
 /// invalidations are idempotent, so no de-duplication is needed.
+///
+/// Alert outcomes yield nothing here: alert events are dispatched exclusively
+/// from durable facts (`surface_pending_safety_alerts`), so a crash between
+/// receive-commit and dispatch can never lose one.
 pub fn incoming_update_events(outcomes: &[BlobOutcome]) -> Vec<VauchiEvent> {
     outcomes
         .iter()
         .filter_map(|outcome| {
             let contact_id = outcome.contact_id.clone()?;
-            Some(match &outcome.alert {
-                Some(alert) => alert_event(contact_id, alert),
-                None => VauchiEvent::IncomingUpdate { contact_id },
-            })
+            match &outcome.alert {
+                Some(_) => None,
+                None => Some(VauchiEvent::IncomingUpdate { contact_id }),
+            }
         })
         .collect()
-}
-
-/// Map a received safety alert to its recipient-side event. Emergency and
-/// duress get distinct events so the recipient can respond appropriately; the
-/// distinction only exists here (post-decryption), never on the wire (ADR-032).
-pub(crate) fn alert_event(contact_id: String, alert: &ReceivedAlert) -> VauchiEvent {
-    let message = alert.message.clone();
-    let timestamp = alert.timestamp;
-    let location = alert.location.as_ref().map(|l| (l.latitude, l.longitude));
-    match alert.kind {
-        AlertKind::Emergency => VauchiEvent::EmergencyAlertReceived {
-            contact_id,
-            message,
-            timestamp,
-            location,
-            alert_nonce: alert.nonce,
-        },
-        AlertKind::Duress => VauchiEvent::DuressAlertReceived {
-            contact_id,
-            message,
-            timestamp,
-            location,
-            alert_nonce: alert.nonce,
-        },
-    }
 }
 
 /// Short, PII-free category for a rejected blob — names WHICH receive step
@@ -430,6 +409,23 @@ mod tests {
             VauchiEvent::IncomingUpdate { contact_id } => assert_eq!(contact_id, "contact-A"),
             other => panic!("expected IncomingUpdate, got {other:?}"),
         }
+    }
+
+    // @scenario: receive_phase :: alert events derive from durable facts only
+    #[test]
+    fn test_incoming_update_events_skips_alert_outcomes() {
+        let mut applied_alert = outcome(true, Some("contact-A"));
+        applied_alert.alert = Some(ReceivedAlert {
+            kind: AlertKind::Duress,
+            message: "m".into(),
+            timestamp: 1,
+            location: None,
+            nonce: [1u8; 32],
+        });
+        assert!(
+            incoming_update_events(&[applied_alert]).is_empty(),
+            "alerts dispatch from surface_pending_safety_alerts, never from outcomes"
+        );
     }
 
     // @scenario: receive_phase :: a batch that applies nothing emits no events

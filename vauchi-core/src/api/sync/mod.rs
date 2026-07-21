@@ -25,6 +25,7 @@ pub mod manager;
 #[cfg(not(feature = "testing"))]
 mod manager;
 
+pub(crate) use card_update::alert_event;
 pub use card_update::{
     CardUpdateError, CardUpdateResult, ReceiveOutcome, ReceivedAlert, process_card_updates,
     process_single_card_update, process_single_card_update_for_device,

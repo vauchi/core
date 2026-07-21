@@ -392,6 +392,34 @@ impl Vauchi {
     /// presentation acknowledgement exists (platform follow-up), so consumers
     /// dedup on the alert nonce. Returns the number of alerts dispatched.
     pub fn surface_pending_safety_alerts(&self) -> VauchiResult<usize> {
-        Ok(0)
+        use crate::sync::delta::VersionedPayload;
+
+        let facts = self.storage.safety_alerts().load_unsurfaced_facts()?;
+        let mut dispatched = 0;
+        for fact in facts {
+            let alert = match VersionedPayload::decode(&fact.signed_payload) {
+                Ok(VersionedPayload::Alert(alert)) => alert,
+                // A fact that no longer decodes is a storage-integrity
+                // defect; skipping silently would re-hide the alert, so name
+                // it (PII-free) and keep surfacing the rest.
+                _ => {
+                    tracing::warn!("safety-alert fact failed to decode — skipping");
+                    continue;
+                }
+            };
+            let received = crate::api::sync::ReceivedAlert {
+                kind: alert.kind(),
+                message: alert.message().to_string(),
+                timestamp: alert.timestamp(),
+                location: alert.location().cloned(),
+                nonce: *alert.nonce(),
+            };
+            self.events.dispatch(crate::api::sync::alert_event(
+                fact.contact_id.clone(),
+                &received,
+            ));
+            dispatched += 1;
+        }
+        Ok(dispatched)
     }
 }

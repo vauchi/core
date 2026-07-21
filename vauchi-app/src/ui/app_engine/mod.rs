@@ -352,6 +352,13 @@ impl AppEngine {
             }
         }));
 
+        // Surface safety alerts a previous session accepted but never
+        // surfaced (crash between receive-commit and dispatch). At-least-once
+        // from durable facts; consumers dedup by the alert nonce.
+        if let Err(error) = vauchi.surface_pending_safety_alerts() {
+            tracing::warn!("[AppEngine] Failed to surface pending safety alerts: {error:?}");
+        }
+
         // Check if a backup reminder is due (only if identity exists and not on lock/onboarding).
         let pending_backup_reminder = matches!(screen, AppScreen::MyInfo | AppScreen::Contacts)
             && vauchi

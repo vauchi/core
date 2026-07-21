@@ -17,6 +17,15 @@ use rusqlite::Connection;
 use super::super::{Storage, StorageError};
 use crate::crypto::SymmetricKey;
 
+/// Outcome of [`SafetyAlertFactStore::insert_or_compare_fact`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GenesisFactWrite {
+    /// The fact was newly inserted.
+    Inserted,
+    /// An identical fact already existed (benign re-delivery).
+    Duplicate,
+}
+
 /// One durable, immutable received safety alert.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredSafetyAlertFact {
@@ -63,6 +72,39 @@ impl SafetyAlertFactStore<'_> {
             rusqlite::params![contact_id, nonce, payload_encrypted, received_at as i64],
         )?;
         Ok(changed > 0)
+    }
+
+    /// Insert a verified alert fact, or confirm an identical one already
+    /// exists. Unlike [`Self::insert_fact_if_absent`], a conflicting
+    /// `(contact_id, nonce)` whose stored signed bytes DIFFER is rejected as
+    /// an integrity error rather than silently ignored — a genesis-delivered
+    /// alert must not let a nonce collision or tamper masquerade as a benign
+    /// duplicate (plan §REVISION F9).
+    pub fn insert_or_compare_fact(
+        &self,
+        contact_id: &str,
+        nonce: &[u8; 32],
+        signed_payload: &[u8],
+        received_at: u64,
+    ) -> Result<GenesisFactWrite, StorageError> {
+        if self.insert_fact_if_absent(contact_id, nonce, signed_payload, received_at)? {
+            return Ok(GenesisFactWrite::Inserted);
+        }
+        let existing: Vec<u8> = self.conn.query_row(
+            "SELECT signed_payload_encrypted FROM safety_alert_facts
+                 WHERE contact_id = ?1 AND nonce = ?2",
+            rusqlite::params![contact_id, nonce],
+            |row| row.get(0),
+        )?;
+        let existing_plain = crate::crypto::decrypt(self.key, &existing)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        if existing_plain == signed_payload {
+            Ok(GenesisFactWrite::Duplicate)
+        } else {
+            Err(StorageError::InvalidData(
+                "safety-alert fact nonce collision: stored payload differs".into(),
+            ))
+        }
     }
 
     /// All facts not yet surfaced to the presentation pipeline, oldest first.

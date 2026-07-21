@@ -74,6 +74,53 @@ fn insert_fact_if_absent_inserts_then_ignores_and_is_immutable() {
 
 // @internal
 #[test]
+fn insert_or_compare_fact_inserts_dedups_and_rejects_mismatch() {
+    // F9: genesis receive needs integrity on conflict, not silent idempotency —
+    // a second alert under the same (contact, nonce) with DIFFERENT signed
+    // bytes is a collision/tamper and must fail closed, while an identical
+    // re-delivery is a benign duplicate.
+    use vauchi_core::storage::GenesisFactWrite;
+
+    let storage = create_test_storage();
+    let contact_id = saved_contact(&storage, "Alice");
+    let nonce = [11u8; 32];
+
+    let first = storage
+        .safety_alerts()
+        .insert_or_compare_fact(&contact_id, &nonce, b"signed-alert", 100)
+        .unwrap();
+    assert_eq!(first, GenesisFactWrite::Inserted);
+
+    let dup = storage
+        .safety_alerts()
+        .insert_or_compare_fact(&contact_id, &nonce, b"signed-alert", 200)
+        .unwrap();
+    assert_eq!(
+        dup,
+        GenesisFactWrite::Duplicate,
+        "identical re-delivery must be a benign duplicate"
+    );
+
+    let mismatch = storage.safety_alerts().insert_or_compare_fact(
+        &contact_id,
+        &nonce,
+        b"different-bytes",
+        300,
+    );
+    assert!(
+        mismatch.is_err(),
+        "same nonce with different signed bytes must fail closed, not silently dedup"
+    );
+
+    // The original fact is untouched by the rejected mismatch.
+    let facts = storage.safety_alerts().load_unsurfaced_facts().unwrap();
+    assert_eq!(facts.len(), 1);
+    assert_eq!(facts[0].signed_payload, b"signed-alert");
+    assert_eq!(facts[0].received_at, 100);
+}
+
+// @internal
+#[test]
 fn load_unsurfaced_facts_excludes_surfaced() {
     let storage = create_test_storage();
     let contact_id = saved_contact(&storage, "Bob");

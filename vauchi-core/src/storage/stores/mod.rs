@@ -60,7 +60,7 @@ pub use ratchet::RatchetStore;
 pub use recovery::RecoveryStore;
 pub use replay::ReplayStore;
 pub use retry::RetryStore;
-pub use safety_alert::{SafetyAlertFactStore, StoredSafetyAlertFact};
+pub use safety_alert::{GenesisFactWrite, SafetyAlertFactStore, StoredSafetyAlertFact};
 pub use sync::SyncStore;
 pub use tag::TagStore;
 pub use ux::UxStore;

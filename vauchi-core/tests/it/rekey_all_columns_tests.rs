@@ -62,6 +62,16 @@ fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
     vec![
         ("contacts", "card_encrypted", b"{\"name\":\"Bob\"}" as &[u8]),
         (
+            "contact_device_registries",
+            "broadcast_encrypted",
+            b"signed-registry-broadcast-json",
+        ),
+        (
+            "safety_alert_facts",
+            "signed_payload_encrypted",
+            b"signed-duress-alert-payload",
+        ),
+        (
             "contacts",
             "shared_key_encrypted",
             b"shared-key-32-bytes-padding!!!ab",
@@ -242,6 +252,33 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
             enc("contacts", "visibility_rules_encrypted"),
             enc("contacts", "nickname_encrypted"),
             enc("contacts", "custom_avatar_encrypted"),
+            now,
+        ],
+    )
+    .unwrap();
+
+    // ── contact_device_registries (keyed by contact) ───────────
+    conn.execute(
+        "INSERT INTO contact_device_registries \
+         (contact_id, broadcast_encrypted, version, updated_at) \
+         VALUES (?1, ?2, 1, ?3)",
+        params![
+            CONTACT_ID,
+            enc("contact_device_registries", "broadcast_encrypted"),
+            now,
+        ],
+    )
+    .unwrap();
+
+    // ── safety_alert_facts (keyed by contact + nonce) ──────────
+    conn.execute(
+        "INSERT INTO safety_alert_facts \
+         (contact_id, nonce, signed_payload_encrypted, received_at) \
+         VALUES (?1, ?2, ?3, ?4)",
+        params![
+            CONTACT_ID,
+            vec![0xA1u8; 32],
+            enc("safety_alert_facts", "signed_payload_encrypted"),
             now,
         ],
     )
@@ -643,6 +680,22 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         "contact_field_notes",
         "note_encrypted",
         "contact_id = ?1 AND field_id = 'email'",
+        by_contact,
+    );
+
+    // ── contact_device_registries ───────────────────────────
+    check_one(
+        "contact_device_registries",
+        "broadcast_encrypted",
+        "contact_id = ?1",
+        by_contact,
+    );
+
+    // ── safety_alert_facts ──────────────────────────────────
+    check_one(
+        "safety_alert_facts",
+        "signed_payload_encrypted",
+        "contact_id = ?1",
         by_contact,
     );
 

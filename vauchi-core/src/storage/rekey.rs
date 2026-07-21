@@ -55,6 +55,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("own_card", "card_json_encrypted"),
     ("device_registry", "registry_json_encrypted"),
     ("contact_device_registries", "broadcast_encrypted"),
+    // V62 received safety-alert facts
+    ("safety_alert_facts", "signed_payload_encrypted"),
     ("device_sync_state", "state_json_encrypted"),
     ("visibility_labels", "contacts_json_encrypted"),
     ("visibility_labels", "visible_fields_json_encrypted"),
@@ -195,7 +197,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 31;
+        const TOTAL_TABLES: u32 = 32;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -231,6 +233,9 @@ impl Storage {
 
             self.rekey_contact_device_registries(old_key, &new_key)?;
             report(&mut completed, "contact_device_registries");
+
+            self.rekey_safety_alert_facts(old_key, &new_key)?;
+            report(&mut completed, "safety_alert_facts");
 
             self.rekey_device_sync_state(old_key, &new_key)?;
             report(&mut completed, "device_sync_state");
@@ -720,6 +725,46 @@ impl Storage {
                     params![reencrypted, contact_id],
                 )
                 .map_err(|e| StorageError::Migration(format!("Update contact registry: {}", e)))?;
+        }
+        Ok(())
+    }
+
+    fn rekey_safety_alert_facts(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT contact_id, nonce, signed_payload_encrypted FROM safety_alert_facts")
+            .map_err(|e| StorageError::Migration(format!("Read safety alert facts: {}", e)))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Vec<u8>>(1)?,
+                    row.get::<_, Vec<u8>>(2)?,
+                ))
+            })
+            .map_err(|e| StorageError::Migration(format!("Query safety alert facts: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect safety alert facts: {}", e)))?;
+        drop(stmt);
+
+        for (contact_id, nonce, encrypted) in rows {
+            let plain = decrypt(old_key, &encrypted).map_err(|e| {
+                StorageError::Migration(format!("Decrypt safety alert fact: {}", e))
+            })?;
+            let reencrypted = encrypt(new_key, &plain).map_err(|e| {
+                StorageError::Migration(format!("Encrypt safety alert fact: {}", e))
+            })?;
+            self.conn
+                .execute(
+                    "UPDATE safety_alert_facts SET signed_payload_encrypted = ?1
+                         WHERE contact_id = ?2 AND nonce = ?3",
+                    params![reencrypted, contact_id, nonce],
+                )
+                .map_err(|e| StorageError::Migration(format!("Update safety alert fact: {}", e)))?;
         }
         Ok(())
     }

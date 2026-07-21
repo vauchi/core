@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 61] = [
+const MIGRATIONS: [Migration; 62] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -577,7 +577,32 @@ const MIGRATIONS: [Migration; 61] = [
         name: "contact_device_delta_versions",
         action: MigrationAction::Sql(MIGRATION_V61_CONTACT_DEVICE_DELTA_VERSIONS),
     },
+    Migration {
+        version: 62,
+        name: "safety_alert_facts",
+        action: MigrationAction::Sql(MIGRATION_V62_SAFETY_ALERT_FACTS),
+    },
 ];
+
+/// Migration v62: durable received safety-alert facts.
+///
+/// Accepting a duress/emergency alert burns its replay nonce; an alert that
+/// then exists only in memory is unrecoverable after a crash before surfacing
+/// (2026-07-21-per-device-ratchet-registry-dormant, delivery-axis findings).
+/// Facts are append-only, keyed by the signed nonce, and store the exact
+/// signed wire payload (encrypted at rest, ADR-015) so sibling devices can
+/// re-verify the contact signature when owner-sync fan-out ships.
+const MIGRATION_V62_SAFETY_ALERT_FACTS: &str = "
+    CREATE TABLE safety_alert_facts (
+        contact_id TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+        nonce BLOB NOT NULL CHECK(length(nonce) = 32),
+        signed_payload_encrypted BLOB NOT NULL,
+        received_at INTEGER NOT NULL,
+        fanout_queued_at INTEGER,
+        surfaced_at INTEGER,
+        PRIMARY KEY (contact_id, nonce)
+    );
+";
 
 /// Migration v61: per-device received-delta version floors (#42).
 ///

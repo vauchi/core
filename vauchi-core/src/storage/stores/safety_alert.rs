@@ -29,9 +29,7 @@ pub struct StoredSafetyAlertFact {
 
 /// Scoped persistence view for received safety-alert facts.
 pub struct SafetyAlertFactStore<'a> {
-    #[allow(dead_code)]
     conn: &'a Connection,
-    #[allow(dead_code)]
     key: &'a SymmetricKey,
 }
 
@@ -51,32 +49,69 @@ impl SafetyAlertFactStore<'_> {
     /// fact is never overwritten — facts are immutable.
     pub fn insert_fact_if_absent(
         &self,
-        _contact_id: &str,
-        _nonce: &[u8; 32],
-        _signed_payload: &[u8],
-        _received_at: u64,
+        contact_id: &str,
+        nonce: &[u8; 32],
+        signed_payload: &[u8],
+        received_at: u64,
     ) -> Result<bool, StorageError> {
-        Err(StorageError::Serialization(
-            "unimplemented: safety_alert_facts (RED)".into(),
-        ))
+        let payload_encrypted = crate::crypto::encrypt(self.key, signed_payload)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let changed = self.conn.execute(
+            "INSERT OR IGNORE INTO safety_alert_facts
+                 (contact_id, nonce, signed_payload_encrypted, received_at)
+                 VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![contact_id, nonce, payload_encrypted, received_at as i64],
+        )?;
+        Ok(changed > 0)
     }
 
     /// All facts not yet surfaced to the presentation pipeline, oldest first.
     pub fn load_unsurfaced_facts(&self) -> Result<Vec<StoredSafetyAlertFact>, StorageError> {
-        Err(StorageError::Serialization(
-            "unimplemented: safety_alert_facts (RED)".into(),
-        ))
+        let mut stmt = self.conn.prepare(
+            "SELECT contact_id, nonce, signed_payload_encrypted, received_at
+                 FROM safety_alert_facts WHERE surfaced_at IS NULL
+                 ORDER BY received_at ASC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Vec<u8>>(1)?,
+                row.get::<_, Vec<u8>>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })?;
+
+        let mut facts = Vec::new();
+        for row in rows {
+            let (contact_id, nonce_bytes, payload_encrypted, received_at) = row?;
+            let nonce: [u8; 32] = nonce_bytes.try_into().map_err(|_| {
+                StorageError::Serialization("safety_alert_facts.nonce is not 32 bytes".into())
+            })?;
+            let signed_payload = crate::crypto::decrypt(self.key, &payload_encrypted)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            facts.push(StoredSafetyAlertFact {
+                contact_id,
+                nonce,
+                signed_payload,
+                received_at: received_at as u64,
+            });
+        }
+        Ok(facts)
     }
 
     /// Record that the fact was durably handed to the presentation pipeline.
+    /// Idempotent — marking an already-surfaced fact is a no-op.
     pub fn mark_fact_surfaced(
         &self,
-        _contact_id: &str,
-        _nonce: &[u8; 32],
-        _surfaced_at: u64,
+        contact_id: &str,
+        nonce: &[u8; 32],
+        surfaced_at: u64,
     ) -> Result<(), StorageError> {
-        Err(StorageError::Serialization(
-            "unimplemented: safety_alert_facts (RED)".into(),
-        ))
+        self.conn.execute(
+            "UPDATE safety_alert_facts SET surfaced_at = ?3
+                 WHERE contact_id = ?1 AND nonce = ?2 AND surfaced_at IS NULL",
+            rusqlite::params![contact_id, nonce, surfaced_at as i64],
+        )?;
+        Ok(())
     }
 }

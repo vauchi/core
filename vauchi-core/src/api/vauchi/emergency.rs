@@ -397,6 +397,13 @@ impl Vauchi {
         let facts = self.storage.safety_alerts().load_unsurfaced_facts()?;
         let mut dispatched = 0;
         for fact in facts {
+            // ADR-056: blocking is fully silent — a fact received before the
+            // block must not be presented while the contact is blocked. The
+            // fact remains stored; no log names the contact.
+            match self.storage.contacts().load_contact(&fact.contact_id)? {
+                Some(contact) if !contact.is_blocked() => {}
+                _ => continue,
+            }
             let alert = match VersionedPayload::decode(&fact.signed_payload) {
                 Ok(VersionedPayload::Alert(alert)) => alert,
                 // A fact that no longer decodes is a storage-integrity
@@ -407,6 +414,12 @@ impl Vauchi {
                     continue;
                 }
             };
+            // The row key is the alert's advertised identity; a payload whose
+            // signed nonce disagrees is not a verified-receive artifact.
+            if *alert.nonce() != fact.nonce {
+                tracing::warn!("safety-alert fact nonce mismatch — skipping");
+                continue;
+            }
             let received = crate::api::sync::ReceivedAlert {
                 kind: alert.kind(),
                 message: alert.message().to_string(),

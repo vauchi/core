@@ -359,6 +359,12 @@ impl Vauchi {
         }
 
         if fetched == 0 {
+            // Still surface leftover durable alerts (e.g. from a session that
+            // crashed between receive-commit and dispatch) — the empty-fetch
+            // fast path must not starve them until new traffic arrives.
+            if let Err(error) = self.surface_pending_safety_alerts() {
+                tracing::warn!(?error, "sync.receive_phase: surfacing safety alerts failed");
+            }
             return Ok((0, 0, 0, 0, String::new()));
         }
 
@@ -467,7 +473,7 @@ impl Vauchi {
 
         // 4. Send ACK envelopes — best-effort, transport failures don't fail
         //    the receive cycle.
-        for outcome in &outcomes {
+        for outcome in outcomes.iter().filter(|o| o.should_ack()) {
             let ack_envelope = create_envelope(
                 MessagePayload::Acknowledgment(Acknowledgment {
                     message_id: outcome.message_id.clone().into(),

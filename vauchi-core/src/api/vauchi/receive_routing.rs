@@ -95,7 +95,7 @@ impl BlobOutcome {
     /// into permanent silent loss (the alert/nonce transaction was rolled
     /// back, so nothing local remembers the blob existed).
     pub(crate) fn should_ack(&self) -> bool {
-        true
+        self.reject_reason != Some("storage")
     }
 }
 

@@ -84,11 +84,17 @@ impl SafetyAlertFactStore<'_> {
         let mut facts = Vec::new();
         for row in rows {
             let (contact_id, nonce_bytes, payload_encrypted, received_at) = row?;
-            let nonce: [u8; 32] = nonce_bytes.try_into().map_err(|_| {
-                StorageError::Serialization("safety_alert_facts.nonce is not 32 bytes".into())
-            })?;
-            let signed_payload = crate::crypto::decrypt(self.key, &payload_encrypted)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            // Per-row resilience: one corrupt row (bad nonce shape or
+            // undecryptable payload) must never hide the healthy life-safety
+            // alerts behind it. PII-free warn, then keep going.
+            let Ok(nonce) = <[u8; 32]>::try_from(nonce_bytes) else {
+                tracing::warn!("safety-alert fact row has a malformed nonce — skipping");
+                continue;
+            };
+            let Ok(signed_payload) = crate::crypto::decrypt(self.key, &payload_encrypted) else {
+                tracing::warn!("safety-alert fact payload failed to decrypt — skipping");
+                continue;
+            };
             facts.push(StoredSafetyAlertFact {
                 contact_id,
                 nonce,
@@ -99,8 +105,15 @@ impl SafetyAlertFactStore<'_> {
         Ok(facts)
     }
 
-    /// Record that the fact was durably handed to the presentation pipeline.
-    /// Idempotent — marking an already-surfaced fact is a no-op.
+    /// Record that the fact was durably acknowledged by the presentation
+    /// pipeline. Idempotent — marking an already-surfaced fact is a no-op.
+    ///
+    /// WHY nothing calls this in production yet: dispatch is not a truthful
+    /// acknowledgement (the activity writer is channel-deferred, and the OS
+    /// notification may never be scheduled). Marking at dispatch would
+    /// recreate the crash-loss window one layer up. Call this only from the
+    /// future durable presentation-acknowledgement contract
+    /// (2026-07-21-per-device-ratchet-registry-dormant, delivery-axis).
     pub fn mark_fact_surfaced(
         &self,
         contact_id: &str,

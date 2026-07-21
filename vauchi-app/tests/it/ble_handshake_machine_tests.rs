@@ -25,7 +25,8 @@ use vauchi_app::orchestrator::ble_handshake_machine::{
 use vauchi_core::Command;
 use vauchi_core::crypto::X3DHKeyPair;
 use vauchi_core::exchange::{
-    BLE_DEFAULT_USABLE, BleCardPayload, CHAR_DATA_WRITE, CHAR_HANDSHAKE_WRITE,
+    BLE_DEFAULT_USABLE, BleCardPayload, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY,
+    CHAR_HANDSHAKE_WRITE,
 };
 
 fn fixture_card() -> (BleCardPayload, [u8; 32], X3DHKeyPair) {
@@ -329,5 +330,99 @@ fn radio_only_binding_leaves_the_echo_zero() {
         &offer[121..137],
         &[0u8; 16],
         "no OOB binding must leave the echo field zero"
+    );
+}
+
+/// A responder with an identity distinct from `fixture_card`'s, so the
+/// initiator's self-exchange check does not reject the pair.
+fn fresh_peer_responder() -> BleHandshakeMachine {
+    let identity_key = [3u8; 32];
+    let x3dh = X3DHKeyPair::from_bytes([4u8; 32]);
+    let card = BleCardPayload::new(
+        identity_key,
+        "Bob".into(),
+        *x3dh.public_key(),
+        vec![("email".into(), "bob@example.test".into())],
+        None,
+    );
+    BleHandshakeMachine::new_responder(identity_key, x3dh, card, 0, None)
+}
+
+/// The 153-byte KeyAck a real responder emits on the handshake-notify
+/// characteristic after processing `offer`.
+fn key_ack_from_responder(offer: &[u8]) -> Vec<u8> {
+    let mut responder = fresh_peer_responder();
+    let (_event, cmds) = responder.on_data_received(CHAR_HANDSHAKE_WRITE, offer, 0);
+    cmds.into_iter()
+        .find_map(|cmd| match cmd {
+            Command::BleWriteCharacteristic { uuid, data }
+                if uuid.as_str() == CHAR_HANDSHAKE_NOTIFY =>
+            {
+                Some(data)
+            }
+            _ => None,
+        })
+        .expect("responder emits a KeyAck on the handshake-notify characteristic")
+}
+
+// @internal
+#[test]
+fn oversized_handshake_notify_is_inert_not_buffered_as_key_ack() {
+    // Input boundary (DC-01): a KeyAck is exactly 153 bytes on the wire. A
+    // larger handshake notify is not a KeyAck and must be dropped BEFORE
+    // buffering — previously `pending_intermediate` held an attacker-sized
+    // Vec until the card chunks completed
+    // (backlog/2026-07-20-ble-exchange-orchestrator-unification).
+    let mut initiator = fresh_initiator();
+    let offer = key_offer(&mut initiator);
+
+    let oversized = vec![0xAAu8; 64 * 1024];
+    let (event, cmds) = initiator.on_data_received(CHAR_HANDSHAKE_NOTIFY, &oversized, 0);
+    assert!(
+        matches!(event, BleMachineEvent::None),
+        "an oversized handshake notify must not be treated as a KeyAck"
+    );
+    assert!(cmds.is_empty(), "no commands from a rejected frame");
+    assert!(
+        matches!(initiator.phase(), BleMachinePhase::Handshaking),
+        "phase must not advance to Transferring on a rejected frame"
+    );
+
+    // The machine must still accept the genuine KeyAck afterwards — the
+    // rejected frame is quarantine-dropped, not a terminal failure.
+    let ack = key_ack_from_responder(&offer);
+    assert_eq!(ack.len(), 153, "wire KeyAck is exactly 153 bytes");
+    let (event, _cmds) = initiator.on_data_received(CHAR_HANDSHAKE_NOTIFY, &ack, 0);
+    assert!(
+        matches!(event, BleMachineEvent::TransferringStarted),
+        "the genuine KeyAck must still be accepted after a dropped frame"
+    );
+    assert!(matches!(initiator.phase(), BleMachinePhase::Transferring));
+}
+
+// @internal
+#[test]
+fn undersized_handshake_notify_is_inert_not_buffered_as_key_ack() {
+    // A short frame (radio residue, hostile neighbor) is structurally not a
+    // KeyAck: dropped without state advance, same as oversized.
+    let mut initiator = fresh_initiator();
+    let offer = key_offer(&mut initiator);
+
+    let (event, cmds) = initiator.on_data_received(CHAR_HANDSHAKE_NOTIFY, &[0u8; 20], 0);
+    assert!(
+        matches!(event, BleMachineEvent::None),
+        "an undersized handshake notify must not be treated as a KeyAck"
+    );
+    assert!(cmds.is_empty(), "no commands from a rejected frame");
+    assert!(
+        matches!(initiator.phase(), BleMachinePhase::Handshaking),
+        "phase must not advance to Transferring on a rejected frame"
+    );
+
+    let ack = key_ack_from_responder(&offer);
+    let (event, _cmds) = initiator.on_data_received(CHAR_HANDSHAKE_NOTIFY, &ack, 0);
+    assert!(
+        matches!(event, BleMachineEvent::TransferringStarted),
+        "the genuine KeyAck must still be accepted after a dropped frame"
     );
 }

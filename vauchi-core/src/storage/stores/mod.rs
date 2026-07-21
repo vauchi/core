@@ -25,6 +25,7 @@ mod device_delivery;
 mod duress;
 mod emergency;
 mod field_notes;
+mod genesis_limit;
 mod identity;
 mod labels;
 mod ohttp_cache;
@@ -50,6 +51,10 @@ pub use device_delivery::DeviceDeliveryStore;
 pub use duress::DuressStore;
 pub use emergency::EmergencyStore;
 pub use field_notes::FieldNoteStore;
+pub use genesis_limit::{
+    GENESIS_CONTACT_ATTEMPTS_PER_WINDOW, GENESIS_GLOBAL_ATTEMPTS_PER_WINDOW, GENESIS_WINDOW_SECS,
+    GenesisLimitStore,
+};
 pub use identity::IdentityStore;
 pub use labels::LabelStore;
 pub use ohttp_cache::OhttpCacheStore;

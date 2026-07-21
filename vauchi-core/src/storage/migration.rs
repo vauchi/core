@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 62] = [
+const MIGRATIONS: [Migration; 63] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -582,7 +582,32 @@ const MIGRATIONS: [Migration; 62] = [
         name: "safety_alert_facts",
         action: MigrationAction::Sql(MIGRATION_V62_SAFETY_ALERT_FACTS),
     },
+    Migration {
+        version: 63,
+        name: "genesis_decrypt_limits",
+        action: MigrationAction::Sql(MIGRATION_V63_GENESIS_DECRYPT_LIMITS),
+    },
 ];
+
+/// Migration v63: durable genesis-decrypt rate-limit counters (ADR-068).
+///
+/// A genesis decrypt attempt derives keys from `shared_key` before any
+/// signature check, so it must be independently rate-limited to bound
+/// pre-authentication CPU work (per-contact and a global cap). Durable so a
+/// process restart cannot reset an in-progress attack. `contact_id` is a
+/// plaintext FK (no secret material), matching `contact_device_delta_versions`.
+const MIGRATION_V63_GENESIS_DECRYPT_LIMITS: &str = "
+    CREATE TABLE genesis_decrypt_contact_limits (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        window_start INTEGER NOT NULL,
+        attempts INTEGER NOT NULL
+    );
+    CREATE TABLE genesis_decrypt_global_limit (
+        singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+        window_start INTEGER NOT NULL,
+        attempts INTEGER NOT NULL
+    );
+";
 
 /// Migration v62: durable received safety-alert facts.
 ///

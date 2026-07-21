@@ -25,7 +25,7 @@ use vauchi_app::orchestrator::ble_handshake_machine::{
 use vauchi_core::Command;
 use vauchi_core::crypto::X3DHKeyPair;
 use vauchi_core::exchange::{
-    BLE_DEFAULT_USABLE, BleCardPayload, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY,
+    BLE_DEFAULT_USABLE, BleCardPayload, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY,
     CHAR_HANDSHAKE_WRITE,
 };
 
@@ -424,5 +424,81 @@ fn undersized_handshake_notify_is_inert_not_buffered_as_key_ack() {
     assert!(
         matches!(event, BleMachineEvent::TransferringStarted),
         "the genuine KeyAck must still be accepted after a dropped frame"
+    );
+}
+
+/// The responder's full Phase-2 output after processing `offer`:
+/// `(key_ack, card_chunks_on_data_notify)` in emission order.
+fn responder_phase2_output(offer: &[u8]) -> (Vec<u8>, Vec<Vec<u8>>) {
+    let mut responder = fresh_peer_responder();
+    // ATT-minimum MTU (23 → 20 usable) so the encrypted card spans several
+    // chunks — the realistic pre-negotiation window where reordering bites.
+    responder.update_mtu(23);
+    let (_event, cmds) = responder.on_data_received(CHAR_HANDSHAKE_WRITE, offer, 0);
+    let mut ack = None;
+    let mut chunks = Vec::new();
+    for cmd in cmds {
+        if let Command::BleWriteCharacteristic { uuid, data } = cmd {
+            match uuid.as_str() {
+                u if u == CHAR_HANDSHAKE_NOTIFY => ack = Some(data),
+                u if u == CHAR_DATA_NOTIFY => chunks.push(data),
+                _ => {}
+            }
+        }
+    }
+    (ack.expect("responder emits a KeyAck"), chunks)
+}
+
+// @scenario: contact_exchange :: Exchange completes over BLE
+/// RED (Phase B, Tier 1): GATT gives no cross-characteristic FIFO, so the
+/// responder's card chunks (CHAR_DATA_NOTIFY) can arrive before its KeyAck
+/// (CHAR_HANDSHAKE_NOTIFY). The machine must quarantine whichever arrives
+/// first and proceed once both are present. Current code fails terminally
+/// at card completion ("No pending KeyAck data",
+/// `on_remote_encrypted_card_received`) and then drops the late KeyAck at
+/// the terminal guard — the observed on-device Magic stall discriminator.
+/// Un-ignore when the bounded reorder quarantine ships
+/// (`backlog/2026-07-20-ble-exchange-orchestrator-unification`).
+// @internal
+#[test]
+#[ignore = "RED: card-before-KeyAck is terminal — backlog/2026-07-20-ble-exchange-orchestrator-unification"]
+fn card_before_key_ack_reorder_should_be_quarantined_not_terminal() {
+    let mut initiator = fresh_initiator();
+    let offer = key_offer(&mut initiator);
+    let (ack, chunks) = responder_phase2_output(&offer);
+    assert!(
+        chunks.len() > 1,
+        "premise: the encrypted card spans multiple chunks at default MTU (got {})",
+        chunks.len()
+    );
+
+    // Reordered delivery: every card chunk lands before the KeyAck.
+    for chunk in &chunks {
+        let (_event, cmds) = initiator.on_data_received(CHAR_DATA_NOTIFY, chunk, 0);
+        assert!(
+            !matches!(initiator.phase(), BleMachinePhase::Failed { .. }),
+            "card-before-KeyAck must be quarantined, not a terminal failure"
+        );
+        assert!(cmds.is_empty(), "no commands while the card is quarantined");
+    }
+
+    // The late KeyAck completes the pair: the machine processes the
+    // quarantined card and advances to Verifying (commitment + our card
+    // go out), exactly as in the in-order flow.
+    let (event, cmds) = initiator.on_data_received(CHAR_HANDSHAKE_NOTIFY, &ack, 0);
+    assert!(
+        matches!(event, BleMachineEvent::VerifyingStarted),
+        "the late KeyAck must unlock processing of the quarantined card"
+    );
+    assert!(
+        matches!(initiator.phase(), BleMachinePhase::Verifying),
+        "the reordered flow must reach Verifying like the in-order flow"
+    );
+    assert!(
+        cmds.iter().any(|cmd| matches!(
+            cmd,
+            Command::BleWriteCharacteristic { uuid, .. } if uuid.as_str() == CHAR_HANDSHAKE_WRITE
+        )),
+        "the commitment write must be emitted after the reordered pair completes"
     );
 }

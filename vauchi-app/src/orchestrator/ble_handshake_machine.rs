@@ -57,7 +57,7 @@ use vauchi_core::crypto::X3DHKeyPair;
 use vauchi_core::exchange::{
     BLE_CHUNK_OVERHEAD, BLE_DEFAULT_USABLE, BleCardPayload, BleChunker, BleExchangeResult,
     BleHandshakeSession, BleHandshakeState, BleReassembler, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE,
-    CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE,
+    CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE, KEY_ACK_SIZE,
 };
 
 /// Role on the BLE exchange — initiator sends the KeyOffer first,
@@ -457,8 +457,16 @@ impl BleHandshakeMachine {
     fn handle_handshake_notify(&mut self, data: &[u8]) -> (BleMachineEvent, Vec<Command>) {
         match (self.role, self.inner.state()) {
             (BleRole::Initiator, BleHandshakeState::KeyOfferSent { .. }) => {
-                // Phase 2 initiator ingress: KeyAck. Stash for
-                // process_key_ack once chunks complete; flip to
+                // Phase 2 initiator ingress: KeyAck. A wire KeyAck is exactly
+                // KEY_ACK_SIZE bytes — anything else is quarantine-dropped
+                // BEFORE buffering so pending_intermediate never holds an
+                // attacker-sized allocation (DC-01,
+                // backlog/2026-07-20-ble-exchange-orchestrator-unification).
+                // Dropped, not failed: the genuine KeyAck may still arrive.
+                if data.len() != KEY_ACK_SIZE {
+                    return (BleMachineEvent::None, Vec::new());
+                }
+                // Stash for process_key_ack once chunks complete; flip to
                 // Transferring chrome.
                 self.pending_intermediate = Some(data.to_vec());
                 self.phase = BleMachinePhase::Transferring;

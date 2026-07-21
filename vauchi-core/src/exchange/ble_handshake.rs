@@ -97,7 +97,7 @@ const KEY_OFFER_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 8 + NONCE_SIZE;
 /// The trailing `sender_timestamp` was added in v3 — pre-v3 KeyAcks
 /// were 145 bytes and the receiver had no value to plug into AAD
 /// reconstruction (problem record `2026-05-21-ble-aad-asymmetry`).
-const KEY_ACK_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 32 + 8;
+pub const KEY_ACK_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 32 + 8;
 
 /// State of a BLE handshake session.
 ///

@@ -96,7 +96,7 @@ pub use ble::{
 pub use ble_chunking::{BLE_CHUNK_OVERHEAD, BleChunker, BleReassembler};
 pub use ble_handshake::{
     BLE_HANDSHAKE_INFO, BLE_HANDSHAKE_VERSION, BleExchangeResult, BleHandshakeSession,
-    BleHandshakeState,
+    BleHandshakeState, KEY_ACK_SIZE,
 };
 pub use ble_payload::BleCardPayload;
 pub use device_link::{

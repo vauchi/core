@@ -300,6 +300,27 @@ impl Vauchi {
         Ok(prepared)
     }
 
+    /// This identity's signed registry broadcast for genesis announcement.
+    ///
+    /// Uses the persisted multi-device registry when present, else the
+    /// single-device registry derived from this identity — either way the
+    /// receiver merges it additively (never destructively) on genesis
+    /// receipt (ADR-068 §Decision req 6, plan §REVISION F2/F3).
+    fn own_registry_broadcast(
+        &self,
+        identity: &crate::identity::Identity,
+    ) -> VauchiResult<crate::identity::RegistryBroadcast> {
+        let registry = match self.storage.device().load_device_registry()? {
+            Some(registry) => registry,
+            None => identity.initial_device_registry(),
+        };
+        Ok(crate::identity::RegistryBroadcast::new(
+            &registry,
+            identity.signing_keypair(),
+            self.clock.unix_seconds(),
+        ))
+    }
+
     /// Encrypts one payload independently for every active peer device.
     pub(crate) fn encrypt_payload_for_contact_devices(
         &self,
@@ -347,7 +368,35 @@ impl Vauchi {
                         VauchiError::Crypto(format!("device-pair ratchet: {error:?}"))
                     })?
                 }
-                (None, None) => return Err(VauchiError::NotFound("ratchet state".into())),
+                (None, None) => {
+                    // No established session and no peer registry — the
+                    // secondary-device / first-contact case. A safety alert
+                    // bootstraps a genesis session rooted in shared_key
+                    // (ADR-068); any other payload has no genesis path and
+                    // keeps failing closed.
+                    if let Ok(crate::sync::delta::VersionedPayload::Alert(_)) =
+                        crate::sync::delta::VersionedPayload::decode(payload)
+                    {
+                        let broadcast = self.own_registry_broadcast(identity)?;
+                        let epoch = crate::network::mailbox_token::current_day_epoch(
+                            self.clock.unix_seconds(),
+                        );
+                        let (message, session) = crate::exchange::genesis::GenesisEnvelope::seal(
+                            &ex.shared_key,
+                            identity,
+                            &ex.public_key,
+                            &broadcast,
+                            epoch,
+                            payload,
+                        )
+                        .map_err(|error| VauchiError::Crypto(format!("genesis seal: {error}")))?;
+                        let encrypted = serde_json::to_vec(&message)
+                            .map_err(|error| VauchiError::Serialization(error.to_string()))?;
+                        prepared.push(([0; 32], encrypted, session, true));
+                        continue;
+                    }
+                    return Err(VauchiError::NotFound("ratchet state".into()));
+                }
             };
             let ratchet_msg = ratchet.encrypt(payload).map_err(|error| match error {
                 crate::crypto::ratchet::RatchetError::NoSendingChain => VauchiError::InvalidState(

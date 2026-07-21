@@ -201,7 +201,6 @@ fn real_owner_sync_leaves_secondary_device_without_ratchet_or_registry() {
 /// secondary device.
 // @internal
 #[test]
-#[ignore = "RED: secondary-device alert silently dropped at send — backlog/2026-07-21-per-device-ratchet-registry-dormant"]
 fn emergency_alert_from_secondary_device_should_reach_recipient() {
     let (secondary, bob_id) = secondary_device_after_owner_sync();
     let mut secondary = secondary;
@@ -234,7 +233,6 @@ fn emergency_alert_from_secondary_device_should_reach_recipient() {
 /// establish a session for a secondary device.
 // @internal
 #[test]
-#[ignore = "RED: secondary-device duress alert silently not queued — backlog/2026-07-21-per-device-ratchet-registry-dormant"]
 fn duress_unlock_from_secondary_device_should_queue_alert() {
     let (secondary, bob_id) = secondary_device_after_owner_sync();
     let mut secondary = secondary;

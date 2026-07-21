@@ -456,3 +456,102 @@ impl<'a> Reader<'a> {
         self.pos == self.data.len()
     }
 }
+
+// INLINE_TEST_REQUIRED: exercises the private wire-format decoder
+// (encode_envelope/decode_envelope/Reader) at its parse boundary (DC-01);
+// truncation/oversize/trailing-byte cases cannot be reached through the public
+// seal/open API, which only produces well-formed envelopes.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_envelope() -> Vec<u8> {
+        encode_envelope(
+            42,
+            &[1u8; 32],
+            &[2u8; 32],
+            &[3u8; 64],
+            b"broadcast-json",
+            b"\x04inner-alert",
+        )
+    }
+
+    // @internal
+    #[test]
+    fn decode_roundtrips_a_well_formed_envelope() {
+        let decoded = decode_envelope(&sample_envelope()).expect("well-formed envelope decodes");
+        assert_eq!(decoded.epoch, 42);
+        assert_eq!(decoded.sender_device_id, [1u8; 32]);
+        assert_eq!(decoded.sender_exchange_public_key, [2u8; 32]);
+        assert_eq!(decoded.signature, [3u8; 64]);
+        assert_eq!(decoded.broadcast_json, b"broadcast-json");
+        assert_eq!(decoded.inner_payload, b"\x04inner-alert");
+    }
+
+    // @internal
+    #[test]
+    fn decode_rejects_trailing_bytes() {
+        let mut bytes = sample_envelope();
+        bytes.push(0xff);
+        assert!(matches!(
+            decode_envelope(&bytes),
+            Err(GenesisError::InvalidFormat)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn decode_rejects_truncation_at_every_prefix_boundary() {
+        let full = sample_envelope();
+        // Every proper prefix is truncated and must fail closed, never panic.
+        for len in 0..full.len() {
+            assert!(
+                matches!(
+                    decode_envelope(&full[..len]),
+                    Err(GenesisError::InvalidFormat)
+                ),
+                "truncation to {len} bytes must be rejected"
+            );
+        }
+    }
+
+    // @internal
+    #[test]
+    fn decode_rejects_wrong_version_byte() {
+        let mut bytes = sample_envelope();
+        bytes[0] = 0x04;
+        assert!(matches!(
+            decode_envelope(&bytes),
+            Err(GenesisError::InvalidFormat)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn decode_rejects_oversized_input() {
+        let oversized = vec![PAYLOAD_VERSION_GENESIS; MAX_GENESIS_PLAINTEXT + 1];
+        assert!(matches!(
+            decode_envelope(&oversized),
+            Err(GenesisError::TooLarge)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn decode_rejects_a_length_prefix_beyond_the_buffer() {
+        // A broadcast_len that claims more bytes than remain must not allocate
+        // or panic — it fails closed (DC-01).
+        let mut bytes = Vec::new();
+        bytes.push(PAYLOAD_VERSION_GENESIS);
+        bytes.extend_from_slice(&7u64.to_be_bytes());
+        bytes.extend_from_slice(&[1u8; 32]);
+        bytes.extend_from_slice(&[2u8; 32]);
+        bytes.extend_from_slice(&[3u8; 64]);
+        bytes.extend_from_slice(&u32::MAX.to_be_bytes()); // absurd broadcast_len
+        bytes.extend_from_slice(b"only-a-few-bytes");
+        assert!(matches!(
+            decode_envelope(&bytes),
+            Err(GenesisError::InvalidFormat)
+        ));
+    }
+}

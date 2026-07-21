@@ -29,12 +29,13 @@
 //! (`api/vauchi/security.rs:122-129`), so the coerced user gets zero signal the
 //! alarm never sent.
 //!
-//! The two non-ignored tests are controls: an alert from a device WITH a ratchet
-//! is delivered and received; a real owner-sync leaves the secondary device
-//! without a ratchet or registry. The `#[ignore]`d tests assert the SAFE
-//! behavior (the alert reaches the contact) and FAIL on current code — run them
-//! with `--ignored`. Un-ignore when the dormant per-device registry is activated
-//! (or the send path bootstraps a session from the synced `shared_key`).
+//! Two tests are controls: an alert from a device WITH a ratchet is delivered
+//! and received; a real owner-sync leaves the secondary device without a ratchet
+//! or registry. The remaining tests were the RED spec for this gap and are now
+//! GREEN regression tests: the ADR-068 genesis envelope (MR B) closes it — the
+//! send path bootstraps a session from the synced `shared_key`, and the receiver
+//! opens the genesis envelope on the `[0;32]` failure path. See
+//! `exchange::genesis` and `backlog/2026-07-21-per-device-ratchet-registry-dormant`.
 
 use crate::common;
 
@@ -43,11 +44,12 @@ use common::device_sync::{
 };
 use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange, setup_ratchets};
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
-use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
+use vauchi_core::api::{CardUpdateError, ReceiveOutcome, process_single_card_update};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::crypto::ratchet::DoubleRatchetState;
+use vauchi_core::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
 use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::storage::GENESIS_CONTACT_ATTEMPTS_PER_WINDOW;
 use vauchi_core::sync::DeviceLinkIntent;
 use vauchi_core::sync::safety_alert::AlertKind;
 use vauchi_core::types::DuressSettings;
@@ -191,14 +193,13 @@ fn real_owner_sync_leaves_secondary_device_without_ratchet_or_registry() {
 }
 
 // ---------------------------------------------------------------------------
-// RED (ignored) — assert the SAFE behavior; fails on current code.
+// Regression — the safe behavior, now delivered by the ADR-068 genesis path.
 // ---------------------------------------------------------------------------
 
 // @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
-/// RED: a secondary device must be able to raise an emergency alert to an
-/// exchanged contact. Current code returns `sent == 0` (silently skipped at
-/// send). Un-ignore when the send path can establish a session for a
-/// secondary device.
+/// A secondary device must be able to raise an emergency alert to an exchanged
+/// contact. Before genesis the send returned `sent == 0` (silently skipped);
+/// the shared-key-rooted genesis envelope now queues it.
 // @internal
 #[test]
 fn emergency_alert_from_secondary_device_should_reach_recipient() {
@@ -226,11 +227,10 @@ fn emergency_alert_from_secondary_device_should_reach_recipient() {
 }
 
 // @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
-/// RED (most safety-critical): a duress unlock on a secondary device must queue
-/// the disguised alert to the configured contact. Current code lets the unlock
-/// succeed (`AuthMode::Duress`) while silently queuing nothing — the coerced
-/// user gets no signal the alarm failed. Un-ignore when the send path can
-/// establish a session for a secondary device.
+/// Most safety-critical: a duress unlock on a secondary device must queue the
+/// disguised alert to the configured contact. Before genesis the unlock
+/// succeeded (`AuthMode::Duress`) while silently queuing nothing — the coerced
+/// user got no signal the alarm failed. Genesis now queues it.
 // @internal
 #[test]
 fn duress_unlock_from_secondary_device_should_queue_alert() {
@@ -362,5 +362,60 @@ fn secondary_device_alert_should_be_surfaced_by_recipient() {
             .len(),
         1,
         "a replay must not create a second durable fact"
+    );
+}
+
+/// A well-formed `RatchetMessage` that is not a genesis envelope — it fails the
+/// genesis open (AEAD mismatch under the shared-key-derived responder), so it
+/// consumes one genesis-decrypt budget unit and then falls back.
+fn non_genesis_ratchet_blob(seed: u8) -> Vec<u8> {
+    let message = RatchetMessage {
+        dh_public: [seed; 32],
+        dh_generation: 0,
+        message_index: 0,
+        previous_chain_length: 0,
+        ciphertext: vec![seed; 96],
+    };
+    serde_json::to_vec(&message).unwrap()
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// A session-less contact's genesis-decrypt budget can be exhausted; once it is,
+/// a further attempt returns the retriable `GenesisRateLimited` (which the
+/// receive loop must not ACK), so a burst of undecryptable traffic delays but
+/// never silently drops a legitimate first-contact alert (plan §REVISION F6).
+// @internal
+#[test]
+fn genesis_decrypt_budget_exhaustion_is_retriable_not_dropped() {
+    let bob = create_vauchi_with_identity("Bob");
+    let alice_contact = Contact::from_exchange(
+        [0x11u8; 32],
+        ContactCard::new("Alice"),
+        SymmetricKey::from_bytes([0x22u8; 32]),
+        0,
+    );
+    let alice_id = alice_contact.id().to_string();
+    bob.add_contact(alice_contact).unwrap();
+
+    // Drive the per-contact budget to exactly its cap with non-genesis blobs;
+    // each consumes one unit on the no-session arm and then fails closed.
+    for i in 0..GENESIS_CONTACT_ATTEMPTS_PER_WINDOW {
+        let blob = non_genesis_ratchet_blob(i as u8);
+        let err =
+            process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &blob)
+                .expect_err("a non-genesis blob must not be accepted");
+        assert!(
+            matches!(err, CardUpdateError::NoRatchetState),
+            "within budget, a non-genesis blob falls back to the ordinary error, got {err:?}"
+        );
+    }
+
+    // The next attempt is denied by the exhausted budget — retriable, distinct.
+    let blob = non_genesis_ratchet_blob(0xff);
+    let err = process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &blob)
+        .expect_err("the over-budget attempt must be denied");
+    assert!(
+        matches!(err, CardUpdateError::GenesisRateLimited),
+        "an exhausted budget must surface as retriable GenesisRateLimited, got {err:?}"
     );
 }

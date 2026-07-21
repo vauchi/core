@@ -108,6 +108,80 @@ fn global_budget_caps_across_contacts() {
 // @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
+fn global_cap_denial_leaves_the_contact_counter_uncharged() {
+    // The two-counter charge is one SAVEPOINT: a denial by the GLOBAL cap must
+    // roll back the already-applied per-contact charge, so the contact is not
+    // silently burned by traffic that never counted against its own budget.
+    let storage = storage_with_clock(fixed_clock());
+    for n in 0..GENESIS_GLOBAL_ATTEMPTS_PER_WINDOW {
+        let contact = saved_contact(&storage, (n % 250) as u8 + 1, &format!("c{n}"));
+        assert!(
+            storage
+                .genesis_limits()
+                .consume_decrypt_budget(&contact)
+                .unwrap()
+        );
+    }
+
+    // A brand-new contact is now denied purely by the exhausted global cap.
+    let victim = saved_contact(&storage, 251, "victim");
+    assert!(
+        !storage
+            .genesis_limits()
+            .consume_decrypt_budget(&victim)
+            .unwrap(),
+        "global cap is exhausted, so the new contact is denied"
+    );
+    assert_eq!(
+        storage
+            .genesis_limits()
+            .contact_attempts_in_window(&victim)
+            .unwrap(),
+        0,
+        "a global-cap denial must not charge the contact's own counter"
+    );
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
+#[test]
+fn backward_clock_correction_resets_an_exhausted_window() {
+    let clock = fixed_clock();
+    let storage = storage_with_clock(clock.clone());
+    let contact = saved_contact(&storage, 1, "Alice");
+
+    for _ in 0..GENESIS_CONTACT_ATTEMPTS_PER_WINDOW {
+        assert!(
+            storage
+                .genesis_limits()
+                .consume_decrypt_budget(&contact)
+                .unwrap()
+        );
+    }
+    assert!(
+        !storage
+            .genesis_limits()
+            .consume_decrypt_budget(&contact)
+            .unwrap(),
+        "budget is exhausted before the clock moves"
+    );
+
+    // A backward wall-clock correction (NTP step, manual set) is a
+    // discontinuity — it must reset the window, not freeze genesis until wall
+    // time catches back up.
+    clock.set(SystemTime::UNIX_EPOCH + Duration::from_secs(1_600_000_000));
+    assert!(
+        storage
+            .genesis_limits()
+            .consume_decrypt_budget(&contact)
+            .unwrap(),
+        "a backward clock correction must reset the exhausted window"
+    );
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
+#[test]
 fn budget_counters_are_durable_across_reopen() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("genesis.db");

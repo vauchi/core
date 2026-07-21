@@ -258,6 +258,9 @@ fn reject_category(e: &CardUpdateError) -> &'static str {
         CardUpdateError::SignatureInvalid => "signature",
         CardUpdateError::ReplayDetected => "replay",
         CardUpdateError::GenesisRateLimited => "genesis_rate",
+        // Deterministic integrity conflict — ACKable (not "storage"/"genesis_rate"),
+        // since retrying the same blob can never resolve it (F9).
+        CardUpdateError::FactConflict => "fact_conflict",
         CardUpdateError::StaleVersion { .. } => "stale",
         CardUpdateError::DeltaApplicationFailed => "delta_apply",
         CardUpdateError::Storage(_) => "storage",

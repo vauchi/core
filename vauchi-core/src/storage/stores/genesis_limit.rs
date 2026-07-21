@@ -110,6 +110,23 @@ impl GenesisLimitStore<'_> {
         Ok(true)
     }
 
+    /// Attempts charged to `contact_id` in the current window (0 if none or the
+    /// window has aged out). Test seam for asserting rollback correctness.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn contact_attempts_in_window(&self, contact_id: &str) -> Result<u32, StorageError> {
+        let now = self.clock.unix_seconds();
+        let row: Option<(i64, i64)> = self
+            .conn
+            .query_row(
+                "SELECT window_start, attempts FROM genesis_decrypt_contact_limits
+                     WHERE contact_id = ?1",
+                params![contact_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+        Ok(current_attempts(row, now))
+    }
+
     fn charge_global(&self, now: u64) -> Result<bool, StorageError> {
         let row: Option<(i64, i64)> = self
             .conn
@@ -136,10 +153,12 @@ impl GenesisLimitStore<'_> {
 }
 
 /// Attempts already charged in the current window: zero once the stored window
-/// has aged out.
+/// has aged out. Saturating cast: this table is unencrypted, so a corrupted or
+/// externally-tampered oversized `attempts` value clamps to the cap-blocking
+/// `u32::MAX` (fail closed) rather than wrapping to a small value.
 fn current_attempts(row: Option<(i64, i64)>, now: u64) -> u32 {
     match row {
-        Some((start, attempts)) if !window_expired(start, now) => attempts.max(0) as u32,
+        Some((start, attempts)) if !window_expired(start, now) => saturating_u32(attempts),
         _ => 0,
     }
 }
@@ -148,14 +167,23 @@ fn current_attempts(row: Option<(i64, i64)>, now: u64) -> u32 {
 /// fresh window when the stored one has aged out.
 fn charged(row: Option<(i64, i64)>, now: u64) -> (u64, u32) {
     match row {
-        Some((start, attempts)) if !window_expired(start, now) => {
-            (start.max(0) as u64, attempts.max(0) as u32 + 1)
-        }
+        Some((start, attempts)) if !window_expired(start, now) => (
+            start.max(0) as u64,
+            saturating_u32(attempts).saturating_add(1),
+        ),
         _ => (now, 1),
     }
 }
 
+/// A window is aged out when the configured span has elapsed, OR when the clock
+/// has moved BACKWARD past the stored start — a backward wall-clock correction
+/// is a discontinuity that must reset the window, otherwise an exhausted window
+/// would stay exhausted (blocking genesis) until wall time caught back up.
 fn window_expired(window_start: i64, now: u64) -> bool {
     let start = window_start.max(0) as u64;
-    now.saturating_sub(start) >= GENESIS_WINDOW_SECS
+    now < start || now.saturating_sub(start) >= GENESIS_WINDOW_SECS
+}
+
+fn saturating_u32(value: i64) -> u32 {
+    u32::try_from(value).unwrap_or(u32::MAX)
 }

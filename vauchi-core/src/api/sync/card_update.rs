@@ -59,6 +59,11 @@ pub enum CardUpdateError {
     /// caller must NOT ACK the relay blob; the next fetch retries once the
     /// window resets (plan §REVISION F6).
     GenesisRateLimited,
+    /// A signed alert fact already exists for this `(contact, nonce)` with
+    /// DIFFERENT bytes — a nonce collision or tamper. Deterministic, so it is
+    /// ACKed (retrying cannot resolve it) rather than treated as a transient
+    /// storage failure that would loop forever (plan §REVISION F9).
+    FactConflict,
     /// Delta version is older than the last applied version (downgrade, #42).
     StaleVersion { delta: u32, last: u32 },
     /// Delta application failed (invalid field changes).
@@ -273,7 +278,8 @@ pub fn process_single_card_update_for_device(
             .map_err(|_| CardUpdateError::NoRatchetState)?
         }
         // No `[0;32]` session and no peer registry — a first-contact genesis
-        // envelope from a secondary device, or fail closed (ADR-068).
+        // envelope from a secondary device is the ONLY way to make progress, so
+        // a rate-limited attempt retains the blob for retry (ADR-068).
         None => {
             return try_receive_genesis_alert(
                 identity,
@@ -281,7 +287,9 @@ pub fn process_single_card_update_for_device(
                 sender_id,
                 &contact,
                 ciphertext,
+                None,
                 CardUpdateError::NoRatchetState,
+                RateLimitDisposition::RetainForRetry,
             );
         }
     };
@@ -293,7 +301,10 @@ pub fn process_single_card_update_for_device(
         Ok(plaintext) => plaintext,
         // A failed decrypt on the legacy `[0;32]` session may be a genesis
         // message from a sender sibling we hold no session with — try genesis
-        // before failing (plan §REVISION F8).
+        // before failing (plan §REVISION F8). We already hold a session here, so
+        // a rate-limited attempt on this arm is speculative: fall through to the
+        // ordinary decrypt failure (ACKed) rather than retaining the blob, so a
+        // burst of ordinary undecryptable traffic cannot pin blobs on the relay.
         Err(_) if *peer_device_id == [0; 32] => {
             return try_receive_genesis_alert(
                 identity,
@@ -301,7 +312,9 @@ pub fn process_single_card_update_for_device(
                 sender_id,
                 &contact,
                 ciphertext,
+                Some(&ratchet_msg),
                 CardUpdateError::DecryptionFailed,
+                RateLimitDisposition::FallThrough,
             );
         }
         Err(_) => return Err(CardUpdateError::DecryptionFailed),
@@ -513,6 +526,16 @@ pub fn process_single_card_update_for_device(
     }
 }
 
+/// What to do when a genesis decrypt attempt is denied by the rate limiter.
+enum RateLimitDisposition {
+    /// No other way to make progress (no session) — retain the blob so a later
+    /// fetch retries once the window resets (`GenesisRateLimited`, not ACKed).
+    RetainForRetry,
+    /// A session already exists, so the genesis attempt was speculative — return
+    /// the ordinary fallback error (ACKed) instead of pinning the blob.
+    FallThrough,
+}
+
 /// Attempt to receive a first-contact genesis alert (ADR-068, MR B).
 ///
 /// A device that holds a contact's `shared_key` but has no established session
@@ -526,36 +549,61 @@ pub fn process_single_card_update_for_device(
 /// error; a rate-limited attempt returns the retriable
 /// [`CardUpdateError::GenesisRateLimited`] so the caller does not ACK the blob.
 ///
-/// MR B does not persist the announced registry or create canonical per-device
-/// sessions — production receive routes everything to the `[0;32]` session;
-/// registry learning for per-device routing is deferred to that program (F4).
+/// MR B does not persist the announced registry (`opened.sender_registry_*`)
+/// or create canonical per-device sessions. This is a deliberate deferral, not
+/// an omission: production receive routes everything to the `[0;32]` session,
+/// so nothing in MR B consumes a learned registry, and persisting it through
+/// the existing (destructive, version-monotonic) registry store would risk
+/// suppressing a valid alert on a stale/older broadcast. The additive
+/// non-destructive merge and per-device routing land together in the routing
+/// program that consumes them (plan §REVISION F2/F3/F4). Re-learning the
+/// registry from a later genesis is idempotent and cheap.
+#[allow(clippy::too_many_arguments)]
 fn try_receive_genesis_alert(
     identity: &Identity,
     storage: &Storage,
     sender_id: &str,
     contact: &crate::contact::Contact,
     ciphertext: &[u8],
+    pre_parsed: Option<&RatchetMessage>,
     fallback: CardUpdateError,
+    on_rate_limit: RateLimitDisposition,
 ) -> Result<ReceiveOutcome, CardUpdateError> {
     let (Some(shared_key), Some(peer_identity)) = (contact.shared_key(), contact.public_key())
     else {
         return Err(fallback);
     };
-    let Ok(message) = serde_json::from_slice::<RatchetMessage>(ciphertext) else {
-        return Err(fallback);
+    // Reuse the caller's already-parsed message where available (the
+    // decrypt-failure arm) to avoid a redundant deserialize.
+    let parsed;
+    let message = match pre_parsed {
+        Some(message) => message,
+        None => match serde_json::from_slice::<RatchetMessage>(ciphertext) {
+            Ok(message) => {
+                parsed = message;
+                &parsed
+            }
+            Err(_) => return Err(fallback),
+        },
     };
 
     // Rate-limit BEFORE deriving keys — a genesis open derives ratchet keys
-    // from shared_key ahead of any signature check (F6). A denial is retriable.
+    // from shared_key ahead of any signature check (F6). On exhaustion, only an
+    // arm with no other way to make progress retains the blob for retry; a
+    // speculative attempt over an existing session falls through to `fallback`
+    // (ACKed) so ordinary undecryptable traffic cannot pin blobs on the relay.
     if !storage.genesis_limits().consume_decrypt_budget(sender_id)? {
-        return Err(CardUpdateError::GenesisRateLimited);
+        return match on_rate_limit {
+            RateLimitDisposition::RetainForRetry => Err(CardUpdateError::GenesisRateLimited),
+            RateLimitDisposition::FallThrough => Err(fallback),
+        };
     }
 
     let Ok(opened) = crate::exchange::genesis::GenesisEnvelope::open(
         shared_key,
         peer_identity,
         identity.signing_public_key(),
-        &message,
+        message,
     ) else {
         return Err(fallback);
     };
@@ -586,16 +634,29 @@ fn try_receive_genesis_alert(
         storage
             .replay()
             .save_replay_nonce(sender_id, alert.nonce(), alert.timestamp())?;
-        storage.safety_alerts().insert_or_compare_fact(
+        match storage.safety_alerts().insert_or_compare_fact(
             sender_id,
             alert.nonce(),
             &opened.inner_payload,
             storage.clock().unix_seconds(),
-        )?;
-        Ok(())
+        ) {
+            Ok(_) => Ok(()),
+            // A same-nonce/different-bytes conflict is deterministic — surface
+            // it as an ACKable rejection, not a transient storage failure that
+            // the caller would retry against forever (F9).
+            Err(StorageError::InvalidData(_)) => Err(CardUpdateError::FactConflict),
+            Err(e) => Err(CardUpdateError::Storage(e)),
+        }
     })();
     match genesis_txn {
-        Ok(()) => storage.commit()?,
+        // Roll back on commit failure too — a failed COMMIT can leave the
+        // SQLite transaction open, wedging every later `BEGIN IMMEDIATE`.
+        Ok(()) => {
+            if let Err(e) = storage.commit() {
+                storage.rollback();
+                return Err(CardUpdateError::Storage(e));
+            }
+        }
         Err(e) => {
             storage.rollback();
             return Err(e);

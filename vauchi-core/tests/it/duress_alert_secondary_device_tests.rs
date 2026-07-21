@@ -624,3 +624,128 @@ fn malformed_blob_to_session_less_contact_falls_back_without_charging_budget() {
         "a blob rejected at the parse boundary must not consume budget"
     );
 }
+
+/// A genuine genesis alert blob from `alice` to `bob_pk` under `shared_bytes`,
+/// carrying the given signed `nonce`.
+fn genesis_alert_blob(
+    alice: &Identity,
+    bob_pk: &[u8; 32],
+    shared_bytes: [u8; 32],
+    broadcast: &RegistryBroadcast,
+    nonce: [u8; 32],
+) -> Vec<u8> {
+    let alert = SafetyAlertPayload::new(
+        AlertKind::Emergency,
+        "check on me".to_string(),
+        7_000,
+        None,
+        nonce,
+        alice,
+        bob_pk,
+    )
+    .expect("alert construction");
+    let inner = VersionedPayload::encode_alert(&alert);
+    let (message, _) = GenesisEnvelope::seal(
+        &SymmetricKey::from_bytes(shared_bytes),
+        alice,
+        bob_pk,
+        broadcast,
+        20_100,
+        &inner,
+    )
+    .expect("seal");
+    serde_json::to_vec(&message).unwrap()
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// A COMMIT failure while accepting a genesis alert must roll back cleanly:
+/// nothing is persisted, the blob is reported as a storage error (so the
+/// receive loop does not ACK it), and — crucially — a retry succeeds instead of
+/// wedging on a left-open transaction (plan §REVISION C4).
+// @internal
+#[test]
+fn genesis_receive_survives_a_commit_failure_and_retry_succeeds() {
+    let alice = Identity::create("Alice", 0);
+    let shared_bytes = [0x88u8; 32];
+    let (bob, alice_id, broadcast) = session_less_pair(&alice, shared_bytes);
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+    let blob = genesis_alert_blob(&alice, &bob_pk, shared_bytes, &broadcast, [0xABu8; 32]);
+
+    // Arm a one-shot COMMIT fault: the accept transaction will fail to commit.
+    bob.storage().arm_commit_fault();
+    let err = process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &blob)
+        .expect_err("a commit failure must surface as an error");
+    assert!(
+        matches!(err, CardUpdateError::Storage(_)),
+        "a commit failure must surface as a (non-ACKed) storage error, got {err:?}"
+    );
+    assert!(
+        bob.storage()
+            .safety_alerts()
+            .load_unsurfaced_facts()
+            .unwrap()
+            .is_empty(),
+        "a rolled-back accept must persist no durable fact"
+    );
+
+    // The fault self-disarmed; the retry must succeed — proving the transaction
+    // was rolled back, not left open to wedge the next BEGIN IMMEDIATE.
+    let outcome =
+        process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &blob)
+            .expect("the retry after a rolled-back commit must succeed, not wedge");
+    assert!(matches!(outcome, ReceiveOutcome::Alert(_)));
+    assert_eq!(
+        bob.storage()
+            .safety_alerts()
+            .load_unsurfaced_facts()
+            .unwrap()
+            .len(),
+        1,
+        "the retry must durably persist the alert exactly once"
+    );
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// A signed alert reusing an existing fact's nonce with DIFFERENT bytes is a
+/// deterministic integrity conflict: the accept transaction rolls back, the
+/// pre-existing fact is untouched, and the receive returns the ACKable
+/// `FactConflict` (retrying can never resolve it) rather than a transient
+/// storage failure that would loop forever (plan §REVISION F9/C3).
+// @internal
+#[test]
+fn genesis_receive_rejects_a_conflicting_fact_and_rolls_back() {
+    let alice = Identity::create("Alice", 0);
+    let shared_bytes = [0x99u8; 32];
+    let (bob, alice_id, broadcast) = session_less_pair(&alice, shared_bytes);
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+    let nonce = [0xCDu8; 32];
+
+    // Pre-seed a DIFFERENT fact under the same (contact, nonce) WITHOUT its
+    // replay row, so the receive reaches the fact comparator (normally the
+    // replay check fires first because the two are written together).
+    bob.storage()
+        .safety_alerts()
+        .insert_fact_if_absent(&alice_id, &nonce, b"pre-existing different bytes", 100)
+        .unwrap();
+
+    let blob = genesis_alert_blob(&alice, &bob_pk, shared_bytes, &broadcast, nonce);
+    let err = process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &blob)
+        .expect_err("a conflicting fact must be rejected");
+    assert!(
+        matches!(err, CardUpdateError::FactConflict),
+        "a same-nonce/different-bytes conflict must be the deterministic FactConflict, got {err:?}"
+    );
+
+    // The pre-existing fact is untouched and no replay nonce was burned — the
+    // whole accept transaction rolled back.
+    let facts = bob
+        .storage()
+        .safety_alerts()
+        .load_unsurfaced_facts()
+        .unwrap();
+    assert_eq!(facts.len(), 1, "no second fact was created");
+    assert_eq!(
+        facts[0].signed_payload, b"pre-existing different bytes",
+        "the original fact must be untouched by the rejected accept"
+    );
+}

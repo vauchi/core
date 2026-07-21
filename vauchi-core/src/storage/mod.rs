@@ -92,6 +92,12 @@ pub struct Storage {
     /// to `SystemClock::shared()`; tests inject a `FakeClock`
     /// via `with_clock(...)`.
     clock: std::sync::Arc<dyn crate::clock::Clock>,
+    /// Test-only fault-injection latch. When armed, the next
+    /// [`Storage::commit`] returns an error with the transaction left open,
+    /// simulating a failed `COMMIT` so callers' rollback-on-commit-failure
+    /// paths can be exercised deterministically. Absent in production builds.
+    #[cfg(any(test, feature = "testing"))]
+    commit_fault: std::cell::Cell<bool>,
 }
 impl Storage {
     /// Borrow the storage subsystem's [`Clock`](crate::clock::Clock).

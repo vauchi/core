@@ -49,6 +49,8 @@ impl Storage {
             encryption_key,
             db_path: Some(path_buf),
             clock: crate::clock::SystemClock::shared(),
+            #[cfg(any(test, feature = "testing"))]
+            commit_fault: std::cell::Cell::new(false),
         };
         storage.run_migrations()?;
         // T2-12: Clean up old terminal delivery records on startup —
@@ -72,6 +74,8 @@ impl Storage {
             encryption_key,
             db_path: None,
             clock: crate::clock::SystemClock::shared(),
+            #[cfg(any(test, feature = "testing"))]
+            commit_fault: std::cell::Cell::new(false),
         };
         storage.run_migrations()?;
         Ok(storage)
@@ -159,9 +163,26 @@ impl Storage {
 
     /// Commits the current transaction.
     pub fn commit(&self) -> Result<(), StorageError> {
+        // Test-only fault injection: return an error WITHOUT committing and
+        // WITHOUT rolling back, so the transaction stays open exactly as a real
+        // failed COMMIT leaves it — the caller must roll back or the next
+        // `begin_transaction` wedges. Self-disarms after firing once.
+        #[cfg(any(test, feature = "testing"))]
+        if self.commit_fault.replace(false) {
+            return Err(StorageError::Database(rusqlite::Error::QueryReturnedNoRows));
+        }
         self.conn
             .execute_batch("COMMIT")
             .map_err(StorageError::from)
+    }
+
+    /// Arm a one-shot commit fault: the next [`Self::commit`] fails with the
+    /// transaction left open. Only the explicit `commit()` path is affected;
+    /// direct `execute_batch`/savepoint commits (e.g. the rate limiter) are
+    /// not, so a fault targets the caller's own transaction precisely.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn arm_commit_fault(&self) {
+        self.commit_fault.set(true);
     }
 
     /// Rolls back the current transaction.

@@ -42,7 +42,6 @@ use crate::api::sync::{
 };
 use crate::contact::Contact;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
-use crate::sync::safety_alert::AlertKind;
 
 /// Outcome of processing a single received blob.
 ///
@@ -312,6 +311,7 @@ mod tests {
     use super::*;
     use crate::SymmetricKey;
     use crate::contact_card::ContactCard;
+    use crate::sync::safety_alert::AlertKind;
 
     fn exchanged_contact(label: &str) -> Contact {
         let pk = [label.as_bytes()[0]; 32];

@@ -121,7 +121,7 @@ impl ActivityLogWriter {
                 alert_nonce,
                 ..
             } => {
-                let key = format!("emergency:{contact_id}:{}", hex::encode(alert_nonce));
+                let key = format!("alert:{contact_id}:{}", hex::encode(alert_nonce));
                 let entry = ActivityLogEntry::EmergencyAlertReceived {
                     contact_id: contact_id.clone(),
                 };
@@ -132,7 +132,7 @@ impl ActivityLogWriter {
                 alert_nonce,
                 ..
             } => {
-                let key = format!("duress:{contact_id}:{}", hex::encode(alert_nonce));
+                let key = format!("alert:{contact_id}:{}", hex::encode(alert_nonce));
                 let entry = ActivityLogEntry::DuressAlertReceived {
                     contact_id: contact_id.clone(),
                 };

@@ -334,8 +334,9 @@ fn alert_receive_is_atomic_fact_failure_preserves_the_nonce() {
     let failed =
         process_single_card_update(alice_identity, alice_wb.storage(), &bob_contact_id, &blob);
     assert!(
-        failed.is_err(),
-        "a fact-persistence failure must fail the receive, got {failed:?}"
+        matches!(failed, Err(CardUpdateError::Storage(_))),
+        "a fact-persistence failure must fail the receive as a storage error \
+         (the non-ACKable category), got {failed:?}"
     );
 
     // Restore the table: the SAME blob must now succeed — the failed attempt

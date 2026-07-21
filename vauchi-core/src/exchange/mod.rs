@@ -60,6 +60,7 @@ pub mod device_link;
 pub mod direct_transport;
 pub mod escrow;
 pub mod exchange_id;
+pub mod genesis;
 pub mod key_order;
 pub mod link_initiator;
 pub mod link_mode;

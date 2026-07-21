@@ -118,11 +118,11 @@ fn genesis_roundtrip_recovers_alert_registry_and_device() {
         alice.device_info().exchange_public_key()
     );
     assert_eq!(
-        opened.inner_alert_payload, alert,
+        opened.inner_payload, alert,
         "the exact signed alert payload must survive the round trip"
     );
     // The recovered inner alert must still verify against the real identities.
-    match VersionedPayload::decode(&opened.inner_alert_payload).expect("decode inner") {
+    match VersionedPayload::decode(&opened.inner_payload).expect("decode inner") {
         VersionedPayload::Alert(a) => assert!(
             a.verify(alice.signing_public_key(), bob.signing_public_key()),
             "inner alert signature must verify after genesis transport"

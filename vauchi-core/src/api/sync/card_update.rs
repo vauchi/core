@@ -293,7 +293,12 @@ pub fn process_single_card_update_for_device(
         if storage.replay().is_replay_nonce(sender_id, alert.nonce())? {
             return Err(CardUpdateError::ReplayDetected);
         }
-        // Persist the advanced ratchet + the nonce atomically. No card is touched.
+        // Persist the advanced ratchet + the nonce + the alert fact atomically.
+        // No card is touched. The fact must commit with the nonce: accepting
+        // the alert burns its replay protection, so an alert that exists only
+        // in memory is unrecoverable after a crash (delivery-axis findings,
+        // 2026-07-21-per-device-ratchet-registry-dormant). The stored bytes
+        // are the exact signed wire payload so siblings can re-verify.
         storage.begin_transaction()?;
         let alert_txn = (|| -> Result<(), CardUpdateError> {
             storage.ratchets().save_ratchet_state_for_device(
@@ -305,6 +310,12 @@ pub fn process_single_card_update_for_device(
             storage
                 .replay()
                 .save_replay_nonce(sender_id, alert.nonce(), alert.timestamp())?;
+            storage.safety_alerts().insert_fact_if_absent(
+                sender_id,
+                alert.nonce(),
+                &plaintext,
+                storage.clock().unix_seconds(),
+            )?;
             Ok(())
         })();
         match alert_txn {

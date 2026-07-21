@@ -198,8 +198,8 @@ pub struct BleHandshakeMachine {
     ///   we reassemble the initiator's encrypted card.
     pending_intermediate: Option<Vec<u8>>,
     /// Usable payload bytes per BLE chunk. Updated by
-    /// `update_mtu_usable`; defaults to [`BLE_DEFAULT_USABLE`] (20
-    /// bytes per the ATT minimum) when no negotiation has happened.
+    /// [`Self::update_mtu`]; defaults to [`BLE_DEFAULT_USABLE`] when
+    /// no negotiation has happened.
     mtu_usable: usize,
     /// Phase derived from `inner.state()`, overridden by terminal
     /// transitions (`Cancelled`, host-side `Failed { reason }`).

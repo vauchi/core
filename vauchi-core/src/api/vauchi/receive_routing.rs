@@ -87,6 +87,18 @@ pub struct BlobOutcome {
     pub alert: Option<ReceivedAlert>,
 }
 
+impl BlobOutcome {
+    /// Whether the receive loop may ACK this blob to the relay. An ACKed
+    /// blob is deleted server-side, so a locally rolled-back receive
+    /// (storage failure) must NOT ACK — the blob stays on the relay and the
+    /// next fetch retries it. ACKing it would turn a transient local failure
+    /// into permanent silent loss (the alert/nonce transaction was rolled
+    /// back, so nothing local remembers the blob existed).
+    pub(crate) fn should_ack(&self) -> bool {
+        true
+    }
+}
+
 /// Route and apply a batch of received blobs.
 ///
 /// Each blob is resolved via its mailbox token in a local
@@ -383,6 +395,27 @@ mod tests {
             device_fanout_contact_id: contact_id.map(str::to_string),
             alert: None,
         }
+    }
+
+    // @scenario: receive_phase :: a rolled-back receive must not ACK the blob
+    #[test]
+    fn test_storage_failure_outcome_is_not_ackable() {
+        let mut storage_failed = outcome(false, None);
+        storage_failed.reject_reason = Some("storage");
+        assert!(
+            !storage_failed.should_ack(),
+            "an ACKed blob is deleted by the relay — a rolled-back receive \
+             must leave it for refetch or the alert is silently lost"
+        );
+
+        assert!(outcome(true, Some("c")).should_ack());
+        let mut rejected = outcome(false, None);
+        rejected.reject_reason = Some("decrypt");
+        assert!(
+            rejected.should_ack(),
+            "non-storage rejects are deterministic — refetching cannot fix \
+             them, so they still ACK"
+        );
     }
 
     // @scenario: receive_phase :: an applied update yields one IncomingUpdate

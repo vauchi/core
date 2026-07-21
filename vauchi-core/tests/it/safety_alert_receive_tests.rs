@@ -420,3 +420,87 @@ fn surfacing_dispatches_pending_facts_at_least_once() {
     assert_eq!(again, 1, "facts stay pending until acknowledged");
     assert_eq!(collected.lock().unwrap().len(), 2);
 }
+
+// ADR-056: blocking is fully silent — no notifications about blocked users.
+// A durable fact received before the block must not be presented while the
+// contact is blocked (the fact itself remains for when/if they are unblocked).
+// @internal
+#[test]
+fn blocked_contact_alert_is_not_surfaced() {
+    let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = setup_two_party();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+
+    let blob = create_alert_blob(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        AlertKind::Duress,
+        [31u8; 32],
+    );
+    process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_contact_id,
+        &blob,
+    )
+    .expect("alert must be received");
+
+    let mut bob = alice_wb
+        .storage()
+        .contacts()
+        .load_contact(&bob_contact_id)
+        .unwrap()
+        .unwrap();
+    bob.set_blocked(true);
+    alice_wb.storage().contacts().save_contact(&bob).unwrap();
+
+    let collected = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let sink = collected.clone();
+    alice_wb.add_event_handler(std::sync::Arc::new(move |e| {
+        sink.lock().unwrap().push(e);
+    }));
+
+    let n = alice_wb.surface_pending_safety_alerts().unwrap();
+    assert_eq!(n, 0, "a blocked contact's alert must not surface (ADR-056)");
+    assert!(collected.lock().unwrap().is_empty());
+}
+
+// A fact whose stored payload carries a different signed nonce than its row
+// key is not a verified-receive artifact — surfacing must skip it rather than
+// dispatch an event whose identity does not match its evidence.
+// @internal
+#[test]
+fn nonce_mismatched_fact_is_not_surfaced() {
+    let (alice_wb, bob_wb, bob_contact_id, _alice_contact_id) = setup_two_party();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+
+    let bob_identity = bob_wb.identity().unwrap();
+    let alert = SafetyAlertPayload::new(
+        AlertKind::Duress,
+        "help me".into(),
+        1_720_000_000,
+        None,
+        [41u8; 32],
+        bob_identity,
+        &alice_signing_pk,
+    )
+    .unwrap();
+    let payload = VersionedPayload::encode_alert(&alert);
+
+    // Row nonce differs from the signed nonce inside the payload.
+    alice_wb
+        .storage()
+        .safety_alerts()
+        .insert_fact_if_absent(&bob_contact_id, &[42u8; 32], &payload, 80)
+        .unwrap();
+
+    let collected = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let sink = collected.clone();
+    alice_wb.add_event_handler(std::sync::Arc::new(move |e| {
+        sink.lock().unwrap().push(e);
+    }));
+
+    let n = alice_wb.surface_pending_safety_alerts().unwrap();
+    assert_eq!(n, 0, "a nonce-mismatched fact must be skipped");
+    assert!(collected.lock().unwrap().is_empty());
+}

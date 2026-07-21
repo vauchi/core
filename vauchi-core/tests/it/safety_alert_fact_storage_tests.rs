@@ -207,3 +207,41 @@ fn migration_v62_creates_safety_alert_facts_table() {
         );
     }
 }
+
+// @internal
+#[test]
+fn corrupt_fact_row_does_not_suppress_healthy_facts() {
+    let storage = create_test_storage();
+    let contact_id = saved_contact(&storage, "Frank");
+
+    storage
+        .safety_alerts()
+        .insert_fact_if_absent(&contact_id, &[6u8; 32], b"healthy-alert", 70)
+        .unwrap();
+    // A row whose payload was corrupted on disk (not decryptable with the
+    // storage key) must not abort the load — one bad row must never hide a
+    // healthy life-safety alert.
+    storage
+        .connection()
+        .execute(
+            "INSERT INTO safety_alert_facts
+                 (contact_id, nonce, signed_payload_encrypted, received_at)
+                 VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![
+                contact_id,
+                [8u8; 32],
+                b"garbage-not-ciphertext".to_vec(),
+                60
+            ],
+        )
+        .unwrap();
+
+    let facts = storage.safety_alerts().load_unsurfaced_facts().unwrap();
+    assert_eq!(
+        facts.len(),
+        1,
+        "healthy fact must survive a corrupt sibling"
+    );
+    assert_eq!(facts[0].nonce, [6u8; 32]);
+    assert_eq!(facts[0].signed_payload, b"healthy-alert");
+}

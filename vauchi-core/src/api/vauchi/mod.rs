@@ -26,6 +26,7 @@ mod ohttp_key_error;
 mod onboarding;
 mod places;
 mod propagation;
+mod propagation_cek;
 #[cfg(feature = "network-http")]
 mod receive_routing;
 mod reciprocity_send;

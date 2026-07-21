@@ -221,3 +221,143 @@ fn emergency_broadcast_is_received_as_alert() {
         other => panic!("expected an Emergency alert outcome, got {other:?}"),
     }
 }
+
+// ── Durable alert facts (delivery-axis findings, ─────────────────────
+//    2026-07-21-per-device-ratchet-registry-dormant): accepting an alert
+//    burns its replay nonce, so the alert must be durable from the same
+//    transaction — a crash before surfacing must not lose it.
+
+// @internal
+#[test]
+fn received_alert_persists_unsurfaced_fact_atomically() {
+    let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = setup_two_party();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+    let bob_signing_pk = *bob_wb.identity().unwrap().signing_public_key();
+
+    let blob = create_alert_blob(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        AlertKind::Duress,
+        [11u8; 32],
+    );
+    process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_contact_id,
+        &blob,
+    )
+    .expect("alert must be received");
+
+    let facts = alice_wb
+        .storage()
+        .safety_alerts()
+        .load_unsurfaced_facts()
+        .unwrap();
+    assert_eq!(facts.len(), 1, "the accepted alert must be a durable fact");
+    assert_eq!(facts[0].contact_id, bob_contact_id);
+    assert_eq!(facts[0].nonce, [11u8; 32]);
+
+    // The stored bytes are the exact signed wire payload: decodable and
+    // re-verifiable against the sender+recipient keys (sibling fan-out
+    // depends on this).
+    match VersionedPayload::decode(&facts[0].signed_payload).unwrap() {
+        VersionedPayload::Alert(stored) => {
+            assert_eq!(stored.kind(), AlertKind::Duress);
+            assert_eq!(stored.message(), "help me");
+            assert_eq!(stored.timestamp(), 1_720_000_000);
+            assert_eq!(stored.nonce(), &[11u8; 32]);
+            assert!(stored.verify(&bob_signing_pk, &alice_signing_pk));
+        }
+        other => panic!("stored fact must decode as an Alert, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn replayed_alert_does_not_duplicate_fact() {
+    let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = setup_two_party();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+
+    let blob1 = create_alert_blob(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        AlertKind::Duress,
+        [12u8; 32],
+    );
+    let blob2 = create_alert_blob(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        AlertKind::Duress,
+        [12u8; 32],
+    );
+
+    let alice_identity = alice_wb.identity().unwrap();
+    process_single_card_update(alice_identity, alice_wb.storage(), &bob_contact_id, &blob1)
+        .expect("first alert must be received");
+    let second =
+        process_single_card_update(alice_identity, alice_wb.storage(), &bob_contact_id, &blob2);
+    assert!(matches!(second, Err(CardUpdateError::ReplayDetected)));
+
+    let facts = alice_wb
+        .storage()
+        .safety_alerts()
+        .load_unsurfaced_facts()
+        .unwrap();
+    assert_eq!(facts.len(), 1, "a replay must not duplicate the fact");
+}
+
+// @internal
+#[test]
+fn alert_receive_is_atomic_fact_failure_preserves_the_nonce() {
+    let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = setup_two_party();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+
+    let blob = create_alert_blob(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        AlertKind::Duress,
+        [13u8; 32],
+    );
+
+    // Sabotage the fact table so the insert fails mid-transaction.
+    alice_wb
+        .storage()
+        .connection()
+        .execute_batch("ALTER TABLE safety_alert_facts RENAME TO safety_alert_facts_gone")
+        .unwrap();
+
+    let alice_identity = alice_wb.identity().unwrap();
+    let failed =
+        process_single_card_update(alice_identity, alice_wb.storage(), &bob_contact_id, &blob);
+    assert!(
+        failed.is_err(),
+        "a fact-persistence failure must fail the receive, got {failed:?}"
+    );
+
+    // Restore the table: the SAME blob must now succeed — the failed attempt
+    // must not have burned the replay nonce or advanced the stored ratchet.
+    alice_wb
+        .storage()
+        .connection()
+        .execute_batch("ALTER TABLE safety_alert_facts_gone RENAME TO safety_alert_facts")
+        .unwrap();
+    let retried =
+        process_single_card_update(alice_identity, alice_wb.storage(), &bob_contact_id, &blob);
+    assert!(
+        matches!(retried, Ok(ReceiveOutcome::Alert(_))),
+        "retry after a rolled-back failure must succeed, got {retried:?}"
+    );
+    assert_eq!(
+        alice_wb
+            .storage()
+            .safety_alerts()
+            .load_unsurfaced_facts()
+            .unwrap()
+            .len(),
+        1
+    );
+}

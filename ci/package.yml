@@ -123,6 +123,13 @@ package:android:
   stage: package
   needs: [build:android, build:validate-bindings]
   script:
+    # package-android.sh signs the checksum with cosign on release/rc tags
+    # (033e787a). `.linux-runner` does not provide cosign, so install it here
+    # — idempotent + checksum-verified — instead of relying on the runner
+    # having it ambient (v0.55.6 failed on allyson-shell which did not; the
+    # other linux signing jobs already reference this). Matches build:cabi-
+    # windows / package:slsa-provenance.
+    - !reference [.cosign-install, script]
     - ./scripts/package-android.sh "$CI_COMMIT_TAG"
   artifacts:
     paths:

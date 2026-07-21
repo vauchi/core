@@ -243,6 +243,7 @@ mod gdpr_deletion_tests;
 mod gdpr_engine_tests;
 mod gdpr_erasure_e2e_tests;
 mod gdpr_export_tests;
+mod genesis_envelope_crypto_tests;
 mod golden_fixtures;
 mod group_detail_engine_tests;
 mod group_tag_place_store_tests;

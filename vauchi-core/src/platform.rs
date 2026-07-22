@@ -367,6 +367,24 @@ pub enum Orientation {
     Landscape,
 }
 
+/// Which physical direction a BLE link was established in, reported by the
+/// shell on [`Event::BleConnected`]. This is the ground truth for the exchange
+/// protocol role: the GATT **central** (it dialed out) drives the handshake as
+/// initiator; the GATT **peripheral** (it was connected to) responds. Deriving
+/// the role from the physical link — not the pre-connection token tiebreak —
+/// is what lets asymmetric BLE discovery self-heal: whichever side actually
+/// connects becomes the initiator, even if the token said otherwise
+/// (`_private/docs/designs/2026-07-22-role-tiebreak-and-glare-design.md`).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum BleLinkDirection {
+    /// This device is the GATT central — it dialed out to the peer's peripheral.
+    Outbound,
+    /// This device is the GATT peripheral — the peer connected to it.
+    Inbound,
+}
+
 /// Why a file picker is being opened — lets frontends label the dialog
 /// (e.g., "Import Contacts" vs "Import Backup") without hardcoded strings.
 ///
@@ -463,8 +481,14 @@ pub enum Event {
         rssi: i16,
         adv_data: Vec<u8>,
     },
-    /// Successfully connected to a BLE device.
-    BleConnected { device_id: String },
+    /// Successfully connected to a BLE device. `direction` reports whether this
+    /// device dialed out (GATT central → [`BleLinkDirection::Outbound`]) or was
+    /// connected to (GATT peripheral → [`BleLinkDirection::Inbound`]); the
+    /// handshake role is derived from it, not from the token tiebreak.
+    BleConnected {
+        device_id: String,
+        direction: BleLinkDirection,
+    },
     /// Data read from a BLE characteristic (response to `BleReadCharacteristic`).
     BleCharacteristicRead { uuid: String, data: Vec<u8> },
     /// BLE characteristic notification received (unsolicited push from peripheral).
@@ -785,6 +809,8 @@ mod tests {
             },
             Event::BleConnected {
                 device_id: "d1".into(),
+                // TODO(f0-direction): verify — role-neutral roundtrip test.
+                direction: BleLinkDirection::Outbound,
             },
             Event::BleCharacteristicRead {
                 uuid: "char1".into(),
@@ -970,6 +996,8 @@ mod tests {
             },
             Event::BleConnected {
                 device_id: "".into(),
+                // TODO(f0-direction): verify — role-neutral distinctness test.
+                direction: BleLinkDirection::Outbound,
             },
             Event::BleCharacteristicRead {
                 uuid: "".into(),

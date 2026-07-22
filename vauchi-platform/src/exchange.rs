@@ -206,6 +206,26 @@ impl From<Command> for MobileCommand {
 ///
 /// Mobile apps create these after executing a command (e.g., QR scanned,
 /// BLE data received) and feed them back via `apply_hardware_event()`.
+/// Physical GATT link direction reported on [`MobileEvent::BleConnected`].
+/// Mirrors [`vauchi_core::platform::BleLinkDirection`]; the shell reports
+/// `Outbound` when it is the central (it dialed out) and `Inbound` when it is
+/// the peripheral (a peer connected to it). Core derives the handshake role
+/// from this, not from the token tiebreak.
+#[derive(uniffi::Enum, Debug, Clone)]
+pub enum MobileBleLinkDirection {
+    Outbound,
+    Inbound,
+}
+
+impl From<MobileBleLinkDirection> for vauchi_core::platform::BleLinkDirection {
+    fn from(d: MobileBleLinkDirection) -> Self {
+        match d {
+            MobileBleLinkDirection::Outbound => Self::Outbound,
+            MobileBleLinkDirection::Inbound => Self::Inbound,
+        }
+    }
+}
+
 #[derive(uniffi::Enum, Debug, Clone)]
 pub enum MobileEvent {
     // QR
@@ -220,6 +240,7 @@ pub enum MobileEvent {
     },
     BleConnected {
         device_id: String,
+        direction: MobileBleLinkDirection,
     },
     BleCharacteristicRead {
         uuid: String,
@@ -320,7 +341,13 @@ impl From<MobileEvent> for Event {
             MobileEvent::BleDeviceDiscovered { id, rssi, adv_data } => {
                 Self::BleDeviceDiscovered { id, rssi, adv_data }
             }
-            MobileEvent::BleConnected { device_id } => Self::BleConnected { device_id },
+            MobileEvent::BleConnected {
+                device_id,
+                direction,
+            } => Self::BleConnected {
+                device_id,
+                direction: direction.into(),
+            },
             MobileEvent::BleCharacteristicRead { uuid, data } => {
                 Self::BleCharacteristicRead { uuid, data }
             }

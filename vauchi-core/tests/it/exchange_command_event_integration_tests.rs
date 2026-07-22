@@ -14,6 +14,7 @@ use vauchi_core::exchange::{
     ExchangeEvent, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
 };
 use vauchi_core::identity::Identity;
+use vauchi_core::platform::BleLinkDirection;
 use vauchi_core::{Command, Event};
 
 // −− Helpers −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
@@ -252,6 +253,8 @@ fn nfc_session_ignores_ble_events() {
     session
         .apply_hardware_event(Event::BleConnected {
             device_id: "rogue".into(),
+            // TODO(f0-direction): verify — role-neutral, session ignores BLE regardless.
+            direction: BleLinkDirection::Outbound,
         })
         .unwrap();
 

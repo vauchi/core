@@ -16,7 +16,7 @@
 use vauchi_app::ui::AppEngine;
 use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
-use vauchi_core::platform::{AnimationToken, HapticPattern, SoundToken};
+use vauchi_core::platform::{AnimationToken, BleLinkDirection, HapticPattern, SoundToken};
 
 fn engine_named(name: &str) -> AppEngine {
     let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
@@ -51,10 +51,12 @@ fn ble_success_celebrates_exactly_once_per_side() {
     bob.start_ble_handshake_on_discovery(&alice_token);
     let ea = alice.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "bob".into(),
+        direction: BleLinkDirection::Outbound,
     });
     alice.apply_ble_machine_event(ea);
     let eb = bob.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "alice".into(),
+        direction: BleLinkDirection::Inbound,
     });
     bob.apply_ble_machine_event(eb);
 
@@ -106,6 +108,8 @@ fn ble_failure_never_celebrates() {
     alice.start_ble_handshake_on_discovery(&bob_token);
     let ev = alice.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "x".into(),
+        // TODO(f0-direction): verify — self-token degenerate case, role is incidental.
+        direction: BleLinkDirection::Outbound,
     });
     alice.apply_ble_machine_event(ev);
     // Force the machine's failure path via a disconnect mid-flow.

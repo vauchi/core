@@ -17,6 +17,7 @@ use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
 use vauchi_core::crypto::X3DHKeyPair;
 use vauchi_core::exchange::BleCardPayload;
+use vauchi_core::platform::BleLinkDirection;
 
 fn fresh_engine() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
@@ -97,6 +98,7 @@ fn forward_ble_connected_advances_initiator_to_handshaking() {
     engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card, None);
     let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "d1".into(),
+        direction: BleLinkDirection::Outbound,
     });
     assert_eq!(
         engine.ble_machine_phase(),
@@ -117,6 +119,8 @@ fn forward_event_without_active_session_is_no_op() {
     // No ensure_* call — session slot is empty.
     let event = Event::BleConnected {
         device_id: "ghost".into(),
+        // TODO(f0-direction): verify — no active session, direction is a no-op.
+        direction: BleLinkDirection::Outbound,
     };
     let _ = engine.forward_ble_hardware_event(&event);
     assert!(!engine.ble_handshake_session_active());
@@ -132,6 +136,7 @@ fn cancel_enqueues_ble_disconnect_into_pending_commands() {
     // Drive past Preparing so cancel emits BleDisconnect.
     let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "d1".into(),
+        direction: BleLinkDirection::Outbound,
     });
     let _ = engine.drain_pending_commands(); // clear the KeyOffer
 
@@ -176,6 +181,7 @@ fn discovery_larger_peer_token_starts_initiator_session() {
 
     let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "d1".into(),
+        direction: BleLinkDirection::Outbound,
     });
     assert_eq!(
         engine.ble_machine_phase(),
@@ -200,6 +206,7 @@ fn discovery_smaller_peer_token_starts_responder_session() {
 
     let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "d1".into(),
+        direction: BleLinkDirection::Inbound,
     });
     // Both roles reach Handshaking on connect; the role differentiator is
     // that the responder emits NO KeyOffer — it waits for the initiator's
@@ -299,10 +306,12 @@ fn two_party_ble_exchange_persists_each_others_contact() {
     // Connect both; the initiator emits its KeyOffer on connect.
     let ea = alice.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "bob".into(),
+        direction: BleLinkDirection::Outbound,
     });
     alice.apply_ble_machine_event(ea);
     let eb = bob.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "alice".into(),
+        direction: BleLinkDirection::Inbound,
     });
     bob.apply_ble_machine_event(eb);
 
@@ -349,10 +358,12 @@ fn two_party_ble_exchange_confirms_reciprocity_both_sides() {
     bob.start_ble_handshake_on_discovery(&alice_token);
     let ea = alice.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "bob".into(),
+        direction: BleLinkDirection::Outbound,
     });
     alice.apply_ble_machine_event(ea);
     let eb = bob.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "alice".into(),
+        direction: BleLinkDirection::Inbound,
     });
     bob.apply_ble_machine_event(eb);
 

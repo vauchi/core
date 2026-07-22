@@ -24,6 +24,7 @@ use proptest::prelude::*;
 use vauchi_app::ui::{BleExchangeEngine, WorkflowEngine};
 use vauchi_core::Event;
 use vauchi_core::exchange::mode::ExchangeMode;
+use vauchi_core::platform::BleLinkDirection;
 
 /// Strategy: arbitrary BLE / proximity / hardware-error events that
 /// could plausibly arrive after exchange completes — spurious scans,
@@ -38,6 +39,8 @@ fn arb_post_complete_event() -> impl Strategy<Value = Event> {
         }),
         Just(Event::BleConnected {
             device_id: "spurious".into(),
+            // TODO(f0-direction): verify — post-complete spurious event, role-neutral.
+            direction: BleLinkDirection::Outbound,
         }),
         Just(Event::BleDisconnected {
             reason: "late disconnect".into(),
@@ -94,6 +97,9 @@ fn drive_magic_to_success() -> BleExchangeEngine {
     });
     e.handle_hardware_event(Event::BleConnected {
         device_id: "peer-1".into(),
+        // TODO(f0-direction): verify — BleExchangeEngine's own tiebreak
+        // decides role; direction is unused here.
+        direction: BleLinkDirection::Outbound,
     });
     // P4: the hollow flow no longer self-completes from notified bytes;
     // the real `BleHandshakeMachine` completion drives the chrome to

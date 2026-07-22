@@ -120,7 +120,7 @@ impl AppEngine {
         };
         let now = self.vauchi.clock().unix_seconds();
         let (m_event, cmds) = match event {
-            Event::BleConnected { .. } => holder.machine.on_connected(now),
+            Event::BleConnected { direction, .. } => holder.machine.on_connected(*direction, now),
             Event::BleCharacteristicNotified { uuid, data } => {
                 holder.machine.on_data_received(uuid, data, now)
             }
@@ -520,6 +520,7 @@ mod tests {
     use super::*;
     use vauchi_core::api::Vauchi;
     use vauchi_core::contact_card::{ContactField, FieldType};
+    use vauchi_core::platform::BleLinkDirection;
 
     /// AppEngine over an in-memory Vauchi whose own card carries `Email` +
     /// `Phone`, plus a "Work" group exposing only `Email`. Returns the engine
@@ -663,10 +664,12 @@ mod tests {
         // Connect both; the initiator emits its KeyOffer on connect.
         let ea = alice.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
             device_id: "bob".into(),
+            direction: BleLinkDirection::Outbound,
         });
         alice.apply_ble_machine_event(ea);
         let eb = bob.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
             device_id: "alice".into(),
+            direction: BleLinkDirection::Inbound,
         });
         bob.apply_ble_machine_event(eb);
 
@@ -731,10 +734,12 @@ mod tests {
 
         let ea = alice.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
             device_id: "bob".into(),
+            direction: BleLinkDirection::Outbound,
         });
         alice.apply_ble_machine_event(ea);
         let eb = bob.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
             device_id: "alice".into(),
+            direction: BleLinkDirection::Inbound,
         });
         bob.apply_ble_machine_event(eb);
 
@@ -797,10 +802,12 @@ mod tests {
 
         let ea = alice.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
             device_id: "bob".into(),
+            direction: BleLinkDirection::Outbound,
         });
         alice.apply_ble_machine_event(ea);
         let eb = bob.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
             device_id: "alice".into(),
+            direction: BleLinkDirection::Inbound,
         });
         bob.apply_ble_machine_event(eb);
 
@@ -896,10 +903,12 @@ mod tests {
 
         let ei = initiator.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
             device_id: "bob".into(),
+            direction: BleLinkDirection::Outbound,
         });
         initiator.apply_ble_machine_event(ei);
         let er = responder.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
             device_id: "alice".into(),
+            direction: BleLinkDirection::Inbound,
         });
         responder.apply_ble_machine_event(er);
 
@@ -943,10 +952,12 @@ mod tests {
     fn run_handshake(initiator: &mut AppEngine, responder: &mut AppEngine) {
         let ei = initiator.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
             device_id: "responder".into(),
+            direction: BleLinkDirection::Outbound,
         });
         initiator.apply_ble_machine_event(ei);
         let er = responder.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
             device_id: "initiator".into(),
+            direction: BleLinkDirection::Inbound,
         });
         responder.apply_ble_machine_event(er);
         for _ in 0..50 {

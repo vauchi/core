@@ -14,6 +14,7 @@ use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact_card::{ContactField, FieldType};
 use vauchi_core::exchange::mode::ExchangeMode;
+use vauchi_core::platform::BleLinkDirection;
 
 fn engine_named(name: &str, email: &str) -> AppEngine {
     let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
@@ -89,10 +90,12 @@ fn ble_completion_renders_rich_success_summary() {
     bob.start_ble_handshake_on_discovery(&alice_token);
     let ea = alice.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "bob".into(),
+        direction: BleLinkDirection::Outbound,
     });
     alice.apply_ble_machine_event(ea);
     let eb = bob.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "alice".into(),
+        direction: BleLinkDirection::Inbound,
     });
     bob.apply_ble_machine_event(eb);
 

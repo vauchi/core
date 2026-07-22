@@ -28,6 +28,7 @@ use vauchi_core::exchange::{
     BLE_DEFAULT_USABLE, BleCardPayload, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY,
     CHAR_HANDSHAKE_WRITE,
 };
+use vauchi_core::platform::BleLinkDirection;
 
 fn fixture_card() -> (BleCardPayload, [u8; 32], X3DHKeyPair) {
     let identity_key = [1u8; 32];
@@ -76,7 +77,7 @@ fn responder_constructs_in_preparing_phase() {
 #[test]
 fn initiator_on_connected_emits_key_offer_on_handshake_write() {
     let mut m = fresh_initiator();
-    let (event, cmds) = m.on_connected(0);
+    let (event, cmds) = m.on_connected(BleLinkDirection::Outbound, 0);
     assert!(matches!(event, BleMachineEvent::None));
     assert_eq!(cmds.len(), 1);
     match &cmds[0] {
@@ -93,6 +94,65 @@ fn initiator_on_connected_emits_key_offer_on_handshake_write() {
 }
 
 // @internal
+// F0 fix: the physical link direction — not the token tiebreak — decides the
+// role. A device the token labelled responder that ends up dialing out (its
+// backoff fallback fired under asymmetric discovery) is reconciled to initiator
+// and MUST send the KeyOffer, otherwise it waits forever and the exchange
+// deadlocks (`2026-07-22-role-tiebreak-and-glare-design.md`).
+#[test]
+fn responder_token_dialing_out_becomes_initiator_and_offers() {
+    let mut m = fresh_responder();
+    assert_eq!(
+        m.role(),
+        BleRole::Responder,
+        "token tiebreak said responder"
+    );
+    let (event, cmds) = m.on_connected(BleLinkDirection::Outbound, 0);
+    assert_eq!(
+        m.role(),
+        BleRole::Initiator,
+        "dialing out (Outbound) reconciles the role to initiator",
+    );
+    assert!(matches!(event, BleMachineEvent::None));
+    assert_eq!(cmds.len(), 1, "the reconciled initiator emits its KeyOffer");
+    match &cmds[0] {
+        Command::BleWriteCharacteristic { uuid, data } => {
+            assert_eq!(uuid, CHAR_HANDSHAKE_WRITE);
+            assert!(!data.is_empty(), "KeyOffer must not be empty: {cmds:?}");
+        }
+        other => panic!("expected BleWriteCharacteristic, got {other:?}"),
+    }
+    assert_eq!(m.phase(), BleMachinePhase::Handshaking);
+}
+
+// @internal
+// F0 fix (mirror): a device the token labelled initiator that is instead
+// connected TO (inbound peripheral link) reconciles to responder and waits for
+// the peer's KeyOffer — it must NOT dial its own KeyOffer over a link it never
+// opened (the "No connected device" misroute).
+#[test]
+fn initiator_token_connected_to_becomes_responder() {
+    let mut m = fresh_initiator();
+    assert_eq!(
+        m.role(),
+        BleRole::Initiator,
+        "token tiebreak said initiator"
+    );
+    let (event, cmds) = m.on_connected(BleLinkDirection::Inbound, 0);
+    assert_eq!(
+        m.role(),
+        BleRole::Responder,
+        "being connected to (Inbound) reconciles the role to responder",
+    );
+    assert!(matches!(event, BleMachineEvent::None));
+    assert!(
+        cmds.is_empty(),
+        "the reconciled responder waits for the KeyOffer, emits nothing: {cmds:?}",
+    );
+    assert_eq!(m.phase(), BleMachinePhase::Handshaking);
+}
+
+// @internal
 #[test]
 fn initiator_duplicate_on_connected_is_idempotent_not_failed() {
     // A second BleConnected arrives because the initiator is ALSO a peripheral
@@ -100,11 +160,11 @@ fn initiator_duplicate_on_connected_is_idempotent_not_failed() {
     // be a no-op — not re-create the KeyOffer and fail with InvalidState, which
     // killed the S7-as-central handshake just as the peer's KeyAck arrived.
     let mut m = fresh_initiator();
-    let (_e1, cmds1) = m.on_connected(0);
+    let (_e1, cmds1) = m.on_connected(BleLinkDirection::Outbound, 0);
     assert_eq!(cmds1.len(), 1, "first connect emits the KeyOffer");
     assert_eq!(m.phase(), BleMachinePhase::Handshaking);
 
-    let (event2, cmds2) = m.on_connected(0);
+    let (event2, cmds2) = m.on_connected(BleLinkDirection::Outbound, 0);
     assert!(
         matches!(event2, BleMachineEvent::None),
         "duplicate connect is a no-op event",
@@ -128,7 +188,7 @@ fn initiator_duplicate_on_connected_is_idempotent_not_failed() {
 #[test]
 fn responder_on_connected_is_no_op_pending_frontend_subscribe() {
     let mut m = fresh_responder();
-    let (event, cmds) = m.on_connected(0);
+    let (event, cmds) = m.on_connected(BleLinkDirection::Inbound, 0);
     assert!(matches!(event, BleMachineEvent::None));
     assert!(
         cmds.is_empty(),
@@ -152,11 +212,11 @@ fn happy_path_emits_no_subscribe_notify_command() {
     let mut emitted: Vec<Command> = Vec::new();
 
     let mut init = fresh_initiator();
-    let (_, mut cmds) = init.on_connected(0);
+    let (_, mut cmds) = init.on_connected(BleLinkDirection::Outbound, 0);
     emitted.append(&mut cmds);
 
     let mut resp = fresh_responder();
-    let (_, mut cmds) = resp.on_connected(0);
+    let (_, mut cmds) = resp.on_connected(BleLinkDirection::Inbound, 0);
     emitted.append(&mut cmds);
 
     for cmd in &emitted {
@@ -201,7 +261,7 @@ fn update_mtu_clamps_above_chunk_overhead() {
 #[test]
 fn cancel_emits_ble_disconnect_once_and_is_absorbing() {
     let mut m = fresh_initiator();
-    m.on_connected(0);
+    m.on_connected(BleLinkDirection::Outbound, 0);
 
     let cmds = m.cancel();
     assert_eq!(cmds.len(), 1);
@@ -227,7 +287,7 @@ fn cancel_emits_ble_disconnect_once_and_is_absorbing() {
 #[test]
 fn disconnected_fails_the_machine_with_reason() {
     let mut m = fresh_initiator();
-    m.on_connected(0);
+    m.on_connected(BleLinkDirection::Outbound, 0);
     let (event, cmds) = m.on_disconnected("timeout");
     match event {
         BleMachineEvent::Failed { reason } => {
@@ -248,7 +308,7 @@ fn disconnected_fails_the_machine_with_reason() {
 #[test]
 fn unknown_characteristic_uuid_is_inert() {
     let mut m = fresh_initiator();
-    m.on_connected(0);
+    m.on_connected(BleLinkDirection::Outbound, 0);
     let (event, cmds) = m.on_data_received("not-a-real-uuid", &[0xAA; 16], 0);
     assert!(matches!(event, BleMachineEvent::None));
     assert!(cmds.is_empty());
@@ -259,7 +319,7 @@ fn unknown_characteristic_uuid_is_inert() {
 #[test]
 fn data_chunk_smaller_than_overhead_is_inert() {
     let mut m = fresh_initiator();
-    m.on_connected(0);
+    m.on_connected(BleLinkDirection::Outbound, 0);
     let (event, cmds) = m.on_data_received(CHAR_DATA_WRITE, &[0xAA, 0xBB], 0);
     assert!(matches!(event, BleMachineEvent::None));
     assert!(cmds.is_empty());
@@ -269,13 +329,13 @@ fn data_chunk_smaller_than_overhead_is_inert() {
 #[test]
 fn role_is_stable_through_lifecycle() {
     let mut init = fresh_initiator();
-    init.on_connected(0);
+    init.on_connected(BleLinkDirection::Outbound, 0);
     init.update_mtu(247);
     init.on_data_received("noise", &[], 0);
     assert_eq!(init.role(), BleRole::Initiator);
 
     let mut resp = fresh_responder();
-    resp.on_connected(0);
+    resp.on_connected(BleLinkDirection::Inbound, 0);
     resp.update_mtu(247);
     assert_eq!(resp.role(), BleRole::Responder);
 }
@@ -287,7 +347,7 @@ fn initiator_with_oob(oob: Option<BleOobBinding>) -> BleHandshakeMachine {
 
 /// The KeyOffer bytes the initiator writes on connect.
 fn key_offer(machine: &mut BleHandshakeMachine) -> Vec<u8> {
-    let (_event, cmds) = machine.on_connected(0);
+    let (_event, cmds) = machine.on_connected(BleLinkDirection::Outbound, 0);
     cmds.into_iter()
         .find_map(|cmd| match cmd {
             Command::BleWriteCharacteristic { uuid, data }

@@ -67,7 +67,7 @@ pub use diagnostic::{
 };
 pub use domain_command::{DomainCommand, DomainCommandResult};
 pub use error::{KeychainError, MobileError};
-pub use exchange::{MobileCommand, MobileEvent, MobileExchangeState};
+pub use exchange::{MobileBleLinkDirection, MobileCommand, MobileEvent, MobileExchangeState};
 pub use exchange_view::{MobileExchangeViewState, exchange_view_state};
 pub use mobile_contact_detail::{
     MobileContactDetailAction, MobileContactDetailBadge, MobileContactDetailBanner,

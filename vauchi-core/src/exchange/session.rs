@@ -927,7 +927,7 @@ impl ExchangeSession {
         match event {
             Event::QrScanned { data } => self.handle_qr_scanned(data),
             Event::NfcDataReceived { data } => self.handle_nfc_data_received(data),
-            Event::BleConnected { device_id } => self.handle_ble_connected(device_id),
+            Event::BleConnected { device_id, .. } => self.handle_ble_connected(device_id),
             Event::BleCharacteristicRead { uuid, data }
             | Event::BleCharacteristicNotified { uuid, data } => {
                 self.handle_ble_characteristic_data(uuid, data)

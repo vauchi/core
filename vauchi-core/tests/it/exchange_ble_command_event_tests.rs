@@ -14,6 +14,7 @@ use vauchi_core::exchange::{
     ExchangeSession, ExchangeState, ManualConfirmationVerifier, VAUCHI_BLE_SERVICE_UUID,
 };
 use vauchi_core::identity::Identity;
+use vauchi_core::platform::BleLinkDirection;
 use vauchi_core::{Command, Event};
 
 /// Helper: create a BLE exchange session with a fresh identity.
@@ -102,6 +103,7 @@ fn ble_connected_after_discovery_emits_key_offer_write() {
     session
         .apply_hardware_event(Event::BleConnected {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
         })
         .unwrap();
 
@@ -143,6 +145,7 @@ fn ble_full_initiator_flow_via_command_event() {
     initiator
         .apply_hardware_event(Event::BleConnected {
             device_id: "bob-device".into(),
+            direction: BleLinkDirection::Outbound,
         })
         .unwrap();
 
@@ -298,6 +301,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
     initiator
         .apply_hardware_event(Event::BleConnected {
             device_id: "bob".into(),
+            direction: BleLinkDirection::Outbound,
         })
         .unwrap();
 

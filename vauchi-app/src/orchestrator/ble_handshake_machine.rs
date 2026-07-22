@@ -59,6 +59,7 @@ use vauchi_core::exchange::{
     BleHandshakeSession, BleHandshakeState, BleReassembler, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE,
     CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE, KEY_ACK_SIZE,
 };
+use vauchi_core::platform::BleLinkDirection;
 
 /// Role on the BLE exchange — initiator sends the KeyOffer first,
 /// responder waits for it.
@@ -324,13 +325,41 @@ impl BleHandshakeMachine {
         self.mtu_usable = usable.max(BLE_CHUNK_OVERHEAD + 1);
     }
 
-    /// Called when the BLE connection completes. For initiators
-    /// this kicks the handshake by creating + sending the KeyOffer.
-    /// For responders this is a no-op (the protocol waits for the
-    /// initiator's KeyOffer on `CHAR_HANDSHAKE_WRITE`).
-    pub fn on_connected(&mut self, _now: u64) -> (BleMachineEvent, Vec<Command>) {
+    /// Called when the BLE connection completes. `direction` is the physical
+    /// GATT role of the link: the **central** (dialed out → `Outbound`) drives
+    /// the handshake as initiator by creating + sending the KeyOffer; the
+    /// **peripheral** (connected to → `Inbound`) responds, waiting for the
+    /// initiator's KeyOffer on `CHAR_HANDSHAKE_WRITE`.
+    ///
+    /// The link direction — not the pre-connection token tiebreak — is the
+    /// authority on the role. This is what heals asymmetric BLE discovery: a
+    /// side the tiebreak labelled responder that ends up dialing out (its
+    /// backoff fallback fired) is reconciled to initiator here, so it actually
+    /// sends the KeyOffer instead of waiting forever
+    /// (`2026-07-22-role-tiebreak-and-glare-design.md`, F0).
+    pub fn on_connected(
+        &mut self,
+        direction: BleLinkDirection,
+        _now: u64,
+    ) -> (BleMachineEvent, Vec<Command>) {
         if self.cancelled || self.is_terminal() {
             return (BleMachineEvent::None, Vec::new());
+        }
+        // Reconcile the role to the physical link before the handshake starts.
+        // Only while `Idle` (no KeyOffer created yet) — once the handshake has
+        // advanced, a second connect in the other direction is a glare duplicate
+        // handled by the idempotency guard below, not a role flip. The inner
+        // session is role-agnostic (initiator/responder build identically), so
+        // flipping `role` here needs no session rebuild.
+        if matches!(self.inner.state(), BleHandshakeState::Idle) {
+            self.role = match direction {
+                BleLinkDirection::Outbound => BleRole::Initiator,
+                BleLinkDirection::Inbound => BleRole::Responder,
+                // `BleLinkDirection` is `#[non_exhaustive]` (cross-crate forward
+                // compat); fail closed to Responder (wait rather than initiate)
+                // for any variant added later that this match hasn't seen yet.
+                _ => BleRole::Responder,
+            };
         }
         if self.role == BleRole::Responder {
             // Frontends auto-subscribe on connect (T0.2 §3.1

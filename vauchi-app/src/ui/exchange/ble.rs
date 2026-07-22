@@ -481,6 +481,7 @@ fn is_proximity_event(event: &Event) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vauchi_core::platform::BleLinkDirection;
 
     // ── Discovery tests ────────────────────────────────────────────
 
@@ -611,6 +612,9 @@ mod tests {
         // Connect
         let outcome = flow.handle_event(&Event::BleConnected {
             device_id: "d1".into(),
+            // TODO(f0-direction): verify — BleExchangeFlow's own tiebreak
+            // decides role; direction is unused here.
+            direction: BleLinkDirection::Outbound,
         });
 
         assert_eq!(*flow.step(), BleStep::Exchanging);
@@ -643,6 +647,9 @@ mod tests {
         });
         let outcome = flow.handle_event(&Event::BleConnected {
             device_id: "d1".into(),
+            // TODO(f0-direction): verify — BleExchangeFlow's own tiebreak
+            // decides role; direction is unused here.
+            direction: BleLinkDirection::Outbound,
         });
 
         assert_eq!(*flow.step(), BleStep::Exchanging);
@@ -1210,6 +1217,9 @@ mod tests {
         push(
             flow.handle_event(&Event::BleConnected {
                 device_id: "d1".into(),
+                // TODO(f0-direction): verify — BleExchangeFlow's own tiebreak
+                // decides role; direction is unused here.
+                direction: BleLinkDirection::Outbound,
             }),
             &mut emitted,
         );
@@ -1243,6 +1253,9 @@ mod tests {
         });
         flow.handle_event(&Event::BleConnected {
             device_id: "d1".into(),
+            // TODO(f0-direction): verify — BleExchangeFlow's own tiebreak
+            // decides role; direction is unused here.
+            direction: BleLinkDirection::Outbound,
         });
         assert_eq!(*flow.step(), BleStep::Exchanging);
     }

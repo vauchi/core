@@ -31,6 +31,7 @@ use vauchi_app::ui::{
 };
 use vauchi_core::Event;
 use vauchi_core::exchange::mode::ExchangeMode;
+use vauchi_core::platform::BleLinkDirection;
 
 /// Discovering exposes only `cancel`.
 const DISCOVERING_HANDLED: &[&str] = &[BLE_EXCHANGE_ACTION_CANCEL];
@@ -100,6 +101,9 @@ fn verifying_factory() -> BleExchangeEngine {
     });
     e.handle_hardware_event(Event::BleConnected {
         device_id: "peer-1".into(),
+        // TODO(f0-direction): verify — BleExchangeEngine's own tiebreak
+        // decides role; direction is unused here.
+        direction: BleLinkDirection::Outbound,
     });
     e.handle_hardware_event(Event::ImpactDetected {
         timestamp_ms: 100,
@@ -126,6 +130,9 @@ fn success_factory() -> BleExchangeEngine {
     });
     e.handle_hardware_event(Event::BleConnected {
         device_id: "peer-1".into(),
+        // TODO(f0-direction): verify — BleExchangeEngine's own tiebreak
+        // decides role; direction is unused here.
+        direction: BleLinkDirection::Outbound,
     });
     // P4: the hollow flow no longer self-completes from notified bytes;
     // the real `BleHandshakeMachine` completion drives Success via

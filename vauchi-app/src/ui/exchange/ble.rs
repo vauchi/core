@@ -207,6 +207,14 @@ pub(super) struct BleExchangeFlow {
     /// this compare into core retires the Android `compareTokens`
     /// frontend logic (ADR-043 Humble UI).
     own_token: Vec<u8>,
+    /// `true` once discovery decided this device is the radio **responder**
+    /// (larger token → waits to be connected to). Arms the F0 backoff: under
+    /// asymmetric BLE discovery the initiator may never discover us, so if no
+    /// inbound connection lands within the fallback window we dial out
+    /// ourselves (`tick`), and role-by-direction reconciles us to initiator.
+    is_responder: bool,
+    /// Guards the backoff so the fallback `BleConnect` is emitted at most once.
+    fallback_connect_emitted: bool,
 }
 
 impl BleExchangeFlow {
@@ -220,7 +228,24 @@ impl BleExchangeFlow {
             shake_envelope_sent: false,
             negotiated_mtu: None,
             own_token,
+            is_responder: false,
+            fallback_connect_emitted: false,
         }
+    }
+
+    /// F0 backoff: the discovered peer this radio responder should dial out to
+    /// if no inbound connection has arrived — `Some(device_id)` only while still
+    /// in `Handshaking` (a real connection advances to `Exchanging`), for a
+    /// radio responder, and only once. The engine's `tick` calls this past the
+    /// fallback window and emits a `BleConnect`.
+    pub(super) fn take_fallback_connect_target(&mut self) -> Option<String> {
+        if !self.is_responder || self.fallback_connect_emitted || self.step != BleStep::Handshaking
+        {
+            return None;
+        }
+        let target = self.connected_device.clone()?;
+        self.fallback_connect_emitted = true;
+        Some(target)
     }
 
     /// Whether this device should initiate the BLE connection (become
@@ -316,7 +341,8 @@ impl BleExchangeFlow {
             // Glance (one-sided QR) connects asymmetrically to the scanned peer
             // via the AppEngine (`handle_glance_discovery`); the symmetric
             // tiebreak here would race that and re-open the multi-peer latch (F1).
-            if self.mode != ExchangeMode::Glance && self.decides_initiator(adv_data) {
+            let radio = self.mode != ExchangeMode::Glance;
+            if radio && self.decides_initiator(adv_data) {
                 // We win the tiebreak → initiate the connection (central).
                 return BleHardwareOutcome::StepAdvanced {
                     commands: vec![Command::BleConnect {
@@ -324,8 +350,11 @@ impl BleExchangeFlow {
                     }],
                 };
             }
-            // Responder (peripheral) → wait for the initiator to connect;
-            // the `BleConnected` event drives the next step.
+            // Radio responder (peripheral) → wait for the initiator to connect;
+            // the `BleConnected` event drives the next step. Arm the F0 backoff
+            // (`take_fallback_connect_target`) so we self-heal if the initiator
+            // never discovered us (asymmetric BLE discovery).
+            self.is_responder = radio;
             return BleHardwareOutcome::StepAdvanced { commands: vec![] };
         }
         BleHardwareOutcome::Ignored

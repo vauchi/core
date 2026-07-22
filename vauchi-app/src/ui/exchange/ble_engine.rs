@@ -52,6 +52,15 @@ pub const ACTION_DONE: &str = "done";
 /// fast; this is the no-event-ever backstop.
 pub const BLE_STEP_TIMEOUT_SECS: u64 = 60;
 
+/// F0 backoff window: how long a radio **responder** waits to be connected to
+/// before it dials out itself (asymmetric-discovery self-heal). Well under
+/// [`BLE_STEP_TIMEOUT_SECS`] so the fallback fires before the stall-fail; long
+/// enough that a genuine inbound connection (symmetric discovery, initiator
+/// dials first) normally lands first and cancels the need. Wall-clock elapsed
+/// in the `Handshaking` step, evaluated on the `poll_notifications`/heartbeat
+/// tick (`_private/docs/designs/2026-07-22-role-tiebreak-and-glare-design.md`).
+pub const BLE_FALLBACK_CONNECT_SECS: u64 = 4;
+
 /// Presentation state of the BLE engine. The active sub-flow screen is derived
 /// from the wrapped flow's `BleStep`; `Success`/`Failed` are terminal.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -468,15 +477,27 @@ impl WorkflowEngine for BleExchangeEngine {
     /// (T1.2, ADR-021). Driven by the `poll_notifications` pump. `Active`
     /// implies a waiting step (`Complete` flips to `Success` via
     /// `apply_outcome`); `Success`/`Failed` are terminal.
-    fn tick(&mut self, now: u64) {
+    fn tick(&mut self, now: u64) -> Vec<Command> {
         if self.cancelled || !matches!(self.screen, BleScreen::Active) {
-            return;
+            return Vec::new();
         }
-        if now.saturating_sub(self.step_entered_unix) >= BLE_STEP_TIMEOUT_SECS {
+        let elapsed = now.saturating_sub(self.step_entered_unix);
+        // F0 backoff (before the stall check): a radio responder that hasn't
+        // been connected to within the fallback window dials out itself, so
+        // asymmetric BLE discovery (the initiator never discovered us) self-
+        // heals instead of deadlocking. Role-by-direction then reconciles the
+        // outbound side to initiator.
+        if elapsed >= BLE_FALLBACK_CONNECT_SECS
+            && let Some(target) = self.flow.take_fallback_connect_target()
+        {
+            return vec![Command::BleConnect { device_id: target }];
+        }
+        if elapsed >= BLE_STEP_TIMEOUT_SECS {
             self.force_failure(Some(
                 "No nearby device responded — Bluetooth exchange timed out.".into(),
             ));
         }
+        Vec::new()
     }
 
     fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
@@ -721,6 +742,54 @@ mod tests {
             other => panic!("expected Commands, got {other:?}"),
         }
         assert_eq!(engine.current_screen().screen_id, "exchange_ble_exchanging");
+    }
+
+    // @internal
+    // F0 backoff: a radio responder (larger token) that discovers the peer but
+    // is never connected to (asymmetric discovery) dials out itself once the
+    // fallback window elapses, so the exchange self-heals instead of
+    // deadlocking. Role-by-direction then makes the outbound side the initiator.
+    #[test]
+    fn responder_backoff_dials_out_after_fallback_window() {
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Magic,
+            true,
+            vec![0xFF], // large own token → we are the responder vs peer 0x01
+            SystemClock::shared(),
+            None,
+            Locale::English,
+        );
+        let entered = SystemClock::shared().unix_seconds();
+        // Discover a peer: as the responder we advance but emit no connect.
+        let result = engine.handle_hardware_event(Event::BleDeviceDiscovered {
+            id: "peer1".into(),
+            rssi: -50,
+            adv_data: vec![0x01],
+        });
+        match result {
+            Some(ActionResult::UpdateScreen(_)) => {}
+            other => panic!("responder discovery emits no connect command, got {other:?}"),
+        }
+        // Before the window: no fallback.
+        assert!(
+            engine
+                .tick(entered + BLE_FALLBACK_CONNECT_SECS - 1)
+                .is_empty(),
+            "no fallback connect before the backoff window",
+        );
+        // Past the window: dial out to the discovered peer.
+        let cmds = engine.tick(entered + BLE_FALLBACK_CONNECT_SECS + 1);
+        assert!(
+            matches!(&cmds[0], Command::BleConnect { device_id } if device_id == "peer1"),
+            "responder backoff dials out to the discovered peer: {cmds:?}",
+        );
+        // Idempotent — the fallback is emitted at most once.
+        assert!(
+            engine
+                .tick(entered + BLE_FALLBACK_CONNECT_SECS + 2)
+                .is_empty(),
+            "fallback connect must fire only once",
+        );
     }
 
     // @internal

@@ -428,15 +428,16 @@ impl WorkflowEngine for NfcExchangeEngine {
     /// (T1.3, ADR-021). Driven by the `poll_notifications` pump. Only the
     /// `Active` step states wait on hardware; `RoleSelection` is a user choice
     /// and `Success`/`Failed` are terminal — none of those time out.
-    fn tick(&mut self, now: u64) {
+    fn tick(&mut self, now: u64) -> Vec<Command> {
         if self.cancelled || !matches!(self.screen, NfcScreen::Active) {
-            return;
+            return Vec::new();
         }
         if now.saturating_sub(self.step_entered_unix) >= NFC_STEP_TIMEOUT_SECS {
             self.screen = NfcScreen::Failed {
                 reason: Some("NFC tap timed out — no response from the other device.".into()),
             };
         }
+        Vec::new()
     }
 
     fn was_cancelled(&self) -> bool {

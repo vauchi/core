@@ -396,15 +396,16 @@ impl WorkflowEngine for DirectTransportEngine {
     /// `poll_notifications` pump. Only `Waiting` has a wall-clock bound —
     /// `Exchanging`/`Verifying` are peer-progress states and the rest are
     /// terminal.
-    fn tick(&mut self, now: u64) {
+    fn tick(&mut self, now: u64) -> Vec<Command> {
         if self.cancelled || self.screen != DirectScreen::Waiting {
-            return;
+            return Vec::new();
         }
         if now.saturating_sub(self.waiting_entered_unix) >= DIRECT_WAITING_TIMEOUT_SECS {
             self.screen = DirectScreen::Failed {
                 reason: Some("No response over USB — the other device didn't connect.".into()),
             };
         }
+        Vec::new()
     }
 
     /// Emit the initial `DirectSend` command once, on first screen entry.

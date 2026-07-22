@@ -684,9 +684,14 @@ impl AppEngine {
         self.advance_multi_stage_session();
 
         let now = self.vauchi.clock().unix_seconds();
-        // Active-engine wall-clock tick — no-op unless bounded-wait (cable
-        // DirectTransport `Waiting` fails a peerless stall; ADR-021, T1.3).
-        self.engine.tick(now);
+        // Active-engine wall-clock tick — bounded-wait stall failure (cable
+        // DirectTransport `Waiting`; ADR-021, T1.3) plus the BLE engine's
+        // asymmetric-discovery fallback `BleConnect` (F0 backoff). Any commands
+        // it emits ride `pending_commands` to the shell.
+        let tick_cmds = self.engine.tick(now);
+        if !tick_cmds.is_empty() {
+            self.extend_pending_commands(tick_cmds);
+        }
     }
 
     /// The shell's platform wakeup fired — a desktop in-process interval, an

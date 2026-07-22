@@ -125,7 +125,14 @@ pub trait WorkflowEngine: Send {
     /// mutates its own screen state — the frontend re-renders via
     /// `current_screen()` after the poll (same path the session
     /// advancers already use).
-    fn tick(&mut self, _now: u64) {}
+    ///
+    /// Returns any [`Command`]s the tick needs executed (drained into
+    /// `pending_commands` by the pump). Most engines mutate state only and
+    /// return an empty vec; the BLE engine uses this to emit its
+    /// asymmetric-discovery fallback `BleConnect` (F0 backoff).
+    fn tick(&mut self, _now: u64) -> Vec<Command> {
+        Vec::new()
+    }
 
     /// Screen-presentation [`Command`]s emitted when this engine becomes
     /// the active one (ADR-031 §Hardware, Phase 2b of

@@ -539,6 +539,57 @@ fn stale_link_data_is_rejected_after_glare_stay() {
     );
 }
 
+// Android identifies both GATT directions with the same Bluetooth address.
+// Direction must therefore participate in the link identity; device_id alone
+// cannot distinguish the surviving outbound link from the stale inbound one.
+// @internal
+#[test]
+fn stale_same_peer_data_is_rejected_by_direction_after_glare_stay() {
+    let mut alice = fresh_initiator(); // smaller — stays initiator
+    let mut bob = fresh_peer_initiator();
+    let offer_a = key_offer_on(&mut alice, "peer");
+    let offer_b = key_offer_on(&mut bob, "peer");
+
+    let (_event, _commands) = alice.on_data_received(
+        "peer",
+        BleLinkDirection::Inbound,
+        CHAR_HANDSHAKE_WRITE,
+        &offer_b,
+        0,
+    );
+    assert_eq!(alice.role(), BleRole::Initiator, "smaller identity stays");
+
+    let ack = key_ack_from_responder(&offer_a);
+    let (event, commands) = alice.on_data_received(
+        "peer",
+        BleLinkDirection::Inbound,
+        CHAR_HANDSHAKE_NOTIFY,
+        &ack,
+        0,
+    );
+    assert!(
+        matches!(event, BleMachineEvent::None),
+        "KeyAck on the stale direction must be ignored",
+    );
+    assert!(commands.is_empty(), "no commands from a stale-link frame");
+    assert!(
+        matches!(alice.phase(), BleMachinePhase::Handshaking),
+        "phase must not advance on a stale-direction KeyAck",
+    );
+
+    let (event, _commands) = alice.on_data_received(
+        "peer",
+        BleLinkDirection::Outbound,
+        CHAR_HANDSHAKE_NOTIFY,
+        &ack,
+        0,
+    );
+    assert!(
+        matches!(event, BleMachineEvent::TransferringStarted),
+        "KeyAck on the active direction must advance the handshake",
+    );
+}
+
 // A disconnect of a link the machine is NOT riding (the dropped glare
 // loser) must not kill the surviving handshake — that phantom-disconnect
 // was the reason direction/device_id addressing exists at all.

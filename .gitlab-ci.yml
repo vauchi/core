@@ -283,7 +283,11 @@ lint:clippy:
 # 2026-06-12-web-demo-core-lock-freeze). Deny warnings so cross-feature
 # dead code is caught here too.
 lint:no-default-features:
-  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  # .timeout-standard (not -quick): this checks the full dep tree under a
+  # DISTINCT feature set (--no-default-features), so it rarely hits the warm
+  # default-features cache and cold-builds like lint:clippy — which also uses
+  # -standard. -quick (10m) intermittently times out mid-dep-compile.
+  extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: lint
   needs: []
   script:

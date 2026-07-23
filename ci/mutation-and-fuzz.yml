@@ -135,7 +135,7 @@ fuzz:nightly:
   resource_group: fuzz-nightly
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $FUZZ_ENABLED == "true"
-  allow_failure: true
+  allow_failure: false
   script:
     - |
       # cargo-fuzz requires nightly for -Zsanitizer=address.
@@ -151,7 +151,8 @@ fuzz:nightly:
       FUZZ_DURATION="${FUZZ_DURATION_SECS:-300}"
       FUZZ_JOBS="${FUZZ_PARALLEL_JOBS:-4}"
       REPORT_DIR="../fuzz-report"
-      mkdir -p "$REPORT_DIR"
+      COVERAGE_REPORT_DIR="$REPORT_DIR/coverage"
+      mkdir -p "$COVERAGE_REPORT_DIR"
 
       TARGETS="fuzz_decode_message fuzz_qr_payload fuzz_unpad fuzz_delta_decode \
                fuzz_recovery_claim fuzz_nfc_payload fuzz_ble_payload \
@@ -199,9 +200,40 @@ fuzz:nightly:
       echo "  </testsuite>" >> "$REPORT_DIR/fuzz-junit.xml"
       echo "</testsuites>" >> "$REPORT_DIR/fuzz-junit.xml"
 
+      # Replay the accumulated corpus with source coverage instrumentation.
+      # Text summaries are kept small enough for long-term CI artifacts while
+      # the profdata files remain available for deeper local inspection.
+      COVERAGE_FAILED=0
+      TARGET_TRIPLE=$(rustc +nightly -vV | awk '/^host:/ { print $2 }')
+      NIGHTLY_SYSROOT=$(rustc +nightly --print sysroot)
+      LLVM_COV="$NIGHTLY_SYSROOT/lib/rustlib/$TARGET_TRIPLE/bin/llvm-cov"
+      for t in $TARGETS; do
+        echo "COVERAGE: ${t}"
+        if cargo +nightly fuzz coverage "$t"; then
+          COVERAGE_BINARY=$(find target -type f \
+            -path "*/coverage/*/release/${t}" | head -n 1)
+          COVERAGE_PROFILE="coverage/${t}/coverage.profdata"
+          if [ -z "$COVERAGE_BINARY" ]; then
+            echo "COVERAGE-BINARY-MISSING:${t}"
+            COVERAGE_FAILED=$((COVERAGE_FAILED + 1))
+          elif "$LLVM_COV" report "$COVERAGE_BINARY" \
+            --instr-profile="$COVERAGE_PROFILE" \
+            --ignore-filename-regex='(/.cargo/registry|/rustc/)' \
+            --summary-only > "$COVERAGE_REPORT_DIR/${t}.txt"; then
+            cat "$COVERAGE_REPORT_DIR/${t}.txt"
+          else
+            echo "COVERAGE-REPORT-FAILED:${t}"
+            COVERAGE_FAILED=$((COVERAGE_FAILED + 1))
+          fi
+        else
+          echo "COVERAGE-REPLAY-FAILED:${t}"
+          COVERAGE_FAILED=$((COVERAGE_FAILED + 1))
+        fi
+      done
+
       echo "=== Fuzz Summary ==="
-      echo "Targets: ${TARGET_COUNT}, Passed: $PASSED, Crashes: $FAILED"
-      [ "$FAILED" -eq 0 ] || exit 1
+      echo "Targets: ${TARGET_COUNT}, Passed: $PASSED, Crashes: $FAILED, Coverage failures: $COVERAGE_FAILED"
+      [ "$FAILED" -eq 0 ] && [ "$COVERAGE_FAILED" -eq 0 ]
   cache:
     key: fuzz-corpus-core
     paths:
@@ -211,6 +243,7 @@ fuzz:nightly:
     when: always
     paths:
       - vauchi-core/fuzz/artifacts/
+      - vauchi-core/fuzz/coverage/
       - vauchi-core/fuzz-report/
     reports:
       junit: vauchi-core/fuzz-report/fuzz-junit.xml

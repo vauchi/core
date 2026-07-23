@@ -27,6 +27,7 @@ vauchi-core/src/platform.rs exempt
 # Exchange protocol state machines — scattered transitions cause protocol bugs.
 vauchi-core/src/exchange/session.rs exempt
 vauchi-core/src/exchange/multistage/session.rs exempt
+vauchi-core/src/exchange/ble_handshake.rs exempt
 vauchi-app/src/ui/exchange/ble.rs exempt
 # Storage — migration ledger (version history co-located) + rekey flow.
 vauchi-core/src/storage/migration.rs exempt

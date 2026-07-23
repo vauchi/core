@@ -1558,6 +1558,11 @@
         },
         "visibility": {
           "$ref": "#/definitions/UiFieldVisibility"
+        },
+        "visibility_label": {
+          "description": "Core-resolved localized display copy for `visibility` (see [`visibility_label`]). Frontends render this verbatim; the `visibility` discriminant selects only native color.",
+          "default": "",
+          "type": "string"
         }
       }
     },

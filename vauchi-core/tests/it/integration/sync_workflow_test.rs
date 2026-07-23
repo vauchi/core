@@ -160,11 +160,10 @@ fn test_field_modification_and_removal_propagation() {
 
         assert!(!delta.is_empty());
         assert!(
-            delta
-                .changes
-                .iter()
-                .any(|c| matches!(c, FieldChange::Modified { .. })),
-            "Modifying a field value should produce a Modified delta"
+            delta.changes.iter().any(|change| {
+                matches!(change, FieldChange::Added { field } if field.id() == field_id)
+            }),
+            "modifying a field must preserve its complete timestamped value"
         );
     }
 

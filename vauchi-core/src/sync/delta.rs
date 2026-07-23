@@ -98,12 +98,15 @@ pub struct CardDelta {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub enum FieldChange {
-    /// A new field was added.
+    /// A complete field was added or upserted.
     ///
     /// INVARIANT: `field` must be the result of `ContactField::strip_private()`.
     /// Private annotations (e.g., `note`) must never appear in outbound deltas.
     Added { field: ContactField },
-    /// An existing field's value was modified.
+    /// A legacy value-only modification.
+    ///
+    /// New deltas use [`FieldChange::Added`] upserts so the sender's logical
+    /// field clock survives delayed delivery.
     Modified { field_id: String, new_value: String },
     /// A field was removed.
     Removed { field_id: String },
@@ -142,9 +145,8 @@ impl CardDelta {
             match new_fields.get(id) {
                 Some(new_field) => {
                     if old_field.value() != new_field.value() {
-                        changes.push(FieldChange::Modified {
-                            field_id: id.to_string(),
-                            new_value: new_field.value().to_string(),
+                        changes.push(FieldChange::Added {
+                            field: new_field.strip_private(),
                         });
                     }
                 }

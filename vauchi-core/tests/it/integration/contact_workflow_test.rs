@@ -123,13 +123,9 @@ fn test_card_delta_workflow() {
             .any(|c| matches!(c, FieldChange::DisplayNameChanged { .. }))
     );
 
-    // Email modified (same field ID, different value)
-    assert!(
-        delta
-            .changes
-            .iter()
-            .any(|c| matches!(c, FieldChange::Modified { .. }))
-    );
+    assert!(delta.changes.iter().any(|change| {
+        matches!(change, FieldChange::Added { field } if field.id() == email_field_id)
+    }));
 
     assert!(
         delta

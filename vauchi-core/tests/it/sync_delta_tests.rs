@@ -613,13 +613,13 @@ fn test_filter_with_allows_matching_fields() {
     let work_changes: Vec<_> = filtered
         .changes
         .iter()
-        .filter(|c| matches!(c, FieldChange::Modified { field_id, .. } if field_id == &work_id))
+        .filter(|change| matches!(change, FieldChange::Added { field } if field.id() == work_id))
         .collect();
 
     let mobile_changes: Vec<_> = filtered
         .changes
         .iter()
-        .filter(|c| matches!(c, FieldChange::Modified { field_id, .. } if field_id == &mobile_id))
+        .filter(|change| matches!(change, FieldChange::Added { field } if field.id() == mobile_id))
         .collect();
 
     assert!(

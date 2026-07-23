@@ -466,6 +466,139 @@ fn glare_larger_identity_yields_to_responder_smaller_stays_initiator() {
     );
 }
 
+// Glare hardening (design §synthesized final): the yielding side holds TWO
+// links — its own outbound (it dialed) and the inbound the peer's KeyOffer
+// arrived on. Yielding must (a) ride the inbound link from then on and (b)
+// drop the losing outbound link with a targeted BleDisconnect — leaving it
+// idle leaks a half-open link the peer writes into until supervision
+// timeout (design rejection F).
+// @internal
+#[test]
+fn glare_yield_drops_the_losing_outbound_link_and_rides_inbound() {
+    let mut alice = fresh_initiator(); // identity [1;32] — smaller
+    let mut bob = fresh_peer_initiator(); // identity [3;32] — larger
+    let offer_a = key_offer_on(&mut alice, "a-out");
+    let _offer_b = key_offer_on(&mut bob, "b-out");
+
+    // Bob (larger) receives Alice's KeyOffer on his INBOUND link.
+    let (_eb, cmds_b) = bob.on_data_received("b-in", CHAR_HANDSHAKE_WRITE, &offer_a, 0);
+    assert_eq!(bob.role(), BleRole::Responder, "larger identity yields");
+    assert!(
+        cmds_b.iter().any(|c| matches!(
+            c,
+            Command::BleDisconnect { device_id, direction }
+                if device_id == "b-out" && *direction == BleLinkDirection::Outbound
+        )),
+        "yielding must drop the losing outbound link with a targeted \
+         disconnect: {cmds_b:?}",
+    );
+    assert!(
+        cmds_b.iter().any(|c| matches!(
+            c,
+            Command::BleWriteCharacteristic { device_id, uuid, .. }
+                if uuid == CHAR_HANDSHAKE_NOTIFY && device_id == "b-in"
+        )),
+        "the KeyAck must ride the surviving inbound link: {cmds_b:?}",
+    );
+}
+
+// After glare where this side STAYS initiator (smaller identity), events
+// arriving on the losing inbound link are stale — feeding them into the
+// surviving session would corrupt it (design: reject stale-device_id
+// events).
+// @internal
+#[test]
+fn stale_link_data_is_rejected_after_glare_stay() {
+    let mut alice = fresh_initiator(); // smaller — stays initiator
+    let mut bob = fresh_peer_initiator();
+    let offer_a = key_offer_on(&mut alice, "a-out");
+    let offer_b = key_offer_on(&mut bob, "b-out");
+
+    let (_ea, _cmds) = alice.on_data_received("a-in", CHAR_HANDSHAKE_WRITE, &offer_b, 0);
+    assert_eq!(alice.role(), BleRole::Initiator, "smaller identity stays");
+
+    // A (valid-shaped) KeyAck arriving on the stale inbound link must be
+    // ignored — not buffered, not a phase flip.
+    let ack = key_ack_from_responder(&offer_a);
+    let (event, cmds) = alice.on_data_received("a-in", CHAR_HANDSHAKE_NOTIFY, &ack, 0);
+    assert!(
+        matches!(event, BleMachineEvent::None),
+        "KeyAck on the stale link must be ignored",
+    );
+    assert!(cmds.is_empty(), "no commands from a stale-link frame");
+    assert!(
+        matches!(alice.phase(), BleMachinePhase::Handshaking),
+        "phase must not advance on a stale-link KeyAck",
+    );
+
+    // The same KeyAck on the ACTIVE link processes normally.
+    let (event, _cmds) = alice.on_data_received("a-out", CHAR_HANDSHAKE_NOTIFY, &ack, 0);
+    assert!(
+        matches!(event, BleMachineEvent::TransferringStarted),
+        "KeyAck on the active link must advance the handshake",
+    );
+}
+
+// A disconnect of a link the machine is NOT riding (the dropped glare
+// loser) must not kill the surviving handshake — that phantom-disconnect
+// was the reason direction/device_id addressing exists at all.
+// @internal
+#[test]
+fn disconnect_of_non_active_link_does_not_fail_the_machine() {
+    let mut m = fresh_initiator();
+    let _offer = key_offer_on(&mut m, "out-1");
+
+    let (event, cmds) = m.on_disconnected("in-1", BleLinkDirection::Inbound, "glare loser dropped");
+    assert!(
+        matches!(event, BleMachineEvent::None),
+        "non-active-link disconnect must be a no-op",
+    );
+    assert!(cmds.is_empty());
+    assert!(
+        !m.is_terminal(),
+        "machine must survive the losing link's disconnect",
+    );
+
+    // The ACTIVE link's disconnect still fails the machine, as does a
+    // legacy un-addressed one (empty device_id = wildcard).
+    let (event, _cmds) = m.on_disconnected("out-1", BleLinkDirection::Outbound, "gone");
+    assert!(
+        matches!(event, BleMachineEvent::Failed { .. }),
+        "active-link disconnect must fail the machine",
+    );
+}
+
+// Legacy/un-addressed disconnects (empty device_id) keep the old
+// fail-the-machine behavior — shells that cannot name the link yet must
+// not have their failure reports silently dropped.
+// @internal
+#[test]
+fn unaddressed_disconnect_still_fails_the_machine() {
+    let mut m = fresh_initiator();
+    let _offer = key_offer_on(&mut m, "out-1");
+    let (event, _cmds) = m.on_disconnected("", BleLinkDirection::Outbound, "legacy");
+    assert!(
+        matches!(event, BleMachineEvent::Failed { .. }),
+        "un-addressed disconnect is a wildcard and must still fail",
+    );
+}
+
+/// Drive `m` to emit its KeyOffer over an outbound link named `link`,
+/// returning the offer bytes.
+fn key_offer_on(m: &mut BleHandshakeMachine, link: &str) -> Vec<u8> {
+    let (_event, cmds) = m.on_connected(link, BleLinkDirection::Outbound, 0);
+    cmds.into_iter()
+        .find_map(|cmd| match cmd {
+            Command::BleWriteCharacteristic { uuid, data, .. }
+                if uuid.as_str() == CHAR_HANDSHAKE_WRITE =>
+            {
+                Some(data)
+            }
+            _ => None,
+        })
+        .expect("initiator emits a KeyOffer on connect")
+}
+
 /// The 153-byte KeyAck a real responder emits on the handshake-notify
 /// characteristic after processing `offer`.
 fn key_ack_from_responder(offer: &[u8]) -> Vec<u8> {

@@ -57,7 +57,7 @@ use vauchi_core::crypto::X3DHKeyPair;
 use vauchi_core::exchange::{
     BLE_CHUNK_OVERHEAD, BLE_DEFAULT_USABLE, BleCardPayload, BleChunker, BleExchangeResult,
     BleHandshakeSession, BleHandshakeState, BleReassembler, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE,
-    CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE, KEY_ACK_SIZE,
+    CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE, KEY_ACK_SIZE, KEY_OFFER_SIZE,
 };
 use vauchi_core::platform::BleLinkDirection;
 
@@ -446,10 +446,31 @@ impl BleHandshakeMachine {
     // ── Internal handlers ──────────────────────────────────────────
 
     fn handle_handshake_write(&mut self, data: &[u8], now: u64) -> (BleMachineEvent, Vec<Command>) {
-        // Initiators never receive on the handshake-write
-        // characteristic in the documented protocol; ignore.
         if self.role == BleRole::Initiator {
-            return (BleMachineEvent::None, Vec::new());
+            // Glare (symmetric BLE discovery, device-confirmed): we initiated
+            // AND the peer initiated, so we — an initiator that already sent its
+            // KeyOffer — received the peer's KeyOffer here. A deterministic
+            // tiebreak on the Ed25519 identity keys resolves it: the peer whose
+            // identity is LARGER yields to responder and processes this offer;
+            // the smaller stays initiator and ignores it. Both sides read the
+            // same two keys (ours + the peer's, at bytes 1..33 of the offer), so
+            // exactly one yields. Without this, both ignore each other's KeyOffer,
+            // neither sends a KeyAck, and the exchange stalls
+            // (`2026-07-22-role-tiebreak-and-glare-design.md`).
+            let glare_offer = data.len() >= KEY_OFFER_SIZE
+                && matches!(self.inner.state(), BleHandshakeState::KeyOfferSent { .. });
+            if !glare_offer {
+                return (BleMachineEvent::None, Vec::new());
+            }
+            let peer_identity = &data[1..33];
+            if self.inner.our_identity_key().as_slice() <= peer_identity {
+                // Smaller identity → stay initiator; the peer will yield.
+                return (BleMachineEvent::None, Vec::new());
+            }
+            // Larger identity → yield: rewind to a fresh Idle responder session
+            // and fall through to process the peer's KeyOffer below.
+            self.inner.reset(now);
+            self.role = BleRole::Responder;
         }
         match self.inner.state() {
             BleHandshakeState::Idle => {

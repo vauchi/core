@@ -408,6 +408,64 @@ fn fresh_peer_responder() -> BleHandshakeMachine {
     BleHandshakeMachine::new_responder(identity_key, x3dh, card, 0, None)
 }
 
+/// A peer initiator with an identity ([3;32]) larger than `fixture_card`'s
+/// ([1;32]) — for the glare tiebreak.
+fn fresh_peer_initiator() -> BleHandshakeMachine {
+    let identity_key = [3u8; 32];
+    let x3dh = X3DHKeyPair::from_bytes([4u8; 32]);
+    let card = BleCardPayload::new(
+        identity_key,
+        "Bob".into(),
+        *x3dh.public_key(),
+        vec![("email".into(), "bob@example.test".into())],
+        None,
+    );
+    BleHandshakeMachine::new_initiator(identity_key, x3dh, card, 0, None)
+}
+
+// @internal
+// Symmetric-discovery glare (device-confirmed): both peers initiated, so each
+// receives the other's KeyOffer on CHAR_HANDSHAKE_WRITE while already an
+// initiator. The identity-key tiebreak must make the LARGER yield to responder
+// (and emit a KeyAck) and the SMALLER stay initiator (ignore) — otherwise both
+// ignore and the exchange stalls.
+#[test]
+fn glare_larger_identity_yields_to_responder_smaller_stays_initiator() {
+    let mut alice = fresh_initiator(); // identity [1;32] — smaller
+    let mut bob = fresh_peer_initiator(); // identity [3;32] — larger
+    let offer_a = key_offer(&mut alice);
+    let offer_b = key_offer(&mut bob);
+    assert_eq!(alice.role(), BleRole::Initiator);
+    assert_eq!(bob.role(), BleRole::Initiator);
+
+    // Smaller identity receives the peer's KeyOffer → stays initiator, ignores.
+    let (_ea, cmds_a) = alice.on_data_received(CHAR_HANDSHAKE_WRITE, &offer_b, 0);
+    assert_eq!(
+        alice.role(),
+        BleRole::Initiator,
+        "smaller identity must stay initiator",
+    );
+    assert!(
+        cmds_a.is_empty(),
+        "smaller identity ignores the peer's KeyOffer, emits nothing: {cmds_a:?}",
+    );
+
+    // Larger identity receives the peer's KeyOffer → yields to responder + KeyAck.
+    let (_eb, cmds_b) = bob.on_data_received(CHAR_HANDSHAKE_WRITE, &offer_a, 0);
+    assert_eq!(
+        bob.role(),
+        BleRole::Responder,
+        "larger identity must yield to responder",
+    );
+    assert!(
+        cmds_b.iter().any(|c| matches!(
+            c,
+            Command::BleWriteCharacteristic { uuid, .. } if uuid == CHAR_HANDSHAKE_NOTIFY
+        )),
+        "yielded responder emits a KeyAck on the handshake-notify char: {cmds_b:?}",
+    );
+}
+
 /// The 153-byte KeyAck a real responder emits on the handshake-notify
 /// characteristic after processing `offer`.
 fn key_ack_from_responder(offer: &[u8]) -> Vec<u8> {

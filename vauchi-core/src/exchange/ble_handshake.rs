@@ -89,7 +89,7 @@ const NONCE_SIZE: usize = 16;
 // when the session was not OOB-bootstrapped (no QR scan / NFC tap).
 // This is the EXACT minimum: the `< KEY_OFFER_SIZE` ingress guard makes
 // the fixed `[121..137]` echo slice safe — keep guard and slice in sync.
-const KEY_OFFER_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 8 + NONCE_SIZE;
+pub const KEY_OFFER_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 8 + NONCE_SIZE;
 
 /// KeyAck wire size (v3): version(1) + identity(32) + exchange(32) +
 /// ephemeral(32) + nonce(16) + commitment(32) + sender_timestamp(8).
@@ -447,6 +447,39 @@ impl BleHandshakeSession {
         self.state = BleHandshakeState::KeyOfferSent { exchange_id };
 
         Ok(offer)
+    }
+
+    /// Our Ed25519 identity signing key — the first 32 bytes (after the version
+    /// byte) of every KeyOffer we send. Used by glare resolution to compare
+    /// against the peer's identity in a received KeyOffer.
+    pub fn our_identity_key(&self) -> &[u8; 32] {
+        &self.our_identity_key
+    }
+
+    /// Rewind to a fresh `Idle` session, regenerating the ephemeral X3DH keypair
+    /// and nonce, while keeping our identity, card, and OOB bindings. Used for
+    /// glare resolution: an initiator that has already sent its KeyOffer
+    /// (`KeyOfferSent`) and then loses the identity-key tiebreak yields to
+    /// responder, and must reset to `Idle` so `process_key_offer` accepts the
+    /// peer's offer. The stale ephemeral is dropped (zeroized); the KeyOffer we
+    /// sent is ignored by the peer (which stays initiator).
+    pub fn reset(&mut self, now: u64) {
+        self.state = BleHandshakeState::Idle;
+        self.our_x3dh = X3DHKeyPair::generate();
+        self.our_nonce = crate::crypto::random_bytes();
+        self.our_timestamp = now;
+        self.their_timestamp = None;
+        self.session_key = None;
+        self.their_card = None;
+        self.their_identity_key = None;
+        self.our_confirmation_token = None;
+        self.expected_their_token = None;
+        self.our_encrypted_card = None;
+        self.our_commitment = None;
+        self.their_commitment = None;
+        self.their_encrypted_card = None;
+        // Kept: our_identity_key/x3dh/exchange_key/card, completed_cache, and the
+        // OOB pins (expected_peer/exchange_key, oob_nonce, required_oob_nonce).
     }
 
     /// Phase 2 (Responder): Process a KeyOffer, derive session key, return KeyAck + encrypted card.

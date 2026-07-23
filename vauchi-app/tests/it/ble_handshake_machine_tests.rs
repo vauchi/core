@@ -93,12 +93,12 @@ fn initiator_on_connected_emits_key_offer_on_handshake_write() {
     assert_eq!(m.phase(), BleMachinePhase::Handshaking);
 }
 
-// @internal
 // F0 fix: the physical link direction — not the token tiebreak — decides the
 // role. A device the token labelled responder that ends up dialing out (its
 // backoff fallback fired under asymmetric discovery) is reconciled to initiator
 // and MUST send the KeyOffer, otherwise it waits forever and the exchange
 // deadlocks (`2026-07-22-role-tiebreak-and-glare-design.md`).
+// @internal
 #[test]
 fn responder_token_dialing_out_becomes_initiator_and_offers() {
     let mut m = fresh_responder();
@@ -125,11 +125,11 @@ fn responder_token_dialing_out_becomes_initiator_and_offers() {
     assert_eq!(m.phase(), BleMachinePhase::Handshaking);
 }
 
-// @internal
 // F0 fix (mirror): a device the token labelled initiator that is instead
 // connected TO (inbound peripheral link) reconciles to responder and waits for
 // the peer's KeyOffer — it must NOT dial its own KeyOffer over a link it never
 // opened (the "No connected device" misroute).
+// @internal
 #[test]
 fn initiator_token_connected_to_becomes_responder() {
     let mut m = fresh_initiator();
@@ -423,12 +423,12 @@ fn fresh_peer_initiator() -> BleHandshakeMachine {
     BleHandshakeMachine::new_initiator(identity_key, x3dh, card, 0, None)
 }
 
-// @internal
 // Symmetric-discovery glare (device-confirmed): both peers initiated, so each
 // receives the other's KeyOffer on CHAR_HANDSHAKE_WRITE while already an
 // initiator. The identity-key tiebreak must make the LARGER yield to responder
 // (and emit a KeyAck) and the SMALLER stay initiator (ignore) — otherwise both
 // ignore and the exchange stalls.
+// @internal
 #[test]
 fn glare_larger_identity_yields_to_responder_smaller_stays_initiator() {
     let mut alice = fresh_initiator(); // identity [1;32] — smaller

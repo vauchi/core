@@ -141,6 +141,43 @@ fn ble_disconnect_forwarded_through_app_engine_renders_failed() {
     );
 }
 
+// The yielding side's targeted glare teardown produces a BleDisconnected
+// for the losing link. While the handshake machine rides a DIFFERENT
+// link, that disconnect is cleanup, not a failure — the exchange screen
+// must survive it. The surviving link's disconnect still fails.
+// @internal
+#[test]
+fn losing_glare_link_disconnect_does_not_fail_the_exchange() {
+    let mut engine = enter_ble_mode("mode:magic");
+    engine.start_ble_handshake_as_responder();
+    let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
+        device_id: "survivor".into(),
+        direction: vauchi_core::BleLinkDirection::Inbound,
+    });
+
+    let _ = engine.handle_hardware_event(Event::BleDisconnected {
+        device_id: "loser".into(),
+        direction: vauchi_core::BleLinkDirection::Outbound,
+        reason: "glare loser dropped".into(),
+    });
+    assert_ne!(
+        engine.current_screen().screen_id,
+        "exchange_failed",
+        "the losing link's teardown must not fail the exchange",
+    );
+
+    let _ = engine.handle_hardware_event(Event::BleDisconnected {
+        device_id: "survivor".into(),
+        direction: vauchi_core::BleLinkDirection::Inbound,
+        reason: "peer gone".into(),
+    });
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_failed",
+        "the surviving link's disconnect is a real failure",
+    );
+}
+
 // @internal
 #[test]
 fn ble_permission_denied_mid_wait_renders_failed_screen() {

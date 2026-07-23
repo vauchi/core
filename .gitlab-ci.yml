@@ -89,6 +89,18 @@ include:
 variables:
   VAUCHI_SCRIPTS_REF: "d6fb250c9eac465a9328bea36153677917774173"
 
+# Ceiling for jobs that compile the full dependency tree. A fresh or
+# reinstalled shell runner has zero per-job caches, so ALL of these jobs
+# cold-build the whole tree concurrently and CPU contention multiplies
+# their solo durations: measured 57-60m+ under 3-way contention
+# (pipelines 2699547003 / 2699666347, runner allyson post-reinstall) vs
+# ~25m solo. One green run per job uploads its cache and returns it to
+# minutes, so 2h only ever bites during a cold-start herd — warm runs
+# are unaffected. The template .timeout-extended is 45m (SHORTER than
+# .timeout-long), hence this local tier.
+.timeout-cold-rebuild:
+  timeout: 2 hours
+
 # Cosign pinned version + checksum (used by update:swift-bindings and publish:maven)
 # Single source of truth for cosign binary integrity — update BOTH values together.
 .cosign-install:
@@ -271,11 +283,9 @@ lint:format:
   needs: []
 
 lint:clippy:
-  # .timeout-long (not -standard): checks --all-targets across the full dep
-  # tree, so a runner with a cold local cache rebuilds everything from
-  # scratch — measured >30m on a fresh runner (pipeline 2699352640, job
-  # terminated mid-dep-compile at 30m). Warm-cache runs stay well under.
-  extends: [.linux-runner, .lint-clippy, .validation-rust, .timeout-long]
+  # .timeout-cold-rebuild: checks --all-targets across the full dep tree —
+  # see the template comment for the cold-runner evidence.
+  extends: [.linux-runner, .lint-clippy, .validation-rust, .timeout-cold-rebuild]
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
@@ -287,13 +297,10 @@ lint:clippy:
 # 2026-06-12-web-demo-core-lock-freeze). Deny warnings so cross-feature
 # dead code is caught here too.
 lint:no-default-features:
-  # .timeout-long (not -standard/-quick): this checks the full dep tree under
-  # a DISTINCT feature set (--no-default-features), so it rarely hits the warm
-  # default-features cache and cold-builds like lint:clippy/lint:semver. On a
-  # cold-cache runner all three dep-tree jobs build concurrently and compete
-  # for CPU — this job hit 30m exactly in pipeline 2699444281 (25m when it ran
-  # with less contention). 1h matches the other two.
-  extends: [.linux-runner, .validation-rust, .timeout-long]
+  # .timeout-cold-rebuild: checks the full dep tree under a DISTINCT feature
+  # set (--no-default-features), so it rarely hits the warm default-features
+  # cache — see the template comment.
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
   stage: lint
   needs: []
   script:
@@ -304,10 +311,10 @@ lint:no-default-features:
 # Advisory while pre-1.0 (no deployed clients, SP-33 allows intentional breaks).
 # Flip to allow_failure: false when version reaches 1.0.0.
 lint:semver:
-  # .timeout-long (not -standard): semver-checks rustdoc-builds BOTH the
-  # current and baseline crate graphs — on a cold-cache runner that exceeds
-  # 30m (hit alongside lint:clippy in pipeline 2699352640).
-  extends: [.linux-runner, .validation-rust, .timeout-long]
+  # .timeout-cold-rebuild: semver-checks rustdoc-builds BOTH the current and
+  # baseline crate graphs — the heaviest cold build here (60m timeout hit in
+  # pipeline 2699666347). See the template comment.
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
   stage: lint
   needs: []
   allow_failure: true
@@ -340,8 +347,8 @@ lint:machete:
 
 # CABI header freshness — catch stale headers after export changes (T0-11)
 lint:cabi-header:
-  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
-  extends: [.linux-runner, .validation-rust, .timeout-long]
+  # .timeout-cold-rebuild: see the template comment.
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
   stage: lint
   needs: []
   script:
@@ -466,8 +473,8 @@ metric:audit-mobile-surface:
 # Cucumber tests use cargo test (not nextest) because harness=false output
 # is incompatible with nextest's test listing format.
 test:core:
-  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
-  extends: [.linux-runner, .validation-rust, .timeout-long]
+  # .timeout-cold-rebuild: see the template comment.
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: lint:format
@@ -487,10 +494,9 @@ test:core:
     expire_in: 1 week
 
 test:cucumber:
-  # .timeout-long: compiles the full workspace before running cucumber; a
-  # cold-cache runner with concurrent dep-tree jobs needs the same headroom
-  # as lint:clippy (see comment there).
-  extends: [.linux-runner, .validation-rust, .timeout-long]
+  # .timeout-cold-rebuild: compiles the full workspace before running
+  # cucumber — see the template comment.
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
   stage: test
   allow_failure: false
   needs:
@@ -518,8 +524,8 @@ test:cucumber:
     - cargo test --test cucumber_tests --features testing,test-kdf -- --tags "not @wip and not @ui"
 
 test:platform:
-  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
-  extends: [.linux-runner, .validation-platform, .timeout-long]
+  # .timeout-cold-rebuild: see the template comment.
+  extends: [.linux-runner, .validation-platform, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: lint:format
@@ -547,8 +553,8 @@ test:platform:
 # its `required-features = ["test-support"]` filter rejects
 # default-feature builds; it runs in `test:reachability` below.
 test:app:
-  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
-  extends: [.linux-runner, .validation-rust, .timeout-long]
+  # .timeout-cold-rebuild: see the template comment.
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: lint:format
@@ -575,8 +581,8 @@ test:app:
 # their own binding builds. The vauchi-platform leg is compile-coverage
 # for the feature on a non-mobile target.
 test:dev-logging:
-  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
-  extends: [.linux-runner, .validation-rust, .timeout-long]
+  # .timeout-cold-rebuild: see the template comment.
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: lint:format
@@ -601,8 +607,8 @@ test:dev-logging:
 #   _private/docs/planning/todo/2026-04-20-frontend-correctness-strategy-plan.md
 #   Phase 1 Task 1.4.
 test:reachability:
-  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
-  extends: [.linux-runner, .validation-rust, .timeout-long]
+  # .timeout-cold-rebuild: see the template comment.
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: lint:format
@@ -624,8 +630,8 @@ test:reachability:
 # Schema contract validation — detect drift between core UI types and
 # generated JSON schemas. Runs when UI type definitions change.
 validate:schema:
-  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
-  extends: [.linux-runner, .timeout-long]
+  # .timeout-cold-rebuild: see the template comment.
+  extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: lint:format
@@ -648,8 +654,8 @@ validate:schema:
 # (linux-qt, windows). Core CI doesn't enable it by default, so trait
 # imports and API compatibility can break undetected (F1, 2026-03-20).
 validate:secure-storage:
-  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
-  extends: [.linux-runner, .timeout-long]
+  # .timeout-cold-rebuild: see the template comment.
+  extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: lint:format
@@ -704,8 +710,8 @@ validate:wasm-compat:
 # Content contract validation — detect drift between core parsers and
 # sibling content repos (themes/, locales/). Runs when parser code changes.
 validate:content-contracts:
-  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
-  extends: [.linux-runner, .timeout-long]
+  # .timeout-cold-rebuild: see the template comment.
+  extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: lint:format

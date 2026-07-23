@@ -897,3 +897,119 @@ fn card_before_key_ack_reorder_should_be_quarantined_not_terminal() {
         "the commitment write must be emitted after the reordered pair completes"
     );
 }
+
+// @scenario: contact_exchange :: Exchange completes over BLE
+// @internal
+#[test]
+fn card_before_commitment_reorder_should_be_quarantined_not_terminal() {
+    let mut initiator = fresh_initiator();
+    let mut responder = fresh_peer_responder();
+    initiator.update_mtu(23);
+    responder.update_mtu(23);
+
+    let offer = key_offer(&mut initiator);
+    let (_event, phase2) = responder.on_data_received(
+        "peer-1",
+        BleLinkDirection::Inbound,
+        CHAR_HANDSHAKE_WRITE,
+        &offer,
+        0,
+    );
+    let ack = phase2
+        .iter()
+        .find_map(|cmd| match cmd {
+            Command::BleWriteCharacteristic { uuid, data, .. }
+                if uuid.as_str() == CHAR_HANDSHAKE_NOTIFY =>
+            {
+                Some(data.clone())
+            }
+            _ => None,
+        })
+        .expect("responder emits a KeyAck");
+    let responder_card = phase2.into_iter().filter_map(|cmd| match cmd {
+        Command::BleWriteCharacteristic { uuid, data, .. } if uuid.as_str() == CHAR_DATA_NOTIFY => {
+            Some(data)
+        }
+        _ => None,
+    });
+
+    initiator.on_data_received(
+        "peer-1",
+        BleLinkDirection::Outbound,
+        CHAR_HANDSHAKE_NOTIFY,
+        &ack,
+        0,
+    );
+    let mut phase3 = Vec::new();
+    for chunk in responder_card {
+        let (_event, cmds) = initiator.on_data_received(
+            "peer-1",
+            BleLinkDirection::Outbound,
+            CHAR_DATA_NOTIFY,
+            &chunk,
+            0,
+        );
+        phase3.extend(cmds);
+    }
+    let commitment = phase3
+        .iter()
+        .find_map(|cmd| match cmd {
+            Command::BleWriteCharacteristic { uuid, data, .. }
+                if uuid.as_str() == CHAR_HANDSHAKE_WRITE =>
+            {
+                Some(data.clone())
+            }
+            _ => None,
+        })
+        .expect("initiator emits a commitment");
+    let initiator_card: Vec<_> = phase3
+        .into_iter()
+        .filter_map(|cmd| match cmd {
+            Command::BleWriteCharacteristic { uuid, data, .. }
+                if uuid.as_str() == CHAR_DATA_WRITE =>
+            {
+                Some(data)
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(
+        initiator_card.len() > 1,
+        "premise: the encrypted card spans multiple chunks"
+    );
+
+    for chunk in initiator_card {
+        let (_event, cmds) = responder.on_data_received(
+            "peer-1",
+            BleLinkDirection::Inbound,
+            CHAR_DATA_WRITE,
+            &chunk,
+            0,
+        );
+        assert!(
+            !matches!(responder.phase(), BleMachinePhase::Failed { .. }),
+            "card-before-commitment must be quarantined, not terminal"
+        );
+        assert!(cmds.is_empty(), "no commands while the card is quarantined");
+    }
+
+    let (event, cmds) = responder.on_data_received(
+        "peer-1",
+        BleLinkDirection::Inbound,
+        CHAR_HANDSHAKE_WRITE,
+        &commitment,
+        0,
+    );
+    assert!(
+        matches!(event, BleMachineEvent::Completed(_)),
+        "the late commitment must unlock responder completion"
+    );
+    assert!(
+        cmds.iter().any(|cmd| matches!(
+            cmd,
+            Command::BleWriteCharacteristic { uuid, .. }
+                if uuid.as_str() == CHAR_HANDSHAKE_NOTIFY
+        )),
+        "responder must emit its reveal after the reordered pair completes"
+    );
+}

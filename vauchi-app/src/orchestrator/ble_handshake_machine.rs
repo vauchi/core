@@ -198,6 +198,11 @@ pub struct BleHandshakeMachine {
     /// - Responder post-commitment: holds the commitment bytes while
     ///   we reassemble the initiator's encrypted card.
     pending_intermediate: Option<Vec<u8>>,
+    /// A fully reassembled encrypted card that arrived before its
+    /// cross-characteristic KeyAck/commitment. GATT preserves order within one
+    /// characteristic, not across characteristics, so either half may arrive
+    /// first. The reassembler's total-size bound also bounds this quarantine.
+    pending_encrypted_card: Option<Vec<u8>>,
     /// Usable payload bytes per BLE chunk. Updated by
     /// [`Self::update_mtu`]; defaults to [`BLE_DEFAULT_USABLE`] when
     /// no negotiation has happened.
@@ -239,6 +244,7 @@ impl BleHandshakeMachine {
             role: BleRole::Initiator,
             reassembler: None,
             pending_intermediate: None,
+            pending_encrypted_card: None,
             mtu_usable: BLE_DEFAULT_USABLE,
             phase: BleMachinePhase::Preparing,
             cancelled: false,
@@ -267,6 +273,7 @@ impl BleHandshakeMachine {
             role: BleRole::Responder,
             reassembler: None,
             pending_intermediate: None,
+            pending_encrypted_card: None,
             mtu_usable: BLE_DEFAULT_USABLE,
             phase: BleMachinePhase::Preparing,
             cancelled: false,
@@ -478,7 +485,7 @@ impl BleHandshakeMachine {
         }
         match uuid {
             CHAR_HANDSHAKE_WRITE => self.handle_handshake_write(device_id, direction, data, now),
-            CHAR_HANDSHAKE_NOTIFY => self.handle_handshake_notify(data),
+            CHAR_HANDSHAKE_NOTIFY => self.handle_handshake_notify(data, now),
             CHAR_DATA_WRITE | CHAR_DATA_NOTIFY => self.handle_data_chunk(data, now),
             _ => (BleMachineEvent::None, Vec::new()),
         }
@@ -588,6 +595,9 @@ impl BleHandshakeMachine {
                 self.link_device = Some(link.to_string());
                 self.link_direction = Some(direction);
             }
+            self.reassembler = None;
+            self.pending_intermediate = None;
+            self.pending_encrypted_card = None;
             self.inner.reset(now);
             self.role = BleRole::Responder;
         }
@@ -619,8 +629,14 @@ impl BleHandshakeMachine {
                 // Stash the commitment; the chunks arrive separately.
                 if data.len() >= 32 {
                     self.pending_intermediate = Some(data[..32].to_vec());
+                    if let Some(card) = self.pending_encrypted_card.take() {
+                        self.on_remote_encrypted_card_received(&card, now)
+                    } else {
+                        (BleMachineEvent::None, Vec::new())
+                    }
+                } else {
+                    (BleMachineEvent::None, Vec::new())
                 }
-                (BleMachineEvent::None, Vec::new())
             }
         };
         if pre_cmds.is_empty() {
@@ -631,7 +647,11 @@ impl BleHandshakeMachine {
         }
     }
 
-    fn handle_handshake_notify(&mut self, data: &[u8]) -> (BleMachineEvent, Vec<Command>) {
+    fn handle_handshake_notify(
+        &mut self,
+        data: &[u8],
+        now: u64,
+    ) -> (BleMachineEvent, Vec<Command>) {
         match (self.role, self.inner.state()) {
             (BleRole::Initiator, BleHandshakeState::KeyOfferSent { .. }) => {
                 // Phase 2 initiator ingress: KeyAck. A wire KeyAck is exactly
@@ -646,8 +666,12 @@ impl BleHandshakeMachine {
                 // Stash for process_key_ack once chunks complete; flip to
                 // Transferring chrome.
                 self.pending_intermediate = Some(data.to_vec());
-                self.phase = BleMachinePhase::Transferring;
-                (BleMachineEvent::TransferringStarted, Vec::new())
+                if let Some(card) = self.pending_encrypted_card.take() {
+                    self.on_remote_encrypted_card_received(&card, now)
+                } else {
+                    self.phase = BleMachinePhase::Transferring;
+                    (BleMachineEvent::TransferringStarted, Vec::new())
+                }
             }
             (BleRole::Initiator, BleHandshakeState::PayloadsExchanged { .. })
             | (BleRole::Responder, BleHandshakeState::PayloadsExchanged { .. }) => {
@@ -687,6 +711,15 @@ impl BleHandshakeMachine {
         // data write; we may reassemble peer's reveal-time payload
         // in a future protocol extension).
         self.reassembler = None;
+        if self.pending_intermediate.is_none() {
+            // Cross-characteristic ordering is unspecified by GATT. Keep the
+            // first complete bounded card until its KeyAck/commitment arrives;
+            // a duplicate complete payload cannot displace it.
+            if self.pending_encrypted_card.is_none() {
+                self.pending_encrypted_card = Some(assembled);
+            }
+            return (BleMachineEvent::None, Vec::new());
+        }
         self.on_remote_encrypted_card_received(&assembled, now)
     }
 

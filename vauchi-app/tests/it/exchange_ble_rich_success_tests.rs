@@ -103,14 +103,14 @@ fn ble_completion_renders_rich_success_summary() {
         let mut routed = 0;
         for cmd in alice.drain_pending_commands() {
             if let vauchi_core::Command::BleWriteCharacteristic {
-                device_id,
+                device_id: _,
                 uuid,
                 data,
             } = cmd
             {
                 routed += 1;
                 let ev = bob.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
-                    device_id,
+                    device_id: String::new(),
                     uuid,
                     data,
                 });
@@ -119,14 +119,14 @@ fn ble_completion_renders_rich_success_summary() {
         }
         for cmd in bob.drain_pending_commands() {
             if let vauchi_core::Command::BleWriteCharacteristic {
-                device_id,
+                device_id: _,
                 uuid,
                 data,
             } = cmd
             {
                 routed += 1;
                 let ev = alice.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
-                    device_id,
+                    device_id: String::new(),
                     uuid,
                     data,
                 });

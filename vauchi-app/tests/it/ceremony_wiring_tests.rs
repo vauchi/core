@@ -69,14 +69,14 @@ fn ble_success_celebrates_exactly_once_per_side() {
                 alice_celebrates += 1;
             }
             if let vauchi_core::Command::BleWriteCharacteristic {
-                device_id,
+                device_id: _,
                 uuid,
                 data,
             } = cmd
             {
                 routed += 1;
                 let ev = bob.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
-                    device_id,
+                    device_id: String::new(),
                     uuid,
                     data,
                 });
@@ -88,14 +88,14 @@ fn ble_success_celebrates_exactly_once_per_side() {
                 bob_celebrates += 1;
             }
             if let vauchi_core::Command::BleWriteCharacteristic {
-                device_id,
+                device_id: _,
                 uuid,
                 data,
             } = cmd
             {
                 routed += 1;
                 let ev = alice.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
-                    device_id,
+                    device_id: String::new(),
                     uuid,
                     data,
                 });

@@ -261,14 +261,14 @@ fn pump(from: &mut AppEngine, to: &mut AppEngine) -> usize {
     let mut routed = 0;
     for cmd in from.drain_pending_commands() {
         if let vauchi_core::Command::BleWriteCharacteristic {
-            device_id,
+            device_id: _,
             uuid,
             data,
         } = cmd
         {
             routed += 1;
             let ev = to.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
-                device_id,
+                device_id: String::new(),
                 uuid,
                 data,
             });
@@ -289,14 +289,14 @@ fn pump_capture(
     let mut routed = 0;
     for cmd in from.drain_pending_commands() {
         if let vauchi_core::Command::BleWriteCharacteristic {
-            device_id,
+            device_id: _,
             uuid,
             data,
         } = &cmd
         {
             routed += 1;
             let ev = to.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
-                device_id: device_id.clone(),
+                device_id: String::new(),
                 uuid: uuid.clone(),
                 data: data.clone(),
             });
@@ -393,14 +393,14 @@ fn two_party_ble_exchange_confirms_reciprocity_both_sides() {
         let mut a = 0;
         for cmd in alice.drain_pending_commands() {
             if let vauchi_core::Command::BleWriteCharacteristic {
-                device_id,
+                device_id: _,
                 uuid,
                 data,
             } = cmd
             {
                 alice_writes.push(data.clone());
                 let ev = bob.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
-                    device_id,
+                    device_id: String::new(),
                     uuid,
                     data,
                 });

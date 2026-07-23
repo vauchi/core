@@ -425,7 +425,22 @@ impl BleHandshakeMachine {
         data: &[u8],
         now: u64,
     ) -> (BleMachineEvent, Vec<Command>) {
-        let _ = device_id;
+        // Stale-link gate: data arriving on a link other than the one this
+        // machine rides is residue of a resolved glare (or a peer's dying
+        // link) — feeding it into the surviving session would corrupt it.
+        // Exactly one exception passes: a KeyOffer while we are an
+        // initiator that already sent ours — that IS the glare, and
+        // `handle_handshake_write` runs the tiebreak (possibly re-latching
+        // onto this link). Empty ids are wildcards (legacy/unaddressed).
+        if self.is_stale_link(device_id) {
+            let glare_ingress = uuid == CHAR_HANDSHAKE_WRITE
+                && self.role == BleRole::Initiator
+                && data.len() >= KEY_OFFER_SIZE
+                && matches!(self.inner.state(), BleHandshakeState::KeyOfferSent { .. });
+            if !glare_ingress {
+                return (BleMachineEvent::None, Vec::new());
+            }
+        }
         // P1 step 2b: once we've Completed, a notify on the handshake channel
         // may be the peer's post-persist reciprocity ack. Handle it BEFORE the
         // terminal guard drops it. `process_reciprocity_ack` rejects anything
@@ -444,10 +459,19 @@ impl BleHandshakeMachine {
             return (BleMachineEvent::None, Vec::new());
         }
         match uuid {
-            CHAR_HANDSHAKE_WRITE => self.handle_handshake_write(data, now),
+            CHAR_HANDSHAKE_WRITE => self.handle_handshake_write(device_id, data, now),
             CHAR_HANDSHAKE_NOTIFY => self.handle_handshake_notify(data),
             CHAR_DATA_WRITE | CHAR_DATA_NOTIFY => self.handle_data_chunk(data, now),
             _ => (BleMachineEvent::None, Vec::new()),
+        }
+    }
+
+    /// Whether `device_id` names a link other than the one this machine
+    /// rides. Empty on either side is a wildcard, never stale.
+    fn is_stale_link(&self, device_id: &str) -> bool {
+        match &self.link_device {
+            Some(active) if !active.is_empty() && !device_id.is_empty() => active != device_id,
+            _ => false,
         }
     }
 
@@ -459,8 +483,18 @@ impl BleHandshakeMachine {
         direction: BleLinkDirection,
         reason: &str,
     ) -> (BleMachineEvent, Vec<Command>) {
-        let _ = (device_id, direction);
         if self.cancelled || self.is_terminal() {
+            return (BleMachineEvent::None, Vec::new());
+        }
+        // Only the ACTIVE link's loss fails the handshake. The dropped
+        // glare loser also produces a disconnect — treating it as fatal is
+        // the phantom-disconnect that link addressing exists to prevent.
+        // Empty ids are wildcards (legacy/unaddressed): those still fail.
+        if let (Some(active), Some(active_dir)) = (&self.link_device, self.link_direction)
+            && !active.is_empty()
+            && !device_id.is_empty()
+            && (device_id != active || direction != active_dir)
+        {
             return (BleMachineEvent::None, Vec::new());
         }
         self.mark_failed(format!("BLE disconnected: {reason}"))
@@ -481,7 +515,16 @@ impl BleHandshakeMachine {
 
     // ── Internal handlers ──────────────────────────────────────────
 
-    fn handle_handshake_write(&mut self, data: &[u8], now: u64) -> (BleMachineEvent, Vec<Command>) {
+    fn handle_handshake_write(
+        &mut self,
+        link: &str,
+        data: &[u8],
+        now: u64,
+    ) -> (BleMachineEvent, Vec<Command>) {
+        // Targeted teardown of the losing outbound link when this side
+        // yields on glare — populated below, prepended to the yield's
+        // response commands.
+        let mut pre_cmds: Vec<Command> = Vec::new();
         if self.role == BleRole::Initiator {
             // Glare (symmetric BLE discovery, device-confirmed): we initiated
             // AND the peer initiated, so we — an initiator that already sent its
@@ -503,12 +546,29 @@ impl BleHandshakeMachine {
                 // Smaller identity → stay initiator; the peer will yield.
                 return (BleMachineEvent::None, Vec::new());
             }
-            // Larger identity → yield: rewind to a fresh Idle responder session
-            // and fall through to process the peer's KeyOffer below.
+            // Larger identity → yield: rewind to a fresh Idle responder
+            // session and fall through to process the peer's KeyOffer below.
+            // The handshake now rides the link the offer arrived on; the
+            // outbound link we dialed lost the glare and is torn down with a
+            // targeted disconnect — leaving it idle would leak a half-open
+            // link the peer writes into until supervision timeout.
+            if let (Some(old), Some(old_dir)) = (self.link_device.clone(), self.link_direction)
+                && !old.is_empty()
+                && old != link
+            {
+                pre_cmds.push(Command::BleDisconnect {
+                    device_id: old,
+                    direction: old_dir,
+                });
+            }
+            if !link.is_empty() {
+                self.link_device = Some(link.to_string());
+                self.link_direction = Some(BleLinkDirection::Inbound);
+            }
             self.inner.reset(now);
             self.role = BleRole::Responder;
         }
-        match self.inner.state() {
+        let (event, cmds) = match self.inner.state() {
             BleHandshakeState::Idle => {
                 // Phase 1 responder ingress: KeyOffer.
                 match self.inner.process_key_offer(data, now) {
@@ -538,6 +598,12 @@ impl BleHandshakeMachine {
                 }
                 (BleMachineEvent::None, Vec::new())
             }
+        };
+        if pre_cmds.is_empty() {
+            (event, cmds)
+        } else {
+            pre_cmds.extend(cmds);
+            (event, pre_cmds)
         }
     }
 

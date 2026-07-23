@@ -634,15 +634,19 @@ mod tests {
         let mut routed = 0;
         for cmd in from.drain_pending_commands() {
             if let vauchi_core::Command::BleWriteCharacteristic {
-                device_id,
+                device_id: _,
                 uuid,
                 data,
             } = cmd
             {
                 routed += 1;
+                // Forward un-addressed (wildcard): the writer stamps ITS
+                // link id, which names the receiver from the writer's side;
+                // a real shell re-stamps with the receiver-side link id.
+                // Link scoping has dedicated machine-level tests.
                 let ev =
                     to.forward_ble_hardware_event(&vauchi_core::Event::BleCharacteristicNotified {
-                        device_id,
+                        device_id: String::new(),
                         uuid,
                         data,
                     });

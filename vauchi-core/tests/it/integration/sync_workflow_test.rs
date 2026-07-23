@@ -139,7 +139,7 @@ fn test_field_modification_and_removal_propagation() {
         );
     }
 
-    // Test 2: Field modification produces Modified delta
+    // Test 2: Field modification produces a complete-field Added upsert
     {
         let mut card = ContactCard::new("Alice");
         card.add_field(ContactField::new(

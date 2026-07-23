@@ -234,6 +234,17 @@ lint:cross-cutting-blocking:
     # lint:locale-key-coverage
     - bash ../locales/scripts/check-locale-key-coverage.sh
         vauchi-app/src ../locales '*.rs'
+    # lint:portable-content-links
+    - |
+      set -eu
+      [ "$(readlink locales)" = "../locales" ] || {
+        echo "locales must link to ../locales"
+        exit 1
+      }
+      [ "$(readlink themes)" = "../themes" ] || {
+        echo "themes must link to ../themes"
+        exit 1
+      }
     # lint:adr-046
     - bash "${VAUCHI_CI_SCRIPTS_DIR}/scripts/check-aead.sh" .
     # lint:core-purity

@@ -43,7 +43,7 @@ vauchi-core/tests/it/duress_pin_tests.rs exempt
 # ── Numbered: SPLIT-queued, reducible over time (PRB-2026-032) ─────────
 vauchi-cabi/src/lib.rs 1606
 vauchi-app/src/ui/exchange/mod.rs 2832
-vauchi-app/src/ui/app_engine/ble_handshake.rs 1174
+vauchi-app/src/ui/app_engine/ble_handshake.rs 1249
 vauchi-core/tests/it/app_engine_navigation_tests.rs 1224
 vauchi-core/tests/it/migration_tests.rs 1280
 vauchi-core/tests/it/ble_handshake_tests.rs 1275

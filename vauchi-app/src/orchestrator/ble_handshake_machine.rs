@@ -515,6 +515,14 @@ impl BleHandshakeMachine {
         if self.cancelled || self.is_terminal() {
             return (BleMachineEvent::None, Vec::new());
         }
+        // A central dial can fail while the peer is simultaneously connecting
+        // to our peripheral. Until a link has advanced the protocol out of
+        // Idle, this is only a failed candidate — not the loss of an active
+        // exchange. Keep listening so the inbound half of that glare can win;
+        // the orchestration timeout remains responsible if no link succeeds.
+        if matches!(self.inner.state(), BleHandshakeState::Idle) {
+            return (BleMachineEvent::None, Vec::new());
+        }
         // Only the ACTIVE link's loss fails the handshake. The dropped
         // glare loser also produces a disconnect — treating it as fatal is
         // the phantom-disconnect that link addressing exists to prevent.

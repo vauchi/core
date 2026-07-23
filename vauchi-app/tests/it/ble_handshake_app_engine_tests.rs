@@ -155,6 +155,11 @@ fn forward_disconnect_marks_machine_failed() {
     let mut engine = fresh_engine();
     let (card, id, x3dh) = fixture_card();
     engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card, None);
+    let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
+        device_id: "d1".into(),
+        direction: BleLinkDirection::Outbound,
+    });
+    let _ = engine.drain_pending_commands();
     let _ = engine.forward_ble_hardware_event(&Event::BleDisconnected {
         device_id: "d1".into(),
         direction: BleLinkDirection::Outbound,

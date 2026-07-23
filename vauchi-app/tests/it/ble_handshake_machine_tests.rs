@@ -304,6 +304,31 @@ fn disconnected_fails_the_machine_with_reason() {
     assert!(m.is_terminal());
 }
 
+// @scenario: contact_exchange :: Exchange completes over BLE
+// @internal
+#[test]
+fn failed_outbound_dial_before_handshake_does_not_poison_inbound_link() {
+    let mut machine = fresh_initiator();
+
+    let (event, cmds) =
+        machine.on_disconnected("outbound-peer", BleLinkDirection::Outbound, "status 133");
+    assert!(
+        matches!(event, BleMachineEvent::None),
+        "a dial that never established a handshake is not the loss of an active exchange"
+    );
+    assert!(cmds.is_empty());
+    assert!(!machine.is_terminal());
+
+    let (event, cmds) = machine.on_connected("inbound-peer", BleLinkDirection::Inbound, 1_000);
+    assert!(matches!(event, BleMachineEvent::None));
+    assert!(
+        cmds.is_empty(),
+        "the inbound responder waits for a KeyOffer"
+    );
+    assert_eq!(machine.role(), BleRole::Responder);
+    assert_eq!(machine.phase(), BleMachinePhase::Handshaking);
+}
+
 // @internal
 #[test]
 fn unknown_characteristic_uuid_is_inert() {

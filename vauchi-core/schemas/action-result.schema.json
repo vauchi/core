@@ -1054,6 +1054,7 @@
               "required": [
                 "data",
                 "device_id",
+                "direction",
                 "uuid"
               ],
               "properties": {
@@ -1067,6 +1068,9 @@
                 },
                 "device_id": {
                   "type": "string"
+                },
+                "direction": {
+                  "$ref": "#/definitions/BleLinkDirection"
                 },
                 "uuid": {
                   "type": "string"
@@ -1087,11 +1091,15 @@
               "type": "object",
               "required": [
                 "device_id",
+                "direction",
                 "uuid"
               ],
               "properties": {
                 "device_id": {
                   "type": "string"
+                },
+                "direction": {
+                  "$ref": "#/definitions/BleLinkDirection"
                 },
                 "uuid": {
                   "type": "string"

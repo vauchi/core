@@ -308,6 +308,7 @@ impl BleHandshakeMachine {
         let ack = self.inner.build_reciprocity_ack()?;
         Some(Command::BleWriteCharacteristic {
             device_id: self.link_device_id(),
+            direction: self.link_direction(),
             uuid: CHAR_HANDSHAKE_NOTIFY.to_string(),
             data: ack,
         })
@@ -317,6 +318,11 @@ impl BleHandshakeMachine {
     /// `on_connected` — shells treat an empty id as "the current link".
     fn link_device_id(&self) -> String {
         self.link_device.clone().unwrap_or_default()
+    }
+
+    /// Latched physical direction for stamping outgoing commands.
+    fn link_direction(&self) -> BleLinkDirection {
+        self.link_direction.unwrap_or(BleLinkDirection::Outbound)
     }
 
     /// The link this machine currently rides, if one is latched. Lets the
@@ -414,6 +420,7 @@ impl BleHandshakeMachine {
                 self.phase = BleMachinePhase::Handshaking;
                 let cmd = Command::BleWriteCharacteristic {
                     device_id: self.link_device_id(),
+                    direction: self.link_direction(),
                     uuid: CHAR_HANDSHAKE_WRITE.into(),
                     data: offer,
                 };
@@ -431,6 +438,7 @@ impl BleHandshakeMachine {
     pub fn on_data_received(
         &mut self,
         device_id: &str,
+        direction: BleLinkDirection,
         uuid: &str,
         data: &[u8],
         now: u64,
@@ -442,7 +450,7 @@ impl BleHandshakeMachine {
         // initiator that already sent ours — that IS the glare, and
         // `handle_handshake_write` runs the tiebreak (possibly re-latching
         // onto this link). Empty ids are wildcards (legacy/unaddressed).
-        if self.is_stale_link(device_id) {
+        if self.is_stale_link(device_id, direction) {
             let glare_ingress = uuid == CHAR_HANDSHAKE_WRITE
                 && self.role == BleRole::Initiator
                 && data.len() >= KEY_OFFER_SIZE
@@ -469,7 +477,7 @@ impl BleHandshakeMachine {
             return (BleMachineEvent::None, Vec::new());
         }
         match uuid {
-            CHAR_HANDSHAKE_WRITE => self.handle_handshake_write(device_id, data, now),
+            CHAR_HANDSHAKE_WRITE => self.handle_handshake_write(device_id, direction, data, now),
             CHAR_HANDSHAKE_NOTIFY => self.handle_handshake_notify(data),
             CHAR_DATA_WRITE | CHAR_DATA_NOTIFY => self.handle_data_chunk(data, now),
             _ => (BleMachineEvent::None, Vec::new()),
@@ -478,9 +486,13 @@ impl BleHandshakeMachine {
 
     /// Whether `device_id` names a link other than the one this machine
     /// rides. Empty on either side is a wildcard, never stale.
-    fn is_stale_link(&self, device_id: &str) -> bool {
-        match &self.link_device {
-            Some(active) if !active.is_empty() && !device_id.is_empty() => active != device_id,
+    fn is_stale_link(&self, device_id: &str, direction: BleLinkDirection) -> bool {
+        match (&self.link_device, self.link_direction) {
+            (Some(active), Some(active_direction))
+                if !active.is_empty() && !device_id.is_empty() =>
+            {
+                active != device_id || active_direction != direction
+            }
             _ => false,
         }
     }
@@ -528,6 +540,7 @@ impl BleHandshakeMachine {
     fn handle_handshake_write(
         &mut self,
         link: &str,
+        direction: BleLinkDirection,
         data: &[u8],
         now: u64,
     ) -> (BleMachineEvent, Vec<Command>) {
@@ -564,7 +577,7 @@ impl BleHandshakeMachine {
             // link the peer writes into until supervision timeout.
             if let (Some(old), Some(old_dir)) = (self.link_device.clone(), self.link_direction)
                 && !old.is_empty()
-                && old != link
+                && (old != link || old_dir != direction)
             {
                 pre_cmds.push(Command::BleDisconnect {
                     device_id: old,
@@ -573,7 +586,7 @@ impl BleHandshakeMachine {
             }
             if !link.is_empty() {
                 self.link_device = Some(link.to_string());
-                self.link_direction = Some(BleLinkDirection::Inbound);
+                self.link_direction = Some(direction);
             }
             self.inner.reset(now);
             self.role = BleRole::Responder;
@@ -588,6 +601,7 @@ impl BleHandshakeMachine {
                         // KeyAck on handshake notify.
                         cmds.push(Command::BleWriteCharacteristic {
                             device_id: self.link_device_id(),
+                            direction: self.link_direction(),
                             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
                             data: ack_bytes,
                         });
@@ -692,6 +706,7 @@ impl BleHandshakeMachine {
                             Vec::with_capacity(1 + chunk_count(&our_encrypted, self.mtu_usable));
                         cmds.push(Command::BleWriteCharacteristic {
                             device_id: self.link_device_id(),
+                            direction: self.link_direction(),
                             uuid: CHAR_HANDSHAKE_WRITE.into(),
                             data: commitment,
                         });
@@ -728,6 +743,7 @@ impl BleHandshakeMachine {
                 // the responder never persisted the contact.
                 let reveal_cmd = Command::BleWriteCharacteristic {
                     device_id: self.link_device_id(),
+                    direction: self.link_direction(),
                     uuid: CHAR_HANDSHAKE_NOTIFY.into(),
                     data: reveal,
                 };
@@ -771,6 +787,7 @@ impl BleHandshakeMachine {
                     .chunk(i)
                     .map(|payload| Command::BleWriteCharacteristic {
                         device_id: self.link_device_id(),
+                        direction: self.link_direction(),
                         uuid: uuid.into(),
                         data: payload,
                     })

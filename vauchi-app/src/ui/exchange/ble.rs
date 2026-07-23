@@ -14,6 +14,7 @@ use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::proximity_runner::{ProximityMethod, ProximityRunner};
+use vauchi_core::platform::BleLinkDirection;
 use vauchi_core::{Command, Event};
 
 use crate::orchestrator::ble_handshake_machine::{BleRole, decide_ble_role};
@@ -412,6 +413,7 @@ impl BleExchangeFlow {
                 commands.extend(stop_cmds);
                 commands.push(Command::BleWriteCharacteristic {
                     device_id: self.connected_device.clone().unwrap_or_default(),
+                    direction: BleLinkDirection::Outbound,
                     uuid: SHAKE_ENVELOPE_CHAR.to_string(),
                     data: envelope,
                 });
@@ -729,6 +731,7 @@ mod tests {
 
         let consumed = flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
@@ -764,6 +767,7 @@ mod tests {
         // card transfer); the flow does not self-complete.
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "card-char".into(),
             data: vec![4, 5, 6],
         });
@@ -779,6 +783,7 @@ mod tests {
 
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
@@ -799,6 +804,7 @@ mod tests {
         // Receive card data
         flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "card-char".into(),
             data: vec![10, 20, 30],
         });
@@ -847,6 +853,7 @@ mod tests {
         // owns the card transfer and completion).
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "card-char".into(),
             data: vec![7, 8, 9],
         });
@@ -906,6 +913,7 @@ mod tests {
         // A card-data notification is consumed (not mistaken for a card).
         let consumed = flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "card-char".into(),
             data: vec![10, 20, 30],
         });
@@ -916,6 +924,7 @@ mod tests {
         // longer self-completes (the real machine drives Success).
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: SHAKE_ENVELOPE_CHAR.into(),
             data: our_envelope,
         });
@@ -941,6 +950,7 @@ mod tests {
         // Peer envelope first (no card yet)
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: SHAKE_ENVELOPE_CHAR.into(),
             data: our_envelope,
         });
@@ -952,6 +962,7 @@ mod tests {
         // owns the card transfer); the flow stays in Verifying.
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
@@ -970,6 +981,7 @@ mod tests {
         // longer stores it as a card.
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "some-other-char".into(),
             data: vec![1, 2],
         });
@@ -1064,6 +1076,7 @@ mod tests {
         // Notification consumed (not mistaken for a card).
         flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "c".into(),
             data: vec![1, 2],
         });
@@ -1090,6 +1103,7 @@ mod tests {
 
         flow.handle_event(&Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "c".into(),
             data: vec![1],
         });
@@ -1289,6 +1303,7 @@ mod tests {
         push(
             flow.handle_event(&Event::BleCharacteristicNotified {
                 device_id: "peer-1".into(),
+                direction: BleLinkDirection::Outbound,
                 uuid: vauchi_core::exchange::CHAR_DATA_NOTIFY.into(),
                 data: vec![0xCC; 32],
             }),

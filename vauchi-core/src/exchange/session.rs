@@ -28,6 +28,7 @@ use crate::crypto::kdf::HKDF;
 const USB_CARD_EXCHANGE_INFO: &[u8] = b"vauchi/usb-card-exchange/v1";
 use crate::diagnostic::exchange_debug::{ExchangeDebugEvent, ExchangeDebugLog};
 use crate::identity::Identity;
+use crate::platform::BleLinkDirection;
 use crate::{Command, Event};
 
 /// Session timeout duration (60 seconds for resumption).
@@ -171,6 +172,8 @@ pub struct ExchangeSession {
     /// `BleDeviceDiscovered`/`BleConnected`; stamped onto every outgoing
     /// BLE command so shells route writes to the right link under glare.
     ble_link_device: Option<String>,
+    /// Physical direction of `ble_link_device`.
+    ble_link_direction: Option<BleLinkDirection>,
     /// Buffered BLE handshake data (KeyAck or commitment) awaiting card data.
     ble_pending_handshake: Option<Vec<u8>>,
     /// Buffered BLE encrypted card data awaiting handshake data.
@@ -259,6 +262,7 @@ impl ExchangeSession {
             usb_role: None,
             ble_is_initiator: false,
             ble_link_device: None,
+            ble_link_direction: None,
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
@@ -351,6 +355,7 @@ impl ExchangeSession {
             usb_role: None,
             ble_is_initiator: false,
             ble_link_device: None,
+            ble_link_direction: None,
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
@@ -402,6 +407,7 @@ impl ExchangeSession {
             usb_role: None,
             ble_is_initiator: false,
             ble_link_device: None,
+            ble_link_direction: None,
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
@@ -464,6 +470,7 @@ impl ExchangeSession {
             usb_role: None,
             ble_is_initiator: false,
             ble_link_device: None,
+            ble_link_direction: None,
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
@@ -521,6 +528,7 @@ impl ExchangeSession {
             usb_role: Some(role),
             ble_is_initiator: false,
             ble_link_device: None,
+            ble_link_direction: None,
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
@@ -936,7 +944,10 @@ impl ExchangeSession {
         match event {
             Event::QrScanned { data } => self.handle_qr_scanned(data),
             Event::NfcDataReceived { data } => self.handle_nfc_data_received(data),
-            Event::BleConnected { device_id, .. } => self.handle_ble_connected(device_id),
+            Event::BleConnected {
+                device_id,
+                direction,
+            } => self.handle_ble_connected(device_id, direction),
             Event::BleCharacteristicRead { uuid, data, .. }
             | Event::BleCharacteristicNotified { uuid, data, .. } => {
                 self.handle_ble_characteristic_data(uuid, data)
@@ -1220,11 +1231,16 @@ impl ExchangeSession {
     /// If we're the initiator (saw `BleDeviceDiscovered` first), creates a
     /// `KeyOffer` and emits a `BleWriteCharacteristic` command to send it.
     /// Responders do nothing here — they wait for the KeyOffer to arrive.
-    fn handle_ble_connected(&mut self, device_id: String) -> Result<(), ExchangeError> {
+    fn handle_ble_connected(
+        &mut self,
+        device_id: String,
+        direction: BleLinkDirection,
+    ) -> Result<(), ExchangeError> {
         if self.transport != ExchangeTransport::Ble {
             return Ok(());
         }
         self.ble_link_device = Some(device_id.clone());
+        self.ble_link_direction = Some(direction);
         if !self.ble_is_initiator {
             return Ok(()); // Responder waits for KeyOffer
         }
@@ -1235,6 +1251,7 @@ impl ExchangeSession {
         let key_offer = hs.create_key_offer()?;
         self.emit_command(Command::BleWriteCharacteristic {
             device_id,
+            direction,
             uuid: super::CHAR_HANDSHAKE_WRITE.to_string(),
             data: key_offer,
         });
@@ -1314,13 +1331,18 @@ impl ExchangeSession {
                 hs.process_key_ack(&key_ack, &their_card, self.clock.unix_seconds())?;
 
             let link = self.ble_link_device.clone().unwrap_or_default();
+            let direction = self
+                .ble_link_direction
+                .unwrap_or(BleLinkDirection::Outbound);
             self.emit_command(Command::BleWriteCharacteristic {
                 device_id: link.clone(),
+                direction,
                 uuid: super::CHAR_HANDSHAKE_WRITE.to_string(),
                 data: our_commitment,
             });
             self.emit_command(Command::BleWriteCharacteristic {
                 device_id: link,
+                direction,
                 uuid: super::CHAR_DATA_WRITE.to_string(),
                 data: our_encrypted_card,
             });
@@ -1351,8 +1373,10 @@ impl ExchangeSession {
 
             // Send reveal back
             let link = self.ble_link_device.clone().unwrap_or_default();
+            let direction = self.ble_link_direction.unwrap_or(BleLinkDirection::Inbound);
             self.emit_command(Command::BleWriteCharacteristic {
                 device_id: link,
+                direction,
                 uuid: super::CHAR_HANDSHAKE_NOTIFY.to_string(),
                 data: reveal,
             });

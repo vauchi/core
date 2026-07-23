@@ -72,11 +72,13 @@ fn ble_success_celebrates_exactly_once_per_side() {
                 device_id: _,
                 uuid,
                 data,
+                ..
             } = cmd
             {
                 routed += 1;
                 let ev = bob.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
                     device_id: String::new(),
+                    direction: BleLinkDirection::Inbound,
                     uuid,
                     data,
                 });
@@ -91,11 +93,13 @@ fn ble_success_celebrates_exactly_once_per_side() {
                 device_id: _,
                 uuid,
                 data,
+                ..
             } = cmd
             {
                 routed += 1;
                 let ev = alice.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
                     device_id: String::new(),
+                    direction: BleLinkDirection::Outbound,
                     uuid,
                     data,
                 });

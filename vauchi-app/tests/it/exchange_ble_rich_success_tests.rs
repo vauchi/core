@@ -106,11 +106,13 @@ fn ble_completion_renders_rich_success_summary() {
                 device_id: _,
                 uuid,
                 data,
+                ..
             } = cmd
             {
                 routed += 1;
                 let ev = bob.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
                     device_id: String::new(),
+                    direction: BleLinkDirection::Inbound,
                     uuid,
                     data,
                 });
@@ -122,11 +124,13 @@ fn ble_completion_renders_rich_success_summary() {
                 device_id: _,
                 uuid,
                 data,
+                ..
             } = cmd
             {
                 routed += 1;
                 let ev = alice.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
                     device_id: String::new(),
+                    direction: BleLinkDirection::Outbound,
                     uuid,
                     data,
                 });

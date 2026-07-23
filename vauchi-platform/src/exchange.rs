@@ -59,11 +59,13 @@ pub enum MobileCommand {
     },
     BleWriteCharacteristic {
         device_id: String,
+        direction: MobileBleLinkDirection,
         uuid: String,
         data: Vec<u8>,
     },
     BleReadCharacteristic {
         device_id: String,
+        direction: MobileBleLinkDirection,
         uuid: String,
     },
     /// Disconnect one specific link (`device_id` + `direction` name it), so
@@ -143,16 +145,24 @@ impl From<Command> for MobileCommand {
             Command::BleConnect { device_id } => Self::BleConnect { device_id },
             Command::BleWriteCharacteristic {
                 device_id,
+                direction,
                 uuid,
                 data,
             } => Self::BleWriteCharacteristic {
                 device_id,
+                direction: direction.into(),
                 uuid,
                 data,
             },
-            Command::BleReadCharacteristic { device_id, uuid } => {
-                Self::BleReadCharacteristic { device_id, uuid }
-            }
+            Command::BleReadCharacteristic {
+                device_id,
+                direction,
+                uuid,
+            } => Self::BleReadCharacteristic {
+                device_id,
+                direction: direction.into(),
+                uuid,
+            },
             Command::BleDisconnect {
                 device_id,
                 direction,
@@ -280,11 +290,13 @@ pub enum MobileEvent {
     },
     BleCharacteristicRead {
         device_id: String,
+        direction: MobileBleLinkDirection,
         uuid: String,
         data: Vec<u8>,
     },
     BleCharacteristicNotified {
         device_id: String,
+        direction: MobileBleLinkDirection,
         uuid: String,
         data: Vec<u8>,
     },
@@ -390,19 +402,23 @@ impl From<MobileEvent> for Event {
             },
             MobileEvent::BleCharacteristicRead {
                 device_id,
+                direction,
                 uuid,
                 data,
             } => Self::BleCharacteristicRead {
                 device_id,
+                direction: direction.into(),
                 uuid,
                 data,
             },
             MobileEvent::BleCharacteristicNotified {
                 device_id,
+                direction,
                 uuid,
                 data,
             } => Self::BleCharacteristicNotified {
                 device_id,
+                direction: direction.into(),
                 uuid,
                 data,
             },

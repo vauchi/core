@@ -264,11 +264,13 @@ fn pump(from: &mut AppEngine, to: &mut AppEngine) -> usize {
             device_id: _,
             uuid,
             data,
+            ..
         } = cmd
         {
             routed += 1;
             let ev = to.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
                 device_id: String::new(),
+                direction: BleLinkDirection::Outbound,
                 uuid,
                 data,
             });
@@ -292,11 +294,13 @@ fn pump_capture(
             device_id: _,
             uuid,
             data,
+            ..
         } = &cmd
         {
             routed += 1;
             let ev = to.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
                 device_id: String::new(),
+                direction: BleLinkDirection::Outbound,
                 uuid: uuid.clone(),
                 data: data.clone(),
             });
@@ -396,11 +400,13 @@ fn two_party_ble_exchange_confirms_reciprocity_both_sides() {
                 device_id: _,
                 uuid,
                 data,
+                ..
             } = cmd
             {
                 alice_writes.push(data.clone());
                 let ev = bob.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
                     device_id: String::new(),
+                    direction: BleLinkDirection::Inbound,
                     uuid,
                     data,
                 });

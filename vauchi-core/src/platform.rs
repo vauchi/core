@@ -81,11 +81,16 @@ pub enum Command {
     /// (`_private/docs/designs/2026-07-22-role-tiebreak-and-glare-design.md`).
     BleWriteCharacteristic {
         device_id: String,
+        direction: BleLinkDirection,
         uuid: String,
         data: Vec<u8>,
     },
     /// Read data from a BLE characteristic on the link to `device_id`.
-    BleReadCharacteristic { device_id: String, uuid: String },
+    BleReadCharacteristic {
+        device_id: String,
+        direction: BleLinkDirection,
+        uuid: String,
+    },
     /// Disconnect one specific BLE link, addressed by peer and direction.
     ///
     /// Targeted (not "disconnect everything") so glare resolution can drop
@@ -512,6 +517,7 @@ pub enum Event {
     /// into the surviving session.
     BleCharacteristicRead {
         device_id: String,
+        direction: BleLinkDirection,
         uuid: String,
         data: Vec<u8>,
     },
@@ -520,6 +526,7 @@ pub enum Event {
     /// [`Event::BleCharacteristicRead`]).
     BleCharacteristicNotified {
         device_id: String,
+        direction: BleLinkDirection,
         uuid: String,
         data: Vec<u8>,
     },
@@ -853,6 +860,7 @@ mod tests {
             },
             Event::BleCharacteristicRead {
                 device_id: "d1".into(),
+                direction: BleLinkDirection::Outbound,
                 uuid: "char1".into(),
                 data: vec![0x0B],
             },
@@ -941,6 +949,7 @@ mod tests {
     fn command_clone_equals_original() {
         let cmd = Command::BleWriteCharacteristic {
             device_id: "d1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "test-uuid".into(),
             data: vec![1, 2, 3, 4, 5],
         };
@@ -953,6 +962,7 @@ mod tests {
     fn event_clone_equals_original() {
         let evt = Event::BleCharacteristicNotified {
             device_id: "d1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "notify-uuid".into(),
             data: vec![0xDE, 0xAD],
         };
@@ -978,11 +988,13 @@ mod tests {
             },
             Command::BleWriteCharacteristic {
                 device_id: "".into(),
+                direction: BleLinkDirection::Outbound,
                 uuid: "".into(),
                 data: vec![],
             },
             Command::BleReadCharacteristic {
                 device_id: "".into(),
+                direction: BleLinkDirection::Outbound,
                 uuid: "".into(),
             },
             Command::BleDisconnect {
@@ -1052,11 +1064,13 @@ mod tests {
             },
             Event::BleCharacteristicRead {
                 device_id: "".into(),
+                direction: BleLinkDirection::Outbound,
                 uuid: "".into(),
                 data: vec![],
             },
             Event::BleCharacteristicNotified {
                 device_id: "".into(),
+                direction: BleLinkDirection::Outbound,
                 uuid: "".into(),
                 data: vec![],
             },

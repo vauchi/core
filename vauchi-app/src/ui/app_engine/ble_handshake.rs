@@ -126,18 +126,24 @@ impl AppEngine {
             } => holder.machine.on_connected(device_id, *direction, now),
             Event::BleCharacteristicNotified {
                 device_id,
+                direction,
                 uuid,
                 data,
-            } => holder.machine.on_data_received(device_id, uuid, data, now),
+            } => holder
+                .machine
+                .on_data_received(device_id, *direction, uuid, data, now),
             Event::BleCharacteristicRead {
                 device_id,
+                direction,
                 uuid,
                 data,
             } => {
                 // Frontends route a READ-response on the same UUID
                 // surface as a notify; the machine's reassembler
                 // handles both.
-                holder.machine.on_data_received(device_id, uuid, data, now)
+                holder
+                    .machine
+                    .on_data_received(device_id, *direction, uuid, data, now)
             }
             Event::BleMtuNegotiated { mtu, .. } => {
                 holder.machine.update_mtu(*mtu);
@@ -659,6 +665,7 @@ mod tests {
         for cmd in from.drain_pending_commands() {
             if let vauchi_core::Command::BleWriteCharacteristic {
                 device_id: _,
+                direction,
                 uuid,
                 data,
             } = cmd
@@ -671,6 +678,7 @@ mod tests {
                 let ev =
                     to.forward_ble_hardware_event(&vauchi_core::Event::BleCharacteristicNotified {
                         device_id: String::new(),
+                        direction,
                         uuid,
                         data,
                     });

@@ -49,11 +49,13 @@ fn arb_post_complete_event() -> impl Strategy<Value = Event> {
         }),
         Just(Event::BleCharacteristicNotified {
             device_id: "spurious".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "spurious".into(),
             data: vec![1, 2, 3],
         }),
         Just(Event::BleCharacteristicRead {
             device_id: "spurious".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: "spurious".into(),
             data: vec![],
         }),

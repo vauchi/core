@@ -181,6 +181,7 @@ fn ble_full_initiator_flow_via_command_event() {
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
             data: key_ack,
         })
@@ -189,6 +190,7 @@ fn ble_full_initiator_flow_via_command_event() {
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: CHAR_DATA_NOTIFY.into(),
             data: bob_encrypted_card.clone(),
         })
@@ -233,6 +235,7 @@ fn ble_full_initiator_flow_via_command_event() {
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
             data: reveal,
         })
@@ -333,6 +336,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: CHAR_DATA_NOTIFY.into(),
             data: encrypted_card,
         })
@@ -348,6 +352,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: BleLinkDirection::Outbound,
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
             data: key_ack,
         })

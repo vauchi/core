@@ -8,8 +8,8 @@
 use std::sync::{Arc, Mutex};
 
 use vauchi_platform::{
-    MobileEvent, MobileLocale, MobileTabLayout, PlatformAppEngine, PlatformAppEngineTestHelpers,
-    PlatformEventListener,
+    MobileBleLinkDirection, MobileEvent, MobileLocale, MobileTabLayout, PlatformAppEngine,
+    PlatformAppEngineTestHelpers, PlatformEventListener,
 };
 
 /// Helper: create a PlatformAppEngine with a temp directory.
@@ -1139,6 +1139,7 @@ fn ble_machine_terminal_event_fires_invalidation_and_flips_chrome() {
     engine
         .handle_hardware_event(MobileEvent::BleCharacteristicNotified {
             device_id: "peer-1".into(),
+            direction: MobileBleLinkDirection::Outbound,
             uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567897".into(),
             data: vec![0u8; 8],
         })

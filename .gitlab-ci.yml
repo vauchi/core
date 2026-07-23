@@ -340,7 +340,8 @@ lint:machete:
 
 # CABI header freshness — catch stale headers after export changes (T0-11)
 lint:cabi-header:
-  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
+  extends: [.linux-runner, .validation-rust, .timeout-long]
   stage: lint
   needs: []
   script:
@@ -465,7 +466,8 @@ metric:audit-mobile-surface:
 # Cucumber tests use cargo test (not nextest) because harness=false output
 # is incompatible with nextest's test listing format.
 test:core:
-  extends: [.linux-runner, .validation-rust, .timeout-standard]
+  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
+  extends: [.linux-runner, .validation-rust, .timeout-long]
   stage: test
   needs:
     - job: lint:format
@@ -485,11 +487,10 @@ test:core:
     expire_in: 1 week
 
 test:cucumber:
-  # timeout-standard (30m), not timeout-quick (10m): this job compiles the
-  # full workspace before running cucumber, and a cold-cache build can take
-  # ~9m on its own — under the 10m quick limit it flakes (killed mid-run)
-  # whenever the cache is cold.
-  extends: [.linux-runner, .validation-rust, .timeout-standard]
+  # .timeout-long: compiles the full workspace before running cucumber; a
+  # cold-cache runner with concurrent dep-tree jobs needs the same headroom
+  # as lint:clippy (see comment there).
+  extends: [.linux-runner, .validation-rust, .timeout-long]
   stage: test
   allow_failure: false
   needs:
@@ -517,7 +518,8 @@ test:cucumber:
     - cargo test --test cucumber_tests --features testing,test-kdf -- --tags "not @wip and not @ui"
 
 test:platform:
-  extends: [.linux-runner, .validation-platform, .timeout-standard]
+  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
+  extends: [.linux-runner, .validation-platform, .timeout-long]
   stage: test
   needs:
     - job: lint:format
@@ -545,7 +547,8 @@ test:platform:
 # its `required-features = ["test-support"]` filter rejects
 # default-feature builds; it runs in `test:reachability` below.
 test:app:
-  extends: [.linux-runner, .validation-rust, .timeout-standard]
+  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
+  extends: [.linux-runner, .validation-rust, .timeout-long]
   stage: test
   needs:
     - job: lint:format
@@ -572,7 +575,8 @@ test:app:
 # their own binding builds. The vauchi-platform leg is compile-coverage
 # for the feature on a non-mobile target.
 test:dev-logging:
-  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
+  extends: [.linux-runner, .validation-rust, .timeout-long]
   stage: test
   needs:
     - job: lint:format
@@ -597,7 +601,8 @@ test:dev-logging:
 #   _private/docs/planning/todo/2026-04-20-frontend-correctness-strategy-plan.md
 #   Phase 1 Task 1.4.
 test:reachability:
-  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
+  extends: [.linux-runner, .validation-rust, .timeout-long]
   stage: test
   needs:
     - job: lint:format
@@ -619,7 +624,8 @@ test:reachability:
 # Schema contract validation — detect drift between core UI types and
 # generated JSON schemas. Runs when UI type definitions change.
 validate:schema:
-  extends: [.linux-runner, .timeout-quick]
+  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
+  extends: [.linux-runner, .timeout-long]
   stage: test
   needs:
     - job: lint:format
@@ -642,7 +648,8 @@ validate:schema:
 # (linux-qt, windows). Core CI doesn't enable it by default, so trait
 # imports and API compatibility can break undetected (F1, 2026-03-20).
 validate:secure-storage:
-  extends: [.linux-runner, .timeout-quick]
+  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
+  extends: [.linux-runner, .timeout-long]
   stage: test
   needs:
     - job: lint:format
@@ -697,7 +704,8 @@ validate:wasm-compat:
 # Content contract validation — detect drift between core parsers and
 # sibling content repos (themes/, locales/). Runs when parser code changes.
 validate:content-contracts:
-  extends: [.linux-runner, .timeout-quick]
+  # .timeout-long: cold-runner dep-tree build headroom — see lint:clippy comment.
+  extends: [.linux-runner, .timeout-long]
   stage: test
   needs:
     - job: lint:format

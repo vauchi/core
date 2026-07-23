@@ -1093,9 +1093,13 @@ fn cancel_action_on_multi_stage_screen_stops_session_after_navigate() {
         "cancel must navigate away; still on multi_stage_exchange",
     );
 
-    // Wait — no further multi_stage invalidations should arrive.
+    // Explicit polls advance any active session synchronously. Once cancel has
+    // removed the session they must not produce another invalidation.
     let pre_count = invalidations.lock().expect("lock").len();
-    std::thread::sleep(std::time::Duration::from_millis(200));
+    engine.poll_notifications().expect("first post-cancel poll");
+    engine
+        .poll_notifications()
+        .expect("second post-cancel poll");
     let post_count = invalidations.lock().expect("lock").len();
     assert_eq!(
         pre_count, post_count,

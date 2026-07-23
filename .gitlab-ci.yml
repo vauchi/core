@@ -271,7 +271,11 @@ lint:format:
   needs: []
 
 lint:clippy:
-  extends: [.linux-runner, .lint-clippy, .validation-rust, .timeout-standard]
+  # .timeout-long (not -standard): checks --all-targets across the full dep
+  # tree, so a runner with a cold local cache rebuilds everything from
+  # scratch — measured >30m on a fresh runner (pipeline 2699352640, job
+  # terminated mid-dep-compile at 30m). Warm-cache runs stay well under.
+  extends: [.linux-runner, .lint-clippy, .validation-rust, .timeout-long]
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
@@ -298,7 +302,10 @@ lint:no-default-features:
 # Advisory while pre-1.0 (no deployed clients, SP-33 allows intentional breaks).
 # Flip to allow_failure: false when version reaches 1.0.0.
 lint:semver:
-  extends: [.linux-runner, .validation-rust, .timeout-standard]
+  # .timeout-long (not -standard): semver-checks rustdoc-builds BOTH the
+  # current and baseline crate graphs — on a cold-cache runner that exceeds
+  # 30m (hit alongside lint:clippy in pipeline 2699352640).
+  extends: [.linux-runner, .validation-rust, .timeout-long]
   stage: lint
   needs: []
   allow_failure: true

@@ -154,6 +154,40 @@ fn test_delta_compute_field_modified() {
     assert!(!delta.is_empty());
 }
 
+// @scenario: sync_updates :: Concurrent linked-device edits converge
+// @internal
+#[test]
+fn delayed_direct_edit_does_not_block_resolved_field_winner() {
+    let mut base = ContactCard::new("Alice");
+    let field = ContactField::new(FieldType::Phone, "phone", "+12025550500", 10);
+    let field_id = field.id().to_string();
+    base.add_field(field).unwrap();
+
+    let mut losing_edit = base.clone();
+    losing_edit
+        .update_field_value(&field_id, "+12025550502", 20)
+        .unwrap();
+    let delayed_loser = CardDelta::compute(&base, &losing_edit, 20);
+
+    let mut resolved_winner = base.clone();
+    resolved_winner
+        .update_field_value(&field_id, "+12025550501", 21)
+        .unwrap();
+    let winner_repropagation = CardDelta::compute(&ContactCard::new("Alice"), &resolved_winner, 21);
+
+    let mut recipient = base;
+    delayed_loser.apply(&mut recipient, 100).unwrap();
+    winner_repropagation.apply(&mut recipient, 101).unwrap();
+
+    let field = recipient
+        .fields()
+        .iter()
+        .find(|field| field.id() == field_id)
+        .unwrap();
+    assert_eq!(field.value(), "+12025550501");
+    assert_eq!(field.updated_at(), 21);
+}
+
 // @scenario: sync_updates :: Only changed fields transmitted
 // @internal
 #[test]

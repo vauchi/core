@@ -124,20 +124,32 @@ impl AppEngine {
                 device_id,
                 direction,
             } => holder.machine.on_connected(device_id, *direction, now),
-            Event::BleCharacteristicNotified { uuid, data, .. } => {
-                holder.machine.on_data_received(uuid, data, now)
-            }
-            Event::BleCharacteristicRead { uuid, data, .. } => {
+            Event::BleCharacteristicNotified {
+                device_id,
+                uuid,
+                data,
+            } => holder.machine.on_data_received(device_id, uuid, data, now),
+            Event::BleCharacteristicRead {
+                device_id,
+                uuid,
+                data,
+            } => {
                 // Frontends route a READ-response on the same UUID
                 // surface as a notify; the machine's reassembler
                 // handles both.
-                holder.machine.on_data_received(uuid, data, now)
+                holder.machine.on_data_received(device_id, uuid, data, now)
             }
             Event::BleMtuNegotiated { mtu, .. } => {
                 holder.machine.update_mtu(*mtu);
                 (BleMachineEvent::None, Vec::new())
             }
-            Event::BleDisconnected { reason, .. } => holder.machine.on_disconnected(reason),
+            Event::BleDisconnected {
+                device_id,
+                direction,
+                reason,
+            } => holder
+                .machine
+                .on_disconnected(device_id, *direction, reason),
             _ => (BleMachineEvent::None, Vec::new()),
         };
         if !cmds.is_empty() {

@@ -413,16 +413,19 @@ impl BleHandshakeMachine {
         }
     }
 
-    /// Called when a BLE characteristic notification arrives. The
-    /// `uuid` selects the handler; the `data` is fed through the
+    /// Called when a BLE characteristic notification arrives. `device_id`
+    /// names the link the data arrived on (empty = unknown/legacy link);
+    /// the `uuid` selects the handler; the `data` is fed through the
     /// reassembler for chunked characteristics (data write / data
     /// notify) and consumed directly for handshake characteristics.
     pub fn on_data_received(
         &mut self,
+        device_id: &str,
         uuid: &str,
         data: &[u8],
         now: u64,
     ) -> (BleMachineEvent, Vec<Command>) {
+        let _ = device_id;
         // P1 step 2b: once we've Completed, a notify on the handshake channel
         // may be the peer's post-persist reciprocity ack. Handle it BEFORE the
         // terminal guard drops it. `process_reciprocity_ack` rejects anything
@@ -448,8 +451,15 @@ impl BleHandshakeMachine {
         }
     }
 
-    /// Called when the BLE peer disconnects.
-    pub fn on_disconnected(&mut self, reason: &str) -> (BleMachineEvent, Vec<Command>) {
+    /// Called when a BLE link is lost. `device_id` + `direction` name the
+    /// dropped link (empty id = unknown/legacy link).
+    pub fn on_disconnected(
+        &mut self,
+        device_id: &str,
+        direction: BleLinkDirection,
+        reason: &str,
+    ) -> (BleMachineEvent, Vec<Command>) {
+        let _ = (device_id, direction);
         if self.cancelled || self.is_terminal() {
             return (BleMachineEvent::None, Vec::new());
         }

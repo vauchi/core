@@ -277,7 +277,7 @@ fn cancel_emits_ble_disconnect_once_and_is_absorbing() {
     );
 
     // Further ingress is inert.
-    let (event, cmds) = m.on_disconnected("late");
+    let (event, cmds) = m.on_disconnected("peer-1", BleLinkDirection::Outbound, "late");
     assert!(matches!(event, BleMachineEvent::None));
     assert!(cmds.is_empty());
     assert_eq!(m.phase(), BleMachinePhase::Cancelled);
@@ -288,7 +288,7 @@ fn cancel_emits_ble_disconnect_once_and_is_absorbing() {
 fn disconnected_fails_the_machine_with_reason() {
     let mut m = fresh_initiator();
     m.on_connected("peer-1", BleLinkDirection::Outbound, 0);
-    let (event, cmds) = m.on_disconnected("timeout");
+    let (event, cmds) = m.on_disconnected("peer-1", BleLinkDirection::Outbound, "timeout");
     match event {
         BleMachineEvent::Failed { reason } => {
             assert!(
@@ -309,7 +309,7 @@ fn disconnected_fails_the_machine_with_reason() {
 fn unknown_characteristic_uuid_is_inert() {
     let mut m = fresh_initiator();
     m.on_connected("peer-1", BleLinkDirection::Outbound, 0);
-    let (event, cmds) = m.on_data_received("not-a-real-uuid", &[0xAA; 16], 0);
+    let (event, cmds) = m.on_data_received("peer-1", "not-a-real-uuid", &[0xAA; 16], 0);
     assert!(matches!(event, BleMachineEvent::None));
     assert!(cmds.is_empty());
     assert_eq!(m.phase(), BleMachinePhase::Handshaking);
@@ -320,7 +320,7 @@ fn unknown_characteristic_uuid_is_inert() {
 fn data_chunk_smaller_than_overhead_is_inert() {
     let mut m = fresh_initiator();
     m.on_connected("peer-1", BleLinkDirection::Outbound, 0);
-    let (event, cmds) = m.on_data_received(CHAR_DATA_WRITE, &[0xAA, 0xBB], 0);
+    let (event, cmds) = m.on_data_received("peer-1", CHAR_DATA_WRITE, &[0xAA, 0xBB], 0);
     assert!(matches!(event, BleMachineEvent::None));
     assert!(cmds.is_empty());
 }
@@ -331,7 +331,7 @@ fn role_is_stable_through_lifecycle() {
     let mut init = fresh_initiator();
     init.on_connected("peer-1", BleLinkDirection::Outbound, 0);
     init.update_mtu(247);
-    init.on_data_received("noise", &[], 0);
+    init.on_data_received("peer-1", "noise", &[], 0);
     assert_eq!(init.role(), BleRole::Initiator);
 
     let mut resp = fresh_responder();
@@ -439,7 +439,7 @@ fn glare_larger_identity_yields_to_responder_smaller_stays_initiator() {
     assert_eq!(bob.role(), BleRole::Initiator);
 
     // Smaller identity receives the peer's KeyOffer → stays initiator, ignores.
-    let (_ea, cmds_a) = alice.on_data_received(CHAR_HANDSHAKE_WRITE, &offer_b, 0);
+    let (_ea, cmds_a) = alice.on_data_received("peer-1", CHAR_HANDSHAKE_WRITE, &offer_b, 0);
     assert_eq!(
         alice.role(),
         BleRole::Initiator,
@@ -451,7 +451,7 @@ fn glare_larger_identity_yields_to_responder_smaller_stays_initiator() {
     );
 
     // Larger identity receives the peer's KeyOffer → yields to responder + KeyAck.
-    let (_eb, cmds_b) = bob.on_data_received(CHAR_HANDSHAKE_WRITE, &offer_a, 0);
+    let (_eb, cmds_b) = bob.on_data_received("peer-1", CHAR_HANDSHAKE_WRITE, &offer_a, 0);
     assert_eq!(
         bob.role(),
         BleRole::Responder,
@@ -470,7 +470,7 @@ fn glare_larger_identity_yields_to_responder_smaller_stays_initiator() {
 /// characteristic after processing `offer`.
 fn key_ack_from_responder(offer: &[u8]) -> Vec<u8> {
     let mut responder = fresh_peer_responder();
-    let (_event, cmds) = responder.on_data_received(CHAR_HANDSHAKE_WRITE, offer, 0);
+    let (_event, cmds) = responder.on_data_received("peer-1", CHAR_HANDSHAKE_WRITE, offer, 0);
     cmds.into_iter()
         .find_map(|cmd| match cmd {
             Command::BleWriteCharacteristic { uuid, data, .. }
@@ -495,7 +495,7 @@ fn oversized_handshake_notify_is_inert_not_buffered_as_key_ack() {
     let offer = key_offer(&mut initiator);
 
     let oversized = vec![0xAAu8; 64 * 1024];
-    let (event, cmds) = initiator.on_data_received(CHAR_HANDSHAKE_NOTIFY, &oversized, 0);
+    let (event, cmds) = initiator.on_data_received("peer-1", CHAR_HANDSHAKE_NOTIFY, &oversized, 0);
     assert!(
         matches!(event, BleMachineEvent::None),
         "an oversized handshake notify must not be treated as a KeyAck"
@@ -510,7 +510,7 @@ fn oversized_handshake_notify_is_inert_not_buffered_as_key_ack() {
     // rejected frame is quarantine-dropped, not a terminal failure.
     let ack = key_ack_from_responder(&offer);
     assert_eq!(ack.len(), 153, "wire KeyAck is exactly 153 bytes");
-    let (event, _cmds) = initiator.on_data_received(CHAR_HANDSHAKE_NOTIFY, &ack, 0);
+    let (event, _cmds) = initiator.on_data_received("peer-1", CHAR_HANDSHAKE_NOTIFY, &ack, 0);
     assert!(
         matches!(event, BleMachineEvent::TransferringStarted),
         "the genuine KeyAck must still be accepted after a dropped frame"
@@ -526,7 +526,7 @@ fn undersized_handshake_notify_is_inert_not_buffered_as_key_ack() {
     let mut initiator = fresh_initiator();
     let offer = key_offer(&mut initiator);
 
-    let (event, cmds) = initiator.on_data_received(CHAR_HANDSHAKE_NOTIFY, &[0u8; 20], 0);
+    let (event, cmds) = initiator.on_data_received("peer-1", CHAR_HANDSHAKE_NOTIFY, &[0u8; 20], 0);
     assert!(
         matches!(event, BleMachineEvent::None),
         "an undersized handshake notify must not be treated as a KeyAck"
@@ -538,7 +538,7 @@ fn undersized_handshake_notify_is_inert_not_buffered_as_key_ack() {
     );
 
     let ack = key_ack_from_responder(&offer);
-    let (event, _cmds) = initiator.on_data_received(CHAR_HANDSHAKE_NOTIFY, &ack, 0);
+    let (event, _cmds) = initiator.on_data_received("peer-1", CHAR_HANDSHAKE_NOTIFY, &ack, 0);
     assert!(
         matches!(event, BleMachineEvent::TransferringStarted),
         "the genuine KeyAck must still be accepted after a dropped frame"
@@ -552,7 +552,7 @@ fn responder_phase2_output(offer: &[u8]) -> (Vec<u8>, Vec<Vec<u8>>) {
     // ATT-minimum MTU (23 → 20 usable) so the encrypted card spans several
     // chunks — the realistic pre-negotiation window where reordering bites.
     responder.update_mtu(23);
-    let (_event, cmds) = responder.on_data_received(CHAR_HANDSHAKE_WRITE, offer, 0);
+    let (_event, cmds) = responder.on_data_received("peer-1", CHAR_HANDSHAKE_WRITE, offer, 0);
     let mut ack = None;
     let mut chunks = Vec::new();
     for cmd in cmds {
@@ -592,7 +592,7 @@ fn card_before_key_ack_reorder_should_be_quarantined_not_terminal() {
 
     // Reordered delivery: every card chunk lands before the KeyAck.
     for chunk in &chunks {
-        let (_event, cmds) = initiator.on_data_received(CHAR_DATA_NOTIFY, chunk, 0);
+        let (_event, cmds) = initiator.on_data_received("peer-1", CHAR_DATA_NOTIFY, chunk, 0);
         assert!(
             !matches!(initiator.phase(), BleMachinePhase::Failed { .. }),
             "card-before-KeyAck must be quarantined, not a terminal failure"
@@ -603,7 +603,7 @@ fn card_before_key_ack_reorder_should_be_quarantined_not_terminal() {
     // The late KeyAck completes the pair: the machine processes the
     // quarantined card and advances to Verifying (commitment + our card
     // go out), exactly as in the in-order flow.
-    let (event, cmds) = initiator.on_data_received(CHAR_HANDSHAKE_NOTIFY, &ack, 0);
+    let (event, cmds) = initiator.on_data_received("peer-1", CHAR_HANDSHAKE_NOTIFY, &ack, 0);
     assert!(
         matches!(event, BleMachineEvent::VerifyingStarted),
         "the late KeyAck must unlock processing of the quarantined card"

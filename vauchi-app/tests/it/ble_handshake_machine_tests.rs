@@ -843,11 +843,8 @@ fn responder_phase2_output(offer: &[u8]) -> (Vec<u8>, Vec<Vec<u8>>) {
 /// at card completion ("No pending KeyAck data",
 /// `on_remote_encrypted_card_received`) and then drops the late KeyAck at
 /// the terminal guard — the observed on-device Magic stall discriminator.
-/// Un-ignore when the bounded reorder quarantine ships
-/// (`backlog/2026-07-20-ble-exchange-orchestrator-unification`).
 // @internal
 #[test]
-#[ignore = "RED: card-before-KeyAck is terminal — backlog/2026-07-20-ble-exchange-orchestrator-unification"]
 fn card_before_key_ack_reorder_should_be_quarantined_not_terminal() {
     let mut initiator = fresh_initiator();
     let offer = key_offer(&mut initiator);

@@ -143,7 +143,10 @@ fn cancel_enqueues_ble_disconnect_into_pending_commands() {
     engine.cancel_ble_handshake_session();
     let pending = engine.drain_pending_commands();
     assert_eq!(pending.len(), 1);
-    assert!(matches!(pending[0], vauchi_core::Command::BleDisconnect));
+    assert!(matches!(
+        pending[0],
+        vauchi_core::Command::BleDisconnect { .. }
+    ));
 }
 
 // @internal
@@ -153,6 +156,8 @@ fn forward_disconnect_marks_machine_failed() {
     let (card, id, x3dh) = fixture_card();
     engine.ensure_ble_handshake_session(BleRole::Initiator, id, x3dh, card, None);
     let _ = engine.forward_ble_hardware_event(&Event::BleDisconnected {
+        device_id: "d1".into(),
+        direction: BleLinkDirection::Outbound,
         reason: "peer left".into(),
     });
     assert!(matches!(
@@ -255,10 +260,18 @@ fn token_of(engine: &AppEngine) -> Vec<u8> {
 fn pump(from: &mut AppEngine, to: &mut AppEngine) -> usize {
     let mut routed = 0;
     for cmd in from.drain_pending_commands() {
-        if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = cmd {
+        if let vauchi_core::Command::BleWriteCharacteristic {
+            device_id,
+            uuid,
+            data,
+        } = cmd
+        {
             routed += 1;
-            let ev =
-                to.forward_ble_hardware_event(&Event::BleCharacteristicNotified { uuid, data });
+            let ev = to.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
+                device_id,
+                uuid,
+                data,
+            });
             to.apply_ble_machine_event(ev);
         }
     }
@@ -275,9 +288,15 @@ fn pump_capture(
 ) -> usize {
     let mut routed = 0;
     for cmd in from.drain_pending_commands() {
-        if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = &cmd {
+        if let vauchi_core::Command::BleWriteCharacteristic {
+            device_id,
+            uuid,
+            data,
+        } = &cmd
+        {
             routed += 1;
             let ev = to.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
+                device_id: device_id.clone(),
                 uuid: uuid.clone(),
                 data: data.clone(),
             });
@@ -373,10 +392,18 @@ fn two_party_ble_exchange_confirms_reciprocity_both_sides() {
     for _ in 0..50 {
         let mut a = 0;
         for cmd in alice.drain_pending_commands() {
-            if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = cmd {
+            if let vauchi_core::Command::BleWriteCharacteristic {
+                device_id,
+                uuid,
+                data,
+            } = cmd
+            {
                 alice_writes.push(data.clone());
-                let ev = bob
-                    .forward_ble_hardware_event(&Event::BleCharacteristicNotified { uuid, data });
+                let ev = bob.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
+                    device_id,
+                    uuid,
+                    data,
+                });
                 bob.apply_ble_machine_event(ev);
                 a += 1;
             }

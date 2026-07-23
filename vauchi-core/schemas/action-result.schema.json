@@ -832,6 +832,25 @@
         }
       ]
     },
+    "BleLinkDirection": {
+      "description": "Which physical direction a BLE link was established in, reported by the shell on [`Event::BleConnected`]. This is the ground truth for the exchange protocol role: the GATT **central** (it dialed out) drives the handshake as initiator; the GATT **peripheral** (it was connected to) responds. Deriving the role from the physical link — not the pre-connection token tiebreak — is what lets asymmetric BLE discovery self-heal: whichever side actually connects becomes the initiator, even if the token said otherwise (`_private/docs/designs/2026-07-22-role-tiebreak-and-glare-design.md`).",
+      "oneOf": [
+        {
+          "description": "This device is the GATT central — it dialed out to the peer's peripheral.",
+          "type": "string",
+          "enum": [
+            "Outbound"
+          ]
+        },
+        {
+          "description": "This device is the GATT peripheral — the peer connected to it.",
+          "type": "string",
+          "enum": [
+            "Inbound"
+          ]
+        }
+      ]
+    },
     "BorderRadiusTokens": {
       "description": "Border radius tokens for rounded corners.",
       "type": "object",
@@ -1024,7 +1043,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Write data to a BLE characteristic.",
+          "description": "Write data to a BLE characteristic on the link to `device_id`.\n\n`device_id` addresses the target link so shells holding more than one live link (glare) route the write to the right peer instead of an implicit \"current\" connection (`_private/docs/designs/2026-07-22-role-tiebreak-and-glare-design.md`).",
           "type": "object",
           "required": [
             "BleWriteCharacteristic"
@@ -1034,6 +1053,7 @@
               "type": "object",
               "required": [
                 "data",
+                "device_id",
                 "uuid"
               ],
               "properties": {
@@ -1045,6 +1065,9 @@
                     "minimum": 0.0
                   }
                 },
+                "device_id": {
+                  "type": "string"
+                },
                 "uuid": {
                   "type": "string"
                 }
@@ -1054,7 +1077,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Read data from a BLE characteristic.",
+          "description": "Read data from a BLE characteristic on the link to `device_id`.",
           "type": "object",
           "required": [
             "BleReadCharacteristic"
@@ -1063,9 +1086,13 @@
             "BleReadCharacteristic": {
               "type": "object",
               "required": [
+                "device_id",
                 "uuid"
               ],
               "properties": {
+                "device_id": {
+                  "type": "string"
+                },
                 "uuid": {
                   "type": "string"
                 }
@@ -1075,11 +1102,29 @@
           "additionalProperties": false
         },
         {
-          "description": "Disconnect from the current BLE peer.",
-          "type": "string",
-          "enum": [
+          "description": "Disconnect one specific BLE link, addressed by peer and direction.\n\nTargeted (not \"disconnect everything\") so glare resolution can drop exactly the losing link while the surviving link keeps carrying the handshake.",
+          "type": "object",
+          "required": [
             "BleDisconnect"
-          ]
+          ],
+          "properties": {
+            "BleDisconnect": {
+              "type": "object",
+              "required": [
+                "device_id",
+                "direction"
+              ],
+              "properties": {
+                "device_id": {
+                  "type": "string"
+                },
+                "direction": {
+                  "$ref": "#/definitions/BleLinkDirection"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Activate the NFC interface and prepare to exchange `payload`.",

@@ -120,11 +120,14 @@ impl AppEngine {
         };
         let now = self.vauchi.clock().unix_seconds();
         let (m_event, cmds) = match event {
-            Event::BleConnected { direction, .. } => holder.machine.on_connected(*direction, now),
-            Event::BleCharacteristicNotified { uuid, data } => {
+            Event::BleConnected {
+                device_id,
+                direction,
+            } => holder.machine.on_connected(device_id, *direction, now),
+            Event::BleCharacteristicNotified { uuid, data, .. } => {
                 holder.machine.on_data_received(uuid, data, now)
             }
-            Event::BleCharacteristicRead { uuid, data } => {
+            Event::BleCharacteristicRead { uuid, data, .. } => {
                 // Frontends route a READ-response on the same UUID
                 // surface as a notify; the machine's reassembler
                 // handles both.
@@ -134,7 +137,7 @@ impl AppEngine {
                 holder.machine.update_mtu(*mtu);
                 (BleMachineEvent::None, Vec::new())
             }
-            Event::BleDisconnected { reason } => holder.machine.on_disconnected(reason),
+            Event::BleDisconnected { reason, .. } => holder.machine.on_disconnected(reason),
             _ => (BleMachineEvent::None, Vec::new()),
         };
         if !cmds.is_empty() {
@@ -618,10 +621,16 @@ mod tests {
     fn pump(from: &mut AppEngine, to: &mut AppEngine) -> usize {
         let mut routed = 0;
         for cmd in from.drain_pending_commands() {
-            if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = cmd {
+            if let vauchi_core::Command::BleWriteCharacteristic {
+                device_id,
+                uuid,
+                data,
+            } = cmd
+            {
                 routed += 1;
                 let ev =
                     to.forward_ble_hardware_event(&vauchi_core::Event::BleCharacteristicNotified {
+                        device_id,
                         uuid,
                         data,
                     });

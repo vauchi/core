@@ -261,6 +261,8 @@ fn ble_session_fails_on_disconnect_with_connection_lost() {
 
     session
         .apply_hardware_event(Event::BleDisconnected {
+            device_id: "peer-1".to_string(),
+            direction: vauchi_core::BleLinkDirection::Outbound,
             reason: "peer went away".to_string(),
         })
         .expect("a disconnect event is handled, not errored");

@@ -153,6 +153,8 @@ fn failed_factory() -> BleExchangeEngine {
         vauchi_app::i18n::Locale::English,
     );
     e.handle_hardware_event(Event::BleDisconnected {
+        device_id: "peer-1".into(),
+        direction: vauchi_core::BleLinkDirection::Outbound,
         reason: "peer hung up".into(),
     });
     e

@@ -58,13 +58,22 @@ pub enum MobileCommand {
         device_id: String,
     },
     BleWriteCharacteristic {
+        device_id: String,
         uuid: String,
         data: Vec<u8>,
     },
     BleReadCharacteristic {
+        device_id: String,
         uuid: String,
     },
-    BleDisconnect,
+    /// Disconnect one specific link (`device_id` + `direction` name it), so
+    /// glare resolution can drop the losing link while the survivor keeps
+    /// carrying the handshake. An empty `device_id` means "the current link"
+    /// (pre-connect teardown).
+    BleDisconnect {
+        device_id: String,
+        direction: MobileBleLinkDirection,
+    },
     // NFC
     NfcActivate {
         payload: Vec<u8>,
@@ -132,11 +141,25 @@ impl From<Command> for MobileCommand {
             Command::BleStartScanning { service_uuid } => Self::BleStartScanning { service_uuid },
             Command::BleStopScanning => Self::BleStopScanning,
             Command::BleConnect { device_id } => Self::BleConnect { device_id },
-            Command::BleWriteCharacteristic { uuid, data } => {
-                Self::BleWriteCharacteristic { uuid, data }
+            Command::BleWriteCharacteristic {
+                device_id,
+                uuid,
+                data,
+            } => Self::BleWriteCharacteristic {
+                device_id,
+                uuid,
+                data,
+            },
+            Command::BleReadCharacteristic { device_id, uuid } => {
+                Self::BleReadCharacteristic { device_id, uuid }
             }
-            Command::BleReadCharacteristic { uuid } => Self::BleReadCharacteristic { uuid },
-            Command::BleDisconnect => Self::BleDisconnect,
+            Command::BleDisconnect {
+                device_id,
+                direction,
+            } => Self::BleDisconnect {
+                device_id,
+                direction: direction.into(),
+            },
             Command::NfcActivate { payload } => Self::NfcActivate { payload },
             Command::NfcDeactivate => Self::NfcDeactivate,
             Command::NfcSendApdu { data } => Self::NfcSendApdu { data },
@@ -226,6 +249,19 @@ impl From<MobileBleLinkDirection> for vauchi_core::platform::BleLinkDirection {
     }
 }
 
+impl From<vauchi_core::platform::BleLinkDirection> for MobileBleLinkDirection {
+    fn from(d: vauchi_core::platform::BleLinkDirection) -> Self {
+        match d {
+            vauchi_core::platform::BleLinkDirection::Outbound => Self::Outbound,
+            vauchi_core::platform::BleLinkDirection::Inbound => Self::Inbound,
+            // `#[non_exhaustive]` forward compat: an unknown future direction
+            // maps to Outbound — the shell drops the link it dialed, never a
+            // link it didn't know it had.
+            _ => Self::Outbound,
+        }
+    }
+}
+
 #[derive(uniffi::Enum, Debug, Clone)]
 pub enum MobileEvent {
     // QR
@@ -243,14 +279,18 @@ pub enum MobileEvent {
         direction: MobileBleLinkDirection,
     },
     BleCharacteristicRead {
+        device_id: String,
         uuid: String,
         data: Vec<u8>,
     },
     BleCharacteristicNotified {
+        device_id: String,
         uuid: String,
         data: Vec<u8>,
     },
     BleDisconnected {
+        device_id: String,
+        direction: MobileBleLinkDirection,
         reason: String,
     },
     // NFC
@@ -348,13 +388,33 @@ impl From<MobileEvent> for Event {
                 device_id,
                 direction: direction.into(),
             },
-            MobileEvent::BleCharacteristicRead { uuid, data } => {
-                Self::BleCharacteristicRead { uuid, data }
-            }
-            MobileEvent::BleCharacteristicNotified { uuid, data } => {
-                Self::BleCharacteristicNotified { uuid, data }
-            }
-            MobileEvent::BleDisconnected { reason } => Self::BleDisconnected { reason },
+            MobileEvent::BleCharacteristicRead {
+                device_id,
+                uuid,
+                data,
+            } => Self::BleCharacteristicRead {
+                device_id,
+                uuid,
+                data,
+            },
+            MobileEvent::BleCharacteristicNotified {
+                device_id,
+                uuid,
+                data,
+            } => Self::BleCharacteristicNotified {
+                device_id,
+                uuid,
+                data,
+            },
+            MobileEvent::BleDisconnected {
+                device_id,
+                direction,
+                reason,
+            } => Self::BleDisconnected {
+                device_id,
+                direction: direction.into(),
+                reason,
+            },
             MobileEvent::NfcDataReceived { data } => Self::NfcDataReceived { data },
             MobileEvent::AudioSamplesRecorded {
                 samples,

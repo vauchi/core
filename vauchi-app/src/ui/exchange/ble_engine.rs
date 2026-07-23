@@ -804,6 +804,8 @@ mod tests {
             Locale::English,
         );
         let _ = engine.handle_hardware_event(Event::BleDisconnected {
+            device_id: "peer-1".into(),
+            direction: vauchi_core::BleLinkDirection::Outbound,
             reason: "lost".into(),
         });
         let screen = engine.current_screen();
@@ -826,7 +828,11 @@ mod tests {
             None,
             Locale::English,
         );
-        let _ = engine.handle_hardware_event(Event::BleDisconnected { reason: "x".into() });
+        let _ = engine.handle_hardware_event(Event::BleDisconnected {
+            device_id: "peer-1".into(),
+            direction: vauchi_core::BleLinkDirection::Outbound,
+            reason: "x".into(),
+        });
         let ids: Vec<String> = engine
             .current_screen()
             .actions
@@ -887,7 +893,11 @@ mod tests {
             None,
             Locale::English,
         );
-        let _ = engine.handle_hardware_event(Event::BleDisconnected { reason: "x".into() });
+        let _ = engine.handle_hardware_event(Event::BleDisconnected {
+            device_id: "peer-1".into(),
+            direction: vauchi_core::BleLinkDirection::Outbound,
+            reason: "x".into(),
+        });
         assert_eq!(engine.current_screen().screen_id, "exchange_failed");
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "retry".into(),

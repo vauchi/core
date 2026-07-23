@@ -209,6 +209,13 @@ pub struct BleHandshakeMachine {
     /// returns [`BleMachineEvent::None`] and the phase stays
     /// [`BleMachinePhase::Cancelled`].
     cancelled: bool,
+    /// Peer device id of the link this machine drives, latched on
+    /// `on_connected`. Stamped onto every outgoing BLE command so shells
+    /// route writes/disconnects to this link under glare (`device_id +
+    /// direction` is the connection id — design doc §synthesized final).
+    link_device: Option<String>,
+    /// Physical direction of the latched link (see `link_device`).
+    link_direction: Option<BleLinkDirection>,
 }
 
 impl BleHandshakeMachine {
@@ -235,6 +242,8 @@ impl BleHandshakeMachine {
             mtu_usable: BLE_DEFAULT_USABLE,
             phase: BleMachinePhase::Preparing,
             cancelled: false,
+            link_device: None,
+            link_direction: None,
         }
     }
 
@@ -261,6 +270,8 @@ impl BleHandshakeMachine {
             mtu_usable: BLE_DEFAULT_USABLE,
             phase: BleMachinePhase::Preparing,
             cancelled: false,
+            link_device: None,
+            link_direction: None,
         }
     }
 
@@ -296,9 +307,16 @@ impl BleHandshakeMachine {
     pub fn build_reciprocity_ack_command(&self) -> Option<Command> {
         let ack = self.inner.build_reciprocity_ack()?;
         Some(Command::BleWriteCharacteristic {
+            device_id: self.link_device_id(),
             uuid: CHAR_HANDSHAKE_NOTIFY.to_string(),
             data: ack,
         })
+    }
+
+    /// Latched peer device id for stamping outgoing commands. Empty until
+    /// `on_connected` — shells treat an empty id as "the current link".
+    fn link_device_id(&self) -> String {
+        self.link_device.clone().unwrap_or_default()
     }
 
     /// Currently negotiated usable MTU (payload bytes per chunk).
@@ -339,6 +357,7 @@ impl BleHandshakeMachine {
     /// (`2026-07-22-role-tiebreak-and-glare-design.md`, F0).
     pub fn on_connected(
         &mut self,
+        device_id: &str,
         direction: BleLinkDirection,
         _now: u64,
     ) -> (BleMachineEvent, Vec<Command>) {
@@ -348,10 +367,13 @@ impl BleHandshakeMachine {
         // Reconcile the role to the physical link before the handshake starts.
         // Only while `Idle` (no KeyOffer created yet) — once the handshake has
         // advanced, a second connect in the other direction is a glare duplicate
-        // handled by the idempotency guard below, not a role flip. The inner
-        // session is role-agnostic (initiator/responder build identically), so
-        // flipping `role` here needs no session rebuild.
+        // handled by the idempotency guard below, not a role flip (and the
+        // latched link stays frozen on the one the handshake is riding). The
+        // inner session is role-agnostic (initiator/responder build
+        // identically), so flipping `role` here needs no session rebuild.
         if matches!(self.inner.state(), BleHandshakeState::Idle) {
+            self.link_device = Some(device_id.to_string());
+            self.link_direction = Some(direction);
             self.role = match direction {
                 BleLinkDirection::Outbound => BleRole::Initiator,
                 BleLinkDirection::Inbound => BleRole::Responder,
@@ -381,6 +403,7 @@ impl BleHandshakeMachine {
             Ok(offer) => {
                 self.phase = BleMachinePhase::Handshaking;
                 let cmd = Command::BleWriteCharacteristic {
+                    device_id: self.link_device_id(),
                     uuid: CHAR_HANDSHAKE_WRITE.into(),
                     data: offer,
                 };
@@ -440,7 +463,10 @@ impl BleHandshakeMachine {
         }
         self.cancelled = true;
         self.phase = BleMachinePhase::Cancelled;
-        vec![Command::BleDisconnect]
+        vec![Command::BleDisconnect {
+            device_id: self.link_device_id(),
+            direction: self.link_direction.unwrap_or(BleLinkDirection::Outbound),
+        }]
     }
 
     // ── Internal handlers ──────────────────────────────────────────
@@ -481,6 +507,7 @@ impl BleHandshakeMachine {
                             Vec::with_capacity(2 + chunk_count(&encrypted_card, self.mtu_usable));
                         // KeyAck on handshake notify.
                         cmds.push(Command::BleWriteCharacteristic {
+                            device_id: self.link_device_id(),
                             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
                             data: ack_bytes,
                         });
@@ -578,6 +605,7 @@ impl BleHandshakeMachine {
                         let mut cmds =
                             Vec::with_capacity(1 + chunk_count(&our_encrypted, self.mtu_usable));
                         cmds.push(Command::BleWriteCharacteristic {
+                            device_id: self.link_device_id(),
                             uuid: CHAR_HANDSHAKE_WRITE.into(),
                             data: commitment,
                         });
@@ -613,6 +641,7 @@ impl BleHandshakeMachine {
                 // completes, so no closing notification ever arrived and
                 // the responder never persisted the contact.
                 let reveal_cmd = Command::BleWriteCharacteristic {
+                    device_id: self.link_device_id(),
                     uuid: CHAR_HANDSHAKE_NOTIFY.into(),
                     data: reveal,
                 };
@@ -655,6 +684,7 @@ impl BleHandshakeMachine {
                 chunker
                     .chunk(i)
                     .map(|payload| Command::BleWriteCharacteristic {
+                        device_id: self.link_device_id(),
                         uuid: uuid.into(),
                         data: payload,
                     })

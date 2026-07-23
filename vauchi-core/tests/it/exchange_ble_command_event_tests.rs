@@ -114,7 +114,7 @@ fn ble_connected_after_discovery_emits_key_offer_write() {
     );
 
     let write_cmd = cmds.iter().find(|c| {
-        matches!(c, Command::BleWriteCharacteristic { uuid, data }
+        matches!(c, Command::BleWriteCharacteristic { uuid, data, .. }
             if uuid == CHAR_HANDSHAKE_WRITE && !data.is_empty())
     });
     assert!(
@@ -154,7 +154,7 @@ fn ble_full_initiator_flow_via_command_event() {
     let key_offer = cmds
         .iter()
         .find_map(|c| match c {
-            Command::BleWriteCharacteristic { uuid, data } if uuid == CHAR_HANDSHAKE_WRITE => {
+            Command::BleWriteCharacteristic { uuid, data, .. } if uuid == CHAR_HANDSHAKE_WRITE => {
                 Some(data.clone())
             }
             _ => None,
@@ -180,6 +180,7 @@ fn ble_full_initiator_flow_via_command_event() {
     // Feed KeyAck and encrypted card back to initiator as hardware events
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
             data: key_ack,
         })
@@ -187,6 +188,7 @@ fn ble_full_initiator_flow_via_command_event() {
 
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: CHAR_DATA_NOTIFY.into(),
             data: bob_encrypted_card.clone(),
         })
@@ -230,6 +232,7 @@ fn ble_full_initiator_flow_via_command_event() {
     // Feed reveal back to initiator
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
             data: reveal,
         })
@@ -251,6 +254,8 @@ fn ble_disconnect_during_connection_fails_session() {
 
     session
         .apply_hardware_event(Event::BleDisconnected {
+            device_id: "peer-1".into(),
+            direction: vauchi_core::BleLinkDirection::Outbound,
             reason: "remote closed".into(),
         })
         .unwrap();
@@ -309,7 +314,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
     let key_offer = cmds
         .iter()
         .find_map(|c| match c {
-            Command::BleWriteCharacteristic { uuid, data } if uuid == CHAR_HANDSHAKE_WRITE => {
+            Command::BleWriteCharacteristic { uuid, data, .. } if uuid == CHAR_HANDSHAKE_WRITE => {
                 Some(data.clone())
             }
             _ => None,
@@ -327,6 +332,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
     // Feed card data BEFORE key_ack (reversed order)
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: CHAR_DATA_NOTIFY.into(),
             data: encrypted_card,
         })
@@ -341,6 +347,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
 
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
             data: key_ack,
         })

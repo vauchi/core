@@ -68,10 +68,18 @@ fn ble_success_celebrates_exactly_once_per_side() {
             if is_celebrate(&cmd) {
                 alice_celebrates += 1;
             }
-            if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = cmd {
+            if let vauchi_core::Command::BleWriteCharacteristic {
+                device_id,
+                uuid,
+                data,
+            } = cmd
+            {
                 routed += 1;
-                let ev = bob
-                    .forward_ble_hardware_event(&Event::BleCharacteristicNotified { uuid, data });
+                let ev = bob.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
+                    device_id,
+                    uuid,
+                    data,
+                });
                 bob.apply_ble_machine_event(ev);
             }
         }
@@ -79,10 +87,18 @@ fn ble_success_celebrates_exactly_once_per_side() {
             if is_celebrate(&cmd) {
                 bob_celebrates += 1;
             }
-            if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = cmd {
+            if let vauchi_core::Command::BleWriteCharacteristic {
+                device_id,
+                uuid,
+                data,
+            } = cmd
+            {
                 routed += 1;
-                let ev = alice
-                    .forward_ble_hardware_event(&Event::BleCharacteristicNotified { uuid, data });
+                let ev = alice.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
+                    device_id,
+                    uuid,
+                    data,
+                });
                 alice.apply_ble_machine_event(ev);
             }
         }
@@ -114,6 +130,8 @@ fn ble_failure_never_celebrates() {
     alice.apply_ble_machine_event(ev);
     // Force the machine's failure path via a disconnect mid-flow.
     let ev = alice.forward_ble_hardware_event(&Event::BleDisconnected {
+        device_id: "peer-1".into(),
+        direction: vauchi_core::BleLinkDirection::Outbound,
         reason: "gone".into(),
     });
     alice.apply_ble_machine_event(ev);

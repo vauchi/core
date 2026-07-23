@@ -215,6 +215,10 @@ pub(super) struct BleExchangeFlow {
     is_responder: bool,
     /// Guards the backoff so the fallback `BleConnect` is emitted at most once.
     fallback_connect_emitted: bool,
+    /// Physical direction of the link this flow rides, latched from
+    /// `BleConnected`. Stamped onto the terminal targeted `BleDisconnect`
+    /// so shells drop exactly this link.
+    link_direction: Option<vauchi_core::BleLinkDirection>,
 }
 
 impl BleExchangeFlow {
@@ -230,6 +234,7 @@ impl BleExchangeFlow {
             own_token,
             is_responder: false,
             fallback_connect_emitted: false,
+            link_direction: None,
         }
     }
 
@@ -277,7 +282,7 @@ impl BleExchangeFlow {
     /// Process a hardware event and return the outcome.
     pub(super) fn handle_event(&mut self, event: &Event) -> BleHardwareOutcome {
         // BLE disconnection is always a failure (any step)
-        if let Event::BleDisconnected { reason } = event {
+        if let Event::BleDisconnected { reason, .. } = event {
             return BleHardwareOutcome::FailedWithFallback {
                 reason: format!("BLE disconnected: {reason}"),
             };
@@ -361,7 +366,16 @@ impl BleExchangeFlow {
     }
 
     fn handle_handshaking(&mut self, event: &Event) -> BleHardwareOutcome {
-        if let Event::BleConnected { .. } = event {
+        if let Event::BleConnected {
+            device_id,
+            direction,
+        } = event
+        {
+            // Latch the link: the responder path may reach here without a
+            // discovery (inbound connect from a peer we never scanned), so
+            // the connect event is the first time we learn the device id.
+            self.connected_device = Some(device_id.clone());
+            self.link_direction = Some(*direction);
             self.step = BleStep::Exchanging;
             // Start a proximity runner only for modes with a proximity signal
             // (Magic/Bump/Shake). G3: Glance has none — the QR scan + BLE range
@@ -397,6 +411,7 @@ impl BleExchangeFlow {
                 self.shake_envelope_sent = true;
                 commands.extend(stop_cmds);
                 commands.push(Command::BleWriteCharacteristic {
+                    device_id: self.connected_device.clone().unwrap_or_default(),
                     uuid: SHAKE_ENVELOPE_CHAR.to_string(),
                     data: envelope,
                 });
@@ -412,7 +427,7 @@ impl BleExchangeFlow {
         }
 
         // BLE characteristic notifications — could be card data or shake envelope
-        if let Event::BleCharacteristicNotified { uuid, data } = event
+        if let Event::BleCharacteristicNotified { uuid, data, .. } = event
             && !data.is_empty()
         {
             // Shake envelope from peer (on data write characteristic)
@@ -452,7 +467,7 @@ impl BleExchangeFlow {
 
     fn handle_verifying(&mut self, event: &Event) -> BleHardwareOutcome {
         // In verifying, we're waiting for card data (proximity already done)
-        if let Event::BleCharacteristicNotified { uuid, data } = event
+        if let Event::BleCharacteristicNotified { uuid, data, .. } = event
             && !data.is_empty()
         {
             // Shake envelope in verifying — peer envelope arrived late
@@ -471,7 +486,12 @@ impl BleExchangeFlow {
             self.step = BleStep::Complete;
             let mut commands = extra_commands;
             commands.push(Command::AccelerometerStop);
-            commands.push(Command::BleDisconnect);
+            commands.push(Command::BleDisconnect {
+                device_id: self.connected_device.clone().unwrap_or_default(),
+                direction: self
+                    .link_direction
+                    .unwrap_or(vauchi_core::BleLinkDirection::Outbound),
+            });
             BleHardwareOutcome::Complete {
                 card_bytes,
                 commands,
@@ -708,6 +728,7 @@ mod tests {
         advance_to_exchanging(&mut flow);
 
         let consumed = flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
@@ -742,6 +763,7 @@ mod tests {
         // P4: a later notification is consumed (the real machine owns the
         // card transfer); the flow does not self-complete.
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "card-char".into(),
             data: vec![4, 5, 6],
         });
@@ -756,6 +778,7 @@ mod tests {
         advance_to_exchanging(&mut flow);
 
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
@@ -775,6 +798,7 @@ mod tests {
 
         // Receive card data
         flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "card-char".into(),
             data: vec![10, 20, 30],
         });
@@ -822,6 +846,7 @@ mod tests {
         // self-complete even after a proximity timeout (the real machine
         // owns the card transfer and completion).
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "card-char".into(),
             data: vec![7, 8, 9],
         });
@@ -880,6 +905,7 @@ mod tests {
 
         // A card-data notification is consumed (not mistaken for a card).
         let consumed = flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "card-char".into(),
             data: vec![10, 20, 30],
         });
@@ -889,6 +915,7 @@ mod tests {
         // proximity verifies and advances to Verifying, but the flow no
         // longer self-completes (the real machine drives Success).
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: SHAKE_ENVELOPE_CHAR.into(),
             data: our_envelope,
         });
@@ -913,6 +940,7 @@ mod tests {
 
         // Peer envelope first (no card yet)
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: SHAKE_ENVELOPE_CHAR.into(),
             data: our_envelope,
         });
@@ -923,6 +951,7 @@ mod tests {
         // P4: a later card notification is consumed (the real machine
         // owns the card transfer); the flow stays in Verifying.
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
@@ -940,6 +969,7 @@ mod tests {
         // machine owns the encrypted card transfer); the hollow flow no
         // longer stores it as a card.
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "some-other-char".into(),
             data: vec![1, 2],
         });
@@ -955,6 +985,8 @@ mod tests {
         for mode in [ExchangeMode::Magic, ExchangeMode::Bump, ExchangeMode::Shake] {
             let mut flow = BleExchangeFlow::new(mode, vec![]);
             let outcome = flow.handle_event(&Event::BleDisconnected {
+                device_id: "peer-1".into(),
+                direction: vauchi_core::BleLinkDirection::Outbound,
                 reason: "timeout".into(),
             });
             assert!(
@@ -1031,6 +1063,7 @@ mod tests {
 
         // Notification consumed (not mistaken for a card).
         flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "c".into(),
             data: vec![1, 2],
         });
@@ -1056,6 +1089,7 @@ mod tests {
         advance_to_exchanging(&mut flow);
 
         flow.handle_event(&Event::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "c".into(),
             data: vec![1],
         });
@@ -1254,6 +1288,7 @@ mod tests {
         );
         push(
             flow.handle_event(&Event::BleCharacteristicNotified {
+                device_id: "peer-1".into(),
                 uuid: vauchi_core::exchange::CHAR_DATA_NOTIFY.into(),
                 data: vec![0xCC; 32],
             }),

@@ -273,6 +273,8 @@ fn exchange_failed_fallback_actions_have_a11y_hints() {
         vauchi_app::i18n::Locale::English,
     );
     let _ = engine.handle_hardware_event(vauchi_core::Event::BleDisconnected {
+        device_id: "peer-1".to_string(),
+        direction: vauchi_core::BleLinkDirection::Outbound,
         reason: "peer hung up".to_string(),
     });
 

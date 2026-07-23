@@ -106,7 +106,7 @@ pub use exchange::{
 };
 
 pub mod platform;
-pub use platform::{Command, Event, FilePickPurpose, Orientation};
+pub use platform::{BleLinkDirection, Command, Event, FilePickPurpose, Orientation};
 
 pub mod recovery;
 pub mod relay_url;

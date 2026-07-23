@@ -130,6 +130,8 @@ fn forwarding_ble_discovery_advances_engine_to_exchanging() {
 fn ble_disconnect_forwarded_through_app_engine_renders_failed() {
     let mut engine = enter_ble_mode("mode:magic");
     let _ = engine.handle_hardware_event(Event::BleDisconnected {
+        device_id: "peer-1".into(),
+        direction: vauchi_core::BleLinkDirection::Outbound,
         reason: "peer hung up".into(),
     });
     assert_eq!(

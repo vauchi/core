@@ -167,6 +167,10 @@ pub struct ExchangeSession {
     /// Whether we initiated the BLE connection (scanner role).
     /// Set to `true` on `BleDeviceDiscovered`, determines who sends KeyOffer first.
     ble_is_initiator: bool,
+    /// Peer device id of the BLE link this session talks over. Latched on
+    /// `BleDeviceDiscovered`/`BleConnected`; stamped onto every outgoing
+    /// BLE command so shells route writes to the right link under glare.
+    ble_link_device: Option<String>,
     /// Buffered BLE handshake data (KeyAck or commitment) awaiting card data.
     ble_pending_handshake: Option<Vec<u8>>,
     /// Buffered BLE encrypted card data awaiting handshake data.
@@ -254,6 +258,7 @@ impl ExchangeSession {
             device_capabilities: None,
             usb_role: None,
             ble_is_initiator: false,
+            ble_link_device: None,
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
@@ -345,6 +350,7 @@ impl ExchangeSession {
             device_capabilities: None,
             usb_role: None,
             ble_is_initiator: false,
+            ble_link_device: None,
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
@@ -395,6 +401,7 @@ impl ExchangeSession {
             device_capabilities: None,
             usb_role: None,
             ble_is_initiator: false,
+            ble_link_device: None,
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
@@ -456,6 +463,7 @@ impl ExchangeSession {
             device_capabilities: None,
             usb_role: None,
             ble_is_initiator: false,
+            ble_link_device: None,
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
@@ -512,6 +520,7 @@ impl ExchangeSession {
             device_capabilities: None,
             usb_role: Some(role),
             ble_is_initiator: false,
+            ble_link_device: None,
             ble_pending_handshake: None,
             ble_pending_card: None,
             our_relay_url: None,
@@ -928,12 +937,12 @@ impl ExchangeSession {
             Event::QrScanned { data } => self.handle_qr_scanned(data),
             Event::NfcDataReceived { data } => self.handle_nfc_data_received(data),
             Event::BleConnected { device_id, .. } => self.handle_ble_connected(device_id),
-            Event::BleCharacteristicRead { uuid, data }
-            | Event::BleCharacteristicNotified { uuid, data } => {
+            Event::BleCharacteristicRead { uuid, data, .. }
+            | Event::BleCharacteristicNotified { uuid, data, .. } => {
                 self.handle_ble_characteristic_data(uuid, data)
             }
             Event::BleDeviceDiscovered { id, .. } => self.handle_ble_device_discovered(id),
-            Event::BleDisconnected { reason } => self.handle_ble_disconnected(reason),
+            Event::BleDisconnected { reason, .. } => self.handle_ble_disconnected(reason),
             Event::HardwareError { transport, error } => {
                 self.handle_hardware_error(transport, error)
             }
@@ -978,6 +987,7 @@ impl ExchangeSession {
     /// Handles BLE peer discovery — stop scanning and initiate connection.
     fn handle_ble_device_discovered(&mut self, id: String) -> Result<(), ExchangeError> {
         self.ble_is_initiator = true;
+        self.ble_link_device = Some(id.clone());
         self.emit_command(Command::BleStopScanning);
         self.emit_command(Command::BleConnect { device_id: id });
         Ok(())
@@ -1210,10 +1220,11 @@ impl ExchangeSession {
     /// If we're the initiator (saw `BleDeviceDiscovered` first), creates a
     /// `KeyOffer` and emits a `BleWriteCharacteristic` command to send it.
     /// Responders do nothing here — they wait for the KeyOffer to arrive.
-    fn handle_ble_connected(&mut self, _device_id: String) -> Result<(), ExchangeError> {
+    fn handle_ble_connected(&mut self, device_id: String) -> Result<(), ExchangeError> {
         if self.transport != ExchangeTransport::Ble {
             return Ok(());
         }
+        self.ble_link_device = Some(device_id.clone());
         if !self.ble_is_initiator {
             return Ok(()); // Responder waits for KeyOffer
         }
@@ -1223,6 +1234,7 @@ impl ExchangeSession {
         };
         let key_offer = hs.create_key_offer()?;
         self.emit_command(Command::BleWriteCharacteristic {
+            device_id,
             uuid: super::CHAR_HANDSHAKE_WRITE.to_string(),
             data: key_offer,
         });
@@ -1301,11 +1313,14 @@ impl ExchangeSession {
             let (our_commitment, our_encrypted_card) =
                 hs.process_key_ack(&key_ack, &their_card, self.clock.unix_seconds())?;
 
+            let link = self.ble_link_device.clone().unwrap_or_default();
             self.emit_command(Command::BleWriteCharacteristic {
+                device_id: link.clone(),
                 uuid: super::CHAR_HANDSHAKE_WRITE.to_string(),
                 data: our_commitment,
             });
             self.emit_command(Command::BleWriteCharacteristic {
+                device_id: link,
                 uuid: super::CHAR_DATA_WRITE.to_string(),
                 data: our_encrypted_card,
             });
@@ -1335,7 +1350,9 @@ impl ExchangeSession {
             let reveal = hs.process_committed_payload(&their_commitment, &their_card)?;
 
             // Send reveal back
+            let link = self.ble_link_device.clone().unwrap_or_default();
             self.emit_command(Command::BleWriteCharacteristic {
+                device_id: link,
                 uuid: super::CHAR_HANDSHAKE_NOTIFY.to_string(),
                 data: reveal,
             });

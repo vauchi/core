@@ -73,12 +73,28 @@ pub enum Command {
     BleStartScanning { service_uuid: String },
     /// Connect to a discovered BLE device.
     BleConnect { device_id: String },
-    /// Write data to a BLE characteristic.
-    BleWriteCharacteristic { uuid: String, data: Vec<u8> },
-    /// Read data from a BLE characteristic.
-    BleReadCharacteristic { uuid: String },
-    /// Disconnect from the current BLE peer.
-    BleDisconnect,
+    /// Write data to a BLE characteristic on the link to `device_id`.
+    ///
+    /// `device_id` addresses the target link so shells holding more than
+    /// one live link (glare) route the write to the right peer instead
+    /// of an implicit "current" connection
+    /// (`_private/docs/designs/2026-07-22-role-tiebreak-and-glare-design.md`).
+    BleWriteCharacteristic {
+        device_id: String,
+        uuid: String,
+        data: Vec<u8>,
+    },
+    /// Read data from a BLE characteristic on the link to `device_id`.
+    BleReadCharacteristic { device_id: String, uuid: String },
+    /// Disconnect one specific BLE link, addressed by peer and direction.
+    ///
+    /// Targeted (not "disconnect everything") so glare resolution can drop
+    /// exactly the losing link while the surviving link keeps carrying the
+    /// handshake.
+    BleDisconnect {
+        device_id: String,
+        direction: BleLinkDirection,
+    },
 
     /// Activate the NFC interface and prepare to exchange `payload`.
     NfcActivate { payload: Vec<u8> },
@@ -416,7 +432,7 @@ impl Command {
             Self::BleConnect { .. } => "BleConnect",
             Self::BleWriteCharacteristic { .. } => "BleWriteCharacteristic",
             Self::BleReadCharacteristic { .. } => "BleReadCharacteristic",
-            Self::BleDisconnect => "BleDisconnect",
+            Self::BleDisconnect { .. } => "BleDisconnect",
             Self::NfcActivate { .. } => "NfcActivate",
             Self::NfcDeactivate => "NfcDeactivate",
             Self::NfcSendApdu { .. } => "NfcSendApdu",
@@ -490,11 +506,31 @@ pub enum Event {
         direction: BleLinkDirection,
     },
     /// Data read from a BLE characteristic (response to `BleReadCharacteristic`).
-    BleCharacteristicRead { uuid: String, data: Vec<u8> },
+    ///
+    /// `device_id` names the link the data arrived on so core can reject
+    /// events from a stale/losing link under glare instead of feeding them
+    /// into the surviving session.
+    BleCharacteristicRead {
+        device_id: String,
+        uuid: String,
+        data: Vec<u8>,
+    },
     /// BLE characteristic notification received (unsolicited push from peripheral).
-    BleCharacteristicNotified { uuid: String, data: Vec<u8> },
-    /// BLE connection lost or closed.
-    BleDisconnected { reason: String },
+    /// `device_id` names the link the notification arrived on (see
+    /// [`Event::BleCharacteristicRead`]).
+    BleCharacteristicNotified {
+        device_id: String,
+        uuid: String,
+        data: Vec<u8>,
+    },
+    /// One BLE link was lost or closed. `device_id` + `direction` identify
+    /// exactly which link, so dropping a losing glare link is distinguishable
+    /// from losing the surviving session's link.
+    BleDisconnected {
+        device_id: String,
+        direction: BleLinkDirection,
+        reason: String,
+    },
 
     /// NFC data received from a tap exchange.
     NfcDataReceived { data: Vec<u8> },
@@ -737,7 +773,10 @@ mod tests {
                 service_uuid: "uuid".into(),
                 payload: vec![1, 2, 3],
             },
-            Command::BleDisconnect,
+            Command::BleDisconnect {
+                device_id: "d1".into(),
+                direction: BleLinkDirection::Outbound,
+            },
             Command::NfcActivate {
                 payload: vec![0xAA],
             },
@@ -813,10 +852,13 @@ mod tests {
                 direction: BleLinkDirection::Outbound,
             },
             Event::BleCharacteristicRead {
+                device_id: "d1".into(),
                 uuid: "char1".into(),
                 data: vec![0x0B],
             },
             Event::BleDisconnected {
+                device_id: "d1".into(),
+                direction: BleLinkDirection::Outbound,
                 reason: "timeout".into(),
             },
             Event::NfcDataReceived { data: vec![0xCC] },
@@ -898,6 +940,7 @@ mod tests {
     #[test]
     fn command_clone_equals_original() {
         let cmd = Command::BleWriteCharacteristic {
+            device_id: "d1".into(),
             uuid: "test-uuid".into(),
             data: vec![1, 2, 3, 4, 5],
         };
@@ -909,6 +952,7 @@ mod tests {
     #[test]
     fn event_clone_equals_original() {
         let evt = Event::BleCharacteristicNotified {
+            device_id: "d1".into(),
             uuid: "notify-uuid".into(),
             data: vec![0xDE, 0xAD],
         };
@@ -933,11 +977,18 @@ mod tests {
                 device_id: "".into(),
             },
             Command::BleWriteCharacteristic {
+                device_id: "".into(),
                 uuid: "".into(),
                 data: vec![],
             },
-            Command::BleReadCharacteristic { uuid: "".into() },
-            Command::BleDisconnect,
+            Command::BleReadCharacteristic {
+                device_id: "".into(),
+                uuid: "".into(),
+            },
+            Command::BleDisconnect {
+                device_id: "".into(),
+                direction: BleLinkDirection::Outbound,
+            },
             Command::NfcActivate { payload: vec![] },
             Command::NfcDeactivate,
             Command::AudioEmitChallenge {
@@ -1000,14 +1051,20 @@ mod tests {
                 direction: BleLinkDirection::Outbound,
             },
             Event::BleCharacteristicRead {
+                device_id: "".into(),
                 uuid: "".into(),
                 data: vec![],
             },
             Event::BleCharacteristicNotified {
+                device_id: "".into(),
                 uuid: "".into(),
                 data: vec![],
             },
-            Event::BleDisconnected { reason: "".into() },
+            Event::BleDisconnected {
+                device_id: "".into(),
+                direction: BleLinkDirection::Outbound,
+                reason: "".into(),
+            },
             Event::NfcDataReceived { data: vec![] },
             Event::AudioSamplesRecorded {
                 samples: vec![],

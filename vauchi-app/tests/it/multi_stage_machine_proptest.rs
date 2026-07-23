@@ -75,6 +75,8 @@ fn arb_non_fatal_event() -> impl Strategy<Value = Event> {
         .prop_map(|transport| Event::HardwareUnavailable { transport }),
         // Stray events — also non-fatal.
         Just(Event::BleDisconnected {
+            device_id: "spurious".into(),
+            direction: vauchi_core::BleLinkDirection::Outbound,
             reason: "spurious".into()
         }),
         Just(Event::LinkShared),
@@ -125,6 +127,8 @@ fn arb_event() -> impl Strategy<Value = Event> {
         prop_oneof![Just("camera".to_string()), Just("microphone".to_string()),]
             .prop_map(|transport| Event::PermissionDenied { transport }),
         Just(Event::BleDisconnected {
+            device_id: "spurious".into(),
+            direction: vauchi_core::BleLinkDirection::Outbound,
             reason: "spurious".into()
         }),
         Just(Event::NfcDataReceived {

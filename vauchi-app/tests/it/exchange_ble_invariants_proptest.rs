@@ -43,13 +43,17 @@ fn arb_post_complete_event() -> impl Strategy<Value = Event> {
             direction: BleLinkDirection::Outbound,
         }),
         Just(Event::BleDisconnected {
+            device_id: "spurious".into(),
+            direction: BleLinkDirection::Outbound,
             reason: "late disconnect".into(),
         }),
         Just(Event::BleCharacteristicNotified {
+            device_id: "spurious".into(),
             uuid: "spurious".into(),
             data: vec![1, 2, 3],
         }),
         Just(Event::BleCharacteristicRead {
+            device_id: "spurious".into(),
             uuid: "spurious".into(),
             data: vec![],
         }),

@@ -102,18 +102,34 @@ fn ble_completion_renders_rich_success_summary() {
     for _ in 0..50 {
         let mut routed = 0;
         for cmd in alice.drain_pending_commands() {
-            if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = cmd {
+            if let vauchi_core::Command::BleWriteCharacteristic {
+                device_id,
+                uuid,
+                data,
+            } = cmd
+            {
                 routed += 1;
-                let ev = bob
-                    .forward_ble_hardware_event(&Event::BleCharacteristicNotified { uuid, data });
+                let ev = bob.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
+                    device_id,
+                    uuid,
+                    data,
+                });
                 bob.apply_ble_machine_event(ev);
             }
         }
         for cmd in bob.drain_pending_commands() {
-            if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = cmd {
+            if let vauchi_core::Command::BleWriteCharacteristic {
+                device_id,
+                uuid,
+                data,
+            } = cmd
+            {
                 routed += 1;
-                let ev = alice
-                    .forward_ble_hardware_event(&Event::BleCharacteristicNotified { uuid, data });
+                let ev = alice.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
+                    device_id,
+                    uuid,
+                    data,
+                });
                 alice.apply_ble_machine_event(ev);
             }
         }

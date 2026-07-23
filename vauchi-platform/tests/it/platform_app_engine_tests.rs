@@ -1138,6 +1138,7 @@ fn ble_machine_terminal_event_fires_invalidation_and_flips_chrome() {
     // forever (P5b re-test, `2026-06-06-android-ble-execution`).
     engine
         .handle_hardware_event(MobileEvent::BleCharacteristicNotified {
+            device_id: "peer-1".into(),
             uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567897".into(),
             data: vec![0u8; 8],
         })

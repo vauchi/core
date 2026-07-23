@@ -180,6 +180,21 @@ impl AppEngine {
             return None;
         }
 
+        // Phase-3 glare cleanup: the handshake machine deliberately tears
+        // down the losing glare link; its BleDisconnected is cleanup, not a
+        // session failure — swallowing it here keeps the flow's
+        // "disconnection is always a failure" rule true for the link that
+        // actually carries the exchange.
+        if let Event::BleDisconnected {
+            device_id,
+            direction,
+            ..
+        } = &event
+            && self.ble_machine_survives_disconnect(device_id, *direction)
+        {
+            return None;
+        }
+
         // ADR-031: For error events, build a user-friendly UI response
         // before delegating to the engine (which may transition to Failed).
         let ui_override = match &event {

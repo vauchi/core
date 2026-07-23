@@ -319,6 +319,16 @@ impl BleHandshakeMachine {
         self.link_device.clone().unwrap_or_default()
     }
 
+    /// The link this machine currently rides, if one is latched. Lets the
+    /// AppEngine distinguish the surviving link's disconnect (a real
+    /// failure) from the torn-down glare loser's (cleanup).
+    pub fn active_link(&self) -> Option<(String, BleLinkDirection)> {
+        match (&self.link_device, self.link_direction) {
+            (Some(device), Some(direction)) => Some((device.clone(), direction)),
+            _ => None,
+        }
+    }
+
     /// Currently negotiated usable MTU (payload bytes per chunk).
     pub fn mtu_usable(&self) -> usize {
         self.mtu_usable

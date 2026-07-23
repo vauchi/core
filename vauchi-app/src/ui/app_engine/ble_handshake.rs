@@ -163,6 +163,30 @@ impl AppEngine {
         self.ble_handshake_session.is_some()
     }
 
+    /// Whether an addressed `BleDisconnected` names a link OTHER than the
+    /// one the active, non-terminal handshake machine rides — i.e. the
+    /// deliberately torn-down glare loser. Such a disconnect is cleanup,
+    /// not a session failure, and must not tear the exchange flow down.
+    /// Un-addressed disconnects (empty id) are wildcards: never survived.
+    pub(crate) fn ble_machine_survives_disconnect(
+        &self,
+        device_id: &str,
+        direction: vauchi_core::BleLinkDirection,
+    ) -> bool {
+        let Some(holder) = self.ble_handshake_session.as_ref() else {
+            return false;
+        };
+        if holder.machine.is_terminal() {
+            return false;
+        }
+        match holder.machine.active_link() {
+            Some((active, active_dir)) if !active.is_empty() && !device_id.is_empty() => {
+                active != device_id || active_dir != direction
+            }
+            _ => false,
+        }
+    }
+
     /// Read the held machine's current phase, if any.
     pub fn ble_machine_phase(&self) -> Option<BleMachinePhase> {
         self.ble_handshake_session

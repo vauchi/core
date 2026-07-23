@@ -89,15 +89,18 @@ include:
 variables:
   VAUCHI_SCRIPTS_REF: "d6fb250c9eac465a9328bea36153677917774173"
 
-# Ceiling for jobs that compile the full dependency tree. A fresh or
-# reinstalled shell runner has zero per-job caches, so ALL of these jobs
-# cold-build the whole tree concurrently and CPU contention multiplies
-# their solo durations: measured 57-60m+ under 3-way contention
-# (pipelines 2699547003 / 2699666347, runner allyson post-reinstall) vs
-# ~25m solo. One green run per job uploads its cache and returns it to
-# minutes, so 2h only ever bites during a cold-start herd — warm runs
-# are unaffected. The template .timeout-extended is 45m (SHORTER than
-# .timeout-long), hence this local tier.
+# Ceiling for jobs that compile the full dependency tree. On a fresh or
+# reinstalled shell runner ALL warm state is gone at once — per-slot
+# target/ dirs (GIT_STRATEGY:none persistence), sccache, and the
+# registry-only GitLab cache — so these jobs cold-build the whole tree
+# concurrently and CPU contention multiplies solo durations: measured
+# 57-60m+ under 3-way contention (pipelines 2699547003 / 2699666347,
+# allyson post-reinstall) vs ~25m solo. Warm runs are unaffected; note
+# the GitLab cache does NOT carry target/, so recovery comes from slot
+# target/ reuse + sccache, not cache uploads. Root-cause record:
+# _private backlog 2026-07-23-ci-cold-runner-cache-meltdown. The shared
+# template's .timeout-extended is 45m (SHORTER than .timeout-long),
+# hence this local tier.
 .timeout-cold-rebuild:
   timeout: 2 hours
 

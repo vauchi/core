@@ -388,14 +388,20 @@ impl WorkflowEngine for BleExchangeEngine {
         self.build_screen()
     }
 
-    /// Emit the initial advertise/scan commands once, on first screen entry —
-    /// the BLE equivalent of the legacy `start_ble_mode` entry commands.
+    /// Prepare mode-specific hardware and emit the initial advertise/scan
+    /// commands once, on first screen entry.
     fn screen_entered(&mut self) -> Vec<Command> {
         if self.started || self.cancelled || self.screen != BleScreen::Active {
             return Vec::new();
         }
         self.started = true;
-        self.start_commands()
+
+        let mut commands = Vec::with_capacity(3);
+        if self.mode == ExchangeMode::Glance {
+            commands.push(Command::SwitchCamera { use_front: false });
+        }
+        commands.extend(self.start_commands());
+        commands
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {

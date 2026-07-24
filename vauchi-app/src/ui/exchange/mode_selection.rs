@@ -527,8 +527,14 @@ mod tests {
             detail.starts_with("Recommended · "),
             "hero detail should carry the marker, got: {detail}"
         );
+        // Expected copy comes from the same bundle the engine reads —
+        // instruction wording is the locales repo's contract, not this
+        // test's. The key-exists guard keeps the assertion non-tautological
+        // (a missing key would echo through both sides identically).
+        let glance_instruction = get_string(Locale::English, "exchange.mode_instruction.glance");
+        assert_ne!(glance_instruction, "exchange.mode_instruction.glance");
         assert!(
-            detail.contains("Point cameras at each other's screen"),
+            detail.contains(&glance_instruction),
             "hero detail should still include the instruction, got: {detail}"
         );
         // Recommendation no longer rides on the icon — that's the per-mode glyph.
@@ -593,9 +599,11 @@ mod tests {
         // Hover is available with full caps and is not the hero (Glance is),
         // so its detail is the plain instruction (no "Recommended" marker).
         let hover = find_mode_item(&screen, "hover").expect("Hover should be listed");
+        let hover_instruction = get_string(Locale::English, "exchange.mode_instruction.hover");
+        assert_ne!(hover_instruction, "exchange.mode_instruction.hover");
         assert_eq!(
             hover.detail.as_deref(),
-            Some("Hold the phones close together"),
+            Some(hover_instruction.as_str()),
             "available non-hero mode shows its instruction"
         );
     }

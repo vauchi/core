@@ -52,6 +52,11 @@ pub struct ProximityRunner {
     recording_done: bool,
 }
 
+/// Total-acceleration magnitude (gravity included) at or above which a
+/// Bump is a verified impact. Per the exchange plan; shared by the raw
+/// accelerometer-stream and the (legacy) `ImpactDetected` paths.
+const IMPACT_THRESHOLD_G: f32 = 2.5;
+
 impl ProximityRunner {
     /// Create a new runner for the given method.
     pub fn new(method: ProximityMethod) -> Self {
@@ -141,6 +146,40 @@ impl ProximityRunner {
 
             (
                 ProximityMethod::Impact,
+                Event::AccelerometerData {
+                    x_milli_g,
+                    y_milli_g,
+                    z_milli_g,
+                    ..
+                },
+            ) => {
+                // Platforms stream raw axes and never emit
+                // `Event::ImpactDetected` (AccelerometerProximityService
+                // .{kt,swift} document "decision logic lives in core"), so
+                // Bump derives the impact peak here from the same magnitude
+                // scale + threshold as the legacy ImpactDetected arm below.
+                // Without this, Impact-mode proximity never completes
+                // (exchange-mode reliability Phase C).
+                let x = *x_milli_g as f32 / 1000.0;
+                let y = *y_milli_g as f32 / 1000.0;
+                let z = *z_milli_g as f32 / 1000.0;
+                let magnitude_g = (x * x + y * y + z * z).sqrt();
+                if magnitude_g >= IMPACT_THRESHOLD_G {
+                    let confidence = (magnitude_g / 5.0).min(0.6);
+                    self.result = Some(ProximityRunnerResult {
+                        method: self.method,
+                        confidence,
+                        verified: true,
+                    });
+                    self.done = true;
+                    vec![Command::AccelerometerStop]
+                } else {
+                    vec![]
+                }
+            }
+
+            (
+                ProximityMethod::Impact,
                 Event::ImpactDetected {
                     magnitude_milli_g, ..
                 },
@@ -149,7 +188,7 @@ impl ProximityRunner {
                 let magnitude_g = *magnitude_milli_g as f32 / 1000.0;
                 // Confidence capped at 0.6 per spec
                 let confidence = (magnitude_g / 5.0).min(0.6);
-                let verified = magnitude_g >= 2.5; // Threshold per plan
+                let verified = magnitude_g >= IMPACT_THRESHOLD_G;
                 self.result = Some(ProximityRunnerResult {
                     method: self.method,
                     confidence,
@@ -333,6 +372,43 @@ mod tests {
         assert!(result.verified);
         assert!(result.confidence > 0.0);
         assert!(result.confidence <= 0.6); // Capped per spec
+        assert!(matches!(cmds[0], Command::AccelerometerStop));
+    }
+
+    // @internal
+    #[test]
+    fn impact_runner_detects_impact_from_raw_accelerometer_stream() {
+        // Platforms stream Event::AccelerometerData (raw axes) and never
+        // emit Event::ImpactDetected (AccelerometerProximityService.{kt,
+        // swift}). Bump must therefore derive the impact peak in Core from
+        // the raw stream, or it never completes (exchange-mode reliability
+        // Phase C; contract-truth record).
+        let mut runner = ProximityRunner::new(ProximityMethod::Impact);
+
+        // Resting samples (~1g gravity) must not complete the runner.
+        for _ in 0..5 {
+            let cmds = runner.feed_event(&Event::AccelerometerData {
+                timestamp_ms: 0,
+                x_milli_g: 0,
+                y_milli_g: 0,
+                z_milli_g: 1000,
+            });
+            assert!(cmds.is_empty(), "resting samples emit no command");
+        }
+        assert!(!runner.is_done(), "resting stream must not complete Bump");
+
+        // A 3g spike (above the 2.5g threshold) completes with a verified
+        // result and stops the accelerometer.
+        let cmds = runner.feed_event(&Event::AccelerometerData {
+            timestamp_ms: 10,
+            x_milli_g: 0,
+            y_milli_g: 0,
+            z_milli_g: 3000,
+        });
+        assert!(runner.is_done(), "impact spike must complete Bump");
+        let result = runner.result().unwrap();
+        assert!(result.verified);
+        assert!(result.confidence > 0.0 && result.confidence <= 0.6);
         assert!(matches!(cmds[0], Command::AccelerometerStop));
     }
 

@@ -406,6 +406,7 @@ mod fault_schedule_props {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(64))]
 
+        // @internal
         #[test]
         fn benign_fault_schedules_always_complete(
             ops in proptest::collection::vec((0u8..3, prop::bool::ANY), 0..6)

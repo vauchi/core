@@ -219,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn no_nfc_makes_tap_modes_unavailable() {
+    fn no_nfc_makes_tap_tap_unavailable_but_not_tap_hover_shake() {
         let caps = DeviceCapabilities {
             has_nfc: false,
             ..full_caps()
@@ -230,10 +230,12 @@ mod tests {
                 reason: "Requires NFC".to_string()
             }
         );
-        assert!(matches!(
+        // TapHoverShake ships the multi-stage-QR ritual — no NFC involved
+        // (exchange-mode-contract-truth record, owner decision 2026-07-20).
+        assert_eq!(
             check_mode_availability(ExchangeMode::TapHoverShake, &caps),
-            ModeAvailability::Unavailable { .. }
-        ));
+            ModeAvailability::Available
+        );
     }
 
     #[test]

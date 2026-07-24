@@ -38,7 +38,10 @@ pub enum ExchangeMode {
     /// `start_taptap_mode`. (Previously documented as "BLE bootstrapped via
     /// NFC tap" — stale; the implementation is NFC end to end.)
     TapTap,
-    /// NFC + BLE + audio + accelerometer multi-factor in-person exchange.
+    /// Multi-stage QR exchange (like `Hover`) plus the accelerometer shake
+    /// signal. The composite NFC+BLE+audio+accel ritual is deferred until
+    /// the single-factor modes pass in isolation (owner decision
+    /// 2026-07-20; dispatched via `StartMultiStageExchange`).
     TapHoverShake,
     /// Async remote exchange via a shareable URL.
     Link,
@@ -284,19 +287,18 @@ static MODE_TAP_TAP: ModeConfig = ModeConfig {
 };
 
 static MODE_TAP_HOVER_SHAKE: ModeConfig = ModeConfig {
-    data_transport: DataTransport::Ble,
-    bootstrap: BootstrapMethod::NfcAndBle,
-    proximity: &[
-        ProximityMethod::NfcRange,
-        ProximityMethod::Audio,
-        ProximityMethod::Accelerometer,
-    ],
+    // Describes the shipped multi-stage-QR ritual (Hover + shake signal).
+    // The composite NFC+BLE ritual this mode once advertised is deferred
+    // until the single-factor modes pass in isolation (owner decision
+    // 2026-07-20, exchange-mode-contract-truth record).
+    data_transport: DataTransport::QrMultiStage,
+    bootstrap: BootstrapMethod::QrMutualScan,
+    proximity: &[ProximityMethod::Audio, ProximityMethod::Accelerometer],
     fallback_transport: Some(DataTransport::Relay),
     context: ExchangeContext::InPerson,
     timeout: Duration::from_secs(90),
     requires: &[
-        DeviceRequirement::Ble,
-        DeviceRequirement::Nfc,
+        DeviceRequirement::Camera,
         DeviceRequirement::Microphone,
         DeviceRequirement::Speaker,
         DeviceRequirement::Accelerometer,
@@ -314,7 +316,7 @@ static MODE_LINK: ModeConfig = ModeConfig {
 };
 
 static MODE_CABLE: ModeConfig = ModeConfig {
-    data_transport: DataTransport::Ble,
+    data_transport: DataTransport::UsbDirect,
     bootstrap: BootstrapMethod::UsbCable,
     proximity: &[ProximityMethod::WiredConnection],
     fallback_transport: Some(DataTransport::Relay),

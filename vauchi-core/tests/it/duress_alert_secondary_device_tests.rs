@@ -784,6 +784,14 @@ fn established_primary_channel_survives_sibling_genesis_alert() {
         ReceiveOutcome::Alert(a) => assert_eq!(a.message, "from primary"),
         other => panic!("expected A1's post-genesis alert, got {other:?}"),
     }
+
+    // Exactly the one declined re-seat (the sibling's genesis over A1's live
+    // session) is counted — the F4-urgency signal, not an approximation.
+    assert_eq!(
+        bob.storage().genesis_limits().reseat_skips().unwrap(),
+        1,
+        "the declined re-seat must increment the skip counter exactly once"
+    );
 }
 
 // @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts

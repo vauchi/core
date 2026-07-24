@@ -705,6 +705,231 @@ fn genesis_receive_survives_a_commit_failure_and_retry_succeeds() {
     );
 }
 
+/// An ordinary (non-genesis) alert blob as the exchanging device A1 would send
+/// it over its established `[0;32]` session: signed by the Alice identity,
+/// ratchet-encrypted with A1's initiator chain.
+fn a1_session_alert_blob(
+    a1_ratchet: &mut DoubleRatchetState,
+    alice: &Identity,
+    bob_pk: &[u8; 32],
+    nonce: [u8; 32],
+    timestamp: u64,
+) -> Vec<u8> {
+    let alert = SafetyAlertPayload::new(
+        AlertKind::Emergency,
+        "from primary".to_string(),
+        timestamp,
+        None,
+        nonce,
+        alice,
+        bob_pk,
+    )
+    .expect("alert construction");
+    let inner = VersionedPayload::encode_alert(&alert);
+    let message = a1_ratchet.encrypt(&inner).expect("ratchet encrypt");
+    serde_json::to_vec(&message).unwrap()
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// Guarded invariant 1 (ADR-064 Amendment 2026-07-24): a sibling's genesis
+/// alert must NOT re-seat the recipient's established `[0;32]` session — doing
+/// so silently severs the exchanging device's channel, and that device is the
+/// sole card mediator for the relationship
+/// (`problems/2026-07-24-genesis-reseat-severs-live-primary-channel`).
+/// Sequence: A1 message decrypts (control) → A2 genesis alert surfaces →
+/// A1's NEXT message on the same chain must still decrypt.
+// @internal
+#[test]
+#[ignore = "RED: receive-side genesis re-seat guard not implemented yet"]
+fn established_primary_channel_survives_sibling_genesis_alert() {
+    let alice = Identity::create("Alice", 0);
+    let shared_bytes = [0xA1u8; 32];
+    let (bob, alice_id, broadcast) = session_less_pair(&alice, shared_bytes);
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+
+    // A1 <-> Bob established session pair over the legacy [0;32] slot.
+    let (mut a1_ratchet, bob_ratchet) = setup_ratchets(&SymmetricKey::from_bytes(shared_bytes));
+    bob.storage()
+        .ratchets()
+        .save_ratchet_state_for_device(&alice_id, &[0; 32], &bob_ratchet, false)
+        .unwrap();
+
+    // Control: A1's ordinary session message reaches Bob.
+    let first = a1_session_alert_blob(&mut a1_ratchet, &alice, &bob_pk, [0x01u8; 32], 7_000);
+    let outcome =
+        process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &first)
+            .expect("A1's message over the established session must be received");
+    match outcome {
+        ReceiveOutcome::Alert(a) => assert_eq!(a.message, "from primary"),
+        other => panic!("expected A1's alert, got {other:?}"),
+    }
+
+    // A2 (session-less sibling) raises a genesis alert; it must surface.
+    let genesis = genesis_alert_blob(&alice, &bob_pk, shared_bytes, &broadcast, [0x02u8; 32]);
+    let outcome =
+        process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &genesis)
+            .expect("the sibling's genesis alert must be received");
+    match outcome {
+        ReceiveOutcome::Alert(a) => assert_eq!(a.kind, AlertKind::Emergency),
+        other => panic!("expected the sibling's alert, got {other:?}"),
+    }
+
+    // The still-alive A1 sends its NEXT message on the same chain. If the
+    // genesis receive re-seated [0;32], this fails DecryptionFailed and the
+    // primary's channel is silently dead.
+    let second = a1_session_alert_blob(&mut a1_ratchet, &alice, &bob_pk, [0x03u8; 32], 7_100);
+    let outcome =
+        process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &second)
+            .expect("A1's channel must survive the sibling's genesis alert");
+    match outcome {
+        ReceiveOutcome::Alert(a) => assert_eq!(a.message, "from primary"),
+        other => panic!("expected A1's post-genesis alert, got {other:?}"),
+    }
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// Guarded invariant 2 (ADR-064 Amendment 2026-07-24): the alert send path
+/// must NOT persist the genesis initiator session. If it does, the sibling's
+/// second alert rides an ordinary ratchet message a guarded receiver cannot
+/// decrypt — ACKed and silently lost: exactly one alert per sibling, ever.
+/// The absence of the persisted row IS the contract here, not an
+/// implementation detail.
+// @internal
+#[test]
+#[ignore = "RED: send-side genesis session persist skip not implemented yet"]
+fn alert_send_leaves_no_genesis_session_behind() {
+    let (secondary, bob_id) = secondary_device_after_owner_sync();
+    let mut secondary = secondary;
+
+    secondary
+        .configure_emergency_broadcast(vec![bob_id.clone()], "check on me".into(), false)
+        .unwrap();
+    let result = secondary.send_emergency_broadcast().unwrap();
+    assert_eq!(result.sent, 1, "the genesis alert must be queued");
+
+    assert!(
+        secondary
+            .storage()
+            .ratchets()
+            .load_ratchet_state_for_device(&bob_id, &[0; 32])
+            .unwrap()
+            .is_none(),
+        "the alert send path must not persist the genesis initiator session — \
+         every sibling alert must re-genesis so a guarded receiver can open it"
+    );
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// Pairing pin: a SECOND alert from the same session-less sibling must reach
+/// the recipient. Green today (via the unguarded re-seat + persisted sender
+/// session); it is the cell a receive-only guard would silently break, so it
+/// must stay green through the two-sided change (both alerts arrive as
+/// self-contained genesis envelopes once the send-side skip lands).
+// @internal
+#[test]
+fn repeat_sibling_alerts_keep_reaching_recipient() {
+    use std::time::{Duration, SystemTime};
+    use vauchi_core::api::emergency::BROADCAST_COOLDOWN_SECS;
+    use vauchi_core::clock::{Clock, FakeClock};
+    use vauchi_core::rng::{OsSecureRng, SecureRng};
+
+    // A fake clock so the second broadcast can pass the send cooldown
+    // without a real-time wait (CC-06).
+    let fake_clock = std::sync::Arc::new(FakeClock::new(
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+    ));
+    let clock: std::sync::Arc<dyn Clock> = fake_clock.clone();
+    let rng: std::sync::Arc<dyn SecureRng> = OsSecureRng::shared();
+    let mut alice_secondary =
+        Vauchi::in_memory_with_clock_and_rng(clock, rng).expect("in-memory Vauchi");
+    alice_secondary.create_identity("Alice").unwrap();
+    let bob = create_vauchi_with_identity("Bob");
+    let alice_pk = *alice_secondary.identity().unwrap().signing_public_key();
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+    let shared_bytes = [0xB2u8; 32];
+
+    let bob_contact_at_alice = Contact::from_exchange(
+        bob_pk,
+        ContactCard::new("Bob"),
+        SymmetricKey::from_bytes(shared_bytes),
+        0,
+    );
+    let bob_id_at_alice = bob_contact_at_alice.id().to_string();
+    alice_secondary.add_contact(bob_contact_at_alice).unwrap();
+
+    let alice_contact_at_bob = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        SymmetricKey::from_bytes(shared_bytes),
+        0,
+    );
+    let alice_id_at_bob = alice_contact_at_bob.id().to_string();
+    bob.add_contact(alice_contact_at_bob).unwrap();
+
+    alice_secondary
+        .configure_emergency_broadcast(vec![bob_id_at_alice.clone()], "first alarm".into(), false)
+        .unwrap();
+    assert_eq!(alice_secondary.send_emergency_broadcast().unwrap().sent, 1);
+    let first_blob = alice_secondary
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap()
+        .into_iter()
+        .find(|u| u.contact_id == bob_id_at_alice)
+        .expect("first queued alert")
+        .payload;
+    let outcome = process_single_card_update(
+        bob.identity().unwrap(),
+        bob.storage(),
+        &alice_id_at_bob,
+        &first_blob,
+    )
+    .expect("the first sibling alert must be received");
+    match outcome {
+        ReceiveOutcome::Alert(a) => assert_eq!(a.message, "first alarm"),
+        other => panic!("expected the first alert, got {other:?}"),
+    }
+
+    // The coerced user re-raises the alarm from the same device, past the
+    // send cooldown.
+    fake_clock.advance(Duration::from_secs(BROADCAST_COOLDOWN_SECS + 1));
+    alice_secondary
+        .configure_emergency_broadcast(vec![bob_id_at_alice.clone()], "second alarm".into(), false)
+        .unwrap();
+    assert_eq!(alice_secondary.send_emergency_broadcast().unwrap().sent, 1);
+    let second_blob = alice_secondary
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap()
+        .into_iter()
+        .filter(|u| u.contact_id == bob_id_at_alice)
+        .map(|u| u.payload)
+        .find(|p| p != &first_blob)
+        .expect("a second, distinct queued alert");
+    let outcome = process_single_card_update(
+        bob.identity().unwrap(),
+        bob.storage(),
+        &alice_id_at_bob,
+        &second_blob,
+    )
+    .expect("the second sibling alert must be received — never one-alert-ever");
+    match outcome {
+        ReceiveOutcome::Alert(a) => assert_eq!(a.message, "second alarm"),
+        other => panic!("expected the second alert, got {other:?}"),
+    }
+    assert_eq!(
+        bob.storage()
+            .safety_alerts()
+            .load_unsurfaced_facts()
+            .unwrap()
+            .len(),
+        2,
+        "both alerts must persist as distinct durable facts"
+    );
+}
+
 // @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 /// A signed alert reusing an existing fact's nonce with DIFFERENT bytes is a
 /// deterministic integrity conflict: the accept transaction rolls back, the

@@ -76,7 +76,7 @@ fn mode_picker_renders_german() {
     assert_eq!(hero.label, "Glance");
     assert_eq!(
         hero.detail.as_deref(),
-        Some("Empfohlen · Kameras auf den Bildschirm des anderen richten")
+        Some("Empfohlen · Zeigen Sie Ihren Code oder scannen Sie ihren")
     );
 
     // Expanded: an unauthenticated mode carries the localized marker.
@@ -113,6 +113,6 @@ fn mode_picker_english_copy_unchanged() {
     let hero = find_item(&picker, "mode:glance").expect("hero present");
     assert_eq!(
         hero.detail.as_deref(),
-        Some("Recommended · Point cameras at each other's screen")
+        Some("Recommended · Show your code or scan theirs")
     );
 }

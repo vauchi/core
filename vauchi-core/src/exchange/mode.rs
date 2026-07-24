@@ -20,10 +20,10 @@ use std::time::Duration;
 pub enum ExchangeMode {
     /// Scan a one-sided QR code, then BLE transfers the card — a quick
     /// "glance" at one peer's QR to bootstrap a BLE connection (the other peer
-    /// shows the QR). **Not yet implemented:** the config currently named
-    /// `MODE_GLANCE` is a multi-stage-QR config (that transport belongs to the
-    /// `Hover` family), mislabelled as Glance. The real Glance flow (one-sided
-    /// QR bootstrap + BLE data) is tracked by the exchange-mode taxonomy design.
+    /// shows the QR). Config and dispatch follow this ritual since the G3
+    /// graduation. Open gap: the handshake pins peer identity on a 2-byte
+    /// advertisement prefix instead of the full QR-pinned identity — see
+    /// `designs/2026-07-24-exchange-mode-contracts-design.md` (private).
     Glance,
     /// Bidirectional multi-stage QR + ultrasonic audio proximity confirmation.
     Hover,

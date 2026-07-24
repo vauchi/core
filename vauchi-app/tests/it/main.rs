@@ -32,6 +32,7 @@ mod batch2_i18n_tests;
 mod batch3_i18n_tests;
 mod ble_exchange_app_engine_tests;
 mod ble_handshake_machine_tests;
+mod ble_pair_fault_gate_tests;
 mod canonical_screen_id_tests;
 mod component_serialization_tests;
 mod contact_detail_engine_tests;

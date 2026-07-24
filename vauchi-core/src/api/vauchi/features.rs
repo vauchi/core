@@ -600,12 +600,12 @@ impl Vauchi {
         // StaleVersion (the 2026-07-19 delta-version-floor bug).
         let now = self.clock.unix_seconds();
         self.seal_and_persist_card_delta(identity, &mut contact, delta, |prepared| {
-            for (_, encrypted, _, _) in prepared {
+            for payload in prepared {
                 let update = PendingUpdate {
                     id: self.rng.uuid_v4(),
                     contact_id: contact_id.to_string(),
                     update_type: "card_delta".to_string(),
-                    payload: encrypted.clone(),
+                    payload: payload.encrypted.clone(),
                     created_at: now,
                     retry_count: 0,
                     status: UpdateStatus::Pending,

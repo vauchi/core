@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 63] = [
+const MIGRATIONS: [Migration; 64] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -587,7 +587,28 @@ const MIGRATIONS: [Migration; 63] = [
         name: "genesis_decrypt_limits",
         action: MigrationAction::Sql(MIGRATION_V63_GENESIS_DECRYPT_LIMITS),
     },
+    Migration {
+        version: 64,
+        name: "genesis_reseat_skips",
+        action: MigrationAction::Sql(MIGRATION_V64_GENESIS_RESEAT_SKIPS),
+    },
 ];
+
+/// Migration v64: PII-free counter of genesis re-seats declined by the guard.
+///
+/// The receive guard persists a genesis-advanced `[0;32]` session only when no
+/// session exists (ADR-064 Amendment 2026-07-24, guarded invariant 1). A skip
+/// means a sibling alert arrived while a session existed — the population
+/// where lost-primary orphaning risk lives — so the count sizes the urgency of
+/// F4 registry activation. Global singleton only: a per-contact count would be
+/// needless metadata
+/// (problems/2026-07-24-genesis-reseat-severs-live-primary-channel).
+const MIGRATION_V64_GENESIS_RESEAT_SKIPS: &str = "
+    CREATE TABLE genesis_reseat_skips (
+        singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+        skips INTEGER NOT NULL
+    );
+";
 
 /// Migration v63: durable genesis-decrypt rate-limit counters (ADR-068).
 ///

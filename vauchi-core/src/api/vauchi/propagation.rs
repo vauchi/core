@@ -11,7 +11,18 @@ use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
 use super::Vauchi;
 
-type PreparedDevicePayload = ([u8; 32], Vec<u8>, crate::crypto::DoubleRatchetState, bool);
+/// One per-device ciphertext plus the session that produced it.
+pub(crate) struct PreparedDevicePayload {
+    pub(crate) peer_device_id: [u8; 32],
+    pub(crate) encrypted: Vec<u8>,
+    pub(crate) session: crate::crypto::DoubleRatchetState,
+    pub(crate) is_initiator: bool,
+    /// False only for genesis-born sessions: persisting one would make the
+    /// sender's next alert ride a private chain a guarded receiver never
+    /// re-seats to, silently dropping every alert after the first
+    /// (ADR-064 Amendment 2026-07-24, guarded invariant 2).
+    pub(crate) persist_session: bool,
+}
 
 impl Vauchi {
     // === Card Propagation Operations ===
@@ -216,7 +227,7 @@ impl Vauchi {
 
         Ok(prepared
             .into_iter()
-            .map(|(device_id, encrypted, _, _)| (device_id, encrypted))
+            .map(|payload| (payload.peer_device_id, payload.encrypted))
             .collect())
     }
 
@@ -282,12 +293,12 @@ impl Vauchi {
         self.storage.with_savepoint(|| -> VauchiResult<()> {
             contact.set_cek(new_cek);
             self.storage.contacts().save_contact(contact)?;
-            for (peer_device_id, _, ratchet, is_initiator) in &prepared {
+            for payload in prepared.iter().filter(|p| p.persist_session) {
                 self.storage.ratchets().save_ratchet_state_for_device(
                     &contact_id,
-                    peer_device_id,
-                    ratchet,
-                    *is_initiator,
+                    &payload.peer_device_id,
+                    &payload.session,
+                    payload.is_initiator,
                 )?;
             }
             self.storage
@@ -392,7 +403,13 @@ impl Vauchi {
                         .map_err(|error| VauchiError::Crypto(format!("genesis seal: {error}")))?;
                         let encrypted = serde_json::to_vec(&message)
                             .map_err(|error| VauchiError::Serialization(error.to_string()))?;
-                        prepared.push(([0; 32], encrypted, session, true));
+                        prepared.push(PreparedDevicePayload {
+                            peer_device_id: [0; 32],
+                            encrypted,
+                            session,
+                            is_initiator: true,
+                            persist_session: false,
+                        });
                         continue;
                     }
                     return Err(VauchiError::NotFound("ratchet state".into()));
@@ -406,7 +423,13 @@ impl Vauchi {
             })?;
             let encrypted = serde_json::to_vec(&ratchet_msg)
                 .map_err(|error| VauchiError::Serialization(error.to_string()))?;
-            prepared.push((peer_device_id, encrypted, ratchet, is_initiator));
+            prepared.push(PreparedDevicePayload {
+                peer_device_id,
+                encrypted,
+                session: ratchet,
+                is_initiator,
+                persist_session: true,
+            });
         }
         Ok(prepared)
     }

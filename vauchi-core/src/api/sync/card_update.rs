@@ -623,14 +623,27 @@ fn try_receive_genesis_alert(
 
     // Durable, atomic: accepting the alert burns its replay nonce, so the fact
     // must commit with it (delivery-axis findings). The advanced responder
-    // ratchet persists under `[0;32]` so subsequent ordinary messages from
-    // this sender decrypt normally.
+    // ratchet persists under `[0;32]` ONLY on true cold start — re-seating
+    // over an existing session would silently sever the exchanging device's
+    // chain, and that device is the relationship's sole card mediator
+    // (ADR-064 Amendment 2026-07-24, guarded invariant 1;
+    // problems/2026-07-24-genesis-reseat-severs-live-primary-channel).
+    // Checked inside the transaction so the decision and the persist are
+    // atomic. A skipped re-seat is counted (PII-free) to size F4 urgency.
     let ratchet = opened.advanced_ratchet;
     storage.begin_transaction()?;
     let genesis_txn = (|| -> Result<(), CardUpdateError> {
-        storage
+        let cold_start = storage
             .ratchets()
-            .save_ratchet_state_for_device(sender_id, &[0; 32], &ratchet, false)?;
+            .load_ratchet_state_for_device(sender_id, &[0; 32])?
+            .is_none();
+        if cold_start {
+            storage
+                .ratchets()
+                .save_ratchet_state_for_device(sender_id, &[0; 32], &ratchet, false)?;
+        } else {
+            storage.genesis_limits().record_reseat_skip()?;
+        }
         storage
             .replay()
             .save_replay_nonce(sender_id, alert.nonce(), alert.timestamp())?;

@@ -86,18 +86,20 @@ impl Vauchi {
                 contact.set_cek(cek);
                 self.storage.contacts().save_contact(&contact)?;
                 let now = self.clock.unix_seconds();
-                for (device_id, encrypted, ratchet, is_initiator) in prepared {
-                    self.storage.ratchets().save_ratchet_state_for_device(
-                        contact.id(),
-                        &device_id,
-                        &ratchet,
-                        is_initiator,
-                    )?;
+                for payload in prepared {
+                    if payload.persist_session {
+                        self.storage.ratchets().save_ratchet_state_for_device(
+                            contact.id(),
+                            &payload.peer_device_id,
+                            &payload.session,
+                            payload.is_initiator,
+                        )?;
+                    }
                     let update = PendingUpdate {
                         id: self.rng.uuid_v4(),
                         contact_id: contact.id().to_string(),
                         update_type: "cek_migration".to_string(),
-                        payload: encrypted,
+                        payload: payload.encrypted,
                         created_at: now,
                         retry_count: 0,
                         status: UpdateStatus::Pending,

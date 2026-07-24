@@ -76,20 +76,22 @@ impl Vauchi {
                     Err(error) => return Err(error),
                 };
             self.storage.with_savepoint(|| -> VauchiResult<()> {
-                for (device_id, encrypted, ratchet, is_initiator) in prepared {
-                    self.storage.ratchets().save_ratchet_state_for_device(
-                        &contact_id,
-                        &device_id,
-                        &ratchet,
-                        is_initiator,
-                    )?;
+                for payload in prepared {
+                    if payload.persist_session {
+                        self.storage.ratchets().save_ratchet_state_for_device(
+                            &contact_id,
+                            &payload.peer_device_id,
+                            &payload.session,
+                            payload.is_initiator,
+                        )?;
+                    }
                     let update = PendingUpdate {
                         id: self.rng.uuid_v4(),
                         contact_id: contact_id.clone(),
                         // Indistinguishable from a card update on the wire (ADR-032),
                         // like the safety-alert send path.
                         update_type: "card_delta".to_string(),
-                        payload: encrypted,
+                        payload: payload.encrypted,
                         created_at: now,
                         retry_count: 0,
                         status: UpdateStatus::Pending,

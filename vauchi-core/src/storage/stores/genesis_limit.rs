@@ -127,6 +127,32 @@ impl GenesisLimitStore<'_> {
         Ok(current_attempts(row, now))
     }
 
+    /// Count one declined genesis re-seat: a sibling alert arrived while a
+    /// `[0;32]` session existed (guarded invariant 1, ADR-064 Amendment
+    /// 2026-07-24). PII-free global counter — it sizes how often the
+    /// lost-primary population is exercised, informing F4 activation urgency.
+    pub fn record_reseat_skip(&self) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT INTO genesis_reseat_skips (singleton, skips) VALUES (1, 1)
+                 ON CONFLICT(singleton) DO UPDATE SET skips = skips + 1",
+            [],
+        )?;
+        Ok(())
+    }
+
+    /// Total genesis re-seats declined by the receive guard.
+    pub fn reseat_skips(&self) -> Result<u64, StorageError> {
+        let skips: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT skips FROM genesis_reseat_skips WHERE singleton = 1",
+                [],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(skips.map(|s| s.max(0) as u64).unwrap_or(0))
+    }
+
     fn charge_global(&self, now: u64) -> Result<bool, StorageError> {
         let row: Option<(i64, i64)> = self
             .conn

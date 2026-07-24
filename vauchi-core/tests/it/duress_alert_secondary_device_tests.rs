@@ -740,7 +740,6 @@ fn a1_session_alert_blob(
 /// A1's NEXT message on the same chain must still decrypt.
 // @internal
 #[test]
-#[ignore = "RED: receive-side genesis re-seat guard not implemented yet"]
 fn established_primary_channel_survives_sibling_genesis_alert() {
     let alice = Identity::create("Alice", 0);
     let shared_bytes = [0xA1u8; 32];
@@ -796,7 +795,6 @@ fn established_primary_channel_survives_sibling_genesis_alert() {
 /// implementation detail.
 // @internal
 #[test]
-#[ignore = "RED: send-side genesis session persist skip not implemented yet"]
 fn alert_send_leaves_no_genesis_session_behind() {
     let (secondary, bob_id) = secondary_device_after_owner_sync();
     let mut secondary = secondary;

@@ -722,6 +722,33 @@ mod tests {
         assert!(engine.screen_entered().is_empty());
     }
 
+    // @scenario: contact_exchange.feature :: Glance selects its scan camera before BLE bootstrap
+    #[test]
+    fn glance_screen_entered_selects_rear_camera_before_ble_bootstrap() {
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Glance,
+            true,
+            vec![],
+            SystemClock::shared(),
+            Some("QR-PAYLOAD".to_string()),
+            Locale::English,
+        );
+
+        let commands = engine.screen_entered();
+
+        assert_eq!(commands.len(), 3);
+        assert!(matches!(
+            commands[0],
+            Command::SwitchCamera { use_front: false }
+        ));
+        assert!(matches!(commands[1], Command::BleStartAdvertising { .. }));
+        assert!(matches!(commands[2], Command::BleStartScanning { .. }));
+        assert!(
+            engine.screen_entered().is_empty(),
+            "Glance must not restart camera or BLE hardware on re-render"
+        );
+    }
+
     // @internal
     #[test]
     fn discovery_event_emits_connect_command_and_advances() {

@@ -135,6 +135,9 @@ pub enum DataTransport {
     Ble,
     Nfc,
     Relay,
+    /// USB cable / direct TCP between a desktop and a phone (Cable) — no
+    /// radio involved.
+    UsbDirect,
 }
 
 /// How the two peers discover / bootstrap the session.
@@ -343,13 +346,15 @@ mod tests {
     }
 
     #[test]
-    fn data_transport_has_three_variants() {
+    fn data_transport_serde_roundtrip_all_variants() {
         let transports = [
             DataTransport::QrMultiStage,
             DataTransport::Ble,
+            DataTransport::Nfc,
             DataTransport::Relay,
+            DataTransport::UsbDirect,
         ];
-        assert_eq!(transports.len(), 3);
+        assert_eq!(transports.len(), 5);
         for t in transports {
             let json = serde_json::to_string(&t).expect("serialize");
             let back: DataTransport = serde_json::from_str(&json).expect("deserialize");
@@ -429,13 +434,26 @@ mod tests {
         assert_eq!(cfg.timeout, Duration::from_secs(7 * 24 * 60 * 60));
     }
 
+    // The composite NFC+BLE ritual is deferred (owner decision 2026-07-20,
+    // `backlog/2026-07-20-exchange-mode-contract-truth.md`); the catalog
+    // must describe the shipped multi-stage-QR ritual, not the deferred one.
     #[test]
-    fn tap_hover_shake_has_three_proximity_methods() {
+    fn tap_hover_shake_config_matches_shipped_multi_stage_ritual() {
         let cfg = ExchangeMode::TapHoverShake.config();
-        assert_eq!(cfg.proximity.len(), 3);
-        assert!(cfg.proximity.contains(&ProximityMethod::NfcRange));
-        assert!(cfg.proximity.contains(&ProximityMethod::Audio));
-        assert!(cfg.proximity.contains(&ProximityMethod::Accelerometer));
+        assert_eq!(cfg.data_transport, DataTransport::QrMultiStage);
+        assert_eq!(cfg.bootstrap, BootstrapMethod::QrMutualScan);
+        assert_eq!(
+            cfg.proximity,
+            &[ProximityMethod::Audio, ProximityMethod::Accelerometer]
+        );
+        assert_eq!(cfg.fallback_transport, Some(DataTransport::Relay));
+        assert_eq!(cfg.context, ExchangeContext::InPerson);
+        assert!(cfg.requires.contains(&DeviceRequirement::Camera));
+        assert!(cfg.requires.contains(&DeviceRequirement::Microphone));
+        assert!(cfg.requires.contains(&DeviceRequirement::Speaker));
+        assert!(cfg.requires.contains(&DeviceRequirement::Accelerometer));
+        assert!(!cfg.requires.contains(&DeviceRequirement::Nfc));
+        assert!(!cfg.requires.contains(&DeviceRequirement::Ble));
     }
 
     #[test]
@@ -502,6 +520,7 @@ mod tests {
     #[test]
     fn cable_config_uses_usb_bootstrap_with_wired_proximity() {
         let cfg = ExchangeMode::Cable.config();
+        assert_eq!(cfg.data_transport, DataTransport::UsbDirect);
         assert_eq!(cfg.bootstrap, BootstrapMethod::UsbCable);
         assert_eq!(cfg.proximity, &[ProximityMethod::WiredConnection]);
         assert_eq!(cfg.context, ExchangeContext::InPerson);

@@ -153,6 +153,14 @@ impl Vauchi {
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.queue_reciprocity_confirmations();
 
+        // Queue F4 registry pushes (vouched push, ADR-064 Amendment
+        // 2026-07-25) for contacts that have not confirmed our current
+        // registry version. AFTER the receive phase for the same reason as
+        // reciprocity: a just-received ack may have confirmed a contact,
+        // and the scanner then skips it (convergence). Best-effort.
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.queue_registry_pushes();
+
         // Send phase — adapter moves into RelayClient → SendPhase
         let send_result = self.run_send_phase(identity, &contacts, adapter)?;
 

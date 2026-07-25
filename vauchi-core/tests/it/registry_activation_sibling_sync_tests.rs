@@ -13,12 +13,15 @@
 use crate::common;
 
 use common::helpers::create_vauchi_with_identity;
-use vauchi_core::SymmetricKey;
+use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
+use vauchi_core::crypto::ratchet::DoubleRatchetState;
+use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::RegistryBroadcast;
 use vauchi_core::sync::SyncItem;
 use vauchi_core::sync::registry_activation::{ActivationState, ActivationTracker};
+use vauchi_core::{SymmetricKey, Vauchi};
 
 /// A device holding one exchanged contact (Bob), as a sibling that never
 /// exchanged with him would after `ContactAdded` sync.
@@ -31,6 +34,158 @@ fn device_with_contact() -> (vauchi_core::Vauchi, vauchi_core::Vauchi, String) {
     let contact_id = contact.id().to_string();
     device.add_contact(contact).unwrap();
     (device, bob_wb, contact_id)
+}
+
+/// Registers a second device on `wb`'s own registry so the sibling journal
+/// has a peer (copied from api_personal_notes_tests.rs).
+fn install_linked_registry(wb: &Vauchi) -> (vauchi_core::identity::DeviceRegistry, [u8; 32]) {
+    use vauchi_core::crypto::SigningKeyPair;
+    use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
+
+    const SEED: [u8; 32] = [9u8; 32];
+    let signing = SigningKeyPair::from_seed(&SEED);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
+        &signing,
+    );
+    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet_id = *tablet.device_id();
+    registry
+        .add_device_unsigned(tablet.to_registered(&SEED))
+        .unwrap();
+    wb.storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+    (registry, tablet_id)
+}
+
+fn two_party_with_ratchets() -> (Vauchi, Vauchi, String, String) {
+    let alice_wb = create_vauchi_with_identity("Alice");
+    let bob_wb = create_vauchi_with_identity("Bob");
+
+    let alice_pk = *alice_wb.identity().unwrap().signing_public_key();
+    let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
+    let shared_secret = SymmetricKey::generate();
+
+    let bob_contact =
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone(), 0);
+    let bob_contact_id = bob_contact.id().to_string();
+    alice_wb.add_contact(bob_contact).unwrap();
+
+    let alice_contact = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        shared_secret.clone(),
+        0,
+    );
+    let alice_contact_id = alice_contact.id().to_string();
+    bob_wb.add_contact(alice_contact).unwrap();
+
+    let alice_dh = X3DHKeyPair::generate();
+    let bob_ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *alice_dh.public_key()).unwrap();
+    let alice_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, alice_dh);
+
+    alice_wb
+        .storage()
+        .ratchets()
+        .save_ratchet_state(&bob_contact_id, &alice_ratchet, false)
+        .unwrap();
+    bob_wb
+        .storage()
+        .ratchets()
+        .save_ratchet_state(&alice_contact_id, &bob_ratchet, true)
+        .unwrap();
+
+    (alice_wb, bob_wb, bob_contact_id, alice_contact_id)
+}
+
+// @scenario: multi_device_sync :: Handshake progress is journaled for linked devices
+// @internal
+#[test]
+fn handshake_progress_journals_registry_and_activation_for_siblings() {
+    let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = two_party_with_ratchets();
+    let (registry, tablet_id) = install_linked_registry(&bob_wb);
+
+    // Bob pushes — the tracker change must journal for his tablet.
+    assert_eq!(bob_wb.queue_registry_pushes().unwrap(), 1);
+    {
+        let orchestrator = vauchi_core::api::sync::DeviceSyncOrchestrator::load(
+            bob_wb.storage(),
+            bob_wb.identity().unwrap().create_device_info(0),
+            registry.clone(),
+        )
+        .unwrap();
+        let pending = orchestrator.pending_for_device(&tablet_id);
+        assert!(
+            pending.iter().any(|item| matches!(
+                item,
+                SyncItem::ContactActivationChanged { contact_id, .. }
+                    if contact_id == &alice_contact_id
+            )),
+            "push must journal activation state for siblings, got {pending:?}"
+        );
+    }
+
+    // Alice receives the push and replies with an echo-carrying ack.
+    let push_blob = bob_wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap()
+        .remove(0)
+        .payload;
+    let alice_identity = alice_wb.identity().unwrap();
+    let reply = match process_single_card_update(
+        alice_identity,
+        alice_wb.storage(),
+        &bob_contact_id,
+        &push_blob,
+    )
+    .expect("alice processes push")
+    {
+        ReceiveOutcome::RegistryPushReceived(reply) => reply,
+        other => panic!("expected RegistryPushReceived, got {other:?}"),
+    };
+    alice_wb.queue_registry_ack(&reply).unwrap();
+
+    // Bob receives the ack: alice's echoed registry + Active state must
+    // journal for his tablet.
+    let ack_blob = alice_wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap()
+        .remove(0)
+        .payload;
+    let bob_identity = bob_wb.identity().unwrap();
+    process_single_card_update(bob_identity, bob_wb.storage(), &alice_contact_id, &ack_blob)
+        .expect("bob processes ack");
+
+    let orchestrator = vauchi_core::api::sync::DeviceSyncOrchestrator::load(
+        bob_wb.storage(),
+        bob_wb.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap();
+    let pending = orchestrator.pending_for_device(&tablet_id);
+    assert!(
+        pending.iter().any(|item| matches!(
+            item,
+            SyncItem::ContactRegistryReceived { contact_id, .. }
+                if contact_id == &alice_contact_id
+        )),
+        "received echo registry must journal for siblings, got {pending:?}"
+    );
+    assert!(
+        pending.iter().any(|item| matches!(
+            item,
+            SyncItem::ContactActivationChanged { contact_id, our_version_acked: Some(_), .. }
+                if contact_id == &alice_contact_id
+        )),
+        "activation must journal with the acked version, got {pending:?}"
+    );
 }
 
 fn bob_broadcast(bob_wb: &vauchi_core::Vauchi) -> RegistryBroadcast {

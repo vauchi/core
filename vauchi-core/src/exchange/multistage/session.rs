@@ -1289,6 +1289,14 @@ impl MultiStageSession {
             }
             Err(_) => {
                 self.transport_decrypt_failures = self.transport_decrypt_failures.saturating_add(1);
+                // Dev instrumentation (dev-logging only; no PII — indices only).
+                // A chunk that keeps failing AEAD is never marked received, so
+                // transfer stalls at "N/M" with the missing chunk invisible
+                // (2026-07-25 Pixel↔Samsung transfer-stall diagnosis).
+                tracing::info!(
+                    "[MSX] chunk decrypt FAIL idx={chunk_idx} total={chunk_total} \
+                     (corrupt/tampered — not marked received)"
+                );
             }
         }
 
@@ -1506,23 +1514,36 @@ impl MultiStageSession {
             .map(|b| b.is_complete())
             .unwrap_or(false);
 
+        let chunks_acked = self
+            .peer_ack_bitmap
+            .as_ref()
+            .map(|b| b.received_count())
+            .unwrap_or(0);
+        let chunks_received = self
+            .inbound_buffer
+            .as_ref()
+            .map(|b| b.received_count())
+            .unwrap_or(0);
+        let peer_total = self.peer_chunks_total.unwrap_or(0);
+
+        // Dev instrumentation (dev-logging only; no PII — counts + booleans).
+        // Distinguishes the two ways a "Transferring N/M" stall arises:
+        // `ack` = our chunks the peer has confirmed, `recv` = their chunks we
+        // hold. A stall with `theirs_recv=false` means we're missing an inbound
+        // chunk (decode phase-lock or repeated AEAD failure); with
+        // `ours_acked=false` the peer never confirmed one of ours
+        // (2026-07-25 Pixel↔Samsung transfer-stall diagnosis).
+        tracing::info!(
+            "[MSX] xfer ack={chunks_acked}/{} recv={chunks_received}/{peer_total} \
+             ours_acked={all_ours_acked} theirs_recv={all_theirs_received}",
+            self.outbound_total
+        );
+
         if all_ours_acked && all_theirs_received {
             self.state = ProtocolState::Verifying;
         } else {
-            let chunks_sent = self
-                .peer_ack_bitmap
-                .as_ref()
-                .map(|b| b.received_count())
-                .unwrap_or(0);
-            let chunks_received = self
-                .inbound_buffer
-                .as_ref()
-                .map(|b| b.received_count())
-                .unwrap_or(0);
-            let peer_total = self.peer_chunks_total.unwrap_or(0);
-
             self.state = ProtocolState::Transferring {
-                chunks_sent,
+                chunks_sent: chunks_acked,
                 chunks_total: self.outbound_total,
                 chunks_received,
                 peer_chunks_total: peer_total,

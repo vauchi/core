@@ -651,6 +651,34 @@ fn try_receive_genesis_alert(
         return Err(fallback);
     };
 
+    // F4 slice 4b: genesis-sealed handshake payloads route to the registry
+    // handlers. Their authority is the envelope's identity-signed header
+    // broadcast (verified at persist); no alert semantics, no [0;32]
+    // session persist, no replay burn (idempotent, rate-limited above).
+    match VersionedPayload::decode(&opened.inner_payload) {
+        Ok(VersionedPayload::RegistryPush(push)) => {
+            return super::registry_handshake::receive_genesis_registry_push(
+                identity,
+                storage,
+                sender_id,
+                contact,
+                &opened.sender_registry_broadcast_json,
+                &push,
+            );
+        }
+        Ok(VersionedPayload::RegistryAck(ack)) => {
+            return super::registry_handshake::receive_genesis_registry_ack(
+                identity,
+                storage,
+                sender_id,
+                contact,
+                &opened.sender_registry_broadcast_json,
+                &ack,
+            );
+        }
+        _ => {}
+    }
+
     // Authority check: the inner payload must be a safety alert whose own
     // sender→recipient signature verifies, independent of the envelope.
     let alert = match VersionedPayload::decode(&opened.inner_payload) {

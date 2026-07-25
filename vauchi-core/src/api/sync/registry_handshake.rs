@@ -79,6 +79,114 @@ fn load_tracker(storage: &Storage, sender_id: &str) -> Result<ActivationTracker,
         .unwrap_or_default())
 }
 
+/// Handle a genesis-sealed RegistryPush (F4 slice 4b).
+///
+/// The envelope's header broadcast is the authority — identity-signed by
+/// the sender and verified at persist. Unlike an alert genesis, no `[0;32]`
+/// session is persisted (a handshake genesis is routing bootstrap, not an
+/// alert cold start) and no replay nonce is burned: processing is
+/// idempotent and the genesis rate limiter bounds volume upstream.
+pub(crate) fn receive_genesis_registry_push(
+    identity: &crate::identity::Identity,
+    storage: &Storage,
+    sender_id: &str,
+    contact: &Contact,
+    header_broadcast_json: &[u8],
+    push: &RegistryPushPayload,
+) -> Result<ReceiveOutcome, CardUpdateError> {
+    storage.begin_transaction()?;
+    let txn = (|| -> Result<u64, CardUpdateError> {
+        let header_version =
+            persist_carried_broadcast(storage, sender_id, contact, header_broadcast_json)?;
+        let inner_version =
+            persist_carried_broadcast(storage, sender_id, contact, push.broadcast_json())?;
+        let held = header_version.max(inner_version);
+        let mut tracker = load_tracker(storage, sender_id)?;
+        tracker.record_peer_registry(held);
+        storage
+            .registry_activation()
+            .save_activation(sender_id, &tracker)?;
+        Ok(held)
+    })();
+    match txn {
+        Ok(held) => {
+            storage.commit()?;
+            journal_handshake_state_for_siblings(identity, storage, sender_id);
+            Ok(ReceiveOutcome::RegistryPushReceived(RegistryReplyNeeded {
+                sender_id: sender_id.to_string(),
+                acked_version: held,
+                push_nonce: *push.push_nonce(),
+            }))
+        }
+        Err(e) => {
+            storage.rollback();
+            Err(e)
+        }
+    }
+}
+
+/// Handle a genesis-sealed RegistryAck (F4 slice 4b).
+///
+/// The header broadcast always carries the sender's registry, so even an
+/// echo-less genesis ack delivers what the receiver needs for routing. A
+/// confirming reply fires only when THIS ack transitioned us to `Active`
+/// — that bound terminates the handshake (an already-Active receiver
+/// processes idempotently and stays silent).
+pub(crate) fn receive_genesis_registry_ack(
+    identity: &crate::identity::Identity,
+    storage: &Storage,
+    sender_id: &str,
+    contact: &Contact,
+    header_broadcast_json: &[u8],
+    ack: &RegistryAckPayload,
+) -> Result<ReceiveOutcome, CardUpdateError> {
+    use crate::sync::registry_activation::ActivationState;
+
+    storage.begin_transaction()?;
+    let txn = (|| -> Result<Option<RegistryReplyNeeded>, CardUpdateError> {
+        let mut tracker = load_tracker(storage, sender_id)?;
+        let was_active = tracker.state() == ActivationState::Active;
+        let header_version =
+            persist_carried_broadcast(storage, sender_id, contact, header_broadcast_json)?;
+        let mut held = header_version;
+        if let Some(echo) = ack.broadcast_json() {
+            held = held.max(persist_carried_broadcast(
+                storage, sender_id, contact, echo,
+            )?);
+        }
+        tracker.record_peer_registry(held);
+        if tracker
+            .record_ack(ack.push_nonce(), ack.acked_version())
+            .is_err()
+        {
+            // In-flight crossing — tolerated without state change (DC-02).
+        }
+        let activated_now = !was_active && tracker.state() == ActivationState::Active;
+        storage
+            .registry_activation()
+            .save_activation(sender_id, &tracker)?;
+        Ok(activated_now.then(|| RegistryReplyNeeded {
+            sender_id: sender_id.to_string(),
+            acked_version: held,
+            push_nonce: *ack.push_nonce(),
+        }))
+    })();
+    match txn {
+        Ok(reply) => {
+            storage.commit()?;
+            journal_handshake_state_for_siblings(identity, storage, sender_id);
+            Ok(ReceiveOutcome::RegistryAckReceived {
+                sender_id: sender_id.to_string(),
+                reply,
+            })
+        }
+        Err(e) => {
+            storage.rollback();
+            Err(e)
+        }
+    }
+}
+
 /// Journal the contact's held registry and activation state for this
 /// identity's linked devices. No-op for single-device identities.
 ///

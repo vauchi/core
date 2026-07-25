@@ -100,14 +100,16 @@ impl Vauchi {
             let push = RegistryPushPayload::new(nonce, broadcast_bytes.clone())
                 .map_err(|error| VauchiError::Serialization(error.to_string()))?;
             let payload = VersionedPayload::encode_registry_push(&push);
-            let prepared =
-                match self.encrypt_payload_for_contact_devices(identity, &contact, &payload) {
-                    Ok(prepared) => prepared,
-                    // No channel yet (responder awaiting first receive, or no
-                    // ratchet) — the next tick retries.
-                    Err(VauchiError::NotFound(_)) | Err(VauchiError::InvalidState(_)) => continue,
-                    Err(error) => return Err(error),
-                };
+            // Pre-activation handshake messages ALWAYS ride the stateless
+            // genesis envelope: a session-less orphaned sibling opens it
+            // statelessly, and a live sessioned peer opens it via the
+            // decrypt-failure genesis fallback — one wire form reaches every
+            // possible receiver state, and the [0;32] path can never strand
+            // the handshake behind a dead exchanging device.
+            let Some(ex) = contact.kind().exchanged_data() else {
+                continue;
+            };
+            let prepared = vec![self.genesis_seal_for_cold_start(identity, ex, &payload)?];
             tracker.record_push_sent(nonce, own_version);
             self.storage.with_savepoint(|| -> VauchiResult<()> {
                 for item in prepared {
@@ -179,7 +181,21 @@ impl Vauchi {
         let ack = RegistryAckPayload::new(reply.push_nonce, reply.acked_version, echo)
             .map_err(|error| VauchiError::Serialization(error.to_string()))?;
         let payload = VersionedPayload::encode_registry_ack(&ack);
-        let prepared = self.encrypt_payload_for_contact_devices(identity, &contact, &payload)?;
+        // Pre-activation acks ride the stateless genesis envelope like
+        // pushes: the peer may be a session-less orphaned sibling that can
+        // only open genesis, while a live sessioned peer opens it via the
+        // decrypt-failure fallback. Once Active, the ordinary path applies
+        // (per-device, resolvable — Active implies the peer holds our
+        // registry).
+        let prepared = if tracker.state() == ActivationState::Active {
+            self.encrypt_payload_for_contact_devices(identity, &contact, &payload)?
+        } else {
+            let ex = contact
+                .kind()
+                .exchanged_data()
+                .ok_or_else(|| VauchiError::InvalidState("contact not exchanged".into()))?;
+            vec![self.genesis_seal_for_cold_start(identity, ex, &payload)?]
+        };
 
         let now = self.clock.unix_seconds();
         self.storage.with_savepoint(|| -> VauchiResult<()> {

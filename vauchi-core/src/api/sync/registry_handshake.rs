@@ -187,6 +187,38 @@ pub(crate) fn receive_genesis_registry_ack(
     }
 }
 
+/// Repair a diverged device-scoped session: drop the corrupt row and
+/// demote the activation so the scanner re-runs the handshake (F4 plan
+/// trigger 4, Kimi corrupt-session condition).
+///
+/// Best-effort — the caller is already returning a deterministic decrypt
+/// failure for the blob; a repair that itself fails will simply retry on
+/// the next divergent receive.
+pub(crate) fn repair_device_session(
+    identity: &crate::identity::Identity,
+    storage: &Storage,
+    sender_id: &str,
+    peer_device_id: &[u8; 32],
+) {
+    let attempt = (|| -> Result<(), crate::storage::StorageError> {
+        storage
+            .ratchets()
+            .delete_ratchet_state_for_device(sender_id, peer_device_id)?;
+        let mut tracker = storage
+            .registry_activation()
+            .load_activation(sender_id)?
+            .unwrap_or_default();
+        tracker.record_session_repair();
+        storage
+            .registry_activation()
+            .save_activation(sender_id, &tracker)
+    })();
+    match attempt {
+        Ok(()) => journal_handshake_state_for_siblings(identity, storage, sender_id),
+        Err(error) => tracing::warn!("device session repair failed: {error}"),
+    }
+}
+
 /// Journal the contact's held registry and activation state for this
 /// identity's linked devices. No-op for single-device identities.
 ///

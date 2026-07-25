@@ -332,7 +332,23 @@ pub fn process_single_card_update_for_device(
                 RateLimitDisposition::FallThrough,
             );
         }
-        Err(_) => return Err(CardUpdateError::DecryptionFailed),
+        // A decrypt failure on an established DEVICE-SCOPED chain is
+        // deterministic divergence (skipped/reordered messages are handled
+        // inside the ratchet). Repair the topology before failing: drop the
+        // corrupt session row (the next receive re-bootstraps from the
+        // registry) and demote the activation so the scanner re-runs the
+        // handshake — otherwise cards stall silently forever behind ACKed
+        // failures (F4 plan trigger 4, Kimi corrupt-session condition).
+        // The blob itself still fails deterministically and is ACKed.
+        Err(_) => {
+            super::registry_handshake::repair_device_session(
+                identity,
+                storage,
+                sender_id,
+                peer_device_id,
+            );
+            return Err(CardUpdateError::DecryptionFailed);
+        }
     };
 
     // 3b. Alerts route separately. Emergency/duress alerts reuse the card-update

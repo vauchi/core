@@ -140,6 +140,15 @@ impl ActivationTracker {
         self.peer_version_held
     }
 
+    /// A held per-device session failed to decrypt — deterministic
+    /// divergence, so the peer's confirmation no longer describes a working
+    /// topology. Dropping it demotes `Active` and the sync-cycle scanner
+    /// re-runs the handshake (Kimi corrupt-session condition; F4 plan
+    /// trigger 4).
+    pub fn record_session_repair(&mut self) {
+        self.our_version_acked = None;
+    }
+
     /// The peer emptied/revoked its registry — the handshake restarts
     /// from scratch.
     pub fn record_peer_registry_emptied(&mut self) {

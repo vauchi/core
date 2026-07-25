@@ -54,6 +54,25 @@ impl Vauchi {
         })
     }
 
+    /// Device-scoped variant of the cold-start genesis seal: identical
+    /// stateless envelope crypto (keyed by the contact `shared_key`, so any
+    /// peer device can open it) but routed to one specific peer device's
+    /// device-scoped mailbox. Fanning the bootstrap handshake out per device
+    /// stops a shared identity mailbox from letting one sibling drain a push
+    /// meant for another — the same orphaning the card delta already avoids
+    /// (ADR-064 Amendment 2026-07-25).
+    fn genesis_seal_for_device(
+        &self,
+        identity: &crate::identity::Identity,
+        ex: &crate::contact::ExchangedData,
+        peer_device_id: [u8; 32],
+        payload: &[u8],
+    ) -> VauchiResult<super::propagation::PreparedDevicePayload> {
+        let mut sealed = self.genesis_seal_for_cold_start(identity, ex, payload)?;
+        sealed.peer_device_id = peer_device_id;
+        Ok(sealed)
+    }
+
     /// Queue a RegistryPush to every exchanged contact that has not
     /// confirmed our current registry version (the F4 vouched push).
     ///
@@ -109,7 +128,25 @@ impl Vauchi {
             let Some(ex) = contact.kind().exchanged_data() else {
                 continue;
             };
-            let prepared = vec![self.genesis_seal_for_cold_start(identity, ex, &payload)?];
+            // Fan the one logical push (same nonce, same registry) out to
+            // every known peer device's device-scoped mailbox, so each peer
+            // device drains its own copy and can complete the handshake. A
+            // truly cold contact (no registry yet) keeps the single
+            // identity-scoped genesis copy.
+            let peer_devices = self
+                .storage
+                .device()
+                .load_contact_active_devices(&contact_id)?;
+            let prepared: Vec<_> = if peer_devices.is_empty() {
+                vec![self.genesis_seal_for_cold_start(identity, ex, &payload)?]
+            } else {
+                peer_devices
+                    .iter()
+                    .map(|device| {
+                        self.genesis_seal_for_device(identity, ex, device.device_id, &payload)
+                    })
+                    .collect::<VauchiResult<_>>()?
+            };
             tracker.record_push_sent(nonce, own_version);
             self.storage.with_savepoint(|| -> VauchiResult<()> {
                 for item in prepared {

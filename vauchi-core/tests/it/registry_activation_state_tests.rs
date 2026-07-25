@@ -43,14 +43,38 @@ fn ack_without_outstanding_push_is_rejected() {
 
 // @internal
 #[test]
-fn ack_with_wrong_nonce_or_stale_version_is_rejected_and_changes_nothing() {
+fn ack_matches_on_version_not_nonce_for_sibling_cross_consumption() {
+    // The contact mailbox is identity-scoped and destructive: an ack Bob
+    // sent to answer a SIBLING's push (different correlation nonce, SAME
+    // identity registry version) is fetched-and-consumed by this device.
+    // It must still activate on the version match, or neither sibling ever
+    // activates (shared-mailbox deadlock — root cause of the e2e
+    // lost-primary failure). The channel is genesis/ratchet authenticated;
+    // the nonce was pure correlation.
     let mut tracker = ActivationTracker::new();
     tracker.record_push_sent([1u8; 32], 4);
 
-    assert!(tracker.record_ack(&[2u8; 32], 4).is_err(), "wrong nonce");
-    assert_eq!(tracker.state(), ActivationState::Pushed);
+    tracker
+        .record_ack(&[2u8; 32], 4)
+        .expect("a sibling's ack for our pushed version activates us");
+    assert_eq!(tracker.state(), ActivationState::Active);
+    assert_eq!(tracker.our_version_acked(), Some(4));
+}
+
+// @internal
+#[test]
+fn ack_with_stale_or_unknown_version_is_rejected_and_changes_nothing() {
+    let mut tracker = ActivationTracker::new();
+    tracker.record_push_sent([1u8; 32], 4);
 
     assert!(tracker.record_ack(&[1u8; 32], 3).is_err(), "stale version");
+    assert_eq!(tracker.state(), ActivationState::Pushed);
+    assert_eq!(tracker.our_version_acked(), None);
+
+    assert!(
+        tracker.record_ack(&[1u8; 32], 9).is_err(),
+        "unknown newer version"
+    );
     assert_eq!(tracker.state(), ActivationState::Pushed);
     assert_eq!(tracker.our_version_acked(), None);
 }
@@ -147,11 +171,13 @@ proptest! {
                 }
                 Op::Ack { nonce, version } => {
                     let accepted = tracker.record_ack(&nonce, version).is_ok();
-                    let matches = last_pushed == Some((nonce, version));
-                    // An ack is accepted iff it answers the outstanding push
-                    // (or re-confirms while already Active on that version).
+                    // An ack is accepted iff its version matches the
+                    // outstanding push VERSION (the nonce is ignored — a
+                    // sibling's ack for the same identity registry version is
+                    // valid, since the mailbox is shared and destructive).
+                    let matches = last_pushed.map(|(_, v)| v) == Some(version);
                     if accepted {
-                        prop_assert!(matches, "accepted ack must match the outstanding push");
+                        prop_assert!(matches, "accepted ack must match the outstanding push version");
                     } else {
                         prop_assert_eq!(tracker.state(), before, "rejected ack must not change state");
                     }

@@ -110,15 +110,22 @@ impl ActivationTracker {
         nonce: &[u8; NONCE_LEN],
         acked_version: u64,
     ) -> Result<(), DeltaError> {
+        // Match on VERSION, not the correlation nonce: the contact mailbox
+        // is identity-scoped and destructive, so an ack Bob sent to answer
+        // a SIBLING's push (different nonce, same identity registry version)
+        // may be fetched-and-consumed by this device. Rejecting on nonce
+        // there strands both siblings (shared-mailbox deadlock). The channel
+        // is genesis/ratchet authenticated and the version is monotonic
+        // (stale/unknown versions still rejected), so the nonce adds no
+        // security — it was pure correlation.
+        let _ = nonce;
         match self.outstanding_push {
-            Some((expected_nonce, pushed_version))
-                if expected_nonce == *nonce && pushed_version == acked_version =>
-            {
+            Some((_, pushed_version)) if pushed_version == acked_version => {
                 self.our_version_acked = Some(acked_version);
                 Ok(())
             }
             Some(_) => Err(DeltaError::ApplyError(
-                "registry ack does not answer the outstanding push".into(),
+                "registry ack does not answer the outstanding push version".into(),
             )),
             None => Err(DeltaError::ApplyError(
                 "registry ack without an outstanding push".into(),

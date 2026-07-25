@@ -212,14 +212,16 @@ fn received_mismatched_ack_is_tolerated_without_state_change() {
     let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = setup_two_party();
 
     let mut tracker = ActivationTracker::new();
-    tracker.record_push_sent([8u8; 32], 4);
+    tracker.record_push_sent([8u8; 32], 5);
     alice_wb
         .storage()
         .registry_activation()
         .save_activation(&bob_contact_id, &tracker)
         .unwrap();
 
-    // Wrong nonce, no echo — e.g. an ack crossing a registry change.
+    // Stale version, no echo — an ack answering an older registry version
+    // than the one currently outstanding (a genuine in-flight crossing of a
+    // registry change). Matching is on version, so this must not activate.
     let ack = RegistryAckPayload::new([9u8; 32], 4, None).unwrap();
     let blob = seal_from_bob(
         &bob_wb,

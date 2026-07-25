@@ -990,10 +990,33 @@ impl MultiStageSession {
             }
             ProtocolState::Confirming => {
                 self.display_cycle += 1;
-                // Randomized VRFY/CONF (+ advisory SHAK) — see
-                // `build_finalization_qr`. Replaces the fixed positional
-                // `display_cycle % 7` pattern that was scanner-phase-lockable.
-                Some(self.build_finalization_qr(true))
+                // TapHoverShake exchanges its accel envelope via SHAK on phase 6
+                // (advisory co-location signal); preserve that. Otherwise emit
+                // the dense COMBO (VRFY+CONF+RDYY) rather than cycling VRFY/CONF:
+                // two peers both in Confirming each need the *other's* CONF to
+                // advance, and catching one specific frame type out of a
+                // multi-type cycle is decode-phase-lockable — it deadlocked both
+                // sides for the full timeout (device-proven 2026-07-25
+                // Pixel↔Samsung: both stuck in Confirming ~2min, both failed). A
+                // single COMBO decode advances the peer Confirming→Complete→
+                // Finalized via `handle_combo`, so the handshake no longer
+                // depends on catching a specific type (COMBO decodability on
+                // these devices is proven — the Complete arm already emits it and
+                // the 07:40 run decoded it). SHAK gate mirrors
+                // `build_finalization_qr`; fall back to the VRFY/CONF cycle only
+                // if the COMBO can't be built.
+                if self.display_cycle % 7 == 6
+                    && let Some(shake_qr) = self.build_shake_qr()
+                {
+                    Some(QrPayload {
+                        data: shake_qr,
+                        error_correction: "M".to_string(),
+                        display_duration_ms: jittered(DISPLAY_MS_CONF),
+                    })
+                } else {
+                    self.get_combo_qr()
+                        .or_else(|| Some(self.build_finalization_qr(true)))
+                }
             }
             ProtocolState::Complete | ProtocolState::RetryReady => {
                 // S1: Wall-clock timeout with progress extension.

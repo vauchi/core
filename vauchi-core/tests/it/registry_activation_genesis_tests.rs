@@ -221,6 +221,7 @@ fn handshake_ack_stays_on_the_legacy_session_before_activation() {
         sender_id: contact_id.clone(),
         acked_version: broadcast.version(),
         push_nonce: [6u8; 32],
+        sender_device_id: [0u8; 32],
     };
     bob_wb.queue_registry_ack(&reply).unwrap();
 

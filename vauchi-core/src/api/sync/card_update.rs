@@ -678,6 +678,7 @@ fn try_receive_genesis_alert(
                 storage,
                 sender_id,
                 contact,
+                opened.sender_device_id,
                 &opened.sender_registry_broadcast_json,
                 &push,
             );
@@ -688,6 +689,7 @@ fn try_receive_genesis_alert(
                 storage,
                 sender_id,
                 contact,
+                opened.sender_device_id,
                 &opened.sender_registry_broadcast_json,
                 &ack,
             );

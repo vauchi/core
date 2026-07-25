@@ -32,6 +32,12 @@ pub struct RegistryReplyNeeded {
     pub acked_version: u64,
     /// Handshake correlation nonce, echoed back verbatim.
     pub push_nonce: [u8; 32],
+    /// The peer device that sent us the push/ack. The reply routes to this
+    /// device's device-scoped mailbox so a shared identity mailbox cannot
+    /// let a sibling drain an ack meant for another (ADR-064 Amendment
+    /// 2026-07-25). `[0; 32]` when the origin device is unknown (legacy
+    /// identity-scoped fallback).
+    pub sender_device_id: [u8; 32],
 }
 
 /// Persist a carried broadcast for `sender_id`, tolerating idempotent
@@ -91,6 +97,7 @@ pub(crate) fn receive_genesis_registry_push(
     storage: &Storage,
     sender_id: &str,
     contact: &Contact,
+    sender_device_id: [u8; 32],
     header_broadcast_json: &[u8],
     push: &RegistryPushPayload,
 ) -> Result<ReceiveOutcome, CardUpdateError> {
@@ -116,6 +123,7 @@ pub(crate) fn receive_genesis_registry_push(
                 sender_id: sender_id.to_string(),
                 acked_version: held,
                 push_nonce: *push.push_nonce(),
+                sender_device_id,
             }))
         }
         Err(e) => {
@@ -137,6 +145,7 @@ pub(crate) fn receive_genesis_registry_ack(
     storage: &Storage,
     sender_id: &str,
     contact: &Contact,
+    sender_device_id: [u8; 32],
     header_broadcast_json: &[u8],
     ack: &RegistryAckPayload,
 ) -> Result<ReceiveOutcome, CardUpdateError> {
@@ -172,6 +181,7 @@ pub(crate) fn receive_genesis_registry_ack(
             sender_id: sender_id.to_string(),
             acked_version: held,
             push_nonce: *ack.push_nonce(),
+            sender_device_id,
         }))
     })();
     match txn {
@@ -358,6 +368,7 @@ pub(crate) fn receive_registry_push(
                 sender_id: sender_id.to_string(),
                 acked_version,
                 push_nonce: *push.push_nonce(),
+                sender_device_id: *peer_device_id,
             }))
         }
         Err(e) => {
@@ -418,6 +429,7 @@ pub(crate) fn receive_registry_ack(
                 sender_id: sender_id.to_string(),
                 acked_version: version,
                 push_nonce: *ack.push_nonce(),
+                sender_device_id: *peer_device_id,
             }),
             _ => None,
         };

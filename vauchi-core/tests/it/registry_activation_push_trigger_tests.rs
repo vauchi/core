@@ -187,6 +187,50 @@ fn scanner_fans_out_a_device_scoped_push_per_known_peer_device() {
     );
 }
 
+// @scenario: multi_device_sync :: The ack routes back to the originating device
+// @internal
+#[test]
+fn ack_routes_to_the_originating_device_scoped_mailbox() {
+    // The reverse leg of the lost-primary bootstrap: a peer replying to a
+    // surviving sibling's push must route the ack to THAT sibling's
+    // device-scoped mailbox, or a shared identity mailbox lets another
+    // sibling drain it and the pushing sibling never reaches Active
+    // (ADR-064 Amendment 2026-07-25).
+    let bob_wb = create_vauchi_with_identity("Bob");
+    let now = bob_wb.storage().clock().unix_seconds();
+    let (_broadcast, peer_pk, peer_device_ids) = three_device_peer(now);
+
+    let contact = Contact::from_exchange(
+        peer_pk,
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+        0,
+    );
+    let contact_id = contact.id().to_string();
+    bob_wb.add_contact(contact).unwrap();
+
+    let origin = peer_device_ids[1];
+    let reply = vauchi_core::api::sync::RegistryReplyNeeded {
+        sender_id: contact_id,
+        acked_version: 1,
+        push_nonce: [9u8; 32],
+        sender_device_id: origin,
+    };
+    bob_wb.queue_registry_ack(&reply).unwrap();
+
+    let pending = bob_wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(
+        pending[0].target_device_id,
+        Some(origin),
+        "the ack routes to the originating device's device-scoped mailbox"
+    );
+}
+
 // @scenario: multi_device_sync :: A confirmed contact is not re-pushed
 // @internal
 #[test]

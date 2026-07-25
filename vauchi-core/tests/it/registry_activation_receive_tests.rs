@@ -309,6 +309,7 @@ fn queue_registry_ack_echoes_own_registry_and_records_our_push_when_dormant() {
         sender_id: alice_contact_id.clone(),
         acked_version: 3,
         push_nonce: [6u8; 32],
+        sender_device_id: [0u8; 32],
     };
     bob_wb.queue_registry_ack(&reply).unwrap();
 
@@ -352,6 +353,7 @@ fn queue_registry_ack_keeps_an_outstanding_push_and_skips_the_echo() {
         sender_id: alice_contact_id.clone(),
         acked_version: 3,
         push_nonce: [6u8; 32],
+        sender_device_id: [0u8; 32],
     };
     bob_wb.queue_registry_ack(&reply).unwrap();
 

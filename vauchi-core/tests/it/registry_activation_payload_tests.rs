@@ -29,6 +29,7 @@ fn test_broadcast_json() -> String {
     broadcast.to_json()
 }
 
+// @internal
 #[test]
 fn push_payload_roundtrips_through_versioned_payload() {
     let json = test_broadcast_json();
@@ -46,6 +47,7 @@ fn push_payload_roundtrips_through_versioned_payload() {
     }
 }
 
+// @internal
 #[test]
 fn ack_payload_roundtrips_with_and_without_broadcast_echo() {
     let json = test_broadcast_json();
@@ -74,6 +76,7 @@ fn ack_payload_roundtrips_with_and_without_broadcast_echo() {
     }
 }
 
+// @internal
 #[test]
 fn push_rejects_oversized_broadcast_at_construction_and_decode() {
     let oversized = vec![b'x'; MAX_BROADCAST_JSON_BYTES + 1];
@@ -93,6 +96,7 @@ fn push_rejects_oversized_broadcast_at_construction_and_decode() {
     ));
 }
 
+// @internal
 #[test]
 fn ack_rejects_oversized_echo_at_construction_and_decode() {
     let oversized = vec![b'x'; MAX_BROADCAST_JSON_BYTES + 1];
@@ -112,6 +116,7 @@ fn ack_rejects_oversized_echo_at_construction_and_decode() {
     ));
 }
 
+// @internal
 #[test]
 fn truncated_payloads_fail_closed() {
     // Push shorter than its 32-byte nonce prefix.
@@ -133,6 +138,7 @@ fn truncated_payloads_fail_closed() {
     assert!(VersionedPayload::decode(&wire).is_err());
 }
 
+// @internal
 #[test]
 fn push_rejects_bytes_that_are_not_a_registry_broadcast() {
     // Structural DC-01 gate: the carried JSON must parse as a
@@ -147,6 +153,7 @@ fn push_rejects_bytes_that_are_not_a_registry_broadcast() {
     ));
 }
 
+// @internal
 #[test]
 fn unknown_future_version_byte_still_fails_closed() {
     // The degrade path a pre-F4 decoder takes for 0x05/0x06 — and this
@@ -159,6 +166,7 @@ fn unknown_future_version_byte_still_fails_closed() {
 }
 
 proptest! {
+    // @internal
     #[test]
     fn push_wire_form_is_stable_over_arbitrary_nonces(nonce in prop::array::uniform32(any::<u8>())) {
         let json = test_broadcast_json();
@@ -171,6 +179,7 @@ proptest! {
         prop_assert_eq!(VersionedPayload::encode_registry_push(&decoded), wire);
     }
 
+    // @internal
     #[test]
     fn ack_wire_form_is_stable_over_versions_and_echo(
         nonce in prop::array::uniform32(any::<u8>()),

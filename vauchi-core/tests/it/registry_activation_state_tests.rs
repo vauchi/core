@@ -12,6 +12,7 @@
 use proptest::prelude::*;
 use vauchi_core::sync::registry_activation::{ActivationState, ActivationTracker};
 
+// @internal
 #[test]
 fn starts_dormant_with_nothing_held() {
     let tracker = ActivationTracker::new();
@@ -20,6 +21,7 @@ fn starts_dormant_with_nothing_held() {
     assert_eq!(tracker.our_version_acked(), None);
 }
 
+// @internal
 #[test]
 fn push_then_matching_ack_activates() {
     let mut tracker = ActivationTracker::new();
@@ -31,6 +33,7 @@ fn push_then_matching_ack_activates() {
     assert_eq!(tracker.our_version_acked(), Some(4));
 }
 
+// @internal
 #[test]
 fn ack_without_outstanding_push_is_rejected() {
     let mut tracker = ActivationTracker::new();
@@ -38,6 +41,7 @@ fn ack_without_outstanding_push_is_rejected() {
     assert_eq!(tracker.state(), ActivationState::Dormant);
 }
 
+// @internal
 #[test]
 fn ack_with_wrong_nonce_or_stale_version_is_rejected_and_changes_nothing() {
     let mut tracker = ActivationTracker::new();
@@ -51,6 +55,7 @@ fn ack_with_wrong_nonce_or_stale_version_is_rejected_and_changes_nothing() {
     assert_eq!(tracker.our_version_acked(), None);
 }
 
+// @internal
 #[test]
 fn registry_change_after_activation_demotes_until_confirmed_again() {
     let mut tracker = ActivationTracker::new();
@@ -68,6 +73,7 @@ fn registry_change_after_activation_demotes_until_confirmed_again() {
     assert_eq!(tracker.state(), ActivationState::Active);
 }
 
+// @internal
 #[test]
 fn repushing_the_acked_version_stays_active() {
     let mut tracker = ActivationTracker::new();
@@ -80,6 +86,7 @@ fn repushing_the_acked_version_stays_active() {
     assert_eq!(tracker.state(), ActivationState::Active);
 }
 
+// @internal
 #[test]
 fn peer_registry_is_held_monotonically_and_emptying_deactivates() {
     let mut tracker = ActivationTracker::new();
@@ -124,6 +131,7 @@ fn op_strategy() -> impl Strategy<Value = Op> {
 }
 
 proptest! {
+    // @internal
     #[test]
     fn invariants_hold_over_arbitrary_sequences(ops in prop::collection::vec(op_strategy(), 1..40)) {
         let mut tracker = ActivationTracker::new();

@@ -46,6 +46,19 @@ pub struct ContactDeviceRegistrySyncData {
     pub broadcast_json: String,
 }
 
+/// F4 activation-handshake snapshot for one contact, transferred with the
+/// device-link full sync so a joining device inherits handshake progress
+/// instead of restarting every contact from Dormant (ADR-064 Amendment
+/// 2026-07-25).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactActivationSyncData {
+    pub contact_id: String,
+    pub push_nonce: Option<Vec<u8>>,
+    pub pushed_version: Option<u64>,
+    pub our_version_acked: Option<u64>,
+    pub peer_version_held: Option<u64>,
+}
+
 /// Errors that can occur during device sync.
 #[derive(Debug, Clone, thiserror::Error)]
 #[non_exhaustive]

@@ -186,15 +186,30 @@ impl Vauchi {
         // only open genesis, while a live sessioned peer opens it via the
         // decrypt-failure fallback. Once Active, the ordinary path applies
         // (per-device, resolvable — Active implies the peer holds our
-        // registry).
-        let prepared = if tracker.state() == ActivationState::Active {
-            self.encrypt_payload_for_contact_devices(identity, &contact, &payload)?
-        } else {
+        // registry) — EXCEPT when a fresh device-pair session puts us on
+        // the responder side, which cannot send first: without the genesis
+        // fallback the handshake livelocks, because our scanner skips
+        // Active contacts and the peer only activates through this very
+        // ack (caught by the ordering-flipped un-orphaning test).
+        let genesis_sealed = |this: &Self| -> VauchiResult<_> {
             let ex = contact
                 .kind()
                 .exchanged_data()
                 .ok_or_else(|| VauchiError::InvalidState("contact not exchanged".into()))?;
-            vec![self.genesis_seal_for_cold_start(identity, ex, &payload)?]
+            Ok(vec![
+                this.genesis_seal_for_cold_start(identity, ex, &payload)?,
+            ])
+        };
+        let prepared = if tracker.state() == ActivationState::Active {
+            match self.encrypt_payload_for_contact_devices(identity, &contact, &payload) {
+                Ok(prepared) => prepared,
+                Err(VauchiError::InvalidState(_)) | Err(VauchiError::NotFound(_)) => {
+                    genesis_sealed(self)?
+                }
+                Err(error) => return Err(error),
+            }
+        } else {
+            genesis_sealed(self)?
         };
 
         let now = self.clock.unix_seconds();

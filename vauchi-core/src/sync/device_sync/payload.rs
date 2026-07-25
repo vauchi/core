@@ -10,8 +10,9 @@ use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 
 use super::{
-    ContactDeviceRegistrySyncData, ContactExchangeLocation, ContactSyncData, DeviceSyncError,
-    GroupSyncData, ImportedContactSyncData, PlaceSyncData, TagSyncData,
+    ContactActivationSyncData, ContactDeviceRegistrySyncData, ContactExchangeLocation,
+    ContactSyncData, DeviceSyncError, GroupSyncData, ImportedContactSyncData, PlaceSyncData,
+    TagSyncData,
 };
 
 /// Payload for syncing all contacts during device linking.
@@ -42,6 +43,10 @@ pub struct DeviceSyncPayload {
     /// Verified peer topology needed to establish this device's own sessions.
     #[serde(default)]
     pub contact_device_registries: Vec<ContactDeviceRegistrySyncData>,
+    /// F4 activation-handshake snapshots (ADR-064 Amendment 2026-07-25).
+    /// `#[serde(default)]` for back-compat with pre-F4 payloads.
+    #[serde(default)]
+    pub contact_activations: Vec<ContactActivationSyncData>,
     /// Version number for conflict resolution.
     pub version: u64,
 }
@@ -58,6 +63,7 @@ impl DeviceSyncPayload {
             places: Vec::new(),
             exchange_locations: Vec::new(),
             contact_device_registries: Vec::new(),
+            contact_activations: Vec::new(),
             version: 0,
         }
     }
@@ -89,6 +95,7 @@ impl DeviceSyncPayload {
             places: Vec::new(),
             exchange_locations: Vec::new(),
             contact_device_registries: Vec::new(),
+            contact_activations: Vec::new(),
             version,
         }
     }
@@ -129,6 +136,11 @@ impl DeviceSyncPayload {
         registries: Vec<ContactDeviceRegistrySyncData>,
     ) -> Self {
         self.contact_device_registries = registries;
+        self
+    }
+
+    pub fn with_contact_activations(mut self, activations: Vec<ContactActivationSyncData>) -> Self {
+        self.contact_activations = activations;
         self
     }
 

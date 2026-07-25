@@ -188,6 +188,56 @@ fn handshake_progress_journals_registry_and_activation_for_siblings() {
     );
 }
 
+// @scenario: multi_device_sync :: A joining device inherits activation state via full sync
+// @internal
+#[test]
+fn full_sync_transfers_activation_state_to_a_joining_device() {
+    // Review finding F2: without this, a newly linked device starts
+    // Dormant for every contact and forces O(contacts) fresh handshakes.
+    use crate::common::device_sync::{
+        create_test_contact, create_test_device, create_test_registry, create_test_storage,
+    };
+    use vauchi_core::api::sync::DeviceSyncOrchestrator;
+    use vauchi_core::sync::DeviceLinkIntent;
+
+    let master_seed = [0x43u8; 32];
+    let a1 = create_test_storage();
+    let bob = create_test_contact("Bob");
+    let bob_id = bob.id().to_string();
+    a1.contacts().save_contact(&bob).unwrap();
+    let mut tracker = ActivationTracker::new();
+    tracker.record_push_sent([5u8; 32], 2);
+    tracker.record_ack(&[5u8; 32], 2).unwrap();
+    tracker.record_peer_registry(7);
+    a1.registry_activation()
+        .save_activation(&bob_id, &tracker)
+        .unwrap();
+
+    let a1_device = create_test_device(&master_seed, 0, "Device A");
+    let a1_registry = create_test_registry(&master_seed, &a1_device);
+    let payload = DeviceSyncOrchestrator::new(&a1, a1_device, a1_registry)
+        .create_full_sync_payload(DeviceLinkIntent::AddDevice)
+        .unwrap();
+
+    let a2 = create_test_storage();
+    let a2_device = create_test_device(&master_seed, 1, "Device B");
+    let a2_registry = create_test_registry(&master_seed, &a2_device);
+    DeviceSyncOrchestrator::new(&a2, a2_device, a2_registry)
+        .apply_full_sync(payload)
+        .unwrap();
+
+    let inherited = a2
+        .registry_activation()
+        .load_activation(&bob_id)
+        .unwrap()
+        .expect("activation state transfers with the full sync");
+    assert_eq!(inherited.state(), ActivationState::Active);
+    assert_eq!(inherited.our_version_acked(), Some(2));
+    assert_eq!(inherited.peer_version_held(), Some(7));
+    let (nonce, version) = inherited.outstanding_push().expect("outstanding push");
+    assert_eq!((nonce, version), ([5u8; 32], 2));
+}
+
 fn bob_broadcast(bob_wb: &vauchi_core::Vauchi) -> RegistryBroadcast {
     let bob_identity = bob_wb.identity().unwrap();
     RegistryBroadcast::new(

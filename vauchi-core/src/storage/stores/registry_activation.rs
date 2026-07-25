@@ -72,6 +72,23 @@ impl RegistryActivationStore<'_> {
         Ok(())
     }
 
+    /// All contacts' activation snapshots (device-link full-sync source).
+    pub fn list_activations(&self) -> Result<Vec<(String, ActivationTracker)>, StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT contact_id FROM registry_activation")?;
+        let ids: Vec<String> = stmt
+            .query_map([], |r| r.get::<_, String>(0))?
+            .collect::<Result<_, _>>()?;
+        let mut out = Vec::with_capacity(ids.len());
+        for contact_id in ids {
+            if let Some(tracker) = self.load_activation(&contact_id)? {
+                out.push((contact_id, tracker));
+            }
+        }
+        Ok(out)
+    }
+
     /// Rehydrate the tracker for `contact_id`; `None` when no handshake has
     /// been recorded (callers treat that as `Dormant`).
     pub fn load_activation(
@@ -90,12 +107,20 @@ impl RegistryActivationStore<'_> {
         let Some((push_nonce, pushed_version, our_version_acked, peer_version_held)) = row else {
             return Ok(None);
         };
+        // This table is written only by this store with u64 inputs, so a
+        // negative version is tampering or corruption — fail closed like
+        // the half-present-push case, never silently clamp (review F4).
+        let checked_version = |value: i64| -> Result<u64, StorageError> {
+            u64::try_from(value).map_err(|_| {
+                StorageError::InvalidData("registry_activation version is negative".into())
+            })
+        };
         let outstanding_push = match (push_nonce, pushed_version) {
             (Some(nonce_bytes), Some(version)) => {
                 let nonce: [u8; 32] = nonce_bytes.try_into().map_err(|_| {
                     StorageError::InvalidData("registry_activation push_nonce length".into())
                 })?;
-                Some((nonce, version.max(0) as u64))
+                Some((nonce, checked_version(version)?))
             }
             // A half-present push (nonce without version or vice versa) is
             // tampering or corruption — fail closed rather than guess.
@@ -108,8 +133,8 @@ impl RegistryActivationStore<'_> {
         };
         Ok(Some(ActivationTracker::from_parts(
             outstanding_push,
-            our_version_acked.map(|v| v.max(0) as u64),
-            peer_version_held.map(|v| v.max(0) as u64),
+            our_version_acked.map(checked_version).transpose()?,
+            peer_version_held.map(checked_version).transpose()?,
         )))
     }
 }

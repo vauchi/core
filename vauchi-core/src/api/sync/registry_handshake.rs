@@ -192,9 +192,13 @@ pub(crate) fn receive_genesis_registry_ack(
 ///
 /// Best-effort AFTER the state commit (`record_local_change` opens its own
 /// transaction, so it cannot nest inside the receive transaction — same
-/// seam as `ContactCardUpdated` fan-out). A lost journal self-heals: the
-/// level-triggered push scanner re-journals unconfirmed state every sync
-/// tick, and any later handshake activity re-journals confirmed state.
+/// seam as `ContactCardUpdated` fan-out). Loss scope (review F3): a lost
+/// journal of UNCONFIRMED state re-journals on the scanner's next push;
+/// a lost journal of the Active transition is repaired only by later
+/// handshake activity (registry change, repair re-push) or by the
+/// device-link full sync, which snapshots activation state — an existing
+/// sibling that misses the transition keeps working via owner-sync
+/// mediation until one of those occurs.
 pub(crate) fn journal_handshake_state_for_siblings(
     identity: &crate::identity::Identity,
     storage: &Storage,
@@ -330,7 +334,10 @@ pub(crate) fn receive_registry_ack(
 ) -> Result<ReceiveOutcome, CardUpdateError> {
     storage.begin_transaction()?;
     let txn = (|| -> Result<Option<RegistryReplyNeeded>, CardUpdateError> {
+        use crate::sync::registry_activation::ActivationState;
+
         let mut tracker = load_tracker(storage, sender_id)?;
+        let was_active = tracker.state() == ActivationState::Active;
         if tracker
             .record_ack(ack.push_nonce(), ack.acked_version())
             .is_err()
@@ -339,17 +346,26 @@ pub(crate) fn receive_registry_ack(
             // is ratchet-authenticated and the state machine rejects
             // explicitly (DC-02) — nothing to record, nothing to error.
         }
-        let reply = match ack.broadcast_json() {
-            Some(echo) => {
-                let held_version = persist_carried_broadcast(storage, sender_id, contact, echo)?;
-                tracker.record_peer_registry(held_version);
-                Some(RegistryReplyNeeded {
-                    sender_id: sender_id.to_string(),
-                    acked_version: held_version,
-                    push_nonce: *ack.push_nonce(),
-                })
-            }
-            None => None,
+        let mut held_version = None;
+        if let Some(echo) = ack.broadcast_json() {
+            let version = persist_carried_broadcast(storage, sender_id, contact, echo)?;
+            tracker.record_peer_registry(version);
+            held_version = Some(version);
+        }
+        // Reply only on OUR not-Active -> Active transition (mirrors the
+        // genesis handler): an already-Active tracker processing a replayed
+        // echo-ack must stay silent, or a malicious authenticated contact
+        // could force an unbounded reply stream against the never-cleared
+        // outstanding push (review finding F1). The peer's un-confirmed
+        // registry still converges via its scanner re-push.
+        let activated_now = !was_active && tracker.state() == ActivationState::Active;
+        let reply = match (activated_now, held_version) {
+            (true, Some(version)) => Some(RegistryReplyNeeded {
+                sender_id: sender_id.to_string(),
+                acked_version: version,
+                push_nonce: *ack.push_nonce(),
+            }),
+            _ => None,
         };
         storage
             .registry_activation()

@@ -28,8 +28,24 @@ use vauchi_core::sync::safety_alert::{AlertKind, SafetyAlertPayload};
 /// Bob holds Alice as an exchanged contact with NO session — the cold-start
 /// state after Alice's exchanging device died and a sibling reaches out.
 fn cold_start_world() -> (vauchi_core::Vauchi, vauchi_core::Vauchi, String, u64) {
-    let alice_wb = create_vauchi_with_identity("Alice");
+    cold_start_world_ordered(true)
+}
+
+/// `alice_initiator` pins the device-pair initiator role (smaller signing
+/// key sends first), making the per-device vs genesis-fallback send path
+/// deterministic instead of a per-run coin flip.
+fn cold_start_world_ordered(
+    alice_initiator: bool,
+) -> (vauchi_core::Vauchi, vauchi_core::Vauchi, String, u64) {
     let bob_wb = create_vauchi_with_identity("Bob");
+    let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
+    let alice_wb = loop {
+        let candidate = create_vauchi_with_identity("Alice");
+        let candidate_pk = *candidate.identity().unwrap().signing_public_key();
+        if (candidate_pk < bob_pk) == alice_initiator {
+            break candidate;
+        }
+    };
 
     let alice_pk = *alice_wb.identity().unwrap().signing_public_key();
     let shared = SymmetricKey::generate();
@@ -285,11 +301,28 @@ fn scanner_push_geneses_when_no_session_and_no_registry_exist() {
 // @internal
 #[test]
 fn orphaned_sibling_reconverges_and_receives_cards_without_reexchange() {
+    run_unorphaning_flow(true);
+}
+
+// @scenario: multi_device_sync :: Un-orphaning converges even when the sibling is the session responder
+// @internal
+#[test]
+fn orphaned_responder_sibling_reconverges_via_genesis_fallback() {
+    // The device-pair initiator role is decided by key order. When A2
+    // lands on the responder side, her fresh per-device session cannot
+    // send first — the Active ack path must fall back to the genesis
+    // envelope or the handshake livelocks (A2's scanner skips Active
+    // contacts, so nothing would ever retry). Caught as an intermittent
+    // failure of the initiator-ordering test.
+    run_unorphaning_flow(false);
+}
+
+fn run_unorphaning_flow(alice_initiator: bool) {
     // The lost-primary repair, end to end. Alice's exchanging device is
     // gone: her sibling A2 holds only the synced shared_key — no session,
     // no peer registry. Bob still holds a [0;32] session anchored to the
     // dead device.
-    let (alice_wb, bob_wb, alice_contact_id, _v) = cold_start_world();
+    let (alice_wb, bob_wb, alice_contact_id, _v) = cold_start_world_ordered(alice_initiator);
     let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
     let shared = bob_wb
         .storage()
@@ -385,7 +418,9 @@ fn orphaned_sibling_reconverges_and_receives_cards_without_reexchange() {
         .expect("tracker");
     assert_eq!(a2_tracker.state(), ActivationState::Active, "A2 activates");
 
-    // 5. A2's confirm reaches Bob (A2 is Active — ordinary per-device path).
+    // 5. A2's confirm reaches Bob. As device-pair initiator it rides the
+    //    ordinary per-device path; as responder the fresh pair cannot send
+    //    first and the confirm falls back to the genesis envelope.
     alice_wb.queue_registry_ack(&confirm).unwrap();
     let confirm_blobs = alice_wb
         .storage()
@@ -397,17 +432,30 @@ fn orphaned_sibling_reconverges_and_receives_cards_without_reexchange() {
         .map(|u| u.payload.clone())
         .last()
         .expect("confirm queued");
-    // In production Bob resolves A2's device from her rotating sender token
-    // (he holds Alice's registry now); the device-aware entry mirrors that.
-    let a2_device_id = *alice_identity.device_id();
-    vauchi_core::api::process_single_card_update_for_device(
-        bob_identity,
-        bob_wb.storage(),
-        &alice_contact_id,
-        &a2_device_id,
-        &confirm_blob,
-    )
-    .expect("bob processes the confirm");
+    if alice_initiator {
+        // In production Bob resolves A2's device from her rotating sender
+        // token (he holds Alice's registry now); the device-aware entry
+        // mirrors that.
+        let a2_device_id = *alice_identity.device_id();
+        vauchi_core::api::process_single_card_update_for_device(
+            bob_identity,
+            bob_wb.storage(),
+            &alice_contact_id,
+            &a2_device_id,
+            &confirm_blob,
+        )
+        .expect("bob processes the per-device confirm");
+    } else {
+        // The genesis-sealed confirm opens on Bob's plain [0;32] path via
+        // the decrypt-failure fallback.
+        process_single_card_update(
+            bob_identity,
+            bob_wb.storage(),
+            &alice_contact_id,
+            &confirm_blob,
+        )
+        .expect("bob processes the genesis confirm");
+    }
     let bob_tracker = bob_wb
         .storage()
         .registry_activation()

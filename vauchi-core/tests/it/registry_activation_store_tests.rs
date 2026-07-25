@@ -120,6 +120,37 @@ fn deleting_the_contact_cascades_the_activation_row() {
 
 // @internal
 #[test]
+fn negative_stored_versions_fail_closed_as_corruption() {
+    // Review finding F4: the table is written only by this store, so a
+    // negative version is tampering or corruption — surface it, never
+    // silently clamp (consistent with the half-present-push policy).
+    let storage = test_storage();
+    let contact_id = saved_contact(&storage, 6, "Corrupt");
+    let mut tracker = ActivationTracker::new();
+    tracker.record_push_sent([1u8; 32], 1);
+    storage
+        .registry_activation()
+        .save_activation(&contact_id, &tracker)
+        .unwrap();
+    storage
+        .connection()
+        .execute(
+            "UPDATE registry_activation SET pushed_version = -3 WHERE contact_id = ?1",
+            rusqlite::params![contact_id],
+        )
+        .unwrap();
+
+    assert!(
+        storage
+            .registry_activation()
+            .load_activation(&contact_id)
+            .is_err(),
+        "a negative stored version must load as corruption, not clamp to 0"
+    );
+}
+
+// @internal
+#[test]
 fn saving_for_unknown_contact_fails_closed() {
     let storage = test_storage();
     let mut tracker = ActivationTracker::new();

@@ -336,6 +336,30 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             })
             .collect();
 
+        // F4: activation snapshots ride along so the joining device inherits
+        // handshake progress instead of restarting every contact (ADR-064
+        // Amendment 2026-07-25, review F2).
+        let contact_activations = self
+            .storage
+            .registry_activation()
+            .list_activations()
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+            .into_iter()
+            .map(|(contact_id, tracker)| {
+                let (push_nonce, pushed_version) = match tracker.outstanding_push() {
+                    Some((nonce, version)) => (Some(nonce.to_vec()), Some(version)),
+                    None => (None, None),
+                };
+                crate::sync::device_sync::ContactActivationSyncData {
+                    contact_id,
+                    push_nonce,
+                    pushed_version,
+                    our_version_acked: tracker.our_version_acked(),
+                    peer_version_held: tracker.peer_version_held(),
+                }
+            })
+            .collect();
+
         // Get current version
         let version = self.version_vector.get(self.current_device.device_id());
 
@@ -344,7 +368,8 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .with_groups(groups)
             .with_places(places)
             .with_exchange_locations(exchange_locations)
-            .with_contact_device_registries(contact_device_registries))
+            .with_contact_device_registries(contact_device_registries)
+            .with_contact_activations(contact_activations))
     }
 
     /// Applies a full sync payload received during device linking.
@@ -425,6 +450,48 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                         )
                         .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
                 }
+            }
+
+            // F4: inherit activation-handshake snapshots (merged monotonically,
+            // like the sibling relay) so this device does not restart every
+            // contact's handshake from Dormant (ADR-064 Amendment 2026-07-25,
+            // review F2). Rows for unknown contacts are skipped.
+            for activation in &payload.contact_activations {
+                if self
+                    .storage
+                    .contacts()
+                    .load_contact(&activation.contact_id)
+                    .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+                    .is_none()
+                {
+                    continue;
+                }
+                let outstanding = match (&activation.push_nonce, activation.pushed_version) {
+                    (Some(nonce_bytes), Some(version)) => {
+                        let Ok(nonce) = <[u8; 32]>::try_from(nonce_bytes.clone()) else {
+                            continue; // malformed row — skip, never guess
+                        };
+                        Some((nonce, version))
+                    }
+                    (None, None) => None,
+                    _ => continue,
+                };
+                let incoming = crate::sync::registry_activation::ActivationTracker::from_parts(
+                    outstanding,
+                    activation.our_version_acked,
+                    activation.peer_version_held,
+                );
+                let mut tracker = self
+                    .storage
+                    .registry_activation()
+                    .load_activation(&activation.contact_id)
+                    .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+                    .unwrap_or_default();
+                tracker.merge_snapshot(&incoming);
+                self.storage
+                    .registry_activation()
+                    .save_activation(&activation.contact_id, &tracker)
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
 
             // Restore owner-private tags (ADR-051), preserving their ids.

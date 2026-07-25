@@ -341,17 +341,25 @@ impl AppEngine {
                 h.machine.transport_key()?,
             ))
         }) else {
+            // Dev instrumentation (no PII). Reaching "Exchange Complete" without
+            // received data / transport key means we finalized without the
+            // decrypted peer card, so no contact is saved — the exact 2026-07-25
+            // Samsung half-exchange symptom (finalized on-screen, empty contacts).
+            tracing::info!("[MSX] persist SKIP: no received_payload/transport_key at Finalized");
             return;
         };
         // `[version: 1][peer_pk: 32][card_json: rest]` — mirrors
         // `serialize_exchange_payload`.
         if payload.len() < 33 || payload[0] != EXCHANGE_PAYLOAD_VERSION {
+            tracing::info!("[MSX] persist SKIP: bad payload len={}", payload.len());
             return;
         }
         let Ok(peer_pk) = <[u8; 32]>::try_from(&payload[1..33]) else {
+            tracing::info!("[MSX] persist SKIP: peer_pk parse");
             return;
         };
         let Ok(card) = serde_json::from_slice::<ContactCard>(&payload[33..]) else {
+            tracing::info!("[MSX] persist SKIP: card json parse");
             return;
         };
         // Pull the success-screen content off the peer card before it is
@@ -426,6 +434,10 @@ impl AppEngine {
             tracing::warn!("multi-stage: failed to persist exchanged contact: {e}");
             return;
         }
+        // Dev instrumentation (no PII): the persist landed. Pairs with the
+        // SKIP logs above so a device run shows definitively whether each side
+        // saved the exchanged contact (2026-07-25 Samsung half-exchange).
+        tracing::info!("[MSX] persist OK: exchanged contact saved");
 
         // Capture-at-exchange (ADR-051): ask the frontend for the current
         // location so we can record where this contact was met. The reply

@@ -389,6 +389,56 @@ fn queue_registry_ack_keeps_an_outstanding_push_and_skips_the_echo() {
     }
 }
 
+// @scenario: multi_device_sync :: Activation re-arms the owed card so pre-activation edits deliver
+// @internal
+#[test]
+fn activation_transition_rearms_the_owed_card_repropagation() {
+    // e2e certification finding: a card edited BEFORE activation arms the
+    // owed-repropagation marker, but every pre-activation tick fails
+    // (session-less contact) and burns the retry budget — by the time the
+    // handshake completes, the marker is backed off and the card never
+    // reaches the peer. The activation transition must reset the budget:
+    // the channel just came alive, and the peer's fleet needs our current
+    // card.
+    let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = setup_two_party();
+
+    let mut tracker = ActivationTracker::new();
+    tracker.record_push_sent([8u8; 32], 4);
+    alice_wb
+        .storage()
+        .registry_activation()
+        .save_activation(&bob_contact_id, &tracker)
+        .unwrap();
+    // Marker exhausted by pre-activation failures.
+    alice_wb
+        .storage()
+        .ux()
+        .save_own_card_repropagate(&vauchi_core::types::OwnCardRepropagateState {
+            needs_repropagate: true,
+            failed_attempts: 250,
+        })
+        .unwrap();
+
+    let broadcast = bob_signed_broadcast(&bob_wb);
+    let ack =
+        RegistryAckPayload::new([8u8; 32], 4, Some(broadcast.to_json().into_bytes())).unwrap();
+    let blob = seal_from_bob(
+        &bob_wb,
+        &alice_contact_id,
+        &VersionedPayload::encode_registry_ack(&ack),
+    );
+    let alice_identity = alice_wb.identity().unwrap();
+    process_single_card_update(alice_identity, alice_wb.storage(), &bob_contact_id, &blob)
+        .expect("activating ack");
+
+    let marker = alice_wb.storage().ux().load_own_card_repropagate().unwrap();
+    assert!(marker.needs_repropagate, "card push stays armed");
+    assert_eq!(
+        marker.failed_attempts, 0,
+        "activation resets the retry budget so the owed card delivers"
+    );
+}
+
 // @scenario: multi_device_sync :: A corrupt per-device session triggers handshake repair
 // @internal
 #[test]

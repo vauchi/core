@@ -25,6 +25,19 @@ fn setup_with_card(name: &str) -> Vauchi {
     wb
 }
 
+/// Helper: mark the F4 handshake complete so the per-device send gate opens
+/// (fan-out requires `Active`, never registry presence alone — ADR-064
+/// Amendment 2026-07-25).
+fn activate_contact(wb: &Vauchi, contact_id: &str) {
+    let mut tracker = vauchi_core::sync::registry_activation::ActivationTracker::new();
+    tracker.record_push_sent([7u8; 32], 1);
+    tracker.record_ack(&[7u8; 32], 1).unwrap();
+    wb.storage()
+        .registry_activation()
+        .save_activation(contact_id, &tracker)
+        .unwrap();
+}
+
 /// Helper: simulate exchange where Alice is the INITIATOR.
 ///
 /// The initiator can send first (has sending chain), unlike the
@@ -200,6 +213,7 @@ fn test_prepare_card_update_fans_out_to_contact_devices() {
         .device()
         .save_contact_device_registry(&contact_id, &broadcast, signing.public_key().as_bytes(), 60)
         .unwrap();
+    activate_contact(&wb, &contact_id);
 
     let empty = ContactCard::new("Alice");
     let current = wb.storage().contacts().load_own_card().unwrap().unwrap();
@@ -257,6 +271,7 @@ fn test_propagate_card_update_queue_failure_rolls_back_all_device_state() {
         .device()
         .save_contact_device_registry(&contact_id, &broadcast, signing.public_key().as_bytes(), 60)
         .unwrap();
+    activate_contact(&wb, &contact_id);
     wb.storage()
         .connection()
         .execute_batch(

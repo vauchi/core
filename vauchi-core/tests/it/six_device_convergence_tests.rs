@@ -88,6 +88,7 @@ fn connect_parties(alice: &mut Party, bob: &mut Party, relationship: &SymmetricK
             .device()
             .save_contact_device_registry(&contact_id, &bob_broadcast, &bob.signing_public_key, 60)
             .unwrap();
+        mark_handshake_active(device, &contact_id);
     }
     for device in &bob.devices {
         let contact = Contact::from_exchange(
@@ -108,7 +109,23 @@ fn connect_parties(alice: &mut Party, bob: &mut Party, relationship: &SymmetricK
                 60,
             )
             .unwrap();
+        mark_handshake_active(device, &contact_id);
     }
+}
+
+/// The six-device world models a post-F4 topology: every side already
+/// completed the bilateral handshake, so the per-device send gate is open
+/// (fan-out requires `Active`, never registry presence alone — ADR-064
+/// Amendment 2026-07-25).
+fn mark_handshake_active(device: &Vauchi, contact_id: &str) {
+    let mut tracker = vauchi_core::sync::registry_activation::ActivationTracker::new();
+    tracker.record_push_sent([7u8; 32], 1);
+    tracker.record_ack(&[7u8; 32], 1).unwrap();
+    device
+        .storage()
+        .registry_activation()
+        .save_activation(contact_id, &tracker)
+        .unwrap();
 }
 
 fn send_from_each_device(

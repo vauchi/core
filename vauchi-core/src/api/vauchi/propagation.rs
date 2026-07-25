@@ -348,11 +348,26 @@ impl Vauchi {
             .storage
             .device()
             .load_contact_active_devices(contact_id)?;
-        let targets: Vec<Option<crate::identity::BroadcastDevice>> = if peer_devices.is_empty() {
-            vec![None]
-        } else {
-            peer_devices.into_iter().map(Some).collect()
-        };
+        // Registry presence alone never opens the per-device path: resolving
+        // our device-scoped tokens requires the peer to hold OUR registry,
+        // which only a completed bilateral handshake confirms (ADR-064
+        // Amendment 2026-07-25 — the refuted B-lite hazard). Anything short
+        // of Active rides the legacy [0;32] session the peer is known to
+        // resolve.
+        let activation_confirmed = self
+            .storage
+            .registry_activation()
+            .load_activation(contact_id)?
+            .map(|tracker| {
+                tracker.state() == crate::sync::registry_activation::ActivationState::Active
+            })
+            .unwrap_or(false);
+        let targets: Vec<Option<crate::identity::BroadcastDevice>> =
+            if peer_devices.is_empty() || !activation_confirmed {
+                vec![None]
+            } else {
+                peer_devices.into_iter().map(Some).collect()
+            };
         let mut prepared = Vec::with_capacity(targets.len());
         for target in targets {
             let peer_device_id = target

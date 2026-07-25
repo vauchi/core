@@ -40,6 +40,12 @@ pub const PAYLOAD_VERSION_RECIPROCITY: u8 = 0x03;
 /// Inside the ratchet ciphertext, so indistinguishable on the wire (ADR-032).
 pub const PAYLOAD_VERSION_ALERT: u8 = 0x04;
 
+/// Version byte for F4 registry-push payloads.
+pub const PAYLOAD_VERSION_REGISTRY_PUSH: u8 = 0x05;
+
+/// Version byte for F4 registry-ack payloads.
+pub const PAYLOAD_VERSION_REGISTRY_ACK: u8 = 0x06;
+
 /// Delta encoding error types.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -520,6 +526,13 @@ pub enum VersionedPayload {
     /// Safety alert (version 0x04): signed, nonce-bearing emergency/duress
     /// envelope routed at the caller (`crate::sync::safety_alert`).
     Alert(crate::sync::safety_alert::SafetyAlertPayload),
+    /// Registry push (version 0x05): the sender's identity-signed
+    /// `RegistryBroadcast` for F4 bilateral activation
+    /// (`crate::sync::registry_activation`).
+    RegistryPush(crate::sync::registry_activation::RegistryPushPayload),
+    /// Registry ack (version 0x06): confirms a received registry version,
+    /// optionally carrying the responder's own broadcast back.
+    RegistryAck(crate::sync::registry_activation::RegistryAckPayload),
 }
 
 impl VersionedPayload {
@@ -550,6 +563,28 @@ impl VersionedPayload {
         buf
     }
 
+    /// Encode a registry push with version prefix.
+    pub fn encode_registry_push(
+        payload: &crate::sync::registry_activation::RegistryPushPayload,
+    ) -> Vec<u8> {
+        let inner = payload.encode();
+        let mut buf = Vec::with_capacity(1 + inner.len());
+        buf.push(PAYLOAD_VERSION_REGISTRY_PUSH);
+        buf.extend_from_slice(&inner);
+        buf
+    }
+
+    /// Encode a registry ack with version prefix.
+    pub fn encode_registry_ack(
+        payload: &crate::sync::registry_activation::RegistryAckPayload,
+    ) -> Vec<u8> {
+        let inner = payload.encode();
+        let mut buf = Vec::with_capacity(1 + inner.len());
+        buf.push(PAYLOAD_VERSION_REGISTRY_ACK);
+        buf.extend_from_slice(&inner);
+        buf
+    }
+
     /// Decode a version-tagged payload.
     pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
         if data.is_empty() {
@@ -568,6 +603,16 @@ impl VersionedPayload {
             PAYLOAD_VERSION_ALERT => {
                 let payload = crate::sync::safety_alert::SafetyAlertPayload::decode(&data[1..])?;
                 Ok(VersionedPayload::Alert(payload))
+            }
+            PAYLOAD_VERSION_REGISTRY_PUSH => {
+                let payload =
+                    crate::sync::registry_activation::RegistryPushPayload::decode(&data[1..])?;
+                Ok(VersionedPayload::RegistryPush(payload))
+            }
+            PAYLOAD_VERSION_REGISTRY_ACK => {
+                let payload =
+                    crate::sync::registry_activation::RegistryAckPayload::decode(&data[1..])?;
+                Ok(VersionedPayload::RegistryAck(payload))
             }
             v => Err(DeltaError::UnknownPayloadVersion(v)),
         }

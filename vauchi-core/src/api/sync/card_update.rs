@@ -713,6 +713,13 @@ fn decode_versioned_payload(
                     "safety alert not handled here".into(),
                 ))
             }
+            Ok(VersionedPayload::RegistryPush(_)) | Ok(VersionedPayload::RegistryAck(_)) => {
+                // F4 registry handshake payloads are not card deltas — routed
+                // at the caller by version byte, like ReciprocityConfirm.
+                Err(CardUpdateError::InvalidPayload(
+                    "registry handshake not handled here".into(),
+                ))
+            }
             Err(e) => Err(CardUpdateError::InvalidPayload(e.to_string())),
         }
     } else {

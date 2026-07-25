@@ -4,8 +4,8 @@
 
 use proptest::prelude::*;
 use vauchi_core::network::mailbox_token::{
-    batch_register_tokens, batch_register_tokens_with_device_sync, compute_device_sync_token,
-    compute_mailbox_token, compute_self_token, token_hex,
+    batch_register_tokens, batch_register_tokens_with_device_sync, compute_device_mailbox_token,
+    compute_device_sync_token, compute_mailbox_token, compute_self_token, token_hex,
 };
 
 // Directional tokens are keyed to the recipient. These tests assert only
@@ -31,6 +31,41 @@ fn test_contact_mailbox_token_rotates_daily() {
     let day1 = compute_mailbox_token(&shared_key, &TEST_PUBKEY, 19804);
     let day2 = compute_mailbox_token(&shared_key, &TEST_PUBKEY, 19805);
     assert_ne!(day1, day2);
+}
+
+// @scenario: multi_device_sync :: Each device has its own contact mailbox
+// @internal
+#[test]
+fn test_device_mailbox_token_is_device_specific_daily_and_distinct_from_identity() {
+    // F4 device-scoped contact mailbox (ADR-064 Amendment 2026-07-25): the
+    // token folds the recipient device id into HKDF input so a sibling
+    // cannot drain another sibling's copy — but stays daily-rotating with
+    // no wire-visible correlator.
+    let shared_key = [0x42u8; 32];
+    let dev_a = [1u8; 32];
+    let dev_b = [2u8; 32];
+    let day = 19804u64;
+
+    // Deterministic.
+    assert_eq!(
+        compute_device_mailbox_token(&shared_key, &TEST_PUBKEY, &dev_a, day),
+        compute_device_mailbox_token(&shared_key, &TEST_PUBKEY, &dev_a, day),
+    );
+    // Device-specific.
+    assert_ne!(
+        compute_device_mailbox_token(&shared_key, &TEST_PUBKEY, &dev_a, day),
+        compute_device_mailbox_token(&shared_key, &TEST_PUBKEY, &dev_b, day),
+    );
+    // Daily-rotating.
+    assert_ne!(
+        compute_device_mailbox_token(&shared_key, &TEST_PUBKEY, &dev_a, day),
+        compute_device_mailbox_token(&shared_key, &TEST_PUBKEY, &dev_a, day + 1),
+    );
+    // Never collides with the identity-scoped token (own domain input).
+    assert_ne!(
+        compute_device_mailbox_token(&shared_key, &TEST_PUBKEY, &dev_a, day).as_bytes(),
+        compute_mailbox_token(&shared_key, &TEST_PUBKEY, day).as_bytes(),
+    );
 }
 
 // @internal

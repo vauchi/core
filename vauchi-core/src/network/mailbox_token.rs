@@ -21,6 +21,10 @@ use crate::crypto::HKDF;
 use crate::identifiers::MailboxToken;
 
 const CONTACT_DOMAIN: &[u8] = b"Vauchi_Mailbox_v1";
+/// Domain for the F4 device-scoped contact mailbox (ADR-064 Amendment
+/// 2026-07-25). Distinct domain so a device-scoped token can never collide
+/// with the identity-scoped `CONTACT_DOMAIN` token for the same inputs.
+const CONTACT_DEVICE_DOMAIN: &[u8] = b"Vauchi_MailboxDevice_v1";
 const DEVICE_SYNC_DOMAIN: &[u8] = b"Vauchi_DeviceSync_v1";
 const DEVICE_SYNC_RECIPIENT_DOMAIN: &[u8] = b"Vauchi_DeviceSyncRecipient_v1";
 
@@ -49,6 +53,35 @@ pub fn compute_mailbox_token(
     let mut info = Vec::with_capacity(CONTACT_DOMAIN.len() + 32 + 8);
     info.extend_from_slice(CONTACT_DOMAIN);
     info.extend_from_slice(recipient_pubkey);
+    info.extend_from_slice(&day_epoch.to_be_bytes());
+    MailboxToken::from_bytes(*HKDF::derive_key(None, shared_key, &info))
+}
+
+/// Compute a device-scoped contact mailbox token (F4, ADR-064 Amendment
+/// 2026-07-25).
+///
+/// Like [`compute_mailbox_token`] but folds the recipient DEVICE id into the
+/// HKDF input, so each of a contact's devices has an independent opaque
+/// mailbox. Relay fetch is destructive; without this, one sibling drains an
+/// envelope encrypted for another (the F4 lost-primary root cause). The
+/// device id is HKDF input only — never sent to the relay — so the token
+/// stays a daily-rotating 32-byte value and introduces no wire-visible
+/// per-device correlator (ADR-029/037 preserved), mirroring
+/// [`compute_device_sync_token`].
+///
+/// - `recipient_pubkey`: the recipient's identity signing key (contact's key
+///   for a send token; own key for a receive token).
+/// - `recipient_device_id`: the target device's 32-byte id.
+pub fn compute_device_mailbox_token(
+    shared_key: &[u8; 32],
+    recipient_pubkey: &[u8; 32],
+    recipient_device_id: &[u8; 32],
+    day_epoch: u64,
+) -> MailboxToken {
+    let mut info = Vec::with_capacity(CONTACT_DEVICE_DOMAIN.len() + 32 + 32 + 8);
+    info.extend_from_slice(CONTACT_DEVICE_DOMAIN);
+    info.extend_from_slice(recipient_pubkey);
+    info.extend_from_slice(recipient_device_id);
     info.extend_from_slice(&day_epoch.to_be_bytes());
     MailboxToken::from_bytes(*HKDF::derive_key(None, shared_key, &info))
 }

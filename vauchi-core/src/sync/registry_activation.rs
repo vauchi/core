@@ -152,6 +152,24 @@ impl ActivationTracker {
     pub fn our_version_acked(&self) -> Option<u64> {
         self.our_version_acked
     }
+
+    /// The push awaiting confirmation, if any (persistence snapshot).
+    pub fn outstanding_push(&self) -> Option<([u8; NONCE_LEN], u64)> {
+        self.outstanding_push
+    }
+
+    /// Rehydrate a tracker from a persisted snapshot.
+    pub fn from_parts(
+        outstanding_push: Option<([u8; NONCE_LEN], u64)>,
+        our_version_acked: Option<u64>,
+        peer_version_held: Option<u64>,
+    ) -> Self {
+        Self {
+            outstanding_push,
+            our_version_acked,
+            peer_version_held,
+        }
+    }
 }
 
 impl Default for ActivationTracker {

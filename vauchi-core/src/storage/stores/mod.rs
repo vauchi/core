@@ -34,6 +34,7 @@ mod pin_cache;
 mod place;
 mod ratchet;
 mod recovery;
+mod registry_activation;
 mod replay;
 mod retry;
 mod safety_alert;

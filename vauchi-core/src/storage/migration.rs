@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 64] = [
+const MIGRATIONS: [Migration; 65] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -592,7 +592,33 @@ const MIGRATIONS: [Migration; 64] = [
         name: "genesis_reseat_skips",
         action: MigrationAction::Sql(MIGRATION_V64_GENESIS_RESEAT_SKIPS),
     },
+    Migration {
+        version: 65,
+        name: "registry_activation",
+        action: MigrationAction::Sql(MIGRATION_V65_REGISTRY_ACTIVATION),
+    },
 ];
+
+/// Migration v65: F4 per-contact registry-activation handshake state
+/// (ADR-064 Amendment 2026-07-25).
+///
+/// Snapshots the `ActivationTracker` — the send path fans out per-device only
+/// for contacts whose row derives `Active` (our pushed registry version acked
+/// by the peer). A missing row is `Dormant` (the legacy `[0;32]` send path),
+/// which is exactly the pre-F4 shipped behavior and the rollback guarantee.
+/// No secret material: the push nonce is a correlation value and versions are
+/// counters, matching the `genesis_decrypt_contact_limits` plaintext-FK
+/// convention.
+const MIGRATION_V65_REGISTRY_ACTIVATION: &str = "
+    CREATE TABLE registry_activation (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        push_nonce BLOB,
+        pushed_version INTEGER,
+        our_version_acked INTEGER,
+        peer_version_held INTEGER,
+        updated_at INTEGER NOT NULL
+    );
+";
 
 /// Migration v64: PII-free counter of genesis re-seats declined by the guard.
 ///

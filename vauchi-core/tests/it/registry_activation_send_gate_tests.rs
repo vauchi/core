@@ -130,6 +130,49 @@ fn active_state_opens_per_device_fan_out() {
     );
 }
 
+// @scenario: multi_device_sync :: Fan-out copies are queued for device-scoped delivery
+// @internal
+#[test]
+fn active_fan_out_tags_pending_updates_with_the_recipient_device() {
+    // The queued per-device copies must carry their recipient device id so
+    // the send phase deposits each at that device's device-scoped mailbox
+    // (F4 delivery isolation, ADR-064 Amendment 2026-07-25).
+    let wb = setup_with_card("Alice");
+    let peer = contact_with_registry_and_legacy_ratchet(&wb);
+
+    let mut tracker = ActivationTracker::new();
+    tracker.record_push_sent([7u8; 32], 1);
+    tracker.record_ack(&[7u8; 32], 1).unwrap();
+    wb.storage()
+        .registry_activation()
+        .save_activation(&peer.contact_id, &tracker)
+        .unwrap();
+
+    let empty = ContactCard::new("Alice");
+    let current = wb.storage().contacts().load_own_card().unwrap().unwrap();
+    wb.propagate_card_update(&empty, &current).unwrap();
+
+    let pending: Vec<_> = wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap()
+        .into_iter()
+        .filter(|u| u.contact_id == peer.contact_id)
+        .collect();
+    assert_eq!(pending.len(), 2, "one queued copy per active device");
+    assert!(
+        pending
+            .iter()
+            .all(|u| u.target_device_id.is_some_and(|d| d != [0u8; 32])),
+        "every per-device copy is tagged with a real recipient device id"
+    );
+    assert_ne!(
+        pending[0].target_device_id, pending[1].target_device_id,
+        "the two copies target distinct devices"
+    );
+}
+
 // @scenario: multi_device_sync :: Demoted activation falls back to the legacy session
 // @internal
 #[test]

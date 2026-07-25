@@ -144,6 +144,67 @@ fn test_device_sync_registration_preserves_legacy_and_own_receive_tokens() {
     assert!(batches[0].contains(&token_hex(&compute_self_token(&master_seed, day - 1,))));
 }
 
+// @scenario: multi_device_sync :: A per-device copy reaches only its own sibling
+// @internal
+#[test]
+fn test_device_scoped_registration_isolates_siblings_from_each_others_copies() {
+    // The F4 delivery-layer guarantee (ADR-064 Amendment 2026-07-25): with
+    // the exchanging device gone, siblings A2/A3 must not drain each other's
+    // per-device copies from a shared destructive mailbox. Each registers a
+    // DISTINCT device-scoped receive token, so a copy Bob addresses to A2's
+    // device is delivered only to A2.
+    let shared_key = [0x77u8; 32];
+    let alice_pubkey = TEST_PUBKEY;
+    let a2_device = [0x22u8; 32];
+    let a3_device = [0x33u8; 32];
+    let alice_master = [0x99u8; 32];
+    let day = 19804u64;
+
+    let flatten =
+        |batches: Vec<Vec<String>>| -> Vec<String> { batches.into_iter().flatten().collect() };
+    let a2_tokens = flatten(batch_register_tokens_with_device_sync(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &[shared_key],
+        &alice_pubkey,
+        &alice_master,
+        &a2_device,
+        day,
+        0,
+    ));
+    let a3_tokens = flatten(batch_register_tokens_with_device_sync(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &[shared_key],
+        &alice_pubkey,
+        &alice_master,
+        &a3_device,
+        day,
+        0,
+    ));
+
+    // Bob's deposit token for the copy addressed to A2's device.
+    let bob_copy_for_a2 = token_hex(&compute_device_mailbox_token(
+        &shared_key,
+        &alice_pubkey,
+        &a2_device,
+        day,
+    ));
+
+    assert!(
+        a2_tokens.contains(&bob_copy_for_a2),
+        "A2 must register the mailbox its own per-device copy lands in"
+    );
+    assert!(
+        !a3_tokens.contains(&bob_copy_for_a2),
+        "A3 must NOT poll A2's device mailbox — no sibling cross-consumption"
+    );
+
+    // The legacy identity mailbox is still shared (legacy [0;32]/genesis
+    // sends), which is fine — only the per-device path needs isolation.
+    let identity_token = token_hex(&compute_mailbox_token(&shared_key, &alice_pubkey, day));
+    assert!(a2_tokens.contains(&identity_token));
+    assert!(a3_tokens.contains(&identity_token));
+}
+
 // @internal
 #[test]
 fn test_self_token_differs_from_contact_token() {

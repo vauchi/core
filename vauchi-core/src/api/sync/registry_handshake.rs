@@ -162,6 +162,9 @@ pub(crate) fn receive_genesis_registry_ack(
             // In-flight crossing — tolerated without state change (DC-02).
         }
         let activated_now = !was_active && tracker.state() == ActivationState::Active;
+        if activated_now {
+            rearm_owed_card_repropagation(storage)?;
+        }
         storage
             .registry_activation()
             .save_activation(sender_id, &tracker)?;
@@ -185,6 +188,22 @@ pub(crate) fn receive_genesis_registry_ack(
             Err(e)
         }
     }
+}
+
+/// Re-arm the owed own-card repropagation with a fresh retry budget.
+///
+/// Called on the not-Active -> Active transition: pre-activation ticks
+/// burn the budget against the session-less channel, and without this
+/// reset a card edited before activation would never deliver (found by
+/// the e2e lost-primary certification).
+fn rearm_owed_card_repropagation(storage: &Storage) -> Result<(), CardUpdateError> {
+    storage
+        .ux()
+        .save_own_card_repropagate(&crate::types::OwnCardRepropagateState {
+            needs_repropagate: true,
+            failed_attempts: 0,
+        })?;
+    Ok(())
 }
 
 /// Repair a diverged device-scoped session: drop the corrupt row and
@@ -391,6 +410,9 @@ pub(crate) fn receive_registry_ack(
         // outstanding push (review finding F1). The peer's un-confirmed
         // registry still converges via its scanner re-push.
         let activated_now = !was_active && tracker.state() == ActivationState::Active;
+        if activated_now {
+            rearm_owed_card_repropagation(storage)?;
+        }
         let reply = match (activated_now, held_version) {
             (true, Some(version)) => Some(RegistryReplyNeeded {
                 sender_id: sender_id.to_string(),

@@ -301,6 +301,8 @@ fn scanner_push_geneses_when_no_session_and_no_registry_exist() {
 // @internal
 #[test]
 fn orphaned_sibling_reconverges_and_receives_cards_without_reexchange() {
+    // allow(zero_assertions): ordering-parameterized wrapper — every
+    // assertion lives in run_unorphaning_flow.
     run_unorphaning_flow(true);
 }
 
@@ -308,6 +310,9 @@ fn orphaned_sibling_reconverges_and_receives_cards_without_reexchange() {
 // @internal
 #[test]
 fn orphaned_responder_sibling_reconverges_via_genesis_fallback() {
+    // allow(zero_assertions): ordering-parameterized wrapper — every
+    // assertion lives in run_unorphaning_flow.
+    //
     // The device-pair initiator role is decided by key order. When A2
     // lands on the responder side, her fresh per-device session cannot
     // send first — the Active ack path must fall back to the genesis

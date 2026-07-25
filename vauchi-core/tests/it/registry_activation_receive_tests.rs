@@ -252,6 +252,49 @@ fn received_mismatched_ack_is_tolerated_without_state_change() {
     );
 }
 
+// @scenario: multi_device_sync :: Repeat acks never force replies from an active contact
+// @internal
+#[test]
+fn received_echo_ack_after_activation_yields_no_reply() {
+    // Review finding (CRITICAL): a malicious authenticated contact could
+    // replay echo-carrying acks against the never-cleared outstanding push
+    // and force an unbounded reply stream. The reply fires only on the
+    // not-Active -> Active transition, mirroring the genesis handler.
+    let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = setup_two_party();
+
+    let mut tracker = ActivationTracker::new();
+    tracker.record_push_sent([8u8; 32], 4);
+    tracker.record_ack(&[8u8; 32], 4).unwrap();
+    alice_wb
+        .storage()
+        .registry_activation()
+        .save_activation(&bob_contact_id, &tracker)
+        .unwrap();
+
+    let broadcast = bob_signed_broadcast(&bob_wb);
+    let ack =
+        RegistryAckPayload::new([8u8; 32], 4, Some(broadcast.to_json().into_bytes())).unwrap();
+    let blob = seal_from_bob(
+        &bob_wb,
+        &alice_contact_id,
+        &VersionedPayload::encode_registry_ack(&ack),
+    );
+
+    let alice_identity = alice_wb.identity().unwrap();
+    let outcome =
+        process_single_card_update(alice_identity, alice_wb.storage(), &bob_contact_id, &blob)
+            .expect("repeat ack processed");
+    match outcome {
+        ReceiveOutcome::RegistryAckReceived { reply, .. } => {
+            assert!(
+                reply.is_none(),
+                "an already-Active tracker must never be forced into a reply"
+            );
+        }
+        other => panic!("expected RegistryAckReceived, got {other:?}"),
+    }
+}
+
 // @scenario: multi_device_sync :: The ack reply echoes our registry exactly once
 // @internal
 #[test]

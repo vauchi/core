@@ -690,6 +690,40 @@ fn try_receive_genesis_alert(
         storage
             .replay()
             .save_replay_nonce(sender_id, alert.nonce(), alert.timestamp())?;
+        // F4 slice 4a: persist the carried identity-signed registry
+        // (additive, monotonic-guarded — ADR-068 req 6) so this receiver can
+        // afterwards address the sender identity's devices. Tolerates a
+        // held-or-newer version; a broadcast the store rejects otherwise is
+        // not fatal to the alert (the alert's own signature already
+        // verified) — registry seeding is opportunistic here.
+        if let Ok(broadcast_text) = std::str::from_utf8(&opened.sender_registry_broadcast_json)
+            && let Ok(broadcast) = crate::identity::RegistryBroadcast::from_json(broadcast_text)
+        {
+            let persisted = storage.device().save_contact_device_registry(
+                sender_id,
+                &broadcast,
+                peer_identity,
+                u64::MAX,
+            );
+            let held_version = match persisted {
+                Ok(()) => Some(broadcast.version()),
+                Err(_) => storage
+                    .device()
+                    .load_contact_device_registry(sender_id)?
+                    .filter(|stored| stored.version() >= broadcast.version())
+                    .map(|stored| stored.version()),
+            };
+            if let Some(version) = held_version {
+                let mut tracker = storage
+                    .registry_activation()
+                    .load_activation(sender_id)?
+                    .unwrap_or_default();
+                tracker.record_peer_registry(version);
+                storage
+                    .registry_activation()
+                    .save_activation(sender_id, &tracker)?;
+            }
+        }
         match storage.safety_alerts().insert_or_compare_fact(
             sender_id,
             alert.nonce(),
@@ -712,6 +746,9 @@ fn try_receive_genesis_alert(
                 storage.rollback();
                 return Err(CardUpdateError::Storage(e));
             }
+            super::registry_handshake::journal_handshake_state_for_siblings(
+                identity, storage, sender_id,
+            );
         }
         Err(e) => {
             storage.rollback();

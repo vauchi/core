@@ -1693,6 +1693,16 @@ impl MultiStageSession {
         })
     }
 
+    /// The finalization COMBO (VRFY+CONF+RDYY) for this session,
+    /// independent of the display cycle and grace window. The engine seeds
+    /// the `Finalized` success-screen broadcast with this so a still-`Complete`
+    /// peer always scans our RDYY — never a stale DATA frame the frozen
+    /// single-frame broadcast would otherwise inherit from the `Complete`-state
+    /// interleave (device-proven half-exchange, 2026-07-25 Pixel↔Samsung Hover).
+    pub fn finalization_combo_qr(&self) -> Option<QrPayload> {
+        self.get_combo_qr()
+    }
+
     /// Handle a COMBO QR from the peer — process VRFY + CONF + RDYY in one shot.
     /// Allows jumping from Verifying/Confirming/Complete straight to Finalized.
     ///

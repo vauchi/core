@@ -171,6 +171,44 @@ fn asymmetric_camera_glance_still_finalizes_both_sides() {
     );
 }
 
+// @internal
+#[test]
+fn finalized_machine_exposes_combo_for_broadcast_seed() {
+    // Regression: the finalized side's success-screen broadcast is a single
+    // frozen frame. If it inherits a stale DATA chunk from the Complete-state
+    // interleave, a still-Complete peer scans DATA forever and times out with
+    // no contact — the device-proven half-exchange (2026-07-25 Pixel↔Samsung
+    // Hover: Pixel finalized + persisted, Samsung read DATA for 58s then timed
+    // out). The AppEngine seeds that broadcast with this COMBO so the trailing
+    // peer always scans our RDYY.
+    let alice_card = b"name:Alice\nemail:alice@example.com".to_vec();
+    let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
+    let (alice, bob, ticks) = drive_two_party_glance(alice_card, bob_card, 4000);
+
+    assert!(
+        matches!(alice.phase(), MultiStagePhase::Finalized { .. }),
+        "precondition: Alice must be Finalized after {ticks} ticks, got {:?}",
+        alice.phase(),
+    );
+    let combo = alice
+        .finalization_combo_qr()
+        .expect("a finalized machine must expose a COMBO to seed the broadcast");
+    assert!(
+        combo.data.starts_with("CMBO"),
+        "the broadcast seed must be a COMBO (VRFY+CONF+RDYY), got prefix {:?}",
+        &combo.data[..combo.data.len().min(4)],
+    );
+    if matches!(bob.phase(), MultiStagePhase::Finalized { .. }) {
+        assert!(
+            bob.finalization_combo_qr()
+                .expect("finalized slow peer must also expose a COMBO")
+                .data
+                .starts_with("CMBO"),
+            "the slow peer's broadcast seed must also be a COMBO",
+        );
+    }
+}
+
 /// The device's `persist_exchanged_contact` step, distilled: build each
 /// side's role-correct ratchet via the wrapper seam exactly as the
 /// AppEngine does (`MultiStageMachine::build_exchange_ratchet`), then

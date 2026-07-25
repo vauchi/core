@@ -550,10 +550,6 @@ criteria = "safe-to-run"
 version = "0.25.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.paranoid-android]]
-version = "0.2.2"
-criteria = "safe-to-deploy"
-
 [[exemptions.peg]]
 version = "0.6.3"
 criteria = "safe-to-run"

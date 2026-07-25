@@ -22,6 +22,38 @@ use crate::sync::delta::VersionedPayload;
 use crate::sync::registry_activation::{ActivationState, RegistryAckPayload, RegistryPushPayload};
 
 impl Vauchi {
+    /// Seal a payload into the stateless genesis envelope for a contact
+    /// with no session and no registry (alerts and F4 handshake payloads).
+    /// The initiator session is deliberately never persisted (ADR-064
+    /// Amendment 2026-07-24, guarded invariant 2).
+    pub(super) fn genesis_seal_for_cold_start(
+        &self,
+        identity: &crate::identity::Identity,
+        ex: &crate::contact::ExchangedData,
+        payload: &[u8],
+    ) -> VauchiResult<super::propagation::PreparedDevicePayload> {
+        let broadcast = self.own_registry_broadcast(identity)?;
+        let epoch = crate::network::mailbox_token::current_day_epoch(self.clock.unix_seconds());
+        let (message, session) = crate::exchange::genesis::GenesisEnvelope::seal(
+            &ex.shared_key,
+            identity,
+            &ex.public_key,
+            &broadcast,
+            epoch,
+            payload,
+        )
+        .map_err(|error| VauchiError::Crypto(format!("genesis seal: {error}")))?;
+        let encrypted = serde_json::to_vec(&message)
+            .map_err(|error| VauchiError::Serialization(error.to_string()))?;
+        Ok(super::propagation::PreparedDevicePayload {
+            peer_device_id: [0; 32],
+            encrypted,
+            session,
+            is_initiator: true,
+            persist_session: false,
+        })
+    }
+
     /// Queue a RegistryPush to every exchanged contact that has not
     /// confirmed our current registry version (the F4 vouched push).
     ///

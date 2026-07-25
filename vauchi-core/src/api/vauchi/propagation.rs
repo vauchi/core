@@ -351,9 +351,17 @@ impl Vauchi {
         // Registry presence alone never opens the per-device path: resolving
         // our device-scoped tokens requires the peer to hold OUR registry,
         // which only a completed bilateral handshake confirms (ADR-064
-        // Amendment 2026-07-25 — the refuted B-lite hazard). Anything short
-        // of Active rides the legacy [0;32] session the peer is known to
-        // resolve.
+        // Amendment 2026-07-25 — the refuted B-lite hazard; this applies to
+        // handshake payloads too, since a crossing handshake means the
+        // counterparty may hold nothing of ours yet). Anything short of
+        // Active rides the legacy [0;32] session — or, for handshake
+        // payloads with no session at all, the stateless genesis envelope
+        // (the (None, None) arm below).
+        let handshake_payload = matches!(
+            payload.first(),
+            Some(&crate::sync::delta::PAYLOAD_VERSION_REGISTRY_PUSH)
+                | Some(&crate::sync::delta::PAYLOAD_VERSION_REGISTRY_ACK)
+        );
         let activation_confirmed = self
             .storage
             .registry_activation()
@@ -398,33 +406,18 @@ impl Vauchi {
                     // No established session and no peer registry — the
                     // secondary-device / first-contact case. A safety alert
                     // bootstraps a genesis session rooted in shared_key
-                    // (ADR-068); any other payload has no genesis path and
-                    // keeps failing closed.
-                    if let Ok(crate::sync::delta::VersionedPayload::Alert(_)) =
-                        crate::sync::delta::VersionedPayload::decode(payload)
-                    {
-                        let broadcast = self.own_registry_broadcast(identity)?;
-                        let epoch = crate::network::mailbox_token::current_day_epoch(
-                            self.clock.unix_seconds(),
-                        );
-                        let (message, session) = crate::exchange::genesis::GenesisEnvelope::seal(
-                            &ex.shared_key,
-                            identity,
-                            &ex.public_key,
-                            &broadcast,
-                            epoch,
-                            payload,
+                    // (ADR-068), and F4 handshake payloads ride the same
+                    // stateless envelope (slice 4b — the orphaned sibling's
+                    // card-continuity entry point, ADR-064 Amendment
+                    // 2026-07-25); any other payload has no genesis path
+                    // and keeps failing closed.
+                    if handshake_payload
+                        || matches!(
+                            crate::sync::delta::VersionedPayload::decode(payload),
+                            Ok(crate::sync::delta::VersionedPayload::Alert(_))
                         )
-                        .map_err(|error| VauchiError::Crypto(format!("genesis seal: {error}")))?;
-                        let encrypted = serde_json::to_vec(&message)
-                            .map_err(|error| VauchiError::Serialization(error.to_string()))?;
-                        prepared.push(PreparedDevicePayload {
-                            peer_device_id: [0; 32],
-                            encrypted,
-                            session,
-                            is_initiator: true,
-                            persist_session: false,
-                        });
+                    {
+                        prepared.push(self.genesis_seal_for_cold_start(identity, ex, payload)?);
                         continue;
                     }
                     return Err(VauchiError::NotFound("ratchet state".into()));

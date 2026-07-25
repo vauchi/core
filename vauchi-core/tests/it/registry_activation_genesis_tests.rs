@@ -281,6 +281,179 @@ fn scanner_push_geneses_when_no_session_and_no_registry_exist() {
     );
 }
 
+// @scenario: multi_device_sync :: An orphaned sibling re-converges to Active without re-exchange
+// @internal
+#[test]
+fn orphaned_sibling_reconverges_and_receives_cards_without_reexchange() {
+    // The lost-primary repair, end to end. Alice's exchanging device is
+    // gone: her sibling A2 holds only the synced shared_key — no session,
+    // no peer registry. Bob still holds a [0;32] session anchored to the
+    // dead device.
+    let (alice_wb, bob_wb, alice_contact_id, _v) = cold_start_world();
+    let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
+    let shared = bob_wb
+        .storage()
+        .contacts()
+        .load_contact(&alice_contact_id)
+        .unwrap()
+        .unwrap()
+        .shared_key()
+        .cloned()
+        .unwrap();
+    let bob_contact = Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared, 0);
+    let bob_contact_id = bob_contact.id().to_string();
+    alice_wb.add_contact(bob_contact).unwrap();
+    // Bob's [0;32] session is anchored to the DEAD device — A2 cannot use it.
+    {
+        use vauchi_core::crypto::ratchet::DoubleRatchetState;
+        use vauchi_core::exchange::X3DHKeyPair;
+        let dead_dh = X3DHKeyPair::generate();
+        let dead_shared = bob_wb
+            .storage()
+            .contacts()
+            .load_contact(&alice_contact_id)
+            .unwrap()
+            .unwrap()
+            .shared_key()
+            .cloned()
+            .unwrap();
+        let bob_ratchet =
+            DoubleRatchetState::initialize_initiator(&dead_shared, *dead_dh.public_key()).unwrap();
+        bob_wb
+            .storage()
+            .ratchets()
+            .save_ratchet_state(&alice_contact_id, &bob_ratchet, true)
+            .unwrap();
+    }
+
+    let alice_identity = alice_wb.identity().unwrap();
+    let bob_identity = bob_wb.identity().unwrap();
+
+    // 1. A2's sync tick geneses a registry push.
+    assert_eq!(alice_wb.queue_registry_pushes().unwrap(), 1);
+    let push_blob = alice_wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap()
+        .remove(0)
+        .payload;
+
+    // 2. Bob receives it — his [0;32] decrypt fails, the genesis fallback
+    //    opens it, and Alice's registry is persisted.
+    let reply = match process_single_card_update(
+        bob_identity,
+        bob_wb.storage(),
+        &alice_contact_id,
+        &push_blob,
+    )
+    .expect("bob opens the genesis push")
+    {
+        ReceiveOutcome::RegistryPushReceived(reply) => reply,
+        other => panic!("expected RegistryPushReceived, got {other:?}"),
+    };
+
+    // 3. Bob acks — pre-activation, so the ack is genesis-sealed too.
+    bob_wb.queue_registry_ack(&reply).unwrap();
+    let ack_blob = bob_wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap()
+        .remove(0)
+        .payload;
+
+    // 4. A2 opens the ack statelessly, activates, and must confirm back.
+    let confirm = match process_single_card_update(
+        alice_identity,
+        alice_wb.storage(),
+        &bob_contact_id,
+        &ack_blob,
+    )
+    .expect("A2 opens the genesis ack")
+    {
+        ReceiveOutcome::RegistryAckReceived { reply, .. } => {
+            reply.expect("activation transition requires a confirming reply")
+        }
+        other => panic!("expected RegistryAckReceived, got {other:?}"),
+    };
+    let a2_tracker = alice_wb
+        .storage()
+        .registry_activation()
+        .load_activation(&bob_contact_id)
+        .unwrap()
+        .expect("tracker");
+    assert_eq!(a2_tracker.state(), ActivationState::Active, "A2 activates");
+
+    // 5. A2's confirm reaches Bob (A2 is Active — ordinary per-device path).
+    alice_wb.queue_registry_ack(&confirm).unwrap();
+    let confirm_blobs = alice_wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap();
+    let confirm_blob = confirm_blobs
+        .iter()
+        .map(|u| u.payload.clone())
+        .last()
+        .expect("confirm queued");
+    // In production Bob resolves A2's device from her rotating sender token
+    // (he holds Alice's registry now); the device-aware entry mirrors that.
+    let a2_device_id = *alice_identity.device_id();
+    vauchi_core::api::process_single_card_update_for_device(
+        bob_identity,
+        bob_wb.storage(),
+        &alice_contact_id,
+        &a2_device_id,
+        &confirm_blob,
+    )
+    .expect("bob processes the confirm");
+    let bob_tracker = bob_wb
+        .storage()
+        .registry_activation()
+        .load_activation(&alice_contact_id)
+        .unwrap()
+        .expect("tracker");
+    assert_eq!(
+        bob_tracker.state(),
+        ActivationState::Active,
+        "both sides active — the relationship is un-orphaned"
+    );
+
+    // 6. The payoff: Bob's next card update fans out per-device, and A2
+    //    can decrypt her copy — card continuity without re-exchange.
+    let bob_own_field =
+        vauchi_core::ContactField::new(vauchi_core::FieldType::Email, "Work", "bob@example.com", 0);
+    let field_id = bob_own_field.id().to_string();
+    bob_wb.add_own_field(bob_own_field).unwrap();
+    bob_wb.set_own_field_public(&field_id).unwrap();
+    let empty = ContactCard::new("Bob");
+    let current = bob_wb
+        .storage()
+        .contacts()
+        .load_own_card()
+        .unwrap()
+        .unwrap();
+    let updates = bob_wb
+        .prepare_card_updates_for_contact(&alice_contact_id, &empty, &current)
+        .unwrap();
+    assert!(
+        updates.iter().all(|(device_id, _)| *device_id != [0u8; 32]),
+        "cards now ride per-device sessions, not the dead legacy chain"
+    );
+    let (_device_id, card_blob) = updates.into_iter().next().expect("one per-device copy");
+    let bob_device_id = *bob_identity.device_id();
+    let outcome = vauchi_core::api::process_single_card_update_for_device(
+        alice_identity,
+        alice_wb.storage(),
+        &bob_contact_id,
+        &bob_device_id,
+        &card_blob,
+    )
+    .expect("A2 decrypts the card update her sibling's death used to orphan");
+    assert!(matches!(outcome, ReceiveOutcome::CardDelta));
+}
+
 // @scenario: multi_device_sync :: A stale carried registry never clobbers a newer held one
 // @internal
 #[test]

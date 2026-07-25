@@ -15,7 +15,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{X3DH, X3DHKeyPair};
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry, RegistryBroadcast};
 use vauchi_core::sync::registry_activation::ActivationTracker;
-use vauchi_core::{Contact, ContactField, FieldType, SigningKeyPair, SymmetricKey, Vauchi};
+use vauchi_core::{Contact, ContactField, FieldType, SigningKeyPair, Vauchi};
 
 fn setup_with_card(name: &str) -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();

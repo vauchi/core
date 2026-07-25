@@ -252,6 +252,100 @@ fn received_mismatched_ack_is_tolerated_without_state_change() {
     );
 }
 
+// @scenario: multi_device_sync :: The ack reply echoes our registry exactly once
+// @internal
+#[test]
+fn queue_registry_ack_echoes_own_registry_and_records_our_push_when_dormant() {
+    // Bob is the ratchet initiator in this harness, so the queuing side is
+    // Bob (a responder defers sends until it has received once).
+    let (_alice_wb, bob_wb, _bob_contact_id, alice_contact_id) = setup_two_party();
+
+    let reply = vauchi_core::api::RegistryReplyNeeded {
+        sender_id: alice_contact_id.clone(),
+        acked_version: 3,
+        push_nonce: [6u8; 32],
+    };
+    bob_wb.queue_registry_ack(&reply).unwrap();
+
+    assert_eq!(
+        bob_wb
+            .storage()
+            .pending()
+            .count_pending_updates(&alice_contact_id)
+            .unwrap(),
+        1,
+        "exactly one ack blob queued"
+    );
+    let tracker = bob_wb
+        .storage()
+        .registry_activation()
+        .load_activation(&alice_contact_id)
+        .unwrap()
+        .expect("tracker row");
+    let (nonce, _version) = tracker
+        .outstanding_push()
+        .expect("echoing constitutes our own push");
+    assert_eq!(nonce, [6u8; 32], "echo rides the same handshake nonce");
+    assert_eq!(tracker.state(), ActivationState::Pushed);
+}
+
+// @scenario: multi_device_sync :: Concurrent handshakes never clobber an in-flight push
+// @internal
+#[test]
+fn queue_registry_ack_keeps_an_outstanding_push_and_skips_the_echo() {
+    let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = setup_two_party();
+
+    let mut tracker = ActivationTracker::new();
+    tracker.record_push_sent([1u8; 32], 9);
+    bob_wb
+        .storage()
+        .registry_activation()
+        .save_activation(&alice_contact_id, &tracker)
+        .unwrap();
+
+    let reply = vauchi_core::api::RegistryReplyNeeded {
+        sender_id: alice_contact_id.clone(),
+        acked_version: 3,
+        push_nonce: [6u8; 32],
+    };
+    bob_wb.queue_registry_ack(&reply).unwrap();
+
+    let tracker = bob_wb
+        .storage()
+        .registry_activation()
+        .load_activation(&alice_contact_id)
+        .unwrap()
+        .expect("tracker row");
+    let (nonce, version) = tracker.outstanding_push().expect("still outstanding");
+    assert_eq!(
+        (nonce, version),
+        ([1u8; 32], 9),
+        "our own in-flight push survives the crossing handshake"
+    );
+
+    // Alice can open the queued blob and sees an ack WITHOUT an echo.
+    let queued = bob_wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap();
+    assert_eq!(queued.len(), 1);
+    let alice_identity_binding = alice_wb.identity().unwrap();
+    let outcome = process_single_card_update(
+        alice_identity_binding,
+        alice_wb.storage(),
+        &bob_contact_id,
+        &queued[0].payload,
+    )
+    .expect("alice opens the ack");
+    match outcome {
+        ReceiveOutcome::RegistryAckReceived { reply, .. } => {
+            assert!(reply.is_none(), "no echo when a push is already in flight");
+        }
+        other => panic!("expected RegistryAckReceived, got {other:?}"),
+    }
+}
+
 // @scenario: multi_device_sync :: A forged registry push is rejected without persisting anything
 // @internal
 #[test]

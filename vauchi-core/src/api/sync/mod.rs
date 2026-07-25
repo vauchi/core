@@ -31,6 +31,7 @@ pub mod registry_handshake;
 mod registry_handshake;
 
 pub use registry_handshake::RegistryReplyNeeded;
+pub(crate) use registry_handshake::journal_handshake_state_for_siblings;
 
 pub(crate) use card_update::alert_event;
 pub use card_update::{

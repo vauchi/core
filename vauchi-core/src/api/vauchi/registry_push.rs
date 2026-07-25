@@ -104,6 +104,11 @@ impl Vauchi {
                     .save_activation(&contact_id, &tracker)?;
                 Ok(())
             })?;
+            crate::api::sync::journal_handshake_state_for_siblings(
+                identity,
+                &self.storage,
+                &contact_id,
+            );
             queued += 1;
         }
         Ok(queued)
@@ -171,6 +176,12 @@ impl Vauchi {
                 .registry_activation()
                 .save_activation(&reply.sender_id, &tracker)?;
             Ok(())
-        })
+        })?;
+        crate::api::sync::journal_handshake_state_for_siblings(
+            identity,
+            &self.storage,
+            &reply.sender_id,
+        );
+        Ok(())
     }
 }

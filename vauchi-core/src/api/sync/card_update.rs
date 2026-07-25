@@ -437,6 +437,7 @@ pub fn process_single_card_update_for_device(
     //     (ADR-064 Amendment 2026-07-25).
     if let Ok(VersionedPayload::RegistryPush(push)) = VersionedPayload::decode(&plaintext) {
         return super::registry_handshake::receive_registry_push(
+            identity,
             storage,
             sender_id,
             &contact,
@@ -448,6 +449,7 @@ pub fn process_single_card_update_for_device(
     }
     if let Ok(VersionedPayload::RegistryAck(ack)) = VersionedPayload::decode(&plaintext) {
         return super::registry_handshake::receive_registry_ack(
+            identity,
             storage,
             sender_id,
             &contact,

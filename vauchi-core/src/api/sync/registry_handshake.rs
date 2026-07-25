@@ -79,9 +79,89 @@ fn load_tracker(storage: &Storage, sender_id: &str) -> Result<ActivationTracker,
         .unwrap_or_default())
 }
 
+/// Journal the contact's held registry and activation state for this
+/// identity's linked devices. No-op for single-device identities.
+///
+/// Best-effort AFTER the state commit (`record_local_change` opens its own
+/// transaction, so it cannot nest inside the receive transaction — same
+/// seam as `ContactCardUpdated` fan-out). A lost journal self-heals: the
+/// level-triggered push scanner re-journals unconfirmed state every sync
+/// tick, and any later handshake activity re-journals confirmed state.
+pub(crate) fn journal_handshake_state_for_siblings(
+    identity: &crate::identity::Identity,
+    storage: &Storage,
+    contact_id: &str,
+) {
+    if let Err(error) = try_journal_for_siblings(identity, storage, contact_id) {
+        tracing::warn!("sibling handshake journal failed: {error}");
+    }
+}
+
+fn try_journal_for_siblings(
+    identity: &crate::identity::Identity,
+    storage: &Storage,
+    contact_id: &str,
+) -> Result<(), String> {
+    use crate::sync::device_sync::SyncItem;
+
+    let Some(own_registry) = storage
+        .device()
+        .load_device_registry()
+        .map_err(|e| e.to_string())?
+    else {
+        return Ok(());
+    };
+    if own_registry.device_count() <= 1 {
+        return Ok(());
+    }
+    let now = storage.clock().unix_seconds();
+    let mut orchestrator = super::device_orchestrator::DeviceSyncOrchestrator::load(
+        storage,
+        identity.create_device_info(now),
+        own_registry,
+    )
+    .map_err(|e| e.to_string())?;
+    if let Some(broadcast) = storage
+        .device()
+        .load_contact_device_registry(contact_id)
+        .map_err(|e| e.to_string())?
+    {
+        orchestrator
+            .record_local_change(SyncItem::ContactRegistryReceived {
+                contact_id: contact_id.to_string(),
+                registry_json: broadcast.to_json(),
+                version: broadcast.version(),
+                timestamp: now,
+            })
+            .map_err(|e| e.to_string())?;
+    }
+    if let Some(tracker) = storage
+        .registry_activation()
+        .load_activation(contact_id)
+        .map_err(|e| e.to_string())?
+    {
+        let (push_nonce, pushed_version) = match tracker.outstanding_push() {
+            Some((nonce, version)) => (Some(nonce.to_vec()), Some(version)),
+            None => (None, None),
+        };
+        orchestrator
+            .record_local_change(SyncItem::ContactActivationChanged {
+                contact_id: contact_id.to_string(),
+                push_nonce,
+                pushed_version,
+                our_version_acked: tracker.our_version_acked(),
+                peer_version_held: tracker.peer_version_held(),
+                timestamp: now,
+            })
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Handle a received RegistryPush inside the receive transaction.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn receive_registry_push(
+    identity: &crate::identity::Identity,
     storage: &Storage,
     sender_id: &str,
     contact: &Contact,
@@ -110,6 +190,7 @@ pub(crate) fn receive_registry_push(
     match txn {
         Ok(acked_version) => {
             storage.commit()?;
+            journal_handshake_state_for_siblings(identity, storage, sender_id);
             Ok(ReceiveOutcome::RegistryPushReceived(RegistryReplyNeeded {
                 sender_id: sender_id.to_string(),
                 acked_version,
@@ -130,6 +211,7 @@ pub(crate) fn receive_registry_push(
 /// ACKable, there is just nothing to record.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn receive_registry_ack(
+    identity: &crate::identity::Identity,
     storage: &Storage,
     sender_id: &str,
     contact: &Contact,
@@ -175,6 +257,7 @@ pub(crate) fn receive_registry_ack(
     match txn {
         Ok(reply) => {
             storage.commit()?;
+            journal_handshake_state_for_siblings(identity, storage, sender_id);
             Ok(ReceiveOutcome::RegistryAckReceived {
                 sender_id: sender_id.to_string(),
                 reply,

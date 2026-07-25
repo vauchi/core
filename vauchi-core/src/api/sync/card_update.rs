@@ -120,6 +120,17 @@ pub enum ReceiveOutcome {
     /// for the app layer to match against the contact's `expected_their_token`
     /// and resolve reciprocity to `Confirmed`.
     ReciprocityConfirm { sender_id: String, token: [u8; 32] },
+    /// An F4 registry push was received and its broadcast persisted; the
+    /// caller must queue the described ack reply (ADR-064 Amendment
+    /// 2026-07-25). Never activates our send side — bilaterality.
+    RegistryPushReceived(super::registry_handshake::RegistryReplyNeeded),
+    /// An F4 registry ack was received (activating on a match, tolerated on
+    /// a mismatch); `reply` is the confirming ack to queue when the message
+    /// carried the peer's own broadcast as an echo.
+    RegistryAckReceived {
+        sender_id: String,
+        reply: Option<super::registry_handshake::RegistryReplyNeeded>,
+    },
 }
 
 /// Processes a batch of incoming card updates with full security checks.
@@ -200,6 +211,10 @@ pub fn process_card_updates(
             // Reciprocity confirmations are surfaced via the receive-blob path
             // (like alerts), not this batch card-update helper; count processed.
             Ok(ReceiveOutcome::ReciprocityConfirm { .. }) => result.processed += 1,
+            // Registry-handshake replies are queued on the receive-blob path,
+            // not this batch card-update helper; state is already persisted.
+            Ok(ReceiveOutcome::RegistryPushReceived(_))
+            | Ok(ReceiveOutcome::RegistryAckReceived { .. }) => result.processed += 1,
             Err(_) => result.skipped += 1,
         }
     }
@@ -415,6 +430,32 @@ pub fn process_single_card_update_for_device(
             sender_id: sender_id.to_string(),
             token,
         });
+    }
+
+    // 3d. F4 registry handshake payloads (0x05/0x06) — persist/ack registry
+    //     state inside the receive transaction; the caller queues any reply
+    //     (ADR-064 Amendment 2026-07-25).
+    if let Ok(VersionedPayload::RegistryPush(push)) = VersionedPayload::decode(&plaintext) {
+        return super::registry_handshake::receive_registry_push(
+            storage,
+            sender_id,
+            &contact,
+            &push,
+            &ratchet,
+            is_initiator,
+            peer_device_id,
+        );
+    }
+    if let Ok(VersionedPayload::RegistryAck(ack)) = VersionedPayload::decode(&plaintext) {
+        return super::registry_handshake::receive_registry_ack(
+            storage,
+            sender_id,
+            &contact,
+            &ack,
+            &ratchet,
+            is_initiator,
+            peer_device_id,
+        );
     }
 
     // 4. Handle versioned payload (CEK-wrapped or legacy)

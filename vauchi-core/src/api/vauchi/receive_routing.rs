@@ -84,6 +84,11 @@ pub struct BlobOutcome {
     /// delta). Drives an `Emergency`/`DuressAlertReceived` event instead of an
     /// `IncomingUpdate` (2026-07-04-coercion-safety-alerts-never-received).
     pub alert: Option<ReceivedAlert>,
+    /// `Some` when the applied blob was an F4 registry push (or an ack
+    /// carrying an echo) that requires a reply ack; the receive loop queues
+    /// it after processing (ADR-064 Amendment 2026-07-25). Control-plane
+    /// only — never drives a user-visible event.
+    pub registry_reply: Option<crate::api::sync::RegistryReplyNeeded>,
 }
 
 impl BlobOutcome {
@@ -132,6 +137,7 @@ pub fn process_received_blobs(
             applied_contact_id,
             device_fanout_contact_id,
             alert,
+            registry_reply,
         ) = match token_to_contact.get(&mailbox_token_hex) {
             Some(contact_id) => {
                 match process_single_card_update(identity, storage, contact_id, &ciphertext) {
@@ -142,9 +148,26 @@ pub fn process_received_blobs(
                         Some(contact_id.clone()),
                         Some(contact_id.clone()),
                         None,
+                        None,
                     ),
-                    Ok(ReceiveOutcome::Alert(a)) => {
-                        (true, true, None, Some(contact_id.clone()), None, Some(a))
+                    Ok(ReceiveOutcome::Alert(a)) => (
+                        true,
+                        true,
+                        None,
+                        Some(contact_id.clone()),
+                        None,
+                        Some(a),
+                        None,
+                    ),
+                    // F4 handshake state is persisted inside the receive
+                    // transaction; the reply ack rides the outcome so the
+                    // receive loop can queue it. Control-plane only — no
+                    // IncomingUpdate, no fan-out, no user-visible event.
+                    Ok(ReceiveOutcome::RegistryPushReceived(reply)) => {
+                        (true, true, None, None, None, None, Some(reply))
+                    }
+                    Ok(ReceiveOutcome::RegistryAckReceived { reply, .. }) => {
+                        (true, true, None, None, None, None, reply)
                     }
                     // P3: the signature is verified in
                     // `process_single_card_update`; match the carried token
@@ -156,19 +179,19 @@ pub fn process_received_blobs(
                     // reciprocity banner clears.
                     Ok(ReceiveOutcome::ReciprocityConfirm { sender_id, token }) => {
                         if resolve_reciprocity_confirm(identity, storage, &sender_id, &token) {
-                            (true, true, None, Some(sender_id), None, None)
+                            (true, true, None, Some(sender_id), None, None, None)
                         } else {
-                            (true, true, None, None, None, None)
+                            (true, true, None, None, None, None, None)
                         }
                     }
                     Err(e) => {
                         let reason = reject_category(&e);
                         let retry_fanout = (reason == "replay").then(|| contact_id.clone());
-                        (true, false, Some(reason), None, retry_fanout, None)
+                        (true, false, Some(reason), None, retry_fanout, None, None)
                     }
                 }
             }
-            None => (false, false, None, None, None, None),
+            None => (false, false, None, None, None, None, None),
         };
         outcomes.push(BlobOutcome {
             message_id,
@@ -178,6 +201,7 @@ pub fn process_received_blobs(
             contact_id: applied_contact_id,
             device_fanout_contact_id,
             alert,
+            registry_reply,
         });
     }
     outcomes
@@ -400,6 +424,7 @@ mod tests {
             contact_id: contact_id.map(str::to_string),
             device_fanout_contact_id: contact_id.map(str::to_string),
             alert: None,
+            registry_reply: None,
         }
     }
 
@@ -438,6 +463,7 @@ mod tests {
                 contact_id: None, // unresolved token
                 device_fanout_contact_id: None,
                 alert: None,
+                registry_reply: None,
             },
         ];
 

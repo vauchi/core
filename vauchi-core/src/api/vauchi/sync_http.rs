@@ -429,6 +429,17 @@ impl Vauchi {
             }
         }
 
+        // 3c. Queue F4 handshake ack replies (ADR-064 Amendment 2026-07-25).
+        // A failed queue must not fail the receive phase: the handshake is
+        // retry-tolerant — the peer re-pushes and this ack is re-requested.
+        for outcome in &outcomes {
+            if let Some(reply) = outcome.registry_reply.as_ref()
+                && let Err(error) = self.queue_registry_ack(reply)
+            {
+                tracing::warn!("registry ack queue failed: {error}");
+            }
+        }
+
         let received = outcomes.iter().filter(|o| o.decrypted).count();
         let rejected = outcomes
             .iter()

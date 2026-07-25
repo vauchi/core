@@ -33,6 +33,7 @@ mod reciprocity_send;
 #[cfg(feature = "network-http")]
 mod recovery;
 mod recovery_offline;
+mod registry_push;
 mod search;
 mod security;
 mod setup;

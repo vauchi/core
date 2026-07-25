@@ -25,6 +25,13 @@ pub mod manager;
 #[cfg(not(feature = "testing"))]
 mod manager;
 
+#[cfg(feature = "testing")]
+pub mod registry_handshake;
+#[cfg(not(feature = "testing"))]
+mod registry_handshake;
+
+pub use registry_handshake::RegistryReplyNeeded;
+
 pub(crate) use card_update::alert_event;
 pub use card_update::{
     CardUpdateError, CardUpdateResult, ReceiveOutcome, ReceivedAlert, process_card_updates,

@@ -317,7 +317,7 @@ impl Vauchi {
     /// single-device registry derived from this identity — either way the
     /// receiver merges it additively (never destructively) on genesis
     /// receipt (ADR-068 §Decision req 6, plan §REVISION F2/F3).
-    fn own_registry_broadcast(
+    pub(crate) fn own_registry_broadcast(
         &self,
         identity: &crate::identity::Identity,
     ) -> VauchiResult<crate::identity::RegistryBroadcast> {

@@ -149,7 +149,7 @@ pub use send_phase::{SendPhase, SyncResult};
 // Sync Application Services
 pub use sync::{
     CardUpdateError, CardUpdateResult, DeviceSyncOrchestrator, ReceiveOutcome, ReceivedAlert,
-    SyncError, SyncManager, build_device_sync_envelopes, process_card_updates,
+    RegistryReplyNeeded, SyncError, SyncManager, build_device_sync_envelopes, process_card_updates,
     process_single_card_update, process_single_card_update_for_device,
 };
 

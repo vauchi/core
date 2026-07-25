@@ -85,6 +85,7 @@ impl Vauchi {
                             payload.is_initiator,
                         )?;
                     }
+                    let target_device_id = payload.target_device_id();
                     let update = PendingUpdate {
                         id: self.rng.uuid_v4(),
                         contact_id: contact_id.clone(),
@@ -96,6 +97,7 @@ impl Vauchi {
                         retry_count: 0,
                         status: UpdateStatus::Pending,
                         target_relay_url: None,
+                        target_device_id,
                     };
                     self.storage.pending().queue_update(&update)?;
                 }

@@ -391,6 +391,7 @@ fn test_sync_get_ready_grouped_by_relay() {
             retry_count: 0,
             status: UpdateStatus::Pending,
             target_relay_url: relay_url.map(String::from),
+            target_device_id: None,
         };
         storage.pending().queue_update(&update).unwrap();
     }
@@ -435,6 +436,7 @@ fn test_sync_grouped_excludes_not_ready_failed() {
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: Some("https://relay.example.com".to_string()),
+        target_device_id: None,
     };
 
     // One failed with retry in the future (not ready)
@@ -450,6 +452,7 @@ fn test_sync_grouped_excludes_not_ready_failed() {
             retry_at: now + 9999,
         },
         target_relay_url: Some("https://relay.example.com".to_string()),
+        target_device_id: None,
     };
 
     storage.pending().queue_update(&u1).unwrap();

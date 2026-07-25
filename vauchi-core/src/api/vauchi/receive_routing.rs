@@ -126,7 +126,12 @@ pub fn process_received_blobs(
     blobs: Vec<(String, String, Vec<u8>)>,
 ) -> Vec<BlobOutcome> {
     let day = current_day_epoch(storage.clock().unix_seconds());
-    let token_to_contact = build_token_to_contact_map(contacts, identity.signing_public_key(), day);
+    let token_to_contact = build_token_to_contact_map(
+        contacts,
+        identity.signing_public_key(),
+        identity.device_id(),
+        day,
+    );
 
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext) in blobs {
@@ -304,8 +309,10 @@ fn reject_category(e: &CardUpdateError) -> &'static str {
 pub(crate) fn build_token_to_contact_map(
     contacts: &[Contact],
     own_pubkey: &[u8; 32],
+    own_device_id: &[u8; 32],
     day: u64,
 ) -> HashMap<String, String> {
+    use crate::network::mailbox_token::compute_device_mailbox_token;
     let mut map = HashMap::new();
     for contact in contacts {
         if !contact.is_exchanged() || contact.is_blocked() {
@@ -322,9 +329,30 @@ pub(crate) fn build_token_to_contact_map(
             token_hex(&compute_mailbox_token(bytes, own_pubkey, day)),
             id.clone(),
         );
+        // F4: also resolve our DEVICE-scoped receive token so per-device
+        // fan-out copies addressed to THIS device route to the contact
+        // (ADR-064 Amendment 2026-07-25).
+        map.insert(
+            token_hex(&compute_device_mailbox_token(
+                bytes,
+                own_pubkey,
+                own_device_id,
+                day,
+            )),
+            id.clone(),
+        );
         if day > 0 {
             map.insert(
                 token_hex(&compute_mailbox_token(bytes, own_pubkey, day - 1)),
+                id.clone(),
+            );
+            map.insert(
+                token_hex(&compute_device_mailbox_token(
+                    bytes,
+                    own_pubkey,
+                    own_device_id,
+                    day - 1,
+                )),
                 id,
             );
         }
@@ -352,6 +380,7 @@ mod tests {
     // Our (the receiver's) identity key — directional tokens are keyed to it,
     // so the injected token must use the SAME key the map derives with.
     const OWN_PK: [u8; 32] = [0xAA; 32];
+    const OWN_DEVICE: [u8; 32] = [0xBB; 32];
 
     // @scenario: receive_phase :: token map resolves contact mailbox tokens
     #[test]
@@ -376,7 +405,7 @@ mod tests {
         ));
 
         let contacts = vec![alice.clone(), bob.clone()];
-        let map = build_token_to_contact_map(&contacts, &OWN_PK, day);
+        let map = build_token_to_contact_map(&contacts, &OWN_PK, &OWN_DEVICE, day);
 
         assert_eq!(map.get(&alice_today).map(String::as_str), Some(alice.id()));
         assert_eq!(
@@ -399,7 +428,7 @@ mod tests {
             day,
         ));
 
-        let map = build_token_to_contact_map(&[alice], &OWN_PK, day);
+        let map = build_token_to_contact_map(&[alice], &OWN_PK, &OWN_DEVICE, day);
 
         assert!(
             !map.contains_key(&alice_today),
@@ -411,7 +440,7 @@ mod tests {
     #[test]
     fn test_build_token_to_contact_map_returns_none_for_unknown_token() {
         let alice = exchanged_contact("A");
-        let map = build_token_to_contact_map(&[alice], &OWN_PK, 100);
+        let map = build_token_to_contact_map(&[alice], &OWN_PK, &OWN_DEVICE, 100);
         assert!(!map.contains_key("00".repeat(32).as_str()));
     }
 

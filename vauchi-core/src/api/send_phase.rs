@@ -243,11 +243,20 @@ impl<'a, T: Transport> SendPhase<'a, T> {
 
             // Compute the recipient's directional mailbox token (keyed to the
             // contact's identity) — SP-33 Task 4.1 + directional tokens 2026-06-30.
-            let token = compute_mailbox_token(
-                &key,
-                &recipient_pk,
-                current_day_epoch(self.storage.clock().unix_seconds()),
-            );
+            // A per-device fan-out copy deposits at the recipient DEVICE's
+            // device-scoped mailbox so no sibling can drain it (F4, ADR-064
+            // Amendment 2026-07-25); legacy/genesis copies keep the identity
+            // mailbox.
+            let day = current_day_epoch(self.storage.clock().unix_seconds());
+            let token = match update.target_device_id {
+                Some(device_id) => crate::network::mailbox_token::compute_device_mailbox_token(
+                    &key,
+                    &recipient_pk,
+                    &device_id,
+                    day,
+                ),
+                None => compute_mailbox_token(&key, &recipient_pk, day),
+            };
             let recipient_id = token_hex(&token);
 
             // Send the PRE-BUILT message as-is — no re-encryption.
@@ -371,18 +380,26 @@ impl<'a, T: Transport> SendPhase<'a, T> {
         };
         let shared_key = Some(key);
 
-        // Compute the recipient's directional mailbox token (keyed to the
-        // contact's identity) — SP-33 Task 4.1 + directional tokens 2026-06-30.
-        let token = compute_mailbox_token(
-            &key,
-            &recipient_pk,
-            current_day_epoch(self.storage.clock().unix_seconds()),
-        );
-        let recipient_id = token_hex(&token);
+        let day = current_day_epoch(self.storage.clock().unix_seconds());
 
         let updates = self.sync_manager.get_pending(contact_id)?;
 
         for update in updates {
+            // Per-update mailbox token: a per-device fan-out copy deposits at
+            // the recipient DEVICE's device-scoped mailbox (F4, ADR-064
+            // Amendment 2026-07-25); legacy/genesis copies keep the identity
+            // mailbox (SP-33 Task 4.1 + directional tokens 2026-06-30).
+            let token = match update.target_device_id {
+                Some(device_id) => crate::network::mailbox_token::compute_device_mailbox_token(
+                    &key,
+                    &recipient_pk,
+                    &device_id,
+                    day,
+                ),
+                None => compute_mailbox_token(&key, &recipient_pk, day),
+            };
+            let recipient_id = token_hex(&token);
+
             // Send the PRE-BUILT message as-is — no re-encryption.
             let ratchet_msg: crate::crypto::ratchet::RatchetMessage =
                 match serde_json::from_slice(&update.payload) {

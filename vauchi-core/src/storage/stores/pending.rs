@@ -51,6 +51,7 @@ impl PendingStore<'_> {
             retry_count: row.retry_count,
             status: row.status,
             target_relay_url: row.target_relay_url,
+            target_device_id: row.target_device_id,
         })
     }
     /// Queues a pending update for a contact (payload encrypted).
@@ -68,8 +69,8 @@ impl PendingStore<'_> {
 
         self.conn.execute(
             "INSERT OR REPLACE INTO pending_updates
-             (id, contact_id, update_type, payload, payload_encrypted, created_at, retry_count, status, error_message, retry_at, target_relay_url)
-             VALUES (?1, ?2, ?3, X'', ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+             (id, contact_id, update_type, payload, payload_encrypted, created_at, retry_count, status, error_message, retry_at, target_relay_url, target_device_id)
+             VALUES (?1, ?2, ?3, X'', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 update.id,
                 update.contact_id,
@@ -81,6 +82,7 @@ impl PendingStore<'_> {
                 error_msg,
                 retry_at,
                 update.target_relay_url,
+                update.target_device_id.map(|d| d.to_vec()),
             ],
         )?;
 
@@ -260,7 +262,7 @@ impl PendingStore<'_> {
 }
 
 /// SQL columns selected for pending update queries (with encrypted payload).
-const PENDING_SELECT: &str = "id, contact_id, update_type, payload_encrypted, payload, created_at, retry_count, status, error_message, retry_at, target_relay_url";
+const PENDING_SELECT: &str = "id, contact_id, update_type, payload_encrypted, payload, created_at, retry_count, status, error_message, retry_at, target_relay_url, target_device_id";
 
 /// Intermediate row before payload decryption.
 struct PendingRow {
@@ -273,6 +275,7 @@ struct PendingRow {
     retry_count: u32,
     status: UpdateStatus,
     target_relay_url: Option<String>,
+    target_device_id: Option<[u8; 32]>,
 }
 
 fn row_to_pending_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PendingRow> {
@@ -290,6 +293,7 @@ fn row_to_pending_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PendingRow> {
         _ => UpdateStatus::Pending,
     };
 
+    let target_device_id: Option<Vec<u8>> = row.get(11)?;
     Ok(PendingRow {
         id: row.get(0)?,
         contact_id: row.get(1)?,
@@ -300,5 +304,8 @@ fn row_to_pending_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PendingRow> {
         retry_count: row.get::<_, i32>(6)? as u32,
         status,
         target_relay_url: row.get(10)?,
+        // A malformed length is corruption — drop to identity mailbox rather
+        // than misroute (fail-safe: identity mailbox always resolves).
+        target_device_id: target_device_id.and_then(|bytes| bytes.try_into().ok()),
     })
 }

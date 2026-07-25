@@ -24,6 +24,16 @@ pub(crate) struct PreparedDevicePayload {
     pub(crate) persist_session: bool,
 }
 
+impl PreparedDevicePayload {
+    /// The recipient device this copy is addressed to for device-scoped
+    /// mailbox deposit (F4, ADR-064 Amendment 2026-07-25): `Some` for a
+    /// per-device fan-out copy, `None` for the legacy `[0;32]` /
+    /// genesis-sealed copy (identity mailbox).
+    pub(crate) fn target_device_id(&self) -> Option<[u8; 32]> {
+        (self.peer_device_id != [0u8; 32]).then_some(self.peer_device_id)
+    }
+}
+
 impl Vauchi {
     // === Card Propagation Operations ===
 
@@ -49,7 +59,7 @@ impl Vauchi {
                 let encrypted =
                     self.prepare_card_updates_for_contact(contact.id(), old_card, new_card)?;
                 let now = self.clock.unix_seconds();
-                for (_, payload) in encrypted {
+                for (peer_device_id, payload) in encrypted {
                     let update = PendingUpdate {
                         id: self.rng.uuid_v4(),
                         contact_id: contact.id().to_string(),
@@ -59,6 +69,7 @@ impl Vauchi {
                         retry_count: 0,
                         status: UpdateStatus::Pending,
                         target_relay_url: contact.relay_url().map(String::from),
+                        target_device_id: (peer_device_id != [0u8; 32]).then_some(peer_device_id),
                     };
                     self.storage.pending().queue_update(&update)?;
                 }
@@ -108,7 +119,7 @@ impl Vauchi {
                 .load_contact(contact_id)?
                 .and_then(|contact| contact.relay_url().map(String::from));
             let now = self.clock.unix_seconds();
-            for (_, payload) in encrypted {
+            for (peer_device_id, payload) in encrypted {
                 let update = PendingUpdate {
                     id: self.rng.uuid_v4(),
                     contact_id: contact_id.to_string(),
@@ -118,6 +129,7 @@ impl Vauchi {
                     retry_count: 0,
                     status: UpdateStatus::Pending,
                     target_relay_url: relay_url.clone(),
+                    target_device_id: (peer_device_id != [0u8; 32]).then_some(peer_device_id),
                 };
                 self.storage.pending().queue_update(&update)?;
             }

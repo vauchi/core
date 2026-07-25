@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 65] = [
+const MIGRATIONS: [Migration; 66] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -597,7 +597,26 @@ const MIGRATIONS: [Migration; 65] = [
         name: "registry_activation",
         action: MigrationAction::Sql(MIGRATION_V65_REGISTRY_ACTIVATION),
     },
+    Migration {
+        version: 66,
+        name: "pending_target_device",
+        action: MigrationAction::Sql(MIGRATION_V66_PENDING_TARGET_DEVICE),
+    },
 ];
+
+/// Migration v66: per-device fan-out target for the F4 device-scoped contact
+/// mailbox (ADR-064 Amendment 2026-07-25).
+///
+/// A nullable device id on each pending update. When set, the send phase
+/// deposits the copy at that recipient device's device-scoped mailbox
+/// (`compute_device_mailbox_token`) instead of the identity mailbox, so no
+/// sibling can drain another sibling's copy. NULL preserves the legacy
+/// identity-mailbox path for `[0;32]`, genesis, alert, and reciprocity sends.
+/// The device id is a routing input, not secret material (it never reaches
+/// the relay — HKDF input only), so the column is plaintext.
+const MIGRATION_V66_PENDING_TARGET_DEVICE: &str = "
+    ALTER TABLE pending_updates ADD COLUMN target_device_id BLOB;
+";
 
 /// Migration v65: F4 per-contact registry-activation handshake state
 /// (ADR-064 Amendment 2026-07-25).

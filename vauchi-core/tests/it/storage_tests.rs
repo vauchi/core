@@ -149,6 +149,7 @@ fn test_storage_pending_updates() {
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: None,
+        target_device_id: None,
     };
 
     storage.pending().queue_update(&update).unwrap();
@@ -175,6 +176,7 @@ fn test_storage_mark_update_sent() {
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: None,
+        target_device_id: None,
     };
 
     storage.pending().queue_update(&update).unwrap();
@@ -212,6 +214,7 @@ fn test_storage_update_status() {
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: None,
+        target_device_id: None,
     };
 
     storage.pending().queue_update(&update).unwrap();

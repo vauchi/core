@@ -266,6 +266,7 @@ fn test_queue_100_pending_updates_under_2s() {
             retry_count: 0,
             status: UpdateStatus::Pending,
             target_relay_url: Some("https://relay.vauchi.app".to_string()),
+            target_device_id: None,
         };
         storage.pending().queue_update(&update).unwrap();
     }

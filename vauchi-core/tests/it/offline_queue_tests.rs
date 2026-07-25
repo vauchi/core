@@ -32,6 +32,7 @@ fn create_pending_update(id: &str, contact_id: &str) -> PendingUpdate {
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: None,
+        target_device_id: None,
     }
 }
 
@@ -155,6 +156,7 @@ fn test_pending_updates_ordered_by_creation() {
             retry_count: 0,
             status: UpdateStatus::Pending,
             target_relay_url: None,
+            target_device_id: None,
         };
         storage.pending().queue_update(&update).unwrap();
     }
@@ -256,6 +258,7 @@ fn test_get_pending_by_status() {
             retry_count: 0,
             status,
             target_relay_url: None,
+            target_device_id: None,
         };
         storage.pending().queue_update(&update).unwrap();
     }

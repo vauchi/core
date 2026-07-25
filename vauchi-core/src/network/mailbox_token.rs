@@ -162,9 +162,13 @@ pub fn batch_register_tokens(
 ) -> Vec<Vec<String>> {
     padded_registration_batches(
         rng,
+        // Legacy path with no device context — identity-scoped receive tokens
+        // only. The device-scoped variant is registered via
+        // `batch_register_tokens_with_device_sync`, which carries the device id.
         registration_tokens(
             contact_keys,
             own_pubkey,
+            None,
             master_seed,
             current_day,
             days_offline,
@@ -176,6 +180,7 @@ pub fn batch_register_tokens(
 fn registration_tokens(
     contact_keys: &[[u8; 32]],
     own_pubkey: &[u8; 32],
+    own_device_id: Option<&[u8; 32]>,
     master_seed: &[u8; 32],
     current_day: u64,
     days_offline: u64,
@@ -202,6 +207,24 @@ fn registration_tokens(
                     own_pubkey,
                     day - 1,
                 )));
+            }
+            // F4: also register our DEVICE-scoped receive token per contact so
+            // a per-device fan-out copy reaches THIS device without a sibling
+            // draining it from a shared identity mailbox (ADR-064 Amendment
+            // 2026-07-25). Kept alongside the identity token, which still
+            // receives legacy [0;32] and genesis-cold-start sends.
+            if let Some(device_id) = own_device_id {
+                all_tokens.push(token_hex(&compute_device_mailbox_token(
+                    shared_key, own_pubkey, device_id, day,
+                )));
+                if day > 0 {
+                    all_tokens.push(token_hex(&compute_device_mailbox_token(
+                        shared_key,
+                        own_pubkey,
+                        device_id,
+                        day - 1,
+                    )));
+                }
             }
         }
     }
@@ -269,6 +292,7 @@ pub fn batch_register_tokens_with_device_sync(
     let mut tokens = registration_tokens(
         contact_keys,
         own_pubkey,
+        Some(device_id),
         master_seed,
         current_day,
         days_offline,

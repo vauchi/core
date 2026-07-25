@@ -111,6 +111,7 @@ fn test_sequential_pending_update_operations() {
             retry_count: 0,
             status: UpdateStatus::Pending,
             target_relay_url: None,
+            target_device_id: None,
         };
         storage.pending().queue_update(&update).unwrap();
     }

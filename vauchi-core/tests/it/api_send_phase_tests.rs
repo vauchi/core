@@ -454,6 +454,7 @@ fn sync_skips_update_when_load_contact_returns_none_adr029() {
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: None,
+        target_device_id: None,
     };
     storage
         .pending()
@@ -552,6 +553,7 @@ fn test_sync_send_clears_pending_update_on_relay_accept() {
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: None,
+        target_device_id: None,
     };
     storage.pending().queue_update(&update).unwrap();
     assert_eq!(
@@ -653,6 +655,7 @@ fn test_sync_send_does_not_downgrade_modern_peer_without_local_device_info() {
             retry_count: 0,
             status: UpdateStatus::Pending,
             target_relay_url: None,
+            target_device_id: None,
         })
         .unwrap();
 

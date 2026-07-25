@@ -43,6 +43,7 @@ fn create_visibility_update(id: &str, contact_id: &str, field_id: &str) -> Pendi
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: None,
+        target_device_id: None,
     }
 }
 
@@ -322,6 +323,7 @@ fn test_visibility_propagation_multiple_changes() {
             retry_count: 0,
             status: UpdateStatus::Pending,
             target_relay_url: None,
+            target_device_id: None,
         };
         storage.pending().queue_update(&update).unwrap();
     }

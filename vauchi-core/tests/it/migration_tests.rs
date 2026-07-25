@@ -408,6 +408,7 @@ fn test_pending_updates_persistence() {
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: None,
+        target_device_id: None,
     };
 
     storage.pending().queue_update(&update).unwrap();
@@ -526,6 +527,7 @@ fn test_default_column_values() {
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: None,
+        target_device_id: None,
     };
 
     storage.pending().queue_update(&update).unwrap();
@@ -819,8 +821,8 @@ fn test_schema_version_after_all_migrations() {
 
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(
-        version, 65,
-        "Schema version should be 65 after all migrations, got {}",
+        version, 66,
+        "Schema version should be 66 after all migrations, got {}",
         version
     );
 }

@@ -33,6 +33,7 @@ fn test_update(id: &str, contact_id: &str) -> PendingUpdate {
         retry_count: 0,
         status: UpdateStatus::Pending,
         target_relay_url: None,
+        target_device_id: None,
     }
 }
 

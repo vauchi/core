@@ -434,8 +434,8 @@ fn run_unorphaning_flow(alice_initiator: bool) {
         .unwrap();
     let confirm_blob = confirm_blobs
         .iter()
+        .next_back()
         .map(|u| u.payload.clone())
-        .last()
         .expect("confirm queued");
     if alice_initiator {
         // In production Bob resolves A2's device from her rotating sender

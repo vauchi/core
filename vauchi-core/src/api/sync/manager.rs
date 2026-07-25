@@ -132,6 +132,7 @@ impl<'a> SyncManager<'a> {
             retry_count: 0,
             status: UpdateStatus::Pending,
             target_relay_url: None,
+            target_device_id: None,
         };
 
         self.storage.pending().queue_update(&update)?;
@@ -162,6 +163,7 @@ impl<'a> SyncManager<'a> {
             retry_count: 0,
             status: UpdateStatus::Pending,
             target_relay_url: None,
+            target_device_id: None,
         };
 
         self.storage.pending().queue_update(&update)?;
@@ -357,6 +359,7 @@ impl<'a> SyncManager<'a> {
             retry_count: 0,
             status: UpdateStatus::Pending,
             target_relay_url: None,
+            target_device_id: None,
         };
 
         for update in card_updates {

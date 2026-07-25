@@ -45,6 +45,121 @@ fn validate_broadcast_json(bytes: &[u8]) -> Result<(), DeltaError> {
     Ok(())
 }
 
+/// Per-contact activation phase for this side of the handshake.
+///
+/// `Active` is the only phase in which the send path may fan out
+/// per-device; it is reachable exclusively through
+/// [`ActivationTracker::record_ack`] confirming the currently pushed
+/// registry version — registry *presence* never activates (the B-lite
+/// hazard, refuted 2026-07-24).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActivationState {
+    /// No handshake in flight; sends use the legacy `[0;32]` path.
+    Dormant,
+    /// Our registry was pushed; awaiting the peer's confirmation.
+    Pushed,
+    /// The peer confirmed our current registry version — per-device sends
+    /// are safe to resolve on their side.
+    Active,
+}
+
+/// Pure activation state machine for one contact (this side's view).
+///
+/// Invalid transitions are rejected explicitly and change nothing (DC-02);
+/// the storage layer persists snapshots of this tracker per contact.
+#[derive(Debug, Clone)]
+pub struct ActivationTracker {
+    outstanding_push: Option<([u8; NONCE_LEN], u64)>,
+    our_version_acked: Option<u64>,
+    peer_version_held: Option<u64>,
+}
+
+impl ActivationTracker {
+    /// A contact with no handshake history: `Dormant`, nothing held.
+    pub fn new() -> Self {
+        Self {
+            outstanding_push: None,
+            our_version_acked: None,
+            peer_version_held: None,
+        }
+    }
+
+    /// Current activation phase, derived from push/ack agreement.
+    pub fn state(&self) -> ActivationState {
+        match (&self.outstanding_push, self.our_version_acked) {
+            (Some((_, pushed)), Some(acked)) if *pushed == acked => ActivationState::Active,
+            (Some(_), _) => ActivationState::Pushed,
+            (None, _) => ActivationState::Dormant,
+        }
+    }
+
+    /// Record that our registry `version` was pushed under `nonce`.
+    ///
+    /// Re-pushing an already-acked version keeps `Active` (repair
+    /// re-pushes must not bounce sends through the legacy fallback);
+    /// pushing a newer version demotes to `Pushed` until re-acked.
+    pub fn record_push_sent(&mut self, nonce: [u8; NONCE_LEN], version: u64) {
+        self.outstanding_push = Some((nonce, version));
+    }
+
+    /// Record the peer's ack. Accepted only when it answers the
+    /// outstanding push exactly (nonce and version); anything else is
+    /// rejected without a state change.
+    pub fn record_ack(
+        &mut self,
+        nonce: &[u8; NONCE_LEN],
+        acked_version: u64,
+    ) -> Result<(), DeltaError> {
+        match self.outstanding_push {
+            Some((expected_nonce, pushed_version))
+                if expected_nonce == *nonce && pushed_version == acked_version =>
+            {
+                self.our_version_acked = Some(acked_version);
+                Ok(())
+            }
+            Some(_) => Err(DeltaError::ApplyError(
+                "registry ack does not answer the outstanding push".into(),
+            )),
+            None => Err(DeltaError::ApplyError(
+                "registry ack without an outstanding push".into(),
+            )),
+        }
+    }
+
+    /// Record a received peer registry version (monotonic — stale
+    /// versions are ignored, mirroring the storage layer's guard).
+    pub fn record_peer_registry(&mut self, version: u64) {
+        self.peer_version_held = Some(
+            self.peer_version_held
+                .map_or(version, |held| held.max(version)),
+        );
+    }
+
+    /// The peer registry version we hold, if any.
+    pub fn peer_version_held(&self) -> Option<u64> {
+        self.peer_version_held
+    }
+
+    /// The peer emptied/revoked its registry — the handshake restarts
+    /// from scratch.
+    pub fn record_peer_registry_emptied(&mut self) {
+        self.peer_version_held = None;
+        self.outstanding_push = None;
+        self.our_version_acked = None;
+    }
+
+    /// Our registry version the peer has confirmed, if any.
+    pub fn our_version_acked(&self) -> Option<u64> {
+        self.our_version_acked
+    }
+}
+
+impl Default for ActivationTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A registry push — [`VersionedPayload`] version `0x05`.
 ///
 /// Wire form (after the version byte): `push_nonce(32) || broadcast_json`.

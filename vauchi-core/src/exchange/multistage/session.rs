@@ -814,6 +814,49 @@ impl MultiStageSession {
     /// `accel_proximity == Listening`, and we have recorded samples. The
     /// envelope is sealed under our own `session_id` (F2 sender-AAD binding) so
     /// a peer that reflects it back fails AEAD at us.
+    /// Build a finalization-stage QR, interleaving VRFY and CONF across the
+    /// `display_cycle % 7` phases (VRFY on 0–2, CONF on 3–6; SHAK on 6 when
+    /// available). Both VRFY (our reveal key) and CONF (our card hash) are
+    /// always computable in the finalization states, and a peer may be in
+    /// Verifying (needs our VRFY) or Confirming (needs our CONF) — so **both
+    /// must be offered from BOTH states**. Offering CONF from Verifying is
+    /// the fix for the device-proven Pixel↔Samsung Hover deadlock 2026-07-24:
+    /// one peer lingered in Verifying emitting only VRFY while the other
+    /// starved for CONF and timed out. A peer that receives a frame it is not
+    /// yet ready for ignores it (`handle_confirm`/`handle_verify` no-op
+    /// off-state). Deterministic (no RNG) so the exchange timing is
+    /// reproducible; the coprime-7 cadence keeps a scanner from locking onto
+    /// one phase.
+    fn build_finalization_qr(&self, include_shake: bool) -> QrPayload {
+        let phase = self.display_cycle % 7;
+        // SHAK carries the advisory accel envelope (TapHoverShake);
+        // `build_shake_qr` returns None for Glance/Hover, falling through.
+        if include_shake
+            && phase == 6
+            && let Some(shake_qr) = self.build_shake_qr()
+        {
+            return QrPayload {
+                data: shake_qr,
+                error_correction: "M".to_string(),
+                display_duration_ms: jittered(DISPLAY_MS_CONF),
+            };
+        }
+        if phase < 3 {
+            QrPayload {
+                data: qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key()),
+                error_correction: "M".to_string(),
+                display_duration_ms: jittered(DISPLAY_MS_VRFY),
+            }
+        } else {
+            let card_hash = self.compute_card_hash(&self.local_card);
+            QrPayload {
+                data: qr_codec::format_confirm_qr(&self.session_id, &card_hash),
+                error_correction: "M".to_string(),
+                display_duration_ms: jittered(DISPLAY_MS_CONF),
+            }
+        }
+    }
+
     fn build_shake_qr(&self) -> Option<String> {
         if self.accel_proximity != AccelerometerProximityState::Listening
             || self.accel_local_envelope.is_empty()
@@ -934,13 +977,11 @@ impl MultiStageSession {
             }
             ProtocolState::Verifying => {
                 self.display_cycle += 1;
-                let qr_data =
-                    qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key());
-                let qr = QrPayload {
-                    data: qr_data,
-                    error_correction: "M".to_string(),
-                    display_duration_ms: jittered(DISPLAY_MS_VRFY), // S3: adaptive
-                };
+                // Offer VRFY *and* CONF (randomized): a peer that has already
+                // reached Confirming needs our CONF (card hash), which is
+                // always computable here — without it, that peer starves
+                // (device-proven deadlock 2026-07-24). No shake in Verifying.
+                let qr = self.build_finalization_qr(false);
                 // If we stashed the peer's reveal key (received VRFY while still
                 // Transferring), process it now that we've generated our own VRFY
                 // for the peer to scan.
@@ -949,42 +990,10 @@ impl MultiStageSession {
             }
             ProtocolState::Confirming => {
                 self.display_cycle += 1;
-                // Interleave VRFY and CONF using cycle mod 7: show VRFY on
-                // phases 0,1,2 and CONF on phases 3,4,5,6. Using prime 7
-                // ensures coprimality with scan_every_n 2..6, so the scanner
-                // cycles through all phases and sees both frame types.
-                let phase = self.display_cycle % 7;
-                // Phase 6 carries the SHAK accel envelope once the shake stage is
-                // recording and transport_key exists (advisory; `build_shake_qr`
-                // returns None for Glance/Hover and before capture, falling
-                // through to the CONF frame).
-                if phase == 6
-                    && let Some(shake_qr) = self.build_shake_qr()
-                {
-                    return Some(QrPayload {
-                        data: shake_qr,
-                        error_correction: "M".to_string(),
-                        display_duration_ms: jittered(DISPLAY_MS_CONF),
-                    });
-                }
-                if phase < 3 {
-                    let qr_data =
-                        qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key());
-                    Some(QrPayload {
-                        data: qr_data,
-                        error_correction: "M".to_string(),
-                        display_duration_ms: jittered(DISPLAY_MS_VRFY),
-                    })
-                } else {
-                    // CONF contains hash of our original plaintext card
-                    let card_hash = self.compute_card_hash(&self.local_card);
-                    let qr_data = qr_codec::format_confirm_qr(&self.session_id, &card_hash);
-                    Some(QrPayload {
-                        data: qr_data,
-                        error_correction: "M".to_string(),
-                        display_duration_ms: jittered(DISPLAY_MS_CONF),
-                    })
-                }
+                // Randomized VRFY/CONF (+ advisory SHAK) — see
+                // `build_finalization_qr`. Replaces the fixed positional
+                // `display_cycle % 7` pattern that was scanner-phase-lockable.
+                Some(self.build_finalization_qr(true))
             }
             ProtocolState::Complete | ProtocolState::RetryReady => {
                 // S1: Wall-clock timeout with progress extension.

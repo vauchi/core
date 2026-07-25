@@ -938,3 +938,84 @@ fn transport_decrypt_failure_count_does_not_increment_on_legitimate_data_chunk()
         "legitimate DATA chunks must not raise the counter"
     );
 }
+
+/// Feed only pre-finalization frames (INIT/DATA), never VRFY/CONF, so a
+/// session that reaches Verifying stays there (its VRFY is not delivered
+/// to advance the peer). Acks ride on DATA, so both still reach Verifying.
+fn is_transfer_frame(data: &str) -> bool {
+    data.starts_with("DATA") || data.starts_with("INI") || data.starts_with("IN2")
+}
+
+// @internal
+#[test]
+fn verifying_state_also_offers_conf_so_confirming_peer_does_not_starve() {
+    // Device-proven deadlock (2026-07-24 Pixel↔Samsung Hover): a peer that
+    // reaches Confirming first needs the other's CONF (card hash), but a
+    // peer lingering in Verifying emitted ONLY VRFY — so the Confirming
+    // peer starved for CONF and timed out. Verifying must ALSO offer CONF
+    // (the card hash is always computable), so a peer ahead of us can
+    // finalize regardless of our sub-state.
+    let alice_card = vec![0xAAu8; 200];
+    let bob_card = vec![0xBBu8; 200];
+    let mut alice = MultiStageSession::new(alice_card);
+    let mut bob = MultiStageSession::new(bob_card);
+
+    let ai = alice.get_display_qr().unwrap();
+    let bi = bob.get_display_qr().unwrap();
+    alice.process_scanned_qr(&bi.data);
+    bob.process_scanned_qr(&ai.data);
+
+    // Drive DATA both ways until BOTH reach Verifying.
+    for _ in 0..4000 {
+        if matches!(alice.get_state(), ProtocolState::Verifying)
+            && matches!(bob.get_state(), ProtocolState::Verifying)
+        {
+            break;
+        }
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        if let Some(aq) = &aq {
+            if is_transfer_frame(&aq.data) {
+                bob.process_scanned_qr(&aq.data);
+            }
+        }
+        if let Some(bq) = &bq {
+            if is_transfer_frame(&bq.data) {
+                alice.process_scanned_qr(&bq.data);
+            }
+        }
+    }
+    assert!(
+        matches!(alice.get_state(), ProtocolState::Verifying),
+        "precondition: alice reaches Verifying, got {:?}",
+        alice.get_state()
+    );
+
+    // Sample alice's display while she is in Verifying (no peer VRFY is
+    // delivered, so she stays in Verifying). She must offer both types.
+    let mut saw_vrfy = false;
+    let mut saw_conf = false;
+    for _ in 0..300 {
+        if let Some(qr) = alice.get_display_qr() {
+            let prefix = &qr.data[..4.min(qr.data.len())];
+            match prefix {
+                "VRFY" => saw_vrfy = true,
+                "CONF" => saw_conf = true,
+                _ => {}
+            }
+        }
+        if saw_vrfy && saw_conf {
+            break;
+        }
+    }
+    assert!(
+        matches!(alice.get_state(), ProtocolState::Verifying),
+        "alice must stay in Verifying while sampling, got {:?}",
+        alice.get_state()
+    );
+    assert!(saw_vrfy, "Verifying must still offer VRFY");
+    assert!(
+        saw_conf,
+        "Verifying must ALSO offer CONF so a Confirming peer does not starve"
+    );
+}

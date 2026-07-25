@@ -366,6 +366,7 @@ mod recovery_tests;
 mod recovery_voucher_v2_tests;
 mod registry_activation_payload_tests;
 mod registry_activation_state_tests;
+mod registry_activation_store_tests;
 mod rekey_all_columns_tests;
 mod rekey_coverage_tests;
 mod rekey_self_heal_tests;

@@ -389,6 +389,83 @@ fn queue_registry_ack_keeps_an_outstanding_push_and_skips_the_echo() {
     }
 }
 
+// @scenario: multi_device_sync :: A corrupt per-device session triggers handshake repair
+// @internal
+#[test]
+fn device_session_decrypt_failure_demotes_activation_and_drops_the_session() {
+    // Kimi condition / plan trigger 4: activation must cover session
+    // REPAIR. A decrypt failure on an established device-scoped chain is
+    // deterministic divergence — without repair, cards stall silently
+    // forever: the blob is ACKed, the session stays corrupt, and the
+    // scanner skips Active contacts so nothing ever re-handshakes.
+    let (alice_wb, bob_wb, bob_contact_id, _alice_contact_id) = setup_two_party();
+    let bob_device_id = *bob_wb.identity().unwrap().device_id();
+
+    // Alice holds an Active handshake and a per-device session for Bob's
+    // device — but the session has diverged (modeled with an unrelated
+    // ratchet pair).
+    let mut tracker = ActivationTracker::new();
+    tracker.record_push_sent([2u8; 32], 1);
+    tracker.record_ack(&[2u8; 32], 1).unwrap();
+    alice_wb
+        .storage()
+        .registry_activation()
+        .save_activation(&bob_contact_id, &tracker)
+        .unwrap();
+    let unrelated = SymmetricKey::generate();
+    let dh = X3DHKeyPair::generate();
+    let alice_side = DoubleRatchetState::initialize_responder(&unrelated, dh);
+    alice_wb
+        .storage()
+        .ratchets()
+        .save_ratchet_state_for_device(&bob_contact_id, &bob_device_id, &alice_side, false)
+        .unwrap();
+
+    // Bob's send rides a chain Alice's stored session does not match.
+    let divergent = SymmetricKey::generate();
+    let other_dh = X3DHKeyPair::generate();
+    let mut bob_side =
+        DoubleRatchetState::initialize_initiator(&divergent, *other_dh.public_key()).unwrap();
+    let blob = serde_json::to_vec(&bob_side.encrypt(b"card bytes").unwrap()).unwrap();
+
+    let alice_identity = alice_wb.identity().unwrap();
+    let result = vauchi_core::api::process_single_card_update_for_device(
+        alice_identity,
+        alice_wb.storage(),
+        &bob_contact_id,
+        &bob_device_id,
+        &blob,
+    );
+    assert!(
+        matches!(
+            result,
+            Err(vauchi_core::api::CardUpdateError::DecryptionFailed)
+        ),
+        "the blob itself still fails deterministically"
+    );
+
+    let tracker = alice_wb
+        .storage()
+        .registry_activation()
+        .load_activation(&bob_contact_id)
+        .unwrap()
+        .expect("tracker row");
+    assert_ne!(
+        tracker.state(),
+        ActivationState::Active,
+        "repair demotes activation so the scanner re-runs the handshake"
+    );
+    assert!(
+        alice_wb
+            .storage()
+            .ratchets()
+            .load_ratchet_state_for_device(&bob_contact_id, &bob_device_id)
+            .unwrap()
+            .is_none(),
+        "the corrupt session row is dropped so the next receive re-bootstraps"
+    );
+}
+
 // @scenario: multi_device_sync :: A forged registry push is rejected without persisting anything
 // @internal
 #[test]

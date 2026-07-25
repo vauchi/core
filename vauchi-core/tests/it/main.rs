@@ -368,6 +368,7 @@ mod registry_activation_payload_tests;
 mod registry_activation_push_trigger_tests;
 mod registry_activation_receive_tests;
 mod registry_activation_send_gate_tests;
+mod registry_activation_sibling_sync_tests;
 mod registry_activation_state_tests;
 mod registry_activation_store_tests;
 mod rekey_all_columns_tests;

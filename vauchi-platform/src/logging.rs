@@ -37,41 +37,59 @@ static LOG_INIT: LogInit = LogInit::new();
 
 /// Install the platform `tracing` subscriber. Safe to call on every app
 /// launch/Activity recreation — only the first call takes effect.
+///
+/// Returns a short, non-PII status string so the shell can log the
+/// outcome via its *own* native logger (Logcat/os_log) — the only way to
+/// observe an install failure, since a failed `try_init` leaves no
+/// subscriber to carry the confirmation event. Values: `installed-*`
+/// (subscriber attached), `already-installed` (idempotent no-op),
+/// `try_init-failed: …` (a global subscriber was already set),
+/// `no-backend` (release/store build, feature off).
 #[uniffi::export]
-pub fn init_mobile_logging() {
+pub fn init_mobile_logging() -> String {
     if LOG_INIT.should_install() {
-        install();
+        let status = install();
         // Deterministic per-launch confirmation the subscriber installed —
-        // its absence in the native log viewer is itself the signal that
-        // this binding has no dev-logging backend (a release/store build).
+        // dropped if `install` failed, so its absence is itself a signal.
         // A no-op without a subscriber, so it never leaks in production.
         tracing::info!("mobile logging bridge active");
+        status
+    } else {
+        "already-installed".to_string()
     }
 }
 
 #[cfg(all(feature = "dev-logging", any(target_os = "ios", target_os = "macos")))]
-fn install() {
+fn install() -> String {
     use tracing_subscriber::prelude::*;
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
-    // try_init returns Err (ignored) if a global subscriber is already
-    // installed — LOG_INIT prevents that here, but a test harness may also
-    // install one, so stay defensive rather than expect().
-    let _ = tracing_subscriber::registry()
+    // try_init returns Err (surfaced in the status) if a global subscriber
+    // is already installed — LOG_INIT prevents that here, but a test harness
+    // may also install one, so stay defensive rather than expect().
+    match tracing_subscriber::registry()
         .with(tracing_oslog::OsLogger::new("app.vauchi.rust", "default"))
         .with(filter)
-        .try_init();
+        .try_init()
+    {
+        Ok(()) => "installed-oslog".to_string(),
+        Err(e) => format!("try_init-failed: {e}"),
+    }
 }
 
 #[cfg(all(feature = "dev-logging", target_os = "android"))]
-fn install() {
+fn install() -> String {
     use tracing_subscriber::prelude::*;
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
-    let _ = tracing_subscriber::registry()
+    match tracing_subscriber::registry()
         .with(paranoid_android::layer("Vauchi"))
         .with(filter)
-        .try_init();
+        .try_init()
+    {
+        Ok(()) => "installed-logcat".to_string(),
+        Err(e) => format!("try_init-failed: {e}"),
+    }
 }
 
 // Release posture (feature off) and unsupported desktop targets: no
@@ -80,7 +98,9 @@ fn install() {
     feature = "dev-logging",
     any(target_os = "android", target_os = "ios", target_os = "macos")
 )))]
-fn install() {}
+fn install() -> String {
+    "no-backend".to_string()
+}
 
 // INLINE_TEST_REQUIRED: LogInit and should_install() are private to this
 // module (not pub) — an external tests/it integration test has no access;
@@ -104,9 +124,9 @@ mod tests {
     fn init_mobile_logging_does_not_panic_when_called_repeatedly() {
         // allow(zero_assertions): repeated init must not panic — there is
         // no observable state to assert beyond that.
-        init_mobile_logging();
-        init_mobile_logging();
-        init_mobile_logging();
+        let _ = init_mobile_logging();
+        let _ = init_mobile_logging();
+        let _ = init_mobile_logging();
     }
 
     // Shipped-binary posture: with `dev-logging` off, init installs no
@@ -120,7 +140,7 @@ mod tests {
     #[cfg(not(feature = "dev-logging"))]
     #[test]
     fn release_build_installs_no_log_backend() {
-        init_mobile_logging();
+        assert_eq!(init_mobile_logging(), "no-backend");
         assert_eq!(
             tracing::level_filters::LevelFilter::current(),
             tracing::level_filters::LevelFilter::OFF

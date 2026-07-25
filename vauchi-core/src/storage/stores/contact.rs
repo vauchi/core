@@ -232,10 +232,30 @@ impl ContactStore<'_> {
         })?;
 
         let mut contacts = Vec::new();
+        let mut row_count = 0usize;
         for row_result in rows {
             let row = row_result?;
-            contacts.push(self.row_to_contact(row)?);
+            row_count += 1;
+            // Dev instrumentation (no PII — counts/errors only). Distinguishes a
+            // query miss from a decrypt failure: a single row that fails to
+            // materialize (`?`) blanks the WHOLE list, so a saved-but-
+            // undecryptable contact reads as "no contacts" (2026-07-25 S7
+            // exchanged-contact-not-listed investigation).
+            match self.row_to_contact(row) {
+                Ok(c) => contacts.push(c),
+                Err(e) => {
+                    tracing::warn!(
+                        "[MSX] list_contacts: row {row_count} failed to materialize \
+                         ({e:?}) — the whole list blanks"
+                    );
+                    return Err(e);
+                }
+            }
         }
+        tracing::info!(
+            "[MSX] list_contacts: {row_count} rows -> {} contacts",
+            contacts.len()
+        );
 
         Ok(contacts)
     }

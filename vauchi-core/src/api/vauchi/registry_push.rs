@@ -235,9 +235,15 @@ impl Vauchi {
                 .kind()
                 .exchanged_data()
                 .ok_or_else(|| VauchiError::InvalidState("contact not exchanged".into()))?;
-            Ok(vec![
-                this.genesis_seal_for_cold_start(identity, ex, &payload)?,
-            ])
+            // Route the ack to the originating device's device-scoped mailbox
+            // so a sibling cannot drain it from a shared identity mailbox; the
+            // truly-unknown-origin case ([0;32]) keeps the identity-scoped copy.
+            let sealed = if reply.sender_device_id == [0u8; 32] {
+                this.genesis_seal_for_cold_start(identity, ex, &payload)?
+            } else {
+                this.genesis_seal_for_device(identity, ex, reply.sender_device_id, &payload)?
+            };
+            Ok(vec![sealed])
         };
         let prepared = if tracker.state() == ActivationState::Active {
             match self.encrypt_payload_for_contact_devices(identity, &contact, &payload) {

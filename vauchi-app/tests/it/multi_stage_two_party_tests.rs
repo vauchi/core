@@ -173,6 +173,78 @@ fn asymmetric_camera_glance_still_finalizes_both_sides() {
 
 // @internal
 #[test]
+fn both_machines_emit_the_finalized_event_that_triggers_persist() {
+    // `persist_exchanged_contact` fires ONLY on `MultiStageEvent::Finalized`
+    // (AppEngine::apply_multi_stage_event). A machine that reaches the
+    // Finalized *phase* without ever emitting the Finalized *event* shows
+    // "Exchange Complete" but never saves the contact — the device-proven
+    // half-exchange (2026-07-25 Samsung S7: finalized on-screen, empty
+    // contact list; Pixel persisted fine). Both sides must emit it exactly
+    // once. Lossy (asymmetric) delivery is used because that is when the two
+    // sides reach Finalized via different paths (scan vs stashed-key advance).
+    let alice_card = b"name:Alice\nemail:alice@example.com".to_vec();
+    let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
+    let mut alice = MultiStageMachine::new_glance(alice_card, 0);
+    let mut bob = MultiStageMachine::new_glance(bob_card, 0);
+
+    let mut now: u64 = 0;
+    let mut alice_frame: Option<String> = None;
+    let mut bob_frame: Option<String> = None;
+    let mut alice_final = 0usize;
+    let mut bob_final = 0usize;
+    let is_final = |e: &MultiStageEvent| matches!(e, MultiStageEvent::Finalized { .. });
+    let slow_factor = 5; // Bob (S7-class) ingests every 5th Alice frame.
+
+    for tick in 0..8000 {
+        now += 500;
+        let ae = alice.advance(now);
+        if is_final(&ae) {
+            alice_final += 1;
+        }
+        if let MultiStageEvent::QrFrameReady(p) = &ae {
+            alice_frame = Some(p.data.clone());
+        }
+        let be = bob.advance(now);
+        if is_final(&be) {
+            bob_final += 1;
+        }
+        if let MultiStageEvent::QrFrameReady(p) = &be {
+            bob_frame = Some(p.data.clone());
+        }
+        if let Some(data) = bob_frame.clone() {
+            let e = alice.handle_hardware_event(&Event::QrScanned { data }, now);
+            if is_final(&e) {
+                alice_final += 1;
+            }
+        }
+        if tick % slow_factor == 0
+            && let Some(data) = alice_frame.clone()
+        {
+            let e = bob.handle_hardware_event(&Event::QrScanned { data }, now);
+            if is_final(&e) {
+                bob_final += 1;
+            }
+        }
+        if alice.is_terminal() && bob.is_terminal() {
+            break;
+        }
+    }
+
+    assert!(
+        alice_final >= 1,
+        "Alice reached {:?} but never emitted the Finalized event that triggers persist",
+        alice.phase(),
+    );
+    assert!(
+        bob_final >= 1,
+        "Bob reached {:?} but never emitted the Finalized event that triggers persist \
+         — this is the Samsung half-exchange: finalized on-screen, contact never saved",
+        bob.phase(),
+    );
+}
+
+// @internal
+#[test]
 fn finalized_machine_exposes_combo_for_broadcast_seed() {
     // Regression: the finalized side's success-screen broadcast is a single
     // frozen frame. If it inherits a stale DATA chunk from the Complete-state

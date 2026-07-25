@@ -82,13 +82,78 @@ fn install() -> String {
     use tracing_subscriber::prelude::*;
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_ansi(false)
+        // Logcat stamps its own timestamp; the classic writer adds the tag.
+        .without_time()
+        .with_writer(logcat::MakeLogcatWriter);
     match tracing_subscriber::registry()
-        .with(paranoid_android::layer("Vauchi"))
+        .with(fmt_layer)
         .with(filter)
         .try_init()
     {
-        Ok(()) => "installed-logcat".to_string(),
+        Ok(()) => "installed-logcat-classic".to_string(),
         Err(e) => format!("try_init-failed: {e}"),
+    }
+}
+
+/// Classic `__android_log_write` (API 1+) sink — works on every Android
+/// version, unlike paranoid-android's structured-log API
+/// (`__android_log_message`, API 30+) which silently dropped events on
+/// API 26-29 devices (Galaxy S7), leaving dev-logging dark on older test
+/// hardware (2026-07-25).
+#[cfg(all(feature = "dev-logging", target_os = "android"))]
+mod logcat {
+    use std::ffi::CString;
+    use std::io::Write;
+    use std::os::raw::c_int;
+
+    const ANDROID_LOG_INFO: c_int = 4; // <android/log.h>, stable ABI
+    const TAG: &[u8] = b"Vauchi\0";
+
+    /// Accumulates one formatted event and emits it whole to Logcat on
+    /// drop — the fmt layer may `write` a single event across several calls,
+    /// and one `__android_log_write` per event keeps lines intact.
+    pub struct LogcatWriter {
+        buf: Vec<u8>,
+    }
+
+    impl Write for LogcatWriter {
+        fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+            self.buf.extend_from_slice(data);
+            Ok(data.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl Drop for LogcatWriter {
+        fn drop(&mut self) {
+            if self.buf.is_empty() {
+                return;
+            }
+            let msg = String::from_utf8_lossy(&self.buf);
+            // An interior NUL would truncate the C string — strip defensively.
+            let Ok(cmsg) = CString::new(msg.trim_end().replace('\0', "")) else {
+                return;
+            };
+            // SAFETY: TAG is a valid NUL-terminated static and `cmsg` is a
+            // valid owned C string live for the duration of the call;
+            // `__android_log_write` copies both and retains neither pointer.
+            unsafe {
+                ndk_sys::__android_log_write(ANDROID_LOG_INFO, TAG.as_ptr().cast(), cmsg.as_ptr());
+            }
+        }
+    }
+
+    pub struct MakeLogcatWriter;
+
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeLogcatWriter {
+        type Writer = LogcatWriter;
+        fn make_writer(&'a self) -> Self::Writer {
+            LogcatWriter { buf: Vec::new() }
+        }
     }
 }
 

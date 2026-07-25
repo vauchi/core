@@ -2779,20 +2779,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "paranoid-android"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "101795d63d371b43e38d6e7254677657be82f17022f7f7893c268f33ac0caadc"
-dependencies = [
- "lazy_static",
- "ndk-sys",
- "sharded-slab",
- "smallvec",
- "tracing-core",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "password-hash"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4608,7 +4594,7 @@ dependencies = [
  "crc32fast",
  "criterion",
  "hex",
- "paranoid-android",
+ "ndk-sys",
  "proptest",
  "qrcode",
  "serde",

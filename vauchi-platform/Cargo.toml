@@ -38,7 +38,7 @@ test-kdf = ["vauchi-core/test-kdf"]
 # vauchi-app `log::` call sites are silent no-ops (the `log` facade
 # discards records when no logger is installed). Frontends enable this
 # only in their debug build config. See logging.rs and logging-rules.md.
-dev-logging = ["dep:tracing-subscriber", "dep:tracing-oslog", "dep:paranoid-android"]
+dev-logging = ["dep:tracing-subscriber", "dep:tracing-oslog", "dep:ndk-sys"]
 
 [dependencies]
 # Core Vauchi library (with rustls for Android/iOS - no OpenSSL dependency)
@@ -72,7 +72,7 @@ tracing = "0.1"
 
 # Dev-only native tracing subscriber (composes the per-platform sink layer
 # below with an Info EnvFilter). Off in release — see [features].
-tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "env-filter"], optional = true }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "env-filter", "fmt"], optional = true }
 
 # CRC32 checksums for multipart QR codec
 crc32fast = "1.4"
@@ -83,8 +83,13 @@ qrcode = { version = "0.14", default-features = false }
 # Native tracing sink layers for the mobile bridge (logging.rs).
 # Excluded from Linux/Windows targets by [target.'cfg(...)'], and gated
 # behind the `dev-logging` feature (off in release) — see [features].
+# ndk-sys (not paranoid-android): paranoid-android writes via the buffered
+# structured-log API (`__android_log_message`, API 30+), which silently
+# no-ops on API 26-29 devices (Galaxy S7 etc.) — dev-logging was dark on
+# all older test hardware. ndk-sys exposes the classic `__android_log_write`
+# (API 1+); logging.rs wraps it in a `MakeWriter`. See logging-rules.md.
 [target.'cfg(target_os = "android")'.dependencies]
-paranoid-android = { version = "0.2", optional = true }
+ndk-sys = { version = "0.5", optional = true }
 
 [target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
 tracing-oslog = { version = "0.3", optional = true }

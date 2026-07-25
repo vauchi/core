@@ -364,6 +364,7 @@ mod recovery_readiness_tests;
 mod recovery_storage_tests;
 mod recovery_tests;
 mod recovery_voucher_v2_tests;
+mod registry_activation_genesis_tests;
 mod registry_activation_payload_tests;
 mod registry_activation_push_trigger_tests;
 mod registry_activation_receive_tests;

@@ -34,6 +34,7 @@ mod reciprocity_send;
 mod recovery;
 mod recovery_offline;
 mod registry_push;
+mod registry_sibling_apply;
 mod search;
 mod security;
 mod setup;

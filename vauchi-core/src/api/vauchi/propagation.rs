@@ -559,6 +559,25 @@ impl Vauchi {
                         Ok(())
                     }
                 }
+                SyncItem::ContactRegistryReceived {
+                    ref contact_id,
+                    ref registry_json,
+                    ..
+                } => self.apply_contact_registry_received(contact_id, registry_json),
+                SyncItem::ContactActivationChanged {
+                    ref contact_id,
+                    ref push_nonce,
+                    pushed_version,
+                    our_version_acked,
+                    peer_version_held,
+                    ..
+                } => self.apply_contact_activation_changed(
+                    contact_id,
+                    push_nonce,
+                    pushed_version,
+                    our_version_acked,
+                    peer_version_held,
+                ),
                 SyncItem::CardUpdated {
                     ref field_label,
                     ref new_value,
@@ -900,6 +919,10 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
             changed_fields: vec!["card".to_string()],
         }),
         SyncItem::DeviceRegistryChanged { .. } => None,
+        // F4 control-plane state: never surfaced to the user (owner decision
+        // 2026-07-24 — no device counts, no change events).
+        SyncItem::ContactRegistryReceived { .. } => None,
+        SyncItem::ContactActivationChanged { .. } => None,
         SyncItem::CardUpdated { field_label, .. } => Some(VauchiEvent::OwnCardUpdated {
             changed_fields: vec![field_label.clone()],
         }),

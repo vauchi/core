@@ -158,6 +158,30 @@ impl ActivationTracker {
         self.outstanding_push
     }
 
+    /// Merge a relayed sibling snapshot monotonically: held/acked versions
+    /// take the max, and the outstanding push with the higher version wins
+    /// (ties keep local). Never regresses local progress — commutative and
+    /// idempotent, so replayed or reordered relay items converge.
+    pub fn merge_snapshot(&mut self, other: &ActivationTracker) {
+        if let Some(version) = other.peer_version_held {
+            self.record_peer_registry(version);
+        }
+        self.our_version_acked = match (self.our_version_acked, other.our_version_acked) {
+            (Some(local), Some(incoming)) => Some(local.max(incoming)),
+            (local, incoming) => local.or(incoming),
+        };
+        let incoming_wins = match (self.outstanding_push, other.outstanding_push) {
+            (None, Some(_)) => true,
+            (Some((_, local_version)), Some((_, incoming_version))) => {
+                incoming_version > local_version
+            }
+            _ => false,
+        };
+        if incoming_wins {
+            self.outstanding_push = other.outstanding_push;
+        }
+    }
+
     /// Rehydrate a tracker from a persisted snapshot.
     pub fn from_parts(
         outstanding_push: Option<([u8; NONCE_LEN], u64)>,

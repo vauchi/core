@@ -118,6 +118,40 @@ pub enum SyncItem {
         version: u64,
     },
 
+    /// A contact's verified signed registry was received (F4, ADR-064
+    /// Amendment 2026-07-25). Siblings persist it so they can resolve the
+    /// contact's device-scoped tokens. Control-plane only.
+    ContactRegistryReceived {
+        /// Existing exchanged contact whose registry this is.
+        contact_id: String,
+        /// The contact's identity-signed `RegistryBroadcast` as JSON —
+        /// siblings re-verify against the contact's pinned key on apply.
+        registry_json: String,
+        /// The broadcast's signed monotonic version.
+        version: u64,
+        /// When this device accepted the registry.
+        timestamp: u64,
+    },
+
+    /// This identity's F4 activation handshake state for a contact changed.
+    /// Snapshots the tracker; siblings merge monotonically (a newer local
+    /// push is never regressed — any sibling may fetch the ack for a push
+    /// another device sent, since mailbox tokens are identity-scoped).
+    ContactActivationChanged {
+        /// Contact the handshake is with.
+        contact_id: String,
+        /// Outstanding push correlation nonce (32 bytes when present).
+        push_nonce: Option<Vec<u8>>,
+        /// Outstanding pushed registry version.
+        pushed_version: Option<u64>,
+        /// Our registry version the peer confirmed.
+        our_version_acked: Option<u64>,
+        /// The peer registry version this identity holds.
+        peer_version_held: Option<u64>,
+        /// When the state changed on the recording device.
+        timestamp: u64,
+    },
+
     /// Own contact card field was updated.
     CardUpdated {
         /// Field label that was updated.
@@ -318,6 +352,8 @@ impl SyncItem {
             SyncItem::ContactRemoved { timestamp, .. } => *timestamp,
             SyncItem::ContactCardUpdated { timestamp, .. } => *timestamp,
             SyncItem::DeviceRegistryChanged { version, .. } => *version,
+            SyncItem::ContactRegistryReceived { timestamp, .. } => *timestamp,
+            SyncItem::ContactActivationChanged { timestamp, .. } => *timestamp,
             SyncItem::CardUpdated { timestamp, .. } => *timestamp,
             SyncItem::CardFieldSynced { timestamp, .. } => *timestamp,
             SyncItem::CardFieldRemoved { timestamp, .. } => *timestamp,

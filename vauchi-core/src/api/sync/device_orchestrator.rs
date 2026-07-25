@@ -641,6 +641,12 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                 format!("contact_card:{}", contact_id)
             }
             SyncItem::DeviceRegistryChanged { .. } => "device_registry".to_string(),
+            SyncItem::ContactRegistryReceived { contact_id, .. } => {
+                format!("contact_registry:{}", contact_id)
+            }
+            SyncItem::ContactActivationChanged { contact_id, .. } => {
+                format!("contact_activation:{}", contact_id)
+            }
             SyncItem::CardUpdated { field_label, .. } => format!("field:{}", field_label),
             SyncItem::CardFieldSynced { field, .. } => format!("field:{}", field.label()),
             SyncItem::CardFieldRemoved { field_label, .. } => format!("field:{}", field_label),

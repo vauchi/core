@@ -78,14 +78,18 @@ fn contact_registry_received_item_rejects_a_wrong_signer() {
     let mallory = create_vauchi_with_identity("Mallory");
     let forged = bob_broadcast(&mallory);
 
-    let result = device.apply_sync_items(vec![SyncItem::ContactRegistryReceived {
-        contact_id: contact_id.clone(),
-        registry_json: forged.to_json(),
-        version: forged.version(),
-        timestamp: 1_753_000_001,
-    }]);
+    let applied = device
+        .apply_sync_items(vec![SyncItem::ContactRegistryReceived {
+            contact_id: contact_id.clone(),
+            registry_json: forged.to_json(),
+            version: forged.version(),
+            timestamp: 1_753_000_001,
+        }])
+        .unwrap();
 
-    assert!(result.is_err(), "forged relayed registry must fail closed");
+    // The tolerant apply skips bad items rather than failing the batch —
+    // the invariant is that a forged registry is never counted or persisted.
+    assert_eq!(applied, 0, "forged relayed registry must not apply");
     assert!(
         device
             .storage()

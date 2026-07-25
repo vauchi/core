@@ -20,7 +20,43 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::identity::{DeviceRegistry, Identity, RegistryBroadcast};
 use vauchi_core::sync::registry_activation::{ActivationState, ActivationTracker};
+
+/// Build a three-device peer (Alice) as a signed registry broadcast — the
+/// state a surviving sibling inherits via owner-sync, holding the peer's
+/// device ids without any per-device session yet.
+fn three_device_peer(now: u64) -> (RegistryBroadcast, [u8; 32], Vec<[u8; 32]>) {
+    let seed = [42u8; 32];
+    let identities: Vec<Identity> = (0..3)
+        .map(|index| {
+            Identity::from_device_link(
+                seed,
+                "Alice".into(),
+                index,
+                format!("Alice device {}", index + 1),
+                1,
+            )
+        })
+        .collect();
+    let first = &identities[0];
+    let mut registry = DeviceRegistry::new(
+        first.device_info().to_registered(&seed),
+        first.signing_keypair(),
+    );
+    for identity in identities.iter().skip(1) {
+        registry
+            .add_device(
+                identity.device_info().to_registered(&seed),
+                first.signing_keypair(),
+            )
+            .unwrap();
+    }
+    let broadcast = RegistryBroadcast::new(&registry, first.signing_keypair(), now);
+    let signing_pk = *first.signing_public_key();
+    let device_ids = identities.iter().map(|i| *i.device_id()).collect();
+    (broadcast, signing_pk, device_ids)
+}
 
 fn setup_two_party() -> (vauchi_core::Vauchi, vauchi_core::Vauchi, String, String) {
     let alice_wb = create_vauchi_with_identity("Alice");
@@ -100,6 +136,55 @@ fn scanner_queues_initial_push_that_the_peer_can_open() {
         }
         other => panic!("expected RegistryPushReceived, got {other:?}"),
     }
+}
+
+// @scenario: multi_device_sync :: The push fans out to each known peer device's mailbox
+// @internal
+#[test]
+fn scanner_fans_out_a_device_scoped_push_per_known_peer_device() {
+    // The lost-primary bootstrap: A2 knows Bob's whole device registry
+    // (owner-synced from the dead A1) but holds no session. A single
+    // identity-scoped push lands in one shared mailbox and only one peer
+    // device ever drains it — so at most one pair activates and the card
+    // can never fan out to the rest. Each known peer device must get its
+    // own device-scoped push (ADR-064 Amendment 2026-07-25).
+    let bob_wb = create_vauchi_with_identity("Bob");
+    let now = bob_wb.storage().clock().unix_seconds();
+    let (peer_broadcast, peer_pk, peer_device_ids) = three_device_peer(now);
+
+    let contact = Contact::from_exchange(
+        peer_pk,
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+        0,
+    );
+    let contact_id = contact.id().to_string();
+    bob_wb.add_contact(contact).unwrap();
+    bob_wb
+        .storage()
+        .device()
+        .save_contact_device_registry(&contact_id, &peer_broadcast, &peer_pk, 60)
+        .unwrap();
+
+    bob_wb.queue_registry_pushes().unwrap();
+
+    let pending = bob_wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap();
+    assert_eq!(
+        pending.len(),
+        3,
+        "one device-scoped push per known peer device"
+    );
+    let targets: std::collections::HashSet<[u8; 32]> =
+        pending.iter().filter_map(|u| u.target_device_id).collect();
+    let expected: std::collections::HashSet<[u8; 32]> = peer_device_ids.into_iter().collect();
+    assert_eq!(
+        targets, expected,
+        "each push routes to a distinct peer device's device-scoped mailbox"
+    );
 }
 
 // @scenario: multi_device_sync :: A confirmed contact is not re-pushed

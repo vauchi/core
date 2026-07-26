@@ -271,7 +271,7 @@ impl<'a, T: Transport> SendPhase<'a, T> {
                         continue;
                     }
                 };
-            let sender_device_id = match self.sender_device_id_for(&update.contact_id) {
+            let sender_device_id = match self.sender_device_id_for(&update) {
                 Ok(device_id) => device_id,
                 Err(error) => {
                     result.failed += 1;
@@ -412,7 +412,7 @@ impl<'a, T: Transport> SendPhase<'a, T> {
                         continue;
                     }
                 };
-            let sender_device_id = self.sender_device_id_for(contact_id)?;
+            let sender_device_id = self.sender_device_id_for(&update)?;
             match self.relay.send_raw_update_for_device(
                 self.storage.clock().unix_seconds(),
                 &recipient_id,
@@ -438,12 +438,22 @@ impl<'a, T: Transport> SendPhase<'a, T> {
         Ok(result)
     }
 
-    fn sender_device_id_for(&self, contact_id: &str) -> VauchiResult<Option<[u8; 32]>> {
-        if self
-            .storage
-            .device()
-            .load_contact_active_devices(contact_id)?
-            .is_empty()
+    /// Choose the envelope sender token for a pending update.
+    ///
+    /// A genesis pre-`Active` handshake message, or any identity-mailbox send
+    /// (`target_device_id: None`), MUST use the legacy token: the peer may not
+    /// yet know this device and can resolve the contact only via the legacy
+    /// token, then reads our real device id from the signed genesis envelope.
+    /// Keying on the message — not on whether we happen to know the peer's
+    /// devices — is the F4 lost-primary fix (2026-07-26 investigation). Only a
+    /// device-scoped card delta to a peer that already knows us gets this
+    /// device's scoped token.
+    fn sender_device_id_for(
+        &self,
+        update: &crate::storage::PendingUpdate,
+    ) -> VauchiResult<Option<[u8; 32]>> {
+        if update.update_type == crate::api::sync::REGISTRY_HANDSHAKE_UPDATE_TYPE
+            || update.target_device_id.is_none()
         {
             return Ok(None);
         }

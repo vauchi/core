@@ -40,3 +40,10 @@ pub use card_update::{
 };
 pub use device_orchestrator::{DeviceSyncOrchestrator, build_device_sync_envelopes};
 pub use manager::{SyncError, SyncManager};
+
+/// `PendingUpdate.update_type` tag for genesis registry-handshake messages
+/// (push and ack). The send phase keys the *legacy* sender token off this so
+/// a peer that does not yet know the sending device can still resolve the
+/// contact (F4 lost-primary bootstrap — see
+/// `_private/docs/investigations/2026-07-26-f4-lost-primary-sender-token-root-cause.md`).
+pub const REGISTRY_HANDSHAKE_UPDATE_TYPE: &str = "registry_handshake";

@@ -128,25 +128,14 @@ impl Vauchi {
             let Some(ex) = contact.kind().exchanged_data() else {
                 continue;
             };
-            // Fan the one logical push (same nonce, same registry) out to
-            // every known peer device's device-scoped mailbox, so each peer
-            // device drains its own copy and can complete the handshake. A
-            // truly cold contact (no registry yet) keeps the single
-            // identity-scoped genesis copy.
-            let peer_devices = self
-                .storage
-                .device()
-                .load_contact_active_devices(&contact_id)?;
-            let prepared: Vec<_> = if peer_devices.is_empty() {
-                vec![self.genesis_seal_for_cold_start(identity, ex, &payload)?]
-            } else {
-                peer_devices
-                    .iter()
-                    .map(|device| {
-                        self.genesis_seal_for_device(identity, ex, device.device_id, &payload)
-                    })
-                    .collect::<VauchiResult<_>>()?
-            };
+            // The bootstrap handshake push ALWAYS rides a single cold-start
+            // genesis to the peer's identity mailbox. A pre-`Active` peer may
+            // not yet know this device, so a device-scoped copy — whether by
+            // routing OR by sender token — is unresolvable and dead-letters
+            // (F4 lost-primary root cause, 2026-07-26). Any peer device drains
+            // the identity-mailbox copy, learns our registry, and routes its
+            // ack back device-scoped. Reverts the Slice 5b per-device fan-out.
+            let prepared = vec![self.genesis_seal_for_cold_start(identity, ex, &payload)?];
             tracker.record_push_sent(nonce, own_version);
             self.storage.with_savepoint(|| -> VauchiResult<()> {
                 for item in prepared {
@@ -162,7 +151,7 @@ impl Vauchi {
                     let update = PendingUpdate {
                         id: self.rng.uuid_v4(),
                         contact_id: contact_id.clone(),
-                        update_type: "card_delta".to_string(),
+                        update_type: crate::api::sync::REGISTRY_HANDSHAKE_UPDATE_TYPE.to_string(),
                         payload: item.encrypted,
                         created_at: now,
                         retry_count: 0,
@@ -272,7 +261,7 @@ impl Vauchi {
                 let update = PendingUpdate {
                     id: self.rng.uuid_v4(),
                     contact_id: reply.sender_id.clone(),
-                    update_type: "card_delta".to_string(),
+                    update_type: crate::api::sync::REGISTRY_HANDSHAKE_UPDATE_TYPE.to_string(),
                     payload: item.encrypted,
                     created_at: now,
                     retry_count: 0,

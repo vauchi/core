@@ -10,7 +10,9 @@ use vauchi_core::api::*;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::RegistryBroadcast;
-use vauchi_core::network::anonymous::{compute_anonymous_id, current_epoch};
+use vauchi_core::network::anonymous::{
+    compute_anonymous_id, compute_anonymous_id_for_device, current_epoch,
+};
 use vauchi_core::network::{MessagePayload, MockTransport, RelayClientConfig, TransportConfig};
 use vauchi_core::*;
 
@@ -605,7 +607,7 @@ fn test_sync_send_clears_pending_update_on_relay_accept() {
     );
 }
 
-// @scenario: multi_device_sync :: Modern sends require a device-scoped token
+// @scenario: multi_device_sync :: A device-scoped send requires local device info
 #[test]
 fn test_sync_send_does_not_downgrade_modern_peer_without_local_device_info() {
     use vauchi_core::storage::{PendingUpdate, UpdateStatus};
@@ -655,7 +657,10 @@ fn test_sync_send_does_not_downgrade_modern_peer_without_local_device_info() {
             retry_count: 0,
             status: UpdateStatus::Pending,
             target_relay_url: None,
-            target_device_id: None,
+            // A device-scoped card delta (not a genesis handshake) — the
+            // sender token must identify THIS device, so local device info
+            // is required and its absence is a hard error.
+            target_device_id: Some(*peer_device.device_id()),
         })
         .unwrap();
 
@@ -685,5 +690,174 @@ fn test_sync_send_does_not_downgrade_modern_peer_without_local_device_info() {
             .unwrap()
             .len(),
         1
+    );
+}
+
+/// Shared setup for the sender-token tests: a contact we can send to, with
+/// one peer device we already know (sibling-synced) and our own device info
+/// present. Returns `(storage, contact_id, shared_key, known_peer_device_id)`.
+fn storage_with_known_peer_device(
+    peer_seed_byte: u8,
+    our_device_id: [u8; 32],
+) -> (Storage, String, SymmetricKey, [u8; 32]) {
+    let storage = create_test_storage();
+    let peer_signing = SigningKeyPair::from_seed(&[peer_seed_byte; 32]);
+    let shared = SymmetricKey::generate();
+    let contact = Contact::from_exchange(
+        *peer_signing.public_key().as_bytes(),
+        ContactCard::new("Bootstrapping peer"),
+        shared.clone(),
+        0,
+    );
+    let contact_id = contact.id().to_string();
+    storage.contacts().save_contact(&contact).unwrap();
+
+    let peer_seed = [peer_seed_byte.wrapping_add(1); 32];
+    let peer_device = DeviceInfo::derive(&peer_seed, 0, "Peer phone".into(), 1);
+    let peer_registry = DeviceRegistry::new(peer_device.to_registered(&peer_seed), &peer_signing);
+    let broadcast = RegistryBroadcast::new(
+        &peer_registry,
+        &peer_signing,
+        storage.clock().unix_seconds(),
+    );
+    storage
+        .device()
+        .save_contact_device_registry(
+            &contact_id,
+            &broadcast,
+            peer_signing.public_key().as_bytes(),
+            60,
+        )
+        .unwrap();
+    storage
+        .device()
+        .save_device_info(&our_device_id, 0, "Local", 0)
+        .unwrap();
+
+    let known_peer_device_id = storage
+        .device()
+        .load_contact_active_devices(&contact_id)
+        .unwrap()[0]
+        .device_id;
+    (storage, contact_id, shared, known_peer_device_id)
+}
+
+fn queue_ratchet_update(
+    storage: &Storage,
+    contact_id: &str,
+    shared: &SymmetricKey,
+    update_type: &str,
+    target_device_id: Option<[u8; 32]>,
+) {
+    use vauchi_core::storage::{PendingUpdate, UpdateStatus};
+    let peer_dh = X3DHKeyPair::generate();
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(shared, *peer_dh.public_key()).unwrap();
+    let msg = ratchet.encrypt(b"payload").unwrap();
+    storage
+        .pending()
+        .queue_update(&PendingUpdate {
+            id: format!("{update_type}-update"),
+            contact_id: contact_id.to_string(),
+            update_type: update_type.to_string(),
+            payload: serde_json::to_vec(&msg).unwrap(),
+            created_at: 0,
+            retry_count: 0,
+            status: UpdateStatus::Pending,
+            target_relay_url: None,
+            target_device_id,
+        })
+        .unwrap();
+}
+
+fn drive_send_sender_id(storage: &Storage) -> String {
+    let events = Arc::new(EventDispatcher::new());
+    let mut controller =
+        SendPhase::new(create_test_relay(), storage, SyncConfig::default(), events);
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+    let result = controller
+        .sync(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+    assert_eq!(result.sent, 1, "the update must be sent");
+    let sent = controller.relay().connection().transport().sent_messages();
+    let MessagePayload::EncryptedUpdate(envelope) = &sent[0].payload else {
+        panic!("expected encrypted update")
+    };
+    envelope.sender_id.to_string()
+}
+
+fn legacy_token(storage: &Storage, shared: &SymmetricKey) -> String {
+    hex::encode(compute_anonymous_id(
+        shared.as_bytes(),
+        current_epoch(storage.clock().unix_seconds()),
+    ))
+}
+
+// A genesis handshake push rides the IDENTITY mailbox (`target_device_id:
+// None`) precisely because the peer may not know this device yet. Even when we
+// already know one of the peer's devices, the envelope sender id MUST be the
+// legacy token, or the unacquainted peer cannot resolve the contact and drops
+// the bootstrap push — the F4 lost-primary root cause (2026-07-26).
+// @scenario: multi_device_sync :: An identity-mailbox send uses the legacy sender token
+#[test]
+fn test_identity_mailbox_send_uses_legacy_token_even_when_peer_device_known() {
+    let (storage, contact_id, shared, _) = storage_with_known_peer_device(0x71, [0x77; 32]);
+    queue_ratchet_update(&storage, &contact_id, &shared, "registry_handshake", None);
+    assert_eq!(
+        drive_send_sender_id(&storage),
+        legacy_token(&storage, &shared),
+        "an identity-mailbox handshake push must use the legacy sender token so a peer that \
+         does not yet know this device can resolve the contact"
+    );
+}
+
+// The handshake ACK routes device-scoped (`target_device_id: Some`) so a
+// sibling cannot drain it, but the peer that pushed to us may not know this
+// device yet — so the envelope sender id must STILL be the legacy token.
+// @scenario: multi_device_sync :: A handshake ack routes device-scoped but signs with the legacy token
+#[test]
+fn test_handshake_ack_uses_legacy_sender_token_despite_device_routing() {
+    let (storage, contact_id, shared, peer_device_id) =
+        storage_with_known_peer_device(0x81, [0x88; 32]);
+    queue_ratchet_update(
+        &storage,
+        &contact_id,
+        &shared,
+        "registry_handshake",
+        Some(peer_device_id),
+    );
+    assert_eq!(
+        drive_send_sender_id(&storage),
+        legacy_token(&storage, &shared),
+        "a genesis handshake ack must use the legacy sender token even though it is routed \
+         to a specific peer device's mailbox"
+    );
+}
+
+// A post-`Active` card delta targets a specific known peer device and the peer
+// knows us, so it correctly uses this device's scoped sender token.
+// @scenario: multi_device_sync :: A device-scoped card delta uses this device's sender token
+#[test]
+fn test_device_scoped_card_delta_uses_device_sender_token() {
+    let our_device_id = [0x99u8; 32];
+    let (storage, contact_id, shared, peer_device_id) =
+        storage_with_known_peer_device(0x91, our_device_id);
+    queue_ratchet_update(
+        &storage,
+        &contact_id,
+        &shared,
+        "card_delta",
+        Some(peer_device_id),
+    );
+    assert_eq!(
+        drive_send_sender_id(&storage),
+        hex::encode(compute_anonymous_id_for_device(
+            shared.as_bytes(),
+            current_epoch(storage.clock().unix_seconds()),
+            &our_device_id,
+        )),
+        "a device-scoped card delta to a peer that knows us uses this device's sender token"
     );
 }

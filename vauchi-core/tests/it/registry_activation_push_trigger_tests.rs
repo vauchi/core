@@ -138,19 +138,21 @@ fn scanner_queues_initial_push_that_the_peer_can_open() {
     }
 }
 
-// @scenario: multi_device_sync :: The push fans out to each known peer device's mailbox
+// @scenario: multi_device_sync :: The bootstrap push is a single identity-mailbox cold-start
 // @internal
 #[test]
-fn scanner_fans_out_a_device_scoped_push_per_known_peer_device() {
+fn scanner_queues_a_single_cold_start_push_even_when_peer_devices_are_known() {
     // The lost-primary bootstrap: A2 knows Bob's whole device registry
-    // (owner-synced from the dead A1) but holds no session. A single
-    // identity-scoped push lands in one shared mailbox and only one peer
-    // device ever drains it — so at most one pair activates and the card
-    // can never fan out to the rest. Each known peer device must get its
-    // own device-scoped push (ADR-064 Amendment 2026-07-25).
+    // (owner-synced from the dead A1) but Bob's devices do NOT yet know A2. A
+    // device-scoped push — routed to a peer device's mailbox and/or signed
+    // with A2's device token — is unresolvable to those peers and dead-letters
+    // (2026-07-26 root cause). The bootstrap push must stay a SINGLE cold-start
+    // to the peer's identity mailbox (`target_device_id: None`): any peer
+    // device drains it, learns A2's registry, and its ack routes back
+    // device-scoped. Reverts the Slice 5b per-device fan-out.
     let bob_wb = create_vauchi_with_identity("Bob");
     let now = bob_wb.storage().clock().unix_seconds();
-    let (peer_broadcast, peer_pk, peer_device_ids) = three_device_peer(now);
+    let (peer_broadcast, peer_pk, _peer_device_ids) = three_device_peer(now);
 
     let contact = Contact::from_exchange(
         peer_pk,
@@ -175,15 +177,12 @@ fn scanner_fans_out_a_device_scoped_push_per_known_peer_device() {
         .unwrap();
     assert_eq!(
         pending.len(),
-        3,
-        "one device-scoped push per known peer device"
+        1,
+        "the bootstrap push is a single identity-mailbox cold-start, not per-device"
     );
-    let targets: std::collections::HashSet<[u8; 32]> =
-        pending.iter().filter_map(|u| u.target_device_id).collect();
-    let expected: std::collections::HashSet<[u8; 32]> = peer_device_ids.into_iter().collect();
     assert_eq!(
-        targets, expected,
-        "each push routes to a distinct peer device's device-scoped mailbox"
+        pending[0].target_device_id, None,
+        "the cold-start push rides the peer's identity mailbox so any peer device can drain it"
     );
 }
 

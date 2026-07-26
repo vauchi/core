@@ -47,3 +47,8 @@ vauchi-app/src/ui/app_engine/ble_handshake.rs 1249
 vauchi-core/tests/it/app_engine_navigation_tests.rs 1224
 vauchi-core/tests/it/migration_tests.rs 1280
 vauchi-core/tests/it/ble_handshake_tests.rs 1275
+# Card receive/genesis flow + card fan-out — cohesive security-critical
+# crypto flows (verify→apply, ratchet+genesis fallbacks); grew past 1000
+# with the F4 genesis-card fan-out fix (2026-07-26). SPLIT-queued.
+vauchi-core/src/api/sync/card_update.rs 1006
+vauchi-core/src/api/vauchi/propagation.rs 1030

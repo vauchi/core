@@ -115,7 +115,6 @@ fn activation_state(device: &Vauchi, contact_id: &str) -> ActivationState {
 // fallback + receive handler land.
 // @scenario: multi_device_sync :: Lost exchanging device no longer orphans the relationship
 // @internal
-#[ignore = "pins F4 responder-side card fan-out deadlock; un-ignore when fixed"]
 #[test]
 fn lost_primary_cold_bootstrap_pins_the_stall() {
     let relationship = SymmetricKey::from_bytes([42u8; 32]);
@@ -351,4 +350,62 @@ fn lost_primary_cold_bootstrap_pins_the_stall() {
         "STALL@5 (reproduces cert): A2's field did not reach {missing:?}"
     );
     eprintln!("REACHED: full six-device lost-primary convergence.");
+
+    // ─── STEP 6: adversarial — the genesis-card path is not a bypass ──────
+    // A2 is responder-side for the whole fleet (identity ordering), so every
+    // card above was genesis-sealed. Prove shared_key possession is parser
+    // admission, not authority: a replay and a tampered envelope are rejected.
+    let card = &card_pending[0];
+    let target_dev = card.target_device_id.expect("device-scoped genesis card");
+    let tok = deposit_token_hex(
+        relationship.as_bytes(),
+        &bob.signing_public_key,
+        card.target_device_id,
+        day,
+    );
+    let bd = bob
+        .devices
+        .iter()
+        .find(|d| d.identity().unwrap().device_id() == &target_dev)
+        .expect("the target Bob device");
+    let contacts = bd.storage().contacts().list_contacts().unwrap();
+
+    // Replay of the already-applied blob: the delta nonce is burned, so it must
+    // not re-apply.
+    let replay = process_received_blobs(
+        bd.identity().unwrap(),
+        bd.storage(),
+        &contacts,
+        vec![("replay".to_string(), tok.clone(), card.payload.clone())],
+    );
+    eprintln!(
+        "STEP6: replay -> resolved={} decrypted={} reject={:?}",
+        replay[0].token_resolved, replay[0].decrypted, replay[0].reject_reason
+    );
+    assert!(
+        !replay[0].decrypted,
+        "STEP6: a replayed genesis card must be rejected"
+    );
+
+    // Tampered envelope: flipping a byte breaks the genesis seal, so it fails to
+    // open and applies nothing.
+    let mut tampered_payload = card.payload.clone();
+    if let Some(b) = tampered_payload.last_mut() {
+        *b ^= 0xFF;
+    }
+    let tampered = process_received_blobs(
+        bd.identity().unwrap(),
+        bd.storage(),
+        &contacts,
+        vec![("tampered".to_string(), tok, tampered_payload)],
+    );
+    eprintln!(
+        "STEP6: tampered -> decrypted={} reject={:?}",
+        tampered[0].decrypted, tampered[0].reject_reason
+    );
+    assert!(
+        !tampered[0].decrypted,
+        "STEP6: a tampered genesis card must be rejected"
+    );
+    eprintln!("REACHED: adversarial genesis-card checks pass.");
 }

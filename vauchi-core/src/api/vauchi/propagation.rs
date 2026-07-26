@@ -435,12 +435,42 @@ impl Vauchi {
                     return Err(VauchiError::NotFound("ratchet state".into()));
                 }
             };
-            let ratchet_msg = ratchet.encrypt(payload).map_err(|error| match error {
-                crate::crypto::ratchet::RatchetError::NoSendingChain => VauchiError::InvalidState(
-                    "responder awaiting initiator's first message; deferring send".into(),
-                ),
-                other => VauchiError::Crypto(format!("{other:?}")),
-            })?;
+            let ratchet_msg = match ratchet.encrypt(payload) {
+                Ok(msg) => msg,
+                // Responder-side of a device-pair ratchet with no sending chain,
+                // on the Active device-scoped fan-out (`target.is_some()`). Roles
+                // are fixed by identity ordering in
+                // `bootstrap_device_pair_ratchet`, so a lost-primary sibling can
+                // be the responder for the whole fleet — and the deterministic
+                // initiator (the peer) may never send first, having no card
+                // change to push, so a plain ratchet card deadlocks forever. A
+                // CARD delta here falls back to the stateless genesis envelope
+                // (the same escape the handshake ack uses in `queue_registry_ack`),
+                // device-scoped so each peer device gets its own copy; the
+                // receiver opens it via the genesis Cek arm in `card_update.rs`.
+                //
+                // This is deliberately NOT the pre-Active `[0;32]` exchange
+                // bootstrap (`target` is `None` there): a fresh responder must
+                // still defer and retry — the initiator's first message is
+                // imminent, so genesis-sealing would be wasteful and would break
+                // the normal two-party bootstrap. Non-card payloads also keep the
+                // prior defer (their own genesis paths cover what needs one).
+                Err(crate::crypto::ratchet::RatchetError::NoSendingChain)
+                    if target.is_some()
+                        && payload.first() == Some(&crate::sync::delta::PAYLOAD_VERSION_CEK) =>
+                {
+                    let mut sealed = self.genesis_seal_for_cold_start(identity, ex, payload)?;
+                    sealed.peer_device_id = peer_device_id;
+                    prepared.push(sealed);
+                    continue;
+                }
+                Err(crate::crypto::ratchet::RatchetError::NoSendingChain) => {
+                    return Err(VauchiError::InvalidState(
+                        "responder awaiting initiator's first message; deferring send".into(),
+                    ));
+                }
+                Err(other) => return Err(VauchiError::Crypto(format!("{other:?}"))),
+            };
             let encrypted = serde_json::to_vec(&ratchet_msg)
                 .map_err(|error| VauchiError::Serialization(error.to_string()))?;
             prepared.push(PreparedDevicePayload {

@@ -697,6 +697,24 @@ fn try_receive_genesis_alert(
         _ => {}
     }
 
+    // Genesis-sealed CARD delta — the responder-side card fan-out fallback
+    // (propagation.rs). The sender is on the responder side of the device-pair
+    // ratchet and cannot send a plain ratchet card, so it seals the delta into
+    // this stateless envelope. Apply it exactly like the ratchet card path
+    // (verify the delta's own sender→recipient signature; shared_key possession
+    // is parser admission, never authority), persisting the advanced [0;32]
+    // session under the same cold-start reseat guard as the alert path below.
+    if opened.inner_payload.first() == Some(&PAYLOAD_VERSION_CEK) {
+        return receive_genesis_card_delta(
+            identity,
+            storage,
+            sender_id,
+            contact,
+            peer_identity,
+            &opened,
+        );
+    }
+
     // Authority check: the inner payload must be a safety alert whose own
     // sender→recipient signature verifies, independent of the envelope.
     let alert = match VersionedPayload::decode(&opened.inner_payload) {
@@ -809,6 +827,107 @@ fn try_receive_genesis_alert(
         location: alert.location().cloned(),
         nonce: *alert.nonce(),
     }))
+}
+
+/// Apply a genesis-sealed CARD delta (the responder-side card fan-out
+/// fallback, `propagation.rs`). Verification and application are identical to
+/// the ratchet card path (§4-9 of `process_single_card_update_for_device`):
+/// possession of `shared_key` admits the payload to the parser but is NEVER
+/// authority — the delta's own sender→recipient signature is the authority.
+/// The advanced `[0;32]` session persists ONLY on true cold start: re-seating
+/// over a live session would silently sever the exchanging device's chain
+/// (`problems/2026-07-24-genesis-reseat-severs-live-primary-channel`), the same
+/// guard the genesis alert path enforces.
+fn receive_genesis_card_delta(
+    identity: &Identity,
+    storage: &Storage,
+    sender_id: &str,
+    contact: &crate::contact::Contact,
+    peer_identity: &[u8; 32],
+    opened: &crate::exchange::genesis::OpenedGenesis,
+) -> Result<ReceiveOutcome, CardUpdateError> {
+    let (delta_bytes, new_cek) = decode_versioned_payload(&opened.inner_payload)?;
+    let delta: CardDelta =
+        serde_json::from_slice(&delta_bytes).map_err(|_| CardUpdateError::InvalidDelta)?;
+
+    // Authority is the delta's own signature, never envelope possession.
+    if !delta.verify(peer_identity, identity.signing_public_key()) {
+        return Err(CardUpdateError::SignatureInvalid);
+    }
+    if storage.replay().is_replay_nonce(sender_id, &delta.nonce)? {
+        return Err(CardUpdateError::ReplayDetected);
+    }
+    // Version floor is tracked per (contact, device); genesis cards apply on the
+    // [0;32] channel, so their floor is the [0;32] one.
+    let last_version = storage
+        .contacts()
+        .last_delta_version_for_device(sender_id, &[0; 32])
+        .unwrap_or(0);
+    if delta.version > 0 && delta.version < last_version {
+        return Err(CardUpdateError::StaleVersion {
+            delta: delta.version,
+            last: last_version,
+        });
+    }
+
+    let mut card = contact.card().clone();
+    card.deduplicate_fields();
+    delta
+        .apply(&mut card, storage.clock().unix_seconds())
+        .map_err(|_| CardUpdateError::DeltaApplicationFailed)?;
+    let mut updated = contact.clone();
+    updated.update_card(card, 0);
+    if let Some(cek) = new_cek {
+        updated.set_cek(cek);
+    }
+
+    storage.begin_transaction()?;
+    let txn = (|| -> Result<(), CardUpdateError> {
+        let cold_start = storage
+            .ratchets()
+            .load_ratchet_state_for_device(sender_id, &[0; 32])?
+            .is_none();
+        if cold_start {
+            storage.ratchets().save_ratchet_state_for_device(
+                sender_id,
+                &[0; 32],
+                &opened.advanced_ratchet,
+                false,
+            )?;
+        } else {
+            storage.genesis_limits().record_reseat_skip()?;
+        }
+        storage
+            .replay()
+            .save_replay_nonce(sender_id, &delta.nonce, delta.timestamp)?;
+        storage.contacts().save_contact(&updated)?;
+        if delta.version > 0 {
+            storage.contacts().record_delta_version_for_device(
+                sender_id,
+                &[0; 32],
+                delta.version,
+            )?;
+        }
+        Ok(())
+    })();
+    match txn {
+        Ok(()) => {
+            storage.commit()?;
+            for change in &delta.changes {
+                if let FieldChange::Removed { field_id } = change {
+                    #[allow(clippy::let_underscore_must_use)]
+                    let _ = storage
+                        .field_notes()
+                        .delete_contact_field_note(sender_id, field_id);
+                }
+            }
+            Ok(ReceiveOutcome::CardDelta)
+        }
+        Err(e) => {
+            storage.rollback();
+            Err(e)
+        }
+    }
 }
 
 /// Decodes versioned payload, handling CEK-wrapped (v2) format.

@@ -20,6 +20,63 @@ use super::super::events::VauchiEvent;
 use super::{RecoveryReadiness, Vauchi};
 
 impl Vauchi {
+    /// Diagnostic dump of a contact's F4 sync/handshake state — debug-only
+    /// observability for the lost-primary certification (2026-07-26). Reveals
+    /// whether this device reaches `Active` for the contact and which peer
+    /// devices it holds pair sessions with, so a black-box e2e run can be
+    /// traced. Single greppable line; no PII (ids truncated to hex prefixes).
+    pub fn debug_contact_sync_state(&self, contact_id: &str) -> String {
+        let activation = self
+            .storage
+            .registry_activation()
+            .load_activation(contact_id)
+            .ok()
+            .flatten();
+        let (state, acked, held) = match &activation {
+            Some(t) => (
+                format!("{:?}", t.state()),
+                t.our_version_acked(),
+                t.peer_version_held(),
+            ),
+            None => ("Dormant".to_string(), None, None),
+        };
+        let has_session = |device: &[u8; 32]| {
+            self.storage
+                .ratchets()
+                .load_ratchet_state_for_device(contact_id, device)
+                .map(|slot| slot.is_some())
+                .unwrap_or(false)
+        };
+        let devices = self
+            .storage
+            .device()
+            .load_contact_active_devices(contact_id)
+            .unwrap_or_default();
+        let dev_sessions: Vec<String> = devices
+            .iter()
+            .map(|d| {
+                let mark = if has_session(&d.device_id) {
+                    "sess"
+                } else {
+                    "nosess"
+                };
+                format!("{}:{mark}", hex::encode(&d.device_id[..4]))
+            })
+            .collect();
+        let pending = self
+            .storage
+            .pending()
+            .count_pending_updates(contact_id)
+            .unwrap_or(0);
+        format!(
+            "SYNCSTATE contact={} activation={state} acked={acked:?} held={held:?} \
+             session0={} devices=[{}] pending={pending}",
+            contact_id.get(..8).unwrap_or(contact_id),
+            has_session(&[0u8; 32]),
+            dev_sessions.join(","),
+        )
+    }
+
     // === Aha Moments Operations ===
 
     /// Tries to trigger an aha moment of the given type.

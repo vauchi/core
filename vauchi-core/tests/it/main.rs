@@ -281,6 +281,7 @@ mod link_responder_tests;
 mod link_two_party_exchange_tests;
 mod local_keys_tests;
 mod lock_screen_engine_tests;
+mod lost_primary_bootstrap_diag_tests;
 mod mailbox_token_shape_tests;
 mod mailbox_token_tests;
 mod migration_tests;

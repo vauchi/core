@@ -378,13 +378,27 @@ impl HttpTransport {
 
     /// Fetches pending blobs for the given mailbox tokens.
     #[tracing::instrument(level = "debug", skip_all, fields(token_count = mailbox_tokens.len()), name = "http.fetch")]
+    /// Fetches a page of pending blobs for the given mailbox tokens. For
+    /// paginated draining under the OHTTP forward cap, use [`Self::fetch_page`],
+    /// which also reports whether the relay truncated the response.
     pub fn fetch(&self, mailbox_tokens: &[String]) -> Result<Vec<FetchedBlob>, NetworkError> {
+        self.fetch_page(mailbox_tokens)
+            .map(|(blobs, _truncated)| blobs)
+    }
+
+    /// Fetches one page of pending blobs. The `bool` is `truncated`: `true`
+    /// when the relay capped this page under the OHTTP forward limit and more
+    /// blobs remain (the caller re-fetches after ACK-removing this page).
+    pub fn fetch_page(
+        &self,
+        mailbox_tokens: &[String],
+    ) -> Result<(Vec<FetchedBlob>, bool), NetworkError> {
         let req = V2FetchRequest {
             mailbox_tokens: mailbox_tokens.to_vec(),
         };
         let resp = self.post_action("fetch", &req)?;
         if resp.status == "ok" {
-            Ok(resp.blobs.unwrap_or_default())
+            Ok((resp.blobs.unwrap_or_default(), resp.truncated))
         } else {
             Err(response_error("fetch", &resp.error.unwrap_or_default()))
         }

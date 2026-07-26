@@ -35,6 +35,62 @@ fn err_response_with(message: &str) -> CannedResponse {
 }
 
 // ============================================================
+// fetch — surfaces the relay's `truncated` pagination flag
+// ============================================================
+
+fn sample_blob() -> vauchi_protocol::v2::FetchedBlob {
+    vauchi_protocol::v2::FetchedBlob {
+        blob_id: "blob-1".to_string(),
+        ciphertext: "Y3Q=".to_string(), // base64("ct")
+        created_at: 100,
+        mailbox_token: Some("a".repeat(64)),
+    }
+}
+
+// @internal
+#[test]
+fn fetch_surfaces_truncated_when_relay_caps_the_page() {
+    let mock = MockRelay::start();
+    mock.queue(
+        "fetch",
+        ok_response_with(|r| {
+            r.blobs = Some(vec![sample_blob()]);
+            r.truncated = true;
+        }),
+    );
+
+    let transport = transport_pointing_at(&mock);
+    let (blobs, truncated) = transport.fetch_page(&["a".repeat(64)]).unwrap();
+
+    assert_eq!(blobs.len(), 1, "the capped page still returns its blobs");
+    assert!(
+        truncated,
+        "fetch must surface the relay's truncated flag so the client re-fetches"
+    );
+}
+
+// @internal
+#[test]
+fn fetch_reports_not_truncated_when_relay_returns_everything() {
+    let mock = MockRelay::start();
+    mock.queue(
+        "fetch",
+        ok_response_with(|r| {
+            r.blobs = Some(vec![sample_blob()]);
+            // `truncated` left at its default (false).
+        }),
+    );
+
+    let transport = transport_pointing_at(&mock);
+    let (_blobs, truncated) = transport.fetch_page(&["a".repeat(64)]).unwrap();
+
+    assert!(
+        !truncated,
+        "a complete page must report truncated=false so the client stops"
+    );
+}
+
+// ============================================================
 // acknowledge — success returns inner `acknowledged` flag
 // ============================================================
 

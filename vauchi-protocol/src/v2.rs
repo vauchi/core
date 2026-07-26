@@ -679,6 +679,11 @@ pub struct V2Response {
     pub blob_id: Option<String>,
     #[serde(default)]
     pub blobs: Option<Vec<FetchedBlob>>,
+    /// `true` when `/v2/fetch` capped this page under the OHTTP forward limit
+    /// and more blobs remain; the client re-fetches after ACK-removing this
+    /// page. Absent/false on responses that returned everything.
+    #[serde(default)]
+    pub truncated: bool,
     #[serde(default)]
     pub acknowledged: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_optional_code")]
@@ -706,6 +711,7 @@ impl V2Response {
             error: None,
             blob_id: None,
             blobs: None,
+            truncated: false,
             acknowledged: None,
             code: None,
             payload: None,

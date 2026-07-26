@@ -317,8 +317,50 @@ impl Vauchi {
     /// and token-unresolved. The breakdown splits sent-not-received into
     /// delivery (`fetched=0`) vs decrypt/token (`fetched>0`) — diagnostics for
     /// 2026-06-28-sync-delivery-sent-not-received.
+    /// Drains the mailbox across paginated fetches within a single receive
+    /// phase. `/v2/fetch` caps each page under the OHTTP forward limit and
+    /// flags `truncated`; after ACK-removing a page the next fetch returns the
+    /// remainder (ADR-064 F4 fan-out can exceed the 128 KiB cap). The loop is
+    /// bounded so a page that ACKs nothing (persistent storage failure) cannot
+    /// spin forever.
     #[tracing::instrument(level = "debug", skip_all, name = "sync.receive_phase")]
     fn run_receive_phase(
+        &self,
+        identity: &crate::identity::Identity,
+        contacts: &[Contact],
+        adapter: &mut HttpTransportAdapter,
+    ) -> VauchiResult<(usize, usize, usize, usize, String)> {
+        const MAX_RECEIVE_PAGES: usize = 64;
+        let (mut received, mut fetched, mut rejected, mut unresolved) = (0, 0, 0, 0);
+        let mut reject_reasons: Vec<String> = Vec::new();
+        for _ in 0..MAX_RECEIVE_PAGES {
+            let (r, f, rej, unr, reasons) = self.run_receive_page(identity, contacts, adapter)?;
+            received += r;
+            fetched += f;
+            rejected += rej;
+            unresolved += unr;
+            if !reasons.is_empty() {
+                reject_reasons.push(reasons);
+            }
+            // Stop when the page was empty or the relay returned everything;
+            // otherwise ACKs for this page are queued, so re-arm and re-fetch —
+            // the next receive() flushes them before polling the remainder.
+            if f == 0 || !adapter.last_fetch_truncated() {
+                break;
+            }
+            adapter.allow_refetch();
+        }
+        Ok((
+            received,
+            fetched,
+            rejected,
+            unresolved,
+            reject_reasons.join(","),
+        ))
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, name = "sync.receive_page")]
+    fn run_receive_page(
         &self,
         identity: &crate::identity::Identity,
         contacts: &[Contact],

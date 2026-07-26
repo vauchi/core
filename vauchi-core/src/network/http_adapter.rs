@@ -61,6 +61,10 @@ pub struct HttpTransportAdapter {
     /// refetches the same unACKed blobs on every iteration, creating an
     /// infinite loop. Reset when new tokens are registered or on reconnect.
     has_fetched: bool,
+    /// Whether the relay capped the most recent fetch page under the OHTTP
+    /// forward limit (more blobs remain). Drives the receive phase's
+    /// drain-until-empty loop via [`Self::last_fetch_truncated`].
+    last_truncated: bool,
 }
 
 impl HttpTransportAdapter {
@@ -73,7 +77,22 @@ impl HttpTransportAdapter {
             pending_blobs: VecDeque::new(),
             ack_queue: Vec::new(),
             has_fetched: false,
+            last_truncated: false,
         }
+    }
+
+    /// Whether the relay capped the most recent fetch page (more blobs
+    /// remain). The receive phase drains by re-fetching while this is `true`.
+    pub fn last_fetch_truncated(&self) -> bool {
+        self.last_truncated
+    }
+
+    /// Re-arm a fetch after the caller has queued ACKs for the current page.
+    /// The next `receive()` flushes those ACKs — removing the page from the
+    /// relay — before re-polling, so the follow-up fetch returns the blobs
+    /// that were held back under the OHTTP forward cap.
+    pub fn allow_refetch(&mut self) {
+        self.has_fetched = false;
     }
 
     /// Creates an adapter from config, optionally with OHTTP encryption.
@@ -244,13 +263,15 @@ impl super::transport::Transport for HttpTransportAdapter {
         }
 
         self.has_fetched = true;
+        self.last_truncated = false;
 
         // Relay accepts at most 100 tokens per fetch request.
         // On rate-limit errors, return what we have so far rather than failing.
         const MAX_FETCH_TOKENS: usize = 100;
         for chunk in self.registered_tokens.chunks(MAX_FETCH_TOKENS) {
-            match self.http.fetch(chunk) {
-                Ok(blobs) => {
+            match self.http.fetch_page(chunk) {
+                Ok((blobs, truncated)) => {
+                    self.last_truncated |= truncated;
                     for blob in blobs {
                         self.pending_blobs.push_back(blob);
                     }

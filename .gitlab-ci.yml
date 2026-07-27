@@ -518,6 +518,31 @@ test:core:
       junit: target/nextest/ci/junit.xml
     expire_in: 1 week
 
+# vauchi-protocol carries the shared relay/client wire types and their
+# contract tests (tests/it/contract_relay_consumer_tests.rs, which pin the
+# exact V2 request/response JSON). No other test job runs `-p
+# vauchi-protocol`, so a wire-format regression there used to merge green
+# and surface only at release-dev — see backlog
+# 2026-07-27-core-ci-skips-vauchi-protocol-tests. No locales/themes or
+# test-kdf: the crate is serde-only.
+test:protocol:
+  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+  script:
+    - cargo nextest run --profile ci -p vauchi-protocol
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    expire_in: 1 week
+
 test:cucumber:
   # .timeout-cold-rebuild: compiles the full workspace before running
   # cucumber — see the template comment.

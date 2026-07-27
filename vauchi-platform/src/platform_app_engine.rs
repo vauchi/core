@@ -138,15 +138,78 @@ impl PlatformAppEngine {
                 engine.current_app_screen(),
                 AppScreen::MultiStageExchange { .. }
             );
+        Self::screen_poll_invalidation_targets(engine.current_app_screen(), multi_stage_active)
+    }
+
+    /// Pure screen → poll-tick invalidation mapping. Any screen whose
+    /// engine-owned relay/exchange machine advances in the background
+    /// (`AppEngine::advance_relay_sessions`) must be re-fetched by the shell
+    /// after each wakeup tick, or its background transitions never render.
+    fn screen_poll_invalidation_targets(
+        screen: &AppScreen,
+        multi_stage_active: bool,
+    ) -> Option<Vec<String>> {
         if multi_stage_active {
             return Some(vec!["multi_stage_exchange".into()]);
         }
-        match engine.current_app_screen() {
+        match screen {
             s @ (AppScreen::BleExchange { .. }
             | AppScreen::NfcExchange
-            | AppScreen::DirectTransport) => Some(vec![s.screen_id().to_string()]),
+            | AppScreen::DirectTransport
+            // Device-link + link-mode flows advance an engine-owned relay
+            // machine each wakeup tick (QrPending -> WaitingForRequest on a
+            // successful offer, or -> LinkFailed on a relay error). Without
+            // invalidation the shell never re-fetches, so it is stuck on the
+            // "Generating link..." spinner forever — the failure (and the
+            // success QR) never render (F1b, backlog
+            // 2026-07-27-device-link-exchange-rendezvous-hang).
+            | AppScreen::DeviceLinking
+            | AppScreen::DeviceLinkJoin { .. }
+            | AppScreen::LinkExchange
+            | AppScreen::DeepLinkResponder { .. }) => Some(vec![s.screen_id().to_string()]),
             _ => None,
         }
+    }
+}
+
+// INLINE_TEST_REQUIRED: exercises the private screen_poll_invalidation_targets
+// mapping (poll-tick screen invalidation) which is not part of the UniFFI surface.
+#[cfg(test)]
+mod poll_invalidation_tests {
+    use super::*;
+    use vauchi_app::ui::AppScreen;
+
+    // @internal
+    #[test]
+    fn device_link_and_link_screens_invalidate_on_poll_tick() {
+        // Regression (F1b): these advance a relay machine in the background;
+        // without invalidation the shell never leaves "Generating link...".
+        assert_eq!(
+            PlatformAppEngine::screen_poll_invalidation_targets(&AppScreen::DeviceLinking, false),
+            Some(vec!["device_linking".to_string()]),
+        );
+        assert_eq!(
+            PlatformAppEngine::screen_poll_invalidation_targets(&AppScreen::LinkExchange, false),
+            Some(vec!["link_exchange".to_string()]),
+        );
+    }
+
+    // @internal
+    #[test]
+    fn static_screen_does_not_invalidate() {
+        assert_eq!(
+            PlatformAppEngine::screen_poll_invalidation_targets(&AppScreen::Help, false),
+            None,
+        );
+    }
+
+    // @internal
+    #[test]
+    fn multi_stage_active_takes_precedence() {
+        assert_eq!(
+            PlatformAppEngine::screen_poll_invalidation_targets(&AppScreen::DeviceLinking, true),
+            Some(vec!["multi_stage_exchange".to_string()]),
+        );
     }
 }
 

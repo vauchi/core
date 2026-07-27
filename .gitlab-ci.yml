@@ -511,7 +511,12 @@ test:core:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - cargo nextest run --profile ci -p vauchi-core --features test-kdf
+    # `testing` compiles the `it` integration binary (required-features =
+    # ["testing"]); without it the ~5000-test suite never ran in CI and
+    # regressions merged green — F4 convergence, a V2 wire-format break, and
+    # 5 stale multistage tests all shipped this way. See backlog
+    # 2026-07-27-f4-bounded-skew-convergence-regression.
+    - cargo nextest run --profile ci -p vauchi-core --features test-kdf,testing
   artifacts:
     when: always
     reports:

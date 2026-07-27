@@ -857,11 +857,12 @@ fn receive_genesis_card_delta(
     if storage.replay().is_replay_nonce(sender_id, &delta.nonce)? {
         return Err(CardUpdateError::ReplayDetected);
     }
-    // Version floor is tracked per (contact, device); genesis cards apply on the
-    // [0;32] channel, so their floor is the [0;32] one.
+    // The [0;32] key identifies only the genesis cold-start ratchet channel.
+    // Keying the floor by the envelope-authenticated origin device keeps
+    // sibling version streams independent.
     let last_version = storage
         .contacts()
-        .last_delta_version_for_device(sender_id, &[0; 32])
+        .last_delta_version_for_device(sender_id, &opened.sender_device_id)
         .unwrap_or(0);
     if delta.version > 0 && delta.version < last_version {
         return Err(CardUpdateError::StaleVersion {
@@ -904,7 +905,7 @@ fn receive_genesis_card_delta(
         if delta.version > 0 {
             storage.contacts().record_delta_version_for_device(
                 sender_id,
-                &[0; 32],
+                &opened.sender_device_id,
                 delta.version,
             )?;
         }

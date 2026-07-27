@@ -421,22 +421,24 @@ fn test_e2e_identical_cards() {
 // === Atomicity tests (PRB-031) ===
 
 /// Feature: contact_exchange.feature @atomicity
-/// Data must not be available until both sides reach Finalized.
+/// Data must not be available before each side reaches Finalized.
 // @internal
 #[test]
-fn test_atomicity_data_not_available_in_complete() {
+fn test_atomicity_data_not_available_before_finalized() {
     let alice_card = b"Alice".to_vec();
     let bob_card = b"Bob".to_vec();
 
-    let mut alice = MultiStageSession::new(alice_card);
-    let mut bob = MultiStageSession::new(bob_card);
+    let mut alice = MultiStageSession::new(alice_card.clone());
+    let mut bob = MultiStageSession::new(bob_card.clone());
 
     let ai = alice.get_display_qr().unwrap();
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    // Drive through DATA/VERIFY/CONFIRM until Complete
+    assert_eq!(alice.get_received_data(), None);
+    assert_eq!(bob.get_received_data(), None);
+
     for _ in 0..500 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
@@ -446,25 +448,33 @@ fn test_atomicity_data_not_available_in_complete() {
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        if !matches!(alice.get_state(), ProtocolState::Finalized) {
+            assert_eq!(
+                alice.get_received_data(),
+                None,
+                "Alice exposed Bob's data before Finalized in {:?}",
+                alice.get_state()
+            );
+        }
+        if !matches!(bob.get_state(), ProtocolState::Finalized) {
+            assert_eq!(
+                bob.get_received_data(),
+                None,
+                "Bob exposed Alice's data before Finalized in {:?}",
+                bob.get_state()
+            );
+        }
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
         {
             break;
         }
     }
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
-
-    // Data must NOT be available in Complete — only in Finalized
-    assert!(
-        alice.get_received_data().is_none(),
-        "Data should not be available in Complete state"
-    );
-    assert!(
-        bob.get_received_data().is_none(),
-        "Data should not be available in Complete state"
-    );
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
+    assert_eq!(alice.get_received_data(), Some(bob_card));
+    assert_eq!(bob.get_received_data(), Some(alice_card));
 }
 
 /// Feature: contact_exchange.feature @atomicity
@@ -483,13 +493,16 @@ fn test_atomicity_ready_exchange_reaches_finalized() {
 }
 
 /// Feature: contact_exchange.feature @atomicity
-/// If one side stops scanning after Complete (never scans READY),
-/// the other side must NOT reach Finalized.
+/// A side that never scans its peer's finalization frame must not finalize.
 // @internal
 #[test]
-fn test_atomicity_one_side_stops_scanning_no_finalize() {
+fn test_atomicity_without_peer_finalization_frame_no_finalize() {
+    use sha2::{Digest, Sha256};
+    use vauchi_core::exchange::multistage::qr_codec;
+
     let alice_card = b"Alice".to_vec();
     let bob_card = b"Bob".to_vec();
+    let alice_card_hash: [u8; 32] = Sha256::digest(&alice_card).into();
 
     let mut alice = MultiStageSession::new(alice_card);
     let mut bob = MultiStageSession::new(bob_card);
@@ -499,47 +512,65 @@ fn test_atomicity_one_side_stops_scanning_no_finalize() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    // Drive to Complete (both sides)
+    let mut bob_stopped_before_finalization_frame = false;
     for _ in 0..500 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
-        if let Some(aq) = &aq {
-            bob.process_scanned_qr(&aq.data);
+        if !bob_stopped_before_finalization_frame && let Some(aq) = &aq {
+            if aq.data.starts_with("CMBO") {
+                bob_stopped_before_finalization_frame = true;
+            } else {
+                bob.process_scanned_qr(&aq.data);
+                bob_stopped_before_finalization_frame = matches!(
+                    bob.get_state(),
+                    ProtocolState::Confirming | ProtocolState::Complete
+                );
+            }
         }
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        assert_ne!(
+            bob.get_state(),
+            ProtocolState::Finalized,
+            "Bob finalized without Alice's finalization frame"
+        );
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && bob_stopped_before_finalization_frame
         {
             break;
         }
     }
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert!(
+        bob_stopped_before_finalization_frame,
+        "Bob never reached the point where Alice's finalization frame was withheld"
+    );
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Confirming);
 
-    // Now only Alice displays QRs (READY), but Bob never scans them.
-    // Only Alice scans Bob's READY QRs, not vice versa.
+    let alice_confirm = qr_codec::format_confirm_qr(&alice.session_id(), &alice_card_hash);
+    assert_eq!(
+        bob.process_scanned_qr(&alice_confirm),
+        ProtocolState::Complete
+    );
+
     for _ in 0..100 {
-        let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        // Bob does NOT scan Alice's READY — simulates one side stopping
-        let _ = aq;
+        let _withheld_alice_qr = alice.get_display_qr();
+        assert_ne!(
+            bob.get_state(),
+            ProtocolState::Finalized,
+            "Bob finalized without scanning Alice's finalization frame"
+        );
+        assert_eq!(bob.get_received_data(), None);
     }
 
-    // Alice may have received Bob's READY, but Bob never received Alice's
-    assert!(
-        !matches!(bob.get_state(), ProtocolState::Finalized),
-        "Bob should not be Finalized without scanning Alice's READY"
-    );
-    assert!(
-        bob.get_received_data().is_none(),
-        "Bob's data should not be available without finalization"
-    );
+    assert_ne!(bob.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_received_data(), None);
 }
 
 /// Feature: contact_exchange.feature @atomicity
@@ -551,7 +582,7 @@ fn test_atomicity_one_side_stops_scanning_no_finalize() {
 /// with "peer did not confirm readiness".
 // @internal
 #[test]
-fn test_asymmetric_finalization_both_must_complete() {
+fn test_asymmetric_finalization_both_reach_finalized() {
     let alice_card = b"Alice (iPhone)".to_vec();
     let bob_card = b"Bob (Samsung)".to_vec();
 
@@ -563,34 +594,17 @@ fn test_asymmetric_finalization_both_must_complete() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    // Drive to Complete (both sides)
+    let mut withheld_alice_finalization_frame = false;
     for _ in 0..500 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(aq) = &aq {
-            bob.process_scanned_qr(&aq.data);
+            if aq.data.starts_with("CMBO") {
+                withheld_alice_finalization_frame = true;
+            } else {
+                bob.process_scanned_qr(&aq.data);
+            }
         }
-        if let Some(bq) = &bq {
-            alice.process_scanned_qr(&bq.data);
-        }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
-        {
-            break;
-        }
-    }
-
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
-
-    // Simulate asymmetric timing: Alice scans Bob's RDYY first (Alice finalizes).
-    // Then Bob must still be able to scan Alice's RDYY to also finalize.
-    // This is the exact C3 scenario: iPhone finalizes, Samsung is left behind.
-
-    // Step 1: Only Alice scans Bob's QRs until Alice finalizes
-    for _ in 0..50 {
-        let _aq = alice.get_display_qr(); // Alice displays but Bob doesn't scan
-        let bq = bob.get_display_qr();
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
@@ -599,57 +613,59 @@ fn test_asymmetric_finalization_both_must_complete() {
         }
     }
 
+    assert!(
+        withheld_alice_finalization_frame,
+        "Alice never displayed the finalization frame withheld from Bob"
+    );
     assert_eq!(
         alice.get_state(),
         ProtocolState::Finalized,
-        "Alice should have finalized after scanning Bob's RDYY"
+        "Alice should finalize while Bob withholds scanning"
     );
-    assert_eq!(
+    assert_ne!(
         bob.get_state(),
-        ProtocolState::Complete,
-        "Bob should still be in Complete (hasn't scanned Alice's RDYY yet)"
+        ProtocolState::Finalized,
+        "Bob should still need Alice's finalization frame"
     );
 
-    // Step 2: Now Bob scans Alice's QRs. Alice is Finalized but MUST still
-    // display RDYY so Bob can finalize too.
     for _ in 0..50 {
         let aq = alice.get_display_qr();
         if let Some(aq) = &aq {
             bob.process_scanned_qr(&aq.data);
         }
-        let _bq = bob.get_display_qr(); // Bob displays but Alice doesn't need to scan
         if matches!(bob.get_state(), ProtocolState::Finalized) {
             break;
         }
     }
 
-    // CRITICAL: Both sides must reach Finalized — no asymmetric outcome
     assert_eq!(
         bob.get_state(),
         ProtocolState::Finalized,
-        "Bob must finalize after scanning Alice's RDYY (C3 regression: was 'peer did not confirm readiness')"
+        "Bob must finalize after scanning Alice's grace-period finalization frame"
     );
-
-    // Both sides must have each other's data
-    assert_eq!(alice.get_received_data().unwrap(), bob_card);
-    assert_eq!(bob.get_received_data().unwrap(), alice_card);
+    assert_eq!(alice.get_received_data(), Some(bob_card));
+    assert_eq!(bob.get_received_data(), Some(alice_card));
 }
 
 // ── Resilience tests (Solutions S1–S6) ──────────────────────────────────
 
-/// S4: Verify data is NOT available in Complete state (only in Finalized).
+/// S4: Verify data is not available before Finalized.
 // @internal
 #[test]
-fn test_data_not_available_in_complete() {
-    let mut alice = MultiStageSession::new(b"Alice".to_vec());
-    let mut bob = MultiStageSession::new(b"Bob".to_vec());
+fn test_data_not_available_before_finalized() {
+    let alice_card = b"Alice".to_vec();
+    let bob_card = b"Bob".to_vec();
+    let mut alice = MultiStageSession::new(alice_card.clone());
+    let mut bob = MultiStageSession::new(bob_card.clone());
 
     let ai = alice.get_display_qr().unwrap();
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    // Drive to Complete (both sides exchange data/vrfy/conf)
+    assert_eq!(alice.get_received_data(), None);
+    assert_eq!(bob.get_received_data(), None);
+
     for _ in 0..500 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
@@ -659,14 +675,33 @@ fn test_data_not_available_in_complete() {
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete) {
+        if !matches!(alice.get_state(), ProtocolState::Finalized) {
+            assert_eq!(
+                alice.get_received_data(),
+                None,
+                "Alice exposed Bob's data before Finalized in {:?}",
+                alice.get_state()
+            );
+        }
+        if !matches!(bob.get_state(), ProtocolState::Finalized) {
+            assert_eq!(
+                bob.get_received_data(),
+                None,
+                "Bob exposed Alice's data before Finalized in {:?}",
+                bob.get_state()
+            );
+        }
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
+        {
             break;
         }
     }
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
 
-    // Data must NOT be available until Finalized
-    assert!(alice.get_received_data().is_none());
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
+    assert_eq!(alice.get_received_data(), Some(bob_card));
+    assert_eq!(bob.get_received_data(), Some(alice_card));
 }
 
 /// S5: FAIL QR type — when one side fails, peer can detect it.
@@ -807,11 +842,16 @@ fn test_clear_sensitive_covers_all_security_fields() {
     );
 }
 
-/// S2: Complete state shows ONLY COMBO QRs (no VRFY/CONF interleave).
+/// S2: Finalization states show only COMBO QRs.
 // @internal
 #[test]
-fn test_complete_shows_only_combo() {
-    let mut alice = MultiStageSession::new(b"Alice".to_vec());
+fn test_finalization_states_show_only_combo() {
+    use sha2::{Digest, Sha256};
+    use vauchi_core::exchange::multistage::qr_codec;
+
+    let alice_card = b"Alice".to_vec();
+    let alice_card_hash: [u8; 32] = Sha256::digest(&alice_card).into();
+    let mut alice = MultiStageSession::new(alice_card);
     let mut bob = MultiStageSession::new(b"Bob".to_vec());
 
     let ai = alice.get_display_qr().unwrap();
@@ -823,36 +863,44 @@ fn test_complete_shows_only_combo() {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(aq) = &aq {
-            bob.process_scanned_qr(&aq.data);
+            if !aq.data.starts_with("CMBO") {
+                bob.process_scanned_qr(&aq.data);
+            }
         }
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete) {
+        if matches!(bob.get_state(), ProtocolState::Confirming) {
             break;
         }
     }
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
 
-    // Verify all QRs in Complete state are COMBO (VRFY+CONF+RDYY in one)
+    assert_eq!(bob.get_state(), ProtocolState::Confirming);
+    let alice_confirm = qr_codec::format_confirm_qr(&alice.session_id(), &alice_card_hash);
+    assert_eq!(
+        bob.process_scanned_qr(&alice_confirm),
+        ProtocolState::Complete
+    );
+
+    let mut finalization_qr_checks = 0;
     for _ in 0..10 {
-        if let Some(qr) = alice.get_display_qr() {
-            assert!(
-                qr.data.starts_with("CMBO"),
-                "Complete state should show COMBO, got: {}",
-                &qr.data[..4]
-            );
-            // COMBO QR uses "Q" error correction for better scan reliability
-            // at high density (172 chars). See: iphone-exchange-completion-delay.
-            assert_eq!(
-                qr.error_correction, "Q",
-                "COMBO QR should use Q (25%) error correction, got {}",
-                qr.error_correction
-            );
-        } else {
-            break;
-        }
+        let qr = bob
+            .get_display_qr()
+            .expect("Bob must display a QR while awaiting Alice's readiness frame");
+        assert!(
+            qr.data.starts_with("CMBO"),
+            "Complete-state QR should be CMBO, got: {}",
+            &qr.data[..4]
+        );
+        assert_eq!(qr.error_correction, "Q");
+        finalization_qr_checks += 1;
     }
+
+    assert!(
+        finalization_qr_checks > 0,
+        "No finalization-state QR assertion executed"
+    );
+    assert_eq!(bob.get_state(), ProtocolState::Complete);
 }
 
 // ============================================================

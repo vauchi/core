@@ -42,6 +42,7 @@ fn test_encrypted_update_serialize() {
             previous_chain_length: 3,
         },
         ciphertext: vec![0xDE, 0xAD, 0xBE, 0xEF],
+        origin_hint: None,
     };
 
     let json = serde_json::to_string(&update).unwrap();

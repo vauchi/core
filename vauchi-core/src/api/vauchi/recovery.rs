@@ -345,7 +345,7 @@ impl Vauchi {
         let transport = self.create_guardian_transport();
         let mut sent = 0;
         for (token, blob_b64) in deliveries {
-            if transport.send_update(token, blob_b64).is_ok() {
+            if transport.send_update(token, blob_b64, None).is_ok() {
                 sent += 1;
             }
         }

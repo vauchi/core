@@ -96,6 +96,7 @@ fn encrypted_update_envelope_message_id_is_raw_string() {
                 previous_chain_length: 0,
             },
             ciphertext: vec![0xAA; 8],
+            origin_hint: None,
         }),
     };
     let json: serde_json::Value =

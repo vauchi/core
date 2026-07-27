@@ -155,6 +155,9 @@ impl HttpTransportAdapter {
                     previous_chain_length: 0,
                 },
                 ciphertext,
+                // Carry the relay-returned hint into the receive path so it can
+                // resolve the sender device before decrypting (F4).
+                origin_hint: blob.origin_hint.clone(),
             }),
         })
     }
@@ -190,8 +193,11 @@ impl super::transport::Transport for HttpTransportAdapter {
             MessagePayload::EncryptedUpdate(update) => {
                 let ciphertext_b64 =
                     base64::engine::general_purpose::STANDARD.encode(&update.ciphertext);
-                self.http
-                    .send_update(update.recipient_id.as_str(), &ciphertext_b64)?;
+                self.http.send_update(
+                    update.recipient_id.as_str(),
+                    &ciphertext_b64,
+                    update.origin_hint.clone(),
+                )?;
                 Ok(())
             }
             MessagePayload::RegisterMailbox(rm) => {
@@ -584,6 +590,7 @@ mod tests {
                     previous_chain_length: 0,
                 },
                 ciphertext: b"test".to_vec(),
+                origin_hint: None,
             }),
         };
         let result = adapter.send(&envelope);

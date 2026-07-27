@@ -99,6 +99,11 @@ pub struct EncryptedUpdate {
     pub ratchet_header: RatchetHeader,
     /// The encrypted payload (CardDelta or other update).
     pub ciphertext: Vec<u8>,
+    /// Opaque base64 origin-device hint (see [`crate::network::origin_hint`]).
+    /// `None` for legacy senders and for non-device-pair traffic; the HTTP
+    /// transport forwards it to the relay's `/v2/send`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_hint: Option<String>,
 }
 
 /// Ratchet header for wire serialization.

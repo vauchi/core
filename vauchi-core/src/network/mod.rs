@@ -36,6 +36,7 @@
 
 pub mod anonymous;
 pub mod mailbox_token;
+pub mod origin_hint;
 
 #[cfg(feature = "testing")]
 pub mod connection;

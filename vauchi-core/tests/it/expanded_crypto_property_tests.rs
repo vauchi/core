@@ -365,6 +365,7 @@ proptest! {
                     previous_chain_length,
                 },
                 ciphertext: ciphertext.clone(),
+                origin_hint: None,
             }),
         };
 

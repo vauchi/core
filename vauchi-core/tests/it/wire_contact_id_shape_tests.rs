@@ -45,6 +45,7 @@ fn encrypted_update_sender_and_recipient_are_raw_strings() {
                 previous_chain_length: 0,
             },
             ciphertext: vec![0xCC; 8],
+            origin_hint: None,
         }),
     };
     let json: serde_json::Value =

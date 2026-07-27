@@ -207,8 +207,14 @@ impl<T: Transport> RelayClient<T> {
             .map_err(|e| NetworkError::Encryption(e.to_string()))?;
 
         let anon_id_hex = anonymous_sender_hex(shared_key, now);
-        let envelope =
-            self.create_update_envelope(recipient_id, &ratchet_msg, anon_id_hex.as_deref(), now);
+        // This legacy send path carries no sender-device id, so no origin hint.
+        let envelope = self.create_update_envelope(
+            recipient_id,
+            &ratchet_msg,
+            anon_id_hex.as_deref(),
+            None,
+            now,
+        );
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;
@@ -255,8 +261,32 @@ impl<T: Transport> RelayClient<T> {
         }
 
         let anon_id_hex = anonymous_sender_hex_for_device(shared_key, sender_device_id, now);
-        let envelope =
-            self.create_update_envelope(recipient_id, ratchet_msg, anon_id_hex.as_deref(), now);
+        // Stamp an origin-device hint so the receiver can select this sender
+        // device's ratchet before decrypting (the HTTP transport otherwise
+        // drops the sender identity). Bound to the mailbox token and the exact
+        // ciphertext (F4 origin-device hint design).
+        let origin_hint = match (shared_key, sender_device_id) {
+            (Some(key), Some(device_id)) => {
+                let ciphertext = serde_json::to_vec(ratchet_msg)
+                    .expect("RatchetMessage serialization is infallible");
+                crate::network::origin_hint::seal_origin_hint(
+                    key,
+                    device_id,
+                    recipient_id,
+                    &ciphertext,
+                    crate::network::origin_hint::SCOPE_CARD_DELTA,
+                    self.rng.as_ref(),
+                )
+            }
+            _ => None,
+        };
+        let envelope = self.create_update_envelope(
+            recipient_id,
+            ratchet_msg,
+            anon_id_hex.as_deref(),
+            origin_hint,
+            now,
+        );
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;
@@ -381,6 +411,9 @@ impl<T: Transport> RelayClient<T> {
                 previous_chain_length: 0,
             },
             ciphertext,
+            // Device-sync and revocation traffic is not a device-pair card
+            // delta, so it carries no origin hint.
+            origin_hint: None,
         };
 
         let message_id: MessageId = self.rng.uuid_v4().into();
@@ -528,6 +561,7 @@ impl<T: Transport> RelayClient<T> {
         recipient_id: &str,
         ratchet_msg: &RatchetMessage,
         anonymous_sender_id: Option<&str>,
+        origin_hint: Option<String>,
         now: u64,
     ) -> MessageEnvelope {
         let encrypted_update = EncryptedUpdate {
@@ -537,6 +571,7 @@ impl<T: Transport> RelayClient<T> {
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| self.our_identity_id.clone()),
             ),
+            origin_hint,
             ratchet_header: RatchetHeader {
                 dh_public: crate::identifiers::DhPublicKey::from(ratchet_msg.dh_public),
                 dh_generation: ratchet_msg.dh_generation,
@@ -608,6 +643,9 @@ impl<T: Transport> RelayClient<T> {
                 previous_chain_length: 0,
             },
             ciphertext,
+            // Device-sync and revocation traffic is not a device-pair card
+            // delta, so it carries no origin hint.
+            origin_hint: None,
         };
         let message_id: MessageId = self.rng.uuid_v4().into();
         let envelope = create_envelope(
@@ -716,7 +754,7 @@ mod wire_format_tests {
             previous_chain_length: 3,
             ciphertext: b"aead-body".to_vec(),
         };
-        let envelope = client.create_update_envelope("recipient-token", &original, None, 0);
+        let envelope = client.create_update_envelope("recipient-token", &original, None, None, 0);
         let MessagePayload::EncryptedUpdate(update) = envelope.payload else {
             panic!("expected EncryptedUpdate payload");
         };

@@ -362,6 +362,7 @@ impl HttpTransport {
         &self,
         recipient_id: &str,
         ciphertext_b64: &str,
+        origin_hint: Option<String>,
     ) -> Result<String, NetworkError> {
         // Dev instrumentation (F4 send-size diagnosis): a single send whose
         // ciphertext approaches the OHTTP relay request cap points at an
@@ -381,9 +382,7 @@ impl HttpTransport {
         let req = V2SendRequest {
             recipient_id: recipient_id.to_string(),
             ciphertext: ciphertext_b64.to_string(),
-            // Filled by the send-stamping slice; None keeps legacy [0;32]
-            // receive routing until then (F4 origin-device hint design).
-            origin_hint: None,
+            origin_hint,
         };
         let resp = self.post_action("send", &req)?;
         if resp.status == "ok" {
@@ -1050,7 +1049,7 @@ mod tests {
             allow_direct: false,
             pinned_certs: vec![],
         });
-        let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+        let result = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("OHTTP not configured"),
@@ -1062,7 +1061,7 @@ mod tests {
     fn test_send_update_direct_connection_refused() {
         let transport =
             HttpTransport::new(HttpTransportConfig::for_testing("http://127.0.0.1:1", 1000));
-        let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+        let result = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
         assert!(
             matches!(result, Err(NetworkError::ConnectionFailed(_))),
             "expected ConnectionFailed, got {result:?}"
@@ -1085,10 +1084,10 @@ mod tests {
         // Fails at network layer (connection refused), but the counter
         // must have ticked because post_action took the direct branch.
         #[allow(clippy::let_underscore_must_use)]
-        let _ = transport.send_update(&"a".repeat(64), "dGVzdA==");
+        let _ = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
         assert_eq!(transport.direct_fallback_count(), 1);
         #[allow(clippy::let_underscore_must_use)]
-        let _ = transport.send_update(&"b".repeat(64), "dGVzdA==");
+        let _ = transport.send_update(&"b".repeat(64), "dGVzdA==", None);
         assert_eq!(transport.direct_fallback_count(), 2);
     }
 
@@ -1099,7 +1098,7 @@ mod tests {
         // before reaching the direct branch. The counter must stay at zero.
         let transport = HttpTransport::new(HttpTransportConfig::default());
         #[allow(clippy::let_underscore_must_use)]
-        let _ = transport.send_update(&"a".repeat(64), "dGVzdA==");
+        let _ = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
         assert_eq!(transport.direct_fallback_count(), 0);
     }
 
@@ -1163,7 +1162,7 @@ mod tests {
         transport.set_ohttp(ohttp_client);
 
         // Should try to POST to /v2/ohttp and fail (connection refused)
-        let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+        let result = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
         assert!(
             matches!(result, Err(NetworkError::ConnectionFailed(_))),
             "expected ConnectionFailed, got {result:?}"

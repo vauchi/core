@@ -194,7 +194,12 @@ fn lost_primary_cold_bootstrap_pins_the_stall() {
             bd.identity().unwrap(),
             bd.storage(),
             &contacts,
-            vec![("push".to_string(), push_token.clone(), push.payload.clone())],
+            vec![(
+                "push".to_string(),
+                push_token.clone(),
+                push.payload.clone(),
+                None,
+            )],
         );
         let o = &outcomes[0];
         eprintln!(
@@ -245,7 +250,12 @@ fn lost_primary_cold_bootstrap_pins_the_stall() {
             ad.identity().unwrap(),
             ad.storage(),
             &contacts,
-            vec![("ack".to_string(), ack_token.clone(), ack.payload.clone())],
+            vec![(
+                "ack".to_string(),
+                ack_token.clone(),
+                ack.payload.clone(),
+                None,
+            )],
         );
         let o = &outcomes[0];
         eprintln!(
@@ -316,7 +326,7 @@ fn lost_primary_cold_bootstrap_pins_the_stall() {
                 bd.identity().unwrap(),
                 bd.storage(),
                 &contacts,
-                vec![("card".to_string(), tok.clone(), u.payload.clone())],
+                vec![("card".to_string(), tok.clone(), u.payload.clone(), None)],
             );
             let o = &out[0];
             if o.token_resolved {
@@ -376,7 +386,12 @@ fn lost_primary_cold_bootstrap_pins_the_stall() {
         bd.identity().unwrap(),
         bd.storage(),
         &contacts,
-        vec![("replay".to_string(), tok.clone(), card.payload.clone())],
+        vec![(
+            "replay".to_string(),
+            tok.clone(),
+            card.payload.clone(),
+            None,
+        )],
     );
     eprintln!(
         "STEP6: replay -> resolved={} decrypted={} reject={:?}",
@@ -397,7 +412,7 @@ fn lost_primary_cold_bootstrap_pins_the_stall() {
         bd.identity().unwrap(),
         bd.storage(),
         &contacts,
-        vec![("tampered".to_string(), tok, tampered_payload)],
+        vec![("tampered".to_string(), tok, tampered_payload, None)],
     );
     eprintln!(
         "STEP6: tampered -> decrypted={} reject={:?}",

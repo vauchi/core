@@ -381,10 +381,11 @@ impl Vauchi {
         let mut fetched = 0usize;
         let mut device_blobs: Vec<(String, Vec<u8>)> = Vec::new();
         let mut revocations: Vec<(String, crate::network::IdentityRevoked)> = Vec::new();
-        let mut update_blobs: Vec<(String, String, Vec<u8>)> = Vec::new();
+        let mut update_blobs: Vec<(String, String, Vec<u8>, Option<String>)> = Vec::new();
         while let Some(envelope) = adapter.receive().map_err(VauchiError::Network)? {
             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
                 fetched += 1;
+                let origin_hint = update.origin_hint;
                 match classify_inbound_blob(
                     &self_tokens,
                     envelope.message_id.into_string(),
@@ -403,7 +404,7 @@ impl Vauchi {
                         message_id,
                         token,
                         ciphertext,
-                    } => update_blobs.push((message_id, token, ciphertext)),
+                    } => update_blobs.push((message_id, token, ciphertext, origin_hint)),
                 }
             }
         }

@@ -158,7 +158,7 @@ fn test_receive_routes_via_mailbox_token_fast_path() {
         current_day_epoch(alice.storage().clock().unix_seconds()),
     ));
 
-    let blobs = vec![("blob-1".to_string(), bob_token, ciphertext)];
+    let blobs = vec![("blob-1".to_string(), bob_token, ciphertext, None)];
 
     let contacts = alice.storage().contacts().list_contacts().unwrap();
     let outcomes =
@@ -246,7 +246,7 @@ fn test_receive_drops_blob_when_token_missing() {
         .unwrap();
     let ratchet_before_bytes = serde_json::to_vec(&ratchet_before.serialize()).unwrap();
 
-    let blobs = vec![("blob-2".to_string(), String::new(), ciphertext)];
+    let blobs = vec![("blob-2".to_string(), String::new(), ciphertext, None)];
 
     let contacts = alice.storage().contacts().list_contacts().unwrap();
     let outcomes =
@@ -323,7 +323,7 @@ fn test_receive_drops_blob_when_token_unknown() {
     );
 
     let unknown_token = "ff".repeat(32);
-    let blobs = vec![("blob-3".to_string(), unknown_token, ciphertext)];
+    let blobs = vec![("blob-3".to_string(), unknown_token, ciphertext, None)];
 
     let contacts = alice.storage().contacts().list_contacts().unwrap();
     let outcomes =
@@ -371,6 +371,7 @@ fn test_receive_reports_undecryptable_blob() {
             current_day_epoch(alice.storage().clock().unix_seconds()),
         )),
         b"not a real ratchet message".to_vec(),
+        None,
     )];
 
     let contacts = alice.storage().contacts().list_contacts().unwrap();
@@ -420,7 +421,7 @@ fn test_receive_fast_path_handles_all_in_spec_input() {
     let day = current_day_epoch(alice.storage().clock().unix_seconds());
     assert!(day > 0, "test requires non-zero day epoch");
 
-    let mut blobs: Vec<(String, String, Vec<u8>)> = Vec::new();
+    let mut blobs: Vec<(String, String, Vec<u8>, Option<String>)> = Vec::new();
     for (i, (peer, link)) in peers.iter().zip(links.iter()).enumerate() {
         let old_card = ContactCard::new(labels[i]);
         let mut new_card = ContactCard::new(labels[i]);
@@ -442,7 +443,7 @@ fn test_receive_fast_path_handles_all_in_spec_input() {
             &alice_pk,
             token_day,
         ));
-        blobs.push((format!("blob-{i}"), token, ciphertext));
+        blobs.push((format!("blob-{i}"), token, ciphertext, None));
     }
 
     let contacts = alice.storage().contacts().list_contacts().unwrap();
@@ -527,6 +528,7 @@ fn test_receive_rejects_replayed_blob() {
             "blob-replay-1".to_string(),
             token.clone(),
             ciphertext.clone(),
+            None,
         )],
     );
     assert!(first[0].decrypted, "first submission must decrypt");
@@ -553,7 +555,7 @@ fn test_receive_rejects_replayed_blob() {
         alice.identity().unwrap(),
         alice.storage(),
         &contacts,
-        vec![("blob-replay-2".to_string(), token, ciphertext)],
+        vec![("blob-replay-2".to_string(), token, ciphertext, None)],
     );
     assert!(
         second[0].token_resolved,
@@ -654,11 +656,12 @@ fn test_receive_mixed_batch_preserves_order() {
     ));
 
     let blobs = vec![
-        ("idx-0-bob-ok".to_string(), bob_token, bob_ct),
+        ("idx-0-bob-ok".to_string(), bob_token, bob_ct, None),
         (
             "idx-1-unknown".to_string(),
             "ee".repeat(32),
             b"any garbage".to_vec(),
+            None,
         ),
         (
             "idx-2-rejected".to_string(),
@@ -669,8 +672,14 @@ fn test_receive_mixed_batch_preserves_order() {
                 current_day_epoch(alice.storage().clock().unix_seconds()),
             )),
             b"not a ratchet message".to_vec(),
+            None,
         ),
-        ("idx-3-charlie-ok".to_string(), charlie_token, charlie_ct),
+        (
+            "idx-3-charlie-ok".to_string(),
+            charlie_token,
+            charlie_ct,
+            None,
+        ),
     ];
 
     let contacts = alice.storage().contacts().list_contacts().unwrap();
@@ -798,6 +807,7 @@ fn reciprocity_confirm_resolves_contact_to_confirmed() {
         "confirm-1".to_string(),
         bob_mailbox_token(&alice, &bob_link, &alice_pk),
         ciphertext,
+        None,
     )];
     let contacts = alice.storage().contacts().list_contacts().unwrap();
 
@@ -844,6 +854,7 @@ fn reciprocity_confirm_wrong_token_never_confirms() {
         "confirm-bad".to_string(),
         bob_mailbox_token(&alice, &bob_link, &alice_pk),
         ciphertext,
+        None,
     )];
     let contacts = alice.storage().contacts().list_contacts().unwrap();
 
@@ -907,7 +918,7 @@ fn queued_reciprocity_confirmation_resolves_peer_to_confirmed() {
         &alice_pk,
         current_day_epoch(now),
     ));
-    let blobs = vec![("confirm-loop".to_string(), alice_token, payload)];
+    let blobs = vec![("confirm-loop".to_string(), alice_token, payload, None)];
     let alice_contacts = alice.storage().contacts().list_contacts().unwrap();
     let _ = process_received_blobs(
         alice.identity().unwrap(),
@@ -992,5 +1003,112 @@ fn queue_does_not_duplicate_confirmation_in_flight() {
             .unwrap(),
         1,
         "exactly one confirmation queued for the contact"
+    );
+}
+
+// @scenario: receive_phase :: origin-device hint routes a secondary-device delta
+/// The production seam the synthetic convergence tests miss: a card delta
+/// encrypted by a sender's SECONDARY device (A2) is dropped by the legacy
+/// `[0;32]` path, but a valid origin-device hint routes it to A2's session so
+/// it applies. Drives the real `process_received_blobs` with a hint sealed by
+/// the send-side primitive (F4 origin-device hint design 2026-07-27).
+// @internal
+#[test]
+fn origin_hint_routes_a_secondary_device_delta_the_legacy_path_drops() {
+    use vauchi_core::network::origin_hint::{SCOPE_CARD_DELTA, seal_origin_hint};
+    use vauchi_core::rng::DeterministicRng;
+
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let link = link_contacts(&alice, &bob, "Bob");
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+
+    // Establish a secondary-device (A2) ratchet pair, distinct from the [0;32]
+    // primary link_contacts set up: Bob-A2 initiator, Alice responder.
+    let device_a2 = [7u8; 32];
+    let alice_dh = X3DHKeyPair::generate();
+    let mut bob_a2 =
+        DoubleRatchetState::initialize_initiator(&link.shared_secret, *alice_dh.public_key())
+            .unwrap();
+    let alice_a2 = DoubleRatchetState::initialize_responder(&link.shared_secret, alice_dh);
+    alice
+        .storage()
+        .ratchets()
+        .save_ratchet_state_for_device(&link.peer_contact_id, &device_a2, &alice_a2, false)
+        .unwrap();
+
+    // A2 encrypts a signed card delta to Alice.
+    let old = ContactCard::new("Bob");
+    let mut new = ContactCard::new("Bob");
+    new.add_field(ContactField::new(
+        FieldType::Email,
+        "Email",
+        "a2@bob.test",
+        0,
+    ))
+    .unwrap();
+    let mut delta = CardDelta::compute(&old, &new, 0);
+    delta.sign(bob.identity().unwrap(), &alice_pk);
+    let delta_bytes = serde_json::to_vec(&delta).unwrap();
+    let cek = ContentEncryptionKey::generate();
+    let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext,
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let ratchet_msg = bob_a2.encrypt(&payload).unwrap();
+    let ciphertext = serde_json::to_vec(&ratchet_msg).unwrap();
+
+    let token = token_hex(&compute_mailbox_token(
+        link.shared_secret.as_bytes(),
+        &alice_pk,
+        current_day_epoch(alice.storage().clock().unix_seconds()),
+    ));
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
+
+    // 1. WITHOUT a hint, the legacy [0;32] path cannot decrypt A2's ratchet
+    //    message → the delta is dropped (the F4 peer-plane bug). A failed
+    //    decrypt saves no ratchet state, so A2's session stays fresh for step 2.
+    let no_hint = process_received_blobs(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &contacts,
+        vec![(
+            "no-hint".to_string(),
+            token.clone(),
+            ciphertext.clone(),
+            None,
+        )],
+    );
+    assert_eq!(no_hint.len(), 1);
+    assert!(
+        !no_hint[0].decrypted,
+        "without a hint, A2's delta is dropped by the [0;32] path"
+    );
+
+    // 2. WITH a valid hint naming A2, the receiver selects A2's session and
+    //    applies the delta.
+    let hint = seal_origin_hint(
+        link.shared_secret.as_bytes(),
+        &device_a2,
+        &token,
+        &ciphertext,
+        SCOPE_CARD_DELTA,
+        &DeterministicRng::from_seed(1),
+    )
+    .unwrap();
+    let with_hint = process_received_blobs(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &contacts,
+        vec![("hint".to_string(), token, ciphertext, Some(hint))],
+    );
+    assert_eq!(with_hint.len(), 1);
+    assert!(
+        with_hint[0].decrypted,
+        "the origin-device hint routes A2's delta to its session and applies it"
     );
 }

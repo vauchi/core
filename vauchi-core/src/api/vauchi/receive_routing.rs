@@ -39,9 +39,34 @@ use std::collections::HashMap;
 use crate::api::events::VauchiEvent;
 use crate::api::sync::{
     CardUpdateError, ReceiveOutcome, ReceivedAlert, process_single_card_update,
+    process_single_card_update_for_device,
 };
 use crate::contact::Contact;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
+
+/// Opens an origin-device hint (if present) to the sender device id, using the
+/// resolved contact's shared key. Returns `None` when there is no hint, the
+/// contact has no shared key, or the hint fails to authenticate — the caller
+/// then falls back to the legacy `[0;32]` sender-device path.
+fn resolve_origin_device(
+    contacts: &[Contact],
+    contact_id: &str,
+    mailbox_token_hex: &str,
+    ciphertext: &[u8],
+    origin_hint: Option<&str>,
+) -> Option<[u8; 32]> {
+    let hint = origin_hint?;
+    let shared_key = contacts
+        .iter()
+        .find(|contact| contact.id() == contact_id)?
+        .shared_key()?;
+    crate::network::origin_hint::open_origin_hint(
+        shared_key.as_bytes(),
+        mailbox_token_hex,
+        ciphertext,
+        hint,
+    )
+}
 
 /// Outcome of processing a single received blob.
 ///
@@ -123,7 +148,7 @@ pub fn process_received_blobs(
     identity: &crate::identity::Identity,
     storage: &crate::storage::Storage,
     contacts: &[Contact],
-    blobs: Vec<(String, String, Vec<u8>)>,
+    blobs: Vec<(String, String, Vec<u8>, Option<String>)>,
 ) -> Vec<BlobOutcome> {
     let day = current_day_epoch(storage.clock().unix_seconds());
     let token_to_contact = build_token_to_contact_map(
@@ -134,7 +159,7 @@ pub fn process_received_blobs(
     );
 
     let mut outcomes = Vec::with_capacity(blobs.len());
-    for (message_id, mailbox_token_hex, ciphertext) in blobs {
+    for (message_id, mailbox_token_hex, ciphertext, origin_hint) in blobs {
         let (
             token_resolved,
             decrypted,
@@ -145,7 +170,27 @@ pub fn process_received_blobs(
             registry_reply,
         ) = match token_to_contact.get(&mailbox_token_hex) {
             Some(contact_id) => {
-                match process_single_card_update(identity, storage, contact_id, &ciphertext) {
+                // Open the origin-device hint (if any) to select the sender's
+                // device-pair ratchet before decrypting. A hint that fails to
+                // open (legacy, wrong contact, swapped, tampered) falls back to
+                // the [0;32] path (F4 origin-device hint design).
+                let outcome = match resolve_origin_device(
+                    contacts,
+                    contact_id,
+                    &mailbox_token_hex,
+                    &ciphertext,
+                    origin_hint.as_deref(),
+                ) {
+                    Some(peer_device_id) => process_single_card_update_for_device(
+                        identity,
+                        storage,
+                        contact_id,
+                        &peer_device_id,
+                        &ciphertext,
+                    ),
+                    None => process_single_card_update(identity, storage, contact_id, &ciphertext),
+                };
+                match outcome {
                     Ok(ReceiveOutcome::CardDelta) => (
                         true,
                         true,

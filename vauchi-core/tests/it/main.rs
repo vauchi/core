@@ -243,6 +243,7 @@ mod gdpr_deletion_tests;
 mod gdpr_engine_tests;
 mod gdpr_erasure_e2e_tests;
 mod gdpr_export_tests;
+mod genesis_card_per_device_floor_tests;
 mod genesis_envelope_crypto_tests;
 mod genesis_rate_limit_tests;
 mod golden_fixtures;

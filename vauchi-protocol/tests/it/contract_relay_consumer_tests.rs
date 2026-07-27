@@ -214,6 +214,7 @@ fn v2_response_serializes_absent_fields_as_null() {
             "error": null,
             "blob_id": null,
             "blobs": null,
+            "truncated": false,
             "acknowledged": null,
             "code": null,
             "payload": null,

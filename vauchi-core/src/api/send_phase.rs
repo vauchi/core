@@ -587,6 +587,11 @@ impl<'a, T: Transport> SendPhase<'a, T> {
         target_public_key: &[u8; 32],
         master_seed: &[u8; 32],
     ) -> VauchiResult<()> {
+        // WHY: Mirror fetch-drain pagination, including progress for a lone
+        // oversized item, while reserving encryption, base64, and encapsulation
+        // headroom under the 128 KiB OHTTP request cap.
+        const MAX_DEVICE_SYNC_PAYLOAD_BYTES: usize = 48 * 1024;
+
         let sync_msg = orchestrator
             .create_sync_message(target_device_id)
             .map_err(VauchiError::DeviceSync)?;
@@ -595,15 +600,52 @@ impl<'a, T: Transport> SendPhase<'a, T> {
             return Ok(());
         }
 
-        // Serialize + seal for the target device. `encrypt_for_device` is
-        // ECDH (our device exchange key × the target device public key, both
-        // derived from the shared master seed) + HKDF + XChaCha20-Poly1305 —
-        // self-contained authenticated encryption with no interactive
-        // handshake. No Double Ratchet: every same-seed device can already
-        // derive this key, so a ratchet adds no confidentiality (see the
-        // `2026-06-06-multi-device-sync-live-wiring` investigation §2).
-        let payload_bytes = serde_json::to_vec(&sync_msg.items)
-            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let mut batch = Vec::new();
+        let mut batch_bytes = 2;
+        for item in sync_msg.items {
+            let item_bytes = serde_json::to_vec(&item)
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?
+                .len();
+            let candidate_bytes = batch_bytes + usize::from(!batch.is_empty()) + item_bytes;
+            if !batch.is_empty() && candidate_bytes > MAX_DEVICE_SYNC_PAYLOAD_BYTES {
+                self.send_device_sync_batch(
+                    orchestrator,
+                    target_device_id,
+                    target_public_key,
+                    master_seed,
+                    &batch,
+                )?;
+                batch.clear();
+                batch_bytes = 2;
+            }
+
+            batch_bytes += usize::from(!batch.is_empty()) + item_bytes;
+            batch.push(item);
+        }
+
+        self.send_device_sync_batch(
+            orchestrator,
+            target_device_id,
+            target_public_key,
+            master_seed,
+            &batch,
+        )?;
+
+        Ok(())
+    }
+
+    fn send_device_sync_batch(
+        &mut self,
+        orchestrator: &DeviceSyncOrchestrator<'_>,
+        target_device_id: &[u8; 32],
+        target_public_key: &[u8; 32],
+        master_seed: &[u8; 32],
+        batch: &[SyncItem],
+    ) -> VauchiResult<()> {
+        // `encrypt_for_device` is ECDH + HKDF + XChaCha20-Poly1305. No Double
+        // Ratchet is needed because every same-seed device can derive this key.
+        let payload_bytes =
+            serde_json::to_vec(batch).map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         let ciphertext = orchestrator
             .encrypt_for_device(target_public_key, &payload_bytes)
             .map_err(VauchiError::DeviceSync)?;
@@ -614,7 +656,6 @@ impl<'a, T: Transport> SendPhase<'a, T> {
             ciphertext,
             self.storage.clock().unix_seconds(),
         )?;
-
         Ok(())
     }
 

@@ -363,6 +363,21 @@ impl HttpTransport {
         recipient_id: &str,
         ciphertext_b64: &str,
     ) -> Result<String, NetworkError> {
+        // Dev instrumentation (F4 send-size diagnosis): a single send whose
+        // ciphertext approaches the OHTTP relay request cap points at an
+        // unbounded-by-bytes payload upstream (e.g. an owner-sync batch bounded
+        // only by item count). Logged at WARN so it surfaces in e2e subprocess
+        // traces; recipient prefix distinguishes device-scoped from contact
+        // mailboxes without leaking the full rotating token.
+        if ciphertext_b64.len() >= 32 * 1024 {
+            let recipient_prefix: String = recipient_id.chars().take(8).collect();
+            tracing::warn!(
+                target: "vauchi::send",
+                ciphertext_b64_bytes = ciphertext_b64.len(),
+                recipient_prefix = %recipient_prefix,
+                "large send payload approaching OHTTP request cap"
+            );
+        }
         let req = V2SendRequest {
             recipient_id: recipient_id.to_string(),
             ciphertext: ciphertext_b64.to_string(),

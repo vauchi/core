@@ -57,6 +57,14 @@ debug = "line-tables-only"  # Backtraces work, 2-30% faster builds (use CARGO_PR
 strip = false
 split-debuginfo = "unpacked"  # Reduce linker work (skip debuginfo bundling)
 
+# Optimize dependencies (crypto crates: ed25519/x25519, chacha20poly1305,
+# argon2, sha2, ratchet) even in dev/test. Unoptimized crypto codegen makes the
+# it-suite and crypto tests several times slower. Security-neutral: identical
+# primitives and rounds, only machine-code optimization; our crates stay
+# opt-level=0 for fast incremental rebuilds (deps are compiled once and cached).
+[profile.dev.package."*"]
+opt-level = 3
+
 # Release with debug info (for profiling)
 [profile.release-with-debug]
 inherits = "release"

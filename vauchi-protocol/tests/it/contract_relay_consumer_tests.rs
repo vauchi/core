@@ -164,6 +164,7 @@ fn v2_send_request_roundtrip() {
     let req = V2SendRequest {
         recipient_id: "abc".into(),
         ciphertext: "data".into(),
+        origin_hint: None,
     };
     let json = serde_json::to_string(&req).unwrap();
     let parsed: V2SendRequest = serde_json::from_str(&json).unwrap();
@@ -235,6 +236,7 @@ fn v2_response_accepts_more_than_two_thousand_blobs() {
             ciphertext: "dGVzdA==".into(),
             created_at: 12345,
             mailbox_token: None,
+            origin_hint: None,
         };
         2001
     ];
@@ -254,6 +256,7 @@ fn v2_response_with_blobs_roundtrip() {
         ciphertext: "dGVzdA==".into(),
         created_at: 12345,
         mailbox_token: None,
+        origin_hint: None,
     }]);
     let json = serde_json::to_string(&resp).unwrap();
     let parsed: V2Response = serde_json::from_str(&json).unwrap();
@@ -273,6 +276,7 @@ fn fetched_blob_roundtrip() {
         ciphertext: "Y2lwaGVy".into(),
         created_at: 99999,
         mailbox_token: None,
+        origin_hint: None,
     };
     let json = serde_json::to_string(&blob).unwrap();
     let parsed: FetchedBlob = serde_json::from_str(&json).unwrap();
@@ -293,6 +297,7 @@ fn fetched_blob_with_mailbox_token_roundtrip() {
         ciphertext: "Y2lwaGVy".into(),
         created_at: 99999,
         mailbox_token: Some("aabbccdd".into()),
+        origin_hint: None,
     };
     let json = serde_json::to_string(&blob).unwrap();
     let parsed: FetchedBlob = serde_json::from_str(&json).unwrap();

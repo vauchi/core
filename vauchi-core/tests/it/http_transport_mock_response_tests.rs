@@ -44,6 +44,7 @@ fn sample_blob() -> vauchi_protocol::v2::FetchedBlob {
         ciphertext: "Y3Q=".to_string(), // base64("ct")
         created_at: 100,
         mailbox_token: Some("a".repeat(64)),
+        origin_hint: None,
     }
 }
 

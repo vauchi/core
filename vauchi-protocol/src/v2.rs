@@ -49,6 +49,12 @@ pub const MAX_GUARDIAN_ENTRIES: usize = 10;
 /// (512 bytes covers the 256-byte raw limit with base64 overhead and margin).
 const MAX_GUARDIAN_ENTRY_B64_LEN: usize = 512;
 
+/// Maximum base64-encoded origin-device hint length. The hint carries
+/// `nonce(24) || XChaCha20Poly1305(sender_device_id[32])` = 72 raw bytes
+/// (96 base64 chars); 128 leaves margin without admitting an oversized field
+/// (F4 origin-device hint design, 2026-07-27).
+const MAX_ORIGIN_HINT_B64_LEN: usize = 128;
+
 /// Maximum generic string length (1 MiB; generous upper bound for status/error text).
 const MAX_STRING_LEN: usize = 1024 * 1024;
 
@@ -448,6 +454,13 @@ where
     deserialize_optional_bounded_string(deserializer, MAX_ID_HEX_LEN)
 }
 
+fn deserialize_optional_origin_hint<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_optional_bounded_string(deserializer, MAX_ORIGIN_HINT_B64_LEN)
+}
+
 fn deserialize_proofs<'de, D>(deserializer: D) -> Result<Option<Vec<V2RecoveryProof>>, D::Error>
 where
     D: Deserializer<'de>,
@@ -474,6 +487,19 @@ pub struct V2SendRequest {
     /// Base64-encoded ciphertext.
     #[serde(deserialize_with = "deserialize_ciphertext")]
     pub ciphertext: String,
+    /// Base64-encoded opaque origin-device hint (`nonce || AEAD(sender_device_id)`,
+    /// encrypted to the recipient). Lets the receiver select the sender's
+    /// device-pair ratchet without the transport learning the sender edge.
+    ///
+    /// `None` for older clients that predate this field; the receiver then
+    /// falls back to the legacy `[0;32]` sender-device path. The relay stores
+    /// and returns it verbatim, never inspecting it.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_origin_hint"
+    )]
+    pub origin_hint: Option<String>,
 }
 
 /// V2 fetch request body.
@@ -567,6 +593,16 @@ pub struct FetchedBlob {
         deserialize_with = "deserialize_optional_mailbox_token"
     )]
     pub mailbox_token: Option<String>,
+    /// Base64-encoded opaque origin-device hint the sender attached (see
+    /// [`V2SendRequest::origin_hint`]). Returned verbatim so the receiver can
+    /// resolve the sender device before decrypting. `None` for blobs sent by
+    /// older clients or relayed by older relays.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_origin_hint"
+    )]
+    pub origin_hint: Option<String>,
 }
 
 /// V2 recovery proof store request body.
@@ -754,6 +790,67 @@ mod tests {
         );
         let err = serde_json::from_str::<V2SendRequest>(&json).unwrap_err();
         assert!(err.to_string().contains("too long"));
+    }
+
+    // @internal
+    #[test]
+    fn v2_send_request_accepts_origin_hint() {
+        let json = r#"{"recipient_id":"aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899","ciphertext":"SGVsbG8=","origin_hint":"bm9uY2VfcGx1c19jaXBoZXJ0ZXh0"}"#;
+        let req: V2SendRequest = serde_json::from_str(json).expect("valid send request with hint");
+        assert_eq!(
+            req.origin_hint.as_deref(),
+            Some("bm9uY2VfcGx1c19jaXBoZXJ0ZXh0")
+        );
+    }
+
+    // @internal
+    #[test]
+    fn v2_send_request_defaults_origin_hint_to_none() {
+        let json = r#"{"recipient_id":"aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899","ciphertext":"SGVsbG8="}"#;
+        let req: V2SendRequest = serde_json::from_str(json).expect("valid legacy send request");
+        assert_eq!(req.origin_hint, None);
+    }
+
+    // @internal
+    #[test]
+    fn v2_send_request_rejects_oversized_origin_hint() {
+        let json = format!(
+            "{{\"recipient_id\":\"{}\",\"ciphertext\":\"SGVsbG8=\",\"origin_hint\":\"{}\"}}",
+            "a".repeat(64),
+            "A".repeat(MAX_ORIGIN_HINT_B64_LEN + 1)
+        );
+        let err = serde_json::from_str::<V2SendRequest>(&json).unwrap_err();
+        assert!(err.to_string().contains("too long"));
+    }
+
+    // @internal
+    #[test]
+    fn v2_send_request_omits_origin_hint_when_none() {
+        let req = V2SendRequest {
+            recipient_id: "a".repeat(64),
+            ciphertext: "SGVsbG8=".to_string(),
+            origin_hint: None,
+        };
+        let json = serde_json::to_string(&req).expect("serialize send request");
+        assert!(
+            !json.contains("origin_hint"),
+            "a None hint must not emit the field: {json}"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn fetched_blob_roundtrips_origin_hint() {
+        let blob = FetchedBlob {
+            blob_id: "b".repeat(64),
+            ciphertext: "SGVsbG8=".to_string(),
+            created_at: 42,
+            mailbox_token: None,
+            origin_hint: Some("aGludA==".to_string()),
+        };
+        let json = serde_json::to_string(&blob).expect("serialize blob");
+        let back: FetchedBlob = serde_json::from_str(&json).expect("deserialize blob");
+        assert_eq!(back.origin_hint.as_deref(), Some("aGludA=="));
     }
 
     // @internal

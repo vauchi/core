@@ -381,6 +381,9 @@ impl HttpTransport {
         let req = V2SendRequest {
             recipient_id: recipient_id.to_string(),
             ciphertext: ciphertext_b64.to_string(),
+            // Filled by the send-stamping slice; None keeps legacy [0;32]
+            // receive routing until then (F4 origin-device hint design).
+            origin_hint: None,
         };
         let resp = self.post_action("send", &req)?;
         if resp.status == "ok" {

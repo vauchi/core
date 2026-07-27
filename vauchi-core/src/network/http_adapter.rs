@@ -512,6 +512,7 @@ mod tests {
             ciphertext: base64::engine::general_purpose::STANDARD.encode(b"encrypted-data"),
             created_at: 1234567890,
             mailbox_token: None,
+            origin_hint: None,
         };
         let envelope = HttpTransportAdapter::blob_to_envelope(&blob).unwrap();
         assert_eq!(envelope.message_id, "blob-123");
@@ -535,6 +536,7 @@ mod tests {
             ciphertext: base64::engine::general_purpose::STANDARD.encode(b"x"),
             created_at: 1,
             mailbox_token: Some("a".repeat(64)),
+            origin_hint: None,
         };
         let envelope = HttpTransportAdapter::blob_to_envelope(&blob).unwrap();
         if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
@@ -555,6 +557,7 @@ mod tests {
             ciphertext: "not-valid-base64!!!".into(),
             created_at: 0,
             mailbox_token: None,
+            origin_hint: None,
         };
         let result = HttpTransportAdapter::blob_to_envelope(&blob);
         let err = result.expect_err("invalid base64 ciphertext must fail to decode");

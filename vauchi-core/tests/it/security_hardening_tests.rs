@@ -38,21 +38,15 @@ fn test_brute_force_protection() {
     let password = b"correct-horse-battery-staple";
     let salt = [0x42u8; 32];
 
-    // Measure time for a single key derivation
-    let start = std::time::Instant::now();
-    let result = derive_key_argon2id(password, &salt);
-    let duration = start.elapsed();
-
-    result.expect("expected success");
-
-    // Argon2id with m=64MB, t=3, p=4 should take meaningful time
-    // This ensures brute-force is expensive. On typical hardware, this
-    // should take at least tens of milliseconds.
-    assert!(
-        duration.as_millis() >= 10,
-        "Key derivation took only {}ms - should be >= 10ms for brute-force protection",
-        duration.as_millis()
-    );
+    // Brute-force *cost* (Argon2id m/t/p ≥ OWASP floor) is enforced
+    // deterministically at compile time by the `const _: ()` floor guard in
+    // `crypto/password_kdf.rs` — a weakening edit fails to compile in every
+    // non-`test-kdf` build. We deliberately do NOT assert on wall-clock
+    // derivation time here: the it-suite runs with `test-kdf` (reduced
+    // params) and wall-clock is load-dependent, so a timing assertion is
+    // both meaningless and flaky (CC-06). This test verifies the KDF's
+    // deterministic security properties instead.
+    derive_key_argon2id(password, &salt).expect("derivation succeeds");
 
     let wrong_password = b"wrong-password";
     let key_correct = derive_key_argon2id(password, &salt).unwrap();
@@ -83,23 +77,30 @@ fn test_brute_force_rate_calculation() {
     // ~62^12 = ~3.2 x 10^21 combinations.
     // Time to crack: ~10^15 years (effectively impossible)
 
+    // The per-attempt *cost* that makes this rate infeasible is the Argon2id
+    // m/t/p parameters, whose OWASP floor is enforced deterministically at
+    // compile time (`const _: ()` guard in `crypto/password_kdf.rs`). Asserting
+    // wall-clock derivation time here would be flaky (CC-06) and meaningless in
+    // the `test-kdf` build (reduced params), so we verify the deterministic
+    // security property a slow KDF alone does not guarantee: salt sensitivity —
+    // the same password under different salts yields unrelated keys, defeating
+    // precomputation/rainbow-table attacks that would otherwise sidestep the
+    // per-attempt cost entirely.
     let password = b"test-password";
-    let salt = [0x01u8; 32];
 
-    let mut total_ms = 0u128;
-    for _ in 0..5 {
-        let start = std::time::Instant::now();
-        let _ = derive_key_argon2id(password, &salt).unwrap();
-        total_ms += start.elapsed().as_millis();
-    }
+    let key_salt_a = derive_key_argon2id(password, &[0x01u8; 32]).unwrap();
+    let key_salt_b = derive_key_argon2id(password, &[0x02u8; 32]).unwrap();
+    assert_ne!(
+        key_salt_a.as_bytes(),
+        key_salt_b.as_bytes(),
+        "Same password under different salts must produce different keys"
+    );
 
-    let avg_ms = total_ms / 5;
-
-    // Average should be meaningful (allow some variance for CI environments)
-    assert!(
-        avg_ms >= 5,
-        "Average derivation time {}ms is too fast - brute force may be feasible",
-        avg_ms
+    let key_salt_a_repeat = derive_key_argon2id(password, &[0x01u8; 32]).unwrap();
+    assert_eq!(
+        key_salt_a.as_bytes(),
+        key_salt_a_repeat.as_bytes(),
+        "Same password + salt must be deterministic"
     );
 }
 

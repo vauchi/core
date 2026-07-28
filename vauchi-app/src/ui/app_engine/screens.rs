@@ -301,15 +301,14 @@ impl AppEngine {
                 LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)
                     .with_locale(render_context.resolved_locale()),
             ),
-            AppScreen::DeviceLinking => {
-                let qr_data = vauchi
-                    .generate_device_link()
-                    .map(|r| r.data_string)
-                    .unwrap_or_default();
-                Box::new(
-                    DeviceLinkingEngine::new(qr_data).with_locale(render_context.resolved_locale()),
-                )
-            }
+            AppScreen::DeviceLinking => Box::new(
+                // Start at the generating-link spinner — never seed a bare,
+                // relay-less `DeviceLinkQR`. The engine-owned initiator posts
+                // the relay offer and supplies the real `vauchi://` invitation
+                // via `QrReady`, or surfaces `link_failed` on relay error
+                // (F1a/join-QR device-cert regression).
+                DeviceLinkingEngine::pending().with_locale(render_context.resolved_locale()),
+            ),
             AppScreen::DeviceLinkJoin { .. } => {
                 let default_name = device_capabilities
                     .device_name

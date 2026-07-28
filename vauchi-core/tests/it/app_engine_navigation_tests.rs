@@ -103,14 +103,18 @@ fn link_new_device_from_device_management_navigates_to_device_linking() {
 
     match result {
         ActionResult::NavigateTo(screen) => {
+            // Lands on the generating-link spinner, not a bare QR: the real
+            // vauchi:// invitation only appears after a successful relay offer
+            // (QrReady). Seeding a local DeviceLinkQR here rendered a bare,
+            // non-routable code (F1a/join-QR device-cert regression).
             assert_eq!(
-                screen.screen_id, "link_show_qr",
-                "tapping link_device on DeviceManagement should land on the link_show_qr screen, got {}",
+                screen.screen_id, "link_qr_pending",
+                "tapping link_device on DeviceManagement should land on the link_qr_pending screen, got {}",
                 screen.screen_id
             );
         }
         other => panic!(
-            "expected NavigateTo(link_show_qr), got {other:?} — \
+            "expected NavigateTo(link_qr_pending), got {other:?} — \
              AppEngine routing for StartDeviceLink(Initiator) missing"
         ),
     }

@@ -33,7 +33,10 @@ fn link_device_resolves_to_device_linking_navigation() {
 
     match result {
         ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "link_show_qr");
+            // Lands on the generating-link spinner, not a bare QR: the real
+            // vauchi:// invitation only appears after a successful relay offer
+            // (QrReady). See device_link_initiator regression test.
+            assert_eq!(screen.screen_id, "link_qr_pending");
             assert_eq!(
                 screen.parent_screen_id.as_deref(),
                 Some("device_management")

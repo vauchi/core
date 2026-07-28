@@ -121,6 +121,24 @@ impl DeviceLinkingEngine {
         }
     }
 
+    /// Creates an engine at the QR-pending spinner with no QR payload yet.
+    ///
+    /// The relay-driven "Link New Device" flow starts here: the
+    /// engine-owned initiator posts the relay offer and only then supplies
+    /// the real `vauchi://device-link` invitation via `QrReady`
+    /// (→ `WaitingForRequest`), or surfaces `link_failed` on relay error.
+    /// The screen never seeds a local `DeviceLinkQR::to_data_string`, which
+    /// renders a bare, non-routable code that looks scannable but carries no
+    /// rendezvous `code` — see the F1a/join-QR device-cert regression.
+    pub fn pending() -> Self {
+        Self {
+            step: DeviceLinkStep::QrPending,
+            invitation_url: String::new(),
+            verification_code: None,
+            locale: Locale::English,
+        }
+    }
+
     /// Set the render locale (defaults to English) — threaded from the
     /// frontend-pushed RenderContext at the AppEngine factory (M3 S6b-6a).
     pub fn with_locale(mut self, locale: Locale) -> Self {

@@ -303,4 +303,36 @@ mod tests {
             &qr_data[..qr_data.len().min(30)]
         );
     }
+
+    // @internal
+    // Regression pinned on the physical rig (2026-07-28): with the relay
+    // OHTTP data-plane returning 502, the DeviceLinking screen presented a
+    // *bare, relay-less* QR (`DeviceLinkQR::to_data_string`) that looks
+    // scannable but has no `vauchi://` scheme and no rendezvous `code` — so
+    // no peer can ever join it. The screen must instead render the honest
+    // "generating link" spinner until the relay produces a real invitation
+    // (`QrReady` → WaitingForRequest); a failed offer surfaces link_failed.
+    // No QR may appear before a successful relay offer.
+    #[test]
+    fn device_linking_shows_generating_spinner_not_a_bare_qr_before_relay_offer() {
+        let mut app = AppEngine::new(Vauchi::in_memory().expect("in-memory vauchi"));
+        app.vauchi.create_identity("Alice").expect("identity");
+
+        // Enter DeviceLinking. No relay offer has landed yet (and the
+        // in-memory Vauchi cannot even post one), so nothing scannable exists.
+        app.navigate_to(AppScreen::DeviceLinking);
+
+        let screen = app.engine.current_screen();
+        let has_qr = screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::QrCode { .. }));
+        assert!(
+            !has_qr,
+            "DeviceLinking must show the generating-link spinner (no QR) until the \
+             relay produces a real vauchi:// invitation — never a bare, non-routable \
+             QR; got screen_id={}",
+            screen.screen_id
+        );
+    }
 }

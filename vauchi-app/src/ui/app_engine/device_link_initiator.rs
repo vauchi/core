@@ -22,17 +22,19 @@
 use super::{AppEngine, AppScreen};
 use crate::orchestrator::device_link_machine::DeviceLinkPersistence;
 use crate::orchestrator::device_link_machine::{DeviceLinkInitiatorMachine, InitiatorEvent};
+use crate::orchestrator::device_link_relay::DeviceLinkBroker;
 use crate::ui::ActionResult;
 use vauchi_core::network::HttpTransport;
 
 /// QR-expiry / relay-listen budget (ADR-035 device-link window = 300 s).
 pub(crate) const RELAY_TIMEOUT_SECS: u64 = 300;
 
-/// Holds the initiator machine plus the relay transport it offered on;
-/// `advance` polls the same transport each tick.
+/// Holds the initiator machine plus the relay broker it offered on;
+/// `advance` polls the same broker each tick. Boxed as a trait object so
+/// tests can inject a fake broker (mirrors the responder holder).
 pub(crate) struct DeviceLinkInitiatorHolder {
     machine: DeviceLinkInitiatorMachine,
-    transport: HttpTransport,
+    transport: Box<dyn DeviceLinkBroker + Send>,
 }
 
 impl AppEngine {
@@ -74,7 +76,10 @@ impl AppEngine {
             RELAY_TIMEOUT_SECS,
             Some(persistence),
         );
-        self.device_link_initiator = Some(DeviceLinkInitiatorHolder { machine, transport });
+        self.device_link_initiator = Some(DeviceLinkInitiatorHolder {
+            machine,
+            transport: Box::new(transport),
+        });
     }
 
     /// Cancel + drop the active initiator machine. Idempotent. `pub`
@@ -90,7 +95,7 @@ impl AppEngine {
     pub(crate) fn advance_device_link_session(&mut self) -> bool {
         let now = self.vauchi.clock().unix_seconds();
         let event = match self.device_link_initiator.as_mut() {
-            Some(holder) => holder.machine.advance(&holder.transport, now),
+            Some(holder) => holder.machine.advance(holder.transport.as_ref(), now),
             None => return false,
         };
         self.apply_initiator_event(event)
@@ -210,5 +215,92 @@ impl AppEngine {
     /// Whether an initiator machine is currently held.
     pub fn device_link_initiator_active(&self) -> bool {
         self.device_link_initiator.is_some()
+    }
+}
+
+// INLINE_TEST_REQUIRED: injects a fake broker into the pub(crate)
+// DeviceLinkInitiatorHolder and reads the private device_link_initiator
+// field — the injection seam is not reachable from tests/.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ui::component::Component;
+    use vauchi_core::Vauchi;
+    use vauchi_core::network::NetworkError;
+
+    /// Broker whose offer always succeeds with a fixed rendezvous code, so the
+    /// initiator reaches `AwaitingClaim` (where `join_invitation()` is `Some`).
+    struct FakeBroker {
+        code: String,
+    }
+    impl DeviceLinkBroker for FakeBroker {
+        fn exchange_offer(&self, _p: &str, _e: Option<u64>) -> Result<String, NetworkError> {
+            Ok(self.code.clone())
+        }
+        fn exchange_claim(&self, _c: &str, _r: &str) -> Result<String, NetworkError> {
+            Ok(String::new())
+        }
+        fn exchange_complete(&self, _c: &str) -> Result<Option<String>, NetworkError> {
+            Ok(None)
+        }
+    }
+
+    // @internal
+    // Regression for the device-link-join QR: after a *successful* offer the
+    // rendered QR must carry the full `vauchi://device-link?qr=…&code=…` deep
+    // link (which iOS/Android can route), NOT the codeless bare `qr_data`
+    // fallback. See backlog 2026-07-27-device-link-exchange-rendezvous-hang.
+    #[test]
+    fn qr_ready_renders_full_vauchi_deep_link_not_bare_qr() {
+        let mut app = AppEngine::new(Vauchi::in_memory().expect("in-memory vauchi"));
+        app.vauchi.create_identity("Alice").expect("identity");
+
+        // Enter DeviceLinking so the active engine is the DeviceLinkingEngine
+        // (its `apply_update` receives the QrReady render).
+        app.navigate_to(AppScreen::DeviceLinking);
+
+        // Build the initiator holder manually with a fake broker. (The real
+        // `ensure_device_link_session` needs a configured `storage_key` for
+        // persistence, which the in-memory test Vauchi lacks — orthogonal to
+        // the QR payload under test, so we pass `persistence: None`.)
+        let (initiator, identity_id) = {
+            let identity = app.vauchi.identity().expect("identity");
+            let registry = identity.initial_device_registry();
+            let now = app.vauchi.clock().unix_seconds();
+            let initiator = identity.create_device_link_initiator(registry, now);
+            (initiator, hex::encode(identity.signing_public_key()))
+        };
+        let machine =
+            DeviceLinkInitiatorMachine::new(initiator, identity_id, RELAY_TIMEOUT_SECS, None);
+        app.device_link_initiator = Some(DeviceLinkInitiatorHolder {
+            machine,
+            // Fake broker whose offer succeeds → machine reaches AwaitingClaim.
+            transport: Box::new(FakeBroker {
+                code: "BROKER42".to_string(),
+            }),
+        });
+
+        // First advance posts the offer → QrReady → renders the waiting screen.
+        assert!(
+            app.advance_device_link_session(),
+            "advance renders the QR-ready screen"
+        );
+
+        let screen = app.engine.current_screen();
+        let qr_data = screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::QrCode { data, .. } => Some(data.clone()),
+                _ => None,
+            })
+            .expect("a QrCode component on the waiting-for-request screen");
+
+        assert!(
+            qr_data.starts_with("vauchi://device-link"),
+            "QR must carry the full vauchi:// deep link (iOS/Android routable), \
+             not the codeless bare qr_data fallback; got prefix: {}",
+            &qr_data[..qr_data.len().min(30)]
+        );
     }
 }

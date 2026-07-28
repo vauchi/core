@@ -304,7 +304,6 @@ mod tests {
         );
     }
 
-    // @internal
     // Regression pinned on the physical rig (2026-07-28): with the relay
     // OHTTP data-plane returning 502, the DeviceLinking screen presented a
     // *bare, relay-less* QR (`DeviceLinkQR::to_data_string`) that looks
@@ -313,6 +312,7 @@ mod tests {
     // "generating link" spinner until the relay produces a real invitation
     // (`QrReady` → WaitingForRequest); a failed offer surfaces link_failed.
     // No QR may appear before a successful relay offer.
+    // @internal
     #[test]
     fn device_linking_shows_generating_spinner_not_a_bare_qr_before_relay_offer() {
         let mut app = AppEngine::new(Vauchi::in_memory().expect("in-memory vauchi"));

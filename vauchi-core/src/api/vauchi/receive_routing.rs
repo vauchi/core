@@ -39,7 +39,7 @@ use std::collections::HashMap;
 use crate::api::events::VauchiEvent;
 use crate::api::sync::{
     CardUpdateError, ReceiveOutcome, ReceivedAlert, process_single_card_update,
-    process_single_card_update_for_device,
+    process_single_card_update_for_authenticated_device,
 };
 use crate::contact::Contact;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
@@ -181,7 +181,7 @@ pub fn process_received_blobs(
                     &ciphertext,
                     origin_hint.as_deref(),
                 ) {
-                    Some(peer_device_id) => process_single_card_update_for_device(
+                    Some(peer_device_id) => process_single_card_update_for_authenticated_device(
                         identity,
                         storage,
                         contact_id,

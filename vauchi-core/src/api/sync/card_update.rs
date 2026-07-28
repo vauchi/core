@@ -239,13 +239,55 @@ pub fn process_single_card_update(
 ///
 /// `peer_device_id` scopes both the ratchet session and the stale-version
 /// floor to one of the sender's devices; the legacy all-zero id addresses
-/// pre-multi-device peers.
+/// pre-multi-device peers. This public entry point does not assume the route is
+/// authenticated, so any stateless device fallback remains safety-rate-limited.
 pub fn process_single_card_update_for_device(
     identity: &Identity,
     storage: &Storage,
     sender_id: &str,
     peer_device_id: &[u8; 32],
     ciphertext: &[u8],
+) -> Result<ReceiveOutcome, CardUpdateError> {
+    process_single_card_update_for_device_with_budget(
+        identity,
+        storage,
+        sender_id,
+        peer_device_id,
+        ciphertext,
+        GenesisBudget::EnforceAndSurface,
+    )
+}
+
+/// Device-aware receive after an origin hint authenticated the relationship
+/// key and bound the selected device to this mailbox token and ciphertext.
+///
+/// Production callers must only use this after `open_origin_hint` succeeds.
+/// The separate entry point makes the safety-budget bypass an enforced call-site
+/// decision rather than an assumption inferred from a non-zero device id.
+pub fn process_single_card_update_for_authenticated_device(
+    identity: &Identity,
+    storage: &Storage,
+    sender_id: &str,
+    peer_device_id: &[u8; 32],
+    ciphertext: &[u8],
+) -> Result<ReceiveOutcome, CardUpdateError> {
+    process_single_card_update_for_device_with_budget(
+        identity,
+        storage,
+        sender_id,
+        peer_device_id,
+        ciphertext,
+        GenesisBudget::AuthenticatedDeviceRoute,
+    )
+}
+
+fn process_single_card_update_for_device_with_budget(
+    identity: &Identity,
+    storage: &Storage,
+    sender_id: &str,
+    peer_device_id: &[u8; 32],
+    ciphertext: &[u8],
+    device_route_budget: GenesisBudget,
 ) -> Result<ReceiveOutcome, CardUpdateError> {
     // 1. Reject updates from revoked senders
     if storage.contacts().is_sender_revoked(sender_id)? {
@@ -304,7 +346,7 @@ pub fn process_single_card_update_for_device(
                 ciphertext,
                 None,
                 CardUpdateError::NoRatchetState,
-                RateLimitDisposition::RetainForRetry,
+                GenesisBudget::EnforceAndSurface,
             );
         }
     };
@@ -329,25 +371,46 @@ pub fn process_single_card_update_for_device(
                 ciphertext,
                 Some(&ratchet_msg),
                 CardUpdateError::DecryptionFailed,
-                RateLimitDisposition::FallThrough,
+                GenesisBudget::EnforceAndFallThrough,
             );
         }
-        // A decrypt failure on an established DEVICE-SCOPED chain is
-        // deterministic divergence (skipped/reordered messages are handled
-        // inside the ratchet). Repair the topology before failing: drop the
-        // corrupt session row (the next receive re-bootstraps from the
-        // registry) and demote the activation so the scanner re-runs the
-        // handshake — otherwise cards stall silently forever behind ACKed
-        // failures (F4 plan trigger 4, Kimi corrupt-session condition).
-        // The blob itself still fails deterministically and is ACKed.
+        // An Active responder that has no sending chain deliberately sends a
+        // device-scoped genesis card fallback (propagation.rs). Try that
+        // authenticated path before treating this as ratchet divergence.
+        //
+        // Only the exact not-genesis/decrypt failure may repair the established
+        // session. Errors after a genesis envelope opened (signature, replay,
+        // storage, floor) belong to that envelope and must not tear down an
+        // otherwise healthy device ratchet.
         Err(_) => {
-            super::registry_handshake::repair_device_session(
+            match try_receive_genesis_alert(
                 identity,
                 storage,
                 sender_id,
-                peer_device_id,
-            );
-            return Err(CardUpdateError::DecryptionFailed);
+                &contact,
+                ciphertext,
+                Some(&ratchet_msg),
+                CardUpdateError::DecryptionFailed,
+                device_route_budget,
+            ) {
+                Ok(outcome) => return Ok(outcome),
+                // A speculative device route with no authenticated hint keeps
+                // the ordinary ACK behavior when the safety budget is
+                // exhausted, but budget exhaustion is not ratchet divergence.
+                Err(CardUpdateError::GenesisRateLimited) => {
+                    return Err(CardUpdateError::DecryptionFailed);
+                }
+                Err(CardUpdateError::DecryptionFailed) => {
+                    super::registry_handshake::repair_device_session(
+                        identity,
+                        storage,
+                        sender_id,
+                        peer_device_id,
+                    );
+                    return Err(CardUpdateError::DecryptionFailed);
+                }
+                Err(other) => return Err(other),
+            }
         }
     };
 
@@ -518,10 +581,14 @@ pub fn process_single_card_update_for_device(
     // Heal any pre-upsert duplicate fields before applying, so a single
     // `Removed` fully revokes (2026-06-14-delta-apply-duplicate-fields).
     card.deduplicate_fields();
+    let received_at = storage.clock().unix_seconds();
     delta
-        .apply(&mut card, storage.clock().unix_seconds())
+        .apply(&mut card, received_at)
         .map_err(|_| CardUpdateError::DeltaApplicationFailed)?;
-    contact.update_card(card, 0);
+    contact.update_card(
+        card,
+        source_timestamp_or_received_at(delta.timestamp, received_at),
+    );
 
     if let Some(cek) = new_cek {
         contact.set_cek(cek);
@@ -585,17 +652,20 @@ pub fn process_single_card_update_for_device(
     }
 }
 
-/// What to do when a genesis decrypt attempt is denied by the rate limiter.
-enum RateLimitDisposition {
-    /// No other way to make progress (no session) — retain the blob so a later
-    /// fetch retries once the window resets (`GenesisRateLimited`, not ACKed).
-    RetainForRetry,
-    /// A session already exists, so the genesis attempt was speculative — return
-    /// the ordinary fallback error (ACKed) instead of pinning the blob.
-    FallThrough,
+/// Admission policy for the expensive stateless genesis-open attempt.
+enum GenesisBudget {
+    /// Unauthenticated cold-start traffic has no other progress path, so
+    /// surface the retriable rate-limit error.
+    EnforceAndSurface,
+    /// A legacy session exists and the attempt is speculative, so fall through
+    /// to the ACKable ordinary error when the safety budget is exhausted.
+    EnforceAndFallThrough,
+    /// A non-zero device route came from the ciphertext-bound, relationship-key
+    /// authenticated origin hint. It must not consume the safety-alert budget.
+    AuthenticatedDeviceRoute,
 }
 
-/// Attempt to receive a first-contact genesis alert (ADR-068, MR B).
+/// Attempt to receive a stateless genesis envelope (ADR-068, F4).
 ///
 /// A device that holds a contact's `shared_key` but has no established session
 /// can send a safety alert sealed into a genesis envelope. This opens it
@@ -605,8 +675,10 @@ enum RateLimitDisposition {
 /// fact + replay nonce + advanced `[0;32]` session in one transaction so an
 /// accepted alert survives any crash before surfacing. On any non-genesis or
 /// verification failure it returns `fallback`, preserving the original receive
-/// error; a rate-limited attempt returns the retriable
-/// [`CardUpdateError::GenesisRateLimited`] so the caller does not ACK the blob.
+/// error. Unauthenticated legacy routes enforce the durable safety budget;
+/// ciphertext-bound origin-hint routes have already authenticated possession of
+/// the relationship key and use a separate admission boundary so card traffic
+/// cannot exhaust safety-alert capacity.
 ///
 /// MR B does not persist the announced registry (`opened.sender_registry_*`)
 /// or create canonical per-device sessions. This is a deliberate deferral, not
@@ -626,7 +698,7 @@ fn try_receive_genesis_alert(
     ciphertext: &[u8],
     pre_parsed: Option<&RatchetMessage>,
     fallback: CardUpdateError,
-    on_rate_limit: RateLimitDisposition,
+    budget: GenesisBudget,
 ) -> Result<ReceiveOutcome, CardUpdateError> {
     let (Some(shared_key), Some(peer_identity)) = (contact.shared_key(), contact.public_key())
     else {
@@ -646,15 +718,18 @@ fn try_receive_genesis_alert(
         },
     };
 
-    // Rate-limit BEFORE deriving keys — a genesis open derives ratchet keys
-    // from shared_key ahead of any signature check (F6). On exhaustion, only an
-    // arm with no other way to make progress retains the blob for retry; a
-    // speculative attempt over an existing session falls through to `fallback`
-    // (ACKed) so ordinary undecryptable traffic cannot pin blobs on the relay.
-    if !storage.genesis_limits().consume_decrypt_budget(sender_id)? {
-        return match on_rate_limit {
-            RateLimitDisposition::RetainForRetry => Err(CardUpdateError::GenesisRateLimited),
-            RateLimitDisposition::FallThrough => Err(fallback),
+    // On legacy routes, rate-limit BEFORE deriving keys: a genesis open derives
+    // ratchet keys from shared_key ahead of any signature check (F6). A
+    // non-zero route is admitted only after the origin hint's AEAD authenticates
+    // the relationship key and binds this exact ciphertext + mailbox token; it
+    // therefore must not consume the distinct safety-alert budget.
+    if !matches!(budget, GenesisBudget::AuthenticatedDeviceRoute)
+        && !storage.genesis_limits().consume_decrypt_budget(sender_id)?
+    {
+        return match budget {
+            GenesisBudget::EnforceAndSurface => Err(CardUpdateError::GenesisRateLimited),
+            GenesisBudget::EnforceAndFallThrough => Err(fallback),
+            GenesisBudget::AuthenticatedDeviceRoute => unreachable!(),
         };
     }
 
@@ -873,11 +948,15 @@ fn receive_genesis_card_delta(
 
     let mut card = contact.card().clone();
     card.deduplicate_fields();
+    let received_at = storage.clock().unix_seconds();
     delta
-        .apply(&mut card, storage.clock().unix_seconds())
+        .apply(&mut card, received_at)
         .map_err(|_| CardUpdateError::DeltaApplicationFailed)?;
     let mut updated = contact.clone();
-    updated.update_card(card, 0);
+    updated.update_card(
+        card,
+        source_timestamp_or_received_at(delta.timestamp, received_at),
+    );
     if let Some(cek) = new_cek {
         updated.set_cek(cek);
     }
@@ -928,6 +1007,18 @@ fn receive_genesis_card_delta(
             storage.rollback();
             Err(e)
         }
+    }
+}
+
+/// Preserve an authenticated sender timestamp for sibling-device ordering when
+/// it is within the existing sync clock-skew policy. Legacy zero timestamps and
+/// implausible future values fall back to the local receive time so they cannot
+/// become permanent last-write-wins fences.
+fn source_timestamp_or_received_at(source_timestamp: u64, received_at: u64) -> u64 {
+    if crate::sync::validate_timestamp(source_timestamp, received_at) {
+        source_timestamp
+    } else {
+        received_at
     }
 }
 

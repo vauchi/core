@@ -7,13 +7,20 @@
 
 use crate::common::helpers::create_vauchi_with_identity;
 use vauchi_core::SymmetricKey;
-use vauchi_core::api::{CardUpdateError, ReceiveOutcome, process_single_card_update};
+use vauchi_core::api::sync::card_update::process_single_card_update_for_authenticated_device;
+use vauchi_core::api::{
+    CardUpdateError, ReceiveOutcome, process_single_card_update,
+    process_single_card_update_for_device,
+};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
+use vauchi_core::crypto::ratchet::DoubleRatchetState;
+use vauchi_core::crypto::x3dh::X3DHKeyPair;
 use vauchi_core::exchange::genesis::GenesisEnvelope;
 use vauchi_core::identity::{Identity, RegistryBroadcast};
 use vauchi_core::network::mailbox_token::current_day_epoch;
+use vauchi_core::storage::GENESIS_CONTACT_ATTEMPTS_PER_WINDOW;
 use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 
 struct ColdStartWorld {
@@ -196,4 +203,195 @@ fn genesis_card_per_device_floor_accepts_each_device_and_rejects_its_own_stale_v
         Err(CardUpdateError::StaleVersion { delta: 1, last: 2 })
     ));
     assert_eq!(stored_email_value(&world), "a2-v1@example.com");
+}
+
+// @scenario: multi_device_sync :: A responder's device-scoped genesis card fallback is received
+#[test]
+fn device_scoped_receive_opens_genesis_card_after_ratchet_decrypt_fails() {
+    let world = cold_start_world();
+    let bob_pk = *world.bob.identity().unwrap().signing_public_key();
+    let alice_device_id = *world.alice_a1.device_id();
+
+    // Active F4 delivery resolves the authenticated origin device before
+    // decrypting. Keep an ordinary device-pair ratchet at that key so the
+    // receive path takes the established device-scoped branch first.
+    let peer_dh = X3DHKeyPair::generate();
+    let established =
+        DoubleRatchetState::initialize_initiator(&world.shared_key, *peer_dh.public_key()).unwrap();
+    world
+        .bob
+        .storage()
+        .ratchets()
+        .save_ratchet_state_for_device(
+            &world.alice_contact_id,
+            &alice_device_id,
+            &established,
+            true,
+        )
+        .unwrap();
+
+    // A responder with no sending chain uses the production genesis fallback
+    // while retaining the non-zero recipient-device route.
+    let blob = genesis_card_blob(
+        &world.alice_a1,
+        &bob_pk,
+        &world.shared_key,
+        &world.registry,
+        &world.base_card,
+        "responder-update@example.com",
+        1,
+        10,
+    );
+    let outcome = process_single_card_update_for_authenticated_device(
+        world.bob.identity().unwrap(),
+        world.bob.storage(),
+        &world.alice_contact_id,
+        &alice_device_id,
+        &blob,
+    )
+    .expect("device-scoped receive must open the responder's genesis card fallback");
+
+    assert!(matches!(outcome, ReceiveOutcome::CardDelta));
+    assert_eq!(stored_email_value(&world), "responder-update@example.com");
+    let stored = world
+        .bob
+        .storage()
+        .contacts()
+        .load_contact(&world.alice_contact_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        stored.card_updated_at(),
+        Some(10),
+        "genesis fallback must preserve the verified sender timestamp"
+    );
+    assert_eq!(
+        world
+            .bob
+            .storage()
+            .genesis_limits()
+            .contact_attempts_in_window(&world.alice_contact_id)
+            .unwrap(),
+        0,
+        "an origin-hint-authenticated card fallback must not consume the safety-alert budget"
+    );
+    assert!(
+        world
+            .bob
+            .storage()
+            .ratchets()
+            .load_ratchet_state_for_device(&world.alice_contact_id, &alice_device_id)
+            .unwrap()
+            .is_some(),
+        "a successful genesis fallback must not replace the device ratchet"
+    );
+
+    let replay = process_single_card_update_for_authenticated_device(
+        world.bob.identity().unwrap(),
+        world.bob.storage(),
+        &world.alice_contact_id,
+        &alice_device_id,
+        &blob,
+    );
+    assert!(matches!(replay, Err(CardUpdateError::ReplayDetected)));
+    assert!(
+        world
+            .bob
+            .storage()
+            .ratchets()
+            .load_ratchet_state_for_device(&world.alice_contact_id, &alice_device_id)
+            .unwrap()
+            .is_some(),
+        "a genesis replay rejection must not repair a healthy device ratchet"
+    );
+}
+
+// @scenario: multi_device_sync :: Safety-alert rate limiting does not block a device card fallback
+#[test]
+fn safety_alert_budget_does_not_block_device_scoped_genesis_card() {
+    let world = cold_start_world();
+    let bob_pk = *world.bob.identity().unwrap().signing_public_key();
+    let alice_device_id = *world.alice_a1.device_id();
+    let peer_dh = X3DHKeyPair::generate();
+    let established =
+        DoubleRatchetState::initialize_initiator(&world.shared_key, *peer_dh.public_key()).unwrap();
+    world
+        .bob
+        .storage()
+        .ratchets()
+        .save_ratchet_state_for_device(
+            &world.alice_contact_id,
+            &alice_device_id,
+            &established,
+            true,
+        )
+        .unwrap();
+
+    for _ in 0..GENESIS_CONTACT_ATTEMPTS_PER_WINDOW {
+        assert!(
+            world
+                .bob
+                .storage()
+                .genesis_limits()
+                .consume_decrypt_budget(&world.alice_contact_id)
+                .unwrap()
+        );
+    }
+
+    let blob = genesis_card_blob(
+        &world.alice_a1,
+        &bob_pk,
+        &world.shared_key,
+        &world.registry,
+        &world.base_card,
+        "rate-limited@example.com",
+        1,
+        10,
+    );
+    let untrusted = process_single_card_update_for_device(
+        world.bob.identity().unwrap(),
+        world.bob.storage(),
+        &world.alice_contact_id,
+        &alice_device_id,
+        &blob,
+    );
+    assert!(
+        matches!(untrusted, Err(CardUpdateError::DecryptionFailed)),
+        "an over-budget speculative route must stay ACKable, got {untrusted:?}"
+    );
+    assert!(
+        world
+            .bob
+            .storage()
+            .ratchets()
+            .load_ratchet_state_for_device(&world.alice_contact_id, &alice_device_id)
+            .unwrap()
+            .is_some(),
+        "rate-limit rejection must not be mistaken for ratchet divergence"
+    );
+
+    let outcome = process_single_card_update_for_authenticated_device(
+        world.bob.identity().unwrap(),
+        world.bob.storage(),
+        &world.alice_contact_id,
+        &alice_device_id,
+        &blob,
+    )
+    .expect("the authenticated device-card path has an independent admission boundary");
+
+    assert!(
+        matches!(outcome, ReceiveOutcome::CardDelta),
+        "the exhausted safety-alert budget must not reject a card fallback"
+    );
+    assert_eq!(stored_email_value(&world), "rate-limited@example.com");
+    assert!(
+        world
+            .bob
+            .storage()
+            .ratchets()
+            .load_ratchet_state_for_device(&world.alice_contact_id, &alice_device_id)
+            .unwrap()
+            .is_some(),
+        "the accepted card fallback must preserve the device session"
+    );
 }

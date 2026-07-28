@@ -190,7 +190,9 @@ impl Vauchi {
         let item = SyncItem::ContactCardUpdated {
             contact_id: contact_id.to_string(),
             card_json,
-            timestamp: self.clock.unix_seconds(),
+            timestamp: contact
+                .card_updated_at()
+                .unwrap_or_else(|| self.clock.unix_seconds()),
         };
         let mut orchestrator = DeviceSyncOrchestrator::load(
             &self.storage,
@@ -432,12 +434,17 @@ mod tests {
         let SyncItem::ContactCardUpdated {
             contact_id,
             card_json,
-            ..
+            timestamp,
         } = &pending[0]
         else {
             panic!("received peer card must queue ContactCardUpdated");
         };
         assert_eq!(contact_id, &alice_id);
+        assert_eq!(
+            *timestamp,
+            NOW + 1,
+            "peer-card fan-out must preserve the authenticated source timestamp"
+        );
         let card: ContactCard = serde_json::from_str(card_json).unwrap();
         assert_eq!(card.display_name(), "Alice Updated");
     }

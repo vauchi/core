@@ -107,6 +107,26 @@ fn create_valid_update(
     )
 }
 
+fn create_valid_update_at(
+    bob_wb: &vauchi_core::Vauchi,
+    alice_signing_pk: &[u8; 32],
+    alice_contact_id: &str,
+    old_card: &ContactCard,
+    new_card: &ContactCard,
+    timestamp: u64,
+) -> Vec<u8> {
+    create_valid_update_versioned_for_device_at(
+        bob_wb,
+        alice_signing_pk,
+        alice_contact_id,
+        &[0; 32],
+        old_card,
+        new_card,
+        1,
+        timestamp,
+    )
+}
+
 /// Like [`create_valid_update`] but stamps an explicit delta version (#42), so a
 /// test can drive the receiver's stale-version downgrade rejection.
 pub(crate) fn create_valid_update_versioned(
@@ -140,9 +160,32 @@ pub(crate) fn create_valid_update_versioned_for_device(
     new_card: &ContactCard,
     version: u32,
 ) -> Vec<u8> {
+    create_valid_update_versioned_for_device_at(
+        bob_wb,
+        alice_signing_pk,
+        alice_contact_id,
+        bob_device_id,
+        old_card,
+        new_card,
+        version,
+        0,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn create_valid_update_versioned_for_device_at(
+    bob_wb: &vauchi_core::Vauchi,
+    alice_signing_pk: &[u8; 32],
+    alice_contact_id: &str,
+    bob_device_id: &[u8; 32],
+    old_card: &ContactCard,
+    new_card: &ContactCard,
+    version: u32,
+    timestamp: u64,
+) -> Vec<u8> {
     let bob_identity = bob_wb.identity().unwrap();
 
-    let mut delta = CardDelta::compute(old_card, new_card, 0);
+    let mut delta = CardDelta::compute(old_card, new_card, timestamp);
     delta.set_version(version);
     delta.sign(bob_identity, alice_signing_pk);
 
@@ -205,12 +248,14 @@ fn test_process_single_valid_update() {
         ))
         .unwrap();
 
-    let ciphertext = create_valid_update(
+    const SOURCE_TIMESTAMP: u64 = 4_242;
+    let ciphertext = create_valid_update_at(
         &bob_wb,
         &alice_signing_pk,
         &alice_contact_id,
         &old_card,
         &new_card,
+        SOURCE_TIMESTAMP,
     );
 
     let result = process_single_card_update(
@@ -234,6 +279,52 @@ fn test_process_single_valid_update() {
         .iter()
         .any(|f| f.label() == "Email" && f.value() == "bob@test.com");
     assert!(has_email, "Card should have the new email field");
+    assert_eq!(
+        contact.card_updated_at(),
+        Some(SOURCE_TIMESTAMP),
+        "the verified sender timestamp must survive relay receipt for sibling LWW"
+    );
+}
+
+// @internal
+#[test]
+fn far_future_sender_timestamp_falls_back_to_receive_time() {
+    let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
+        setup_exchange_with_ratchets();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+    let old_card = ContactCard::new("Bob");
+    let new_card = ContactCard::new("Bob Updated");
+    let before = alice_wb.storage().clock().unix_seconds();
+    let far_future = before + 86_400;
+    let ciphertext = create_valid_update_at(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        &old_card,
+        &new_card,
+        far_future,
+    );
+
+    process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_contact_id,
+        &ciphertext,
+    )
+    .expect("a valid signed update with clock skew still applies");
+
+    let after = alice_wb.storage().clock().unix_seconds();
+    let stored = alice_wb
+        .storage()
+        .contacts()
+        .load_contact(&bob_contact_id)
+        .unwrap()
+        .unwrap();
+    let applied_at = stored.card_updated_at().unwrap();
+    assert!(
+        (before..=after).contains(&applied_at),
+        "far-future sender time must fall back to local receive time, got {applied_at}"
+    );
 }
 
 // @internal

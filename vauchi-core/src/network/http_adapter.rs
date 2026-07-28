@@ -25,7 +25,7 @@
 //!   failed relay, which is invisible for non-interactive sync.
 //! - `disconnect()` → no-op (HTTP is stateless)
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use base64::Engine;
 
@@ -51,8 +51,14 @@ pub struct HttpTransportAdapter {
     registered_tokens: Vec<String>,
     /// Buffered blobs fetched from the relay but not yet returned.
     pending_blobs: VecDeque<FetchedBlob>,
+    /// Mailbox token each fetched blob arrived on, keyed by blob ID.
+    ///
+    /// `/v2/fetch` can return blobs for several registered tokens. ACKs must
+    /// use the token attributed by the relay rather than whichever token was
+    /// registered first, or blobs on later tokens remain queued forever.
+    fetched_blob_tokens: HashMap<String, String>,
     /// Acknowledged blob IDs (sent ACK to relay on next receive cycle).
-    /// Stored as (token, blob_id) where token is the first registered mailbox token.
+    /// Stored as `(mailbox_token, blob_id)`.
     ack_queue: Vec<(String, String)>,
     /// Whether we've already polled the relay in this receive cycle.
     ///
@@ -75,6 +81,7 @@ impl HttpTransportAdapter {
             state: ConnectionState::Disconnected,
             registered_tokens: Vec::new(),
             pending_blobs: VecDeque::new(),
+            fetched_blob_tokens: HashMap::new(),
             ack_queue: Vec::new(),
             has_fetched: false,
             last_truncated: false,
@@ -180,6 +187,7 @@ impl super::transport::Transport for HttpTransportAdapter {
         self.state = ConnectionState::Disconnected;
         self.registered_tokens.clear();
         self.pending_blobs.clear();
+        self.fetched_blob_tokens.clear();
         self.has_fetched = false;
         Ok(())
     }
@@ -216,10 +224,16 @@ impl super::transport::Transport for HttpTransportAdapter {
                 Ok(())
             }
             MessagePayload::Acknowledgment(ack) => {
-                // Queue acknowledgment — use first registered token as recipient_id
-                if let Some(token) = self.registered_tokens.first() {
-                    self.ack_queue
-                        .push((token.clone(), ack.message_id.clone().into_string()));
+                let blob_id = ack.message_id.clone().into_string();
+                // Modern relay responses attribute every blob to its mailbox.
+                // Keep the first-token fallback for older responses that omit
+                // `mailbox_token`.
+                if let Some(token) = self
+                    .fetched_blob_tokens
+                    .get(&blob_id)
+                    .or_else(|| self.registered_tokens.first())
+                {
+                    self.ack_queue.push((token.clone(), blob_id));
                 }
                 Ok(())
             }
@@ -251,10 +265,15 @@ impl super::transport::Transport for HttpTransportAdapter {
             // Best-effort ACK — don't fail the receive cycle
             #[allow(clippy::let_underscore_must_use)]
             let _ = self.http.acknowledge(&recipient_id, &blob_id);
+            self.fetched_blob_tokens.remove(&blob_id);
         }
 
         if let Some(blob) = self.pending_blobs.pop_front() {
-            return Self::blob_to_envelope(&blob).map(Some);
+            let envelope = Self::blob_to_envelope(&blob)?;
+            if let Some(token) = blob.mailbox_token {
+                self.fetched_blob_tokens.insert(blob.blob_id, token);
+            }
+            return Ok(Some(envelope));
         }
 
         // 3. If no buffered blobs and we have tokens, poll the relay (once per cycle).
@@ -288,7 +307,11 @@ impl super::transport::Transport for HttpTransportAdapter {
         }
 
         if let Some(blob) = self.pending_blobs.pop_front() {
-            Self::blob_to_envelope(&blob).map(Some)
+            let envelope = Self::blob_to_envelope(&blob)?;
+            if let Some(token) = blob.mailbox_token {
+                self.fetched_blob_tokens.insert(blob.blob_id, token);
+            }
+            Ok(Some(envelope))
         } else {
             Ok(None)
         }
@@ -304,7 +327,7 @@ impl super::transport::Transport for HttpTransportAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::network::message::RegisterMailbox;
+    use crate::network::message::{AckStatus, Acknowledgment, RegisterMailbox};
     use crate::network::transport::Transport;
 
     fn make_adapter(allow_direct: bool) -> HttpTransportAdapter {
@@ -554,6 +577,47 @@ mod tests {
         } else {
             panic!("expected EncryptedUpdate payload");
         }
+    }
+
+    // @internal
+    #[test]
+    fn test_ack_uses_the_fetched_blobs_mailbox_token() {
+        let first_token = "a".repeat(64);
+        let blob_token = "b".repeat(64);
+        let blob_id = "blob-on-second-token";
+        let mut adapter = make_adapter(true);
+        adapter.registered_tokens = vec![first_token, blob_token.clone()];
+        adapter.pending_blobs.push_back(FetchedBlob {
+            blob_id: blob_id.into(),
+            ciphertext: base64::engine::general_purpose::STANDARD.encode(b"x"),
+            created_at: 1,
+            mailbox_token: Some(blob_token.clone()),
+            origin_hint: None,
+        });
+
+        let fetched = adapter
+            .receive()
+            .expect("buffered receive should succeed")
+            .expect("buffered blob should produce an envelope");
+        let acknowledgment = MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: "ack".to_string().into(),
+            timestamp: 0,
+            payload: MessagePayload::Acknowledgment(Acknowledgment {
+                message_id: fetched.message_id,
+                status: AckStatus::ReceivedByRecipient,
+                error: None,
+            }),
+        };
+        adapter
+            .send(&acknowledgment)
+            .expect("queuing an acknowledgment should succeed");
+
+        assert_eq!(
+            adapter.ack_queue,
+            vec![(blob_token, blob_id.to_string())],
+            "each fetched blob must be acknowledged against the mailbox token it arrived on"
+        );
     }
 
     #[test]

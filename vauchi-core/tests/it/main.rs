@@ -416,6 +416,7 @@ mod storage_tests;
 mod support_engine_tests;
 mod sync_card_update_device_floor_tests;
 mod sync_card_update_tests;
+mod sync_card_update_timestamp_tests;
 mod sync_correctness_tests;
 mod sync_delta_tests;
 mod sync_device_conflict_tests;

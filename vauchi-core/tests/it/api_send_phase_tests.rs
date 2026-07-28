@@ -810,6 +810,31 @@ fn drive_send_sender_id_with_local_device(storage: &Storage, local_device_id: [u
     envelope.sender_id.to_string()
 }
 
+fn drive_send_routing_with_local_device(
+    storage: &Storage,
+    local_device_id: [u8; 32],
+) -> (String, bool) {
+    let events = Arc::new(EventDispatcher::new());
+    let mut controller =
+        SendPhase::new(create_test_relay(), storage, SyncConfig::default(), events)
+            .with_local_device_id(local_device_id);
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+    let result = controller
+        .sync(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+    assert_eq!(result.sent, 1, "the update must be sent");
+    let sent = controller.relay().connection().transport().sent_messages();
+    let MessagePayload::EncryptedUpdate(envelope) = &sent[0].payload else {
+        panic!("expected encrypted update")
+    };
+    (
+        envelope.sender_id.to_string(),
+        envelope.origin_hint.is_some(),
+    )
+}
+
 fn legacy_token(storage: &Storage, shared: &SymmetricKey) -> String {
     hex::encode(compute_anonymous_id(
         shared.as_bytes(),
@@ -855,6 +880,34 @@ fn test_handshake_ack_uses_legacy_sender_token_despite_device_routing() {
         legacy_token(&storage, &shared),
         "a genesis handshake ack must use the legacy sender token even though it is routed \
          to a specific peer device's mailbox"
+    );
+}
+
+// A device-routed handshake ACK can carry a per-device ratchet message. Its
+// sender token stays legacy for cold-start resolution, but the authenticated
+// origin hint must still identify the local device so the receiver selects
+// the matching pairwise ratchet before decrypting.
+// @scenario: multi_device_sync :: A device-routed handshake ack carries an origin hint
+#[test]
+fn test_handshake_ack_keeps_origin_hint_with_legacy_sender_token() {
+    let local_device_id = [0x89u8; 32];
+    let (storage, contact_id, shared, peer_device_id) =
+        storage_with_known_peer_device(0x82, [0x87; 32], false);
+    queue_ratchet_update(
+        &storage,
+        &contact_id,
+        &shared,
+        "registry_handshake",
+        Some(peer_device_id),
+    );
+
+    let (sender_id, has_origin_hint) =
+        drive_send_routing_with_local_device(&storage, local_device_id);
+    assert_eq!(sender_id, legacy_token(&storage, &shared));
+    assert!(
+        has_origin_hint,
+        "a device-routed handshake ACK needs an authenticated origin hint even while its sender \
+         token stays legacy"
     );
 }
 

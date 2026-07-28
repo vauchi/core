@@ -256,6 +256,30 @@ impl<T: Transport> RelayClient<T> {
         shared_key: Option<&[u8; 32]>,
         sender_device_id: Option<&[u8; 32]>,
     ) -> Result<MessageId, NetworkError> {
+        self.send_raw_update_with_routing(
+            now,
+            recipient_id,
+            ratchet_msg,
+            update_id,
+            shared_key,
+            sender_device_id,
+            sender_device_id,
+        )
+    }
+
+    /// Sends a pre-encrypted update with independently selected anonymous
+    /// sender-token and authenticated origin-device scopes.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_raw_update_with_routing(
+        &mut self,
+        now: u64,
+        recipient_id: &str,
+        ratchet_msg: &RatchetMessage,
+        update_id: &str,
+        shared_key: Option<&[u8; 32]>,
+        sender_device_id: Option<&[u8; 32]>,
+        origin_device_id: Option<&[u8; 32]>,
+    ) -> Result<MessageId, NetworkError> {
         if self.in_flight.len() >= self.config.max_pending_messages {
             return Err(NetworkError::SendFailed("Too many pending messages".into()));
         }
@@ -265,7 +289,7 @@ impl<T: Transport> RelayClient<T> {
         // device's ratchet before decrypting (the HTTP transport otherwise
         // drops the sender identity). Bound to the mailbox token and the exact
         // ciphertext (F4 origin-device hint design).
-        let origin_hint = match (shared_key, sender_device_id) {
+        let origin_hint = match (shared_key, origin_device_id) {
             (Some(key), Some(device_id)) => {
                 let ciphertext = serde_json::to_vec(ratchet_msg)
                     .expect("RatchetMessage serialization is infallible");

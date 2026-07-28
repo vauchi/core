@@ -108,9 +108,13 @@ impl Vauchi {
             if confirmed {
                 continue;
             }
-            // One handshake message in flight per contact — like reciprocity
-            // confirmations, a queued undelivered push must not pile up.
-            if self.storage.pending().count_pending_updates(&contact_id)? > 0 {
+            // One handshake message in flight per contact. Ordinary pending
+            // updates must not suppress this bootstrap: they may themselves
+            // be blocked until the handshake activates device-scoped routing.
+            if self.storage.pending().has_pending_update_type(
+                &contact_id,
+                crate::api::sync::REGISTRY_HANDSHAKE_UPDATE_TYPE,
+            )? {
                 continue;
             }
 

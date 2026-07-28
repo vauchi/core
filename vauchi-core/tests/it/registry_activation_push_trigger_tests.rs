@@ -21,6 +21,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::{DeviceRegistry, Identity, RegistryBroadcast};
+use vauchi_core::storage::{PendingUpdate, UpdateStatus};
 use vauchi_core::sync::registry_activation::{ActivationState, ActivationTracker};
 
 /// Build a three-device peer (Alice) as a signed registry broadcast — the
@@ -332,5 +333,47 @@ fn scanner_keeps_one_push_in_flight_per_contact() {
             .count_pending_updates(&alice_contact_id)
             .unwrap(),
         1
+    );
+}
+
+// @scenario: multi_device_sync :: A queued card update cannot starve registry activation
+// @internal
+#[test]
+fn scanner_queues_activation_alongside_a_blocked_card_update() {
+    let (_alice_wb, bob_wb, _bob_contact_id, alice_contact_id) = setup_two_party();
+    bob_wb
+        .storage()
+        .pending()
+        .queue_update(&PendingUpdate {
+            id: "blocked-card".to_string(),
+            contact_id: alice_contact_id.clone(),
+            update_type: "card_delta".to_string(),
+            payload: vec![1, 2, 3],
+            created_at: 0,
+            retry_count: 0,
+            status: UpdateStatus::Pending,
+            target_relay_url: None,
+            target_device_id: None,
+        })
+        .unwrap();
+
+    assert_eq!(
+        bob_wb.queue_registry_pushes().unwrap(),
+        1,
+        "a card update that needs activation must not block the handshake that unlocks it"
+    );
+    let pending = bob_wb
+        .storage()
+        .pending()
+        .get_pending_updates(&alice_contact_id)
+        .unwrap();
+    assert_eq!(pending.len(), 2);
+    assert_eq!(
+        pending
+            .iter()
+            .filter(|update| update.update_type == "registry_handshake")
+            .count(),
+        1,
+        "the scanner still keeps only one handshake in flight"
     );
 }

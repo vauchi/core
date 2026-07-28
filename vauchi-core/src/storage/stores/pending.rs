@@ -184,6 +184,23 @@ impl PendingStore<'_> {
         )?;
         Ok(count as usize)
     }
+    /// Returns whether a contact has a queued update of the requested type.
+    pub fn has_pending_update_type(
+        &self,
+        contact_id: &str,
+        update_type: &str,
+    ) -> Result<bool, StorageError> {
+        self.conn
+            .query_row(
+                "SELECT EXISTS(
+                    SELECT 1 FROM pending_updates
+                    WHERE contact_id = ?1 AND update_type = ?2
+                )",
+                params![contact_id, update_type],
+                |row| row.get(0),
+            )
+            .map_err(StorageError::Database)
+    }
     /// Deletes a pending update by ID.
     pub fn delete_pending_update(&self, id: &str) -> Result<bool, StorageError> {
         let rows_affected = self

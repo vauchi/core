@@ -292,13 +292,24 @@ impl<'a, T: Transport> SendPhase<'a, T> {
                     continue;
                 }
             };
-            match self.relay.send_raw_update_for_device(
+            let origin_device_id = match self.origin_device_id_for(&update) {
+                Ok(device_id) => device_id,
+                Err(error) => {
+                    result.failed += 1;
+                    result
+                        .errors
+                        .push((update.contact_id.clone(), error.to_string()));
+                    continue;
+                }
+            };
+            match self.relay.send_raw_update_with_routing(
                 self.storage.clock().unix_seconds(),
                 &recipient_id,
                 &ratchet_msg,
                 &update.id,
                 shared_key.as_ref(),
                 sender_device_id.as_ref(),
+                origin_device_id.as_ref(),
             ) {
                 Ok(msg_id) => {
                     result.sent += 1;
@@ -424,13 +435,15 @@ impl<'a, T: Transport> SendPhase<'a, T> {
                     }
                 };
             let sender_device_id = self.sender_device_id_for(&update)?;
-            match self.relay.send_raw_update_for_device(
+            let origin_device_id = self.origin_device_id_for(&update)?;
+            match self.relay.send_raw_update_with_routing(
                 self.storage.clock().unix_seconds(),
                 &recipient_id,
                 &ratchet_msg,
                 &update.id,
                 shared_key.as_ref(),
                 sender_device_id.as_ref(),
+                origin_device_id.as_ref(),
             ) {
                 Ok(_) => {
                     result.sent += 1;
@@ -468,13 +481,32 @@ impl<'a, T: Transport> SendPhase<'a, T> {
         {
             return Ok(None);
         }
+        self.authenticated_local_device_id().map(Some)
+    }
+
+    /// Choose the authenticated device stamped into the origin hint.
+    ///
+    /// Device-routed handshake ACKs deliberately retain the legacy anonymous
+    /// sender token for cold-start contact resolution, but still need this
+    /// hint so the receiver can select a per-device ratchet before decrypting.
+    fn origin_device_id_for(
+        &self,
+        update: &crate::storage::PendingUpdate,
+    ) -> VauchiResult<Option<[u8; 32]>> {
+        if update.target_device_id.is_none() {
+            return Ok(None);
+        }
+        self.authenticated_local_device_id().map(Some)
+    }
+
+    fn authenticated_local_device_id(&self) -> VauchiResult<[u8; 32]> {
         if let Some(local_device_id) = self.local_device_id {
-            return Ok(Some(local_device_id));
+            return Ok(local_device_id);
         }
         self.storage
             .device()
             .load_device_info()?
-            .map(|info| Some(info.0))
+            .map(|info| info.0)
             .ok_or_else(|| {
                 VauchiError::InvalidState(
                     "local device info is required for a device-scoped sender token".into(),

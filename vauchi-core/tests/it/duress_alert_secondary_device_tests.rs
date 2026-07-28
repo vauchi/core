@@ -44,16 +44,18 @@ use common::device_sync::{
 };
 use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange, setup_ratchets};
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
+use vauchi_core::api::sync::card_update::process_single_card_update_for_authenticated_device;
 use vauchi_core::api::{CardUpdateError, ReceiveOutcome, process_single_card_update};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::exchange::genesis::GenesisEnvelope;
-use vauchi_core::identity::{Identity, RegistryBroadcast};
+use vauchi_core::identity::{DeviceRegistry, Identity, RegistryBroadcast};
 use vauchi_core::storage::GENESIS_CONTACT_ATTEMPTS_PER_WINDOW;
 use vauchi_core::sync::DeviceLinkIntent;
 use vauchi_core::sync::delta::VersionedPayload;
+use vauchi_core::sync::registry_activation::ActivationTracker;
 use vauchi_core::sync::safety_alert::{AlertKind, SafetyAlertPayload};
 use vauchi_core::types::DuressSettings;
 use vauchi_core::{AuthMode, SymmetricKey, Vauchi};
@@ -365,6 +367,157 @@ fn secondary_device_alert_should_be_surfaced_by_recipient() {
             .len(),
         1,
         "a replay must not create a second durable fact"
+    );
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// After registry activation, a sender that is the deterministic responder for
+/// a peer-device ratchet has no sending chain until that peer sends first.
+/// Safety alerts cannot wait for ordinary traffic: they must use the same
+/// device-scoped, non-persistent genesis fallback as responder-side card
+/// deltas.
+// @internal
+#[test]
+fn active_responder_device_genesis_seals_emergency_alert() {
+    let sender_seed = [0xa5u8; 32];
+    let sender_identity =
+        Identity::from_device_link(sender_seed, "Alice".into(), 0, "Alice phone".into(), 1);
+    let sender_pk = *sender_identity.signing_public_key();
+
+    let (recipient_seed, recipient_identity) = (1u32..=100_000)
+        .find_map(|value| {
+            let mut seed = [0u8; 32];
+            seed[..4].copy_from_slice(&value.to_le_bytes());
+            let identity = Identity::from_device_link(seed, "Bob".into(), 0, "Bob phone".into(), 1);
+            (identity.signing_public_key() < &sender_pk).then_some((seed, identity))
+        })
+        .expect("a lexicographically smaller recipient identity");
+    let recipient_pk = *recipient_identity.signing_public_key();
+    let recipient_device_id = *recipient_identity.device_id();
+    assert!(
+        sender_pk > recipient_pk,
+        "the sender must bootstrap as the responder for this regression"
+    );
+
+    let shared = SymmetricKey::from_bytes([0x5au8; 32]);
+    let mut sender = Vauchi::in_memory().unwrap();
+    sender.set_identity(sender_identity).unwrap();
+    let recipient_contact =
+        Contact::from_exchange(recipient_pk, ContactCard::new("Bob"), shared.clone(), 0);
+    let recipient_id = recipient_contact.id().to_string();
+    sender.add_contact(recipient_contact).unwrap();
+
+    let recipient_registry = DeviceRegistry::new(
+        recipient_identity
+            .device_info()
+            .to_registered(&recipient_seed),
+        recipient_identity.signing_keypair(),
+    );
+    let recipient_broadcast = RegistryBroadcast::new(
+        &recipient_registry,
+        recipient_identity.signing_keypair(),
+        sender.storage().clock().unix_seconds(),
+    );
+    sender
+        .storage()
+        .device()
+        .save_contact_device_registry(&recipient_id, &recipient_broadcast, &recipient_pk, 60)
+        .unwrap();
+    let mut activation = ActivationTracker::new();
+    activation.record_push_sent([7u8; 32], 1);
+    activation.record_ack(&[7u8; 32], 1).unwrap();
+    sender
+        .storage()
+        .registry_activation()
+        .save_activation(&recipient_id, &activation)
+        .unwrap();
+
+    sender
+        .configure_emergency_broadcast(
+            vec![recipient_id.clone()],
+            "active responder alert".into(),
+            false,
+        )
+        .unwrap();
+    let result = sender.send_emergency_broadcast().unwrap();
+    assert_eq!(
+        result.sent, 1,
+        "an Active responder must genesis-seal instead of dropping the alert"
+    );
+
+    let pending = sender
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap();
+    assert_eq!(pending.len(), 1, "one peer device gets one alert copy");
+    assert_eq!(
+        pending[0].target_device_id,
+        Some(recipient_device_id),
+        "the fallback must stay on the peer device's mailbox"
+    );
+    assert!(
+        sender
+            .storage()
+            .ratchets()
+            .load_ratchet_state_for_device(&recipient_id, &recipient_device_id)
+            .unwrap()
+            .is_none(),
+        "a genesis-born sending session must not be persisted"
+    );
+
+    let sender_device_id = *sender.identity().unwrap().device_id();
+    let mut recipient = Vauchi::in_memory().unwrap();
+    recipient.set_identity(recipient_identity).unwrap();
+    let sender_contact = Contact::from_exchange(sender_pk, ContactCard::new("Alice"), shared, 0);
+    let sender_id = sender_contact.id().to_string();
+    recipient.add_contact(sender_contact).unwrap();
+    let sender_registry = DeviceRegistry::new(
+        sender
+            .identity()
+            .unwrap()
+            .device_info()
+            .to_registered(&sender_seed),
+        sender.identity().unwrap().signing_keypair(),
+    );
+    let sender_broadcast = RegistryBroadcast::new(
+        &sender_registry,
+        sender.identity().unwrap().signing_keypair(),
+        recipient.storage().clock().unix_seconds(),
+    );
+    recipient
+        .storage()
+        .device()
+        .save_contact_device_registry(&sender_id, &sender_broadcast, &sender_pk, 60)
+        .unwrap();
+
+    let outcome = process_single_card_update_for_authenticated_device(
+        recipient.identity().unwrap(),
+        recipient.storage(),
+        &sender_id,
+        &sender_device_id,
+        &pending[0].payload,
+    )
+    .expect("the peer device must open the genesis-sealed alert");
+    assert!(
+        matches!(
+            outcome,
+            ReceiveOutcome::Alert(ref alert)
+                if alert.kind == AlertKind::Emergency
+                    && alert.message == "active responder alert"
+        ),
+        "the received payload must be the original emergency alert"
+    );
+    assert!(
+        process_single_card_update_for_authenticated_device(
+            recipient.identity().unwrap(),
+            recipient.storage(),
+            &sender_id,
+            &sender_device_id,
+            &pending[0].payload,
+        )
+        .is_err(),
+        "replaying the genesis alert must be rejected"
     );
 }
 

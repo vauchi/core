@@ -443,21 +443,25 @@ impl Vauchi {
                 // `bootstrap_device_pair_ratchet`, so a lost-primary sibling can
                 // be the responder for the whole fleet — and the deterministic
                 // initiator (the peer) may never send first, having no card
-                // change to push, so a plain ratchet card deadlocks forever. A
-                // CARD delta here falls back to the stateless genesis envelope
-                // (the same escape the handshake ack uses in `queue_registry_ack`),
-                // device-scoped so each peer device gets its own copy; the
-                // receiver opens it via the genesis Cek arm in `card_update.rs`.
+                // change to push. A card delta or urgent safety alert here falls
+                // back to the stateless genesis envelope (the same escape the
+                // handshake ack uses in `queue_registry_ack`), device-scoped so
+                // each peer device gets its own copy. The receiver opens both
+                // payload forms through the genesis arm in `card_update.rs`.
                 //
                 // This is deliberately NOT the pre-Active `[0;32]` exchange
                 // bootstrap (`target` is `None` there): a fresh responder must
                 // still defer and retry — the initiator's first message is
                 // imminent, so genesis-sealing would be wasteful and would break
-                // the normal two-party bootstrap. Non-card payloads also keep the
-                // prior defer (their own genesis paths cover what needs one).
+                // the normal two-party bootstrap. Other payloads keep the prior
+                // defer because their own genesis paths cover what needs one.
                 Err(crate::crypto::ratchet::RatchetError::NoSendingChain)
                     if target.is_some()
-                        && payload.first() == Some(&crate::sync::delta::PAYLOAD_VERSION_CEK) =>
+                        && matches!(
+                            payload.first(),
+                            Some(&crate::sync::delta::PAYLOAD_VERSION_CEK)
+                                | Some(&crate::sync::delta::PAYLOAD_VERSION_ALERT)
+                        ) =>
                 {
                     let mut sealed = self.genesis_seal_for_cold_start(identity, ex, payload)?;
                     sealed.peer_device_id = peer_device_id;

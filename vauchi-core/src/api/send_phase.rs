@@ -69,6 +69,9 @@ pub struct SendPhase<'a, T: Transport> {
     storage: &'a Storage,
     config: SyncConfig,
     events: Arc<EventDispatcher>,
+    /// Authenticated device ID from the in-memory Identity. Production always
+    /// supplies this; the storage fallback exists for low-level test callers.
+    local_device_id: Option<[u8; 32]>,
     /// Connection state tracking
     last_connection_state: ConnectionState,
 }
@@ -90,8 +93,16 @@ impl<'a, T: Transport> SendPhase<'a, T> {
             storage,
             config,
             events,
+            local_device_id: None,
             last_connection_state: ConnectionState::Disconnected,
         }
+    }
+
+    /// Supplies the authenticated local device ID used for device-scoped
+    /// sender tokens.
+    pub fn with_local_device_id(mut self, local_device_id: [u8; 32]) -> Self {
+        self.local_device_id = Some(local_device_id);
+        self
     }
 
     /// Connects to the relay server.
@@ -456,6 +467,9 @@ impl<'a, T: Transport> SendPhase<'a, T> {
             || update.target_device_id.is_none()
         {
             return Ok(None);
+        }
+        if let Some(local_device_id) = self.local_device_id {
+            return Ok(Some(local_device_id));
         }
         self.storage
             .device()

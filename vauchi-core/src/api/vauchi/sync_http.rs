@@ -613,7 +613,8 @@ impl Vauchi {
             &self.storage,
             self.config.sync.clone(),
             self.events.clone(),
-        );
+        )
+        .with_local_device_id(*identity.device_id());
 
         // Connect the relay (adapter is already connected from receive phase)
         // SendPhase.connect() calls relay.connect() which calls

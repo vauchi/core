@@ -699,6 +699,7 @@ fn test_sync_send_does_not_downgrade_modern_peer_without_local_device_info() {
 fn storage_with_known_peer_device(
     peer_seed_byte: u8,
     our_device_id: [u8; 32],
+    persist_local_device: bool,
 ) -> (Storage, String, SymmetricKey, [u8; 32]) {
     let storage = create_test_storage();
     let peer_signing = SigningKeyPair::from_seed(&[peer_seed_byte; 32]);
@@ -729,10 +730,12 @@ fn storage_with_known_peer_device(
             60,
         )
         .unwrap();
-    storage
-        .device()
-        .save_device_info(&our_device_id, 0, "Local", 0)
-        .unwrap();
+    if persist_local_device {
+        storage
+            .device()
+            .save_device_info(&our_device_id, 0, "Local", 0)
+            .unwrap();
+    }
 
     let known_peer_device_id = storage
         .device()
@@ -788,6 +791,25 @@ fn drive_send_sender_id(storage: &Storage) -> String {
     envelope.sender_id.to_string()
 }
 
+fn drive_send_sender_id_with_local_device(storage: &Storage, local_device_id: [u8; 32]) -> String {
+    let events = Arc::new(EventDispatcher::new());
+    let mut controller =
+        SendPhase::new(create_test_relay(), storage, SyncConfig::default(), events)
+            .with_local_device_id(local_device_id);
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+    let result = controller
+        .sync(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+    assert_eq!(result.sent, 1, "the update must be sent");
+    let sent = controller.relay().connection().transport().sent_messages();
+    let MessagePayload::EncryptedUpdate(envelope) = &sent[0].payload else {
+        panic!("expected encrypted update")
+    };
+    envelope.sender_id.to_string()
+}
+
 fn legacy_token(storage: &Storage, shared: &SymmetricKey) -> String {
     hex::encode(compute_anonymous_id(
         shared.as_bytes(),
@@ -803,7 +825,7 @@ fn legacy_token(storage: &Storage, shared: &SymmetricKey) -> String {
 // @scenario: multi_device_sync :: An identity-mailbox send uses the legacy sender token
 #[test]
 fn test_identity_mailbox_send_uses_legacy_token_even_when_peer_device_known() {
-    let (storage, contact_id, shared, _) = storage_with_known_peer_device(0x71, [0x77; 32]);
+    let (storage, contact_id, shared, _) = storage_with_known_peer_device(0x71, [0x77; 32], true);
     queue_ratchet_update(&storage, &contact_id, &shared, "registry_handshake", None);
     assert_eq!(
         drive_send_sender_id(&storage),
@@ -820,7 +842,7 @@ fn test_identity_mailbox_send_uses_legacy_token_even_when_peer_device_known() {
 #[test]
 fn test_handshake_ack_uses_legacy_sender_token_despite_device_routing() {
     let (storage, contact_id, shared, peer_device_id) =
-        storage_with_known_peer_device(0x81, [0x88; 32]);
+        storage_with_known_peer_device(0x81, [0x88; 32], true);
     queue_ratchet_update(
         &storage,
         &contact_id,
@@ -843,7 +865,7 @@ fn test_handshake_ack_uses_legacy_sender_token_despite_device_routing() {
 fn test_device_scoped_card_delta_uses_device_sender_token() {
     let our_device_id = [0x99u8; 32];
     let (storage, contact_id, shared, peer_device_id) =
-        storage_with_known_peer_device(0x91, our_device_id);
+        storage_with_known_peer_device(0x91, our_device_id, true);
     queue_ratchet_update(
         &storage,
         &contact_id,
@@ -859,5 +881,58 @@ fn test_device_scoped_card_delta_uses_device_sender_token() {
             &our_device_id,
         )),
         "a device-scoped card delta to a peer that knows us uses this device's sender token"
+    );
+}
+
+// Production constructs the send phase with the authenticated Identity's
+// device ID. The legacy device_info row is not populated on linked devices.
+// @scenario: multi_device_sync :: A linked device sends without legacy local device storage
+#[test]
+fn test_device_scoped_send_uses_authenticated_local_device_id_without_storage_row() {
+    let authenticated_device_id = [0xA1u8; 32];
+    let (storage, contact_id, shared, peer_device_id) =
+        storage_with_known_peer_device(0xA2, [0x55; 32], false);
+    queue_ratchet_update(
+        &storage,
+        &contact_id,
+        &shared,
+        "card_delta",
+        Some(peer_device_id),
+    );
+
+    assert_eq!(
+        drive_send_sender_id_with_local_device(&storage, authenticated_device_id),
+        hex::encode(compute_anonymous_id_for_device(
+            shared.as_bytes(),
+            current_epoch(storage.clock().unix_seconds()),
+            &authenticated_device_id,
+        )),
+    );
+}
+
+// The authenticated Identity is authoritative over vestigial storage state:
+// a stale row must not stamp an origin token the peer cannot resolve.
+// @scenario: multi_device_sync :: Authenticated local device identity wins over stale storage
+#[test]
+fn test_authenticated_local_device_id_wins_over_stored_device_info() {
+    let authenticated_device_id = [0xB1u8; 32];
+    let stale_device_id = [0xB2u8; 32];
+    let (storage, contact_id, shared, peer_device_id) =
+        storage_with_known_peer_device(0xB3, stale_device_id, true);
+    queue_ratchet_update(
+        &storage,
+        &contact_id,
+        &shared,
+        "card_delta",
+        Some(peer_device_id),
+    );
+
+    assert_eq!(
+        drive_send_sender_id_with_local_device(&storage, authenticated_device_id),
+        hex::encode(compute_anonymous_id_for_device(
+            shared.as_bytes(),
+            current_epoch(storage.clock().unix_seconds()),
+            &authenticated_device_id,
+        )),
     );
 }

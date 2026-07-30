@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_app::ui::{
-    ActionListItem, Component, InputType, PreparedSurface, ScreenModel, TextStyle, UserAction,
+    ActionListItem, Component, FormDialogEngine, FormDialogType, InputType, PreparedSurface,
+    ScreenModel, TextStyle, UserAction, WorkflowEngine,
 };
 use vauchi_core::{
     Command, Event, InputValue, PresentationInputKind, PresentationNode, PresentationTextStyle,
@@ -191,6 +192,51 @@ fn action_list_activation_preserves_the_list_selection_route() {
             item_id: "delete_local_data".into(),
         }
     );
+}
+
+// @scenario: generic_presentation_protocol.feature :: User interaction returns as an opaque event
+#[test]
+fn prepared_email_activation_advances_the_form_dialog() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
+    let prepared = PreparedSurface::from_screen(
+        SurfaceId::new("form_add_field").unwrap(),
+        3,
+        &engine.current_screen(),
+    )
+    .expect("form picker projects to a generic surface");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("form picker projects atomically");
+    };
+    let email_interaction = surface
+        .nodes
+        .iter()
+        .find_map(|node| {
+            let PresentationNode::List { rows, .. } = node else {
+                return None;
+            };
+            rows.iter()
+                .find(|row| row.title == "Email")
+                .and_then(|row| row.activation.as_ref())
+                .map(|action| action.interaction_id.clone())
+        })
+        .expect("Email row activation");
+
+    let action = prepared
+        .reduce(Event::ActionActivated {
+            surface_id: SurfaceId::new("form_add_field").unwrap(),
+            interaction_id: email_interaction,
+        })
+        .expect("prepared Email activation");
+    let _ = engine.handle_action(action);
+
+    assert!(engine.current_screen().components.iter().any(|component| {
+        matches!(
+            component,
+            Component::TextInput { id, .. } if id == "field_value"
+        )
+    }));
 }
 
 // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely

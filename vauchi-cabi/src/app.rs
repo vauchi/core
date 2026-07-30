@@ -13,9 +13,18 @@ use vauchi_app::ui::*;
 use vauchi_core::api::Vauchi;
 #[cfg(feature = "secure-storage")]
 use vauchi_core::storage::SecureStorage;
+use vauchi_core::storage::local_keys::load_or_generate_fallback_key;
 
 use super::app_import_warnings::warnings_to_json;
 use super::{VauchiApp, from_c_str, to_c_string};
+
+pub(crate) fn open_with_file_fallback(
+    data_path: &std::path::Path,
+    config: vauchi_core::api::VauchiConfig,
+) -> Option<Vauchi> {
+    let storage_key = load_or_generate_fallback_key(data_path).ok()?;
+    Vauchi::new(config.with_storage_key(storage_key)).ok()
+}
 
 /// Create a new AppEngine with in-memory storage and default relay.
 ///
@@ -827,7 +836,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_keyring(
             config = config.with_relay_url(url);
         }
 
-        // Try platform keyring first, fall back to config-only init
+        // Try platform keyring first, then use a durable file-backed key.
         #[cfg(feature = "secure-storage")]
         {
             let keyring = Arc::new(vauchi_core::storage::PlatformKeyring::new("vauchi"));
@@ -842,10 +851,9 @@ pub unsafe extern "C" fn vauchi_app_create_with_keyring(
             }
         }
 
-        // Fallback: no keyring
-        let vauchi = match Vauchi::new(config) {
-            Ok(v) => v,
-            Err(_) => return std::ptr::null_mut(),
+        let vauchi = match open_with_file_fallback(&data_path, config) {
+            Some(v) => v,
+            None => return std::ptr::null_mut(),
         };
 
         Box::into_raw(Box::new(VauchiApp {

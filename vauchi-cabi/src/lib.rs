@@ -1303,6 +1303,25 @@ mod tests {
         }
     }
 
+    // @scenario: linux_desktop_reliability :: Qt identity survives restart without a system keyring
+    #[test]
+    fn file_fallback_reopens_created_identity() {
+        let dir = tempfile::tempdir().unwrap();
+        let config =
+            || vauchi_core::api::VauchiConfig::with_storage_path(dir.path().join("vauchi.db"));
+
+        let mut first = crate::app::open_with_file_fallback(dir.path(), config())
+            .expect("first file-fallback open");
+        first
+            .create_identity("Persistent C ABI Identity")
+            .expect("create identity");
+        drop(first);
+
+        let reopened = crate::app::open_with_file_fallback(dir.path(), config())
+            .expect("second file-fallback open");
+        assert!(reopened.has_identity());
+    }
+
     // ── Key-based init tests ───────────────────────────────────────
 
     #[test]

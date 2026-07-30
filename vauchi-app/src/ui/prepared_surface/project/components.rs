@@ -127,7 +127,7 @@ impl Projection {
                     Some(BindingId::new(id)?),
                     None,
                     children,
-                    AccessibilitySpec::label(id),
+                    AccessibilitySpec::label(""),
                 ))
             }
             Component::Row { id, items } => {

@@ -77,7 +77,7 @@ impl Projection {
                 offset,
                 window,
             }),
-            accessibility: AccessibilitySpec::label(id),
+            accessibility: AccessibilitySpec::label(""),
         })
     }
 
@@ -204,7 +204,7 @@ impl Projection {
             rows,
             searchable: false,
             paging: None,
-            accessibility: AccessibilitySpec::label(label.as_deref().unwrap_or(id)),
+            accessibility: AccessibilitySpec::label(label.as_deref().unwrap_or("")),
         })
     }
 

@@ -9,7 +9,7 @@
 
 use serde::Serialize;
 use vauchi_app::ui::{ActionResult, AppScreen, ScreenModel, UserAction};
-use vauchi_core::Command;
+use vauchi_core::{Command, Event};
 
 use crate::error::MobileError;
 use crate::types::notification::MobilePendingNotification;
@@ -97,36 +97,23 @@ pub(crate) fn wakeup_envelope_to_json(
     })
 }
 
-/// Envelope returned by `handle_hardware_event`. Carries the optional
-/// `ActionResult` (`None` when the event only advanced an engine-held machine,
-/// e.g. a multi-stage tick) plus **all** `Command`s the event produced, drained
-/// from `pending_commands`.
-///
-/// Without this, command-driven transports stall: a hardware event (BLE
-/// connected / characteristic notified, NFC data, audio response) makes core
-/// emit `Command`s (KeyOffer write, data chunks, NFC APDU) into
-/// `pending_commands`, but the old `handle_hardware_event` returned only the
-/// `ActionResult` and never drained them — so the radio never executed them and
-/// the exchange hung at "Exchanging cards" with zero data flowing.
 #[derive(Serialize)]
-struct HardwareEventEnvelope<'a> {
-    action_result: Option<&'a ActionResult>,
+struct CommandsEnvelope<'a> {
     commands: &'a [Command],
 }
 
-/// Serialize the optional `ActionResult` + drained `Command`s into the
-/// hardware-event envelope JSON shape
-/// `{"action_result": <ActionResult>|null, "commands": [...]}`.
-pub(crate) fn hardware_event_envelope_to_json(
-    result: Option<&ActionResult>,
-    commands: &[Command],
-) -> Result<String, MobileError> {
-    let envelope = HardwareEventEnvelope {
-        action_result: result,
-        commands,
-    };
-    serde_json::to_string(&envelope).map_err(|e| MobileError::Other {
-        detail: format!("Failed to serialize HardwareEventEnvelope: {e}"),
+/// Serialize generic Core-owned presentation commands.
+pub(crate) fn commands_envelope_to_json(commands: &[Command]) -> Result<String, MobileError> {
+    serde_json::to_string(&CommandsEnvelope { commands }).map_err(|e| MobileError::Other {
+        detail: format!("Failed to serialize CommandsEnvelope: {e}"),
+    })
+}
+
+/// Deserialize a generic platform event without a hand-maintained FFI mirror.
+pub(crate) fn event_from_json(json: &str) -> Result<Event, MobileError> {
+    serde_json::from_str(json).map_err(|e| MobileError::InvalidInput {
+        field: String::new(),
+        detail: format!("Failed to parse Event JSON: {e}"),
     })
 }
 

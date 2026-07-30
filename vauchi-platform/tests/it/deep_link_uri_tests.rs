@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Integration tests for deep-link ingestion via `UserAction::LinkOpened`.
+//! Integration tests for deep-link ingestion via the generic event protocol.
 //!
 //! Deep links no longer have a dedicated UniFFI/C-ABI surface; the frontend
-//! forwards the raw URI through `handle_action_json` and core parses + routes
-//! it. This file tests the routing contract for `vauchi://exchange` (exchange
-//! consent) and `vauchi://device-link` (device-link join), plus the error
-//! shape for unsupported links.
+//! forwards the raw URI as `DeepLinkOpened` and Core parses + routes it. This
+//! file tests the routing contract for `vauchi://exchange` (exchange consent)
+//! and `vauchi://device-link` (device-link join), plus the error shape for
+//! unsupported links.
 
 use serde_json::Value;
 use vauchi_platform::{PlatformAppEngine, PlatformAppEngineTestHelpers};
@@ -54,19 +54,33 @@ fn action_result_from_envelope(envelope_json: &str) -> Value {
 fn valid_exchange_uri_navigates_to_consent_screen() {
     let (engine, _dir) = create_engine();
     let url = fresh_link_url();
-    let result = engine
-        .handle_action_json(link_opened_action(&url))
-        .expect("LinkOpened must dispatch");
-    let action_result = action_result_from_envelope(&result);
-    let screen = action_result
-        .get("NavigateTo")
-        .expect("expected NavigateTo result");
-    assert_eq!(screen["screen_id"], "deep_link_consent");
-    assert_eq!(screen["title"], "Exchange Request");
-    let actions = screen["actions"].as_array().expect("actions is array");
-    assert_eq!(actions.len(), 2);
-    assert_eq!(actions[0]["id"], "grant");
-    assert_eq!(actions[1]["id"], "deny");
+    let event = serde_json::json!({"DeepLinkOpened": {"uri": url}});
+    let result: Value = serde_json::from_str(
+        &engine
+            .dispatch_json(event.to_string())
+            .expect("DeepLinkOpened must dispatch"),
+    )
+    .expect("command envelope");
+    let commands = result["commands"].as_array().expect("commands array");
+    let surface = commands
+        .iter()
+        .find_map(|command| command.get("ReplaceSurface"))
+        .and_then(|command| command.get("surface"))
+        .expect("consent surface command");
+    assert_eq!(surface["surface_id"], "deep_link_consent");
+    assert_eq!(surface["title"], "Exchange Request");
+
+    let context_bar = commands
+        .iter()
+        .find_map(|command| command.get("SetContextBar"))
+        .and_then(|command| command.get("bar"))
+        .expect("consent context bar command");
+    assert_eq!(context_bar["primary"]["label"], "Accept Exchange");
+    assert_eq!(context_bar["secondary"]["label"], "Actions");
+    assert!(
+        surface.get("actions").is_none(),
+        "legacy ScreenModel actions must not cross the presentation boundary"
+    );
 }
 
 #[test]

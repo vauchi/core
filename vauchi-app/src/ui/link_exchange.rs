@@ -190,7 +190,7 @@ impl LinkExchangeEngine {
                 content: self.share_url.clone(),
                 style: TextStyle::Body,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: ACTION_SHARE.into(),
                     label: self.t("action.share"),
@@ -228,7 +228,7 @@ impl LinkExchangeEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: ACTION_CANCEL.into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -257,7 +257,7 @@ impl LinkExchangeEngine {
                     role: None,
                 }),
             }],
-            actions: vec![],
+            contextual_actions: vec![],
             ..Default::default()
         }
     }
@@ -292,7 +292,7 @@ impl LinkExchangeEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,
@@ -321,7 +321,7 @@ impl LinkExchangeEngine {
                     role: None,
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: ACTION_RETRY.into(),
                     label: self.t("action.try_again"),

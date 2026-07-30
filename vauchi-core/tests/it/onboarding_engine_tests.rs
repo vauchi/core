@@ -64,13 +64,22 @@ fn identity_check_has_info_panel_and_three_actions() {
             .any(|c| matches!(c, Component::InfoPanel { .. })),
         "IdentityCheck should have an InfoPanel"
     );
-    assert_eq!(screen.actions.len(), 3);
-    assert_eq!(screen.actions[0].id, "create_new");
-    assert!(matches!(screen.actions[0].style, ActionStyle::Primary));
-    assert_eq!(screen.actions[1].id, "link_device");
-    assert!(matches!(screen.actions[1].style, ActionStyle::Secondary));
-    assert_eq!(screen.actions[2].id, "load_backup");
-    assert!(matches!(screen.actions[2].style, ActionStyle::Secondary));
+    assert_eq!(screen.contextual_actions.len(), 3);
+    assert_eq!(screen.contextual_actions[0].id, "create_new");
+    assert!(matches!(
+        screen.contextual_actions[0].style,
+        ActionStyle::Primary
+    ));
+    assert_eq!(screen.contextual_actions[1].id, "link_device");
+    assert!(matches!(
+        screen.contextual_actions[1].style,
+        ActionStyle::Secondary
+    ));
+    assert_eq!(screen.contextual_actions[2].id, "load_backup");
+    assert!(matches!(
+        screen.contextual_actions[2].style,
+        ActionStyle::Secondary
+    ));
 }
 
 // @internal
@@ -255,7 +264,11 @@ fn default_name_text_changed_updates_screen() {
     match result {
         ActionResult::UpdateScreen(screen) => {
             assert_eq!(screen.screen_id, "default_name");
-            let continue_btn = screen.actions.iter().find(|a| a.id == "continue").unwrap();
+            let continue_btn = screen
+                .contextual_actions
+                .iter()
+                .find(|a| a.id == "continue")
+                .unwrap();
             assert!(continue_btn.enabled);
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
@@ -401,7 +414,11 @@ fn contact_info_has_quick_add_buttons() {
         .any(|c| matches!(c, Component::FieldList { .. }));
     assert!(!has_field_list, "Quick-add should NOT have FieldList");
 
-    let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    let action_ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
     assert!(
         action_ids.contains(&"show_phone"),
         "Should have show_phone action"
@@ -442,7 +459,10 @@ fn contact_info_show_phone_reveals_input() {
         .any(|c| matches!(c, Component::TextInput { id, .. } if id == "phone_input"));
     assert!(has_phone_input, "Phone input should be visible");
 
-    let has_show_phone = screen.actions.iter().any(|a| a.id == "show_phone");
+    let has_show_phone = screen
+        .contextual_actions
+        .iter()
+        .any(|a| a.id == "show_phone");
     assert!(!has_show_phone, "show_phone button should be hidden");
 }
 
@@ -601,13 +621,22 @@ fn what_next_has_three_actions_with_start_app_as_primary() {
     assert_eq!(screen.screen_id, "what_next");
     assert_eq!(screen.progress.as_ref().unwrap().current_step, 4);
     assert_eq!(screen.progress.as_ref().unwrap().total_steps, 4);
-    assert_eq!(screen.actions.len(), 3);
-    assert_eq!(screen.actions[0].id, "start_app");
-    assert!(matches!(screen.actions[0].style, ActionStyle::Primary));
-    assert_eq!(screen.actions[1].id, "exchange");
-    assert!(matches!(screen.actions[1].style, ActionStyle::Secondary));
-    assert_eq!(screen.actions[2].id, "import_contacts");
-    assert!(matches!(screen.actions[2].style, ActionStyle::Secondary));
+    assert_eq!(screen.contextual_actions.len(), 3);
+    assert_eq!(screen.contextual_actions[0].id, "start_app");
+    assert!(matches!(
+        screen.contextual_actions[0].style,
+        ActionStyle::Primary
+    ));
+    assert_eq!(screen.contextual_actions[1].id, "exchange");
+    assert!(matches!(
+        screen.contextual_actions[1].style,
+        ActionStyle::Secondary
+    ));
+    assert_eq!(screen.contextual_actions[2].id, "import_contacts");
+    assert!(matches!(
+        screen.contextual_actions[2].style,
+        ActionStyle::Secondary
+    ));
 }
 
 #[test]

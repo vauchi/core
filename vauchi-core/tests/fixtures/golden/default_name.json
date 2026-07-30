@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "default_name",
   "title": "What's your name?",
   "subtitle": "How you appear to contacts",
@@ -25,19 +25,6 @@
           "hint": "Enter the name others will see on your contact card",
           "role": null
         }
-      }
-    }
-  ],
-  "actions": [
-    {
-      "id": "continue",
-      "label": "Continue",
-      "style": "Primary",
-      "enabled": false,
-      "a11y": {
-        "label": "Continue",
-        "hint": null,
-        "role": null
       }
     }
   ],

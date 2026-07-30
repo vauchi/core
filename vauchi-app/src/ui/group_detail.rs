@@ -163,7 +163,7 @@ impl GroupDetailEngine {
             title: self.group_name.clone(),
             subtitle: None,
             components,
-            actions: self.build_actions(),
+            contextual_actions: self.build_actions(),
             progress: None,
             ..Default::default()
         }

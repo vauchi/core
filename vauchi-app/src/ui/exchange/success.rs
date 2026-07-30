@@ -204,8 +204,8 @@ mod tests {
             ids.contains(&"my_visibility".to_string()),
             "visibility section present"
         );
-        assert_eq!(screen.actions.len(), 1, "one Done action");
-        assert_eq!(screen.actions[0].id, "done");
+        assert_eq!(screen.contextual_actions.len(), 1, "one Done action");
+        assert_eq!(screen.contextual_actions[0].id, "done");
     }
 
     // @internal

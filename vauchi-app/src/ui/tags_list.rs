@@ -151,7 +151,7 @@ impl TagsEngine {
             title: self.t("more.tags"),
             subtitle: None,
             components,
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }

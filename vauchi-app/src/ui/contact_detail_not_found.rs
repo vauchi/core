@@ -58,7 +58,7 @@ impl WorkflowEngine for ContactNotFoundEngine {
                     role: Some(AccessibilityRole::Heading),
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "back".into(),
                 label: self.t("action.back"),
                 style: ActionStyle::Secondary,

@@ -133,13 +133,13 @@ fn duress_overview_shows_read_only_status_not_dead_toggle() {
 
     // When disabled, should show "Set Up PIN" and no disable action
     let configure = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "configure")
         .expect("should have configure action");
     assert_eq!(configure.label, "Set Up PIN");
     assert!(
-        screen.actions.iter().all(|a| a.id != "disable"),
+        screen.contextual_actions.iter().all(|a| a.id != "disable"),
         "disable action should not appear when not enabled"
     );
 
@@ -147,13 +147,13 @@ fn duress_overview_shows_read_only_status_not_dead_toggle() {
     let engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::English);
     let screen = engine.current_screen();
     let configure = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "configure")
         .expect("should have configure action");
     assert_eq!(configure.label, "Change PIN");
     let disable = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "disable")
         .expect("should have disable action when enabled");
@@ -606,7 +606,7 @@ fn duress_save_blocked_without_recipient() {
 
     let save = engine
         .current_screen()
-        .actions
+        .contextual_actions
         .into_iter()
         .find(|a| a.id == "save")
         .expect("a 'save' action");
@@ -636,7 +636,7 @@ fn duress_recipient_selection_round_trips_to_output() {
 
     let save = engine
         .current_screen()
-        .actions
+        .contextual_actions
         .into_iter()
         .find(|a| a.id == "save")
         .expect("a 'save' action");

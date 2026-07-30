@@ -28,6 +28,18 @@
 
 use serde::{Deserialize, Serialize};
 
+mod presentation;
+
+pub use presentation::{
+    AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, BindingId, ChoiceOption, ContextBar,
+    ExportFileSpec, InputMode, InputValue, InteractionId, MotionPreference, NotificationSpec,
+    NotificationUrgency, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis,
+    PresentationIdError, PresentationImageShape, PresentationInputKind, PresentationNode,
+    PresentationPaging, PresentationProfile, PresentationQrPurpose, PresentationRow,
+    PresentationTextStyle, PresentationTokens, PresentationTone, StandardShortcut, SurfaceId,
+    SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass,
+};
+
 /// A command from core to the frontend requesting a hardware action.
 ///
 /// Frontends match on these and dispatch to platform-specific APIs
@@ -327,6 +339,53 @@ pub enum Command {
         sound: SoundToken,
         animation: AnimationToken,
     },
+    /// Atomically replace the contextual controls associated with a surface.
+    SetContextBar {
+        surface_id: SurfaceId,
+        revision: u64,
+        bar: Box<ContextBar>,
+    },
+    /// Present navigation or secondary actions for a surface.
+    PresentOverlay {
+        surface_id: SurfaceId,
+        revision: u64,
+        overlay: OverlaySpec,
+    },
+    /// Apply Core's structural composition for the current window.
+    SetPresentationProfile { profile: PresentationProfile },
+    /// Atomically replace one named surface with fully prepared,
+    /// domain-free presentation primitives.
+    ReplaceSurface { surface: SurfaceSpec },
+    /// Present a prepared native alert.
+    PresentAlert { alert: AlertSpec },
+    /// Present transient informational feedback.
+    ShowToast { toast: ToastSpec },
+    /// Open a prepared URL using the platform default handler.
+    OpenExternalUrl { url: String },
+    /// Offer prepared bytes through the platform save/share mechanism.
+    ExportFile { file: ExportFileSpec },
+    /// Perform the platform's default back behavior.
+    PerformNativeBack,
+    /// Reset platform-owned application state after Core wiped its data.
+    ResetApplication,
+    /// Post a fully prepared operating-system notification.
+    PostNotification { notification: NotificationSpec },
+    /// Apply Core's post-biometric authentication decision.
+    SetAuthenticationRequirement {
+        requirement: AuthenticationRequirement,
+    },
+}
+
+/// Authentication state the native startup shell must present.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum AuthenticationRequirement {
+    /// Biometric authentication completed and normal app state may be shown.
+    Unlocked,
+    /// A configured duress PIN requires the native app-password prompt.
+    AppPassword,
 }
 
 /// Haptic intent for [`Command::Celebrate`]. Closed enum — platforms map
@@ -463,6 +522,18 @@ impl Command {
             Self::SetOrientationLock { .. } => "SetOrientationLock",
             Self::LocationRequest { .. } => "LocationRequest",
             Self::Celebrate { .. } => "Celebrate",
+            Self::SetContextBar { .. } => "SetContextBar",
+            Self::PresentOverlay { .. } => "PresentOverlay",
+            Self::SetPresentationProfile { .. } => "SetPresentationProfile",
+            Self::ReplaceSurface { .. } => "ReplaceSurface",
+            Self::PresentAlert { .. } => "PresentAlert",
+            Self::ShowToast { .. } => "ShowToast",
+            Self::OpenExternalUrl { .. } => "OpenExternalUrl",
+            Self::ExportFile { .. } => "ExportFile",
+            Self::PerformNativeBack => "PerformNativeBack",
+            Self::ResetApplication => "ResetApplication",
+            Self::PostNotification { .. } => "PostNotification",
+            Self::SetAuthenticationRequirement { .. } => "SetAuthenticationRequirement",
         }
     }
 }
@@ -661,6 +732,37 @@ pub enum Event {
     /// The session decrypts it under the HKDF-derived card key and completes the
     /// exchange (USB is physical → proximity High, no user step).
     DirectCardReceived { ciphertext: Vec<u8> },
+    /// A Core-minted interaction on a presented surface was activated.
+    ActionActivated {
+        surface_id: SurfaceId,
+        interaction_id: InteractionId,
+    },
+    /// Available presentation facts changed for the current window.
+    PresentationEnvironmentChanged {
+        available_width: u32,
+        available_height: u32,
+        input_modes: Vec<InputMode>,
+        motion: MotionPreference,
+    },
+    /// A visible surface became the target of user interaction.
+    SurfaceActivated { surface_id: SurfaceId },
+    /// Native or contextual Back was requested for a surface.
+    BackRequested { surface_id: SurfaceId },
+    /// A presented overlay was dismissed without activating an item.
+    OverlayDismissed {
+        surface_id: SurfaceId,
+        kind: OverlayKind,
+    },
+    /// A raw value changed for an opaque binding on the current surface.
+    ValueChanged {
+        surface_id: SurfaceId,
+        binding_id: BindingId,
+        value: InputValue,
+    },
+    /// The operating system delivered an opaque application deep link.
+    DeepLinkOpened { uri: String },
+    /// The application moved to the background or lost its active session.
+    AppBackgrounded,
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

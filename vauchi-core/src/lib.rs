@@ -106,7 +106,16 @@ pub use exchange::{
 };
 
 pub mod platform;
-pub use platform::{BleLinkDirection, Command, Event, FilePickPurpose, Orientation};
+pub use platform::{
+    AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, AuthenticationRequirement, BindingId,
+    BleLinkDirection, ChoiceOption, Command, ContextBar, Event, ExportFileSpec, FilePickPurpose,
+    InputMode, InputValue, InteractionId, MotionPreference, NotificationSpec, NotificationUrgency,
+    Orientation, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis, PresentationIdError,
+    PresentationImageShape, PresentationInputKind, PresentationNode, PresentationPaging,
+    PresentationProfile, PresentationQrPurpose, PresentationRow, PresentationTextStyle,
+    PresentationTokens, PresentationTone, StandardShortcut, SurfaceId, SurfaceLayout, SurfaceSpec,
+    ToastSpec, WindowClass,
+};
 
 pub mod recovery;
 pub mod relay_url;

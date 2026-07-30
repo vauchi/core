@@ -217,7 +217,7 @@ impl ChangePasswordEngine {
             title,
             subtitle,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "submit".into(),
                     label: self.t("action.save"),

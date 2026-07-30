@@ -90,7 +90,7 @@ fn test_no_footer_back_completion_defaults_none() {
 
     let screen = engine.current_screen();
     assert!(
-        !screen.actions.iter().any(|a| a.id == "back"),
+        !screen.contextual_actions.iter().any(|a| a.id == "back"),
         "fingerprint_verify must not offer a footer back action"
     );
     assert_eq!(
@@ -133,7 +133,7 @@ fn test_verified_screen_shows_unverify_button() {
     );
 
     let screen = engine.current_screen();
-    let has_unverify = screen.actions.iter().any(|a| a.id == "unverify");
+    let has_unverify = screen.contextual_actions.iter().any(|a| a.id == "unverify");
     assert!(has_unverify, "Verified screen must have an unverify button");
 }
 

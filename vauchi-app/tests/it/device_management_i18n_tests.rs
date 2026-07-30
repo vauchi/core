@@ -36,7 +36,7 @@ fn device_management_renders_german() {
     assert_eq!(screen.title, "Geräte");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "revoke_device")
             .unwrap()
@@ -54,7 +54,7 @@ fn device_management_english_copy_unchanged() {
     assert_eq!(screen.title, "Devices");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "revoke_device")
             .unwrap()

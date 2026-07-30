@@ -59,7 +59,7 @@ fn intro_disables_start_when_quorum_short() {
     let engine = engine();
     let screen = engine.build_screen();
     let start = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "start_recovery_process")
         .unwrap();
@@ -80,7 +80,7 @@ fn intro_enables_start_when_quorum_met() {
     let engine = engine_with_quorum();
     let screen = engine.build_screen();
     let start = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "start_recovery_process")
         .unwrap();
@@ -106,7 +106,7 @@ fn create_claim_disabled_until_64_hex_chars() {
     // Empty input → disabled
     let screen = engine.build_screen();
     let create = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "create_claim")
         .unwrap();
@@ -116,7 +116,7 @@ fn create_claim_disabled_until_64_hex_chars() {
     type_old_key(&mut engine, "abcd");
     let screen = engine.build_screen();
     let create = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "create_claim")
         .unwrap();
@@ -126,7 +126,7 @@ fn create_claim_disabled_until_64_hex_chars() {
     type_old_key(&mut engine, &"a".repeat(64));
     let screen = engine.build_screen();
     let create = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "create_claim")
         .unwrap();

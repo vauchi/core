@@ -14,7 +14,7 @@
 
 use std::sync::Arc;
 
-use vauchi_platform::PlatformAppEngine;
+use vauchi_platform::{PlatformAppEngine, PlatformAppEngineTestHelpers};
 
 fn create_engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");

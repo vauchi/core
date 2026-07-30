@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "edit_fields",
   "title": "Edit Contact",
   "subtitle": null,
@@ -72,14 +72,6 @@
           "role": null
         }
       }
-    }
-  ],
-  "actions": [
-    {
-      "id": "continue",
-      "label": "Continue",
-      "style": "Primary",
-      "enabled": true
     }
   ],
   "progress": {

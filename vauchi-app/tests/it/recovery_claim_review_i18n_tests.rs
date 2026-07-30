@@ -39,7 +39,7 @@ fn claim_review_screen_renders_german() {
     assert_eq!(screen.title, "Wiederherstellung: Alice");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "vouch")
             .unwrap()
@@ -57,7 +57,7 @@ fn claim_review_screen_english_copy_unchanged() {
     assert_eq!(screen.title, "Recovery: Alice");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "vouch")
             .unwrap()

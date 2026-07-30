@@ -180,7 +180,7 @@ impl ContactEditEngine {
                     }),
                 },
             ],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "continue".into(),
                 label: self.t("action.continue"),
                 style: ActionStyle::Primary,
@@ -253,7 +253,7 @@ impl ContactEditEngine {
             title: self.t("group_detail.field_visibility_label"),
             subtitle: None,
             components: toggle_lists,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "back".into(),
                     label: self.t("action.back"),
@@ -312,7 +312,7 @@ impl ContactEditEngine {
                     role: None,
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "back".into(),
                     label: self.t("action.back"),

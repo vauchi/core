@@ -17,30 +17,38 @@ use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 
 mod app;
 mod app_import_warnings;
+#[cfg(test)]
 mod app_navigation;
+mod app_presentation;
 mod config;
 mod exchange;
 mod i18n;
 mod logging;
 pub(crate) mod platform_event;
+#[cfg(test)]
 mod workflow;
 
 pub use app::*;
+#[cfg(test)]
 pub use app_navigation::*;
+pub use app_presentation::*;
 pub use exchange::*;
 pub use i18n::*;
 pub use logging::*;
+#[cfg(test)]
 pub use workflow::*;
 
 use config::CabiConfig;
 
 // ── Type-erased engine wrapper ──────────────────────────────────────
 
+#[cfg(test)]
 pub(crate) trait WorkflowEngineAny: Send {
     fn current_screen_json(&self) -> String;
     fn handle_action_json(&mut self, json: &str) -> String;
 }
 
+#[cfg(test)]
 impl<T: WorkflowEngine + Send> WorkflowEngineAny for T {
     fn current_screen_json(&self) -> String {
         match serde_json::to_string(&self.current_screen()) {
@@ -64,6 +72,7 @@ impl<T: WorkflowEngine + Send> WorkflowEngineAny for T {
 }
 
 /// Opaque handle to a workflow engine instance.
+#[cfg(test)]
 pub struct VauchiWorkflow {
     pub(crate) engine: Mutex<Box<dyn WorkflowEngineAny>>,
 }
@@ -478,6 +487,49 @@ mod tests {
             assert_eq!(screen["screen_id"], "identity_check");
             vauchi_string_free(json_ptr);
             vauchi_app_destroy(handle);
+        }
+    }
+
+    // @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+    #[test]
+    fn app_c_abi_transports_contextual_commands_and_generic_events() {
+        unsafe {
+            let app = vauchi_app_create();
+            assert!(!app.is_null());
+
+            let commands_ptr = vauchi_app_initial_commands(app);
+            assert!(!commands_ptr.is_null());
+            let commands: serde_json::Value =
+                serde_json::from_str(CStr::from_ptr(commands_ptr).to_str().unwrap()).unwrap();
+            vauchi_string_free(commands_ptr);
+            assert_eq!(
+                commands["commands"][0]["ReplaceSurface"]["surface"]["revision"],
+                1
+            );
+
+            let event = CString::new(
+                serde_json::json!({
+                    "PresentationEnvironmentChanged": {
+                        "available_width": 840,
+                        "available_height": 900,
+                        "input_modes": ["keyboard", "pointer"],
+                        "motion": "full",
+                    }
+                })
+                .to_string(),
+            )
+            .unwrap();
+            let response_ptr = vauchi_app_dispatch(app, event.as_ptr());
+            assert!(!response_ptr.is_null());
+            let response: serde_json::Value =
+                serde_json::from_str(CStr::from_ptr(response_ptr).to_str().unwrap()).unwrap();
+            vauchi_string_free(response_ptr);
+            assert_eq!(
+                response["commands"][0]["SetPresentationProfile"]["profile"]["window_class"],
+                "expanded"
+            );
+
+            vauchi_app_destroy(app);
         }
     }
 

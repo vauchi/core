@@ -151,7 +151,7 @@ impl DecoyContactsEngine {
             title: self.t("decoy_contacts.title"),
             subtitle: None,
             components,
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "add_decoy".into(),
                 label: self.t("decoy_contacts.add_button"),
                 style: ActionStyle::Primary,
@@ -275,7 +275,11 @@ mod tests {
     fn add_decoy_action_enabled_only_with_non_empty_name() {
         let mut engine = DecoyContactsEngine::new(vec![]);
         let screen = engine.current_screen();
-        let add_action = screen.actions.iter().find(|a| a.id == "add_decoy").unwrap();
+        let add_action = screen
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "add_decoy")
+            .unwrap();
         assert!(!add_action.enabled, "Add disabled when name is empty");
 
         let _ = engine.handle_action(UserAction::TextChanged {
@@ -283,7 +287,11 @@ mod tests {
             value: "Charlie".into(),
         });
         let screen = engine.current_screen();
-        let add_action = screen.actions.iter().find(|a| a.id == "add_decoy").unwrap();
+        let add_action = screen
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "add_decoy")
+            .unwrap();
         assert!(add_action.enabled, "Add enabled when name is non-empty");
     }
 
@@ -296,7 +304,11 @@ mod tests {
             value: "   ".into(),
         });
         let screen = engine.current_screen();
-        let add_action = screen.actions.iter().find(|a| a.id == "add_decoy").unwrap();
+        let add_action = screen
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "add_decoy")
+            .unwrap();
         assert!(!add_action.enabled, "Add must reject whitespace-only names");
     }
 
@@ -348,7 +360,11 @@ mod tests {
             item_id: "d1".into(),
         });
         let screen = engine.current_screen();
-        let add_action = screen.actions.iter().find(|a| a.id == "add_decoy").unwrap();
+        let add_action = screen
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "add_decoy")
+            .unwrap();
         assert!(
             !add_action.enabled,
             "Add must be disabled while delete-confirm is pending"

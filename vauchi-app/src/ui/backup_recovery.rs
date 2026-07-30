@@ -202,7 +202,7 @@ impl BackupRecoveryEngine {
                     a11y: None,
                 },
             ],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "create".into(),
                     label: self.t("backup.wizard.create"),
@@ -275,7 +275,7 @@ impl BackupRecoveryEngine {
             title: self.t("backup.wizard.password_title"),
             subtitle: None,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "back".into(),
                     label: self.t("action.back"),
@@ -315,7 +315,7 @@ impl BackupRecoveryEngine {
                     role: Some(AccessibilityRole::Alert),
                 }),
             }],
-            actions: vec![],
+            contextual_actions: vec![],
             progress: self.progress(),
             ..Default::default()
         }
@@ -345,7 +345,7 @@ impl BackupRecoveryEngine {
                 }),
                 info_key: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "back".into(),
                     label: self.t("action.back"),
@@ -398,7 +398,7 @@ impl BackupRecoveryEngine {
                     role: None,
                 }),
             }],
-            actions: vec![],
+            contextual_actions: vec![],
             progress: self.progress(),
             ..Default::default()
         }
@@ -430,7 +430,7 @@ impl BackupRecoveryEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "done".into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,
@@ -468,7 +468,7 @@ impl BackupRecoveryEngine {
                     role: None,
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "retry".into(),
                     label: self.t("action.retry"),

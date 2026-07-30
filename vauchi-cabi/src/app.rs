@@ -203,6 +203,9 @@ pub unsafe extern "C" fn vauchi_app_destroy(handle: *mut VauchiApp) {
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.
+// INLINE_TEST_REQUIRED: retired ScreenModel C ABI functions remain test-only
+// so migration regressions are covered without exporting the old protocol.
+#[cfg(test)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_current_screen(handle: *mut VauchiApp) -> *mut c_char {
     // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
@@ -311,6 +314,7 @@ pub unsafe extern "C" fn vauchi_app_on_wakeup(app: *mut VauchiApp) -> *mut c_cha
 /// # Safety
 /// `handle` must be a valid app handle or null.
 /// `action_json` must be a valid null-terminated C string, or null.
+#[cfg(test)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_handle_action(
     handle: *mut VauchiApp,
@@ -363,6 +367,7 @@ pub unsafe extern "C" fn vauchi_app_handle_action(
 /// # Safety
 /// `handle` must be a valid app handle or null.
 /// `screen_name` must be a valid null-terminated C string, or null.
+#[cfg(test)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_navigate_to(
     handle: *mut VauchiApp,
@@ -404,13 +409,12 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
 ///
 /// Pops the engine's `AppScreen` nav history, or rewinds one in-engine
 /// sub-flow step (the exchange flow). Deprecated for the OS back gesture:
-/// frontends should forward system back via `UserAction::NavigateBack`
-/// (using `vauchi_app_handle_action`) and render the `go_back` chrome
-/// action from `nav_actions`. Kept for the few remaining internal callers
-/// while C-ABI frontends migrate (ADR-044 Amendment 2a).
+/// frontends should forward system back as a generic `BackRequested` event
+/// using `vauchi_app_dispatch`. Kept only for internal migration tests.
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.
+#[cfg(test)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_navigate_back(handle: *mut VauchiApp) -> *mut c_char {
     // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
@@ -441,6 +445,7 @@ pub unsafe extern "C" fn vauchi_app_navigate_back(handle: *mut VauchiApp) -> *mu
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.
+#[cfg(test)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) -> *mut c_char {
     // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
@@ -475,6 +480,7 @@ pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) ->
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.
+#[cfg(test)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *mut c_char {
     // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
@@ -510,6 +516,7 @@ pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *m
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.
+#[cfg(test)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_current_tab_id(
     handle: *mut VauchiApp,
@@ -616,6 +623,7 @@ pub unsafe extern "C" fn vauchi_app_create_identity(
 /// `handle` must be a valid app handle or null.
 /// `event_json` must be a valid null-terminated C string, or null.
 #[unsafe(no_mangle)]
+#[cfg(test)]
 pub unsafe extern "C" fn vauchi_app_handle_hardware_event(
     handle: *mut VauchiApp,
     event_json: *const c_char,
@@ -660,6 +668,7 @@ pub unsafe extern "C" fn vauchi_app_handle_hardware_event(
 /// # Safety
 /// `handle` must be a valid app handle or null.
 #[unsafe(no_mangle)]
+#[cfg(test)]
 pub unsafe extern "C" fn vauchi_app_handle_app_backgrounded(handle: *mut VauchiApp) -> *mut c_char {
     // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
     unsafe {
@@ -704,7 +713,7 @@ pub type VauchiEventCallback =
 /// # Threading — IMPORTANT
 ///
 /// The callback may fire **on the same thread** that called
-/// `vauchi_app_handle_action` (synchronous event dispatch). The callback
+/// `vauchi_app_dispatch` (synchronous event dispatch). The callback
 /// **must not** call back into any `vauchi_app_*` function directly —
 /// doing so would deadlock on the internal Mutex. Always defer
 /// processing to a separate thread or event loop iteration.

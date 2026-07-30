@@ -74,10 +74,10 @@ fn my_info_title_is_display_name() {
 fn my_info_has_add_entry_and_toggle_view_actions() {
     let engine = MyInfoEngine::new(MyInfoProgress::default());
     let screen = engine.current_screen();
-    assert_eq!(screen.actions.len(), 3);
-    assert_eq!(screen.actions[0].id, "add_field");
-    assert_eq!(screen.actions[1].id, "toggle_view");
-    assert_eq!(screen.actions[2].id, "preview-as-picker");
+    assert_eq!(screen.contextual_actions.len(), 3);
+    assert_eq!(screen.contextual_actions[0].id, "add_field");
+    assert_eq!(screen.contextual_actions[1].id, "toggle_view");
+    assert_eq!(screen.contextual_actions[2].id, "preview-as-picker");
 }
 
 // @internal
@@ -116,7 +116,7 @@ fn my_info_toggle_view_switches_mode() {
     let screen = engine.current_screen();
     assert!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .any(|a| a.id == "toggle_view" && a.label == "Group View")
     );
@@ -129,7 +129,7 @@ fn my_info_toggle_view_switches_mode() {
     let screen = engine.current_screen();
     assert!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .any(|a| a.id == "toggle_view" && a.label == "Entry View")
     );
@@ -213,7 +213,10 @@ fn test_preview_view_shows_banner_and_fields() {
     }
 
     // An action with id "exit-preview" must be present
-    let has_exit = screen.actions.iter().any(|a| a.id == "exit-preview");
+    let has_exit = screen
+        .contextual_actions
+        .iter()
+        .any(|a| a.id == "exit-preview");
     assert!(has_exit, "Expected exit-preview action in screen actions");
 
     // Visible field must have Shown marker, hidden field must have Hidden marker
@@ -271,11 +274,15 @@ fn my_info_shows_exchange_prompt_when_no_contacts() {
     );
 
     // Should have go_exchange as first action (primary)
-    assert_eq!(screen.actions[0].id, "go_exchange");
-    assert_eq!(screen.actions[0].style, ActionStyle::Primary);
+    assert_eq!(screen.contextual_actions[0].id, "go_exchange");
+    assert_eq!(screen.contextual_actions[0].style, ActionStyle::Primary);
 
     // add_field should be demoted to secondary
-    let add_field = screen.actions.iter().find(|a| a.id == "add_field").unwrap();
+    let add_field = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "add_field")
+        .unwrap();
     assert_eq!(add_field.style, ActionStyle::Secondary);
 }
 
@@ -295,11 +302,14 @@ fn my_info_hides_exchange_prompt_when_has_contacts() {
     assert!(!prompt, "Should not show exchange prompt when has contacts");
 
     assert!(
-        !screen.actions.iter().any(|a| a.id == "go_exchange"),
+        !screen
+            .contextual_actions
+            .iter()
+            .any(|a| a.id == "go_exchange"),
         "Should not have go_exchange action"
     );
 
     // add_field should be primary
-    assert_eq!(screen.actions[0].id, "add_field");
-    assert_eq!(screen.actions[0].style, ActionStyle::Primary);
+    assert_eq!(screen.contextual_actions[0].id, "add_field");
+    assert_eq!(screen.contextual_actions[0].style, ActionStyle::Primary);
 }

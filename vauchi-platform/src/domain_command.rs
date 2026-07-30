@@ -483,8 +483,8 @@ pub enum DomainCommand {
     /// All pending device deliveries.
     GetPendingDeviceDeliveries,
     // ── Identity reads + Onboarding helpers (B7 batch 9) ──
-    /// Programmatically create an identity bypassing the onboarding
-    /// `UserAction` flow. Errors when an identity already exists.
+    /// Programmatically create an identity outside the presentation reducer.
+    /// Errors when an identity already exists.
     CreateIdentity {
         display_name: String,
     },

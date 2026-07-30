@@ -203,7 +203,7 @@ impl RecoveryHelpEngine {
             title: self.t("recovery.tab_help_others"),
             subtitle: None,
             components,
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "vouch".into(),
                 label: self.t("recovery.vouch_for_someone"),
                 style: ActionStyle::Primary,
@@ -247,7 +247,7 @@ impl RecoveryHelpEngine {
             title: self.t("recovery.vouch_for_recovery"),
             subtitle: None,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "verify_claim".into(),
                     label: self.t("recovery.verify_button"),
@@ -324,7 +324,7 @@ impl RecoveryHelpEngine {
             title: self.t("recovery.confirm_voucher"),
             subtitle: None,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "create_voucher".into(),
                     label: self.t("recovery.create_voucher_button"),
@@ -371,7 +371,7 @@ impl RecoveryHelpEngine {
                     style: TextStyle::Caption,
                 },
             ],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "copy_voucher".into(),
                     label: self.t("recovery.copy_voucher_data"),
@@ -529,7 +529,10 @@ mod tests {
         let screen = engine.build_screen();
         assert_eq!(screen.title, "Help Others");
         assert!(
-            screen.actions.iter().any(|a| a.id == "vouch" && a.enabled),
+            screen
+                .contextual_actions
+                .iter()
+                .any(|a| a.id == "vouch" && a.enabled),
             "Info screen must offer the vouch action"
         );
     }
@@ -553,7 +556,7 @@ mod tests {
         // Empty input → disabled
         let screen = engine.build_screen();
         let verify = screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "verify_claim")
             .unwrap();
@@ -563,7 +566,7 @@ mod tests {
         type_claim(&mut engine, "tooshort");
         let screen = engine.build_screen();
         let verify = screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "verify_claim")
             .unwrap();
@@ -573,7 +576,7 @@ mod tests {
         type_claim(&mut engine, "this_is_long_enough_to_pass_the_guard");
         let screen = engine.build_screen();
         let verify = screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "verify_claim")
             .unwrap();
@@ -624,7 +627,7 @@ mod tests {
         let screen = engine.build_screen();
         assert_eq!(screen.title, "Confirm Voucher");
         let create = screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "create_voucher")
             .unwrap();
@@ -646,7 +649,7 @@ mod tests {
 
         let screen = engine.build_screen();
         let create = screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "create_voucher")
             .unwrap();

@@ -114,11 +114,11 @@ fn delivery_failed_section_emits_retry_all_action() {
     let engine = DeliveryStatusEngine::new(items);
     let screen = engine.current_screen();
 
-    assert_eq!(screen.actions.len(), 1);
-    assert_eq!(screen.actions[0].id, "retry_all");
-    assert_eq!(screen.actions[0].label, "Retry Failed");
-    assert_eq!(screen.actions[0].style, ActionStyle::Primary);
-    assert!(screen.actions[0].enabled);
+    assert_eq!(screen.contextual_actions.len(), 1);
+    assert_eq!(screen.contextual_actions[0].id, "retry_all");
+    assert_eq!(screen.contextual_actions[0].label, "Retry Failed");
+    assert_eq!(screen.contextual_actions[0].style, ActionStyle::Primary);
+    assert!(screen.contextual_actions[0].enabled);
 }
 
 // @internal
@@ -131,7 +131,7 @@ fn delivery_no_retry_when_all_success() {
     let engine = DeliveryStatusEngine::new(items);
     let screen = engine.current_screen();
 
-    assert!(screen.actions.is_empty());
+    assert!(screen.contextual_actions.is_empty());
 }
 
 // @internal

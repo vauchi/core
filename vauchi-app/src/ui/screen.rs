@@ -10,7 +10,7 @@ use crate::theme::DesignTokens;
 /// Current schema version. Increment for any breaking ScreenModel wire-contract
 /// change, including required fields on an existing Component variant.
 /// Shells use this to detect unsupported components and degrade gracefully.
-pub const CURRENT_SCHEMA_VERSION: u16 = 4;
+pub const CURRENT_SCHEMA_VERSION: u16 = 5;
 
 /// How the frontend should present this screen. Replaces frontend-side
 /// substring checks on `screen_id` (e.g. windows
@@ -105,7 +105,11 @@ pub struct ScreenModel {
     pub title: String,
     pub subtitle: Option<String>,
     pub components: Vec<Component>,
-    pub actions: Vec<ScreenAction>,
+    /// Core-internal transition candidates. Shells receive their prepared,
+    /// prioritized equivalents through `ContextBar` and `OverlaySpec`.
+    #[serde(skip)]
+    #[cfg_attr(feature = "schema-gen", schemars(skip))]
+    pub contextual_actions: Vec<ScreenAction>,
     pub progress: Option<Progress>,
     /// Resolved design tokens for layout consistency. Frontends read
     /// spacing, radius, typography from here — never hardcode values.
@@ -148,15 +152,10 @@ pub struct ScreenModel {
     /// (`2026-07-06-mobile-domain-shell-violations` I5/A2).
     #[serde(default, skip_serializing_if = "NativeWrapperHint::is_none")]
     pub native_wrapper_hint: NativeWrapperHint,
-    /// Global/top-bar chrome actions offered on this screen (e.g. the
-    /// Settings gear on the home screen). Core owns *what* chrome actions
-    /// exist; each frontend presents them per its form factor (mobile
-    /// top-bar, desktop may route to its sidebar) instead of hardcoding
-    /// native chrome — retires android's `ReadyScreen`/`isHomeTab` gate and
-    /// the iOS `HomeView` header (`2026-07-06-mobile-domain-shell-violations`).
-    /// Reserved chrome ids (e.g. `open_settings`) resolve to their
-    /// `NavigateTo` before per-screen dispatch. Empty on most screens.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Core-internal navigation action candidates. Shells receive their
+    /// prepared equivalents through `ContextBar` and `OverlaySpec`.
+    #[serde(skip)]
+    #[cfg_attr(feature = "schema-gen", schemars(skip))]
     pub nav_actions: Vec<ScreenAction>,
 }
 
@@ -172,7 +171,7 @@ impl Default for ScreenModel {
             title: String::new(),
             subtitle: None,
             components: Vec::new(),
-            actions: Vec::new(),
+            contextual_actions: Vec::new(),
             progress: None,
             // Active tokens here too, so struct-literal builders using
             // `..Default::default()` reflect a token hot-reload. The serde
@@ -196,7 +195,7 @@ impl ScreenModel {
         screen_id: impl Into<String>,
         title: impl Into<String>,
         components: Vec<Component>,
-        actions: Vec<ScreenAction>,
+        contextual_actions: Vec<ScreenAction>,
     ) -> Self {
         Self {
             schema_version: CURRENT_SCHEMA_VERSION,
@@ -204,7 +203,7 @@ impl ScreenModel {
             title: title.into(),
             subtitle: None,
             components,
-            actions,
+            contextual_actions,
             progress: None,
             // Source tokens from the hot-reload store so a reloaded
             // tokens.json shows up in every emitted screen; falls back to
@@ -289,6 +288,39 @@ mod tests {
         let m = ScreenModel::new("test", "Title", vec![], vec![]);
         let json = serde_json::to_string(&m).unwrap();
         assert!(json.contains(&format!("\"schema_version\":{CURRENT_SCHEMA_VERSION}")));
+    }
+
+    // @scenario: generic_presentation_protocol.feature :: Release contains only the generic action system
+    #[test]
+    fn serialized_screen_model_does_not_expose_any_screen_actions() {
+        let mut screen = ScreenModel::new(
+            "test",
+            "Title",
+            vec![],
+            vec![ScreenAction {
+                id: "save".into(),
+                label: "Save".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+                a11y: None,
+            }],
+        );
+        screen.nav_actions.push(ScreenAction {
+            id: "settings".into(),
+            label: "Settings".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: None,
+        });
+
+        let value = serde_json::to_value(screen).unwrap();
+
+        assert!(
+            value.get("actions").is_none()
+                && value.get("contextual_actions").is_none()
+                && value.get("nav_actions").is_none(),
+            "legacy shell action loops must not survive on the wire",
+        );
     }
 
     // @internal

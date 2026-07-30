@@ -228,5 +228,5 @@ fn help_empty_items_shows_empty() {
     assert_eq!(screen.screen_id, "help");
     // Only the search TextInput, no ActionLists
     assert_eq!(screen.components.len(), 1);
-    assert!(screen.actions.is_empty());
+    assert!(screen.contextual_actions.is_empty());
 }

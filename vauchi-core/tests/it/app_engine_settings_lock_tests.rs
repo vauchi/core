@@ -438,7 +438,7 @@ fn set_password_mismatch_disables_submit() {
         panic!("expected UpdateScreen, got {result:?}");
     };
     let submit = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "submit")
         .expect("submit action");
@@ -541,7 +541,7 @@ fn change_password_mismatch_disables_submit() {
         panic!("expected UpdateScreen, got {result:?}");
     };
     let submit = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "submit")
         .expect("submit action present");

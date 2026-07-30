@@ -115,7 +115,7 @@ impl WorkflowEngine for HelpEngine {
             title: get_string(self.locale, "help.title"),
             subtitle: None,
             components,
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }

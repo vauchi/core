@@ -60,7 +60,11 @@ fn qr_expired_bridge_renders_expired_screen() {
         .device_link_qr_expired()
         .expect("on device linking screen");
     assert_eq!(screen.screen_id, "link_qr_expired");
-    let ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    let ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
     assert_eq!(ids, vec!["retry", "cancel"]);
 }
 

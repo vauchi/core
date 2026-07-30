@@ -13,6 +13,10 @@ mod app_engine_invalidation_tests;
 mod app_engine_navigation_tests;
 mod app_engine_onboarding_completion_tests;
 mod app_lifecycle_tests;
+#[path = "../app_reducer_protocol_tests.rs"]
+mod app_reducer_protocol_tests;
+#[path = "../app_undo_protocol_tests.rs"]
+mod app_undo_protocol_tests;
 mod ble_handshake_app_engine_tests;
 mod schedule_wakeup_tests;
 // The multi-stage half needs FakeClock (gated inside the file); the
@@ -43,6 +47,10 @@ mod contact_list_faceted_tests;
 mod contact_list_i18n_tests;
 mod contact_list_intercepts_tests;
 mod contact_merge_engine_tests;
+#[path = "../contextual_surface_tests.rs"]
+mod contextual_surface_tests;
+#[path = "../contextual_undo_tests.rs"]
+mod contextual_undo_tests;
 mod deep_link_consent_engine_tests;
 mod device_link_bridge_tests;
 mod device_linking_i18n_tests;
@@ -88,6 +96,8 @@ mod multi_stage_exchange_i18n_tests;
 mod multi_stage_machine_proptest;
 mod nfc_exchange_app_engine_tests;
 mod places_tests;
+#[path = "../prepared_surface_tests.rs"]
+mod prepared_surface_tests;
 mod tag_promotion_tests;
 mod tags_engine_tests;
 mod tags_intercepts_tests;
@@ -113,6 +123,8 @@ mod recovery_claim_review_i18n_tests;
 mod recovery_help_i18n_tests;
 mod recovery_status_i18n_tests;
 mod render_context_tests;
+#[path = "../responsive_presentation_tests.rs"]
+mod responsive_presentation_tests;
 mod result_routing_wiring_tests;
 mod settings_more_parity_tests;
 mod settings_profile_i18n_tests;

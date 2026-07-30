@@ -243,7 +243,7 @@ impl FormDialogEngine {
             title: self.t("form.add_to_card_title"),
             subtitle: Some(self.t("form.select_type_subtitle")),
             components,
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "cancel".into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -316,7 +316,7 @@ impl FormDialogEngine {
             title,
             subtitle: None,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "submit".into(),
                     label: self.t("action.save"),
@@ -465,7 +465,7 @@ impl FormDialogEngine {
                     info_key: None,
                 },
             ],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "submit".into(),
                     label: self.t("action.save"),
@@ -506,7 +506,7 @@ impl FormDialogEngine {
                 }),
                 info_key: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "submit".into(),
                     label: self.t("action.save"),
@@ -547,7 +547,7 @@ impl FormDialogEngine {
                 }),
                 info_key: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "submit".into(),
                     label: self.t("action.save"),
@@ -594,7 +594,7 @@ impl FormDialogEngine {
                 }),
                 info_key: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "submit".into(),
                     label: submit_label.clone(),

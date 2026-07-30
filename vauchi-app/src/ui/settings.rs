@@ -752,7 +752,7 @@ impl SettingsEngine {
             title: self.t("settings.title"),
             subtitle: None,
             components,
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }
@@ -790,7 +790,7 @@ impl SettingsEngine {
             title: self.t("settings.advanced_title"),
             subtitle: None,
             components,
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }

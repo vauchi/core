@@ -170,7 +170,7 @@ fn action_result_variants_validate_against_schema() {
         title: "Test".into(),
         subtitle: None,
         components: vec![],
-        actions: vec![],
+        contextual_actions: vec![],
         progress: None,
         ..Default::default()
     };

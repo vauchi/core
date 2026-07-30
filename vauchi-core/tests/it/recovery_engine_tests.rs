@@ -76,7 +76,7 @@ fn recovery_quorum_not_met_disables_start() {
     let screen = engine.current_screen();
 
     let start_action = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "start_recovery")
         .expect("start_recovery action should exist");
@@ -99,7 +99,7 @@ fn recovery_quorum_met_enables_start() {
     let screen = engine.current_screen();
 
     let start_action = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "start_recovery")
         .expect("start_recovery action should exist");
@@ -151,7 +151,7 @@ fn start_recovery_transitions_to_show_claim_qr() {
                 .iter()
                 .any(|c| matches!(c, Component::QrCode { mode, .. } if *mode == QrMode::Display));
             assert!(has_qr, "should show QR code with claim data");
-            let has_cancel = screen.actions.iter().any(|a| a.id == "cancel");
+            let has_cancel = screen.contextual_actions.iter().any(|a| a.id == "cancel");
             assert!(has_cancel, "should have cancel action");
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
@@ -173,7 +173,10 @@ fn cancel_from_claim_qr_returns_to_status() {
 
     match result {
         ActionResult::UpdateScreen(screen) => {
-            let has_start = screen.actions.iter().any(|a| a.id == "start_recovery");
+            let has_start = screen
+                .contextual_actions
+                .iter()
+                .any(|a| a.id == "start_recovery");
             assert!(
                 has_start,
                 "should be back at status with start_recovery action"
@@ -248,7 +251,7 @@ fn threshold_met_enables_submit() {
 
     let screen = engine.current_screen();
     let submit = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "submit_proof")
         .expect("submit_proof action should exist");
@@ -284,7 +287,7 @@ fn submit_proof_transitions_to_complete() {
                 )
             });
             assert!(has_success, "should show success status");
-            let has_done = screen.actions.iter().any(|a| a.id == "done");
+            let has_done = screen.contextual_actions.iter().any(|a| a.id == "done");
             assert!(has_done, "should have done action");
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
@@ -348,7 +351,10 @@ fn submit_before_threshold_not_enabled() {
     // Only 1 of 3
 
     let screen = engine.current_screen();
-    let submit = screen.actions.iter().find(|a| a.id == "submit_proof");
+    let submit = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "submit_proof");
     assert!(submit.is_some(), "submit_proof should exist");
     assert!(
         !submit.unwrap().enabled,

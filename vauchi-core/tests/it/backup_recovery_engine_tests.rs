@@ -11,11 +11,11 @@ fn backup_starts_at_choose() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "backup_choose");
     assert!(screen.progress.is_none());
-    assert_eq!(screen.actions.len(), 2);
-    assert_eq!(screen.actions[0].id, "create");
-    assert_eq!(screen.actions[0].style, ActionStyle::Primary);
-    assert_eq!(screen.actions[1].id, "restore");
-    assert_eq!(screen.actions[1].style, ActionStyle::Secondary);
+    assert_eq!(screen.contextual_actions.len(), 2);
+    assert_eq!(screen.contextual_actions[0].id, "create");
+    assert_eq!(screen.contextual_actions[0].style, ActionStyle::Primary);
+    assert_eq!(screen.contextual_actions[1].id, "restore");
+    assert_eq!(screen.contextual_actions[1].style, ActionStyle::Secondary);
 }
 
 // @internal
@@ -82,7 +82,11 @@ fn backup_password_validation() {
     }
 
     let screen = engine.current_screen();
-    let continue_action = screen.actions.iter().find(|a| a.id == "continue").unwrap();
+    let continue_action = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "continue")
+        .unwrap();
     assert!(!continue_action.enabled);
 }
 
@@ -159,7 +163,7 @@ fn backup_confirm_match_to_processing() {
     match result {
         ActionResult::NavigateTo(screen) => {
             assert_eq!(screen.screen_id, "backup_processing");
-            assert!(screen.actions.is_empty());
+            assert!(screen.contextual_actions.is_empty());
             match &screen.components[0] {
                 Component::StatusIndicator { status, .. } => {
                     assert_eq!(*status, Status::InProgress);
@@ -239,8 +243,8 @@ fn backup_processing_complete() {
         }
         other => panic!("Expected StatusIndicator, got {:?}", other),
     }
-    assert_eq!(screen.actions.len(), 1);
-    assert_eq!(screen.actions[0].id, "done");
+    assert_eq!(screen.contextual_actions.len(), 1);
+    assert_eq!(screen.contextual_actions[0].id, "done");
 
     let mut engine_done = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
@@ -298,9 +302,9 @@ fn backup_processing_failed() {
         }
         other => panic!("Expected StatusIndicator, got {:?}", other),
     }
-    assert_eq!(screen.actions.len(), 2);
-    assert_eq!(screen.actions[0].id, "retry");
-    assert_eq!(screen.actions[1].id, "cancel");
+    assert_eq!(screen.contextual_actions.len(), 2);
+    assert_eq!(screen.contextual_actions[0].id, "retry");
+    assert_eq!(screen.contextual_actions[1].id, "cancel");
 
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "retry".into(),

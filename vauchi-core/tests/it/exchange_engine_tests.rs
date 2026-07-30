@@ -77,11 +77,11 @@ fn exchange_mark_failed() {
         other => panic!("expected StatusIndicator, got {:?}", other),
     }
 
-    assert_eq!(screen.actions.len(), 2);
-    assert_eq!(screen.actions[0].id, "retry");
-    assert_eq!(screen.actions[0].style, ActionStyle::Primary);
-    assert_eq!(screen.actions[1].id, "cancel");
-    assert_eq!(screen.actions[1].style, ActionStyle::Secondary);
+    assert_eq!(screen.contextual_actions.len(), 2);
+    assert_eq!(screen.contextual_actions[0].id, "retry");
+    assert_eq!(screen.contextual_actions[0].style, ActionStyle::Primary);
+    assert_eq!(screen.contextual_actions[1].id, "cancel");
+    assert_eq!(screen.contextual_actions[1].style, ActionStyle::Secondary);
 }
 
 // @internal
@@ -283,7 +283,7 @@ fn exchange_failed_fallback_actions_have_a11y_hints() {
 
     let find = |id: &str| {
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == id)
             .unwrap_or_else(|| panic!("action {id} must be present on the Failed screen"))

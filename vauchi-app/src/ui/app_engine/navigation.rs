@@ -157,6 +157,7 @@ impl AppEngine {
         // variant — even after `has_identity()` correctly returned true
         // via the storage fallback. Idempotent.
         self.vauchi.refresh_identity_from_storage();
+        self.retained_detail_screen = screen.parent_screen_id().is_some().then(|| screen.clone());
 
         // Swap in the new screen, get the old one back
         let old_screen = std::mem::replace(&mut self.screen, screen.clone());
@@ -253,6 +254,29 @@ impl AppEngine {
         // `current_screen()`. Idempotent: the route_result path re-decorates
         // via `apply_update_overlay_to_result`.
         self.apply_screen_id_metadata(self.engine.current_screen())
+    }
+
+    pub(super) fn activate_surface_engine(&mut self, screen: AppScreen) {
+        if self.screen == screen {
+            return;
+        }
+        let new_engine = self.engine_cache.remove(&screen).unwrap_or_else(|| {
+            Self::create_engine(
+                &self.vauchi,
+                &screen,
+                self.preview_as_contact.as_deref(),
+                &self.device_capabilities,
+                &self.transport_readiness,
+                &self.render_context,
+                &self.pending_exchange_groups,
+                self.glance_display_qr.as_deref(),
+            )
+        });
+        let old_screen = std::mem::replace(&mut self.screen, screen);
+        let old_engine = std::mem::replace(&mut self.engine, new_engine);
+        if Self::is_cacheable(&old_screen) {
+            self.engine_cache.insert(old_screen, old_engine);
+        }
     }
 
     /// Navigate back using the history stack. Falls back to Home if empty.

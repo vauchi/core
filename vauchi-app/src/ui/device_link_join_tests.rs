@@ -22,7 +22,7 @@ fn new_starts_at_enter_name() {
     assert_eq!(screen_id(&engine), "device_link_join");
     let actions: Vec<String> = engine
         .current_screen()
-        .actions
+        .contextual_actions
         .iter()
         .map(|a| a.id.clone())
         .collect();
@@ -40,7 +40,7 @@ fn text_changed_updates_name_and_join_enable_state() {
     });
     let join_enabled = engine
         .current_screen()
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == JOIN_ACTION_ID)
         .map(|a| a.enabled)
@@ -53,7 +53,7 @@ fn text_changed_updates_name_and_join_enable_state() {
     });
     let join_enabled = engine
         .current_screen()
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == JOIN_ACTION_ID)
         .map(|a| a.enabled)
@@ -147,7 +147,7 @@ fn failed_update_renders_failed_screen_with_retry() {
     assert_eq!(screen_id(&engine), "device_link_join_failed");
     let actions: Vec<String> = engine
         .current_screen()
-        .actions
+        .contextual_actions
         .iter()
         .map(|a| a.id.clone())
         .collect();

@@ -711,7 +711,7 @@ impl ExchangeEngine {
                         role: None,
                     }),
                 }],
-                actions: vec![ScreenAction {
+                contextual_actions: vec![ScreenAction {
                     id: "done".into(),
                     label: self.t("action.done"),
                     style: ActionStyle::Primary,
@@ -787,7 +787,7 @@ impl ExchangeEngine {
                     role: None,
                 }),
             }],
-            actions,
+            contextual_actions: actions,
             ..Default::default()
         }
     }
@@ -835,7 +835,7 @@ fn build_group_selection_screen(
             items,
             a11y: None,
         }],
-        actions: vec![
+        contextual_actions: vec![
             // One primary button whose label follows the selection (record D,
             // 2026-06-02-exchange-group-selection-ux): nothing selected reads
             // "Skip", ≥1 reads "Continue" — the handler routes both the same
@@ -1564,7 +1564,7 @@ mod tests {
         assert_eq!(a11y.role, Some(AccessibilityRole::Toggle));
 
         // The continue/skip actions intentionally have no a11y.
-        for action in &screen.actions {
+        for action in &screen.contextual_actions {
             assert!(
                 action.a11y.is_none(),
                 "ScreenAction {} must not carry a11y (label is the accessible name)",
@@ -2137,7 +2137,11 @@ mod tests {
         };
         assert_eq!(screen.screen_id, "exchange_failed");
         assert_eq!(engine.step, ExchangeStep::Failed);
-        let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+        let action_ids: Vec<&str> = screen
+            .contextual_actions
+            .iter()
+            .map(|a| a.id.as_str())
+            .collect();
         assert!(
             action_ids.contains(&"retry") && action_ids.contains(&"cancel"),
             "fail-fast screen must offer retry + cancel, got {action_ids:?}"

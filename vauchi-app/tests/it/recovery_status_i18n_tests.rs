@@ -27,7 +27,10 @@ fn recovery_intro_screen_renders_german() {
         panic!("expected InfoPanel, got {:?}", screen.components[0]);
     };
     assert_eq!(title, "Gerät verloren?");
-    assert_eq!(screen.actions[0].label, "Wiederherstellungsprozess starten");
+    assert_eq!(
+        screen.contextual_actions[0].label,
+        "Wiederherstellungsprozess starten"
+    );
 }
 
 // English stays exactly as before (regression pin).
@@ -41,5 +44,5 @@ fn recovery_intro_screen_english_copy_unchanged() {
         panic!("expected InfoPanel, got {:?}", screen.components[0]);
     };
     assert_eq!(title, "Lost Your Device?");
-    assert_eq!(screen.actions[0].label, "Start Recovery Process");
+    assert_eq!(screen.contextual_actions[0].label, "Start Recovery Process");
 }

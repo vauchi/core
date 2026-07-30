@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "contact_limit",
   "title": "Contact Limit",
   "subtitle": null,
@@ -29,14 +29,6 @@
         "input_type": "Text",
         "a11y": null
       }
-    }
-  ],
-  "actions": [
-    {
-      "id": "edit",
-      "label": "Edit Limit",
-      "style": "Primary",
-      "enabled": true
     }
   ],
   "progress": null,

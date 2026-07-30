@@ -220,7 +220,7 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
             title: self.label.clone(),
             subtitle: Some(self.field_type.clone()),
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "edit".into(),
                     label: self.t("action.edit"),

@@ -700,68 +700,6 @@ fn qr_data_from_screen_json(screen_json: &str) -> String {
     panic!("no QrCode Display in screen: {screen_json}");
 }
 
-/// Drive onboarding → Exchange → QR (TapHoverShake mode) so the engine is parked on
-/// `exchange_show_qr` with an animated-QR session ready to cycle frames.
-///
-/// Glance + Hover both graduated to `MultiStageExchange`
-/// (Pair 4 + Phase 1.E of the hover graduation plan); TapHoverShake is
-/// the next QR-legacy mode in line for graduation — until then it
-/// drives the same `exchange_show_qr` chrome the legacy frame-cycling
-/// path needs.
-fn drive_to_show_qr(engine: &PlatformAppEngine) {
-    drive_onboarding(engine);
-    engine
-        .navigate_to_json_for_test(r#""Exchange""#.into())
-        .expect("navigate to Exchange");
-    // Pick TapHoverShake mode (fun category) to drop into ShowQr.
-    engine
-        .handle_action_json(
-            r#"{"ListItemSelected": {"component_id": "category:fun", "item_id": "mode:tap_hover_shake"}}"#.into(),
-        )
-        .expect("select tap_hover_shake mode");
-    // Regardless of which ActionResult shape mode-selection returns, the
-    // current screen must now be exchange_show_qr.
-    let id = current_screen_id(engine);
-    assert_eq!(
-        id, "exchange_show_qr",
-        "expected show_qr after selecting TapHoverShake, got {id}"
-    );
-}
-
-// @internal
-#[test]
-#[ignore = "Legacy animated-QR frame cycling on exchange_show_qr. After P2.D of the TapHoverShake graduation plan, no exchange mode reaches the legacy QR screen via the picker (all modes graduated; Broadcast removed), so drive_to_show_qr can no longer arrive there. This test + the advance_qr_frame_json UniFFI surface are retired together in P2.E (legacy QR deletion). Re-enable only if a QR-legacy entry path is reintroduced."]
-fn advance_qr_frame_json_cycles_frames_on_show_qr() {
-    let (engine, _dir) = create_engine();
-    drive_to_show_qr(&engine);
-
-    let initial = engine.current_screen_json().expect("screen json");
-    let initial_data = qr_data_from_screen_json(&initial);
-
-    let next = engine
-        .advance_qr_frame_json()
-        .expect("advance call")
-        .expect("Some(screen) on ShowQr with animated frames");
-    let after_data = qr_data_from_screen_json(&next);
-    assert_ne!(
-        initial_data, after_data,
-        "QR frame data must change after advance"
-    );
-}
-
-// @internal
-#[test]
-fn advance_qr_frame_json_returns_none_off_exchange_screen() {
-    let (engine, _dir) = create_engine();
-    drive_onboarding(&engine);
-    // On my_info (not Exchange).
-    let result = engine.advance_qr_frame_json().expect("advance call");
-    assert!(
-        result.is_none(),
-        "advance must return None outside the Exchange screen"
-    );
-}
-
 // ============================================================================
 // Pair 4 — multi-stage exchange engine bridge
 // ============================================================================
@@ -883,10 +821,10 @@ fn qr_scanned_hardware_event_routes_to_session_when_on_multi_stage_screen() {
     let (engine, _dir) = create_engine();
     drive_to_multi_stage(&engine);
 
-    // QrScanned must not return an ActionResult — the bridge handles
-    // the post-scan state push asynchronously. Returning Some here
-    // would mean the engine handled it directly (the legacy path),
-    // which is the leak we just fixed.
+    // Hardware events use the same Event -> Command boundary as every other
+    // shell interaction. The multi-stage bridge may handle the scan
+    // internally, but it must still return a generic presentation batch and
+    // never expose the retired ActionResult envelope.
     let result_json = engine
         .handle_hardware_event(MobileEvent::QrScanned {
             data: "garbage-not-an-init-frame".into(),
@@ -895,8 +833,12 @@ fn qr_scanned_hardware_event_routes_to_session_when_on_multi_stage_screen() {
     let v: serde_json::Value =
         serde_json::from_str(&result_json).expect("parse hardware event envelope");
     assert!(
-        v["action_result"].is_null(),
-        "QrScanned on multi_stage_exchange must be routed to session (no ActionResult), got {v:?}",
+        v.get("action_result").is_none(),
+        "legacy result escaped: {v:?}"
+    );
+    assert!(
+        v["commands"].is_array(),
+        "hardware event must return a generic command envelope, got {v:?}",
     );
 }
 
@@ -1010,7 +952,7 @@ fn text_changed_from_peer_scan_routes_to_multi_stage_session() {
 
 // @internal
 #[test]
-fn biometric_unlock_succeeded_hardware_event_returns_unlocked_outcome_when_no_duress() {
+fn biometric_unlock_succeeded_hardware_event_returns_authentication_command_when_no_duress() {
     // ADR-031 routing test for the biometric unlock pathway. A fresh
     // engine has no identity and no duress PIN configured, so
     // `is_duress_enabled()` returns false and the outcome must be
@@ -1018,8 +960,8 @@ fn biometric_unlock_succeeded_hardware_event_returns_unlocked_outcome_when_no_du
     // the `Vauchi::biometric_unlock_decision` layer in
     // `core/vauchi-core/src/api/vauchi/security.rs` tests; here we
     // assert only that the hardware event is routed to that decision
-    // path and that the outcome rides back as
-    // `ActionResult::BiometricUnlockOutcome`. Retires the legacy
+    // path and that its decision returns as a generic authentication
+    // command. Retires the legacy
     // `PlatformAppEngine::biometric_unlock_check` typed getter
     // (Track B of `2026-05-11-pure-functional-core-program`).
     use vauchi_platform::MobileEvent;
@@ -1030,9 +972,13 @@ fn biometric_unlock_succeeded_hardware_event_returns_unlocked_outcome_when_no_du
         .expect("biometric event accepted");
     let v: serde_json::Value =
         serde_json::from_str(&result_json).expect("parse biometric result envelope");
+    assert!(
+        v.get("action_result").is_none(),
+        "legacy result escaped: {v:?}"
+    );
     assert_eq!(
-        v["action_result"]["BiometricUnlockOutcome"]["outcome"], "Unlocked",
-        "fresh engine without duress must yield Unlocked, got {v:?}",
+        v["commands"][0]["SetAuthenticationRequirement"]["requirement"], "unlocked",
+        "fresh engine without duress must yield an unlocked command, got {v:?}",
     );
 }
 

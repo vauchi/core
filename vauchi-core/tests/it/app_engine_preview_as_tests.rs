@@ -100,11 +100,14 @@ fn test_preview_as_screen_has_exit_preview_action() {
 
     let screen = engine.preview_as(contact_id);
 
-    let has_exit_action = screen.actions.iter().any(|a| a.id == "exit-preview");
+    let has_exit_action = screen
+        .contextual_actions
+        .iter()
+        .any(|a| a.id == "exit-preview");
     assert!(
         has_exit_action,
         "PreviewAs screen must include 'exit-preview' in screen actions, got: {:?}",
-        screen.actions
+        screen.contextual_actions
     );
 }
 
@@ -198,8 +201,14 @@ fn test_exit_preview_screen_has_normal_my_info_actions() {
     };
 
     // Normal MyInfo has "add_field" and "toggle_view" actions, not "exit-preview"
-    let has_add_field = screen.actions.iter().any(|a| a.id == "add_field");
-    let has_exit_preview = screen.actions.iter().any(|a| a.id == "exit-preview");
+    let has_add_field = screen
+        .contextual_actions
+        .iter()
+        .any(|a| a.id == "add_field");
+    let has_exit_preview = screen
+        .contextual_actions
+        .iter()
+        .any(|a| a.id == "exit-preview");
 
     assert!(
         has_add_field,
@@ -238,7 +247,10 @@ fn test_preview_as_state_cleared_by_exit_preview_not_left_over() {
         "After exit-preview, subsequent MyInfo navigation must not re-enter preview mode"
     );
 
-    let has_add_field = screen.actions.iter().any(|a| a.id == "add_field");
+    let has_add_field = screen
+        .contextual_actions
+        .iter()
+        .any(|a| a.id == "add_field");
     assert!(
         has_add_field,
         "Normal MyInfo must have 'add_field' after clearing preview state"

@@ -20,9 +20,12 @@ fn with_transport_selection_starts_at_transport_picker() {
     let e = DeviceLinkingEngine::with_transport_selection("qr-data".into());
     let screen = e.current_screen();
     assert_eq!(screen.screen_id, "link_transport");
-    assert_eq!(screen.actions.len(), 3); // internet + offline + cancel
-    assert_eq!(screen.actions[0].id, TRANSPORT_INTERNET_ACTION_ID);
-    assert_eq!(screen.actions[1].id, TRANSPORT_OFFLINE_ACTION_ID);
+    assert_eq!(screen.contextual_actions.len(), 3); // internet + offline + cancel
+    assert_eq!(
+        screen.contextual_actions[0].id,
+        TRANSPORT_INTERNET_ACTION_ID
+    );
+    assert_eq!(screen.contextual_actions[1].id, TRANSPORT_OFFLINE_ACTION_ID);
 }
 
 // @internal
@@ -147,8 +150,8 @@ fn transition_to_qr_pending_sets_pending_screen() {
     e.transition_to_qr_pending();
     let screen = e.current_screen();
     assert_eq!(screen.screen_id, "link_qr_pending");
-    assert_eq!(screen.actions.len(), 1);
-    assert_eq!(screen.actions[0].id, CANCEL_ACTION_ID);
+    assert_eq!(screen.contextual_actions.len(), 1);
+    assert_eq!(screen.contextual_actions[0].id, CANCEL_ACTION_ID);
 }
 
 // @internal
@@ -184,7 +187,11 @@ fn transition_to_qr_expired_shows_retry_and_cancel() {
     e.transition_to_qr_expired();
     let screen = e.current_screen();
     assert_eq!(screen.screen_id, "link_qr_expired");
-    let ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    let ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
     assert_eq!(ids, vec![RETRY_ACTION_ID, CANCEL_ACTION_ID]);
 }
 
@@ -205,7 +212,11 @@ fn confirming_device_screen_shows_name_and_code() {
         })
         .expect("code text present");
     assert_eq!(code, "654321");
-    let ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    let ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
     assert_eq!(ids, vec![CODES_MATCH_ACTION_ID, DENY_ACTION_ID]);
 }
 
@@ -280,7 +291,11 @@ fn transition_to_link_failed_renders_honest_message_and_retry() {
         "raw reason must never render: {detail}"
     );
     assert_eq!(detail, "Device linking failed. Please try again.");
-    let ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    let ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
     assert_eq!(ids, vec![RETRY_ACTION_ID, CANCEL_ACTION_ID]);
 }
 

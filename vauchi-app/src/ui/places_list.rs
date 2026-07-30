@@ -128,7 +128,7 @@ impl PlacesEngine {
             title: self.t("places_list.title"),
             subtitle: None,
             components,
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }

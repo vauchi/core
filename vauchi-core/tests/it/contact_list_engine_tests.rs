@@ -169,7 +169,10 @@ fn contact_list_empty_shows_guidance() {
         _ => unreachable!(),
     }
 
-    let exchange_action = screen.actions.iter().find(|a| a.id == "go_exchange");
+    let exchange_action = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "go_exchange");
     assert!(
         exchange_action.is_some(),
         "Empty contacts should have a 'go exchange' action"
@@ -441,7 +444,7 @@ fn available_groups_shown_in_screen() {
     let screen = engine.current_screen();
 
     let group_actions: Vec<_> = screen
-        .actions
+        .contextual_actions
         .iter()
         .filter(|a| a.id.starts_with("filter_group:"))
         .collect();

@@ -52,7 +52,7 @@ fn archived_contacts_empty_state_has_no_actions() {
     let engine = ArchivedContactsEngine::new(vec![]);
     let screen = engine.current_screen();
     assert!(
-        screen.actions.is_empty(),
+        screen.contextual_actions.is_empty(),
         "empty archived contacts should have no screen actions"
     );
 }
@@ -188,7 +188,7 @@ fn contacts_screen_has_view_archived_action() {
     let screen = contact_engine.current_screen();
 
     let action = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a: &&ScreenAction| a.id == "view_archived")
         .expect("Contacts screen should have 'view_archived' action");

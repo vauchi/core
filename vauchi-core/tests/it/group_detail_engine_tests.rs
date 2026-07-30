@@ -153,7 +153,11 @@ fn group_detail_has_preview_as_member_actions() {
     let engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
     let screen = engine.current_screen();
 
-    let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    let action_ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
     assert!(
         action_ids.contains(&"preview-as-member:c1"),
         "Expected action 'preview-as-member:c1', got: {action_ids:?}"
@@ -171,7 +175,7 @@ fn group_detail_preview_as_member_label_contains_name() {
     let screen = engine.current_screen();
 
     let alice_action = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "preview-as-member:c1")
         .expect("preview-as-member:c1 action missing");
@@ -204,7 +208,7 @@ fn group_detail_no_preview_as_actions_when_no_members() {
     let screen = engine.current_screen();
 
     let preview_actions: Vec<&str> = screen
-        .actions
+        .contextual_actions
         .iter()
         .filter(|a| a.id.starts_with("preview-as-member:"))
         .map(|a| a.id.as_str())

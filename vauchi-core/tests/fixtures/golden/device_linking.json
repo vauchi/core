@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "link_show_qr",
   "title": "Link Device",
   "subtitle": null,
@@ -15,19 +15,6 @@
           "hint": "Scan this code on your new device to begin linking.",
           "role": "Image"
         }
-      }
-    }
-  ],
-  "actions": [
-    {
-      "id": "cancel",
-      "label": "Cancel",
-      "style": "Secondary",
-      "enabled": true,
-      "a11y": {
-        "label": "Cancel",
-        "hint": null,
-        "role": null
       }
     }
   ],

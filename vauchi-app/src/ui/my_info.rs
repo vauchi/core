@@ -446,7 +446,7 @@ impl WorkflowEngine for MyInfoEngine {
                 title: format!("Viewing as {contact_name}"),
                 subtitle: None,
                 components,
-                actions,
+                contextual_actions: actions,
                 progress: None,
                 ..Default::default()
             };
@@ -504,7 +504,7 @@ impl WorkflowEngine for MyInfoEngine {
             title: self.display_name.clone(),
             subtitle: None,
             components,
-            actions,
+            contextual_actions: actions,
             progress: None,
             ..Default::default()
         }
@@ -565,7 +565,10 @@ mod tests {
         let engine = MyInfoEngine::new(MyInfoProgress::default());
         let screen = engine.current_screen();
 
-        let action = screen.actions.iter().find(|a| a.id == "preview-as-picker");
+        let action = screen
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "preview-as-picker");
         assert!(
             action.is_some(),
             "MyInfo (EntryView) should have 'preview-as-picker' action"
@@ -579,7 +582,10 @@ mod tests {
             .with_view_mode(MyInfoViewMode::GroupView { selected_tab: 0 });
         let screen = engine.current_screen();
 
-        let action = screen.actions.iter().find(|a| a.id == "preview-as-picker");
+        let action = screen
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "preview-as-picker");
         assert!(
             action.is_some(),
             "MyInfo (GroupView) should have 'preview-as-picker' action"
@@ -595,7 +601,10 @@ mod tests {
         );
         let screen = engine.current_screen();
 
-        let action = screen.actions.iter().find(|a| a.id == "preview-as-picker");
+        let action = screen
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "preview-as-picker");
         assert!(
             action.is_none(),
             "MyInfo in PreviewAs mode should NOT have 'preview-as-picker' action"

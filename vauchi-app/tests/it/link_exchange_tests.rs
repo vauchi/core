@@ -33,7 +33,7 @@ fn press(id: &str) -> UserAction {
 fn action_ids(engine: &LinkExchangeEngine) -> Vec<String> {
     engine
         .current_screen()
-        .actions
+        .contextual_actions
         .iter()
         .map(|a| a.id.clone())
         .collect()
@@ -101,7 +101,7 @@ fn retrieving_screen_has_no_affordances() {
     engine.transition_to_retrieving();
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_link_retrieving");
-    assert!(screen.actions.is_empty());
+    assert!(screen.contextual_actions.is_empty());
 }
 
 // @internal
@@ -125,7 +125,7 @@ fn failed_screen_offers_retry_and_cancel() {
     assert_eq!(screen.screen_id, "exchange_link_failed");
     assert_eq!(action_ids(&engine), vec!["retry", "cancel"]);
     let retry_style = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "retry")
         .map(|a| a.style.clone());

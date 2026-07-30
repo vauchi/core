@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "archived_contacts",
   "title": "Archived Contacts",
   "subtitle": null,
@@ -26,7 +26,6 @@
       }
     }
   ],
-  "actions": [],
   "progress": null,
   "tokens": {
     "spacing": {

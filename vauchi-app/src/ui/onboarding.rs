@@ -213,7 +213,7 @@ impl OnboardingEngine {
                     role: Some(AccessibilityRole::Heading),
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "create_new".into(),
                     label: self.t("onboarding.create_identity"),
@@ -277,7 +277,7 @@ impl OnboardingEngine {
                     role: Some(AccessibilityRole::Heading),
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "scan_qr".into(),
                     label: self.t("qr.scan_button"),
@@ -319,7 +319,7 @@ impl OnboardingEngine {
                 a11y: Some(A11y::labeled(self.t("backup.password"))),
                 info_key: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "submit_backup_password".into(),
                     label: self.t("onboarding.restore_button"),
@@ -368,7 +368,7 @@ impl OnboardingEngine {
                     info_key: None,
                 },
             ],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "continue".into(),
                 label: self.t("action.continue"),
                 style: ActionStyle::Primary,
@@ -448,7 +448,7 @@ impl OnboardingEngine {
                     info_key: None,
                 },
             ],
-            actions: vec![
+            contextual_actions: vec![
                 // Commit the pending `custom_group` TextInput on the
                 // current screen, keeping the user on groups_setup so
                 // they can see the entry appear and optionally add
@@ -580,7 +580,7 @@ impl OnboardingEngine {
             title: self.t("onboarding.info_title"),
             subtitle: Some(self.t("onboarding.info_subtitle")),
             components,
-            actions,
+            contextual_actions: actions,
             progress: self.progress(3),
             ..Default::default()
         }
@@ -592,7 +592,7 @@ impl OnboardingEngine {
             title: self.t("onboarding.done_title"),
             subtitle: Some(self.t("onboarding.done_subtitle")),
             components: vec![],
-            actions: vec![
+            contextual_actions: vec![
                 // The final onboarding step's job is to land the user
                 // in the app — "Start using the app" is the natural
                 // exit, so it owns the primary affordance. Exchange

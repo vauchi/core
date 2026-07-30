@@ -168,7 +168,7 @@ impl TagPromotionEngine {
             title: self.t("tag_promotion.title"),
             subtitle: None,
             components,
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: CONFIRM_PROMOTION_ACTION_ID.into(),
                 label: self.t("tag_promotion.create_group_button"),
                 style: ActionStyle::Primary,

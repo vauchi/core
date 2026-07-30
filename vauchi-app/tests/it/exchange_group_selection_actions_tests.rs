@@ -27,7 +27,7 @@ fn engine_on_group_selection() -> (AppEngine, String) {
 fn action_labels(engine: &AppEngine) -> Vec<(String, String)> {
     engine
         .current_screen()
-        .actions
+        .contextual_actions
         .iter()
         .map(|a| (a.id.clone(), a.label.clone()))
         .collect()

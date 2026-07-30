@@ -133,7 +133,7 @@ pub(super) fn build_field_preview_screen(
                 }),
             },
         ],
-        actions: vec![
+        contextual_actions: vec![
             ScreenAction {
                 id: "start_exchange".into(),
                 label: t("exchange.preview.start"),
@@ -316,9 +316,9 @@ mod tests {
             selected_name_id,
         };
         let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
-        assert_eq!(screen.actions.len(), 2);
-        assert_eq!(screen.actions[0].id, "start_exchange");
-        assert_eq!(screen.actions[1].id, "change_groups");
+        assert_eq!(screen.contextual_actions.len(), 2);
+        assert_eq!(screen.contextual_actions[0].id, "start_exchange");
+        assert_eq!(screen.contextual_actions[1].id, "change_groups");
     }
 
     #[test]

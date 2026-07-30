@@ -26,11 +26,11 @@ fn contact_list_empty_state_renders_german() {
     assert_eq!(screen.title, "Kontakte");
     assert!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .any(|a| a.id == "add_contact" && a.label == "Kontakt hinzufügen"),
         "add-contact action localized; actions: {:?}",
-        screen.actions
+        screen.contextual_actions
     );
 }
 
@@ -43,10 +43,10 @@ fn contact_list_english_copy_unchanged() {
     assert_eq!(screen.title, "Contacts");
     assert!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .any(|a| a.id == "add_contact" && a.label == "Add Contact"),
         "English add-contact label unchanged; actions: {:?}",
-        screen.actions
+        screen.contextual_actions
     );
 }

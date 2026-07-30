@@ -182,12 +182,12 @@ fn form_dialog_add_field_picker_step_omits_save_action() {
         available_groups: vec![],
     });
     let screen = engine.current_screen();
-    let has_submit = screen.actions.iter().any(|a| a.id == "submit");
+    let has_submit = screen.contextual_actions.iter().any(|a| a.id == "submit");
     assert!(
         !has_submit,
         "Picker step must not show a Save action — the user has nothing to save yet"
     );
-    let has_cancel = screen.actions.iter().any(|a| a.id == "cancel");
+    let has_cancel = screen.contextual_actions.iter().any(|a| a.id == "cancel");
     assert!(has_cancel, "Picker step must still show Cancel");
 }
 
@@ -206,11 +206,18 @@ fn form_dialog_add_field_form_step_has_change_type_action() {
         item_id: "email".into(),
     });
     let screen = engine.current_screen();
-    let change_type = screen.actions.iter().find(|a| a.id == "change_type");
+    let change_type = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "change_type");
     assert!(
         change_type.is_some(),
         "Form step must expose a `change_type` action — got actions: {:?}",
-        screen.actions.iter().map(|a| &a.id).collect::<Vec<_>>()
+        screen
+            .contextual_actions
+            .iter()
+            .map(|a| &a.id)
+            .collect::<Vec<_>>()
     );
     assert!(
         change_type.unwrap().enabled,
@@ -289,7 +296,7 @@ fn form_dialog_add_field_save_disabled_when_value_empty() {
     });
     let screen = engine.current_screen();
     let submit = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "submit")
         .expect("submit action present");
@@ -315,7 +322,7 @@ fn form_dialog_add_field_save_enabled_when_complete() {
     });
     let screen = engine.current_screen();
     let submit = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "submit")
         .expect("submit action present");

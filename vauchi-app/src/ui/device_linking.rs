@@ -307,7 +307,7 @@ impl DeviceLinkingEngine {
                     role: Some(AccessibilityRole::Heading),
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: TRANSPORT_INTERNET_ACTION_ID.into(),
                     label: self.t("devices.link.via_internet"),
@@ -351,7 +351,7 @@ impl DeviceLinkingEngine {
                 }],
                 a11y: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: BACK_TO_TRANSPORT_ACTION_ID.into(),
                     label: self.t("action.back"),
@@ -397,7 +397,7 @@ impl DeviceLinkingEngine {
                 // Removed — the scan-to-begin a11y hint above is the
                 // GUI-appropriate guidance.
             ],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: CANCEL_ACTION_ID.into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -433,7 +433,7 @@ impl DeviceLinkingEngine {
                     a11y: None,
                 },
             ],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: CONFIRM_ACTION_ID.into(),
                     label: self.t("platform.button_confirm"),
@@ -472,7 +472,7 @@ impl DeviceLinkingEngine {
                     role: None,
                 }),
             }],
-            actions: vec![],
+            contextual_actions: vec![],
             progress: self.progress(),
             ..Default::default()
         }
@@ -496,7 +496,7 @@ impl DeviceLinkingEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: DONE_ACTION_ID.into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,
@@ -526,7 +526,7 @@ impl DeviceLinkingEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: CANCEL_ACTION_ID.into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -567,7 +567,7 @@ impl DeviceLinkingEngine {
                     style: TextStyle::Caption,
                 },
             ],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: CANCEL_ACTION_ID.into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -597,7 +597,7 @@ impl DeviceLinkingEngine {
                     role: None,
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: RETRY_ACTION_ID.into(),
                     label: self.t("devices.link.generate_new_qr"),
@@ -645,7 +645,7 @@ impl DeviceLinkingEngine {
                     a11y: None,
                 },
             ],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: CODES_MATCH_ACTION_ID.into(),
                     label: self.t("devices.link.codes_match_verify"),
@@ -684,7 +684,7 @@ impl DeviceLinkingEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: CANCEL_ACTION_ID.into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -717,7 +717,7 @@ impl DeviceLinkingEngine {
                     role: None,
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: RETRY_ACTION_ID.into(),
                     label: self.t("action.try_again"),

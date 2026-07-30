@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "groups_setup",
   "title": "Choose your groups",
   "subtitle": "Organize who sees what",
@@ -82,41 +82,6 @@
           "hint": "Enter a name for a custom contact group",
           "role": null
         }
-      }
-    }
-  ],
-  "actions": [
-    {
-      "id": "submit_custom_group",
-      "label": "Add group",
-      "style": "Secondary",
-      "enabled": false,
-      "a11y": {
-        "label": "Add group",
-        "hint": null,
-        "role": null
-      }
-    },
-    {
-      "id": "continue",
-      "label": "Continue",
-      "style": "Primary",
-      "enabled": true,
-      "a11y": {
-        "label": "Continue",
-        "hint": null,
-        "role": null
-      }
-    },
-    {
-      "id": "skip",
-      "label": "Skip",
-      "style": "Secondary",
-      "enabled": true,
-      "a11y": {
-        "label": "Skip",
-        "hint": null,
-        "role": null
       }
     }
   ],

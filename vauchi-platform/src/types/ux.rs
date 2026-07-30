@@ -78,17 +78,13 @@ impl From<MobileAhaMomentType> for vauchi_core::AhaMomentType {
 
 /// Tab metadata for top-level navigation.
 ///
-/// Mirrors `vauchi_app::ui::TabInfo` for UniFFI consumers so frontends
-/// can render tabs without hardcoding labels or icons (G1 of the
-/// pure-renderer remediation; ADR-021 / ADR-038).
-#[derive(Debug, Clone, uniffi::Record)]
+/// Retained only for retired-boundary integration tests.
+#[derive(Debug, Clone)]
 pub struct MobileTabInfo {
     /// Stable identifier matching the screen's `screen_id()`. For selection
     /// equality only — never used to construct a navigation target.
     pub id: String,
-    /// Opaque navigation token. Forward verbatim via
-    /// `UserAction::NavigateToTab { action_id }` on tap; core resolves it to
-    /// `NavigateTo`. Never parsed or branched on by the frontend.
+    /// Opaque navigation token used only by retired-boundary tests.
     pub action_id: String,
     /// Localized display label resolved by core.
     pub label: String,
@@ -550,11 +546,8 @@ impl From<&vauchi_app::theme::Theme> for MobileTheme {
 // i18n Types
 // ============================================================
 
-/// Form-factor lens for tab-resolution queries (§1D pure-renderer
-/// remediation). Mobile collapses Settings/Recovery/Help/etc under
-/// `More`; Desktop has them as first-class sidebar items. Frontends
-/// pass the layout matching their nav surface.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+/// Retired form-factor lens retained only by integration tests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MobileTabLayout {
     Mobile,
     Desktop,

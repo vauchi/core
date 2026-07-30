@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "my_info",
   "title": "Alice",
   "subtitle": null,
@@ -31,26 +31,6 @@
           }
         ]
       }
-    }
-  ],
-  "actions": [
-    {
-      "id": "add_field",
-      "label": "Add Entry",
-      "style": "Primary",
-      "enabled": true
-    },
-    {
-      "id": "toggle_view",
-      "label": "Group View",
-      "style": "Secondary",
-      "enabled": true
-    },
-    {
-      "id": "preview-as-picker",
-      "label": "Preview as...",
-      "style": "Secondary",
-      "enabled": true
     }
   ],
   "progress": null,

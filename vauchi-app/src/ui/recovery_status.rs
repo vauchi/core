@@ -241,7 +241,7 @@ impl RecoveryEngine {
             title: self.t("more.social_recovery"),
             subtitle: None,
             components,
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "start_recovery_process".into(),
                 label: self.t("recovery.start_process"),
                 style: ActionStyle::Primary,
@@ -314,7 +314,7 @@ impl RecoveryEngine {
             title: self.t("recovery.create_claim_title"),
             subtitle: None,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "create_claim".into(),
                     label: self.t("recovery.create_claim_button"),
@@ -361,7 +361,7 @@ impl RecoveryEngine {
                     style: TextStyle::Caption,
                 },
             ],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "copy_claim".into(),
                     label: self.t("recovery.copy_claim_data"),
@@ -450,7 +450,7 @@ impl RecoveryEngine {
             title: self.t("more.social_recovery"),
             subtitle: None,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "start_recovery".into(),
                     label: self.t("recovery.start_recovery_short"),
@@ -498,7 +498,7 @@ impl RecoveryEngine {
                     style: TextStyle::Body,
                 },
             ],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "wait_for_voucher".into(),
                     label: self.t("recovery.step3_title"),
@@ -574,7 +574,7 @@ impl RecoveryEngine {
             title: self.t("recovery.collecting_vouchers_title"),
             subtitle: None,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "submit_proof".into(),
                     label: self.t("recovery.submit_proof_button"),
@@ -632,7 +632,7 @@ impl RecoveryEngine {
                     style: TextStyle::Caption,
                 },
             ],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "done".into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,

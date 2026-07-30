@@ -25,8 +25,8 @@ fn contact_limit_screen_id() {
 fn contact_limit_initial_shows_edit_action() {
     let engine = make_engine();
     let screen = engine.current_screen();
-    assert_eq!(screen.actions.len(), 1);
-    assert_eq!(screen.actions[0].id, "edit");
+    assert_eq!(screen.contextual_actions.len(), 1);
+    assert_eq!(screen.contextual_actions[0].id, "edit");
 }
 
 // @internal
@@ -39,9 +39,9 @@ fn contact_limit_edit_shows_save_and_cancel() {
 
     match result {
         ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.actions.len(), 2);
-            assert_eq!(screen.actions[0].id, "save");
-            assert_eq!(screen.actions[1].id, "cancel_edit");
+            assert_eq!(screen.contextual_actions.len(), 2);
+            assert_eq!(screen.contextual_actions[0].id, "save");
+            assert_eq!(screen.contextual_actions[1].id, "cancel_edit");
         }
         other => panic!("Expected UpdateScreen, got {:?}", other),
     }
@@ -106,8 +106,8 @@ fn contact_limit_cancel_edit_returns_to_view_mode() {
     match result {
         ActionResult::UpdateScreen(screen) => {
             // Back to view mode: only "edit" action
-            assert_eq!(screen.actions.len(), 1);
-            assert_eq!(screen.actions[0].id, "edit");
+            assert_eq!(screen.contextual_actions.len(), 1);
+            assert_eq!(screen.contextual_actions[0].id, "edit");
         }
         other => panic!("Expected UpdateScreen, got {:?}", other),
     }

@@ -143,7 +143,7 @@ impl ModeSelectionEngine {
             title: self.t("exchange.picker.title"),
             subtitle: Some(self.t("exchange.picker.subtitle")),
             components,
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }

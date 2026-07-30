@@ -100,7 +100,7 @@ pub(super) fn build_discovering_screen(mode: ExchangeMode, locale: Locale) -> Sc
             content: t("exchange.ble.scanning"),
             style: TextStyle::Body,
         }],
-        actions: vec![ScreenAction {
+        contextual_actions: vec![ScreenAction {
             id: "cancel".into(),
             label: t("action.cancel"),
             style: ActionStyle::Secondary,
@@ -129,7 +129,7 @@ pub(super) fn build_exchanging_screen(mode: ExchangeMode, locale: Locale) -> Scr
             content: t("exchange.ble.transferring_status"),
             style: TextStyle::Body,
         }],
-        actions: vec![],
+        contextual_actions: vec![],
         ..Default::default()
     }
 }
@@ -148,7 +148,7 @@ pub(super) fn build_verifying_screen(mode: ExchangeMode, locale: Locale) -> Scre
         title: t("exchange.verifying.title"),
         subtitle: Some(t(subtitle_key)),
         components: vec![],
-        actions: vec![],
+        contextual_actions: vec![],
         ..Default::default()
     }
 }

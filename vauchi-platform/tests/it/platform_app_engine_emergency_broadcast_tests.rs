@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use vauchi_platform::{
     DomainCommand, DomainCommandResult, MobileEmergencyConfig, PlatformAppEngine,
+    PlatformAppEngineTestHelpers,
 };
 
 /// Create a `PlatformAppEngine` with a temp directory, drive it through

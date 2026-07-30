@@ -157,7 +157,7 @@ impl RecoveryClaimReviewEngine {
                 status_label: self.t(status.label_key()),
                 a11y: None,
             }],
-            actions,
+            contextual_actions: actions,
             progress: None,
             ..Default::default()
         }
@@ -338,7 +338,7 @@ impl RecoveryClaimReviewEngine {
                     style: TextStyle::Body,
                 },
             ],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "back".into(),
                 label: self.t("action.back"),
                 style: ActionStyle::Secondary,
@@ -369,7 +369,7 @@ impl RecoveryClaimReviewEngine {
                 destructive: true,
                 a11y: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "confirm_accept".into(),
                     label: self.t("recovery.accept_anyway_button"),
@@ -423,7 +423,7 @@ impl RecoveryClaimReviewEngine {
                     a11y: None,
                 },
             ],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "done".into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,
@@ -441,7 +441,7 @@ impl RecoveryClaimReviewEngine {
             title: self.t("action.done"),
             subtitle: None,
             components: vec![],
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }

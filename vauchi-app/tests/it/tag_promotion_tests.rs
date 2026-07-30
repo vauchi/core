@@ -53,7 +53,11 @@ fn toggle_items(screen: &vauchi_app::ui::ScreenModel) -> Vec<(String, bool)> {
 fn renders_draft_with_confirm_and_field_toggles() {
     let screen = engine().current_screen();
     assert_eq!(screen.screen_id, "tag_promotion");
-    let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    let action_ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
     assert_eq!(action_ids, vec!["confirm_promotion"]);
 
     assert_eq!(

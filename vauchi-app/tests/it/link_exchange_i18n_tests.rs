@@ -26,7 +26,7 @@ fn link_exchange_share_url_screen_renders_german() {
     assert_eq!(screen.title, "Link teilen");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "share")
             .unwrap()
@@ -44,7 +44,7 @@ fn link_exchange_share_url_screen_english_copy_unchanged() {
     assert_eq!(screen.title, "Share Link");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "share")
             .unwrap()

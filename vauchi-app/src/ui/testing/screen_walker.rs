@@ -30,7 +30,7 @@ use crate::ui::screen::ScreenModel;
 pub fn walk_actions(screen: &ScreenModel) -> Vec<UserAction> {
     let mut actions = Vec::new();
 
-    for screen_action in &screen.actions {
+    for screen_action in &screen.contextual_actions {
         actions.push(UserAction::ActionPressed {
             action_id: screen_action.id.clone(),
         });

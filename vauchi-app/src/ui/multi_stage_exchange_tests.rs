@@ -103,7 +103,11 @@ fn action_ids(screen: &ScreenModel) -> Vec<&str> {
     // Screen-level actions (success / failed terminals) plus the
     // buttons the active screen now carries inside its preview
     // `Row`'s `ActionList` (so they sit beside the camera preview).
-    let mut ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    let mut ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
     fn collect<'a>(component: &'a Component, out: &mut Vec<&'a str>) {
         match component {
             Component::ActionList { items, .. } => {
@@ -181,7 +185,7 @@ fn active_screen_layout_is_fixed() {
 fn active_screen_groups_preview_and_actions_in_row() {
     let screen = engine_with_qr(ProtocolState::Advertising, "payload").current_screen();
     assert!(
-        screen.actions.is_empty(),
+        screen.contextual_actions.is_empty(),
         "active screen actions must be empty; buttons live in the row"
     );
     let row = screen

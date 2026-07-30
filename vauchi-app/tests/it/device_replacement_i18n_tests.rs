@@ -25,7 +25,7 @@ fn device_replacement_select_mode_renders_german() {
     assert_eq!(screen.title, "Von einem anderen Gerät übertragen");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "has_old_device")
             .unwrap()
@@ -43,7 +43,7 @@ fn device_replacement_select_mode_english_copy_unchanged() {
     assert_eq!(screen.title, "Transfer from another device");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "has_old_device")
             .unwrap()

@@ -405,7 +405,7 @@ impl ContactDetailEngine {
             title,
             subtitle: self.contact.subtitle.clone(),
             components,
-            actions: self.build_actions(),
+            contextual_actions: self.build_actions(),
             progress: None,
             ..Default::default()
         }

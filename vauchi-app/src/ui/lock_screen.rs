@@ -105,7 +105,7 @@ impl WorkflowEngine for LockScreenEngine {
             title: get_string(self.locale, "lock_screen.title"),
             subtitle: None,
             components,
-            actions,
+            contextual_actions: actions,
             progress: None,
             ..Default::default()
         }

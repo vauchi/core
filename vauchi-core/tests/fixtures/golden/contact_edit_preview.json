@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "edit_preview",
   "title": "Preview Card",
   "subtitle": null,
@@ -169,20 +169,6 @@
           "role": null
         }
       }
-    }
-  ],
-  "actions": [
-    {
-      "id": "back",
-      "label": "Back",
-      "style": "Secondary",
-      "enabled": true
-    },
-    {
-      "id": "save",
-      "label": "Save Changes",
-      "style": "Primary",
-      "enabled": true
     }
   ],
   "progress": {

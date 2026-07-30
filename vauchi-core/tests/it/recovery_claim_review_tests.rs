@@ -101,7 +101,7 @@ fn high_confidence_vouching_shows_safe_status() {
         "high confidence should show success status"
     );
 
-    let has_vouch = screen.actions.iter().any(|a| a.id == "vouch");
+    let has_vouch = screen.contextual_actions.iter().any(|a| a.id == "vouch");
     assert!(has_vouch, "should have vouch action");
 }
 
@@ -111,7 +111,7 @@ fn high_confidence_acceptance_shows_accept() {
     let engine = acceptance_engine(Confidence::High);
     let screen = engine.current_screen();
 
-    let has_accept = screen.actions.iter().any(|a| a.id == "accept");
+    let has_accept = screen.contextual_actions.iter().any(|a| a.id == "accept");
     assert!(has_accept, "should have accept action");
 }
 
@@ -157,7 +157,7 @@ fn medium_confidence_has_remind_action() {
     let engine = vouching_engine(Confidence::Medium);
     let screen = engine.current_screen();
 
-    let has_remind = screen.actions.iter().any(|a| a.id == "remind");
+    let has_remind = screen.contextual_actions.iter().any(|a| a.id == "remind");
     assert!(has_remind, "medium confidence should have remind action");
 }
 
@@ -184,7 +184,10 @@ fn low_confidence_has_verify_another_way() {
     let engine = vouching_engine(Confidence::Low);
     let screen = engine.current_screen();
 
-    let has_verify = screen.actions.iter().any(|a| a.id == "verify_other");
+    let has_verify = screen
+        .contextual_actions
+        .iter()
+        .any(|a| a.id == "verify_other");
     assert!(has_verify, "low confidence should have verify_other action");
 }
 
@@ -324,7 +327,7 @@ fn cancel_from_confirm_returns_to_review() {
     match result {
         ActionResult::UpdateScreen(screen) => {
             // Should be back at the review screen (no InlineConfirm)
-            let has_reject = screen.actions.iter().any(|a| a.id == "reject");
+            let has_reject = screen.contextual_actions.iter().any(|a| a.id == "reject");
             assert!(has_reject, "should be back at review with reject action");
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),

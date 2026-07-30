@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use vauchi_platform::{
     DomainCommand, DomainCommandResult, MobileAhaMomentType, MobileConsentType, PlatformAppEngine,
+    PlatformAppEngineTestHelpers,
 };
 
 fn create_engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {

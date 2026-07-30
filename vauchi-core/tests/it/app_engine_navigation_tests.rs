@@ -530,12 +530,12 @@ fn navigate_to_recovery_shows_recovery_intro() {
     // which is now reached after creating a claim).
     assert!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .any(|a| a.id == "start_recovery_process" && !a.enabled),
         "Recovery Intro must offer start_recovery_process and disable it when quorum not met, got actions: {:?}",
         screen
-            .actions
+            .contextual_actions
             .iter()
             .map(|a| (&a.id, a.enabled))
             .collect::<Vec<_>>()
@@ -551,7 +551,7 @@ fn navigate_to_recovery_claim_review_shows_review() {
     let screen = engine.navigate_to(AppScreen::RecoveryClaimReview);
     assert_eq!(screen.screen_id, "recovery_claim_review");
     assert!(
-        screen.actions.iter().any(|a| a.id == "reject"),
+        screen.contextual_actions.iter().any(|a| a.id == "reject"),
         "Recovery claim review must have reject action"
     );
 }
@@ -568,7 +568,7 @@ fn navigate_to_privacy_shows_privacy_settings() {
     // GDPR delete action must be Destructive style
     assert!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .any(|a| a.id == "delete" && a.style == ActionStyle::Destructive),
         "Privacy screen must have destructive delete action"

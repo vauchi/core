@@ -25,7 +25,7 @@ fn form_dialog_create_group_renders_german() {
     assert_eq!(screen.title, "Neue Gruppe");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "submit")
             .unwrap()
@@ -43,7 +43,7 @@ fn form_dialog_create_group_english_copy_unchanged() {
     assert_eq!(screen.title, "New Group");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "submit")
             .unwrap()

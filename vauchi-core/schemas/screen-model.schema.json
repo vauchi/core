@@ -4,18 +4,11 @@
   "description": "Describes a full screen to render.",
   "type": "object",
   "required": [
-    "actions",
     "components",
     "screen_id",
     "title"
   ],
   "properties": {
-    "actions": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/ScreenAction"
-      }
-    },
     "components": {
       "type": "array",
       "items": {
@@ -44,13 +37,6 @@
           "$ref": "#/definitions/NativeWrapperHint"
         }
       ]
-    },
-    "nav_actions": {
-      "description": "Global/top-bar chrome actions offered on this screen (e.g. the Settings gear on the home screen). Core owns *what* chrome actions exist; each frontend presents them per its form factor (mobile top-bar, desktop may route to its sidebar) instead of hardcoding native chrome — retires android's `ReadyScreen`/`isHomeTab` gate and the iOS `HomeView` header (`2026-07-06-mobile-domain-shell-violations`). Reserved chrome ids (e.g. `open_settings`) resolve to their `NavigateTo` before per-screen dispatch. Empty on most screens.",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/ScreenAction"
-      }
     },
     "nav_tab_id": {
       "description": "The bottom-nav tab that owns this screen (`my_info` / `contacts` / `exchange` / `groups` / `more`), or `None` for pre-auth / transient screens that show no bottom nav. Unlike [`Self::parent_screen_id`] (which stops at the immediate parent for the desktop sidebar), this resolves transitively to one of the five tab roots so the mobile / TUI 5-tab shells highlight the active tab without re-deriving it from the screen id (retires the hand-maintained `match AppScreen -> tab`).",
@@ -87,7 +73,7 @@
     },
     "schema_version": {
       "description": "Schema version — shells ignore components from higher versions.",
-      "default": 4,
+      "default": 5,
       "type": "integer",
       "format": "uint16",
       "minimum": 0.0
@@ -270,15 +256,6 @@
           "type": "string"
         }
       }
-    },
-    "ActionStyle": {
-      "description": "Visual style for a screen action.",
-      "type": "string",
-      "enum": [
-        "Primary",
-        "Secondary",
-        "Destructive"
-      ]
     },
     "BorderRadiusTokens": {
       "description": "Border radius tokens for rounded corners.",
@@ -1951,41 +1928,6 @@
         "Poor",
         "NoSignal"
       ]
-    },
-    "ScreenAction": {
-      "description": "A button or action the user can take on the screen.\n\nFrontends render this as the primary button row on a screen. The `id` is the stable action identifier consumed by `handle_action` via `UserAction::ActionPressed { action_id }`; the `label` is the localized display string.\n\n# Accessibility contract\n\n- `id` is the stable accessibility identifier (Compose `testTag`, SwiftUI `accessibilityIdentifier`). Frontends map `ScreenAction.id` onto the platform a11y identifier so Maestro (or any a11y-based test driver) can tap by `id:` rather than by localized visible text. When `a11y` is `None`, `label` serves as the screen-reader announcement. - `a11y.label`, when `Some`, overrides `label` for screen readers. Use this for destructive buttons (\"Delete permanently, this cannot be undone\") or toggles-as-buttons (\"Turned on\" vs the visible \"On\"). For 95%+ of screens, leave `a11y` as `None`.\n\nSee `_private/docs/problems/2026-04-20-screen-action-a11y-identifier-gap`.",
-      "type": "object",
-      "required": [
-        "enabled",
-        "id",
-        "label",
-        "style"
-      ],
-      "properties": {
-        "a11y": {
-          "description": "Accessibility override. `None` means \"use `label`\".",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/A11y"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "enabled": {
-          "type": "boolean"
-        },
-        "id": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "style": {
-          "$ref": "#/definitions/ActionStyle"
-        }
-      }
     },
     "ScreenLayout": {
       "description": "Whether the renderer wraps content in a scroll container or renders a fixed, non-scrolling layout sized to the viewport. Frontends honour this instead of always wrapping content in a scroll view. `Fixed` is used by screens that must not reflow while a live element updates — e.g. the QR exchange screen, where a moving QR breaks the peer camera lock (`2026-06-03-exchange-qr-scan-stability`). `Pinned` is used by list-dominant screens: chrome stays pinned while the list component owns scrolling lazily — eager rendering of 10k rows froze and crashed the mobile renderers (`2026-06-11-contacts-list-windowing-design`).",

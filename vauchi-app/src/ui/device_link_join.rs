@@ -115,7 +115,7 @@ impl DeviceLinkJoinEngine {
                 a11y: Some(A11y::labeled(self.t("devices.link.device_name"))),
                 info_key: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: JOIN_ACTION_ID.into(),
                     label: self.t("action.confirm"),
@@ -154,7 +154,7 @@ impl DeviceLinkJoinEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: CANCEL_ACTION_ID.into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -189,7 +189,7 @@ impl DeviceLinkJoinEngine {
                     a11y: None,
                 },
             ],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: CANCEL_ACTION_ID.into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -219,7 +219,7 @@ impl DeviceLinkJoinEngine {
                     role: None,
                 }),
             }],
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }
@@ -243,7 +243,7 @@ impl DeviceLinkJoinEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: CANCEL_ACTION_ID.into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,
@@ -273,7 +273,7 @@ impl DeviceLinkJoinEngine {
                     role: None,
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: RETRY_ACTION_ID.into(),
                     label: self.t("action.try_again"),

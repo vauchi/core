@@ -32,11 +32,11 @@ fn starts_in_pending_with_grant_and_deny_actions() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "deep_link_consent");
     assert_eq!(screen.title, "Exchange Request");
-    assert_eq!(screen.actions.len(), 2);
-    assert_eq!(screen.actions[0].id, DEEP_LINK_ACTION_GRANT);
-    assert_eq!(screen.actions[0].style, ActionStyle::Primary);
-    assert_eq!(screen.actions[1].id, DEEP_LINK_ACTION_DENY);
-    assert_eq!(screen.actions[1].style, ActionStyle::Secondary);
+    assert_eq!(screen.contextual_actions.len(), 2);
+    assert_eq!(screen.contextual_actions[0].id, DEEP_LINK_ACTION_GRANT);
+    assert_eq!(screen.contextual_actions[0].style, ActionStyle::Primary);
+    assert_eq!(screen.contextual_actions[1].id, DEEP_LINK_ACTION_DENY);
+    assert_eq!(screen.contextual_actions[1].style, ActionStyle::Secondary);
 }
 
 // @internal

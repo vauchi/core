@@ -33,7 +33,7 @@ pub(super) fn build_verifying_screen(locale: crate::i18n::Locale) -> ScreenModel
                 role: None,
             }),
         }],
-        actions: vec![],
+        contextual_actions: vec![],
         ..Default::default()
     }
 }

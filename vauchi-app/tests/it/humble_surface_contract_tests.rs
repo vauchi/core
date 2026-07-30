@@ -8,7 +8,7 @@
 //! Asserts that every `pub fn` inside an `impl PlatformAppEngine { … }`
 //! block in `core/vauchi-platform/src/**` either:
 //!
-//!   (a) appears in `HUMBLE_ALLOWLIST` — the 22-method genuine binding
+//!   (a) appears in `HUMBLE_ALLOWLIST` — the transitional binding
 //!       surface every frontend renders against, or
 //!   (b) is one of the `SURPLUS_RATCHET_CEILING` known-legacy methods
 //!       still pending retirement in Phase 3 of the program.
@@ -45,27 +45,19 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The 22-method Humble surface — the binding surface every frontend
-/// is allowed to depend on per ADR-021 / ADR-043. Source of truth for
-/// Phase 0 / Task 0.2 of the pure-functional-core program plan.
+/// Humble platform surface after the ADR-066 presentation cutover.
 ///
-/// Edits to this list require an ADR amendment (ADR-021/043 or a
-/// follow-up). The list is alphabetically sorted to make additions /
-/// removals reviewable.
+/// `initial_commands_json` and `dispatch_json` are the sole presentation
+/// boundary; form-factor navigation and screen/action/result methods are absent.
+/// The list is alphabetically sorted to make additions/removals reviewable.
 const HUMBLE_ALLOWLIST: &[&str] = &[
-    "advance_qr_frame_json",
-    "boot",
-    "current_screen_json",
-    "current_tab_id",
     "dispatch_domain_command",
-    "handle_action_json",
-    "handle_app_backgrounded",
+    "dispatch_json",
     "handle_hardware_event",
     "has_identity",
+    "initial_commands_json",
     "invalidate_all",
     "invalidate_screen_json",
-    "nav_items",
-    "navigate_back_json",
     "new",
     "on_wakeup",
     "periodic_sync_tick",
@@ -282,15 +274,10 @@ fn humble_allowlist_size_matches_plan() {
     // ADR-044 Am2a field retirement (2026-07-13, 23 -> 22): frontends now
     // read the Back affordance from `ScreenModel.nav_actions`, so the
     // `can_go_back()` binding query is retired.
-    assert_eq!(
-        HUMBLE_ALLOWLIST.len(),
-        22,
-        "Humble allow-list size drifted from the 22 expected after \
-         ADR-044 Am2a retired `can_go_back`. Edits to this list require an \
-         ADR amendment (ADR-021/043 for the Humble engine framing — incl. \
-         Amendment 3 for the linchpin promotions — or ADR-048's G1-G5 gates \
-         for retirements)."
-    );
+    // ADR-066 replaces six screen/action/navigation methods with the two
+    // canonical reducer methods. Retiring the animated-QR getter and the
+    // duplicate background lifecycle path shrinks the binding surface to 16.
+    assert_eq!(HUMBLE_ALLOWLIST.len(), 16);
 }
 
 // @internal
@@ -312,9 +299,7 @@ fn platform_app_engine_surface_respects_ratchet() {
 
     let (humble, surplus) = classify(&names);
 
-    // Every method on the Humble allow-list MUST appear on the actual
-    // engine. A missing one means a binding was deleted before Phase 6
-    // updated this list — the deletion is wrong, not the list.
+    // Every method on the Humble allow-list MUST appear on the actual engine.
     let humble_set: BTreeSet<&str> = humble.iter().map(String::as_str).collect();
     let missing: Vec<&&str> = HUMBLE_ALLOWLIST
         .iter()

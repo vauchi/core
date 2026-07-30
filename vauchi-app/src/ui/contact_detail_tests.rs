@@ -216,7 +216,7 @@ fn test_main_screen_has_no_back_action() {
     let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
     let screen = engine.current_screen();
     assert!(
-        !screen.actions.iter().any(|a| a.id == "back"),
+        !screen.contextual_actions.iter().any(|a| a.id == "back"),
         "main contact-detail must not offer a footer back action"
     );
 }
@@ -233,7 +233,7 @@ fn test_contact_detail_has_no_preview_action() {
 
     assert!(
         !screen
-            .actions
+            .contextual_actions
             .iter()
             .any(|a| a.id.starts_with("preview-as:")),
         "contact-detail must not offer a preview-as footer action; \
@@ -389,7 +389,10 @@ fn test_imported_contact_shows_delete_action() {
         .with_imported(true);
     let screen = engine.current_screen();
 
-    let delete_action = screen.actions.iter().find(|a| a.id == "delete_contact");
+    let delete_action = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "delete_contact");
     assert!(
         delete_action.is_some(),
         "Imported contact must have delete_contact action"
@@ -397,7 +400,10 @@ fn test_imported_contact_shows_delete_action() {
     assert_eq!(delete_action.unwrap().label, "Delete Contact");
     assert_eq!(delete_action.unwrap().style, ActionStyle::Destructive);
 
-    let archive_action = screen.actions.iter().find(|a| a.id == "archive_contact");
+    let archive_action = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "archive_contact");
     assert!(
         archive_action.is_none(),
         "Imported contact must not have archive_contact action"
@@ -411,7 +417,10 @@ fn test_exchanged_contact_shows_archive_action() {
         .with_imported(false);
     let screen = engine.current_screen();
 
-    let archive_action = screen.actions.iter().find(|a| a.id == "archive_contact");
+    let archive_action = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "archive_contact");
     assert!(
         archive_action.is_some(),
         "Exchanged contact must have archive_contact action"
@@ -419,7 +428,10 @@ fn test_exchanged_contact_shows_archive_action() {
     assert_eq!(archive_action.unwrap().label, "Archive Contact");
     assert_eq!(archive_action.unwrap().style, ActionStyle::Secondary);
 
-    let delete_action = screen.actions.iter().find(|a| a.id == "delete_contact");
+    let delete_action = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "delete_contact");
     assert!(
         delete_action.is_none(),
         "Exchanged contact must not have delete_contact action"
@@ -504,7 +516,10 @@ fn test_footer_action_id_matches_build_screen_emission() {
             .with_imported(is_imported);
         let screen = engine.current_screen();
         let expected_id = footer_action_id(is_imported);
-        let footer_action_present = screen.actions.iter().any(|a| a.id == expected_id);
+        let footer_action_present = screen
+            .contextual_actions
+            .iter()
+            .any(|a| a.id == expected_id);
         assert!(
             footer_action_present,
             "build_screen must emit ScreenAction with id `{}` for is_imported={}",

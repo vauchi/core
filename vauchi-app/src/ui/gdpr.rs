@@ -182,7 +182,7 @@ impl GdprEngine {
                     ],
                 },
             ],
-            actions: {
+            contextual_actions: {
                 let mut actions = vec![ScreenAction {
                     id: "export".into(),
                     label: self.t("privacy.export_data"),
@@ -280,7 +280,7 @@ impl GdprEngine {
                 items,
                 a11y: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "confirm_delete".into(),
                     label: self.t("privacy.delete_identity"),
@@ -348,7 +348,7 @@ impl GdprEngine {
                     },
                 ],
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "cancel".into(),
                 label: self.t("action.back"),
                 style: ActionStyle::Secondary,
@@ -376,7 +376,7 @@ impl GdprEngine {
                 }],
                 a11y: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "confirm_execute".into(),
                     label: self.t("privacy.delete_now.confirm"),
@@ -413,7 +413,7 @@ impl GdprEngine {
                 }],
                 a11y: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "confirm_shred".into(),
                     label: self.t("shred.panic_confirm_button"),
@@ -784,7 +784,7 @@ mod tests {
             .with_deletion_scheduled(true);
         let ids: Vec<String> = e
             .current_screen()
-            .actions
+            .contextual_actions
             .iter()
             .map(|a| a.id.clone())
             .collect();
@@ -803,7 +803,7 @@ mod tests {
     fn overview_always_offers_panic_shred() {
         let ids: Vec<String> = engine()
             .current_screen()
-            .actions
+            .contextual_actions
             .iter()
             .map(|a| a.id.clone())
             .collect();
@@ -821,7 +821,7 @@ mod tests {
                 .with_deletion_scheduled(true)
                 .with_deletion_executable(true)
                 .current_screen()
-                .actions
+                .contextual_actions
                 .iter()
                 .map(|a| a.id.clone())
                 .collect();

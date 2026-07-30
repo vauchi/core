@@ -28,7 +28,7 @@ fn device_linking_qr_expired_and_link_failed_render_german() {
     assert_eq!(screen.title, "QR-Code abgelaufen");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "retry")
             .unwrap()
@@ -42,7 +42,7 @@ fn device_linking_qr_expired_and_link_failed_render_german() {
     assert_eq!(failed_screen.title, "Verknüpfung fehlgeschlagen");
     assert_eq!(
         failed_screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "retry")
             .unwrap()
@@ -61,7 +61,7 @@ fn device_linking_qr_expired_and_link_failed_english_copy_unchanged() {
     assert_eq!(screen.title, "QR Code Expired");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "retry")
             .unwrap()
@@ -75,7 +75,7 @@ fn device_linking_qr_expired_and_link_failed_english_copy_unchanged() {
     assert_eq!(failed_screen.title, "Linking Failed");
     assert_eq!(
         failed_screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "retry")
             .unwrap()

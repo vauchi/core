@@ -435,7 +435,7 @@ fn contact_detail_main_screen_has_no_back_action() {
     let engine = make_detail_engine();
     let screen = engine.current_screen();
     assert!(
-        !screen.actions.iter().any(|a| a.id == "back"),
+        !screen.contextual_actions.iter().any(|a| a.id == "back"),
         "main contact-detail must not offer a footer back action"
     );
 }

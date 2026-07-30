@@ -196,7 +196,7 @@ impl DirectTransportEngine {
                 content: self.t("exchange.usb.instructions"),
                 style: TextStyle::Body,
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: ACTION_CANCEL.into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -217,7 +217,7 @@ impl DirectTransportEngine {
                 content: self.t("exchange.usb.exchanging_status"),
                 style: TextStyle::Body,
             }],
-            actions: vec![],
+            contextual_actions: vec![],
             ..Default::default()
         }
     }
@@ -249,7 +249,7 @@ impl DirectTransportEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,
@@ -278,7 +278,7 @@ impl DirectTransportEngine {
                     role: None,
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: ACTION_RETRY.into(),
                     label: self.t("action.retry"),

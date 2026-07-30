@@ -99,7 +99,7 @@ fn link_confirm_starts_sync() {
                 }
                 other => panic!("expected StatusIndicator, got {:?}", other),
             }
-            assert!(screen.actions.is_empty());
+            assert!(screen.contextual_actions.is_empty());
         }
         other => panic!("expected NavigateTo, got {:?}", other),
     }

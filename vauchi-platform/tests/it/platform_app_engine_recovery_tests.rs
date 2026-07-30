@@ -12,7 +12,10 @@
 
 use std::sync::Arc;
 
-use vauchi_platform::{DomainCommand, DomainCommandResult, MobileRecoveryClaim, PlatformAppEngine};
+use vauchi_platform::{
+    DomainCommand, DomainCommandResult, MobileRecoveryClaim, PlatformAppEngine,
+    PlatformAppEngineTestHelpers,
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────
 

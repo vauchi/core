@@ -246,7 +246,7 @@ fn finalized_before_session_ended_shows_success_with_qr_broadcast() {
     );
     assert_eq!(action_ids(&screen), vec![DONE_ACTION_ID]);
     let done_style = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == DONE_ACTION_ID)
         .map(|a| a.style.clone());

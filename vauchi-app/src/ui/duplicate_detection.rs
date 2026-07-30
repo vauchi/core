@@ -163,7 +163,7 @@ impl DuplicateDetectionEngine {
             title: self.t("duplicate_detection.title"),
             subtitle: None,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "merge".into(),
                     label: self.t("duplicate_detection.merge_button"),
@@ -255,7 +255,7 @@ mod tests {
             Component::Text { id, .. } if id == "no_duplicates"
         ));
         // Both screen-level actions disabled with no pairs.
-        assert!(screen.actions.iter().all(|a| !a.enabled));
+        assert!(screen.contextual_actions.iter().all(|a| !a.enabled));
     }
 
     // @internal
@@ -301,7 +301,11 @@ mod tests {
 
         // Merge starts disabled.
         let initial = engine.build_screen();
-        let merge = initial.actions.iter().find(|a| a.id == "merge").unwrap();
+        let merge = initial
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "merge")
+            .unwrap();
         assert!(!merge.enabled);
 
         // After selecting a pair, merge becomes enabled.
@@ -312,7 +316,11 @@ mod tests {
         let ActionResult::UpdateScreen(updated) = result else {
             panic!("expected UpdateScreen");
         };
-        let merge = updated.actions.iter().find(|a| a.id == "merge").unwrap();
+        let merge = updated
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "merge")
+            .unwrap();
         assert!(merge.enabled);
         assert_eq!(engine.selected_pair_index(), Some(0));
     }

@@ -124,7 +124,7 @@ impl DeepLinkConsentEngine {
             title: get_string(self.locale, "deep_link_consent.title"),
             subtitle: None,
             components,
-            actions,
+            contextual_actions: actions,
             progress: None,
             ..Default::default()
         }

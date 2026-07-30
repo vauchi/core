@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "my_info",
   "title": "",
   "subtitle": null,
@@ -24,26 +24,6 @@
         "content": "No entries yet. Add your first entry to share with contacts.\n\nYou can add phone numbers, email addresses, websites, social profiles, and more. Tap \"Add Entry\" to get started.",
         "style": "Caption"
       }
-    }
-  ],
-  "actions": [
-    {
-      "id": "add_field",
-      "label": "Add Entry",
-      "style": "Primary",
-      "enabled": true
-    },
-    {
-      "id": "toggle_view",
-      "label": "Group View",
-      "style": "Secondary",
-      "enabled": true
-    },
-    {
-      "id": "preview-as-picker",
-      "label": "Preview as...",
-      "style": "Secondary",
-      "enabled": true
     }
   ],
   "progress": null,

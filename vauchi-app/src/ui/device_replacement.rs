@@ -224,7 +224,7 @@ impl DeviceReplacementEngine {
                     role: Some(AccessibilityRole::Heading),
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "has_old_device".into(),
                     label: self.t("device.transfer_via_qr_button"),
@@ -277,7 +277,7 @@ impl DeviceReplacementEngine {
                     a11y: None,
                 },
             ],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "cancel".into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -313,7 +313,7 @@ impl DeviceReplacementEngine {
                     a11y: None,
                 },
             ],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "confirm".into(),
                     label: self.t("device.codes_match_button"),
@@ -364,7 +364,7 @@ impl DeviceReplacementEngine {
                     role: None,
                 }),
             }],
-            actions: vec![],
+            contextual_actions: vec![],
             progress: self.progress(),
             ..Default::default()
         }
@@ -414,7 +414,7 @@ impl DeviceReplacementEngine {
                     role: None,
                 }),
             }],
-            actions,
+            contextual_actions: actions,
             progress: self.progress(),
             ..Default::default()
         }
@@ -443,7 +443,7 @@ impl DeviceReplacementEngine {
                 ],
                 a11y: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "remove_old".into(),
                     label: self.t("device.remove_device_title"),
@@ -484,7 +484,7 @@ impl DeviceReplacementEngine {
                     role: None,
                 }),
             }],
-            actions: vec![],
+            contextual_actions: vec![],
             progress: self.progress(),
             ..Default::default()
         }
@@ -517,7 +517,7 @@ impl DeviceReplacementEngine {
                     role: Some(AccessibilityRole::Heading),
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "social_recovery".into(),
                     label: self.t("more.social_recovery"),

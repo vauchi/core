@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Deprecated direct help FFI functions are kept for backward compatibility
-// with iOS/Android until Tasks 13-14 migrate them to ScreenModel routing.
+// Deprecated direct help FFI functions remain for unrelated compatibility
+// work; presentation shells use only the generic Command/Event boundary.
 #![allow(deprecated)]
 
 //! Vauchi Mobile Bindings

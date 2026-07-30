@@ -61,7 +61,7 @@ impl ContactVisibilityEngine {
                     }),
                 },
             ],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "save".into(),
                 label: self.t("action.save"),
                 style: ActionStyle::Primary,

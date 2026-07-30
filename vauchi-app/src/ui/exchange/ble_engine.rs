@@ -212,7 +212,7 @@ impl BleExchangeEngine {
             title: self.t("exchange.mode_name.glance"),
             subtitle: Some(self.t("exchange.ble.glance_subtitle")),
             components,
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "cancel".into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -275,7 +275,7 @@ impl BleExchangeEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,
@@ -342,7 +342,7 @@ impl BleExchangeEngine {
                     role: None,
                 }),
             }],
-            actions,
+            contextual_actions: actions,
             ..Default::default()
         }
     }
@@ -843,7 +843,11 @@ mod tests {
         });
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, "exchange_failed");
-        let ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+        let ids: Vec<&str> = screen
+            .contextual_actions
+            .iter()
+            .map(|a| a.id.as_str())
+            .collect();
         assert!(ids.contains(&"retry"));
         assert!(ids.contains(&"fallback_qr")); // has_camera == true
         assert!(ids.contains(&"fallback_relay"));
@@ -868,7 +872,7 @@ mod tests {
         });
         let ids: Vec<String> = engine
             .current_screen()
-            .actions
+            .contextual_actions
             .iter()
             .map(|a| a.id.clone())
             .collect();

@@ -184,7 +184,7 @@ fn navigate_to_contact_visibility_shows_toggles() {
     });
     assert_eq!(screen.screen_id, "contact_visibility");
     assert!(
-        screen.actions.iter().any(|a| a.id == "save"),
+        screen.contextual_actions.iter().any(|a| a.id == "save"),
         "Visibility screen must have save action"
     );
 }
@@ -225,7 +225,7 @@ fn navigate_to_group_detail_shows_group() {
     assert_eq!(screen.screen_id, "group_detail");
     assert!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .any(|a| a.id == "delete_group" && a.style == ActionStyle::Destructive),
         "GroupDetail must have destructive delete action"
@@ -568,7 +568,7 @@ fn contact_limit_cancel_edit_restores_value() {
     // Screen should show edit action (not save) — meaning we exited edit mode
     let screen = engine.current_screen();
     assert!(
-        screen.actions.iter().any(|a| a.id == "edit"),
+        screen.contextual_actions.iter().any(|a| a.id == "edit"),
         "After cancel_edit, should show 'edit' action again"
     );
 }

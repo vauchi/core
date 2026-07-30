@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "shred_warning",
   "title": "Emergency Data Wipe",
   "subtitle": null,
@@ -27,30 +27,6 @@
           }
         ],
         "a11y": null
-      }
-    }
-  ],
-  "actions": [
-    {
-      "id": "continue",
-      "label": "I Understand",
-      "style": "Destructive",
-      "enabled": true,
-      "a11y": {
-        "label": "I Understand",
-        "hint": null,
-        "role": null
-      }
-    },
-    {
-      "id": "cancel",
-      "label": "Cancel",
-      "style": "Secondary",
-      "enabled": true,
-      "a11y": {
-        "label": "Cancel",
-        "hint": null,
-        "role": null
       }
     }
   ],

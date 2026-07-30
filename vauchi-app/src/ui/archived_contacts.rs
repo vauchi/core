@@ -64,7 +64,7 @@ impl ArchivedContactsEngine {
             title: self.t("archived_contacts.title"),
             subtitle: None,
             components,
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }

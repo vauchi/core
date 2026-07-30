@@ -40,7 +40,7 @@ fn contact_detail_renders_german() {
     let screen = engine.current_screen();
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "edit")
             .unwrap()
@@ -67,7 +67,7 @@ fn contact_detail_archive_toast_undo_label_renders_german() {
             undo_label,
             ..
         } => {
-            assert!(undo_action_id.is_some());
+            assert_eq!(undo_action_id.as_deref(), Some("undo_archive_contact:c1"),);
             assert_eq!(undo_label.as_deref(), Some("Rückgängig"));
         }
         other => panic!("expected actionable ShowToast, got {other:?}"),
@@ -82,7 +82,7 @@ fn contact_detail_english_copy_unchanged() {
     let screen = engine.current_screen();
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "edit")
             .unwrap()
@@ -101,7 +101,7 @@ fn contact_not_found_renders_german() {
     assert_eq!(screen.title, "Kontakt nicht gefunden");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "back")
             .unwrap()
@@ -118,7 +118,7 @@ fn contact_not_found_english_copy_unchanged() {
     assert_eq!(screen.title, "Contact Not Found");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "back")
             .unwrap()

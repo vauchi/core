@@ -154,7 +154,7 @@ impl WorkflowEngine for MoreEngine {
                 id: "more_menu".into(),
                 sections,
             }],
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }

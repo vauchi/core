@@ -112,7 +112,7 @@ impl ContactMergeEngine {
             title: self.t("contact_merge.title"),
             subtitle: None,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "confirm".into(),
                     label: self.t("contact_merge.confirm_button"),

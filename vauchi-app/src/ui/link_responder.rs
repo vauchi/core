@@ -137,7 +137,7 @@ impl LinkResponderEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: ACTION_CANCEL.into(),
                 label: self.t("action.cancel"),
                 style: ActionStyle::Secondary,
@@ -178,7 +178,7 @@ impl LinkResponderEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,
@@ -208,7 +208,7 @@ impl LinkResponderEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,

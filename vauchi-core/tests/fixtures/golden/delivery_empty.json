@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "delivery_status",
   "title": "Delivery Status",
   "subtitle": null,
@@ -14,7 +14,6 @@
       }
     }
   ],
-  "actions": [],
   "progress": null,
   "tokens": {
     "spacing": {

@@ -121,7 +121,7 @@ impl ContactLimitEngine {
             title: self.t("contact_limit.title"),
             subtitle: None,
             components,
-            actions,
+            contextual_actions: actions,
             progress: None,
             ..Default::default()
         }

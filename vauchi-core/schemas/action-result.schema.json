@@ -740,6 +740,23 @@
         "Alert"
       ]
     },
+    "AccessibilitySpec": {
+      "type": "object",
+      "required": [
+        "label"
+      ],
+      "properties": {
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
     "ActionListItem": {
       "description": "An item in an action list.",
       "type": "object",
@@ -785,14 +802,69 @@
         }
       }
     },
-    "ActionStyle": {
-      "description": "Visual style for a screen action.",
+    "ActionSpec": {
+      "type": "object",
+      "required": [
+        "accessibility_label",
+        "enabled",
+        "interaction_id",
+        "label"
+      ],
+      "properties": {
+        "accessibility_label": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "icon_token": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "interaction_id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "shortcut": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/StandardShortcut"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tone": {
+          "$ref": "#/definitions/ActionTone"
+        }
+      }
+    },
+    "ActionTone": {
       "type": "string",
       "enum": [
-        "Primary",
-        "Secondary",
-        "Destructive"
+        "standard",
+        "destructive"
       ]
+    },
+    "AlertSpec": {
+      "type": "object",
+      "required": [
+        "message",
+        "title"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      }
     },
     "AnimationToken": {
       "description": "Animation intent for [`Command::Celebrate`]. Closed enum — platforms map to a native one-beat animation, respecting reduce-motion.",
@@ -809,6 +881,25 @@
           "type": "string",
           "enum": [
             "none"
+          ]
+        }
+      ]
+    },
+    "AuthenticationRequirement": {
+      "description": "Authentication state the native startup shell must present.",
+      "oneOf": [
+        {
+          "description": "Biometric authentication completed and normal app state may be shown.",
+          "type": "string",
+          "enum": [
+            "unlocked"
+          ]
+        },
+        {
+          "description": "A configured duress PIN requires the native app-password prompt.",
+          "type": "string",
+          "enum": [
+            "app_password"
           ]
         }
       ]
@@ -898,6 +989,21 @@
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0
+        }
+      }
+    },
+    "ChoiceOption": {
+      "type": "object",
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
         }
       }
     },
@@ -1664,6 +1770,250 @@
                 },
                 "sound": {
                   "$ref": "#/definitions/SoundToken"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Atomically replace the contextual controls associated with a surface.",
+          "type": "object",
+          "required": [
+            "SetContextBar"
+          ],
+          "properties": {
+            "SetContextBar": {
+              "type": "object",
+              "required": [
+                "bar",
+                "revision",
+                "surface_id"
+              ],
+              "properties": {
+                "bar": {
+                  "$ref": "#/definitions/ContextBar"
+                },
+                "revision": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                },
+                "surface_id": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Present navigation or secondary actions for a surface.",
+          "type": "object",
+          "required": [
+            "PresentOverlay"
+          ],
+          "properties": {
+            "PresentOverlay": {
+              "type": "object",
+              "required": [
+                "overlay",
+                "revision",
+                "surface_id"
+              ],
+              "properties": {
+                "overlay": {
+                  "$ref": "#/definitions/OverlaySpec"
+                },
+                "revision": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                },
+                "surface_id": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Apply Core's structural composition for the current window.",
+          "type": "object",
+          "required": [
+            "SetPresentationProfile"
+          ],
+          "properties": {
+            "SetPresentationProfile": {
+              "type": "object",
+              "required": [
+                "profile"
+              ],
+              "properties": {
+                "profile": {
+                  "$ref": "#/definitions/PresentationProfile"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Atomically replace one named surface with fully prepared, domain-free presentation primitives.",
+          "type": "object",
+          "required": [
+            "ReplaceSurface"
+          ],
+          "properties": {
+            "ReplaceSurface": {
+              "type": "object",
+              "required": [
+                "surface"
+              ],
+              "properties": {
+                "surface": {
+                  "$ref": "#/definitions/SurfaceSpec"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Present a prepared native alert.",
+          "type": "object",
+          "required": [
+            "PresentAlert"
+          ],
+          "properties": {
+            "PresentAlert": {
+              "type": "object",
+              "required": [
+                "alert"
+              ],
+              "properties": {
+                "alert": {
+                  "$ref": "#/definitions/AlertSpec"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Present transient informational feedback.",
+          "type": "object",
+          "required": [
+            "ShowToast"
+          ],
+          "properties": {
+            "ShowToast": {
+              "type": "object",
+              "required": [
+                "toast"
+              ],
+              "properties": {
+                "toast": {
+                  "$ref": "#/definitions/ToastSpec"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Open a prepared URL using the platform default handler.",
+          "type": "object",
+          "required": [
+            "OpenExternalUrl"
+          ],
+          "properties": {
+            "OpenExternalUrl": {
+              "type": "object",
+              "required": [
+                "url"
+              ],
+              "properties": {
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Offer prepared bytes through the platform save/share mechanism.",
+          "type": "object",
+          "required": [
+            "ExportFile"
+          ],
+          "properties": {
+            "ExportFile": {
+              "type": "object",
+              "required": [
+                "file"
+              ],
+              "properties": {
+                "file": {
+                  "$ref": "#/definitions/ExportFileSpec"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Perform the platform's default back behavior.",
+          "type": "string",
+          "enum": [
+            "PerformNativeBack"
+          ]
+        },
+        {
+          "description": "Reset platform-owned application state after Core wiped its data.",
+          "type": "string",
+          "enum": [
+            "ResetApplication"
+          ]
+        },
+        {
+          "description": "Post a fully prepared operating-system notification.",
+          "type": "object",
+          "required": [
+            "PostNotification"
+          ],
+          "properties": {
+            "PostNotification": {
+              "type": "object",
+              "required": [
+                "notification"
+              ],
+              "properties": {
+                "notification": {
+                  "$ref": "#/definitions/NotificationSpec"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Apply Core's post-biometric authentication decision.",
+          "type": "object",
+          "required": [
+            "SetAuthenticationRequirement"
+          ],
+          "properties": {
+            "SetAuthenticationRequirement": {
+              "type": "object",
+              "required": [
+                "requirement"
+              ],
+              "properties": {
+                "requirement": {
+                  "$ref": "#/definitions/AuthenticationRequirement"
                 }
               }
             }
@@ -2796,6 +3146,51 @@
         }
       ]
     },
+    "ContextBar": {
+      "type": "object",
+      "properties": {
+        "back": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActionSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "navigation": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActionSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "primary": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActionSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secondary": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActionSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
     "DesignTokens": {
       "description": "Design tokens for consistent cross-platform rendering.\n\nProvides spacing, typography, border radius, touch target, and motion values that all platform clients use for layout consistency. Source of truth: themes/tokens.json. Default impl generated by themes/scripts/generate.py.",
       "type": "object",
@@ -2967,6 +3362,30 @@
           ]
         }
       ]
+    },
+    "ExportFileSpec": {
+      "type": "object",
+      "required": [
+        "data",
+        "mime_type",
+        "suggested_name"
+      ],
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          }
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "suggested_name": {
+          "type": "string"
+        }
+      }
     },
     "Field": {
       "description": "A contact field as displayed in the UI.\n\n`icon` carries a platform-neutral icon vocabulary name (see [`icon_for_field_type`]) computed by core from `field_type`. Frontends render this directly instead of duplicating the `field_type` → icon switch in each renderer (ADR-021/043 Humble UI). Five frontends previously carried the same switch (iOS×2, cli, tui, android); shipping `icon` on the wire collapses that duplication and makes adding a new field type a single-file change in core.",
@@ -3444,6 +3863,54 @@
         "Urgent"
       ]
     },
+    "NotificationSpec": {
+      "type": "object",
+      "required": [
+        "body",
+        "category_id",
+        "category_options",
+        "channel_id",
+        "title",
+        "urgency"
+      ],
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "category_id": {
+          "type": "string"
+        },
+        "category_options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "channel_id": {
+          "type": "string"
+        },
+        "deep_link_uri": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "urgency": {
+          "$ref": "#/definitions/NotificationUrgency"
+        }
+      }
+    },
+    "NotificationUrgency": {
+      "type": "string",
+      "enum": [
+        "default",
+        "high",
+        "urgent"
+      ]
+    },
     "Orientation": {
       "description": "Screen orientation a frontend should pin to via [`Command::SetOrientationLock`]. Values mirror the platform-native vocabulary (`Activity.requestedOrientation` on Android, `UIInterfaceOrientationMask` on iOS) but are platform-neutral — each frontend maps to its OS API.",
       "oneOf": [
@@ -3461,6 +3928,44 @@
             "Landscape"
           ]
         }
+      ]
+    },
+    "OverlayKind": {
+      "type": "string",
+      "enum": [
+        "navigation",
+        "action_menu"
+      ]
+    },
+    "OverlaySpec": {
+      "type": "object",
+      "required": [
+        "items",
+        "kind"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActionSpec"
+          }
+        },
+        "kind": {
+          "$ref": "#/definitions/OverlayKind"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "PaneLayout": {
+      "type": "string",
+      "enum": [
+        "single",
+        "split"
       ]
     },
     "PendingNotification": {
@@ -3536,6 +4041,808 @@
         "BackupSetup"
       ]
     },
+    "PresentationAxis": {
+      "type": "string",
+      "enum": [
+        "horizontal",
+        "vertical"
+      ]
+    },
+    "PresentationImageShape": {
+      "type": "string",
+      "enum": [
+        "natural",
+        "circle"
+      ]
+    },
+    "PresentationInputKind": {
+      "type": "string",
+      "enum": [
+        "text",
+        "email",
+        "phone",
+        "url",
+        "password",
+        "number",
+        "search",
+        "pin"
+      ]
+    },
+    "PresentationNode": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "Divider"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "Text"
+          ],
+          "properties": {
+            "Text": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "content",
+                "style"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "style": {
+                  "$ref": "#/definitions/PresentationTextStyle"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Input"
+          ],
+          "properties": {
+            "Input": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "binding_id",
+                "enabled",
+                "input_kind",
+                "label",
+                "value"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "binding_id": {
+                  "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "input_kind": {
+                  "$ref": "#/definitions/PresentationInputKind"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "max_length": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "uint",
+                  "minimum": 0.0
+                },
+                "placeholder": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "validation_error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Toggle"
+          ],
+          "properties": {
+            "Toggle": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "binding_id",
+                "enabled",
+                "label",
+                "value"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "binding_id": {
+                  "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Choice"
+          ],
+          "properties": {
+            "Choice": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "binding_id",
+                "enabled",
+                "label",
+                "options"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "binding_id": {
+                  "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ChoiceOption"
+                  }
+                },
+                "selected": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Group"
+          ],
+          "properties": {
+            "Group": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "axis",
+                "children"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "axis": {
+                  "$ref": "#/definitions/PresentationAxis"
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/PresentationNode"
+                  }
+                },
+                "id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "List"
+          ],
+          "properties": {
+            "List": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "id",
+                "rows",
+                "searchable"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "paging": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/PresentationPaging"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/PresentationRow"
+                  }
+                },
+                "searchable": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Image"
+          ],
+          "properties": {
+            "Image": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "brightness",
+                "shape"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "activation": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/ActionSpec"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "brightness": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "data": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "fallback_text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "shape": {
+                  "$ref": "#/definitions/PresentationImageShape"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Status"
+          ],
+          "properties": {
+            "Status": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "title",
+                "tone"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "activation": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/ActionSpec"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "badge": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "icon_token": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "tone": {
+                  "$ref": "#/definitions/PresentationTone"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Qr"
+          ],
+          "properties": {
+            "Qr": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "id",
+                "payloads",
+                "purpose"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "payloads": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "purpose": {
+                  "$ref": "#/definitions/PresentationQrPurpose"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Confirmation"
+          ],
+          "properties": {
+            "Confirmation": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "cancel",
+                "confirm",
+                "id",
+                "warning"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "cancel": {
+                  "$ref": "#/definitions/ActionSpec"
+                },
+                "confirm": {
+                  "$ref": "#/definitions/ActionSpec"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "warning": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Slider"
+          ],
+          "properties": {
+            "Slider": {
+              "type": "object",
+              "required": [
+                "accessibility",
+                "binding_id",
+                "label",
+                "maximum",
+                "minimum",
+                "value"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "binding_id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "maximum": {
+                  "type": "number",
+                  "format": "double"
+                },
+                "maximum_icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "minimum": {
+                  "type": "number",
+                  "format": "double"
+                },
+                "minimum_icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "step": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "format": "double"
+                },
+                "value": {
+                  "type": "number",
+                  "format": "double"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Progress"
+          ],
+          "properties": {
+            "Progress": {
+              "type": "object",
+              "required": [
+                "accessibility"
+              ],
+              "properties": {
+                "accessibility": {
+                  "$ref": "#/definitions/AccessibilitySpec"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "format": "double"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PresentationPaging": {
+      "type": "object",
+      "required": [
+        "offset",
+        "total_count",
+        "window"
+      ],
+      "properties": {
+        "offset": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "total_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "window": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "PresentationProfile": {
+      "type": "object",
+      "required": [
+        "active_surface",
+        "pane_layout",
+        "primary_surface",
+        "window_class"
+      ],
+      "properties": {
+        "active_surface": {
+          "type": "string"
+        },
+        "detail_surface": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pane_layout": {
+          "$ref": "#/definitions/PaneLayout"
+        },
+        "primary_surface": {
+          "type": "string"
+        },
+        "window_class": {
+          "$ref": "#/definitions/WindowClass"
+        }
+      }
+    },
+    "PresentationQrPurpose": {
+      "type": "string",
+      "enum": [
+        "display",
+        "capture"
+      ]
+    },
+    "PresentationRow": {
+      "type": "object",
+      "required": [
+        "accessibility",
+        "controls",
+        "enabled",
+        "secondary_actions",
+        "selected",
+        "title"
+      ],
+      "properties": {
+        "accessibility": {
+          "$ref": "#/definitions/AccessibilitySpec"
+        },
+        "activation": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActionSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "controls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PresentationNode"
+          }
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "fallback_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "icon_token": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image_data": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          }
+        },
+        "secondary_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActionSpec"
+          }
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "subtitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        }
+      }
+    },
+    "PresentationTextStyle": {
+      "type": "string",
+      "enum": [
+        "heading",
+        "body",
+        "caption",
+        "monospace",
+        "muted"
+      ]
+    },
+    "PresentationTokens": {
+      "type": "object",
+      "required": [
+        "corner_radius",
+        "minimum_target_size",
+        "spacing_large",
+        "spacing_medium",
+        "spacing_small"
+      ],
+      "properties": {
+        "corner_radius": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "minimum_target_size": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "spacing_large": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "spacing_medium": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "spacing_small": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        }
+      }
+    },
+    "PresentationTone": {
+      "type": "string",
+      "enum": [
+        "neutral",
+        "accent",
+        "success",
+        "warning",
+        "error"
+      ]
+    },
     "PreviewVariant": {
       "description": "One alternate look at a `Component::Preview` — a per-variant view of the same content. Today only contact-card group views populate this; future variants (per-locale views, accessibility variants, previews-as-other-relationship) reuse the same shape.\n\nEngines populate `variant_id` with whatever stable identifier they know (group name, locale code, etc.); the renderer only matches it against `Component::Preview.selected_variant` and never reads the string for meaning.",
       "type": "object",
@@ -3603,41 +4910,6 @@
         "NoSignal"
       ]
     },
-    "ScreenAction": {
-      "description": "A button or action the user can take on the screen.\n\nFrontends render this as the primary button row on a screen. The `id` is the stable action identifier consumed by `handle_action` via `UserAction::ActionPressed { action_id }`; the `label` is the localized display string.\n\n# Accessibility contract\n\n- `id` is the stable accessibility identifier (Compose `testTag`, SwiftUI `accessibilityIdentifier`). Frontends map `ScreenAction.id` onto the platform a11y identifier so Maestro (or any a11y-based test driver) can tap by `id:` rather than by localized visible text. When `a11y` is `None`, `label` serves as the screen-reader announcement. - `a11y.label`, when `Some`, overrides `label` for screen readers. Use this for destructive buttons (\"Delete permanently, this cannot be undone\") or toggles-as-buttons (\"Turned on\" vs the visible \"On\"). For 95%+ of screens, leave `a11y` as `None`.\n\nSee `_private/docs/problems/2026-04-20-screen-action-a11y-identifier-gap`.",
-      "type": "object",
-      "required": [
-        "enabled",
-        "id",
-        "label",
-        "style"
-      ],
-      "properties": {
-        "a11y": {
-          "description": "Accessibility override. `None` means \"use `label`\".",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/A11y"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "enabled": {
-          "type": "boolean"
-        },
-        "id": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "style": {
-          "$ref": "#/definitions/ActionStyle"
-        }
-      }
-    },
     "ScreenLayout": {
       "description": "Whether the renderer wraps content in a scroll container or renders a fixed, non-scrolling layout sized to the viewport. Frontends honour this instead of always wrapping content in a scroll view. `Fixed` is used by screens that must not reflow while a live element updates — e.g. the QR exchange screen, where a moving QR breaks the peer camera lock (`2026-06-03-exchange-qr-scan-stability`). `Pinned` is used by list-dominant screens: chrome stays pinned while the list component owns scrolling lazily — eager rendering of 10k rows froze and crashed the mobile renderers (`2026-06-11-contacts-list-windowing-design`).",
       "oneOf": [
@@ -3668,18 +4940,11 @@
       "description": "Describes a full screen to render.",
       "type": "object",
       "required": [
-        "actions",
         "components",
         "screen_id",
         "title"
       ],
       "properties": {
-        "actions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ScreenAction"
-          }
-        },
         "components": {
           "type": "array",
           "items": {
@@ -3708,13 +4973,6 @@
               "$ref": "#/definitions/NativeWrapperHint"
             }
           ]
-        },
-        "nav_actions": {
-          "description": "Global/top-bar chrome actions offered on this screen (e.g. the Settings gear on the home screen). Core owns *what* chrome actions exist; each frontend presents them per its form factor (mobile top-bar, desktop may route to its sidebar) instead of hardcoding native chrome — retires android's `ReadyScreen`/`isHomeTab` gate and the iOS `HomeView` header (`2026-07-06-mobile-domain-shell-violations`). Reserved chrome ids (e.g. `open_settings`) resolve to their `NavigateTo` before per-screen dispatch. Empty on most screens.",
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ScreenAction"
-          }
         },
         "nav_tab_id": {
           "description": "The bottom-nav tab that owns this screen (`my_info` / `contacts` / `exchange` / `groups` / `more`), or `None` for pre-auth / transient screens that show no bottom nav. Unlike [`Self::parent_screen_id`] (which stops at the immediate parent for the desktop sidebar), this resolves transitively to one of the five tab roots so the mobile / TUI 5-tab shells highlight the active tab without re-deriving it from the screen id (retires the hand-maintained `match AppScreen -> tab`).",
@@ -3751,7 +5009,7 @@
         },
         "schema_version": {
           "description": "Schema version — shells ignore components from higher versions.",
-          "default": 4,
+          "default": 5,
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0
@@ -4123,6 +5381,14 @@
         }
       }
     },
+    "StandardShortcut": {
+      "type": "string",
+      "enum": [
+        "back",
+        "activate_primary",
+        "undo"
+      ]
+    },
     "Status": {
       "description": "Status for a status indicator component.",
       "type": "string",
@@ -4134,6 +5400,61 @@
         "Warning"
       ]
     },
+    "SurfaceLayout": {
+      "type": "string",
+      "enum": [
+        "scroll",
+        "fixed",
+        "pinned"
+      ]
+    },
+    "SurfaceSpec": {
+      "type": "object",
+      "required": [
+        "accessibility_label",
+        "layout",
+        "nodes",
+        "revision",
+        "surface_id",
+        "title",
+        "tokens"
+      ],
+      "properties": {
+        "accessibility_label": {
+          "type": "string"
+        },
+        "layout": {
+          "$ref": "#/definitions/SurfaceLayout"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PresentationNode"
+          }
+        },
+        "revision": {
+          "description": "Monotonic Core-owned replacement generation for this surface.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "subtitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "surface_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "tokens": {
+          "$ref": "#/definitions/PresentationTokens"
+        }
+      }
+    },
     "TextStyle": {
       "description": "Text rendering style.",
       "type": "string",
@@ -4143,6 +5464,17 @@
         "Body",
         "Caption"
       ]
+    },
+    "ToastSpec": {
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
     },
     "ToggleItem": {
       "description": "A toggleable item in a list.",
@@ -4344,6 +5676,14 @@
             "PerGroup"
           ]
         }
+      ]
+    },
+    "WindowClass": {
+      "type": "string",
+      "enum": [
+        "compact",
+        "medium",
+        "expanded"
       ]
     }
   }

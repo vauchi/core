@@ -20,7 +20,7 @@ fn load_german() {
 
 fn action_label(screen: &ScreenModel, id: &str) -> String {
     screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == id)
         .unwrap_or_else(|| panic!("action {id} present"))

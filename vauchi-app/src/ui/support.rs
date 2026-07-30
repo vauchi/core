@@ -60,7 +60,7 @@ impl SupportEngine {
                 ],
                 a11y: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "open_github_sponsors".into(),
                     label: self.t("support.github_sponsors_label"),

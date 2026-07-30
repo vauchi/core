@@ -25,9 +25,12 @@ mod contact_limit;
 mod contact_list;
 mod contact_merge;
 mod contact_visibility;
+mod contextual_actions;
+mod contextual_surface;
 mod decoy_contacts;
 mod deep_link_consent;
 pub mod delivery;
+mod demo_presentation;
 mod device_link_join;
 mod device_linking;
 mod device_management;
@@ -54,6 +57,8 @@ mod my_info;
 mod my_info_entry_detail;
 mod onboarding;
 mod places_list;
+mod prepared_surface;
+mod presentation;
 pub mod reciprocity_confirmer;
 pub mod recovery_claim_review;
 mod recovery_help;
@@ -71,7 +76,7 @@ pub use action::{
 };
 pub use activity_log::{ActivityLogEngine, ActivityLogItem};
 #[cfg(feature = "network-rustls")]
-pub use app_engine::{AppEngine, AppScreen, TabLayout};
+pub use app_engine::{AppEngine, AppPresentationError, AppScreen, TabLayout};
 pub use archived_contacts::ArchivedContactsEngine;
 pub use avatar_editor::AvatarEditorEngine;
 pub use backup_recovery::{BackupLevel, BackupMode, BackupRecoveryEngine};
@@ -101,12 +106,17 @@ pub use contact_limit::ContactLimitEngine;
 pub use contact_list::{ContactListEngine, IndexedItem};
 pub use contact_merge::{ContactMergeEngine, MergePreview};
 pub use contact_visibility::ContactVisibilityEngine;
+pub use contextual_actions::{
+    ContextualActionCoordinator, ContextualActionCoordinatorError, ContextualActionTransition,
+};
+pub use contextual_surface::{ContextualSurface, ContextualSurfaceError, ContextualSurfaceRoute};
 pub use decoy_contacts::{DecoyContactItem, DecoyContactsEngine};
 pub use deep_link_consent::{
     ACTION_DENY as DEEP_LINK_ACTION_DENY, ACTION_GRANT as DEEP_LINK_ACTION_GRANT, ConsentDecision,
     DeepLinkConsentEngine,
 };
 pub use delivery::{DeliveryItem, DeliveryStatusEngine};
+pub use demo_presentation::DemoPresentationEngine;
 pub use device_link_join::{
     CANCEL_ACTION_ID as DEVICE_LINK_CANCEL_ACTION_ID, DeviceLinkJoinEngine,
     JOIN_ACTION_ID as DEVICE_LINK_JOIN_ACTION_ID,
@@ -158,6 +168,8 @@ pub use my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, MyInfoViewMode, 
 pub use my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
 pub use places_list::{PlaceSummary, PlacesEngine};
+pub use prepared_surface::{PreparedSurface, PreparedSurfaceError};
+pub use presentation::{PresentationCoordinator, PresentationCoordinatorError};
 pub use recovery_help::{ParsedClaimSummary, RecoveryHelpEngine};
 pub use recovery_status::RecoveryEngine;
 pub use render_context::RenderContext;

@@ -168,7 +168,7 @@ impl GroupsEngine {
             // Only "New Group" is a list-level action. Rename/delete a group
             // by opening it (tap a row → GroupDetail), where the target is
             // unambiguous.
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "new_group".into(),
                 label: self.t("form.new_group_title"),
                 style: ActionStyle::Primary,
@@ -403,13 +403,20 @@ mod tests {
         for groups in [vec![], sample_groups()] {
             let engine = GroupsEngine::new(groups, GroupsMode::Members);
             let screen = engine.current_screen();
-            let ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+            let ids: Vec<&str> = screen
+                .contextual_actions
+                .iter()
+                .map(|a| a.id.as_str())
+                .collect();
             assert_eq!(
                 ids,
                 vec!["new_group"],
                 "Groups list must offer only New Group, got {ids:?}"
             );
-            assert!(screen.actions[0].enabled, "New Group is always enabled");
+            assert!(
+                screen.contextual_actions[0].enabled,
+                "New Group is always enabled"
+            );
         }
     }
 

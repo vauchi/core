@@ -176,7 +176,7 @@ impl DuressPinEngine {
             title: self.t("resistance.duress.pin_label"),
             subtitle: None,
             components,
-            actions,
+            contextual_actions: actions,
             progress: Some(self.progress()),
             ..Default::default()
         }
@@ -200,7 +200,7 @@ impl DuressPinEngine {
                     role: None,
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "back".into(),
                     label: self.t("action.back"),
@@ -239,7 +239,7 @@ impl DuressPinEngine {
                     role: None,
                 }),
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "back".into(),
                     label: self.t("action.back"),
@@ -315,7 +315,7 @@ impl DuressPinEngine {
                     a11y: None,
                 },
             ],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "back".into(),
                     label: self.t("action.back"),

@@ -204,7 +204,7 @@ impl NfcExchangeEngine {
                     role: None,
                 }),
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: ACTION_DONE.into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,
@@ -271,7 +271,7 @@ impl NfcExchangeEngine {
                     role: None,
                 }),
             }],
-            actions,
+            contextual_actions: actions,
             ..Default::default()
         }
     }
@@ -476,7 +476,7 @@ fn build_nfc_role_screen(locale: Locale) -> ScreenModel {
                 },
             ],
         }],
-        actions: vec![ScreenAction {
+        contextual_actions: vec![ScreenAction {
             id: ACTION_CANCEL.into(),
             label: t("action.cancel"),
             style: ActionStyle::Secondary,
@@ -715,7 +715,7 @@ mod tests {
         let _ = with.handle_action(select(ROLE_SEND));
         let with_ids: Vec<String> = with
             .current_screen()
-            .actions
+            .contextual_actions
             .iter()
             .map(|a| a.id.clone())
             .collect();
@@ -731,7 +731,7 @@ mod tests {
         let _ = without.handle_action(select(ROLE_SEND));
         let without_ids: Vec<String> = without
             .current_screen()
-            .actions
+            .contextual_actions
             .iter()
             .map(|a| a.id.clone())
             .collect();

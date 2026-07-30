@@ -36,8 +36,9 @@ use crate::error::MobileError;
 use crate::platform_app_engine_internals::self_heal_post_auth;
 
 use crate::json_helpers::{
-    action_result_envelope_to_json, app_screen_from_json, hardware_event_envelope_to_json,
-    screen_envelope_to_json, screen_to_json, user_action_from_json, wakeup_envelope_to_json,
+    action_result_envelope_to_json, app_screen_from_json, commands_envelope_to_json,
+    event_from_json, screen_envelope_to_json, screen_to_json, user_action_from_json,
+    wakeup_envelope_to_json,
 };
 
 // ── PlatformEventListener ──────────────────────────────────────────
@@ -81,16 +82,13 @@ pub(crate) type DirectListenerSlot = Arc<Mutex<Option<Arc<Box<dyn PlatformEventL
 ///     storageKeyBytes: keyBytes
 /// )
 ///
-/// // Get current screen
-/// let screenJson = try engine.currentScreenJson()
+/// // Render Core's complete initial reducer batch.
+/// let commandsJson = try engine.initialCommandsJson()
 ///
-/// // Handle user action
-/// let resultJson = try engine.handleActionJson(
-///     actionJson: "{\"ActionPressed\": {\"action_id\": \"get_started\"}}"
+/// // Reduce a prepared interaction into the next command batch.
+/// let nextCommandsJson = try engine.dispatchJson(
+///     eventJson: "{\"ActionActivated\":{\"surface_id\":\"main\",\"interaction_id\":\"get_started\"}}"
 /// )
-///
-/// // Navigate to a screen
-/// let screenJson = try engine.navigateToJson(screenJson: "\"Exchange\"")
 ///
 /// // After VauchiPlatform mutations, invalidate
 /// try engine.invalidateAll()
@@ -262,7 +260,9 @@ impl PlatformAppEngine {
             relay_url,
         }))
     }
+}
 
+impl PlatformAppEngine {
     /// Returns the cold-start `ScreenModel` JSON for whatever the
     /// app's current persistent state is.
     ///
@@ -280,14 +280,14 @@ impl PlatformAppEngine {
     /// "implicit / by convention" to "named API method", so iOS
     /// `AppState` and Android `UiState` shadow enums can be deleted
     /// without ambiguity. Subsequent reads use `current_screen_json`.
-    pub fn boot(&self) -> Result<String, MobileError> {
-        self.current_screen_json()
+    pub(crate) fn boot_for_test(&self) -> Result<String, MobileError> {
+        self.current_screen_json_for_test()
     }
 
     /// Returns the current screen as a JSON string.
     ///
     /// The JSON structure matches `ScreenModel` from vauchi-core.
-    pub fn current_screen_json(&self) -> Result<String, MobileError> {
+    pub(crate) fn current_screen_json_for_test(&self) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
@@ -302,7 +302,42 @@ impl PlatformAppEngine {
         self_heal_post_auth(&mut engine);
         screen_to_json(&engine.current_screen())
     }
+}
 
+#[uniffi::export]
+impl PlatformAppEngine {
+    /// Return Core's complete initial presentation command batch.
+    pub fn initial_commands_json(&self) -> Result<String, MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        self_heal_post_auth(&mut engine);
+        let commands = engine.initial_commands().map_err(|e| MobileError::Other {
+            detail: format!("Failed to compose initial presentation: {e}"),
+        })?;
+        commands_envelope_to_json(&commands)
+    }
+
+    /// Reduce one canonical event into the next ordered command batch.
+    pub fn dispatch_json(&self, event_json: String) -> Result<String, MobileError> {
+        let event = event_from_json(&event_json)?;
+        let commands = {
+            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            self_heal_post_auth(&mut engine);
+            engine
+                .dispatch(event)
+                .map_err(|e| MobileError::InvalidInput {
+                    field: String::new(),
+                    detail: format!("Invalid event: {e}"),
+                })?
+        };
+        commands_envelope_to_json(&commands)
+    }
+}
+
+impl PlatformAppEngine {
     /// Returns the navigation chrome for `layout` — the mobile bottom-tab
     /// bar (`Mobile`) or the desktop sidebar (`Desktop`) — with labels
     /// resolved from `locale`.
@@ -313,7 +348,7 @@ impl PlatformAppEngine {
     /// so the form-factor decision stays in core (ADR-023 Amendment 1).
     /// The engine peers `tab_info()` / `sidebar_items()` remain — cabi
     /// serves the C-ABI desktop frontends through them.
-    pub fn nav_items(
+    pub(crate) fn nav_items_for_test(
         &self,
         layout: MobileTabLayout,
         locale: MobileLocale,
@@ -336,7 +371,10 @@ impl PlatformAppEngine {
     /// `ValidationError` is never returned — validation errors are
     /// resolved into `UpdateScreen` with the error injected into the
     /// matching component's `validation_error` field.
-    pub fn handle_action_json(&self, action_json: String) -> Result<String, MobileError> {
+    pub(crate) fn handle_action_json_for_test(
+        &self,
+        action_json: String,
+    ) -> Result<String, MobileError> {
         let action = user_action_from_json(&action_json)?;
         // Pair 4 — pre-action retry detection: when the user presses
         // Retry on the multi-stage screen the underlying session must
@@ -452,24 +490,15 @@ impl PlatformAppEngine {
         };
         action_result_envelope_to_json(&result, &pending_commands)
     }
+}
 
-    /// Handle a hardware event from the frontend during an exchange (ADR-031).
+#[uniffi::export]
+impl PlatformAppEngine {
+    /// Reduce a typed hardware event into the next generic command batch.
     ///
-    /// Frontends call this when hardware reports results (QR scanned, BLE
-    /// data received, etc.). Returns the serialized `ActionResult` JSON if
-    /// the event produced a result, or `None` if the current screen doesn't
-    /// handle hardware events.
-    ///
-    /// # Usage from Swift
-    ///
-    /// ```swift
-    /// if let resultJson = try engine.handleHardwareEvent(
-    ///     event: .qrScanned(data: scannedData)
-    /// ) {
-    ///     let result = try decoder.decode(ActionResult.self, from: resultJson.data(using: .utf8)!)
-    ///     applyResult(result)
-    /// }
-    /// ```
+    /// This is the typed UniFFI companion to [`Self::dispatch_json`]. It keeps
+    /// native callers from hand-encoding hardware payloads while preserving the
+    /// same Event -> Command protocol used by every presentation interaction.
     pub fn handle_hardware_event(&self, event: crate::MobileEvent) -> Result<String, MobileError> {
         let hw_event: vauchi_core::Event = event.into();
         // Pair 4 — auto-route QrScanned to the live multi-stage session
@@ -490,165 +519,115 @@ impl PlatformAppEngine {
         // the invalidation fires after the engine lock is released.
         let mut ble_terminal = false;
 
-        // Resolve the optional `ActionResult` from whichever routing path the
-        // event takes. The `Command`s it emits accumulate in `pending_commands`
-        // regardless of path, and are drained into the envelope at the end — the
-        // fix for command-driven transports (BLE / NFC data / audio responses),
-        // whose commands were previously stranded and never executed.
-        let action_result: Option<vauchi_app::ui::ActionResult> =
-            if on_multi_stage && let vauchi_core::Event::QrScanned { .. } = &hw_event {
-                // T1.2c: route through the AppEngine-owned machine.
+        let commands = if on_multi_stage && let vauchi_core::Event::QrScanned { .. } = &hw_event {
+            // T1.2c: route through the AppEngine-owned machine.
+            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            let m_event = engine.forward_multi_stage_hardware_event(&hw_event);
+            engine.apply_multi_stage_event(m_event);
+            engine.initial_commands().map_err(|e| MobileError::Other {
+                detail: format!("Failed to compose presentation after hardware event: {e}"),
+            })?
+        } else {
+            // BLE/Magic completion P2 — a peer discovery on the BLE
+            // exchange screen builds the AppEngine-owned handshake session.
+            // The role is decided from the peer's advertised tiebreak
+            // token (in `adv_data`), matching `BleExchangeFlow`'s connect
+            // decision. Idempotent; falls through to the engine below,
+            // which emits `BleConnect` for the tiebreak winner. Once the
+            // session is active, the `BleConnected`/data events route into
+            // the real machine via the gate that follows.
+            if let vauchi_core::Event::BleDeviceDiscovered { id, adv_data, .. } = &hw_event {
                 let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                     detail: format!("Lock failed: {e}"),
                 })?;
-                let m_event = engine.forward_multi_stage_hardware_event(&hw_event);
-                engine.apply_multi_stage_event(m_event);
-                None
-            } else {
-                // BLE/Magic completion P2 — a peer discovery on the BLE
-                // exchange screen builds the AppEngine-owned handshake session.
-                // The role is decided from the peer's advertised tiebreak
-                // token (in `adv_data`), matching `BleExchangeFlow`'s connect
-                // decision. Idempotent; falls through to the engine below,
-                // which emits `BleConnect` for the tiebreak winner. Once the
-                // session is active, the `BleConnected`/data events route into
-                // the real machine via the gate that follows.
-                if let vauchi_core::Event::BleDeviceDiscovered { id, adv_data, .. } = &hw_event {
-                    let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                        detail: format!("Lock failed: {e}"),
-                    })?;
-                    match engine.current_app_screen() {
-                        // Glance is asymmetric: connect only to the advertiser
-                        // whose identity matches the scanned QR (no tiebreak, no
-                        // latch race — F1 dissolves). Builds the initiator
-                        // session with the scanned pins + drains a `BleConnect`.
-                        AppScreen::BleExchange {
-                            mode: vauchi_core::exchange::mode::ExchangeMode::Glance,
-                        } => engine.handle_glance_discovery(id, adv_data),
-                        AppScreen::BleExchange { .. } => {
-                            engine.start_ble_handshake_on_discovery(adv_data);
-                        }
-                        _ => {}
+                match engine.current_app_screen() {
+                    // Glance is asymmetric: connect only to the advertiser
+                    // whose identity matches the scanned QR (no tiebreak, no
+                    // latch race — F1 dissolves). Builds the initiator
+                    // session with the scanned pins + drains a `BleConnect`.
+                    AppScreen::BleExchange {
+                        mode: vauchi_core::exchange::mode::ExchangeMode::Glance,
+                    } => engine.handle_glance_discovery(id, adv_data),
+                    AppScreen::BleExchange { .. } => {
+                        engine.start_ble_handshake_on_discovery(adv_data);
                     }
+                    _ => {}
                 }
+            }
 
-                // Slice 32m T2.2c — BLE event routing into the AppEngine-owned
-                // `BleHandshakeMachine`, gated on an active session. Additive on top
-                // of the regular `engine.handle_hardware_event` below so the existing
-                // `ExchangeEngine::BleExchangeFlow` proximity path runs undisturbed.
-                if matches!(
-                    &hw_event,
-                    vauchi_core::Event::BleConnected { .. }
-                        | vauchi_core::Event::BleCharacteristicNotified { .. }
-                        | vauchi_core::Event::BleCharacteristicRead { .. }
-                        | vauchi_core::Event::BleMtuNegotiated { .. }
-                        | vauchi_core::Event::BleDisconnected { .. }
-                ) {
-                    let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                        detail: format!("Lock failed: {e}"),
-                    })?;
-                    // A GATT peripheral never scans, so it emits no
-                    // `BleDeviceDiscovered` and the discovery branch above never
-                    // built its session. The peripheral that gets connected to
-                    // is always the responder — build that session now so its
-                    // KeyOffer-onward writes reach the real machine and the
-                    // contact persists (`2026-06-08-ios-ble-responder-persist`).
-                    // No-op for the central, which already holds an active
-                    // session from discovery.
-                    if matches!(&hw_event, vauchi_core::Event::BleConnected { .. })
-                        && !engine.ble_handshake_session_active()
-                        && matches!(engine.current_app_screen(), AppScreen::BleExchange { .. })
-                    {
-                        engine.start_ble_handshake_as_responder();
-                    }
-                    if engine.ble_handshake_session_active() {
-                        let m_event = engine.forward_ble_hardware_event(&hw_event);
-                        // P3 — on Completed, persist the decrypted peer card +
-                        // Double Ratchet as an exchanged contact; terminal
-                        // events also flip the engine chrome.
-                        // No BLE poll loop + terminal envelopes carry no
-                        // ActionResult → push an invalidation or the UI
-                        // freezes on "Exchanging..." (P5b, 2026-06-10).
-                        ble_terminal = matches!(
-                            m_event,
-                            BleMachineEvent::Completed(_) | BleMachineEvent::Failed { .. }
-                        );
-                        engine.apply_ble_machine_event(m_event);
-                    }
+            // Slice 32m T2.2c — BLE event routing into the AppEngine-owned
+            // `BleHandshakeMachine`, gated on an active session. Additive on top
+            // of the regular `engine.dispatch` below so the existing
+            // `ExchangeEngine::BleExchangeFlow` proximity path runs undisturbed.
+            if matches!(
+                &hw_event,
+                vauchi_core::Event::BleConnected { .. }
+                    | vauchi_core::Event::BleCharacteristicNotified { .. }
+                    | vauchi_core::Event::BleCharacteristicRead { .. }
+                    | vauchi_core::Event::BleMtuNegotiated { .. }
+                    | vauchi_core::Event::BleDisconnected { .. }
+            ) {
+                let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                    detail: format!("Lock failed: {e}"),
+                })?;
+                // A GATT peripheral never scans, so it emits no
+                // `BleDeviceDiscovered` and the discovery branch above never
+                // built its session. The peripheral that gets connected to
+                // is always the responder — build that session now so its
+                // KeyOffer-onward writes reach the real machine and the
+                // contact persists (`2026-06-08-ios-ble-responder-persist`).
+                // No-op for the central, which already holds an active
+                // session from discovery.
+                if matches!(&hw_event, vauchi_core::Event::BleConnected { .. })
+                    && !engine.ble_handshake_session_active()
+                    && matches!(engine.current_app_screen(), AppScreen::BleExchange { .. })
+                {
+                    engine.start_ble_handshake_as_responder();
                 }
-
-                // ADR-031: biometric unlock arrives as a hardware event. Core
-                // consults its duress-PIN state and pads the wall-clock to
-                // `BIOMETRIC_UNLOCK_MIN_DURATION` so the unlock-screen timing can't
-                // leak whether duress is configured.
-                if let vauchi_core::Event::BiometricUnlockSucceeded = &hw_event {
-                    let outcome = self
-                        .engine
-                        .lock()
-                        .map_err(|e| MobileError::Other {
-                            detail: format!("Lock failed: {e}"),
-                        })?
-                        .vauchi_mut()
-                        .biometric_unlock_check()
-                        .map_err(|e| MobileError::Other {
-                            detail: e.to_string(),
-                        })?;
-                    Some(vauchi_app::ui::ActionResult::BiometricUnlockOutcome { outcome })
-                } else {
-                    let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                        detail: format!("Lock failed: {e}"),
-                    })?;
-                    engine.handle_hardware_event(hw_event)
+                if engine.ble_handshake_session_active() {
+                    let m_event = engine.forward_ble_hardware_event(&hw_event);
+                    // P3 — on Completed, persist the decrypted peer card +
+                    // Double Ratchet as an exchanged contact; terminal
+                    // events also flip the engine chrome.
+                    // No BLE poll loop: push an invalidation on terminal events
+                    // so observers that are not rendering this command batch
+                    // also leave "Exchanging..." (P5b, 2026-06-10).
+                    ble_terminal = matches!(
+                        m_event,
+                        BleMachineEvent::Completed(_) | BleMachineEvent::Failed { .. }
+                    );
+                    engine.apply_ble_machine_event(m_event);
                 }
-            };
+            }
 
-        // Drain every command the event produced and ship it alongside the
-        // result so the frontend executes it on the hardware.
-        let commands = self
-            .engine
-            .lock()
-            .map_err(|e| MobileError::Other {
+            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
-            })?
-            .drain_pending_commands();
+            })?;
+            engine
+                .dispatch(hw_event)
+                .map_err(|e| MobileError::InvalidInput {
+                    field: String::new(),
+                    detail: format!("Invalid hardware event: {e}"),
+                })?
+        };
+
         if ble_terminal {
             self.fire_screens_invalidated(vec!["ble_exchange".into()]);
         }
-        hardware_event_envelope_to_json(action_result.as_ref(), &commands)
+        commands_envelope_to_json(&commands)
     }
+}
 
-    /// Advance the animated QR to the next frame.
-    ///
-    /// Returns the updated ScreenModel JSON when the active engine has animated
-    /// frames to cycle (currently only `ExchangeEngine` on the ShowQr step), or
-    /// `None` otherwise. Frontends call this on a ~100ms timer while displaying
-    /// the "Share Your Code" screen to cycle V6-sized QR chunks for reliable
-    /// 240p camera decode.
-    ///
-    /// # Usage from Swift
-    ///
-    /// ```swift
-    /// if let frameJson = try engine.advanceQrFrameJson() {
-    ///     applyScreen(decode(frameJson))
-    /// }
-    /// ```
-    pub fn advance_qr_frame_json(&self) -> Result<Option<String>, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        match engine.advance_qr_frame() {
-            Some(screen) => Ok(Some(screen_to_json(&screen)?)),
-            None => Ok(None),
-        }
-    }
-
+impl PlatformAppEngine {
     /// Navigate back in the history stack.
     ///
     /// Returns the previous screen model as JSON envelope:
     /// `{"screen": <ScreenModel>, "commands": [<Command>, ...]}`.
     /// `commands` carries any screen-presentation `Command`s emitted by
     /// the lifecycle hooks of the outgoing + incoming engines (Phase 2b).
-    pub fn navigate_back_json(&self) -> Result<String, MobileError> {
+    pub(crate) fn navigate_back_json_for_test(&self) -> Result<String, MobileError> {
         let (model, pending_commands) = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
@@ -669,13 +648,19 @@ impl PlatformAppEngine {
     /// Frontends use this to keep tab/sidebar selection in sync with
     /// the active screen without maintaining their own
     /// `screen_id` → `parent_tab` map (§1D pure-renderer remediation).
-    pub fn current_tab_id(&self, layout: MobileTabLayout) -> Result<Option<String>, MobileError> {
+    pub(crate) fn current_tab_id_for_test(
+        &self,
+        layout: MobileTabLayout,
+    ) -> Result<Option<String>, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
         Ok(engine.current_tab_id(layout.into()).map(|s| s.to_string()))
     }
+}
 
+#[uniffi::export]
+impl PlatformAppEngine {
     /// Invalidate all cached engines.
     ///
     /// Call this after mutations via `VauchiPlatform` so the next
@@ -746,9 +731,8 @@ impl PlatformAppEngine {
     /// frontends own the canonical copy in OS-native sandboxed
     /// storage (`SharedPreferences`, `UserDefaults`, …) and push
     /// the active values to core at app boot + on every Settings
-    /// dropdown change. Core uses them to render Settings dropdown
-    /// `selected` values (S3 of the implementation plan) and,
-    /// later, to resolve locale-keyed strings into ScreenModel.
+    /// dropdown change. Core uses them to prepare selected values and
+    /// localized presentation commands.
     ///
     /// JSON shape: `{ "locale": "de", "theme_id": "cyber" }`.
     /// Both fields optional — `null` / absent means "frontend has
@@ -770,11 +754,8 @@ impl PlatformAppEngine {
     ///
     /// Frontends call this from their platform reachability monitor
     /// (`NWPathMonitor` on iOS, `ConnectivityManager` on Android)
-    /// callback. While `online == false`, every emitted
-    /// `ScreenModel` carries a presentational offline `Component::Banner`
-    /// that frontends render automatically — no
-    /// `MainViewModel.isOnline` mirror flag, no `OfflineBanner()`
-    /// switch in the view tree.
+    /// callback. Core owns any resulting offline presentation and sync
+    /// policy; shells do not mirror the state or select a banner.
     ///
     /// Audit `2026-04-28-lifecycle-session-residue-umbrella` P2-D.
     pub fn set_network_online(&self, online: bool) -> Result<(), MobileError> {
@@ -792,27 +773,6 @@ impl PlatformAppEngine {
     pub fn set_platform_keychain(&self, keychain: Box<dyn crate::MobilePlatformKeychain>) {
         if let Ok(mut lock) = self.platform_keychain.lock() {
             *lock = Some(Arc::from(keychain));
-        }
-    }
-
-    /// Notify core that the app was backgrounded.
-    ///
-    /// If a password is set and the app is not already locked,
-    /// returns the lock screen JSON. Otherwise returns null.
-    /// Frontends should call on `scenePhase == .background` (iOS)
-    /// or `onPause()` (Android).
-    pub fn handle_app_backgrounded(&self) -> Result<Option<String>, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        match engine.handle_app_backgrounded() {
-            Some(screen) => {
-                let json = serde_json::to_string(&screen).map_err(|e| MobileError::Other {
-                    detail: e.to_string(),
-                })?;
-                Ok(Some(json))
-            }
-            None => Ok(None),
         }
     }
 
@@ -963,8 +923,8 @@ impl PlatformAppEngine {
     ///
     /// # Threading — IMPORTANT
     ///
-    /// The callback may fire **on the same thread** that called
-    /// `handle_action_json` (synchronous event dispatch). The callback
+    /// The callback may fire **on the same thread** that dispatched a
+    /// synchronous event. The callback
     /// **must not** call back into `PlatformAppEngine` methods directly —
     /// doing so would deadlock on the internal Mutex. Always dispatch
     /// to a separate queue/thread before touching the engine.

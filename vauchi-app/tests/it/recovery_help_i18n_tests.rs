@@ -26,7 +26,7 @@ fn recovery_help_info_screen_renders_german() {
     assert_eq!(screen.title, "Anderen helfen");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "vouch")
             .unwrap()
@@ -44,7 +44,7 @@ fn recovery_help_info_screen_english_copy_unchanged() {
     assert_eq!(screen.title, "Help Others");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "vouch")
             .unwrap()

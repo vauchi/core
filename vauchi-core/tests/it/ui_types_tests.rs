@@ -6,7 +6,7 @@ use vauchi_app::ui::{A11y, AccessibilityRole, SettingsItem, *};
 
 // @internal
 #[test]
-fn test_screen_model_serde_roundtrip() {
+fn screen_model_serialization_excludes_internal_contextual_actions() {
     let screen = ScreenModel {
         screen_id: "default_name".to_string(),
         title: "What's your name?".to_string(),
@@ -25,7 +25,7 @@ fn test_screen_model_serde_roundtrip() {
             },
             Component::Divider,
         ],
-        actions: vec![ScreenAction {
+        contextual_actions: vec![ScreenAction {
             id: "continue".to_string(),
             label: "Continue".to_string(),
             style: ActionStyle::Primary,
@@ -46,7 +46,10 @@ fn test_screen_model_serde_roundtrip() {
     assert_eq!(restored.screen_id, "default_name");
     assert_eq!(restored.title, "What's your name?");
     assert_eq!(restored.components.len(), 2);
-    assert_eq!(restored.actions.len(), 1);
+    assert!(
+        restored.contextual_actions.is_empty(),
+        "legacy screen actions must not cross the shell boundary"
+    );
     assert!(restored.progress.is_some(), "expected Some value");
     let progress = restored.progress.unwrap();
     assert_eq!(progress.current_step, 1);
@@ -160,7 +163,7 @@ fn test_action_result_update_screen_roundtrip() {
         title: "Test".into(),
         subtitle: None,
         components: vec![],
-        actions: vec![],
+        contextual_actions: vec![],
         progress: None,
         ..Default::default()
     };
@@ -187,7 +190,7 @@ fn test_action_result_navigate_to_roundtrip() {
         title: "Next".into(),
         subtitle: None,
         components: vec![],
-        actions: vec![],
+        contextual_actions: vec![],
         progress: None,
         ..Default::default()
     };
@@ -551,7 +554,7 @@ fn test_screen_model_empty_components() {
         title: "Empty".into(),
         subtitle: None,
         components: vec![],
-        actions: vec![],
+        contextual_actions: vec![],
         progress: None,
         ..Default::default()
     };
@@ -560,7 +563,7 @@ fn test_screen_model_empty_components() {
     let restored: ScreenModel = serde_json::from_str(&json).unwrap();
     assert_eq!(restored.screen_id, "empty");
     assert!(restored.components.is_empty());
-    assert!(restored.actions.is_empty());
+    assert!(restored.contextual_actions.is_empty());
     assert!(restored.progress.is_none());
     assert!(restored.subtitle.is_none());
 }

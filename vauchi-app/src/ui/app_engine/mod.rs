@@ -22,6 +22,7 @@ mod device_link_initiator;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_responder;
 mod dispatch;
+mod entry_points;
 mod help_catalog;
 // INLINE_TEST_REQUIRED: drives the `pub(super)` create_engine factory and the
 // `pub(crate)` DirectTransportEngine::outgoing_card seam — crate-internal.
@@ -34,10 +35,13 @@ mod link_responder;
 mod multi_stage_exchange;
 mod navigation;
 mod overlays;
+mod presentation_protocol;
 // INLINE_TEST_REQUIRED: injects a legacy ExchangeEngine into the private
 // `engine`/`screen` fields to drive the persist-at-Complete hook.
 #[cfg(test)]
 mod persist_at_complete_tests;
+mod responsive_surfaces;
+mod result_commands;
 mod result_routing;
 mod routing;
 mod screens;
@@ -49,7 +53,9 @@ use overlays::{
     ACTION_DISMISS_DEMO_CONTACT, ACTION_GO_BACK, ACTION_OPEN_SETTINGS, ACTION_OPEN_UPDATE_LINK,
     ACTION_SYNC_NOW,
 };
-pub use {navigation::TabLayout, overlays::SyncChromeStatus};
+pub use {
+    navigation::TabLayout, overlays::SyncChromeStatus, presentation_protocol::AppPresentationError,
+};
 
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -199,6 +205,14 @@ pub struct AppEngine {
     /// screen entry (never per-render — regenerating rotates the nonce and
     /// breaks the pin) and injected into the `BleExchangeEngine`'s screen.
     glance_display_qr: Option<String>,
+    /// Core-owned responsive and active-surface state for the generic
+    /// presentation protocol.
+    presentation_coordinator: crate::ui::PresentationCoordinator,
+    retained_detail_screen: Option<AppScreen>,
+    /// Monotonic generation of the atomic generic surface command.
+    surface_revision: u64,
+    /// Contextual roles and causal Undo state retained per visible surface.
+    contextual_actions: HashMap<vauchi_core::SurfaceId, crate::ui::ContextualActionCoordinator>,
 }
 
 impl AppEngine {
@@ -371,6 +385,10 @@ impl AppEngine {
                         .map(|state| state.is_reminder_due(now, fallback))
                 })
                 .unwrap_or(false);
+        let presentation_coordinator = crate::ui::PresentationCoordinator::new(
+            vauchi_core::SurfaceId::new(screen.screen_id())
+                .expect("AppScreen identifiers are valid presentation identifiers"),
+        );
 
         Self {
             vauchi,
@@ -411,6 +429,10 @@ impl AppEngine {
             glance_display_nonce: None,
             glance_scanned: None,
             glance_display_qr: None,
+            presentation_coordinator,
+            retained_detail_screen: None,
+            surface_revision: 1,
+            contextual_actions: HashMap::new(),
         }
     }
 

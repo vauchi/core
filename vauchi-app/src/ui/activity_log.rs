@@ -76,7 +76,7 @@ impl ActivityLogEngine {
             title: get_string(self.locale, "activity_log.title"),
             subtitle: None,
             components,
-            actions: vec![],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }

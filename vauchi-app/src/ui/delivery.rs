@@ -152,7 +152,7 @@ impl DeliveryStatusEngine {
             title: self.t("delivery_status.title"),
             subtitle: None,
             components,
-            actions,
+            contextual_actions: actions,
             progress: None,
             ..Default::default()
         }
@@ -295,7 +295,7 @@ mod tests {
             &screen.components[0],
             Component::InfoPanel { title, .. } if title == "All Delivered"
         ));
-        assert!(screen.actions.is_empty());
+        assert!(screen.contextual_actions.is_empty());
     }
 
     // @internal
@@ -309,7 +309,7 @@ mod tests {
             &screen.components[0],
             Component::Text { content, .. } if content == "Recent"
         ));
-        assert!(screen.actions.is_empty());
+        assert!(screen.contextual_actions.is_empty());
     }
 
     // @internal
@@ -331,8 +331,8 @@ mod tests {
             other => panic!("expected StatusIndicator, got {other:?}"),
         }
         // Footer: "Retry Failed" (single global action)
-        assert_eq!(screen.actions.len(), 1);
-        assert_eq!(screen.actions[0].id, RETRY_ALL_ACTION_ID);
+        assert_eq!(screen.contextual_actions.len(), 1);
+        assert_eq!(screen.contextual_actions[0].id, RETRY_ALL_ACTION_ID);
     }
 
     // @internal
@@ -393,7 +393,7 @@ mod tests {
                 "Pending Retries".into(),
             ]
         );
-        assert_eq!(screen.actions.len(), 1);
+        assert_eq!(screen.contextual_actions.len(), 1);
     }
 
     // @internal

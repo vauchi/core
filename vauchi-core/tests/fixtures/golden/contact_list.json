@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "contact_list",
   "title": "Contacts",
   "subtitle": null,
@@ -75,26 +75,6 @@
         ],
         "searchable": true
       }
-    }
-  ],
-  "actions": [
-    {
-      "id": "add_contact",
-      "label": "Add Contact",
-      "style": "Primary",
-      "enabled": true
-    },
-    {
-      "id": "view_archived",
-      "label": "Archived Contacts",
-      "style": "Secondary",
-      "enabled": true
-    },
-    {
-      "id": "find_duplicates",
-      "label": "Find Duplicates",
-      "style": "Secondary",
-      "enabled": true
     }
   ],
   "progress": null,

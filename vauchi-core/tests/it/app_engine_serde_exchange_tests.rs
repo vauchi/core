@@ -313,7 +313,11 @@ fn multi_stage_exchange_navigates_to_engine_idle_screen() {
     // camera, not the success or failed terminal screens.
     // The active screen's switch/cancel buttons live inside the preview
     // `Row`'s `ActionList` (so they sit beside the camera preview).
-    let mut ids: Vec<String> = screen.actions.iter().map(|a| a.id.clone()).collect();
+    let mut ids: Vec<String> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.clone())
+        .collect();
     collect_row_action_ids(&screen.components, &mut ids);
     let action_ids: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
     assert!(action_ids.contains(&"cancel"));
@@ -360,7 +364,11 @@ fn multi_stage_exchange_camera_permission_denied_event_swaps_chrome() {
         "permission denial must be handled by the multi-stage engine",
     );
     let screen = engine.current_screen();
-    let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    let action_ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
     assert!(
         action_ids.contains(&"grant_camera_permission"),
         "engine must surface Grant Permission action after camera denial; got actions {action_ids:?}",

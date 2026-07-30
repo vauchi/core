@@ -29,7 +29,7 @@ fn multi_stage_camera_denied_screen_renders_german() {
     assert_eq!(screen.title, "Austausch");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "grant_camera_permission")
             .unwrap()
@@ -50,7 +50,7 @@ fn multi_stage_camera_denied_screen_english_copy_unchanged() {
     assert_eq!(screen.title, "Exchange");
     assert_eq!(
         screen
-            .actions
+            .contextual_actions
             .iter()
             .find(|a| a.id == "grant_camera_permission")
             .unwrap()

@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "recovery_help",
   "title": "Help Others",
   "subtitle": null,
@@ -58,19 +58,6 @@
           }
         ],
         "a11y": null
-      }
-    }
-  ],
-  "actions": [
-    {
-      "id": "vouch",
-      "label": "Vouch for Someone",
-      "style": "Primary",
-      "enabled": true,
-      "a11y": {
-        "label": "Vouch for Someone",
-        "hint": null,
-        "role": null
       }
     }
   ],

@@ -142,7 +142,7 @@ impl DeviceManagementEngine {
             title: self.t("devices.count"),
             subtitle: None,
             components,
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "link_device".into(),
                     label: self.t("devices.link_new"),
@@ -329,7 +329,10 @@ mod tests {
         let engine = DeviceManagementEngine::new(devices);
         let screen = engine.build_screen();
 
-        let revoke_action = screen.actions.iter().find(|a| a.id == "revoke_device");
+        let revoke_action = screen
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "revoke_device");
         assert!(
             revoke_action.is_some_and(|a| !a.enabled),
             "Revoke action must be disabled when only current device exists"

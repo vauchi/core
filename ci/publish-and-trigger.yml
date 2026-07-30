@@ -535,6 +535,13 @@ trigger:windows:
       WINDOWS_REPO="https://project-access-token:${CI_PUSH_TOKEN_WINDOWS}@gitlab.com/vauchi/windows.git"
       git clone --depth 1 "$WINDOWS_REPO" windows-checkout
       cd windows-checkout
+      BRANCH="chore/bump-vauchi-cabi-${CLEAN_VERSION}"
+
+      if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+        echo "Branch $BRANCH already exists — CABI update is already under review"
+        exit 0
+      fi
+      git checkout -b "$BRANCH"
 
       cat > cabi-version.json << JSONEOF
       {
@@ -558,8 +565,41 @@ trigger:windows:
 
       SHA-256: $DLL_SHA256
       Source: $CI_COMMIT_SHA"
-      git push origin main
-      echo "✓ windows/ updated to CABI $CLEAN_VERSION"
+      git push -u origin "$BRANCH"
+
+      DESCRIPTION=$(cat <<EOF
+      ## Summary
+
+      - Update the signed Vauchi C ABI DLL to $CLEAN_VERSION.
+      - Keep the dependency change gated with any required Windows UI migration.
+
+      ## Verification
+
+      - Source commit: $CI_COMMIT_SHA
+      - SHA-256: $DLL_SHA256
+
+      This MR is intentionally Draft. Make it ready only after the Windows
+      application and tests are compatible with this C ABI version.
+      EOF
+      )
+      MR_RESPONSE=$(curl --fail --silent --show-error \
+        --request POST \
+        --header "PRIVATE-TOKEN: ${CI_PUSH_TOKEN_WINDOWS}" \
+        --header "Content-Type: application/json" \
+        --data "$(jq -n \
+          --arg source_branch "$BRANCH" \
+          --arg description "$DESCRIPTION" \
+          --arg title "Draft: chore: update CABI DLL to ${CLEAN_VERSION}" \
+          '{
+            source_branch: $source_branch,
+            target_branch: "main",
+            title: $title,
+            description: $description,
+            remove_source_branch: true
+          }')" \
+        "${CI_API_V4_URL}/projects/vauchi%2Fwindows/merge_requests")
+      MR_URL=$(printf '%s' "$MR_RESPONSE" | jq -r '.web_url')
+      echo "✓ Opened Draft Windows CABI update: $MR_URL"
 
 # Trigger consumer apps directly (no intermediary repos)
 # Note: bridge jobs (trigger:) do not support timeout: — downstream jobs

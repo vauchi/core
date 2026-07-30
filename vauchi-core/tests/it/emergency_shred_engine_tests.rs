@@ -32,12 +32,12 @@ fn shred_warning_has_info_panel() {
         other => panic!("expected InfoPanel, got {:?}", other),
     }
 
-    assert_eq!(screen.actions.len(), 2);
-    assert_eq!(screen.actions[0].id, "continue");
-    assert_eq!(screen.actions[0].style, ActionStyle::Destructive);
-    assert_eq!(screen.actions[0].label, "I Understand");
-    assert_eq!(screen.actions[1].id, "cancel");
-    assert_eq!(screen.actions[1].style, ActionStyle::Secondary);
+    assert_eq!(screen.contextual_actions.len(), 2);
+    assert_eq!(screen.contextual_actions[0].id, "continue");
+    assert_eq!(screen.contextual_actions[0].style, ActionStyle::Destructive);
+    assert_eq!(screen.contextual_actions[0].label, "I Understand");
+    assert_eq!(screen.contextual_actions[1].id, "cancel");
+    assert_eq!(screen.contextual_actions[1].style, ActionStyle::Secondary);
 }
 
 // @internal
@@ -68,7 +68,7 @@ fn shred_confirm_requires_delete_text() {
 
     let screen = engine.current_screen();
     let wipe_action = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "wipe")
         .expect("should have wipe action");
@@ -83,7 +83,7 @@ fn shred_confirm_requires_delete_text() {
     });
     let screen = engine.current_screen();
     let wipe_action = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "wipe")
         .expect("should have wipe action");
@@ -154,7 +154,7 @@ fn shred_confirm_delete_starts_wipe() {
             }
 
             assert!(
-                screen.actions.is_empty(),
+                screen.contextual_actions.is_empty(),
                 "wiping screen should have no actions"
             );
         }
@@ -183,8 +183,8 @@ fn shred_wipe_complete() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "shred_complete");
-    assert_eq!(screen.actions.len(), 1);
-    assert_eq!(screen.actions[0].id, "done");
+    assert_eq!(screen.contextual_actions.len(), 1);
+    assert_eq!(screen.contextual_actions[0].id, "done");
 
     match &screen.components[0] {
         Component::StatusIndicator { status, title, .. } => {

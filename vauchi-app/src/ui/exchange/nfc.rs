@@ -399,7 +399,7 @@ pub(super) fn build_nfc_screen(step: &NfcStep, locale: crate::i18n::Locale) -> S
             content: subtitle,
             style: TextStyle::Body,
         }],
-        actions: vec![ScreenAction {
+        contextual_actions: vec![ScreenAction {
             id: "cancel".into(),
             label: t("action.cancel"),
             style: ActionStyle::Secondary,
@@ -657,7 +657,11 @@ mod tests {
     // ── Screen-builder coverage ────────────────────────────────────────────
 
     fn action_ids(screen: &ScreenModel) -> Vec<String> {
-        screen.actions.iter().map(|a| a.id.clone()).collect()
+        screen
+            .contextual_actions
+            .iter()
+            .map(|a| a.id.clone())
+            .collect()
     }
 
     // @internal
@@ -666,7 +670,11 @@ mod tests {
         let s = build_nfc_screen(&NfcStep::Idle, crate::i18n::Locale::English);
         assert_eq!(s.screen_id, "exchange_nfc_idle");
         assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
-        assert!(s.actions.iter().any(|a| a.id == "cancel" && a.enabled));
+        assert!(
+            s.contextual_actions
+                .iter()
+                .any(|a| a.id == "cancel" && a.enabled)
+        );
     }
 
     // @internal
@@ -675,7 +683,11 @@ mod tests {
         let s = build_nfc_screen(&NfcStep::AwaitingTap, crate::i18n::Locale::English);
         assert_eq!(s.screen_id, "exchange_nfc_awaiting_tap");
         assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
-        assert!(s.actions.iter().any(|a| a.id == "cancel" && a.enabled));
+        assert!(
+            s.contextual_actions
+                .iter()
+                .any(|a| a.id == "cancel" && a.enabled)
+        );
     }
 
     // @internal
@@ -697,7 +709,11 @@ mod tests {
         // Cancel is still listed (so the action surface is stable across
         // states) but disabled — the exchange has already completed.
         assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
-        assert!(s.actions.iter().any(|a| a.id == "cancel" && !a.enabled));
+        assert!(
+            s.contextual_actions
+                .iter()
+                .any(|a| a.id == "cancel" && !a.enabled)
+        );
     }
 
     // ── CC-13 proptest: Complete is absorbing ──────────────────────────────

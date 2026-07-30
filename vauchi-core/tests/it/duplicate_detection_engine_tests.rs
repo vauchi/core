@@ -17,7 +17,7 @@ fn contacts_screen_has_find_duplicates_action() {
     let engine = ContactListEngine::new(vec![]);
     let screen = engine.current_screen();
     let action = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "find_duplicates")
         .expect("Contacts screen should have find_duplicates action");
@@ -91,7 +91,7 @@ fn duplicate_detection_empty_disables_actions() {
     let engine = make_empty_engine();
     let screen = engine.current_screen();
 
-    for action in &screen.actions {
+    for action in &screen.contextual_actions {
         assert!(
             !action.enabled,
             "Action '{}' should be disabled when no pairs exist",

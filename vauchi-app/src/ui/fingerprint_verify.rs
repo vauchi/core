@@ -143,7 +143,7 @@ impl FingerprintVerifyEngine {
             title: self.t("contact_detail.verify_fingerprint_button"),
             subtitle: None,
             components,
-            actions,
+            contextual_actions: actions,
             progress: None,
             ..Default::default()
         }

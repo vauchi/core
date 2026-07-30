@@ -22,6 +22,7 @@
 
 use crate::error::MobileError;
 use crate::platform_app_engine::PlatformAppEngine;
+use crate::types::{MobileLocale, MobileTabInfo, MobileTabLayout};
 
 /// Test-only helpers on `PlatformAppEngine`.
 ///
@@ -35,6 +36,28 @@ use crate::platform_app_engine::PlatformAppEngine;
 /// surface frontends route through.
 #[doc(hidden)]
 pub trait PlatformAppEngineTestHelpers {
+    /// Drive the retired screen-model bootstrap boundary in integration tests.
+    fn boot(&self) -> Result<String, MobileError>;
+
+    /// Read the retired screen-model JSON in integration tests.
+    fn current_screen_json(&self) -> Result<String, MobileError>;
+
+    /// Drive the retired user-action/result boundary in integration tests.
+    fn handle_action_json(&self, action_json: String) -> Result<String, MobileError>;
+
+    /// Query the retired form-factor-specific navigation list in tests.
+    fn nav_items(
+        &self,
+        layout: MobileTabLayout,
+        locale: MobileLocale,
+    ) -> Result<Vec<MobileTabInfo>, MobileError>;
+
+    /// Drive the retired back-navigation result boundary in tests.
+    fn navigate_back_json(&self) -> Result<String, MobileError>;
+
+    /// Query the retired layout-specific active tab in tests.
+    fn current_tab_id(&self, layout: MobileTabLayout) -> Result<Option<String>, MobileError>;
+
     /// Save a contact directly to storage.
     ///
     /// Used by integration tests that need exchanged or imported
@@ -135,6 +158,34 @@ pub trait PlatformAppEngineTestHelpers {
 }
 
 impl PlatformAppEngineTestHelpers for PlatformAppEngine {
+    fn boot(&self) -> Result<String, MobileError> {
+        self.boot_for_test()
+    }
+
+    fn current_screen_json(&self) -> Result<String, MobileError> {
+        self.current_screen_json_for_test()
+    }
+
+    fn handle_action_json(&self, action_json: String) -> Result<String, MobileError> {
+        self.handle_action_json_for_test(action_json)
+    }
+
+    fn nav_items(
+        &self,
+        layout: MobileTabLayout,
+        locale: MobileLocale,
+    ) -> Result<Vec<MobileTabInfo>, MobileError> {
+        self.nav_items_for_test(layout, locale)
+    }
+
+    fn navigate_back_json(&self) -> Result<String, MobileError> {
+        self.navigate_back_json_for_test()
+    }
+
+    fn current_tab_id(&self, layout: MobileTabLayout) -> Result<Option<String>, MobileError> {
+        self.current_tab_id_for_test(layout)
+    }
+
     fn save_test_contact(&self, contact: &vauchi_core::Contact) -> Result<(), MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("engine lock poisoned: {e}"),

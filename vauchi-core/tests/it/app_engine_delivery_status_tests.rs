@@ -149,11 +149,14 @@ fn test_delivery_status_screen_shows_retry_for_failed() {
 
     assert_eq!(screen.screen_id, "delivery_status");
 
-    let retry_action = screen.actions.iter().find(|a| a.id == "retry_all");
+    let retry_action = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "retry_all");
     assert!(
         retry_action.is_some(),
         "Expected 'retry_all' action for failed deliveries, got actions: {:?}",
-        screen.actions
+        screen.contextual_actions
     );
 }
 

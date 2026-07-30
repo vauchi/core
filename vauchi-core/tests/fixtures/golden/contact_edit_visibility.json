@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "screen_id": "edit_visibility",
   "title": "Field Visibility",
   "subtitle": null,
@@ -95,20 +95,6 @@
           "role": null
         }
       }
-    }
-  ],
-  "actions": [
-    {
-      "id": "back",
-      "label": "Back",
-      "style": "Secondary",
-      "enabled": true
-    },
-    {
-      "id": "continue",
-      "label": "Preview",
-      "style": "Primary",
-      "enabled": true
     }
   ],
   "progress": {

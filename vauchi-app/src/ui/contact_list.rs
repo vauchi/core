@@ -380,7 +380,7 @@ impl WorkflowEngine for ContactListEngine {
             title: self.t("contacts.title"),
             subtitle: None,
             components,
-            actions,
+            contextual_actions: actions,
             progress: None,
             // The list owns scrolling lazily; eager rendering of 10k
             // rows crashed the mobile renderers

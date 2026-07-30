@@ -39,7 +39,7 @@ fn enter(engine: &mut LockScreenEngine, value: &str) {
 
 fn unlock_enabled(screen: &ScreenModel) -> bool {
     screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id == "unlock")
         .expect("should have unlock action")

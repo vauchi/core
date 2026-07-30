@@ -80,7 +80,7 @@ impl EmergencyShredEngine {
                 ],
                 a11y: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "continue".into(),
                     label: self.t("shred.wipe.understand"),
@@ -121,7 +121,7 @@ impl EmergencyShredEngine {
                 a11y: Some(A11y::labeled(self.t("shred.wipe.type_delete"))),
                 info_key: None,
             }],
-            actions: vec![
+            contextual_actions: vec![
                 ScreenAction {
                     id: "wipe".into(),
                     label: self.t("shred.wipe.wipe_all"),
@@ -160,7 +160,7 @@ impl EmergencyShredEngine {
                 status_label: self.t(Status::InProgress.label_key()),
                 a11y: None,
             }],
-            actions: vec![],
+            contextual_actions: vec![],
             progress: Some(Progress {
                 current_step: 3,
                 total_steps: 3,
@@ -184,7 +184,7 @@ impl EmergencyShredEngine {
                 status_label: self.t(Status::Success.label_key()),
                 a11y: None,
             }],
-            actions: vec![ScreenAction {
+            contextual_actions: vec![ScreenAction {
                 id: "done".into(),
                 label: self.t("action.done"),
                 style: ActionStyle::Primary,

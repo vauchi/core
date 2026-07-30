@@ -4,15 +4,15 @@
 
 //! Humble-UI flow driver: generic steps that run scenarios written in UI
 //! language (`I open the app`, `I tap …`, `I should see …`) against core's
-//! `AppEngine`. Under ADR-021/043 every flow lives in core — frontends only
-//! render `ScreenModel` and forward `UserAction`s — so tapping an affordance
-//! and asserting on-screen text are pure core operations: find the labeled
-//! action in the serialized `ScreenModel`, dispatch `ActionPressed`, re-read
-//! the screen. Same mechanics as `vauchi_app::ui::testing::screen_walker`.
+//! `AppEngine`. Under ADR-021/043 every flow lives in core — frontends render
+//! the presentation command stream and return opaque events. Contextual
+//! actions are therefore resolved through `SetContextBar` and, when needed,
+//! the secondary-action overlay. Component-local interactions retain the
+//! legacy screen-walker fallback until their presentation-node migration.
 
 use cucumber::{then, when};
 use vauchi_app::ui::{AppEngine, UserAction, WorkflowEngine};
-use vauchi_core::Vauchi;
+use vauchi_core::{ActionSpec, Command, Event, SurfaceId, Vauchi};
 
 use crate::VauchiWorld;
 
@@ -63,6 +63,78 @@ fn screen_json(world: &mut VauchiWorld) -> serde_json::Value {
     serde_json::to_value(&screen).expect("ScreenModel serializes")
 }
 
+fn contextual_action(
+    commands: &[Command],
+    label: &str,
+) -> Option<(SurfaceId, vauchi_core::InteractionId)> {
+    commands.iter().find_map(|command| match command {
+        Command::SetContextBar {
+            surface_id, bar, ..
+        } => [&bar.back, &bar.navigation, &bar.primary, &bar.secondary]
+            .into_iter()
+            .filter_map(|action| action.as_ref())
+            .find(|action| action.label == label)
+            .map(|action| (surface_id.clone(), action.interaction_id.clone())),
+        Command::PresentOverlay {
+            surface_id,
+            overlay,
+            ..
+        } => overlay
+            .items
+            .iter()
+            .find(|action| action.label == label)
+            .map(|action| (surface_id.clone(), action.interaction_id.clone())),
+        _ => None,
+    })
+}
+
+fn secondary_launcher(commands: &[Command]) -> Option<(SurfaceId, ActionSpec)> {
+    commands.iter().find_map(|command| match command {
+        Command::SetContextBar {
+            surface_id, bar, ..
+        } => bar
+            .secondary
+            .clone()
+            .map(|action| (surface_id.clone(), action)),
+        _ => None,
+    })
+}
+
+fn dispatch_contextual_action(world: &mut VauchiWorld, label: &str) -> bool {
+    let initial = engine(world)
+        .initial_commands()
+        .expect("compose current presentation");
+    if let Some((surface_id, interaction_id)) = contextual_action(&initial, label) {
+        engine(world)
+            .dispatch(Event::ActionActivated {
+                surface_id,
+                interaction_id,
+            })
+            .expect("dispatch contextual action");
+        return true;
+    }
+
+    let Some((surface_id, launcher)) = secondary_launcher(&initial) else {
+        return false;
+    };
+    let overlay = engine(world)
+        .dispatch(Event::ActionActivated {
+            surface_id,
+            interaction_id: launcher.interaction_id,
+        })
+        .expect("open secondary-action overlay");
+    let Some((surface_id, interaction_id)) = contextual_action(&overlay, label) else {
+        return false;
+    };
+    engine(world)
+        .dispatch(Event::ActionActivated {
+            surface_id,
+            interaction_id,
+        })
+        .expect("dispatch secondary contextual action");
+    true
+}
+
 #[when("I open the app")]
 fn open_app(world: &mut VauchiWorld) {
     // AppEngine consumes the Vauchi; the World keeps a fresh placeholder so
@@ -95,6 +167,9 @@ fn navigate(world: &mut VauchiWorld, screen: String) {
 
 #[when(expr = "I tap {string}")]
 fn tap(world: &mut VauchiWorld, label: String) {
+    if dispatch_contextual_action(world, &label) {
+        return;
+    }
     let json = screen_json(world);
     let action_id = find_action_id(&json, &label).unwrap_or_else(|| {
         let mut strings = Vec::new();

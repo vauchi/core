@@ -211,17 +211,17 @@ impl PlatformAppEngine {
         }
     }
 
-    /// Fire `on_screens_invalidated` on the direct listener, if any.
+    /// Fire `on_presentation_invalidated` on the direct listener, if any.
     /// Used by paths whose state change produces no `ActionResult` for
     /// the frontend to render (machine-held protocol advances).
-    pub(crate) fn fire_screens_invalidated(&self, screen_ids: Vec<String>) {
+    pub(crate) fn fire_presentation_invalidated(&self) {
         let listener = self
             .direct_listener
             .lock()
             .ok()
             .and_then(|guard| guard.clone());
         if let Some(listener) = listener {
-            listener.on_screens_invalidated(screen_ids);
+            listener.on_presentation_invalidated();
         }
     }
 }

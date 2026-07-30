@@ -74,6 +74,22 @@ fn initial_reducer_state_is_one_ordered_atomic_command_batch() {
     );
 }
 
+// @scenario: generic_presentation_protocol.feature :: User interaction returns as an opaque event
+#[test]
+fn background_invalidation_reenters_through_the_canonical_reducer() {
+    let mut app = app_with_contact();
+    app.initial_commands().expect("initial commands");
+
+    let commands = app
+        .dispatch(Event::PresentationInvalidated)
+        .expect("presentation invalidation");
+
+    assert!(matches!(
+        commands.first(),
+        Some(Command::ReplaceSurface { surface }) if surface.surface_id.as_str() == "contacts"
+    ));
+}
+
 // @scenario: generic_presentation_protocol.feature :: Available window drives structural composition
 #[test]
 fn environment_event_reduces_to_core_owned_responsive_profile() {

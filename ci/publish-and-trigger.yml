@@ -538,8 +538,19 @@ trigger:windows:
       BRANCH="chore/bump-vauchi-cabi-${CLEAN_VERSION}"
 
       if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-        echo "Branch $BRANCH already exists — CABI update is already under review"
-        exit 0
+        OPEN_MR_URL=$(curl --fail --silent --show-error \
+          --get \
+          --header "PRIVATE-TOKEN: ${CI_PUSH_TOKEN_WINDOWS}" \
+          --data-urlencode "state=opened" \
+          --data-urlencode "source_branch=$BRANCH" \
+          "${CI_API_V4_URL}/projects/vauchi%2Fwindows/merge_requests" \
+          | jq -r '.[0].web_url // empty')
+        if [ -n "$OPEN_MR_URL" ]; then
+          echo "Branch $BRANCH is already under review: $OPEN_MR_URL"
+          exit 0
+        fi
+        echo "ERROR: branch $BRANCH exists without an open merge request"
+        exit 1
       fi
       git checkout -b "$BRANCH"
 

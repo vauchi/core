@@ -763,6 +763,12 @@ pub enum Event {
     DeepLinkOpened { uri: String },
     /// The application moved to the background or lost its active session.
     AppBackgrounded,
+    /// Core reported that background state changed outside an interaction.
+    ///
+    /// Shells receive only a parameter-free wake signal, then return this
+    /// canonical event. Core owns cache invalidation and emits the complete
+    /// replacement command batch; no screen identifiers cross the boundary.
+    PresentationInvalidated,
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

@@ -7,7 +7,7 @@
 //! `Vauchi::update_contact` is the persist seam every exchange transport
 //! converges on (BLE + multi-stage via `save_exchanged_contact`, QR
 //! directly). Without a `VauchiEvent` dispatched there, the
-//! `affected_screens` → `on_screens_invalidated` bridge never fires and
+//! `affected_screens` → presentation-invalidated bridge never fires and
 //! frontends render a stale contacts list until process death — the
 //! third sibling of the sync-UI invalidation family (relay receive
 //! 9468ad3d, device-sync arms 5d13a463). Problem record:

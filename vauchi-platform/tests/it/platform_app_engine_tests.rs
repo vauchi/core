@@ -552,14 +552,14 @@ fn has_identity_returns_true_after_onboarding() {
 // Event listener (PlatformEventListener)
 // ============================================================================
 
-/// Mock listener that records all `on_screens_invalidated` calls.
+/// Mock listener that records presentation invalidation calls.
 struct RecordingListener {
     calls: Arc<Mutex<Vec<Vec<String>>>>,
 }
 
 impl PlatformEventListener for RecordingListener {
-    fn on_screens_invalidated(&self, screen_ids: Vec<String>) {
-        self.calls.lock().unwrap().push(screen_ids);
+    fn on_presentation_invalidated(&self) {
+        self.calls.lock().unwrap().push(Vec::new());
     }
 }
 
@@ -610,16 +610,11 @@ fn event_listener_receives_invalidation_on_card_update() {
         .handle_action_json(r#"{"ActionPressed": {"action_id": "submit"}}"#.into())
         .expect("submit field");
 
-    // Verify the listener was called with "my_info"
+    // Verify the generic presentation listener was called.
     let recorded = calls.lock().unwrap();
     assert!(
         !recorded.is_empty(),
         "listener should have been called at least once"
-    );
-    let all_screen_ids: Vec<&String> = recorded.iter().flat_map(|v| v.iter()).collect();
-    assert!(
-        all_screen_ids.contains(&&"my_info".to_string()),
-        "should include my_info screen, got: {all_screen_ids:?}"
     );
 }
 
@@ -766,8 +761,8 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
         sink: Arc<Mutex<Vec<Vec<String>>>>,
     }
     impl PlatformEventListener for CaptureListener {
-        fn on_screens_invalidated(&self, screen_ids: Vec<String>) {
-            self.sink.lock().expect("lock").push(screen_ids);
+        fn on_presentation_invalidated(&self) {
+            self.sink.lock().expect("lock").push(Vec::new());
         }
     }
     engine
@@ -790,11 +785,8 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
     // tests, the cycle thread that needed them is retired).
     engine.poll_notifications().expect("poll");
     let calls = invalidations.lock().expect("lock").clone();
-    let saw_multi_stage = calls
-        .iter()
-        .any(|ids| ids.iter().any(|id| id == "multi_stage_exchange"));
     assert!(
-        saw_multi_stage,
+        !calls.is_empty(),
         "auto-managed session must push at least one invalidation on poll; got {calls:?}",
     );
 
@@ -1017,8 +1009,8 @@ fn cancel_action_on_multi_stage_screen_stops_session_after_navigate() {
         sink: Arc<Mutex<Vec<Vec<String>>>>,
     }
     impl PlatformEventListener for CaptureListener {
-        fn on_screens_invalidated(&self, screen_ids: Vec<String>) {
-            self.sink.lock().expect("lock").push(screen_ids);
+        fn on_presentation_invalidated(&self) {
+            self.sink.lock().expect("lock").push(Vec::new());
         }
     }
     engine
@@ -1101,12 +1093,8 @@ fn ble_machine_terminal_event_fires_invalidation_and_flips_chrome() {
         "terminal machine failure must flip the chrome to the failed screen"
     );
     assert!(
-        calls
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|ids| ids.iter().any(|id| id == "ble_exchange")),
-        "terminal BLE machine event must fire on_screens_invalidated"
+        !calls.lock().unwrap().is_empty(),
+        "terminal BLE machine event must fire a presentation invalidation"
     );
 }
 
@@ -1140,13 +1128,9 @@ fn poll_notifications_on_ble_discovery_fires_invalidation() {
     engine.poll_notifications().expect("poll");
 
     assert!(
-        calls
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|ids| ids.iter().any(|id| id == "ble_exchange")),
+        !calls.lock().unwrap().is_empty(),
         "a bare poll on the BLE discovering screen must fire \
-         on_screens_invalidated([\"ble_exchange\"]) so a tick-driven timeout surfaces; got {:?}",
+         a presentation invalidation so a tick-driven timeout surfaces; got {:?}",
         calls.lock().unwrap()
     );
 }

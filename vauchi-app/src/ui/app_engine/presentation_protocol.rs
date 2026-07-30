@@ -43,6 +43,11 @@ impl AppEngine {
 
     /// Reduce one raw shell event into the next ordered command batch.
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
+        if matches!(event, Event::PresentationInvalidated) {
+            self.invalidate_all();
+            return self.initial_commands();
+        }
+
         if let Event::DeepLinkOpened { uri } = &event {
             return self.reduce_user_action(UserAction::LinkOpened { uri: uri.clone() }, None);
         }

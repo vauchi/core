@@ -47,17 +47,16 @@ use crate::json_helpers::{
 ///
 /// Frontends implement this trait (in Swift/Kotlin via UniFFI) and register
 /// it with [`PlatformAppEngine::set_event_listener`]. Core calls
-/// `on_screens_invalidated` when background operations (sync, delivery,
-/// device link) change data that affects rendered screens.
+/// `on_presentation_invalidated` when background operations (sync, delivery,
+/// device link) change data that affects the prepared presentation.
 ///
-/// On receiving the callback, frontends should call `invalidate_screen_json`
-/// or `invalidate_all` and re-render the affected screens.
+/// On receiving the callback, frontends return
+/// [`vauchi_core::Event::PresentationInvalidated`] through `dispatch_json`.
+/// Core invalidates its caches and returns a complete replacement batch.
 #[uniffi::export(callback_interface)]
 pub trait PlatformEventListener: Send + Sync {
-    /// Called when one or more screens have stale data due to a background
-    /// operation. `screen_ids` contains the `screen_id` values of affected
-    /// screens (e.g., `["contacts", "delivery_status"]`).
-    fn on_screens_invalidated(&self, screen_ids: Vec<String>);
+    /// Called when background state has made the prepared presentation stale.
+    fn on_presentation_invalidated(&self);
 }
 
 /// Shared slot for the registered `PlatformEventListener`. Used both
@@ -107,7 +106,7 @@ pub struct PlatformAppEngine {
     /// existing `set_event_listener` path routes via `VauchiEvent` →
     /// `affected_screens(...)`; the multi-stage cycle thread does not
     /// emit `VauchiEvent`s, so this slot lets the bridge call
-    /// `on_screens_invalidated` directly when the engine state changes
+    /// `on_presentation_invalidated` directly when the engine state changes
     /// from a listener callback (Pair 4 of pure-humble-ui-retire-native-screens).
     pub(crate) direct_listener: DirectListenerSlot,
     /// Storage path retained for in-place session creation. Mirrors
@@ -614,7 +613,7 @@ impl PlatformAppEngine {
         };
 
         if ble_terminal {
-            self.fire_screens_invalidated(vec!["ble_exchange".into()]);
+            self.fire_presentation_invalidated();
         }
         commands_envelope_to_json(&commands)
     }
@@ -784,7 +783,7 @@ impl PlatformAppEngine {
         let items = engine.poll_notifications();
         // T1.2c: the multi-stage machine just advanced inside
         // `engine.poll_notifications`. The cycle-thread bridge that
-        // used to fire `on_screens_invalidated` on every state change
+        // used to fire a presentation invalidation on every state change
         // is dead, so fire one ourselves whenever a machine is held —
         // the frontend re-fetches `current_screen_json` and reflects
         // the new QR / state. Cheap over-fire (frontend renders are
@@ -802,8 +801,8 @@ impl PlatformAppEngine {
         // re-fetches the post-timeout screen.
         let invalidation_targets = self.poll_tick_invalidation_targets(&engine);
         drop(engine);
-        if let Some(targets) = invalidation_targets {
-            self.fire_screens_invalidated(targets);
+        if invalidation_targets.is_some() {
+            self.fire_presentation_invalidated();
         }
         let mapped = items
             .into_iter()
@@ -860,8 +859,8 @@ impl PlatformAppEngine {
             let pending_commands = engine.drain_pending_commands();
             (items, pending_commands, invalidation_targets)
         };
-        if let Some(targets) = invalidation_targets {
-            self.fire_screens_invalidated(targets);
+        if invalidation_targets.is_some() {
+            self.fire_presentation_invalidated();
         }
         let mapped: Vec<MobilePendingNotification> = items
             .into_iter()
@@ -917,9 +916,9 @@ impl PlatformAppEngine {
 
     /// Register a listener for async state-change notifications.
     ///
-    /// Core calls `on_screens_invalidated` when background operations
-    /// (sync, delivery receipts, device link) change data that affects
-    /// rendered screens. Replaces any previously registered listener.
+    /// Core calls `on_presentation_invalidated` when background operations
+    /// (sync, delivery receipts, device link) change prepared state. Replaces
+    /// any previously registered listener.
     ///
     /// # Threading — IMPORTANT
     ///
@@ -933,12 +932,9 @@ impl PlatformAppEngine {
     ///
     /// ```swift
     /// class MyListener: PlatformEventListener {
-    ///     func onScreensInvalidated(screenIds: [String]) {
+    ///     func onPresentationInvalidated() {
     ///         DispatchQueue.main.async {  // REQUIRED — never call engine synchronously
-    ///             for id in screenIds {
-    ///                 try? engine.invalidateScreenJson(screenJson: "\"\(id)\"")
-    ///             }
-    ///             self.reloadCurrentScreen()
+    ///             try? engine.dispatchJson(eventJson: "\"PresentationInvalidated\"")
     ///         }
     ///     }
     /// }
@@ -949,12 +945,9 @@ impl PlatformAppEngine {
     ///
     /// ```kotlin
     /// class MyListener : PlatformEventListener {
-    ///     override fun onScreensInvalidated(screenIds: List<String>) {
+    ///     override fun onPresentationInvalidated() {
     ///         viewModelScope.launch {  // REQUIRED — never call engine synchronously
-    ///             for (id in screenIds) {
-    ///                 engine.invalidateScreenJson("\"$id\"")
-    ///             }
-    ///             reloadCurrentScreen()
+    ///             engine.dispatchJson("\"PresentationInvalidated\"")
     ///         }
     ///     }
     /// }
@@ -985,10 +978,8 @@ impl PlatformAppEngine {
         let new_id = engine
             .vauchi()
             .add_event_handler(Arc::new(move |event: VauchiEvent| {
-                let screen_ids = vauchi_app::ui::affected_screens(&event);
-                if !screen_ids.is_empty() {
-                    let owned: Vec<String> = screen_ids.into_iter().map(String::from).collect();
-                    listener_clone.on_screens_invalidated(owned);
+                if !vauchi_app::ui::affected_screens(&event).is_empty() {
+                    listener_clone.on_presentation_invalidated();
                 }
             }));
 

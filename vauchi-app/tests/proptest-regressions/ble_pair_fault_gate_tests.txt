@@ -8,3 +8,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc ce57c8291040f621cd65a57d33041ab8a7fe399d91830596252e699a3b6ccd61 # shrinks to ops = [(0, true), (1, true)]
+cc 123321553920da20633bcb455399f466b0f07085ca2e15bdcaf2efce2ea67c0f # shrinks to ops = [(1, true), (0, false), (0, false), (0, false), (0, false)]

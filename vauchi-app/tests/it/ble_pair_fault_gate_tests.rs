@@ -39,6 +39,12 @@ const BOB_IDENTITY: [u8; 32] = [2u8; 32];
 /// Delivery budget: a full exchange is ~a dozen messages; anything
 /// beyond this is a livelock, not slowness (virtual time — no waits).
 const MAX_STEPS: usize = 200;
+/// Simulated seconds charged per delivery. BLE notifications arrive in
+/// milliseconds, so this only has to advance monotonically; at 10s a
+/// mere six deliveries burned the whole 60s handshake window and any
+/// benign reorder read as an expiry
+/// (`backlog/2026-07-28-ble-pair-benign-handshake-reorder-expires`).
+const DELIVERY_SECS: u64 = 1;
 
 fn card_for(identity: [u8; 32], secret: [u8; 32], name: &str) -> (BleCardPayload, X3DHKeyPair) {
     let x3dh = X3DHKeyPair::from_bytes(secret);
@@ -163,7 +169,7 @@ impl Pair {
         let Some((uuid, data, sent_dir)) = self.to_alice.pop_front() else {
             return;
         };
-        self.now += 10;
+        self.now += DELIVERY_SECS;
         let (event, cmds) =
             self.alice
                 .on_data_received(BOB_DEV, invert(sent_dir), &uuid, &data, self.now);
@@ -175,7 +181,7 @@ impl Pair {
         let Some((uuid, data, sent_dir)) = self.to_bob.pop_front() else {
             return;
         };
-        self.now += 10;
+        self.now += DELIVERY_SECS;
         let (event, cmds) =
             self.bob
                 .on_data_received(ALICE_DEV, invert(sent_dir), &uuid, &data, self.now);

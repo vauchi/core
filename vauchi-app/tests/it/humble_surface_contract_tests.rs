@@ -275,7 +275,8 @@ fn humble_allowlist_size_matches_plan() {
     // ADR-066 replaces six screen/action/navigation methods with the two
     // canonical reducer methods. Retiring the animated-QR getter and the
     // duplicate background lifecycle path shrinks the binding surface to 16.
-    assert_eq!(HUMBLE_ALLOWLIST.len(), 16);
+    // Retiring the two direct invalidation exports then shrinks it to 14.
+    assert_eq!(HUMBLE_ALLOWLIST.len(), 14);
 }
 
 // @internal

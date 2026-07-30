@@ -87,7 +87,7 @@ include:
   - local: ci/internal-dev-bindings.yml
 
 variables:
-  VAUCHI_SCRIPTS_REF: "0abfa5ebb8eefcbac9b09184bab4dcaae23ee8f2"
+  VAUCHI_SCRIPTS_REF: "4e2c91d387aed482b80bd24e1b8d94477152aeef"
 
 # Ceiling for jobs that compile the full dependency tree. On a fresh or
 # reinstalled shell runner ALL warm state is gone at once — per-slot

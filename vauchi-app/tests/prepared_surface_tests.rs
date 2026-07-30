@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_app::ui::{
-    ActionListItem, Component, FormDialogEngine, FormDialogType, InputType, PreparedSurface,
-    ScreenModel, TextStyle, UserAction, WorkflowEngine,
+    ActionListItem, Component, FormDialogEngine, FormDialogType, InputType, Item, PreparedSurface,
+    ScreenModel, Section, TextStyle, UserAction, WorkflowEngine,
 };
 use vauchi_core::{
     Command, Event, InputValue, PresentationInputKind, PresentationNode, PresentationTextStyle,
@@ -237,6 +237,91 @@ fn prepared_email_activation_advances_the_form_dialog() {
             Component::TextInput { id, .. } if id == "field_value"
         )
     }));
+}
+
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn a_collection_container_never_announces_its_opaque_component_id() {
+    let action_screen = ScreenModel::new(
+        "settings",
+        "Settings",
+        vec![
+            Component::ActionList {
+                id: "own_entries".into(),
+                items: vec![ActionListItem {
+                    id: "entry_1".into(),
+                    label: "ada@example.com (Email)".into(),
+                    icon: None,
+                    detail: None,
+                    a11y: None,
+                    info_key: None,
+                }],
+            },
+            Component::List {
+                id: "contacts".into(),
+                items: vec![Item {
+                    id: "contact_1".into(),
+                    name: "Ada".into(),
+                    subtitle: None,
+                    initials: "A".into(),
+                    status: None,
+                    actions: vec![],
+                    a11y: None,
+                }],
+                searchable: false,
+                total_count: 0,
+                offset: 0,
+                window: 0,
+            },
+            Component::SectionedActionList {
+                id: "more".into(),
+                sections: vec![Section {
+                    id: "primary".into(),
+                    label: "Primary".into(),
+                    items: vec![ActionListItem {
+                        id: "my_card".into(),
+                        label: "My Card".into(),
+                        icon: None,
+                        detail: None,
+                        a11y: None,
+                        info_key: None,
+                    }],
+                }],
+            },
+        ],
+        vec![],
+    );
+    let prepared =
+        PreparedSurface::from_screen(SurfaceId::new("settings").unwrap(), 11, &action_screen)
+            .expect("supported generic projection");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("atomic surface command");
+    };
+
+    let PresentationNode::List { accessibility, .. } = &surface.nodes[0] else {
+        panic!("action list projects as a list");
+    };
+    assert_eq!(accessibility.label, "");
+
+    let PresentationNode::List { accessibility, .. } = &surface.nodes[1] else {
+        panic!("list projects as a list");
+    };
+    assert_eq!(accessibility.label, "");
+
+    let PresentationNode::Group {
+        accessibility,
+        children,
+        ..
+    } = &surface.nodes[2]
+    else {
+        panic!("sectioned action list projects as a group");
+    };
+    assert_eq!(accessibility.label, "");
+
+    let PresentationNode::List { accessibility, .. } = &children[0] else {
+        panic!("each section projects as a list");
+    };
+    assert_eq!(accessibility.label, "Primary");
 }
 
 // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely

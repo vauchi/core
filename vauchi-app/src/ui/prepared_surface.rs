@@ -99,6 +99,10 @@ impl PreparedSurface {
     /// tell "same surface, new content" from "different component in the same
     /// slot". Comparing the routes an id resolves to distinguishes them, which
     /// is what decides whether the surface revision has to advance.
+    ///
+    /// Gated with the sole caller in `ui::app_engine`, which the
+    /// no-default-features build compiles out.
+    #[cfg(feature = "network-rustls")]
     pub(crate) fn routes_match(&self, other: &Self) -> bool {
         self.value_routes == other.value_routes
             && self.interaction_routes == other.interaction_routes

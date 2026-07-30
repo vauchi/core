@@ -374,3 +374,45 @@ fn changing_an_active_parent_pane_preserves_the_selected_detail_surface() {
                 && profile.active_surface.as_str() == "contacts"
     )));
 }
+
+fn surface_named<'a>(commands: &'a [Command], name: &str) -> Option<&'a vauchi_core::SurfaceSpec> {
+    commands.iter().find_map(|command| match command {
+        Command::ReplaceSurface { surface } if surface.surface_id.as_str() == name => Some(surface),
+        _ => None,
+    })
+}
+
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn changing_a_value_keeps_binding_ids_stable() {
+    let mut app = app_with_contact();
+    let initial = app.initial_commands().expect("contacts transaction");
+    app.dispatch(Event::PresentationEnvironmentChanged {
+        available_width: 900,
+        available_height: 700,
+        input_modes: vec![InputMode::Pointer, InputMode::Keyboard],
+        motion: MotionPreference::Full,
+    })
+    .expect("expanded environment");
+
+    let surface = surface_named(&initial, "contacts").expect("contacts surface");
+    let binding =
+        first_toggle_binding(&surface.nodes).expect("a value binding on the contacts screen");
+
+    let after = app
+        .dispatch(Event::ValueChanged {
+            surface_id: SurfaceId::new("contacts").expect("surface id"),
+            binding_id: binding.clone(),
+            value: InputValue::Boolean(true),
+        })
+        .expect("value change");
+    let surface =
+        surface_named(&after, "contacts").expect("contacts surface after the value change");
+    let rebound = first_toggle_binding(&surface.nodes).expect("binding survives the value change");
+
+    assert_eq!(
+        rebound, binding,
+        "a value change must not remint binding ids: shells key composition state on them, so \
+         reminting drops focus and closes the soft keyboard mid-typing"
+    );
+}

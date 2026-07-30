@@ -56,6 +56,27 @@ fn test_platform_binding_exposes_context_bar_and_routes_primary_activation() {
     );
 }
 
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn test_platform_binding_refreshes_through_canonical_invalidation_event() {
+    let (engine, _dir) = create_engine();
+    engine
+        .initial_commands_json()
+        .expect("prepare initial presentation");
+
+    let result: serde_json::Value = serde_json::from_str(
+        &engine
+            .dispatch_json(r#""PresentationInvalidated""#.into())
+            .expect("dispatch presentation invalidation"),
+    )
+    .expect("valid command envelope");
+
+    assert_eq!(
+        result["commands"][0]["ReplaceSurface"]["surface"]["surface_id"],
+        "onboarding"
+    );
+}
+
 /// Feature: generic_presentation_protocol.feature
 /// Scenario Outline: Available window drives structural composition
 // @scenario: generic_presentation_protocol.feature :: Available window drives structural composition

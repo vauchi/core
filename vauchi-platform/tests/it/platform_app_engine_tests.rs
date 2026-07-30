@@ -506,27 +506,19 @@ fn navigate_to_invalid_json_returns_error() {
 }
 
 // ============================================================================
-// Invalidation
+// Canonical presentation invalidation
 // ============================================================================
 
 // @internal
 #[test]
-fn invalidate_all_succeeds() {
-    let (engine, _dir) = create_engine();
-    drive_onboarding(&engine);
-    engine.invalidate_all().expect("invalidate should succeed");
-    let id = current_screen_id(&engine);
-    assert_eq!(id, "my_info");
-}
-
-// @internal
-#[test]
-fn invalidate_screen_json_succeeds() {
+fn presentation_invalidation_succeeds() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     engine
-        .invalidate_screen_json(r#""MyInfo""#.into())
-        .expect("invalidate screen");
+        .dispatch_json(r#""PresentationInvalidated""#.into())
+        .expect("presentation invalidation should succeed");
+    let id = current_screen_id(&engine);
+    assert_eq!(id, "my_info");
 }
 
 // ============================================================================

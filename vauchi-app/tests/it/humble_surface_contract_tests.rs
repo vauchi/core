@@ -56,8 +56,6 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "handle_hardware_event",
     "has_identity",
     "initial_commands_json",
-    "invalidate_all",
-    "invalidate_screen_json",
     "new",
     "on_wakeup",
     "periodic_sync_tick",

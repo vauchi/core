@@ -346,8 +346,8 @@ fn create_recovery_claim_invalidates_recovery_screen_cache() {
     // a stale-engine panic. The Recovery screen is reachable via
     // settings, so we just exercise the cache by invalidating + reading.
     engine
-        .invalidate_all()
-        .expect("invalidate_all does not panic");
+        .dispatch_json(r#""PresentationInvalidated""#.into())
+        .expect("presentation invalidation does not panic");
     let _ = engine
         .current_screen_json()
         .expect("current_screen_json after recovery write");

@@ -200,7 +200,9 @@ fn configure_emergency_broadcast_invalidates_settings_cache() {
     let (engine, _dir) = create_engine_with_identity();
     configure(&engine, vec![], "msg", false);
 
-    engine.invalidate_all().expect("invalidate_all");
+    engine
+        .dispatch_json(r#""PresentationInvalidated""#.into())
+        .expect("presentation invalidation");
     let _ = engine
         .current_screen_json()
         .expect("current_screen_json after configure");

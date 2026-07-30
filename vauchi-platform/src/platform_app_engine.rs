@@ -13,8 +13,9 @@
 //! - `VauchiPlatform` handles lifecycle, storage, and hardware-bound operations
 //! - `PlatformAppEngine` handles navigation, screen rendering, and user actions
 //!
-//! After mutations via `VauchiPlatform`, call `invalidate_all()` so the next
-//! `current_screen_json()` rebuilds engines with fresh data from storage.
+//! After external mutations, dispatch
+//! [`vauchi_core::Event::PresentationInvalidated`] and apply the returned
+//! replacement batch.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -36,9 +37,8 @@ use crate::error::MobileError;
 use crate::platform_app_engine_internals::self_heal_post_auth;
 
 use crate::json_helpers::{
-    action_result_envelope_to_json, app_screen_from_json, commands_envelope_to_json,
-    event_from_json, screen_envelope_to_json, screen_to_json, user_action_from_json,
-    wakeup_envelope_to_json,
+    action_result_envelope_to_json, commands_envelope_to_json, event_from_json,
+    screen_envelope_to_json, screen_to_json, user_action_from_json, wakeup_envelope_to_json,
 };
 
 // ── PlatformEventListener ──────────────────────────────────────────
@@ -215,8 +215,9 @@ impl PlatformAppEngine {
     /// Create a new PlatformAppEngine with platform-provided secure key.
     ///
     /// This creates its own `Vauchi` instance backed by the same database
-    /// as `VauchiPlatform`. After mutations via `VauchiPlatform`, call
-    /// `invalidate_all()` to refresh cached engines.
+    /// as `VauchiPlatform`. After external mutations, dispatch
+    /// [`vauchi_core::Event::PresentationInvalidated`] through
+    /// [`Self::dispatch_json`] and apply the returned replacement batch.
     #[uniffi::constructor]
     pub fn new(
         data_dir: String,
@@ -660,30 +661,6 @@ impl PlatformAppEngine {
 
 #[uniffi::export]
 impl PlatformAppEngine {
-    /// Invalidate all cached engines.
-    ///
-    /// Call this after mutations via `VauchiPlatform` so the next
-    /// `current_screen_json()` rebuilds engines with fresh data.
-    pub fn invalidate_all(&self) -> Result<(), MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        engine.invalidate_all();
-        Ok(())
-    }
-
-    /// Invalidate a specific screen's cached engine.
-    ///
-    /// The screen JSON must match the `AppScreen` enum format.
-    pub fn invalidate_screen_json(&self, screen_json: String) -> Result<(), MobileError> {
-        let screen = app_screen_from_json(&screen_json)?;
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        engine.invalidate_screen(&screen);
-        Ok(())
-    }
-
     /// Returns whether the user has created an identity.
     ///
     /// Used by frontends to decide between onboarding and main UI.

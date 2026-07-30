@@ -208,7 +208,9 @@ fn unlink_device_invalidates_device_management_cache() {
     // out-of-range so no actual mutation, but the wrapper must still
     // be a no-panic call and the read-after-call must succeed.
     let _ = engine.dispatch_domain_command(DomainCommand::UnlinkDevice { device_index: 99 });
-    engine.invalidate_all().expect("invalidate_all");
+    engine
+        .dispatch_json(r#""PresentationInvalidated""#.into())
+        .expect("presentation invalidation");
     let _ = engine
         .current_screen_json()
         .expect("current_screen_json after unlink_device");

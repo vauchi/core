@@ -219,7 +219,9 @@ fn grant_consent_invalidates_settings_and_privacy_screens() {
         })
         .expect("grant");
 
-    engine.invalidate_all().expect("invalidate_all");
+    engine
+        .dispatch_json(r#""PresentationInvalidated""#.into())
+        .expect("presentation invalidation");
     let _ = engine
         .current_screen_json()
         .expect("current_screen_json after grant");
@@ -842,7 +844,9 @@ fn schedule_deletion_invalidates_settings_cache() {
         .dispatch_domain_command(DomainCommand::ScheduleIdentityDeletion)
         .expect("schedule");
 
-    engine.invalidate_all().expect("invalidate_all");
+    engine
+        .dispatch_json(r#""PresentationInvalidated""#.into())
+        .expect("presentation invalidation");
     let _ = engine
         .current_screen_json()
         .expect("current_screen_json after schedule");
@@ -952,7 +956,9 @@ fn save_recovery_response_invalidates_recovery_screens() {
         })
         .expect("save");
 
-    engine.invalidate_all().expect("invalidate_all");
+    engine
+        .dispatch_json(r#""PresentationInvalidated""#.into())
+        .expect("presentation invalidation");
     let json = engine
         .current_screen_json()
         .expect("current_screen_json after save");
@@ -1203,7 +1209,9 @@ fn create_label_invalidates_groups_screen() {
         })
         .expect("create");
 
-    engine.invalidate_all().expect("invalidate_all");
+    engine
+        .dispatch_json(r#""PresentationInvalidated""#.into())
+        .expect("presentation invalidation");
     let json = engine
         .current_screen_json()
         .expect("current_screen_json after create");

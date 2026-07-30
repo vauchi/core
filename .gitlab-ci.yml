@@ -38,7 +38,7 @@
 include:
   - project: 'vauchi/scripts'
     # Pin the commit because tags are not protected.
-    ref: d6fb250c9eac465a9328bea36153677917774173
+    ref: 4e2c91d387aed482b80bd24e1b8d94477152aeef
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'

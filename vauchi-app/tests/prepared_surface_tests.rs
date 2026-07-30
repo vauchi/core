@@ -146,7 +146,7 @@ fn value_event_from_an_old_surface_revision_fails_closed() {
 
 // @scenario: generic_presentation_protocol.feature :: User interaction returns as an opaque event
 #[test]
-fn opaque_activation_reduces_to_the_registered_workflow_action() {
+fn action_list_activation_preserves_the_list_selection_route() {
     let action_screen = ScreenModel::new(
         "settings",
         "Settings",
@@ -186,8 +186,9 @@ fn opaque_activation_reduces_to_the_registered_workflow_action() {
                 interaction_id,
             })
             .expect("registered activation"),
-        UserAction::ActionPressed {
-            action_id: "delete_local_data".into(),
+        UserAction::ListItemSelected {
+            component_id: "settings.actions".into(),
+            item_id: "delete_local_data".into(),
         }
     );
 }

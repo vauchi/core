@@ -178,8 +178,9 @@ impl Projection {
                 &item.label,
                 accessibility(&item.a11y, &item.label),
                 ActionTone::Standard,
-                UserAction::ActionPressed {
-                    action_id: item.id.clone(),
+                UserAction::ListItemSelected {
+                    component_id: id.to_owned(),
+                    item_id: item.id.clone(),
                 },
             )?;
             rows.push(PresentationRow {

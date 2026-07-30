@@ -18,7 +18,7 @@ mod collections;
 mod components;
 mod remaining;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ValueRoute {
     Text {
         component_id: String,

@@ -93,6 +93,17 @@ impl PreparedSurface {
         }
     }
 
+    /// Whether both projections give every opaque id the same meaning.
+    ///
+    /// Ids are minted from a positional counter, so an id set alone cannot
+    /// tell "same surface, new content" from "different component in the same
+    /// slot". Comparing the routes an id resolves to distinguishes them, which
+    /// is what decides whether the surface revision has to advance.
+    pub(crate) fn routes_match(&self, other: &Self) -> bool {
+        self.value_routes == other.value_routes
+            && self.interaction_routes == other.interaction_routes
+    }
+
     pub fn reduce(&self, event: Event) -> Result<UserAction, PreparedSurfaceError> {
         match event {
             Event::ValueChanged {

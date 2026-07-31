@@ -554,6 +554,13 @@ trigger:windows:
   # mobile bindings behind it. The same applies to the ios/macos/android
   # bridges below: a red consumer is a consumer problem, not a reason to
   # withhold artifacts other consumers are waiting on.
+  #
+  # The 403 itself is a token-scope bug, not a GitLab limit: the MR call
+  # below sends CI_PUSH_TOKEN_WINDOWS, which can push the branch but is
+  # not permitted to create the merge request. Fix the scope/role on that
+  # token — do not reach for a new credential. (Commit 3761e61d claimed
+  # CI_JOB_TOKEN was the blocker; that was asserted without testing and
+  # is wrong — this path never uses CI_JOB_TOKEN.)
   allow_failure: true
   interruptible: false
   needs: [build:cabi-windows]

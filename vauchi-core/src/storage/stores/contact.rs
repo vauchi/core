@@ -259,6 +259,16 @@ impl ContactStore<'_> {
 
         Ok(contacts)
     }
+    /// Returns true if at least one active contact exists, excluding
+    /// soft-deleted and archived contacts (same filter as
+    /// `list_contacts`). O(1) existence check for UI gating that runs
+    /// on every screen emit.
+    pub fn has_contacts(&self) -> Result<bool, StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT 1 FROM contacts WHERE deleted_at IS NULL AND archived = 0 LIMIT 1")?;
+        Ok(stmt.exists([])?)
+    }
     /// Lists contacts with pagination support.
     ///
     /// Returns contacts ordered by display_name, starting from `offset`

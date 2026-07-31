@@ -317,7 +317,9 @@ impl AppEngine {
 
     /// Inject the sync-chrome `Component::Indicator` on every emitted
     /// top-level screen. Idempotent. Skipped when offline (the
-    /// `apply_offline_overlay` Banner already conveys "no network").
+    /// `apply_offline_overlay` Banner already conveys "no network")
+    /// and while the contact list is empty (nobody to sync with;
+    /// `problems/2026-07-31-sync-chip-before-first-contact`).
     /// Replaces iOS's `HomeView.SyncStatusIndicator` per G1 of
     /// `2026-05-02-ios-humble-ui-deep-retirement` — design at
     /// `_private/docs/designs/2026-05-28-sync-chrome-overlay-design.md`.
@@ -340,6 +342,15 @@ impl AppEngine {
         }
         if !self.network_online {
             return screen;
+        }
+        // No contacts → nobody to sync with: keep the chip hidden
+        // during and after onboarding until the first contact exists
+        // (`problems/2026-07-31-sync-chip-before-first-contact`).
+        // Storage errors fail closed — a chip that might fail
+        // underneath is worse than a missing chip for one render.
+        match self.vauchi.storage().contacts().has_contacts() {
+            Ok(true) => {}
+            Ok(false) | Err(_) => return screen,
         }
         let already_present = screen
             .components

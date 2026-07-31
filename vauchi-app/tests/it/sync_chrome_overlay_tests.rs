@@ -12,11 +12,35 @@
 use vauchi_app::ui::{
     ActionResult, AppEngine, Component, IndicatorKind, UserAction, WorkflowEngine,
 };
+use vauchi_core::ImportSource;
 use vauchi_core::api::Vauchi;
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
 
 fn test_engine() -> AppEngine {
     let vauchi = Vauchi::in_memory().unwrap();
     AppEngine::new(vauchi)
+}
+
+fn add_contact(engine: &AppEngine, name: &str) {
+    let contact = Contact::from_import(
+        format!("contact-{name}"),
+        ContactCard::new(name),
+        ImportSource::VcardFile,
+        None,
+        0,
+    );
+    engine.vauchi().add_contact(contact).unwrap();
+}
+
+/// Engine whose user has completed onboarding far enough to sync:
+/// an identity and at least one contact.
+fn test_engine_with_contact() -> AppEngine {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let engine = AppEngine::new(vauchi);
+    add_contact(&engine, "Bob");
+    engine
 }
 
 fn find_sync_indicator(
@@ -35,6 +59,43 @@ fn find_sync_indicator(
 }
 
 // ---------------------------------------------------------------------------
+// Contact gate: no contacts → no sync chip (nobody to sync with)
+// ---------------------------------------------------------------------------
+
+// @internal
+#[test]
+fn no_contacts_emit_no_sync_indicator() {
+    // A fresh install (identity, but zero contacts) must not offer
+    // sync: there is nobody to sync with. Owner rule 2026-07-31:
+    // sync only becomes available once at least one contact exists.
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let engine = AppEngine::new(vauchi);
+    let screen = engine.current_screen();
+    assert!(
+        find_sync_indicator(&screen.components).is_none(),
+        "sync indicator must not be emitted while the contact list is empty"
+    );
+}
+
+// @internal
+#[test]
+fn sync_indicator_appears_once_first_contact_exists() {
+    // The gate is evaluated lazily on every emit: adding the first
+    // contact must surface the chip on the next current_screen().
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let engine = AppEngine::new(vauchi);
+    assert!(find_sync_indicator(&engine.current_screen().components).is_none());
+
+    add_contact(&engine, "Bob");
+    assert!(
+        find_sync_indicator(&engine.current_screen().components).is_some(),
+        "sync indicator should appear once a contact exists"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Default Idle state → Neutral sync chip on every emitted screen
 // ---------------------------------------------------------------------------
 
@@ -44,8 +105,8 @@ fn idle_status_emits_neutral_sync_indicator_with_tap_action() {
     // On engine boot, sync_chrome_status defaults to Idle, so the
     // overlay should inject a Component::Indicator with kind=Neutral,
     // label="Sync", action_id=Some("sync_now") on every emitted
-    // top-level screen.
-    let engine = test_engine();
+    // top-level screen (given a contact exists — see the gate tests).
+    let engine = test_engine_with_contact();
     let screen = engine.current_screen();
     let (label, kind, action_id) =
         find_sync_indicator(&screen.components).expect("sync indicator missing on idle screen");
@@ -60,7 +121,7 @@ fn sync_indicator_appears_first_in_components() {
     // The overlay inserts at index 0 so chrome stays at the top of
     // the screen body — frontends with a chrome region (toolbar)
     // can render it there, frontends without render it inline.
-    let engine = test_engine();
+    let engine = test_engine_with_contact();
     let screen = engine.current_screen();
     let first = screen.components.first().expect("no components");
     assert!(
@@ -105,9 +166,7 @@ fn pinned_layout_screen_keeps_sync_indicator() {
     // chrome must render (`2026-06-11-contacts-list-windowing-design`).
     use vauchi_app::ui::{AppScreen, ScreenLayout};
 
-    let mut vauchi = Vauchi::in_memory().unwrap();
-    vauchi.create_identity("Alice").unwrap();
-    let mut engine = AppEngine::new(vauchi);
+    let mut engine = test_engine_with_contact();
     engine.navigate_to(AppScreen::Contacts);
     let screen = engine.current_screen();
     assert_eq!(
@@ -148,7 +207,7 @@ fn going_back_online_re_enables_sync_chrome_overlay() {
     // Flipping back to online restores the chip — the state read
     // is lazy, so toggling network_online flips the emission on the
     // next current_screen() call without any explicit re-init.
-    let mut engine = test_engine();
+    let mut engine = test_engine_with_contact();
     engine.set_network_online(false);
     assert!(find_sync_indicator(&engine.current_screen().components).is_none());
 
@@ -170,7 +229,7 @@ fn apply_sync_chrome_overlay_is_idempotent_across_renders() {
     // accumulate sync indicators. Each emission walks the existing
     // components and skips if any Indicator with id="sync" is
     // already present — mirroring the four sibling overlays.
-    let engine = test_engine();
+    let engine = test_engine_with_contact();
     let screen_a = engine.current_screen();
     let screen_b = engine.current_screen();
     let count_a = screen_a

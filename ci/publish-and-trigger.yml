@@ -493,6 +493,14 @@ update:swift-bindings:
 trigger:windows:
   extends: [.linux-runner, .timeout-quick]
   stage: trigger
+  # Notifying a consumer must never abort a release that is still
+  # publishing. On v0.59.1 this job pushed its branch, got 403 creating
+  # the MR, and cancelled package:xcframework, package:android,
+  # publish:maven and update:swift-bindings — so the tag existed with no
+  # mobile bindings behind it. The same applies to the ios/macos/android
+  # bridges below: a red consumer is a consumer problem, not a reason to
+  # withhold artifacts other consumers are waiting on.
+  allow_failure: true
   interruptible: false
   needs: [build:cabi-windows]
   rules:
@@ -617,6 +625,8 @@ trigger:windows:
 # have their own timeouts via .timeout-standard/.timeout-extended.
 trigger:ios:
   stage: trigger
+  # See trigger:windows — consumer notification never gates the release.
+  allow_failure: true
   needs: [update:swift-bindings]
   interruptible: false
   variables:
@@ -631,6 +641,8 @@ trigger:ios:
 
 trigger:macos:
   stage: trigger
+  # See trigger:windows — consumer notification never gates the release.
+  allow_failure: true
   needs: [update:swift-bindings]
   interruptible: false
   variables:
@@ -645,6 +657,8 @@ trigger:macos:
 
 trigger:android:
   stage: trigger
+  # See trigger:windows — consumer notification never gates the release.
+  allow_failure: true
   needs: [publish:maven]
   interruptible: false
   variables:

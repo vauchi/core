@@ -38,7 +38,7 @@
 include:
   - project: 'vauchi/scripts'
     # Pin the commit because tags are not protected.
-    ref: 4e2c91d387aed482b80bd24e1b8d94477152aeef
+    ref: 679cedc3a3112273ed35bb68c482da4106b13232
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -87,7 +87,7 @@ include:
   - local: ci/internal-dev-bindings.yml
 
 variables:
-  VAUCHI_SCRIPTS_REF: "4e2c91d387aed482b80bd24e1b8d94477152aeef"
+  VAUCHI_SCRIPTS_REF: "679cedc3a3112273ed35bb68c482da4106b13232"
 
 # Ceiling for jobs that compile the full dependency tree. On a fresh or
 # reinstalled shell runner ALL warm state is gone at once — per-slot

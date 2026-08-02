@@ -18,7 +18,7 @@ pub(super) fn default_help_items() -> Vec<HelpItem> {
                  Both parties must be present — Vauchi never exchanges contacts remotely."
                     .into(),
             ),
-            answer_url: Some("https://docs.vauchi.app/users/faq#contacts--exchange".into()),
+            answer_url: Some("https://vauchi.app/docs/users/faq#contacts--exchange".into()),
             category: "Getting Started".into(),
         },
         HelpItem {
@@ -31,7 +31,7 @@ pub(super) fn default_help_items() -> Vec<HelpItem> {
                  in person and never leave your device."
                     .into(),
             ),
-            answer_url: Some("https://docs.vauchi.app/users/faq#privacy--security".into()),
+            answer_url: Some("https://vauchi.app/docs/users/faq#privacy--security".into()),
             category: "Security".into(),
         },
         HelpItem {
@@ -44,7 +44,7 @@ pub(super) fn default_help_items() -> Vec<HelpItem> {
                  and all field data."
                     .into(),
             ),
-            answer_url: Some("https://docs.vauchi.app/users/faq#backup--restore".into()),
+            answer_url: Some("https://vauchi.app/docs/users/faq#backup--restore".into()),
             category: "Getting Started".into(),
         },
         HelpItem {
@@ -57,7 +57,7 @@ pub(super) fn default_help_items() -> Vec<HelpItem> {
                  identity in person."
                     .into(),
             ),
-            answer_url: Some("https://docs.vauchi.app/users/faq#identity--account".into()),
+            answer_url: Some("https://vauchi.app/docs/users/faq#identity--account".into()),
             category: "Security".into(),
         },
         HelpItem {
@@ -70,7 +70,7 @@ pub(super) fn default_help_items() -> Vec<HelpItem> {
                  Both parties must be physically present."
                     .into(),
             ),
-            answer_url: Some("https://docs.vauchi.app/users/faq#contacts--exchange".into()),
+            answer_url: Some("https://vauchi.app/docs/users/faq#contacts--exchange".into()),
             category: "Getting Started".into(),
         },
         HelpItem {
@@ -83,7 +83,7 @@ pub(super) fn default_help_items() -> Vec<HelpItem> {
                  Timing obfuscation further prevents traffic correlation."
                     .into(),
             ),
-            answer_url: Some("https://docs.vauchi.app/users/faq#privacy--security".into()),
+            answer_url: Some("https://vauchi.app/docs/users/faq#privacy--security".into()),
             category: "Privacy".into(),
         },
         HelpItem {
@@ -104,7 +104,7 @@ pub(super) fn default_help_items() -> Vec<HelpItem> {
             id: "known-issues".into(),
             question: "Known Issues".into(),
             answer: None,
-            answer_url: Some("https://docs.vauchi.app/users/known-issues".into()),
+            answer_url: Some("https://vauchi.app/docs/users/known-issues".into()),
             category: "Support".into(),
         },
     ]

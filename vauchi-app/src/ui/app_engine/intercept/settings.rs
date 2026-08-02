@@ -222,12 +222,12 @@ impl AppEngine {
                 }
                 "funding" => {
                     return Some(ActionResult::OpenUrl {
-                        url: "https://docs.vauchi.app/about/supporters".into(),
+                        url: "https://vauchi.app/docs/about/supporters".into(),
                     });
                 }
                 "privacy_policy" => {
                     return Some(ActionResult::OpenUrl {
-                        url: "https://docs.vauchi.app/legal/privacy-policy".into(),
+                        url: "https://vauchi.app/docs/legal/privacy-policy".into(),
                     });
                 }
                 "change_password" => {

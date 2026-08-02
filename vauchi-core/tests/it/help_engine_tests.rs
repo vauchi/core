@@ -10,14 +10,14 @@ fn sample_items() -> Vec<HelpItem> {
             id: "q1".into(),
             question: "How do I add a contact?".into(),
             answer: Some("Meet in person and use Exchange.".into()),
-            answer_url: Some("https://docs.vauchi.app/users/faq#contacts--exchange".into()),
+            answer_url: Some("https://vauchi.app/docs/users/faq#contacts--exchange".into()),
             category: "Getting Started".into(),
         },
         HelpItem {
             id: "q2".into(),
             question: "What is end-to-end encryption?".into(),
             answer: None,
-            answer_url: Some("https://docs.vauchi.app/users/faq#privacy--security".into()),
+            answer_url: Some("https://vauchi.app/docs/users/faq#privacy--security".into()),
             category: "Security".into(),
         },
         HelpItem {
@@ -110,7 +110,7 @@ fn help_select_item_without_answer_falls_back_to_url() {
 
     match result {
         ActionResult::OpenUrl { url } => {
-            assert_eq!(url, "https://docs.vauchi.app/users/faq#privacy--security");
+            assert_eq!(url, "https://vauchi.app/docs/users/faq#privacy--security");
         }
         other => panic!("Expected OpenUrl, got {:?}", other),
     }

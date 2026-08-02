@@ -5,7 +5,8 @@
 
 ## Reporting a Vulnerability
 
-The Vauchi team takes security seriously. We appreciate your efforts to responsibly disclose your findings.
+The Vauchi team takes security seriously. We appreciate your efforts to
+responsibly disclose your findings.
 
 ### How to Report
 
@@ -17,7 +18,8 @@ Instead, please report them via email to:
 
 Include the following information:
 
-- Type of vulnerability (e.g., buffer overflow, cryptographic weakness, data exposure)
+- Type of vulnerability (e.g., buffer overflow, cryptographic weakness, data
+exposure)
 - Full paths of source file(s) related to the vulnerability
 - Location of the affected source code (tag/branch/commit or direct URL)
 - Step-by-step instructions to reproduce the issue
@@ -80,7 +82,7 @@ For details on Vauchi's security architecture, see:
 
 - Threat Analysis - `_private/docs/reference/threat-analysis.md` (internal)
 - Security Audit Checklist - `_private/docs/reference/security-audit.md` (internal)
-- [Architecture](https://docs.vauchi.app/developers/architecture/) - System design
+- [Architecture](https://vauchi.app/docs/developers/architecture/) - System design
 
 ### Key Security Properties
 

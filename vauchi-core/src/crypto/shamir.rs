@@ -404,6 +404,26 @@ mod tests {
 
     // @internal
     #[test]
+    fn reconstruct_rejects_invalid_thresholds() {
+        let secret = [42u8; 32];
+        let shares = split(&secret, 2, 3).unwrap();
+
+        assert_eq!(
+            reconstruct(&shares, 0),
+            Err(ShamirError::ThresholdTooLow(0))
+        );
+        assert_eq!(
+            reconstruct(&shares, 1),
+            Err(ShamirError::ThresholdTooLow(1))
+        );
+        assert_eq!(
+            reconstruct(&shares, 11),
+            Err(ShamirError::ThresholdTooHigh(11))
+        );
+    }
+
+    // @internal
+    #[test]
     fn duplicate_indices_error() {
         let secret = [42u8; 32];
         let mut shares = split(&secret, 2, 3).unwrap();

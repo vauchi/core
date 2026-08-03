@@ -861,6 +861,11 @@ impl Vauchi {
     /// key and clear recovery metadata before any plaintext is returned. No
     /// guardian secret or plaintext share crosses the platform boundary.
     ///
+    /// Re-sealed responses are sender-anonymous: this API cannot attribute an
+    /// invalid response to a particular guardian. It accepts at most 20 raw
+    /// responses, filters malformed and ceremony-mismatched entries, and keeps
+    /// at most one surplus matching shard to bound candidate reconstruction.
+    ///
     /// **This method does not restore identity, contacts, or labels to storage.**
     /// The caller must apply the returned envelope the same way
     /// [`Self::import_full_backup`] applies a decrypted v3 backup, or call
@@ -882,7 +887,8 @@ impl Vauchi {
         let bytes = hex::decode(backup_data.trim()).map_err(|_| guardian_recovery_failed())?;
         let metadata = crate::backup::guardian_backup_metadata(&bytes)
             .map_err(|_| guardian_recovery_failed())?;
-        if re_sealed_shares.len() > metadata.count() as usize {
+        let maximum_responses = crate::backup::KeyShardConfig::MAX_COUNT as usize * 2;
+        if re_sealed_shares.len() > maximum_responses {
             return Err(guardian_recovery_failed());
         }
 

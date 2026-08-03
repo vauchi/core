@@ -19,6 +19,8 @@ pub mod key_shard;
 pub(crate) use guardian_recovery::recover_from_shards;
 
 pub use contact_backup::{BackupError, export_contact_backup, import_contact_backup};
+#[cfg(feature = "network-rustls")]
+pub(crate) use full_backup::guardian_backup_key_matches;
 pub use full_backup::{
     BackupSections, FullBackupEnvelope, FullBackupIdentityData, IdentitySection, LabelSection,
     export_full_backup, export_guardian_backup, extract_master_seed, guardian_backup_metadata,

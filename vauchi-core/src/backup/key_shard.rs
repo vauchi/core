@@ -41,7 +41,11 @@ const SHARD_VERSION: u8 = 2;
 /// Byte length of the random identifier shared by one backup and its shards.
 pub const CEREMONY_ID_LENGTH: usize = 16;
 
-/// Authenticated public parameters for one guardian backup ceremony.
+/// Public parameters that identify one guardian backup ceremony.
+///
+/// A shard carries these parameters inside its sealed box, but sealed boxes do
+/// not authenticate the guardian sender. The backup AEAD authenticates the
+/// matching header only after a candidate key successfully opens it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GuardianBackupMetadata {
     threshold: u8,
@@ -114,7 +118,13 @@ impl fmt::Debug for BackupKeyShard {
 }
 
 impl BackupKeyShard {
-    fn new(
+    /// Serialized byte length of one v2 guardian shard.
+    pub const SERIALIZED_LENGTH: usize = 1 + 1 + 1 + CEREMONY_ID_LENGTH + 1 + 32;
+    /// Sealed-box byte length for one serialized guardian shard.
+    pub const SEALED_LENGTH: usize = 32 + 24 + Self::SERIALIZED_LENGTH + 16;
+
+    /// Creates a shard after validating its ceremony-bound public index.
+    pub fn from_parts(
         metadata: GuardianBackupMetadata,
         index: u8,
         value: [u8; 32],
@@ -129,7 +139,7 @@ impl BackupKeyShard {
         })
     }
 
-    /// Returns the authenticated ceremony metadata carried by this shard.
+    /// Returns the ceremony metadata carried by this shard.
     pub fn metadata(&self) -> GuardianBackupMetadata {
         self.metadata
     }
@@ -141,7 +151,7 @@ impl BackupKeyShard {
 
     /// Serializes the shard to a compact byte representation.
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(1 + 1 + 1 + CEREMONY_ID_LENGTH + 1 + 32);
+        let mut bytes = Vec::with_capacity(Self::SERIALIZED_LENGTH);
         bytes.push(SHARD_VERSION);
         bytes.push(self.metadata.threshold());
         bytes.push(self.metadata.count());
@@ -157,7 +167,7 @@ impl BackupKeyShard {
     /// Returns [`KeyShardError::InvalidFormat`] if the bytes are malformed or
     /// the version is unsupported.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, KeyShardError> {
-        if bytes.len() != 1 + 1 + 1 + CEREMONY_ID_LENGTH + 1 + 32 {
+        if bytes.len() != Self::SERIALIZED_LENGTH {
             return Err(KeyShardError::InvalidFormat);
         }
 
@@ -177,7 +187,7 @@ impl BackupKeyShard {
             .try_into()
             .map_err(|_| KeyShardError::InvalidFormat)?;
 
-        Self::new(metadata, index, value)
+        Self::from_parts(metadata, index, value)
     }
 
     /// Converts this shard to the internal Shamir [`Share`] representation.
@@ -187,7 +197,7 @@ impl BackupKeyShard {
 
     /// Creates a `BackupKeyShard` from an internal Shamir [`Share`].
     fn from_share(metadata: GuardianBackupMetadata, share: &Share) -> Result<Self, KeyShardError> {
-        Self::new(metadata, share.index(), *share.value())
+        Self::from_parts(metadata, share.index(), *share.value())
     }
 }
 
@@ -201,8 +211,17 @@ pub enum KeyShardError {
     #[error("Unsupported key shard version: {0}")]
     UnsupportedVersion(u8),
 
-    #[error("Shamir error: {0}")]
-    Shamir(#[from] ShamirError),
+    #[error("Invalid key shard parameters")]
+    InvalidParameters,
+
+    #[error("Insufficient key shards")]
+    InsufficientShares,
+
+    #[error("Duplicate key shard indices")]
+    DuplicateIndices,
+
+    #[error("Key shard reconstruction failed")]
+    ReconstructionFailed,
 
     #[error("Sealed-box error: {0}")]
     SealedBox(String),
@@ -212,6 +231,24 @@ pub enum KeyShardError {
 
     #[error("Invalid backup key: {0}")]
     InvalidKey(String),
+}
+
+impl From<ShamirError> for KeyShardError {
+    fn from(error: ShamirError) -> Self {
+        match error {
+            ShamirError::ThresholdTooLow(_)
+            | ShamirError::ThresholdTooHigh(_)
+            | ShamirError::ThresholdExceedsCount(_, _)
+            | ShamirError::CountTooLow(_)
+            | ShamirError::CountTooHigh(_)
+            | ShamirError::InvalidSecretLength(_) => Self::InvalidParameters,
+            ShamirError::InsufficientShares { .. } => Self::InsufficientShares,
+            ShamirError::DuplicateIndices => Self::DuplicateIndices,
+            ShamirError::DivisionByZero | ShamirError::InvalidShareIndex => {
+                Self::ReconstructionFailed
+            }
+        }
+    }
 }
 
 impl From<KeyShardError> for BackupError {
@@ -297,8 +334,8 @@ impl KeyShardConfig {
     /// Creates a new configuration with validation.
     ///
     /// # Errors
-    /// Returns [`KeyShardError::Shamir`] if parameters are outside the allowed
-    /// range `2 <= threshold <= count <= 10`.
+    /// Returns [`KeyShardError::InvalidParameters`] if parameters are outside
+    /// the allowed range `2 <= threshold <= count <= 10`.
     pub fn new(threshold: u8, count: u8) -> Result<Self, KeyShardError> {
         // Match the constraints enforced by Shamir's Secret Sharing.
         if threshold < Self::MIN_THRESHOLD {
@@ -330,7 +367,7 @@ impl KeyShardConfig {
 /// Splits a backup key into guardian shares.
 ///
 /// # Errors
-/// Returns [`KeyShardError::Shamir`] if parameters are invalid.
+/// Returns [`KeyShardError::InvalidParameters`] if parameters are invalid.
 pub fn split_backup_key(
     key: &BackupKey,
     metadata: GuardianBackupMetadata,
@@ -350,10 +387,7 @@ pub fn split_backup_key(
 pub fn reconstruct_backup_key(shards: &[BackupKeyShard]) -> Result<BackupKey, KeyShardError> {
     let metadata = shards
         .first()
-        .ok_or(KeyShardError::Shamir(ShamirError::InsufficientShares {
-            required: KeyShardConfig::MIN_THRESHOLD,
-            got: 0,
-        }))?
+        .ok_or(KeyShardError::InsufficientShares)?
         .metadata();
     if shards.iter().any(|shard| shard.metadata() != metadata) {
         return Err(KeyShardError::InvalidFormat);
@@ -390,6 +424,9 @@ pub fn open_share_for_guardian(
     sealed: &[u8],
     guardian_sk: &StaticSecret,
 ) -> Result<BackupKeyShard, KeyShardError> {
+    if sealed.len() != BackupKeyShard::SEALED_LENGTH {
+        return Err(KeyShardError::InvalidFormat);
+    }
     let plaintext = Zeroizing::new(
         sealed_box::open(sealed, guardian_sk)
             .map_err(|e| KeyShardError::SealedBox(e.to_string()))?,
@@ -419,7 +456,7 @@ mod tests {
     // @internal
     #[test]
     fn backup_key_shard_serialization_round_trip() {
-        let shard = BackupKeyShard::new(metadata(2, 10), 7, [0xABu8; 32]).unwrap();
+        let shard = BackupKeyShard::from_parts(metadata(2, 10), 7, [0xABu8; 32]).unwrap();
         let bytes = shard.to_bytes();
         let parsed = BackupKeyShard::from_bytes(&bytes).unwrap();
         assert_eq!(shard, parsed);
@@ -428,7 +465,7 @@ mod tests {
     // @internal
     #[test]
     fn backup_key_shard_debug_redacts_value() {
-        let shard = BackupKeyShard::new(metadata(2, 3), 1, [0xAB; 32]).unwrap();
+        let shard = BackupKeyShard::from_parts(metadata(2, 3), 1, [0xAB; 32]).unwrap();
 
         let debug = format!("{shard:?}");
 
@@ -439,7 +476,7 @@ mod tests {
     // @internal
     #[test]
     fn backup_key_shard_rejects_zero_index() {
-        let shard = BackupKeyShard::new(metadata(2, 3), 1, [0xABu8; 32]).unwrap();
+        let shard = BackupKeyShard::from_parts(metadata(2, 3), 1, [0xABu8; 32]).unwrap();
         let mut bytes = shard.to_bytes();
         bytes[3 + CEREMONY_ID_LENGTH] = 0;
         assert_eq!(
@@ -450,8 +487,8 @@ mod tests {
 
     // @internal
     #[test]
-    fn backup_key_shard_rejects_index_above_authenticated_count() {
-        let shard = BackupKeyShard::new(metadata(2, 3), 1, [0xABu8; 32]).unwrap();
+    fn backup_key_shard_rejects_index_above_declared_count() {
+        let shard = BackupKeyShard::from_parts(metadata(2, 3), 1, [0xABu8; 32]).unwrap();
         let mut bytes = shard.to_bytes();
         bytes[3 + CEREMONY_ID_LENGTH] = 4;
 
@@ -468,7 +505,7 @@ mod tests {
             BackupKeyShard::from_bytes(&[1, 1]),
             Err(KeyShardError::InvalidFormat)
         );
-        let mut bytes = BackupKeyShard::new(metadata(2, 3), 1, [0u8; 32])
+        let mut bytes = BackupKeyShard::from_parts(metadata(2, 3), 1, [0u8; 32])
             .unwrap()
             .to_bytes();
         bytes[0] = SHARD_VERSION + 1;
@@ -524,6 +561,20 @@ mod tests {
 
         let opened = open_share_for_guardian(&sealed, &guardian_sk).unwrap();
         assert_eq!(shards[0], opened);
+    }
+
+    // @internal
+    #[test]
+    fn open_share_rejects_noncanonical_sealed_length() {
+        let (guardian_sk, guardian_pk) = guardian_keypair();
+        let shard = BackupKeyShard::from_parts(metadata(2, 3), 1, [0xAB; 32]).unwrap();
+        let mut sealed = seal_share_for_guardian(&shard, &guardian_pk).unwrap();
+        sealed.push(0);
+
+        assert_eq!(
+            open_share_for_guardian(&sealed, &guardian_sk),
+            Err(KeyShardError::InvalidFormat)
+        );
     }
 
     // @internal

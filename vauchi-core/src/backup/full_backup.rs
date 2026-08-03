@@ -23,7 +23,9 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use flate2::Compression;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 use zeroize::{Zeroize, Zeroizing};
 
 use super::BackupError;
@@ -44,10 +46,17 @@ pub(crate) const FULL_BACKUP_VERSION: u8 = 0x03;
 /// Backup format version byte for guardian backups with an explicit random key.
 ///
 /// Format: `0x05 || threshold || count || ceremony_id (16) || salt (16)`
-/// `|| ciphertext`. The complete clear header is AEAD associated data.
+/// `|| key_confirmation (16) || ciphertext`. The complete clear header is
+/// AEAD associated data.
 pub(crate) const GUARDIAN_BACKUP_VERSION: u8 = 0x05;
 
-const GUARDIAN_BACKUP_HEADER_LENGTH: usize = 1 + 1 + 1 + CEREMONY_ID_LENGTH + 16;
+const GUARDIAN_BACKUP_PREFIX_LENGTH: usize = 1 + 1 + 1 + CEREMONY_ID_LENGTH + 16;
+const KEY_CONFIRMATION_LENGTH: usize = 16;
+const GUARDIAN_BACKUP_HEADER_LENGTH: usize =
+    GUARDIAN_BACKUP_PREFIX_LENGTH + KEY_CONFIRMATION_LENGTH;
+
+/// Maximum accepted v5 guardian backup size (32 MiB).
+pub(crate) const MAX_GUARDIAN_BACKUP_BYTES: usize = 32 * 1024 * 1024;
 
 /// HKDF domain separation info for v3 backup key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-backup-v3";
@@ -58,6 +67,9 @@ const HKDF_INFO: &[u8] = b"vauchi-backup-v3";
 /// separation so that a key accidentally used in another context cannot be
 /// directly reused as a v5 backup key.
 const GUARDIAN_BACKUP_HKDF_INFO: &[u8] = b"vauchi-backup-v5-guardian";
+const GUARDIAN_KEY_CONFIRMATION_DOMAIN: &[u8] = b"vauchi-backup-v5-key-confirmation";
+
+type HmacSha256 = Hmac<Sha256>;
 
 /// Identity data required for a full backup export.
 pub struct FullBackupIdentityData {
@@ -272,11 +284,14 @@ pub fn export_full_backup(
 ///
 /// ## Format
 ///
-/// `version || threshold || count || ceremony_id || salt || ciphertext`
+/// `version || threshold || count || ceremony_id || salt`
+/// `|| key_confirmation || ciphertext`
 ///
 /// The ciphertext encrypts a JSON `FullBackupEnvelope`. The encryption key is
 /// provided by the caller (typically a freshly generated key that is then split
-/// and distributed as guardian key shards).
+/// and distributed as guardian key shards). The 16-byte key confirmation lets
+/// recovery reject incorrect reconstructed keys before attempting decompression;
+/// the final AEAD open remains authoritative.
 pub fn export_guardian_backup(
     identity_data: &FullBackupIdentityData,
     contacts: &[Contact],
@@ -327,7 +342,7 @@ pub fn export_guardian_backup(
     let compressed = compress_backup(&plaintext)?;
 
     let salt: [u8; 16] = random_bytes();
-    let header = guardian_backup_header(metadata, &salt);
+    let header = guardian_backup_header(metadata, &salt, key);
     let derived_key = derive_guardian_key(key, &salt)?;
     let ciphertext = encrypt_with_ad(&derived_key, &compressed, &header)
         .map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
@@ -335,25 +350,47 @@ pub fn export_guardian_backup(
     let mut out = Vec::with_capacity(header.len() + ciphertext.len());
     out.extend_from_slice(&header);
     out.extend_from_slice(&ciphertext);
+    if out.len() > MAX_GUARDIAN_BACKUP_BYTES {
+        return Err(BackupError::TooLarge);
+    }
     Ok(out)
 }
 
 fn guardian_backup_header(
     metadata: GuardianBackupMetadata,
     salt: &[u8; 16],
+    key: &SymmetricKey,
 ) -> [u8; GUARDIAN_BACKUP_HEADER_LENGTH] {
     let mut header = [0u8; GUARDIAN_BACKUP_HEADER_LENGTH];
     header[0] = GUARDIAN_BACKUP_VERSION;
     header[1] = metadata.threshold();
     header[2] = metadata.count();
     header[3..3 + CEREMONY_ID_LENGTH].copy_from_slice(metadata.ceremony_id());
-    header[3 + CEREMONY_ID_LENGTH..].copy_from_slice(salt);
+    header[3 + CEREMONY_ID_LENGTH..GUARDIAN_BACKUP_PREFIX_LENGTH].copy_from_slice(salt);
+    let confirmation = guardian_key_confirmation(key, &header[..GUARDIAN_BACKUP_PREFIX_LENGTH]);
+    header[GUARDIAN_BACKUP_PREFIX_LENGTH..].copy_from_slice(&confirmation);
     header
+}
+
+fn guardian_key_confirmation(
+    key: &SymmetricKey,
+    header_prefix: &[u8],
+) -> [u8; KEY_CONFIRMATION_LENGTH] {
+    let mut mac = HmacSha256::new_from_slice(key.as_bytes()).expect("HMAC accepts 32-byte keys");
+    mac.update(GUARDIAN_KEY_CONFIRMATION_DOMAIN);
+    mac.update(header_prefix);
+    let output = mac.finalize().into_bytes();
+    let mut confirmation = [0u8; KEY_CONFIRMATION_LENGTH];
+    confirmation.copy_from_slice(&output[..KEY_CONFIRMATION_LENGTH]);
+    confirmation
 }
 
 fn parse_guardian_backup_header(
     data: &[u8],
 ) -> Result<(GuardianBackupMetadata, [u8; 16]), BackupError> {
+    if data.len() > MAX_GUARDIAN_BACKUP_BYTES {
+        return Err(BackupError::TooLarge);
+    }
     if data.len() < GUARDIAN_BACKUP_HEADER_LENGTH {
         return Err(BackupError::TooShort);
     }
@@ -365,7 +402,7 @@ fn parse_guardian_backup_header(
         .map_err(|_| BackupError::TooShort)?;
     let metadata = GuardianBackupMetadata::new(data[1], data[2], ceremony_id)
         .map_err(|_| BackupError::KeyShard("Invalid guardian backup metadata".into()))?;
-    let salt = data[3 + CEREMONY_ID_LENGTH..GUARDIAN_BACKUP_HEADER_LENGTH]
+    let salt = data[3 + CEREMONY_ID_LENGTH..GUARDIAN_BACKUP_PREFIX_LENGTH]
         .try_into()
         .map_err(|_| BackupError::TooShort)?;
     Ok((metadata, salt))
@@ -378,6 +415,27 @@ fn parse_guardian_backup_header(
 /// shards, but must not release plaintext until that authentication succeeds.
 pub fn guardian_backup_metadata(data: &[u8]) -> Result<GuardianBackupMetadata, BackupError> {
     parse_guardian_backup_header(data).map(|(metadata, _)| metadata)
+}
+
+/// Checks a reconstructed candidate key against the v5 confirmation field.
+///
+/// This is a cheap candidate filter only. Callers must still open the backup
+/// AEAD before accepting plaintext or treating metadata as authenticated.
+#[cfg(feature = "network-rustls")]
+pub(crate) fn guardian_backup_key_matches(
+    data: &[u8],
+    key: &SymmetricKey,
+) -> Result<bool, BackupError> {
+    parse_guardian_backup_header(data)?;
+    let expected = guardian_key_confirmation(key, &data[..GUARDIAN_BACKUP_PREFIX_LENGTH]);
+    let actual = &data[GUARDIAN_BACKUP_PREFIX_LENGTH..GUARDIAN_BACKUP_HEADER_LENGTH];
+    let difference = expected
+        .iter()
+        .zip(actual)
+        .fold(0u8, |difference, (&left, &right)| {
+            difference | (left ^ right)
+        });
+    Ok(difference == 0)
 }
 
 /// Imports a full v3 backup, returning the decrypted envelope.
@@ -509,6 +567,33 @@ mod tests {
         assert!(matches!(
             import_guardian_backup(&backup, &key),
             Err(BackupError::DecryptionFailed)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn guardian_backup_key_confirmation_accepts_only_original_key() {
+        let (backup, key) = guardian_backup();
+        let wrong_key = SymmetricKey::generate();
+
+        assert!(matches!(
+            guardian_backup_key_matches(&backup, &key),
+            Ok(true)
+        ));
+        assert!(matches!(
+            guardian_backup_key_matches(&backup, &wrong_key),
+            Ok(false)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn guardian_backup_rejects_oversized_input_before_authentication() {
+        let oversized = vec![0u8; MAX_GUARDIAN_BACKUP_BYTES + 1];
+
+        assert!(matches!(
+            guardian_backup_metadata(&oversized),
+            Err(BackupError::TooLarge)
         ));
     }
 }

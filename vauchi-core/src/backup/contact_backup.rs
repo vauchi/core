@@ -44,6 +44,9 @@ pub enum BackupError {
     #[error("Backup data is too short")]
     TooShort,
 
+    #[error("Backup data exceeds the size limit")]
+    TooLarge,
+
     #[error("Serialization failed: {0}")]
     Serialization(String),
 

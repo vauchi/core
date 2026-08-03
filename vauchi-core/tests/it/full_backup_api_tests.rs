@@ -447,6 +447,37 @@ fn recover_tolerates_unopenable_response_above_threshold() {
     assert_eq!(envelope.sections.identity.display_name, "Alice Smith");
 }
 
+/// One injected junk response beyond the configured guardian count must not
+/// block an otherwise complete honest quorum.
+// @scenario: backup_format_versioning :: Guardian recovery tolerates one bad response
+#[test]
+fn recover_tolerates_surplus_junk_response() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+    let (backup_hex, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+    let re0 = guardians[0]
+        .respond_to_recovery(&sealed_shares[0], &recovering_pk)
+        .unwrap();
+    let re1 = guardians[1]
+        .respond_to_recovery(&sealed_shares[1], &recovering_pk)
+        .unwrap();
+    let re2 = guardians[2]
+        .respond_to_recovery(&sealed_shares[2], &recovering_pk)
+        .unwrap();
+
+    let envelope = recovering
+        .recover_guardian_backup(&backup_hex, &[vec![0xFF], re0, re1, re2])
+        .unwrap();
+    assert_eq!(envelope.sections.identity.display_name, "Alice Smith");
+}
+
 /// A structurally valid share with altered secret bytes must be bypassed when
 /// another threshold-sized subset authenticates the backup.
 // @scenario: backup_format_versioning :: Guardian recovery tolerates one bad response

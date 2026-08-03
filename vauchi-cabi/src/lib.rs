@@ -490,6 +490,21 @@ mod tests {
         }
     }
 
+    #[test]
+    fn c_abi_returns_the_core_owned_fixture_bytes() {
+        // SAFETY: The returned pointer is owned by the C ABI and freed once.
+        unsafe {
+            let fixture_ptr = vauchi_presentation_contract_fixture();
+            assert!(!fixture_ptr.is_null());
+            let fixture = CStr::from_ptr(fixture_ptr).to_str().unwrap();
+            assert_eq!(
+                fixture,
+                vauchi_app::ui::presentation_contract_fixture_json()
+            );
+            vauchi_string_free(fixture_ptr);
+        }
+    }
+
     // @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
     #[test]
     fn app_c_abi_transports_contextual_commands_and_generic_events() {

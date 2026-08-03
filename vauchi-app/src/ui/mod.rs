@@ -117,6 +117,8 @@ pub use deep_link_consent::{
 };
 pub use delivery::{DeliveryItem, DeliveryStatusEngine};
 pub use demo_presentation::DemoPresentationEngine;
+
+mod presentation_contract_fixture;
 pub use device_link_join::{
     CANCEL_ACTION_ID as DEVICE_LINK_CANCEL_ACTION_ID, DeviceLinkJoinEngine,
     JOIN_ACTION_ID as DEVICE_LINK_JOIN_ACTION_ID,
@@ -170,6 +172,7 @@ pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
 pub use places_list::{PlaceSummary, PlacesEngine};
 pub use prepared_surface::{PreparedSurface, PreparedSurfaceError};
 pub use presentation::{PresentationCoordinator, PresentationCoordinatorError};
+pub use presentation_contract_fixture::presentation_contract_fixture_json;
 pub use recovery_help::{ParsedClaimSummary, RecoveryHelpEngine};
 pub use recovery_status::RecoveryEngine;
 pub use render_context::RenderContext;

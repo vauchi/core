@@ -1,0 +1,372 @@
+{
+  "schema_version": 1,
+  "initial_commands": [
+    {
+      "ReplaceSurface": {
+        "surface": {
+          "surface_id": "onboarding",
+          "revision": 1,
+          "title": "Welcome to Vauchi",
+          "subtitle": "Privacy-focused contact cards.",
+          "accessibility_label": "Welcome to Vauchi",
+          "layout": "scroll",
+          "tokens": {
+            "spacing_small": 8,
+            "spacing_medium": 16,
+            "spacing_large": 24,
+            "corner_radius": 12,
+            "minimum_target_size": 44
+          },
+          "nodes": [
+            {
+              "Group": {
+                "id": "identity_check_info",
+                "label": "Welcome to Vauchi",
+                "axis": "vertical",
+                "children": [
+                  {
+                    "Status": {
+                      "id": null,
+                      "title": "Private by design",
+                      "detail": "Your data is end-to-end encrypted and never leaves your control.",
+                      "icon_token": "lock",
+                      "badge": null,
+                      "tone": "neutral",
+                      "activation": null,
+                      "accessibility": {
+                        "label": "Private by design",
+                        "description": null
+                      }
+                    }
+                  },
+                  {
+                    "Status": {
+                      "id": null,
+                      "title": "Multi-device",
+                      "detail": "Use Vauchi on all your devices with seamless sync.",
+                      "icon_token": "devices",
+                      "badge": null,
+                      "tone": "neutral",
+                      "activation": null,
+                      "accessibility": {
+                        "label": "Multi-device",
+                        "description": null
+                      }
+                    }
+                  }
+                ],
+                "accessibility": {
+                  "label": "Welcome to Vauchi",
+                  "description": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "SetContextBar": {
+        "surface_id": "onboarding",
+        "revision": 1,
+        "bar": {
+          "back": null,
+          "navigation": {
+            "interaction_id": "surface.1.context.presentation.navigation",
+            "label": "More",
+            "accessibility_label": "More",
+            "icon_token": null,
+            "enabled": true,
+            "shortcut": null
+          },
+          "primary": {
+            "interaction_id": "surface.1.context.create_new",
+            "label": "Create new identity",
+            "accessibility_label": "Create new identity",
+            "icon_token": null,
+            "enabled": true,
+            "shortcut": "activate_primary"
+          },
+          "secondary": {
+            "interaction_id": "surface.1.context.presentation.secondary",
+            "label": "Actions",
+            "accessibility_label": "Actions",
+            "icon_token": null,
+            "enabled": true,
+            "shortcut": null
+          }
+        }
+      }
+    }
+  ],
+  "steps": [
+    {
+      "event": {
+        "ActionActivated": {
+          "surface_id": "onboarding",
+          "interaction_id": "surface.1.context.create_new"
+        }
+      },
+      "commands": [
+        {
+          "ReplaceSurface": {
+            "surface": {
+              "surface_id": "onboarding",
+              "revision": 2,
+              "title": "What's your name?",
+              "subtitle": "How you appear to contacts",
+              "accessibility_label": "What's your name?",
+              "layout": "scroll",
+              "tokens": {
+                "spacing_small": 8,
+                "spacing_medium": 16,
+                "spacing_large": 24,
+                "corner_radius": 12,
+                "minimum_target_size": 44
+              },
+              "nodes": [
+                {
+                  "Text": {
+                    "id": "name_instruction",
+                    "content": "Enter the name you'd like to show on your contact card.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "Enter the name you'd like to show on your contact card.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Input": {
+                    "binding_id": "surface.2.display_name",
+                    "label": "Display name",
+                    "value": "",
+                    "placeholder": "Enter your name",
+                    "input_kind": "text",
+                    "max_length": 100,
+                    "validation_error": null,
+                    "enabled": true,
+                    "accessibility": {
+                      "label": "Display name input",
+                      "description": "Enter the name others will see on your contact card"
+                    }
+                  }
+                },
+                {
+                  "Progress": {
+                    "label": null,
+                    "value": 0.25,
+                    "accessibility": {
+                      "label": "Progress",
+                      "description": null
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "SetContextBar": {
+            "surface_id": "onboarding",
+            "revision": 2,
+            "bar": {
+              "back": null,
+              "navigation": {
+                "interaction_id": "surface.2.context.presentation.navigation",
+                "label": "More",
+                "accessibility_label": "More",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "primary": {
+                "interaction_id": "surface.2.context.continue",
+                "label": "Continue",
+                "accessibility_label": "Continue",
+                "icon_token": null,
+                "enabled": false,
+                "shortcut": "activate_primary"
+              },
+              "secondary": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "event": {
+        "ValueChanged": {
+          "surface_id": "onboarding",
+          "binding_id": "surface.2.display_name",
+          "value": {
+            "text": "Ada"
+          }
+        }
+      },
+      "commands": [
+        {
+          "ReplaceSurface": {
+            "surface": {
+              "surface_id": "onboarding",
+              "revision": 2,
+              "title": "What's your name?",
+              "subtitle": "How you appear to contacts",
+              "accessibility_label": "What's your name?",
+              "layout": "scroll",
+              "tokens": {
+                "spacing_small": 8,
+                "spacing_medium": 16,
+                "spacing_large": 24,
+                "corner_radius": 12,
+                "minimum_target_size": 44
+              },
+              "nodes": [
+                {
+                  "Text": {
+                    "id": "name_instruction",
+                    "content": "Enter the name you'd like to show on your contact card.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "Enter the name you'd like to show on your contact card.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Input": {
+                    "binding_id": "surface.2.display_name",
+                    "label": "Display name",
+                    "value": "Ada",
+                    "placeholder": "Enter your name",
+                    "input_kind": "text",
+                    "max_length": 100,
+                    "validation_error": null,
+                    "enabled": true,
+                    "accessibility": {
+                      "label": "Display name input",
+                      "description": "Enter the name others will see on your contact card"
+                    }
+                  }
+                },
+                {
+                  "Progress": {
+                    "label": null,
+                    "value": 0.25,
+                    "accessibility": {
+                      "label": "Progress",
+                      "description": null
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "SetContextBar": {
+            "surface_id": "onboarding",
+            "revision": 2,
+            "bar": {
+              "back": null,
+              "navigation": {
+                "interaction_id": "surface.2.context.presentation.navigation",
+                "label": "More",
+                "accessibility_label": "More",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "primary": {
+                "interaction_id": "surface.2.context.continue",
+                "label": "Continue",
+                "accessibility_label": "Continue",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": "activate_primary"
+              },
+              "secondary": null
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected_state": {
+    "active_surface_id": "onboarding",
+    "surface": {
+      "surface_id": "onboarding",
+      "revision": 2,
+      "title": "What's your name?",
+      "subtitle": "How you appear to contacts",
+      "accessibility_label": "What's your name?",
+      "layout": "scroll",
+      "tokens": {
+        "spacing_small": 8,
+        "spacing_medium": 16,
+        "spacing_large": 24,
+        "corner_radius": 12,
+        "minimum_target_size": 44
+      },
+      "nodes": [
+        {
+          "Text": {
+            "id": "name_instruction",
+            "content": "Enter the name you'd like to show on your contact card.",
+            "style": "body",
+            "accessibility": {
+              "label": "Enter the name you'd like to show on your contact card.",
+              "description": null
+            }
+          }
+        },
+        {
+          "Input": {
+            "binding_id": "surface.2.display_name",
+            "label": "Display name",
+            "value": "Ada",
+            "placeholder": "Enter your name",
+            "input_kind": "text",
+            "max_length": 100,
+            "validation_error": null,
+            "enabled": true,
+            "accessibility": {
+              "label": "Display name input",
+              "description": "Enter the name others will see on your contact card"
+            }
+          }
+        },
+        {
+          "Progress": {
+            "label": null,
+            "value": 0.25,
+            "accessibility": {
+              "label": "Progress",
+              "description": null
+            }
+          }
+        }
+      ]
+    },
+    "context_bar": {
+      "back": null,
+      "navigation": {
+        "interaction_id": "surface.2.context.presentation.navigation",
+        "label": "More",
+        "accessibility_label": "More",
+        "icon_token": null,
+        "enabled": true,
+        "shortcut": null
+      },
+      "primary": {
+        "interaction_id": "surface.2.context.continue",
+        "label": "Continue",
+        "accessibility_label": "Continue",
+        "icon_token": null,
+        "enabled": true,
+        "shortcut": "activate_primary"
+      },
+      "secondary": null
+    }
+  }
+}

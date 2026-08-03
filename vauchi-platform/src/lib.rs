@@ -127,6 +127,16 @@ pub fn app_compat_version() -> u16 {
     vauchi_core::version::APP_COMPAT_VERSION
 }
 
+/// Return the versioned Core presentation contract corpus as canonical JSON.
+///
+/// Shell contract tests consume these bytes through the same generated
+/// binding as production presentation traffic, so no repository carries a
+/// stale fixture copy.
+#[uniffi::export]
+pub fn presentation_contract_fixture_json() -> String {
+    vauchi_app::ui::presentation_contract_fixture_json().to_owned()
+}
+
 // === Platform Secure Storage Callback ===
 
 /// Callback interface for platform-specific secure key storage.

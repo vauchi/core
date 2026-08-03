@@ -297,6 +297,13 @@ char *vauchi_app_import_contacts_from_vcf(struct VauchiApp *handle,
 char *vauchi_app_drain_notifications(struct VauchiApp *handle);
 
 /**
+ * Return the versioned Core presentation contract corpus as canonical JSON.
+ *
+ * The returned string must be released with `vauchi_string_free`.
+ */
+char *vauchi_presentation_contract_fixture(void);
+
+/**
  * Return the complete initial Core command batch.
  *
  * # Safety

@@ -8,6 +8,15 @@ use std::os::raw::c_char;
 
 use super::{VauchiApp, from_c_str, to_c_string};
 
+/// Return the versioned Core presentation contract corpus as canonical JSON.
+///
+/// The returned string must be released with `vauchi_string_free`.
+#[unsafe(no_mangle)]
+pub extern "C" fn vauchi_presentation_contract_fixture() -> *mut c_char {
+    std::panic::catch_unwind(|| to_c_string(vauchi_app::ui::presentation_contract_fixture_json()))
+        .unwrap_or(std::ptr::null_mut())
+}
+
 /// Return the complete initial Core command batch.
 ///
 /// # Safety

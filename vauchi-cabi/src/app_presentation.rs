@@ -98,6 +98,7 @@ mod tests {
 
     use super::*;
 
+    // @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
     #[test]
     fn c_abi_returns_the_core_owned_fixture_bytes() {
         let fixture_ptr = vauchi_presentation_contract_fixture();

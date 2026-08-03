@@ -130,6 +130,7 @@ fn current_fixture() -> PresentationContractFixture {
     }
 }
 
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
 #[test]
 fn shared_fixture_replays_the_exact_core_event_command_sequence() {
     init_fixture_i18n();
@@ -151,6 +152,7 @@ fn shared_fixture_replays_the_exact_core_event_command_sequence() {
     }
 }
 
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
 #[test]
 fn shared_fixture_pins_equal_revision_as_an_atomic_replacement() {
     let fixture: PresentationContractFixture =
@@ -186,6 +188,7 @@ fn shared_fixture_pins_equal_revision_as_an_atomic_replacement() {
     );
 }
 
+// @internal
 #[test]
 fn shared_fixture_is_fresh() {
     let recorded: PresentationContractFixture =
@@ -195,6 +198,7 @@ fn shared_fixture_is_fresh() {
     assert_eq!(recorded, current_fixture());
 }
 
+// @internal
 #[test]
 #[ignore = "regenerates the checked-in Core contract fixture"]
 fn regenerate_shared_fixture() {

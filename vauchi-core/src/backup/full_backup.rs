@@ -31,27 +31,33 @@ use super::contact_backup::ContactBackupEntry;
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::crypto::kdf::HKDF;
-use crate::crypto::{SymmetricKey, decrypt, derive_key_argon2id, encrypt, random_bytes};
+use crate::crypto::{
+    SymmetricKey, decrypt, decrypt_with_ad, derive_key_argon2id, encrypt, encrypt_with_ad,
+    random_bytes,
+};
+
+use super::key_shard::{CEREMONY_ID_LENGTH, GuardianBackupMetadata};
 
 /// Backup format version byte for v3 (full backup).
 pub(crate) const FULL_BACKUP_VERSION: u8 = 0x03;
 
-/// Backup format version byte for v3 with an explicit random key.
+/// Backup format version byte for guardian backups with an explicit random key.
 ///
-/// Format: `0x04 || salt (16) || ciphertext`
-/// Same inner envelope as v3, but the key is a random 32-byte key rather than
-/// derived from a password. This is used for guardian key-shard backups.
-pub(crate) const GUARDIAN_BACKUP_VERSION: u8 = 0x04;
+/// Format: `0x05 || threshold || count || ceremony_id (16) || salt (16)`
+/// `|| ciphertext`. The complete clear header is AEAD associated data.
+pub(crate) const GUARDIAN_BACKUP_VERSION: u8 = 0x05;
+
+const GUARDIAN_BACKUP_HEADER_LENGTH: usize = 1 + 1 + 1 + CEREMONY_ID_LENGTH + 16;
 
 /// HKDF domain separation info for v3 backup key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-backup-v3";
 
-/// HKDF domain separation info for v4 guardian backup key derivation.
+/// HKDF domain separation info for v5 guardian backup key derivation.
 ///
 /// The key is generated randomly, but we still run it through HKDF with domain
 /// separation so that a key accidentally used in another context cannot be
-/// directly reused as a v4 backup key.
-const GUARDIAN_BACKUP_HKDF_INFO: &[u8] = b"vauchi-backup-v4-guardian";
+/// directly reused as a v5 backup key.
+const GUARDIAN_BACKUP_HKDF_INFO: &[u8] = b"vauchi-backup-v5-guardian";
 
 /// Identity data required for a full backup export.
 pub struct FullBackupIdentityData {
@@ -151,8 +157,8 @@ fn derive_v3_key(password: &str, salt: &[u8; 16]) -> Result<SymmetricKey, Backup
     Ok(key)
 }
 
-/// Derives the v4 guardian backup encryption key from an explicit random key.
-fn derive_v4_key(key: &SymmetricKey, salt: &[u8; 16]) -> Result<SymmetricKey, BackupError> {
+/// Derives the v5 guardian backup encryption key from an explicit random key.
+fn derive_guardian_key(key: &SymmetricKey, salt: &[u8; 16]) -> Result<SymmetricKey, BackupError> {
     let prk = HKDF::extract(Some(salt), key.as_bytes());
     let okm = HKDF::expand(&prk, GUARDIAN_BACKUP_HKDF_INFO, 32)
         .map_err(|_| BackupError::KeyDerivation)?;
@@ -262,11 +268,11 @@ pub fn export_full_backup(
     Ok(out)
 }
 
-/// Exports a full v4 guardian backup using an explicit random symmetric key.
+/// Exports a full v5 guardian backup using an explicit random symmetric key.
 ///
 /// ## Format
 ///
-/// `GUARDIAN_BACKUP_VERSION (0x04) || salt (16 bytes) || ciphertext`
+/// `version || threshold || count || ceremony_id || salt || ciphertext`
 ///
 /// The ciphertext encrypts a JSON `FullBackupEnvelope`. The encryption key is
 /// provided by the caller (typically a freshly generated key that is then split
@@ -277,6 +283,7 @@ pub fn export_guardian_backup(
     own_card: Option<&ContactCard>,
     labels: &[(String, String, Vec<String>)],
     key: &SymmetricKey,
+    metadata: GuardianBackupMetadata,
     now: u64,
 ) -> Result<Vec<u8>, BackupError> {
     let identity = IdentitySection {
@@ -304,7 +311,7 @@ pub fn export_guardian_backup(
         .collect();
 
     let envelope = FullBackupEnvelope {
-        version: 4,
+        version: 5,
         created_at: now,
         sections: BackupSections {
             identity,
@@ -320,15 +327,57 @@ pub fn export_guardian_backup(
     let compressed = compress_backup(&plaintext)?;
 
     let salt: [u8; 16] = random_bytes();
-    let derived_key = derive_v4_key(key, &salt)?;
-    let ciphertext = encrypt(&derived_key, &compressed)
+    let header = guardian_backup_header(metadata, &salt);
+    let derived_key = derive_guardian_key(key, &salt)?;
+    let ciphertext = encrypt_with_ad(&derived_key, &compressed, &header)
         .map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
 
-    let mut out = Vec::with_capacity(1 + 16 + ciphertext.len());
-    out.push(GUARDIAN_BACKUP_VERSION);
-    out.extend_from_slice(&salt);
+    let mut out = Vec::with_capacity(header.len() + ciphertext.len());
+    out.extend_from_slice(&header);
     out.extend_from_slice(&ciphertext);
     Ok(out)
+}
+
+fn guardian_backup_header(
+    metadata: GuardianBackupMetadata,
+    salt: &[u8; 16],
+) -> [u8; GUARDIAN_BACKUP_HEADER_LENGTH] {
+    let mut header = [0u8; GUARDIAN_BACKUP_HEADER_LENGTH];
+    header[0] = GUARDIAN_BACKUP_VERSION;
+    header[1] = metadata.threshold();
+    header[2] = metadata.count();
+    header[3..3 + CEREMONY_ID_LENGTH].copy_from_slice(metadata.ceremony_id());
+    header[3 + CEREMONY_ID_LENGTH..].copy_from_slice(salt);
+    header
+}
+
+fn parse_guardian_backup_header(
+    data: &[u8],
+) -> Result<(GuardianBackupMetadata, [u8; 16]), BackupError> {
+    if data.len() < GUARDIAN_BACKUP_HEADER_LENGTH {
+        return Err(BackupError::TooShort);
+    }
+    if data[0] != GUARDIAN_BACKUP_VERSION {
+        return Err(BackupError::UnsupportedVersion(data[0]));
+    }
+    let ceremony_id = data[3..3 + CEREMONY_ID_LENGTH]
+        .try_into()
+        .map_err(|_| BackupError::TooShort)?;
+    let metadata = GuardianBackupMetadata::new(data[1], data[2], ceremony_id)
+        .map_err(|_| BackupError::KeyShard("Invalid guardian backup metadata".into()))?;
+    let salt = data[3 + CEREMONY_ID_LENGTH..GUARDIAN_BACKUP_HEADER_LENGTH]
+        .try_into()
+        .map_err(|_| BackupError::TooShort)?;
+    Ok((metadata, salt))
+}
+
+/// Parses the public recovery metadata from a v5 guardian backup header.
+///
+/// The values are authenticated only after [`import_guardian_backup`] opens
+/// the ciphertext. Recovery may use them to bound work and select candidate
+/// shards, but must not release plaintext until that authentication succeeds.
+pub fn guardian_backup_metadata(data: &[u8]) -> Result<GuardianBackupMetadata, BackupError> {
+    parse_guardian_backup_header(data).map(|(metadata, _)| metadata)
 }
 
 /// Imports a full v3 backup, returning the decrypted envelope.
@@ -362,7 +411,7 @@ pub fn import_full_backup(data: &[u8], password: &str) -> Result<FullBackupEnvel
     Ok(envelope)
 }
 
-/// Imports a full v4 guardian backup using an explicit symmetric key.
+/// Imports a full v5 guardian backup using an explicit symmetric key.
 ///
 /// This is the companion to [`export_guardian_backup`]. The caller supplies the
 /// key reconstructed from guardian key shards.
@@ -370,25 +419,14 @@ pub fn import_guardian_backup(
     data: &[u8],
     key: &SymmetricKey,
 ) -> Result<FullBackupEnvelope, BackupError> {
-    // Minimum: version (1) + salt (16) + nonce (24) + tag (16) + some ciphertext
-    if data.len() < 1 + 16 {
-        return Err(BackupError::TooShort);
-    }
-
-    let version = data[0];
-    if version != GUARDIAN_BACKUP_VERSION {
-        return Err(BackupError::UnsupportedVersion(version));
-    }
-
-    let salt: [u8; 16] = data[1..17]
-        .try_into()
-        .expect("salt slice is exactly 16 bytes");
-    let ciphertext = &data[17..];
-
-    let derived_key = derive_v4_key(key, &salt)?;
+    let (_metadata, salt) = parse_guardian_backup_header(data)?;
+    let header = &data[..GUARDIAN_BACKUP_HEADER_LENGTH];
+    let ciphertext = &data[GUARDIAN_BACKUP_HEADER_LENGTH..];
+    let derived_key = derive_guardian_key(key, &salt)?;
 
     let decrypted = Zeroizing::new(
-        decrypt(&derived_key, ciphertext).map_err(|_| BackupError::DecryptionFailed)?,
+        decrypt_with_ad(&derived_key, ciphertext, header)
+            .map_err(|_| BackupError::DecryptionFailed)?,
     );
     let plaintext = decompress_backup(&decrypted)?;
 
@@ -429,4 +467,48 @@ pub fn extract_master_seed(identity: &IdentitySection) -> Result<Zeroizing<[u8; 
         .map_err(|_| BackupError::Deserialization("bad master_seed length".into()))?;
     decoded.zeroize();
     Ok(Zeroizing::new(seed))
+}
+
+// INLINE_TEST_REQUIRED: guardian header bytes and their AEAD binding are a
+// private wire-format contract and must be tested beside the offsets.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn guardian_backup() -> (Vec<u8>, SymmetricKey) {
+        let identity = FullBackupIdentityData {
+            display_name: "Alice".into(),
+            master_seed: [0x42; 32],
+            device_index: 0,
+            device_name: "Test device".into(),
+        };
+        let key = SymmetricKey::generate();
+        let metadata = GuardianBackupMetadata::new(2, 3, [0x24; CEREMONY_ID_LENGTH]).unwrap();
+        let backup = export_guardian_backup(&identity, &[], None, &[], &key, metadata, 1).unwrap();
+        (backup, key)
+    }
+
+    // @internal
+    #[test]
+    fn guardian_backup_aead_authenticates_threshold() {
+        let (mut backup, key) = guardian_backup();
+        backup[1] = 3;
+
+        assert!(matches!(
+            import_guardian_backup(&backup, &key),
+            Err(BackupError::DecryptionFailed)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn guardian_backup_aead_authenticates_ceremony_id() {
+        let (mut backup, key) = guardian_backup();
+        backup[3] ^= 0x80;
+
+        assert!(matches!(
+            import_guardian_backup(&backup, &key),
+            Err(BackupError::DecryptionFailed)
+        ));
+    }
 }

@@ -82,9 +82,29 @@ pub enum ShamirError {
 #[derive(Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct Share {
     /// Non-zero byte identifier for this share (x-coordinate).
-    pub index: u8,
+    index: u8,
     /// 32-byte share value (y-coordinate).
-    pub value: [u8; 32],
+    value: [u8; 32],
+}
+
+impl Share {
+    /// Creates a share after validating its public x-coordinate.
+    pub(crate) fn new(index: u8, value: [u8; 32]) -> Result<Self, ShamirError> {
+        if index == 0 {
+            return Err(ShamirError::InvalidShareIndex);
+        }
+        Ok(Self { index, value })
+    }
+
+    /// Returns the non-zero public x-coordinate.
+    pub(crate) fn index(&self) -> u8 {
+        self.index
+    }
+
+    /// Returns the secret y-coordinate bytes.
+    pub(crate) fn value(&self) -> &[u8; 32] {
+        &self.value
+    }
 }
 
 impl fmt::Debug for Share {
@@ -314,6 +334,21 @@ fn gf_inv(a: u8) -> Result<u8, ShamirError> {
 mod tests {
     use super::*;
 
+    fn reference_gf_mul(a: u8, b: u8) -> u8 {
+        let mut polynomial = 0u16;
+        for bit in 0..8 {
+            if b & (1 << bit) != 0 {
+                polynomial ^= (a as u16) << bit;
+            }
+        }
+        for degree in (8..=14).rev() {
+            if polynomial & (1 << degree) != 0 {
+                polynomial ^= 0x11b << (degree - 8);
+            }
+        }
+        polynomial as u8
+    }
+
     // @internal
     #[test]
     fn round_trip_2_of_3() {
@@ -508,6 +543,20 @@ mod tests {
         assert_eq!(gf_mul(0x57, 0x13), 0xfe);
         assert_eq!(gf_inv(0x53), Ok(0xca));
         assert_eq!(gf_div(0x57, 0x13), Ok(0x6b));
+    }
+
+    // @internal
+    #[test]
+    fn gf_mul_matches_independent_polynomial_reference_exhaustively() {
+        for a in 0..=u8::MAX {
+            for b in 0..=u8::MAX {
+                assert_eq!(
+                    gf_mul(a, b),
+                    reference_gf_mul(a, b),
+                    "a={a:#04x}, b={b:#04x}"
+                );
+            }
+        }
     }
 
     // @internal

@@ -11,7 +11,10 @@ pub mod kdf;
 pub mod padding;
 pub mod password_kdf;
 pub mod ratchet;
+#[cfg(feature = "testing")]
 pub mod shamir;
+#[cfg(not(feature = "testing"))]
+pub(crate) mod shamir;
 pub mod shredding;
 pub mod signing;
 pub mod x3dh;

@@ -10,7 +10,8 @@
 //! # Wire format
 //!
 //! `BackupKeyShard` serializes as:
-//! `version (1) || index (1) || value (32)`
+//! `version (1) || threshold (1) || count (1) || ceremony_id (16)`
+//! `|| index (1) || value (32)`
 //!
 //! `SealedBackupKeyShard` is the raw output of [`crate::recovery::sealed_box`]
 //! (`ephemeral_pk || nonce || ciphertext+tag`), encrypting a serialized
@@ -30,12 +31,63 @@ use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::BackupError;
-use crate::crypto::SymmetricKey;
 use crate::crypto::shamir::{self, ShamirError, Share};
+use crate::crypto::{SymmetricKey, random_bytes};
 use crate::recovery::sealed_box;
 
 /// Version byte for `BackupKeyShard` serialization.
-const SHARD_VERSION: u8 = 1;
+const SHARD_VERSION: u8 = 2;
+
+/// Byte length of the random identifier shared by one backup and its shards.
+pub const CEREMONY_ID_LENGTH: usize = 16;
+
+/// Authenticated public parameters for one guardian backup ceremony.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GuardianBackupMetadata {
+    threshold: u8,
+    count: u8,
+    ceremony_id: [u8; CEREMONY_ID_LENGTH],
+}
+
+impl GuardianBackupMetadata {
+    /// Generates metadata with a fresh random ceremony identifier.
+    pub fn generate(config: KeyShardConfig) -> Self {
+        Self {
+            threshold: config.threshold(),
+            count: config.count(),
+            ceremony_id: random_bytes(),
+        }
+    }
+
+    /// Validates metadata parsed from a wire format.
+    pub fn new(
+        threshold: u8,
+        count: u8,
+        ceremony_id: [u8; CEREMONY_ID_LENGTH],
+    ) -> Result<Self, KeyShardError> {
+        let config = KeyShardConfig::new(threshold, count)?;
+        Ok(Self {
+            threshold: config.threshold(),
+            count: config.count(),
+            ceremony_id,
+        })
+    }
+
+    /// Minimum number of distinct shares needed for recovery.
+    pub fn threshold(&self) -> u8 {
+        self.threshold
+    }
+
+    /// Total number of shares generated for the ceremony.
+    pub fn count(&self) -> u8 {
+        self.count
+    }
+
+    /// Random public identifier that separates independent backup ceremonies.
+    pub fn ceremony_id(&self) -> &[u8; CEREMONY_ID_LENGTH] {
+        &self.ceremony_id
+    }
+}
 
 /// A single guardian key shard.
 ///
@@ -43,10 +95,12 @@ const SHARD_VERSION: u8 = 1;
 /// field is zeroized on drop.
 #[derive(Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct BackupKeyShard {
+    #[zeroize(skip)]
+    metadata: GuardianBackupMetadata,
     /// Non-zero byte index (x-coordinate).
-    pub index: u8,
+    index: u8,
     /// 32-byte share value (y-coordinate).
-    pub value: [u8; 32],
+    value: [u8; 32],
 }
 
 impl fmt::Debug for BackupKeyShard {
@@ -60,10 +114,38 @@ impl fmt::Debug for BackupKeyShard {
 }
 
 impl BackupKeyShard {
+    fn new(
+        metadata: GuardianBackupMetadata,
+        index: u8,
+        value: [u8; 32],
+    ) -> Result<Self, KeyShardError> {
+        if index == 0 || index > metadata.count() {
+            return Err(KeyShardError::InvalidFormat);
+        }
+        Ok(Self {
+            metadata,
+            index,
+            value,
+        })
+    }
+
+    /// Returns the authenticated ceremony metadata carried by this shard.
+    pub fn metadata(&self) -> GuardianBackupMetadata {
+        self.metadata
+    }
+
+    /// Returns the non-zero Shamir x-coordinate.
+    pub fn index(&self) -> u8 {
+        self.index
+    }
+
     /// Serializes the shard to a compact byte representation.
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(1 + 1 + 32);
+        let mut bytes = Vec::with_capacity(1 + 1 + 1 + CEREMONY_ID_LENGTH + 1 + 32);
         bytes.push(SHARD_VERSION);
+        bytes.push(self.metadata.threshold());
+        bytes.push(self.metadata.count());
+        bytes.extend_from_slice(self.metadata.ceremony_id());
         bytes.push(self.index);
         bytes.extend_from_slice(&self.value);
         bytes
@@ -75,7 +157,7 @@ impl BackupKeyShard {
     /// Returns [`KeyShardError::InvalidFormat`] if the bytes are malformed or
     /// the version is unsupported.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, KeyShardError> {
-        if bytes.len() != 1 + 1 + 32 {
+        if bytes.len() != 1 + 1 + 1 + CEREMONY_ID_LENGTH + 1 + 32 {
             return Err(KeyShardError::InvalidFormat);
         }
 
@@ -84,32 +166,28 @@ impl BackupKeyShard {
             return Err(KeyShardError::UnsupportedVersion(version));
         }
 
-        let index = bytes[1];
-        if index == 0 {
-            return Err(KeyShardError::InvalidFormat);
-        }
+        let ceremony_id = bytes[3..3 + CEREMONY_ID_LENGTH]
+            .try_into()
+            .map_err(|_| KeyShardError::InvalidFormat)?;
+        let metadata = GuardianBackupMetadata::new(bytes[1], bytes[2], ceremony_id)?;
+        let index_offset = 3 + CEREMONY_ID_LENGTH;
+        let index = bytes[index_offset];
 
-        let value: [u8; 32] = bytes[2..34]
+        let value: [u8; 32] = bytes[index_offset + 1..]
             .try_into()
             .map_err(|_| KeyShardError::InvalidFormat)?;
 
-        Ok(Self { index, value })
+        Self::new(metadata, index, value)
     }
 
     /// Converts this shard to the internal Shamir [`Share`] representation.
-    fn to_share(&self) -> Share {
-        Share {
-            index: self.index,
-            value: self.value,
-        }
+    fn to_share(&self) -> Result<Share, KeyShardError> {
+        Share::new(self.index, self.value).map_err(Into::into)
     }
 
     /// Creates a `BackupKeyShard` from an internal Shamir [`Share`].
-    fn from_share(share: &Share) -> Self {
-        Self {
-            index: share.index,
-            value: share.value,
-        }
+    fn from_share(metadata: GuardianBackupMetadata, share: &Share) -> Result<Self, KeyShardError> {
+        Self::new(metadata, share.index(), *share.value())
     }
 }
 
@@ -199,9 +277,9 @@ impl BackupKey {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct KeyShardConfig {
     /// Minimum shares needed to reconstruct the key.
-    pub threshold: u8,
+    threshold: u8,
     /// Total number of shares to generate.
-    pub count: u8,
+    count: u8,
 }
 
 impl KeyShardConfig {
@@ -237,6 +315,16 @@ impl KeyShardConfig {
         }
         Ok(Self { threshold, count })
     }
+
+    /// Minimum shares needed to reconstruct the key.
+    pub fn threshold(&self) -> u8 {
+        self.threshold
+    }
+
+    /// Total number of shares generated.
+    pub fn count(&self) -> u8 {
+        self.count
+    }
 }
 
 /// Splits a backup key into guardian shares.
@@ -245,23 +333,36 @@ impl KeyShardConfig {
 /// Returns [`KeyShardError::Shamir`] if parameters are invalid.
 pub fn split_backup_key(
     key: &BackupKey,
-    config: KeyShardConfig,
+    metadata: GuardianBackupMetadata,
 ) -> Result<Vec<BackupKeyShard>, KeyShardError> {
-    let shares = shamir::split(key.as_bytes(), config.threshold, config.count)?;
-    Ok(shares.iter().map(BackupKeyShard::from_share).collect())
+    let shares = shamir::split(key.as_bytes(), metadata.threshold(), metadata.count())?;
+    shares
+        .iter()
+        .map(|share| BackupKeyShard::from_share(metadata, share))
+        .collect()
 }
 
-/// Reconstructs a backup key from at least `threshold` shares.
+/// Reconstructs a backup key from shares carrying one validated ceremony.
 ///
 /// # Errors
-/// Returns [`KeyShardError::Shamir`] if `threshold` is invalid or the shares
-/// are insufficient or malformed.
-pub fn reconstruct_backup_key(
-    shards: &[BackupKeyShard],
-    threshold: u8,
-) -> Result<BackupKey, KeyShardError> {
-    let shares: Vec<Share> = shards.iter().map(|s| s.to_share()).collect();
-    let secret = Zeroizing::new(shamir::reconstruct(&shares, threshold)?);
+/// Returns an error if the shares are insufficient, malformed, or carry
+/// different ceremony metadata.
+pub fn reconstruct_backup_key(shards: &[BackupKeyShard]) -> Result<BackupKey, KeyShardError> {
+    let metadata = shards
+        .first()
+        .ok_or(KeyShardError::Shamir(ShamirError::InsufficientShares {
+            required: KeyShardConfig::MIN_THRESHOLD,
+            got: 0,
+        }))?
+        .metadata();
+    if shards.iter().any(|shard| shard.metadata() != metadata) {
+        return Err(KeyShardError::InvalidFormat);
+    }
+    let shares: Vec<Share> = shards
+        .iter()
+        .map(BackupKeyShard::to_share)
+        .collect::<Result<_, _>>()?;
+    let secret = Zeroizing::new(shamir::reconstruct(&shares, metadata.threshold())?);
     BackupKey::from_bytes(secret.as_slice())
 }
 
@@ -311,13 +412,14 @@ mod tests {
         (sk, pk)
     }
 
+    fn metadata(threshold: u8, count: u8) -> GuardianBackupMetadata {
+        GuardianBackupMetadata::new(threshold, count, [0x42; CEREMONY_ID_LENGTH]).unwrap()
+    }
+
     // @internal
     #[test]
     fn backup_key_shard_serialization_round_trip() {
-        let shard = BackupKeyShard {
-            index: 7,
-            value: [0xABu8; 32],
-        };
+        let shard = BackupKeyShard::new(metadata(2, 10), 7, [0xABu8; 32]).unwrap();
         let bytes = shard.to_bytes();
         let parsed = BackupKeyShard::from_bytes(&bytes).unwrap();
         assert_eq!(shard, parsed);
@@ -326,10 +428,7 @@ mod tests {
     // @internal
     #[test]
     fn backup_key_shard_debug_redacts_value() {
-        let shard = BackupKeyShard {
-            index: 1,
-            value: [0xAB; 32],
-        };
+        let shard = BackupKeyShard::new(metadata(2, 3), 1, [0xAB; 32]).unwrap();
 
         let debug = format!("{shard:?}");
 
@@ -340,11 +439,22 @@ mod tests {
     // @internal
     #[test]
     fn backup_key_shard_rejects_zero_index() {
-        let shard = BackupKeyShard {
-            index: 0,
-            value: [0xABu8; 32],
-        };
-        let bytes = shard.to_bytes();
+        let shard = BackupKeyShard::new(metadata(2, 3), 1, [0xABu8; 32]).unwrap();
+        let mut bytes = shard.to_bytes();
+        bytes[3 + CEREMONY_ID_LENGTH] = 0;
+        assert_eq!(
+            BackupKeyShard::from_bytes(&bytes),
+            Err(KeyShardError::InvalidFormat)
+        );
+    }
+
+    // @internal
+    #[test]
+    fn backup_key_shard_rejects_index_above_authenticated_count() {
+        let shard = BackupKeyShard::new(metadata(2, 3), 1, [0xABu8; 32]).unwrap();
+        let mut bytes = shard.to_bytes();
+        bytes[3 + CEREMONY_ID_LENGTH] = 4;
+
         assert_eq!(
             BackupKeyShard::from_bytes(&bytes),
             Err(KeyShardError::InvalidFormat)
@@ -358,11 +468,13 @@ mod tests {
             BackupKeyShard::from_bytes(&[1, 1]),
             Err(KeyShardError::InvalidFormat)
         );
-        let mut bytes = vec![2u8, 1u8];
-        bytes.extend_from_slice(&[0u8; 32]);
+        let mut bytes = BackupKeyShard::new(metadata(2, 3), 1, [0u8; 32])
+            .unwrap()
+            .to_bytes();
+        bytes[0] = SHARD_VERSION + 1;
         assert_eq!(
             BackupKeyShard::from_bytes(&bytes),
-            Err(KeyShardError::UnsupportedVersion(2))
+            Err(KeyShardError::UnsupportedVersion(SHARD_VERSION + 1))
         );
     }
 
@@ -371,15 +483,32 @@ mod tests {
     fn split_and_reconstruct_backup_key() {
         let key = BackupKey::generate();
         let config = KeyShardConfig::new(2, 3).unwrap();
-        let shards = split_backup_key(&key, config).unwrap();
+        let metadata = GuardianBackupMetadata::generate(config);
+        let shards = split_backup_key(&key, metadata).unwrap();
         assert_eq!(shards.len(), 3);
 
         // Any 2 shares reconstruct
-        let reconstructed = reconstruct_backup_key(&shards[0..2], config.threshold).unwrap();
+        let reconstructed = reconstruct_backup_key(&shards[0..2]).unwrap();
         assert_eq!(reconstructed.as_bytes(), key.as_bytes());
 
-        let reconstructed = reconstruct_backup_key(&shards[1..3], config.threshold).unwrap();
+        let reconstructed = reconstruct_backup_key(&shards[1..3]).unwrap();
         assert_eq!(reconstructed.as_bytes(), key.as_bytes());
+    }
+
+    // @internal
+    #[test]
+    fn reconstruct_rejects_mixed_ceremony_metadata() {
+        let key = BackupKey::generate();
+        let first_metadata = metadata(2, 3);
+        let second_metadata =
+            GuardianBackupMetadata::new(2, 3, [0x43; CEREMONY_ID_LENGTH]).unwrap();
+        let first = split_backup_key(&key, first_metadata).unwrap();
+        let second = split_backup_key(&key, second_metadata).unwrap();
+
+        assert!(matches!(
+            reconstruct_backup_key(&[first[0].clone(), second[1].clone()]),
+            Err(KeyShardError::InvalidFormat)
+        ));
     }
 
     // @internal
@@ -387,7 +516,7 @@ mod tests {
     fn seal_and_open_share_for_guardian() {
         let key = BackupKey::generate();
         let config = KeyShardConfig::new(2, 3).unwrap();
-        let shards = split_backup_key(&key, config).unwrap();
+        let shards = split_backup_key(&key, GuardianBackupMetadata::generate(config)).unwrap();
 
         let (guardian_sk, guardian_pk) = guardian_keypair();
         let sealed = seal_share_for_guardian(&shards[0], &guardian_pk).unwrap();
@@ -402,7 +531,7 @@ mod tests {
     fn wrong_guardian_cannot_open_share() {
         let key = BackupKey::generate();
         let config = KeyShardConfig::new(2, 3).unwrap();
-        let shards = split_backup_key(&key, config).unwrap();
+        let shards = split_backup_key(&key, GuardianBackupMetadata::generate(config)).unwrap();
 
         let (_right_sk, right_pk) = guardian_keypair();
         let (wrong_sk, _wrong_pk) = guardian_keypair();
@@ -415,8 +544,8 @@ mod tests {
     #[test]
     fn default_config_is_2_of_3() {
         let config = KeyShardConfig::DEFAULT;
-        assert_eq!(config.threshold, 2);
-        assert_eq!(config.count, 3);
+        assert_eq!(config.threshold(), 2);
+        assert_eq!(config.count(), 3);
     }
 
     // @internal
@@ -433,7 +562,8 @@ mod tests {
         // User creates a guardian backup
         let backup_key = BackupKey::generate();
         let config = KeyShardConfig::new(3, 5).unwrap();
-        let shards = split_backup_key(&backup_key, config).unwrap();
+        let shards =
+            split_backup_key(&backup_key, GuardianBackupMetadata::generate(config)).unwrap();
 
         // Guardians: each has their own X25519 keypair
         let guardians: Vec<(StaticSecret, PublicKey)> =
@@ -453,7 +583,7 @@ mod tests {
             open_share_for_guardian(&sealed_shares[4], &guardians[4].0).unwrap(),
         ];
 
-        let recovered_key = reconstruct_backup_key(&recovered_shards, config.threshold).unwrap();
+        let recovered_key = reconstruct_backup_key(&recovered_shards).unwrap();
         assert_eq!(recovered_key.as_bytes(), backup_key.as_bytes());
     }
 }

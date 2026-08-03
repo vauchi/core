@@ -77,3 +77,8 @@ doc = false
 name = "fuzz_ratchet_state"
 path = "fuzz_targets/fuzz_ratchet_state.rs"
 doc = false
+
+[[bin]]
+name = "fuzz_shamir_reconstruct"
+path = "fuzz_targets/fuzz_shamir_reconstruct.rs"
+doc = false

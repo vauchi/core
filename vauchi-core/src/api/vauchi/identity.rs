@@ -731,7 +731,7 @@ impl Vauchi {
 
     // === Guardian Key Shard Backup Operations ===
 
-    /// Exports a full v4 guardian backup and splits the encryption key into shards.
+    /// Exports a full v5 guardian backup and splits the encryption key into shards.
     ///
     /// Returns the encrypted backup blob (hex-encoded) and a vector of sealed
     /// shares, one per guardian. The backup key is generated randomly, split
@@ -762,6 +762,7 @@ impl Vauchi {
 
         let config = crate::backup::KeyShardConfig::new(threshold, guardian_pks.len() as u8)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let metadata = crate::backup::GuardianBackupMetadata::generate(config);
 
         let identity_data = crate::backup::FullBackupIdentityData {
             display_name: identity.display_name().to_string(),
@@ -791,11 +792,12 @@ impl Vauchi {
             own_card.as_ref(),
             &labels,
             backup_key.symmetric_key(),
+            metadata,
             self.clock.unix_seconds(),
         )
         .map_err(|e| VauchiError::Configuration(format!("Guardian backup export failed: {e}")))?;
 
-        let shards = crate::backup::split_backup_key(&backup_key, config)
+        let shards = crate::backup::split_backup_key(&backup_key, metadata)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
         let mut sealed_shares = Vec::with_capacity(guardian_pks.len());
@@ -849,15 +851,15 @@ impl Vauchi {
             .map_err(|e| VauchiError::InvalidState(e.to_string()))
     }
 
-    /// Recovers a v4 guardian backup from re-sealed shares.
+    /// Recovers a v5 guardian backup from re-sealed shares.
     ///
     /// Takes the encrypted backup blob (hex-encoded) and the shares that
     /// guardians re-sealed to this identity via [`Self::respond_to_recovery`].
     /// Opens each with this identity's own X25519 secret — derived in Core,
-    /// never supplied by the caller — reconstructs the backup key, and returns
-    /// the decrypted [`FullBackupEnvelope`]. The backup AEAD authenticates the
-    /// reconstructed key before any plaintext is returned. No guardian secret
-    /// or plaintext share ever crosses the platform boundary.
+    /// never supplied by the caller — and tries bounded threshold-sized share
+    /// subsets. The backup AEAD authenticates both the reconstructed candidate
+    /// key and clear recovery metadata before any plaintext is returned. No
+    /// guardian secret or plaintext share crosses the platform boundary.
     ///
     /// **This method does not restore identity, contacts, or labels to storage.**
     /// The caller must apply the returned envelope the same way
@@ -868,17 +870,22 @@ impl Vauchi {
     /// # Arguments
     /// * `backup_data` - Hex-encoded backup blob from [`Self::export_guardian_backup_with_shards`].
     /// * `re_sealed_shares` - Shares re-sealed to this identity by guardians.
-    /// * `threshold` - Threshold selected when the guardian backup was exported.
     ///
     /// # Errors
-    /// Returns [`VauchiError::InvalidState`] if share decryption or key
-    /// reconstruction fails.
+    /// Returns a sanitized [`VauchiError::Configuration`] if no supplied share
+    /// subset authenticates the backup.
     pub fn recover_guardian_backup(
         &self,
         backup_data: &str,
         re_sealed_shares: &[Vec<u8>],
-        threshold: u8,
     ) -> VauchiResult<crate::backup::FullBackupEnvelope> {
+        let bytes = hex::decode(backup_data.trim()).map_err(|_| guardian_recovery_failed())?;
+        let metadata = crate::backup::guardian_backup_metadata(&bytes)
+            .map_err(|_| guardian_recovery_failed())?;
+        if re_sealed_shares.len() > metadata.count() as usize {
+            return Err(guardian_recovery_failed());
+        }
+
         let identity = self
             .identity
             .as_ref()
@@ -887,20 +894,19 @@ impl Vauchi {
 
         let mut shards = Vec::with_capacity(re_sealed_shares.len());
         for sealed in re_sealed_shares {
-            let shard = crate::backup::open_share_for_guardian(sealed, &our_secret)
-                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-            shards.push(shard);
+            if let Ok(shard) = crate::backup::open_share_for_guardian(sealed, &our_secret)
+                && shard.metadata() == metadata
+            {
+                shards.push(shard);
+            }
         }
 
-        let backup_key = crate::backup::reconstruct_backup_key(&shards, threshold)
-            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-
-        let bytes = hex::decode(backup_data.trim())
-            .map_err(|e| VauchiError::Configuration(format!("Invalid hex data: {e}")))?;
-
-        crate::backup::import_guardian_backup(&bytes, backup_key.symmetric_key())
-            .map_err(|e| VauchiError::Configuration(format!("Guardian backup import failed: {e}")))
+        crate::backup::recover_from_shards(&bytes, &shards).map_err(|_| guardian_recovery_failed())
     }
+}
+
+fn guardian_recovery_failed() -> VauchiError {
+    VauchiError::Configuration("Guardian backup recovery failed".into())
 }
 
 /// Converts an Ed25519 public key to an X25519 (Curve25519) public key.

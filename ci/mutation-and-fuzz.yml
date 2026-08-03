@@ -127,7 +127,7 @@ mutation:nightly:
 # Fuzz Testing (Nightly scheduled, T2-10)
 # ============================================================
 
-# Nightly fuzz run — cycles through all 11 fuzz targets for 5 minutes each
+# Nightly fuzz run — cycles through all 12 fuzz targets for 5 minutes each
 fuzz:nightly:
   extends: [.linux-runner]
   timeout: 12h
@@ -157,7 +157,7 @@ fuzz:nightly:
       TARGETS="fuzz_decode_message fuzz_qr_payload fuzz_unpad fuzz_delta_decode \
                fuzz_recovery_claim fuzz_nfc_payload fuzz_ble_payload \
                fuzz_ble_advertisement fuzz_exchange_payload fuzz_encrypted_exchange \
-               fuzz_ratchet_state"
+               fuzz_ratchet_state fuzz_shamir_reconstruct"
 
       TARGET_COUNT=$(echo $TARGETS | wc -w | tr -d ' ')
       echo "=== Fuzzing ${TARGET_COUNT} targets, ${FUZZ_JOBS} parallel, ${FUZZ_DURATION}s each ==="
@@ -169,7 +169,7 @@ fuzz:nightly:
       # pipefail killing the script before the CRASH/PASS count check runs.
       # libFuzzer flags:
       #   -verbosity=0        suppresses per-iteration pulse lines (NEW/REDUCE/cov/ft/corp).
-      #                       Without it, 11 × 300s of fuzzing emits ~27k progress lines and
+      #                       Without it, 12 × 300s of fuzzing emits ~29k progress lines and
       #                       blows past GitLab's 4 MiB trace cap (last PASS echoes get truncated).
       #   -print_final_stats=1 keeps one summary line per target so we still see exec counts.
       # Crash output is unconditional — silencing progress does not hide failures.

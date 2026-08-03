@@ -16,13 +16,14 @@
 use proptest::prelude::*;
 use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::{
-    BackupKey, BackupKeyShard, KeyShardConfig, open_share_for_guardian, seal_share_for_guardian,
-    split_backup_key,
+    BackupKey, BackupKeyShard, GuardianBackupMetadata, KeyShardConfig, open_share_for_guardian,
+    seal_share_for_guardian, split_backup_key,
 };
 
 fn a_shard() -> BackupKeyShard {
     let key = BackupKey::generate();
-    split_backup_key(&key, KeyShardConfig::new(2, 3).expect("valid config"))
+    let config = KeyShardConfig::new(2, 3).expect("valid config");
+    split_backup_key(&key, GuardianBackupMetadata::generate(config))
         .expect("split succeeds")
         .swap_remove(0)
 }

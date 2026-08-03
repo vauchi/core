@@ -3,7 +3,8 @@
 
 # Fuzz Targets
 
-11 fuzz targets covering protocol parsing, crypto boundaries, and data serialization.
+12 fuzz targets covering protocol parsing, crypto boundaries, and data
+serialization.
 
 ## Targets
 
@@ -20,6 +21,7 @@
 | `fuzz_exchange_payload` | `exchange` | Generic exchange payload parsing |
 | `fuzz_encrypted_exchange` | `exchange` | Encrypted exchange envelope parsing |
 | `fuzz_ratchet_state` | `crypto::ratchet` | Ratchet state deserialization |
+| `fuzz_shamir_reconstruct` | `backup::key_shard` | Guardian shard parsing and Shamir reconstruction |
 
 ## Running Locally
 
@@ -41,9 +43,17 @@ for target in $(cargo fuzz list); do
 done
 ```
 
+To exercise guardian shard reconstruction for one million iterations:
+
+```bash
+cd vauchi-core/fuzz
+cargo +nightly fuzz run fuzz_shamir_reconstruct -- -runs=1000000
+```
+
 ## CI
 
-The `fuzz:nightly` scheduled pipeline job runs all 11 targets for 5 minutes each. Crashes are saved as artifacts for 30 days. Enable by setting `FUZZ_ENABLED=true` on the schedule.
+The `fuzz:nightly` scheduled pipeline job runs all 12 targets for 5 minutes each. Crashes are
+saved as artifacts for 30 days. Enable by setting `FUZZ_ENABLED=true` on the schedule.
 
 ## Adding a New Target
 

@@ -12,7 +12,10 @@ use proptest::prelude::*;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::{ContactField, FieldType, ImportSource, Vauchi, VauchiConfig};
+use vauchi_core::{
+    BackupKeyShard, ContactField, FieldType, ImportSource, Vauchi, VauchiConfig,
+    open_share_for_guardian, seal_share_for_guardian,
+};
 
 const BACKUP_PASSWORD: &str = "correct-horse-battery-staple";
 
@@ -246,8 +249,22 @@ fn guardian_backup_reseal_roundtrip() {
     assert!(!backup_hex.is_empty());
     assert_eq!(
         hex::decode(&backup_hex).unwrap()[0],
-        0x04,
-        "guardian backup must use v4 format byte"
+        0x05,
+        "guardian backup must use v5 format byte"
+    );
+    let backup_bytes = hex::decode(&backup_hex).unwrap();
+    assert_eq!(
+        backup_bytes[1], 2,
+        "threshold must be carried by the backup"
+    );
+    assert_eq!(
+        backup_bytes[2], 3,
+        "share count must be carried by the backup"
+    );
+    assert_ne!(
+        &backup_bytes[3..19],
+        &[0u8; 16],
+        "each backup must carry a random ceremony identifier"
     );
     assert_eq!(
         sealed_shares.len(),
@@ -275,7 +292,7 @@ fn guardian_backup_reseal_roundtrip() {
     );
 
     let envelope = recovering
-        .recover_guardian_backup(&backup_hex, &[re0, re2], 2)
+        .recover_guardian_backup(&backup_hex, &[re0, re2])
         .unwrap();
 
     // Identity round-tripped.
@@ -325,18 +342,17 @@ fn recover_rejects_insufficient_shares() {
         .unwrap();
 
     // One share against a 2-of-3 threshold: reconstruction must fail.
-    let result = recovering.recover_guardian_backup(&backup_hex, &[re0], 2);
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0]);
     assert!(matches!(
         result,
-        Err(vauchi_core::VauchiError::InvalidState(_))
+        Err(vauchi_core::VauchiError::Configuration(_))
     ));
 }
 
-/// Supplying a threshold lower than the export policy must not turn a partial
-/// reconstruction into accepted backup plaintext.
-// @scenario: backup_format_versioning :: Guardian backup authenticates reconstructed key
+/// Tampering with clear threshold metadata must invalidate the backup AEAD.
+// @scenario: backup_format_versioning :: Guardian backup authenticates recovery metadata
 #[test]
-fn recover_rejects_below_export_threshold_with_lower_claim() {
+fn recover_rejects_tampered_backup_threshold() {
     let alice = setup_vauchi_with_data();
     let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
     let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
@@ -354,12 +370,127 @@ fn recover_rejects_below_export_threshold_with_lower_claim() {
     let re1 = guardians[1]
         .respond_to_recovery(&sealed_shares[1], &recovering_pk)
         .unwrap();
+    let re2 = guardians[2]
+        .respond_to_recovery(&sealed_shares[2], &recovering_pk)
+        .unwrap();
 
-    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re1], 2);
+    let mut tampered = hex::decode(&backup_hex).unwrap();
+    tampered[1] = 2;
+    let result = recovering.recover_guardian_backup(&hex::encode(tampered), &[re0, re1, re2]);
     assert!(matches!(
         result,
         Err(vauchi_core::VauchiError::Configuration(_))
     ));
+}
+
+/// The ceremony identifier is public routing metadata, but the backup AEAD
+/// must authenticate it so callers cannot relabel an existing backup.
+// @scenario: backup_format_versioning :: Guardian backup authenticates recovery metadata
+#[test]
+fn recover_rejects_tampered_ceremony_id() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+    let (backup_hex, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+    let re0 = guardians[0]
+        .respond_to_recovery(&sealed_shares[0], &recovering_pk)
+        .unwrap();
+    let re1 = guardians[1]
+        .respond_to_recovery(&sealed_shares[1], &recovering_pk)
+        .unwrap();
+
+    let mut tampered = hex::decode(&backup_hex).unwrap();
+    tampered[3] ^= 0x80;
+    let result = recovering.recover_guardian_backup(&hex::encode(tampered), &[re0, re1]);
+    assert!(matches!(
+        result,
+        Err(vauchi_core::VauchiError::Configuration(_))
+    ));
+}
+
+/// A malformed response must not poison recovery when an honest quorum is
+/// also available.
+// @scenario: backup_format_versioning :: Guardian recovery tolerates one bad response
+#[test]
+fn recover_tolerates_unopenable_response_above_threshold() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+    let (backup_hex, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+    let mut bad = guardians[0]
+        .respond_to_recovery(&sealed_shares[0], &recovering_pk)
+        .unwrap();
+    let re1 = guardians[1]
+        .respond_to_recovery(&sealed_shares[1], &recovering_pk)
+        .unwrap();
+    let re2 = guardians[2]
+        .respond_to_recovery(&sealed_shares[2], &recovering_pk)
+        .unwrap();
+    let last = bad.len() - 1;
+    bad[last] ^= 0x80;
+
+    let envelope = recovering
+        .recover_guardian_backup(&backup_hex, &[bad, re1, re2])
+        .unwrap();
+    assert_eq!(envelope.sections.identity.display_name, "Alice Smith");
+}
+
+/// A structurally valid share with altered secret bytes must be bypassed when
+/// another threshold-sized subset authenticates the backup.
+// @scenario: backup_format_versioning :: Guardian recovery tolerates one bad response
+#[test]
+fn recover_tolerates_incorrect_valid_response_above_threshold() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+    let (backup_hex, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+    let guardian_secret = guardians[0]
+        .identity()
+        .unwrap()
+        .signing_keypair()
+        .to_x25519_secret();
+    let opened = open_share_for_guardian(&sealed_shares[0], &guardian_secret).unwrap();
+    let mut altered_bytes = opened.to_bytes();
+    let last = altered_bytes.len() - 1;
+    altered_bytes[last] ^= 0x80;
+    let altered = BackupKeyShard::from_bytes(&altered_bytes).unwrap();
+    let recovering_recipient = recovering
+        .identity()
+        .unwrap()
+        .signing_keypair()
+        .public_key()
+        .to_x25519()
+        .unwrap();
+    let bad = seal_share_for_guardian(&altered, &recovering_recipient).unwrap();
+    let re1 = guardians[1]
+        .respond_to_recovery(&sealed_shares[1], &recovering_pk)
+        .unwrap();
+    let re2 = guardians[2]
+        .respond_to_recovery(&sealed_shares[2], &recovering_pk)
+        .unwrap();
+
+    let envelope = recovering
+        .recover_guardian_backup(&backup_hex, &[bad, re1, re2])
+        .unwrap();
+    assert_eq!(envelope.sections.identity.display_name, "Alice Smith");
 }
 
 /// Individually valid shares from different backups reconstruct a wrong key,
@@ -389,11 +520,46 @@ fn recover_rejects_mixed_backup_shares() {
         .respond_to_recovery(&bob_shares[1], &recovering_pk)
         .unwrap();
 
-    let result = recovering.recover_guardian_backup(&alice_backup, &[alice_re0, bob_re1], 2);
+    let result = recovering.recover_guardian_backup(&alice_backup, &[alice_re0, bob_re1]);
     assert!(matches!(
         result,
         Err(vauchi_core::VauchiError::Configuration(_))
     ));
+}
+
+/// A response from another ceremony is ignored when enough matching shares
+/// remain to recover the authenticated backup.
+// @scenario: backup_format_versioning :: Guardian recovery isolates ceremonies
+#[test]
+fn recover_tolerates_foreign_ceremony_response_above_threshold() {
+    let alice = setup_vauchi_with_data();
+    let bob = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+    let (alice_backup, alice_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+    let (_bob_backup, bob_shares) = bob
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+    let alice_re0 = guardians[0]
+        .respond_to_recovery(&alice_shares[0], &recovering_pk)
+        .unwrap();
+    let alice_re1 = guardians[1]
+        .respond_to_recovery(&alice_shares[1], &recovering_pk)
+        .unwrap();
+    let bob_re2 = guardians[2]
+        .respond_to_recovery(&bob_shares[2], &recovering_pk)
+        .unwrap();
+
+    let envelope = recovering
+        .recover_guardian_backup(&alice_backup, &[alice_re0, bob_re2, alice_re1])
+        .unwrap();
+    assert_eq!(envelope.sections.identity.display_name, "Alice Smith");
 }
 
 /// A guardian cannot open a share sealed to a *different* guardian, so it
@@ -444,7 +610,7 @@ fn recover_rejects_shares_resealed_to_another_party() {
         .respond_to_recovery(&sealed_shares[2], &impostor_pk)
         .unwrap();
 
-    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re2], 2);
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re2]);
     assert!(
         result.is_err(),
         "recovering party must not open shares re-sealed to another key"
@@ -477,7 +643,7 @@ fn recover_rejects_tampered_share() {
     let last = re0.len() - 1;
     re0[last] ^= 0xFF;
 
-    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re2], 2);
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re2]);
     assert!(result.is_err(), "tampered re-sealed share must be rejected");
 }
 
@@ -505,7 +671,7 @@ fn recover_rejects_duplicate_share() {
         .respond_to_recovery(&sealed_shares[0], &recovering_pk)
         .unwrap();
 
-    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re0_again], 2);
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re0_again]);
     assert!(
         result.is_err(),
         "two shares from the same guardian must not reconstruct the key"
@@ -537,6 +703,6 @@ proptest! {
     ) {
         let mut recovering = Vauchi::in_memory().unwrap();
         recovering.create_identity("Recovering").unwrap();
-        prop_assert!(recovering.recover_guardian_backup("00", &[a, b], 2).is_err());
+        prop_assert!(recovering.recover_guardian_backup("00", &[a, b]).is_err());
     }
 }

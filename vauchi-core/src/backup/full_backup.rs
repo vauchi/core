@@ -60,6 +60,9 @@ const GUARDIAN_BACKUP_HEADER_LENGTH: usize =
 /// Maximum accepted v5 guardian backup size (32 MiB).
 pub(crate) const MAX_GUARDIAN_BACKUP_BYTES: usize = 32 * 1024 * 1024;
 
+/// Maximum accepted password-based full backup size (32 MiB).
+const MAX_FULL_BACKUP_BYTES: usize = 32 * 1024 * 1024;
+
 /// Maximum decompressed JSON size for any full backup (64 MiB).
 const MAX_DECOMPRESSED_BACKUP_BYTES: usize = 64 * 1024 * 1024;
 
@@ -324,6 +327,9 @@ pub fn export_full_backup(
     out.push(FULL_BACKUP_VERSION);
     out.extend_from_slice(&salt);
     out.extend_from_slice(&ciphertext);
+    if out.len() > MAX_FULL_BACKUP_BYTES {
+        return Err(BackupError::TooLarge);
+    }
     Ok(out)
 }
 
@@ -495,6 +501,9 @@ pub(crate) fn guardian_backup_key_matches(
 ///
 /// The caller decides how to restore each section (identity, contacts, etc.).
 pub fn import_full_backup(data: &[u8], password: &str) -> Result<FullBackupEnvelope, BackupError> {
+    if data.len() > MAX_FULL_BACKUP_BYTES {
+        return Err(BackupError::TooLarge);
+    }
     // Minimum: version (1) + salt (16) + nonce (24) + tag (16) + some ciphertext
     if data.len() < 1 + 16 {
         return Err(BackupError::TooShort);
@@ -646,6 +655,17 @@ mod tests {
 
         assert!(matches!(
             guardian_backup_metadata(&oversized),
+            Err(BackupError::TooLarge)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn full_backup_rejects_oversized_input_before_key_derivation() {
+        let oversized = vec![0u8; MAX_FULL_BACKUP_BYTES + 1];
+
+        assert!(matches!(
+            import_full_backup(&oversized, "password"),
             Err(BackupError::TooLarge)
         ));
     }

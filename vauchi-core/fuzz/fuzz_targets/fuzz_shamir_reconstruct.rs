@@ -7,7 +7,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use vauchi_core::{BackupKeyShard, GuardianBackupMetadata, reconstruct_backup_key};
+use vauchi_core::{BackupKeyShard, GuardianBackupMetadata, KeyShardError, reconstruct_backup_key};
 
 fn gf_mul_reference(mut left: u8, mut right: u8) -> u8 {
     let mut product = 0u8;
@@ -65,7 +65,10 @@ fuzz_target!(|data: &[u8]| {
         }
         match reconstruct_backup_key(&[first, second]) {
             Ok(reconstructed) => assert_eq!(reconstructed.as_bytes(), &expected),
-            Err(_) => assert!(expected.iter().all(|byte| *byte == 0)),
+            Err(KeyShardError::InvalidKey(_)) => {
+                assert!(expected.iter().all(|byte| *byte == 0));
+            }
+            Err(error) => panic!("valid two-point reconstruction failed: {error}"),
         }
     }
 });

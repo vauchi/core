@@ -865,7 +865,8 @@ impl Vauchi {
     /// Re-sealed responses are sender-anonymous: this API cannot attribute an
     /// invalid response to a particular guardian. It accepts at most 20 raw
     /// responses, filters malformed and ceremony-mismatched entries, and keeps
-    /// at most one surplus matching shard to bound candidate reconstruction.
+    /// at most one response beyond the configured guardian count to bound
+    /// candidate reconstruction.
     ///
     /// **This method does not restore identity, contacts, or labels to storage.**
     /// The caller must apply the returned envelope the same way

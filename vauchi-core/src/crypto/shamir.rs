@@ -16,6 +16,13 @@
 //! - Information-theoretic security: fewer than `t` shares reveal *nothing*.
 //! - Each share is 33 bytes: 1-byte index + 32-byte value.
 //! - The secret is the polynomial's constant term `f(0)`.
+//! - Field operations use fixed iteration counts and avoid secret-dependent
+//!   lookup tables and source-level branches. Compiler-level constant-time
+//!   behavior is not formally verified.
+//!
+//! Reconstruction does not authenticate shares. Callers must validate the
+//! reconstructed key by opening authenticated ciphertext or using an
+//! equivalent trusted authenticator before accepting it.
 //!
 //! # Constraints
 //!
@@ -24,8 +31,8 @@
 //!
 //! # TODO
 //!
-//! Re-evaluate audited crates (e.g., `shamir-zero`, `secret-sharing-rs`)
-//! post-v0.5.0 to replace this custom implementation.
+//! Re-evaluate replacement crates during dependency reviews. Adopt one only
+//! after its relevant implementation has a published independent audit.
 
 use rand_core::OsRng;
 use rand_core::RngCore;
@@ -60,6 +67,9 @@ pub enum ShamirError {
 
     #[error("Duplicate share indices detected")]
     DuplicateIndices,
+
+    #[error("Division by zero in GF(256)")]
+    DivisionByZero,
 
     #[error("Reconstruction failed: polynomial evaluation mismatch")]
     ReconstructionFailed,
@@ -245,7 +255,7 @@ fn lagrange_interpolate_at_zero(points: &[(u8, u8)]) -> Result<u8, ShamirError> 
             denominator = gf_mul(denominator, xi ^ xj); // subtraction = addition in GF(2^8)
         }
 
-        let lagrange_coeff = gf_mul(yi, gf_div(numerator, denominator));
+        let lagrange_coeff = gf_mul(yi, gf_div(numerator, denominator)?);
         result ^= lagrange_coeff;
     }
 
@@ -259,14 +269,11 @@ fn gf_mul(a: u8, b: u8) -> u8 {
     let mut b = b;
 
     for _ in 0..8 {
-        if b & 1 != 0 {
-            result ^= a;
-        }
-        let high_bit = a & 0x80;
-        a <<= 1;
-        if high_bit != 0 {
-            a ^= 0x1b; // XOR with 0x11b without the leading 1 (since a is already shifted)
-        }
+        let add_mask = 0u8.wrapping_sub(b & 1);
+        result ^= a & add_mask;
+
+        let reduction_mask = 0u8.wrapping_sub(a >> 7);
+        a = (a << 1) ^ (0x1b & reduction_mask);
         b >>= 1;
     }
 
@@ -274,80 +281,30 @@ fn gf_mul(a: u8, b: u8) -> u8 {
 }
 
 /// GF(256) division: a / b = a * b^-1.
-fn gf_div(a: u8, b: u8) -> u8 {
-    gf_mul(a, gf_inv(b))
+fn gf_div(a: u8, b: u8) -> Result<u8, ShamirError> {
+    Ok(gf_mul(a, gf_inv(b)?))
 }
 
-/// GF(256) multiplicative inverse using extended Euclidean algorithm.
-///
-/// Returns 0 for input 0 (though 0 has no multiplicative inverse, this
-/// case shouldn't arise in valid Lagrange interpolation).
-fn gf_inv(a: u8) -> u8 {
+/// GF(256) multiplicative inverse using a fixed addition chain for a^254.
+fn gf_inv(a: u8) -> Result<u8, ShamirError> {
     if a == 0 {
-        return 0;
+        return Err(ShamirError::DivisionByZero);
     }
 
-    // Extended Euclidean algorithm for GF(256)
-    // Find x such that a * x ≡ 1 (mod 0x11b)
-    let mut old_r = a as u16;
-    let mut r = 0x11b; // irreducible polynomial
-    let mut old_s = 1u16;
-    let mut s = 0u16;
+    let a2 = gf_mul(a, a);
+    let a4 = gf_mul(a2, a2);
+    let a8 = gf_mul(a4, a4);
+    let a16 = gf_mul(a8, a8);
+    let a32 = gf_mul(a16, a16);
+    let a64 = gf_mul(a32, a32);
+    let a128 = gf_mul(a64, a64);
 
-    while r != 0 {
-        let quotient = gf_poly_div(old_r, r);
-        let temp_r = r;
-        r = gf_poly_mod(old_r, r, quotient);
-        old_r = temp_r;
-
-        let temp_s = s;
-        s = old_s ^ gf_poly_mul_scalar(quotient, s);
-        old_s = temp_s;
-    }
-
-    // old_r now contains the GCD (should be 1); old_s is the inverse
-    old_s as u8
-}
-
-/// Polynomial division in GF(2): divide dividend by divisor, return quotient.
-fn gf_poly_div(dividend: u16, divisor: u16) -> u16 {
-    let mut quotient = 0u16;
-    let mut remainder = dividend;
-    let divisor_deg = 15 - divisor.leading_zeros() as u16;
-
-    while remainder != 0 {
-        let rem_deg = 15 - remainder.leading_zeros() as u16;
-        if rem_deg < divisor_deg {
-            break;
-        }
-        let shift = rem_deg - divisor_deg;
-        quotient ^= 1 << shift;
-        remainder ^= divisor << shift;
-    }
-
-    quotient
-}
-
-/// Polynomial modulo: dividend - quotient * divisor.
-fn gf_poly_mod(dividend: u16, divisor: u16, quotient: u16) -> u16 {
-    dividend ^ (gf_poly_mul_scalar(quotient, divisor))
-}
-
-/// Multiply a polynomial by a scalar (shift and XOR).
-fn gf_poly_mul_scalar(scalar: u16, poly: u16) -> u16 {
-    let mut result = 0u16;
-    let mut s = scalar;
-    let mut p = poly;
-
-    while s != 0 {
-        if s & 1 != 0 {
-            result ^= p;
-        }
-        p <<= 1;
-        s >>= 1;
-    }
-
-    result
+    let a6 = gf_mul(a2, a4);
+    let a14 = gf_mul(a6, a8);
+    let a30 = gf_mul(a14, a16);
+    let a62 = gf_mul(a30, a32);
+    let a126 = gf_mul(a62, a64);
+    Ok(gf_mul(a126, a128))
 }
 
 // INLINE_TEST_REQUIRED: GF(256) arithmetic and Shamir split/reconstruct logic are
@@ -550,7 +507,24 @@ mod tests {
     fn gf_arithmetic_matches_aes_known_answers() {
         assert_eq!(gf_mul(0x57, 0x13), 0xfe);
         assert_eq!(gf_inv(0x53), Ok(0xca));
-        assert_eq!(gf_div(0x57, 0x13), Ok(0x04));
+        assert_eq!(gf_div(0x57, 0x13), Ok(0x6b));
+    }
+
+    // @internal
+    #[test]
+    fn deterministic_reconstruction_fixture() {
+        let shares = [
+            Share {
+                index: 1,
+                value: [0x2d; 32],
+            },
+            Share {
+                index: 2,
+                value: [0x24; 32],
+            },
+        ];
+
+        assert_eq!(reconstruct(&shares, 2), Ok([0x2a; 32]));
     }
 
     // @internal

@@ -16,8 +16,8 @@
 //! - Information-theoretic security: fewer than `t` shares reveal *nothing*.
 //! - Each share is 33 bytes: 1-byte index + 32-byte value.
 //! - The secret is the polynomial's constant term `f(0)`.
-//! - Field operations use fixed iteration counts and avoid secret-dependent
-//!   lookup tables and source-level branches. Compiler-level constant-time
+//! - Field operations use fixed iteration counts and avoid lookup tables and
+//!   secret-dependent source-level branches. Compiler-level constant-time
 //!   behavior is not formally verified.
 //!
 //! Reconstruction does not authenticate shares. Callers must validate the
@@ -71,8 +71,8 @@ pub enum ShamirError {
     #[error("Division by zero in GF(256)")]
     DivisionByZero,
 
-    #[error("Reconstruction failed: polynomial evaluation mismatch")]
-    ReconstructionFailed,
+    #[error("Invalid share index: zero is reserved for the secret")]
+    InvalidShareIndex,
 }
 
 /// A single share in the Shamir scheme.
@@ -237,7 +237,7 @@ fn lagrange_interpolate_at_zero(points: &[(u8, u8)]) -> Result<u8, ShamirError> 
         if xi == 0 {
             // This shouldn't happen because share indices are 1..=n, but
             // guard against it for robustness.
-            return Err(ShamirError::ReconstructionFailed);
+            return Err(ShamirError::InvalidShareIndex);
         }
 
         let mut numerator = 1u8;

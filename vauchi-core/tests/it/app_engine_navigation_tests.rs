@@ -12,6 +12,52 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::mode::ExchangeMode;
 
+// Choosing between onboarding, lock and the default landing screen is a
+// navigation decision derived from domain state, which ADR-066 reserves to
+// Core. The TUI derived it itself (tui/src/app/mod.rs), importing the
+// retired `AppScreen` vocabulary to do so; `bootstrap` moves that decision
+// here so no shell has to.
+// Compared against explicit navigation rather than a literal id: an
+// `AppScreen` and the `ScreenModel` it renders do not share an id
+// (`AppScreen::Onboarding` renders `identity_check`), so a hardcoded
+// string would assert the mapping instead of the routing decision.
+// @internal
+#[test]
+fn bootstrap_without_identity_starts_where_onboarding_navigation_lands() {
+    let mut reference = AppEngine::new(Vauchi::in_memory().unwrap());
+    let expected = reference.set_initial_screen(AppScreen::Onboarding);
+
+    let mut engine = AppEngine::new(Vauchi::in_memory().unwrap());
+    let screen = engine.bootstrap();
+
+    assert_eq!(screen.screen_id, expected.screen_id);
+}
+
+// @internal
+#[test]
+fn bootstrap_with_identity_and_no_password_starts_on_the_default_screen() {
+    let mut reference_vauchi = Vauchi::in_memory().unwrap();
+    reference_vauchi.create_identity("Alice").unwrap();
+    let mut reference = AppEngine::new(reference_vauchi);
+    let default_screen = reference.default_screen();
+    let expected = reference.set_initial_screen(default_screen);
+
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let onboarding = AppEngine::new(Vauchi::in_memory().unwrap())
+        .set_initial_screen(AppScreen::Onboarding)
+        .screen_id;
+
+    let screen = engine.bootstrap();
+
+    assert_eq!(screen.screen_id, expected.screen_id);
+    assert_ne!(
+        screen.screen_id, onboarding,
+        "an identity exists, so bootstrap must not land on onboarding"
+    );
+}
+
 // @internal
 #[test]
 fn navigate_to_home_shows_home_screen() {

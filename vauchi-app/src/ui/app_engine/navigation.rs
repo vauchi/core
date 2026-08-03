@@ -147,6 +147,25 @@ impl AppEngine {
         self.navigate_to_internal(screen)
     }
 
+    /// Resolve and apply the bootstrap screen from Core-owned state.
+    ///
+    /// Prefer this over `set_initial_screen` in shells. Choosing between
+    /// onboarding, lock and the default landing screen is a navigation
+    /// decision derived from domain state (identity presence, password
+    /// enablement), and ADR-066 reserves those to Core — a shell that
+    /// derives it must import `AppScreen`, which is retired from the shell
+    /// boundary. The TUI did exactly that before this existed.
+    pub fn bootstrap(&mut self) -> ScreenModel {
+        let screen = if !self.vauchi().has_identity() {
+            AppScreen::Onboarding
+        } else if self.vauchi().is_password_enabled().unwrap_or(false) {
+            AppScreen::Lock
+        } else {
+            self.default_screen()
+        };
+        self.set_initial_screen(screen)
+    }
+
     /// Navigate without pushing to history (used by back-navigation and completion routing).
     pub(super) fn navigate_to_internal(&mut self, screen: AppScreen) -> ScreenModel {
         // Refresh identity from storage if a sibling `Vauchi` instance

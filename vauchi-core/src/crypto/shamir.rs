@@ -40,6 +40,9 @@ pub enum ShamirError {
     #[error("Threshold must be at least 2, got {0}")]
     ThresholdTooLow(u8),
 
+    #[error("Threshold cannot exceed 10, got {0}")]
+    ThresholdTooHigh(u8),
+
     #[error("Threshold cannot exceed count, got threshold={0}, count={1}")]
     ThresholdExceedsCount(u8, u8),
 
@@ -133,13 +136,20 @@ pub fn split(secret: &[u8; 32], threshold: u8, count: u8) -> Result<Vec<Share>, 
 /// # Arguments
 /// * `shares` - A slice of shares. Must contain at least `threshold` unique
 ///   shares with distinct indices.
+/// * `threshold` - Minimum shares required by the original split.
 ///
 /// # Errors
 /// Returns [`ShamirError`] if shares are insufficient or have duplicate indices.
-pub fn reconstruct(shares: &[Share]) -> Result<[u8; 32], ShamirError> {
-    if shares.len() < 2 {
+pub fn reconstruct(shares: &[Share], threshold: u8) -> Result<[u8; 32], ShamirError> {
+    if threshold < 2 {
+        return Err(ShamirError::ThresholdTooLow(threshold));
+    }
+    if threshold > 10 {
+        return Err(ShamirError::ThresholdTooHigh(threshold));
+    }
+    if shares.len() < threshold as usize {
         return Err(ShamirError::InsufficientShares {
-            required: 2,
+            required: threshold,
             got: shares.len(),
         });
     }
@@ -355,13 +365,13 @@ mod tests {
         assert_eq!(shares.len(), 3);
 
         // Reconstruct from any 2 shares
-        let reconstructed = reconstruct(&shares[0..2]).unwrap();
+        let reconstructed = reconstruct(&shares[0..2], 2).unwrap();
         assert_eq!(reconstructed, secret);
 
-        let reconstructed = reconstruct(&shares[1..3]).unwrap();
+        let reconstructed = reconstruct(&shares[1..3], 2).unwrap();
         assert_eq!(reconstructed, secret);
 
-        let reconstructed = reconstruct(&[shares[0].clone(), shares[2].clone()]).unwrap();
+        let reconstructed = reconstruct(&[shares[0].clone(), shares[2].clone()], 2).unwrap();
         assert_eq!(reconstructed, secret);
     }
 
@@ -377,10 +387,10 @@ mod tests {
         assert_eq!(shares.len(), 5);
 
         // Reconstruct from any 3 shares
-        let reconstructed = reconstruct(&shares[0..3]).unwrap();
+        let reconstructed = reconstruct(&shares[0..3], 3).unwrap();
         assert_eq!(reconstructed, secret);
 
-        let reconstructed = reconstruct(&shares[2..5]).unwrap();
+        let reconstructed = reconstruct(&shares[2..5], 3).unwrap();
         assert_eq!(reconstructed, secret);
     }
 
@@ -428,7 +438,7 @@ mod tests {
         let secret = [42u8; 32];
         let mut shares = split(&secret, 2, 3).unwrap();
         shares[1].index = shares[0].index; // duplicate
-        assert_eq!(reconstruct(&shares), Err(ShamirError::DuplicateIndices));
+        assert_eq!(reconstruct(&shares, 2), Err(ShamirError::DuplicateIndices));
     }
 
     // @internal
@@ -450,7 +460,7 @@ mod tests {
     fn all_zeros_secret() {
         let secret = [0u8; 32];
         let shares = split(&secret, 2, 3).unwrap();
-        let reconstructed = reconstruct(&shares).unwrap();
+        let reconstructed = reconstruct(&shares, 2).unwrap();
         assert_eq!(reconstructed, secret);
     }
 
@@ -459,7 +469,7 @@ mod tests {
     fn all_ones_secret() {
         let secret = [0xFFu8; 32];
         let shares = split(&secret, 2, 3).unwrap();
-        let reconstructed = reconstruct(&shares).unwrap();
+        let reconstructed = reconstruct(&shares, 2).unwrap();
         assert_eq!(reconstructed, secret);
     }
 
@@ -535,7 +545,7 @@ mod tests {
 
         // Mix one share from each set
         let mixed = vec![shares1[0].clone(), shares2[1].clone()];
-        let result = reconstruct(&mixed).unwrap();
+        let result = reconstruct(&mixed, 2).unwrap();
         assert_ne!(result, secret1);
         assert_ne!(result, secret2);
     }
@@ -551,7 +561,7 @@ mod tests {
         let shares = split(&secret, 2, 10).unwrap();
         assert_eq!(shares.len(), 10);
 
-        let reconstructed = reconstruct(&shares).unwrap();
+        let reconstructed = reconstruct(&shares, 2).unwrap();
         assert_eq!(reconstructed, secret);
     }
 

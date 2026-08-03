@@ -875,6 +875,7 @@ impl Vauchi {
         &self,
         backup_data: &str,
         re_sealed_shares: &[Vec<u8>],
+        threshold: u8,
     ) -> VauchiResult<crate::backup::FullBackupEnvelope> {
         let identity = self
             .identity
@@ -889,7 +890,7 @@ impl Vauchi {
             shards.push(shard);
         }
 
-        let backup_key = crate::backup::reconstruct_backup_key(&shards)
+        let backup_key = crate::backup::reconstruct_backup_key(&shards, threshold)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
         let bytes = hex::decode(backup_data.trim())

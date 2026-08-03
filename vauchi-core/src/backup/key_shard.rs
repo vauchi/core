@@ -255,9 +255,12 @@ pub fn split_backup_key(
 ///
 /// # Errors
 /// Returns [`KeyShardError::Shamir`] if shares are insufficient or malformed.
-pub fn reconstruct_backup_key(shards: &[BackupKeyShard]) -> Result<BackupKey, KeyShardError> {
+pub fn reconstruct_backup_key(
+    shards: &[BackupKeyShard],
+    threshold: u8,
+) -> Result<BackupKey, KeyShardError> {
     let shares: Vec<Share> = shards.iter().map(|s| s.to_share()).collect();
-    let secret = Zeroizing::new(shamir::reconstruct(&shares)?);
+    let secret = Zeroizing::new(shamir::reconstruct(&shares, threshold)?);
     BackupKey::from_bytes(secret.as_slice())
 }
 
@@ -371,10 +374,10 @@ mod tests {
         assert_eq!(shards.len(), 3);
 
         // Any 2 shares reconstruct
-        let reconstructed = reconstruct_backup_key(&shards[0..2]).unwrap();
+        let reconstructed = reconstruct_backup_key(&shards[0..2], config.threshold).unwrap();
         assert_eq!(reconstructed.as_bytes(), key.as_bytes());
 
-        let reconstructed = reconstruct_backup_key(&shards[1..3]).unwrap();
+        let reconstructed = reconstruct_backup_key(&shards[1..3], config.threshold).unwrap();
         assert_eq!(reconstructed.as_bytes(), key.as_bytes());
     }
 
@@ -449,7 +452,7 @@ mod tests {
             open_share_for_guardian(&sealed_shares[4], &guardians[4].0).unwrap(),
         ];
 
-        let recovered_key = reconstruct_backup_key(&recovered_shards).unwrap();
+        let recovered_key = reconstruct_backup_key(&recovered_shards, config.threshold).unwrap();
         assert_eq!(recovered_key.as_bytes(), backup_key.as_bytes());
     }
 }

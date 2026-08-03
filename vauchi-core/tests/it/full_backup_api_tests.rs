@@ -275,7 +275,7 @@ fn guardian_backup_reseal_roundtrip() {
     );
 
     let envelope = recovering
-        .recover_guardian_backup(&backup_hex, &[re0, re2])
+        .recover_guardian_backup(&backup_hex, &[re0, re2], 2)
         .unwrap();
 
     // Identity round-tripped.
@@ -325,7 +325,7 @@ fn recover_rejects_insufficient_shares() {
         .unwrap();
 
     // One share against a 2-of-3 threshold: reconstruction must fail.
-    let result = recovering.recover_guardian_backup(&backup_hex, &[re0]);
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0], 2);
     assert!(result.is_err(), "recovery with 1-of-2 threshold must fail");
 }
 
@@ -377,7 +377,7 @@ fn recover_rejects_shares_resealed_to_another_party() {
         .respond_to_recovery(&sealed_shares[2], &impostor_pk)
         .unwrap();
 
-    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re2]);
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re2], 2);
     assert!(
         result.is_err(),
         "recovering party must not open shares re-sealed to another key"
@@ -410,7 +410,7 @@ fn recover_rejects_tampered_share() {
     let last = re0.len() - 1;
     re0[last] ^= 0xFF;
 
-    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re2]);
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re2], 2);
     assert!(result.is_err(), "tampered re-sealed share must be rejected");
 }
 
@@ -438,7 +438,7 @@ fn recover_rejects_duplicate_share() {
         .respond_to_recovery(&sealed_shares[0], &recovering_pk)
         .unwrap();
 
-    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re0_again]);
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re0_again], 2);
     assert!(
         result.is_err(),
         "two shares from the same guardian must not reconstruct the key"
@@ -470,6 +470,6 @@ proptest! {
     ) {
         let mut recovering = Vauchi::in_memory().unwrap();
         recovering.create_identity("Recovering").unwrap();
-        prop_assert!(recovering.recover_guardian_backup("00", &[a, b]).is_err());
+        prop_assert!(recovering.recover_guardian_backup("00", &[a, b], 2).is_err());
     }
 }

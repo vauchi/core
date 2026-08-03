@@ -386,18 +386,19 @@ mod tests {
 
     // @internal
     #[test]
-    fn threshold_minus_one_fails() {
+    fn reconstruct_rejects_threshold_minus_one() {
         let secret = [
             1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
             24, 25, 26, 27, 28, 29, 30, 31, 32,
         ];
         let shares = split(&secret, 3, 5).unwrap();
 
-        // 2 shares should NOT reconstruct (returns garbage, not the secret)
-        let bad = reconstruct(&shares[0..2]).unwrap();
-        assert_ne!(
-            bad, secret,
-            "2-of-3 should not reconstruct with only 2 shares"
+        assert_eq!(
+            reconstruct(&shares[0..2], 3),
+            Err(ShamirError::InsufficientShares {
+                required: 3,
+                got: 2,
+            })
         );
     }
 

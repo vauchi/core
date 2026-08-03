@@ -443,6 +443,19 @@ mod tests {
 
     // @internal
     #[test]
+    fn zero_share_index_error() {
+        let secret = [42u8; 32];
+        let mut shares = split(&secret, 2, 3).unwrap();
+        shares[0].index = 0;
+
+        assert_eq!(
+            reconstruct(&shares[0..2], 2),
+            Err(ShamirError::ReconstructionFailed)
+        );
+    }
+
+    // @internal
+    #[test]
     fn invalid_params_rejected() {
         let secret = [42u8; 32];
 
@@ -519,10 +532,25 @@ mod tests {
     fn gf_inv_identity() {
         // a * a^-1 == 1 for all a != 0
         for a in 1..=255u8 {
-            let inv = gf_inv(a);
+            let inv = gf_inv(a).unwrap();
             let product = gf_mul(a, inv);
             assert_eq!(product, 1, "GF inverse failed for {a}");
         }
+    }
+
+    // @internal
+    #[test]
+    fn gf_inv_rejects_zero() {
+        assert_eq!(gf_inv(0), Err(ShamirError::DivisionByZero));
+        assert_eq!(gf_div(1, 0), Err(ShamirError::DivisionByZero));
+    }
+
+    // @internal
+    #[test]
+    fn gf_arithmetic_matches_aes_known_answers() {
+        assert_eq!(gf_mul(0x57, 0x13), 0xfe);
+        assert_eq!(gf_inv(0x53), Ok(0xca));
+        assert_eq!(gf_div(0x57, 0x13), Ok(0x04));
     }
 
     // @internal

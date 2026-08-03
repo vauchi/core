@@ -13,7 +13,7 @@ pub mod contact_backup;
 pub mod full_backup;
 #[cfg(feature = "network-rustls")]
 mod guardian_recovery;
-pub mod key_shard;
+mod key_shard;
 
 #[cfg(feature = "network-rustls")]
 pub(crate) use guardian_recovery::recover_from_shards;
@@ -28,7 +28,11 @@ pub use full_backup::{
 };
 #[cfg(feature = "network-rustls")]
 pub(crate) use full_backup::{decode_guardian_backup_hex, guardian_backup_metadata};
+#[cfg(all(feature = "network-rustls", not(feature = "testing")))]
+pub(crate) use key_shard::reconstruct_backup_key;
+#[cfg(feature = "testing")]
+pub use key_shard::reconstruct_backup_key;
 pub use key_shard::{
     BackupKey, BackupKeyShard, GuardianBackupMetadata, KeyShardConfig, KeyShardError,
-    open_share_for_guardian, reconstruct_backup_key, seal_share_for_guardian, split_backup_key,
+    open_share_for_guardian, seal_share_for_guardian, split_backup_key,
 };

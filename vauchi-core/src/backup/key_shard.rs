@@ -26,6 +26,8 @@
 //! 5. Reconstruct the key from any threshold of shares: [`reconstruct_backup_key`].
 
 use std::fmt;
+#[cfg(any(feature = "network-rustls", feature = "testing", test))]
+use subtle::ConstantTimeEq;
 use thiserror::Error;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
@@ -149,6 +151,14 @@ impl BackupKeyShard {
         self.index
     }
 
+    /// Compares response identity and secret value without early-exit on value bytes.
+    #[cfg(any(feature = "network-rustls", feature = "testing", test))]
+    pub(crate) fn same_response(&self, other: &Self) -> bool {
+        self.metadata == other.metadata
+            && self.index == other.index
+            && bool::from(self.value.ct_eq(&other.value))
+    }
+
     /// Serializes the shard to a compact byte representation.
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(Self::SERIALIZED_LENGTH);
@@ -191,6 +201,7 @@ impl BackupKeyShard {
     }
 
     /// Converts this shard to the internal Shamir [`Share`] representation.
+    #[cfg(any(feature = "network-rustls", feature = "testing", test))]
     fn to_share(&self) -> Result<Share, KeyShardError> {
         Share::new(self.index, self.value).map_err(Into::into)
     }
@@ -384,6 +395,7 @@ pub fn split_backup_key(
 /// # Errors
 /// Returns an error if the shares are insufficient, malformed, or carry
 /// different ceremony metadata.
+#[cfg(any(feature = "network-rustls", feature = "testing", test))]
 pub fn reconstruct_backup_key(shards: &[BackupKeyShard]) -> Result<BackupKey, KeyShardError> {
     let metadata = shards
         .first()

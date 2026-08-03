@@ -89,7 +89,8 @@ pub struct Share {
 
 impl Share {
     /// Creates a share after validating its public x-coordinate.
-    pub(crate) fn new(index: u8, value: [u8; 32]) -> Result<Self, ShamirError> {
+    #[cfg(any(feature = "network-rustls", feature = "testing", test))]
+    pub fn new(index: u8, value: [u8; 32]) -> Result<Self, ShamirError> {
         if index == 0 {
             return Err(ShamirError::InvalidShareIndex);
         }
@@ -97,12 +98,12 @@ impl Share {
     }
 
     /// Returns the non-zero public x-coordinate.
-    pub(crate) fn index(&self) -> u8 {
+    pub fn index(&self) -> u8 {
         self.index
     }
 
     /// Returns the secret y-coordinate bytes.
-    pub(crate) fn value(&self) -> &[u8; 32] {
+    pub fn value(&self) -> &[u8; 32] {
         &self.value
     }
 }
@@ -170,6 +171,7 @@ pub fn split(secret: &[u8; 32], threshold: u8, count: u8) -> Result<Vec<Share>, 
 ///
 /// # Errors
 /// Returns [`ShamirError`] if shares are insufficient or have duplicate indices.
+#[cfg(any(feature = "network-rustls", feature = "testing", test))]
 pub fn reconstruct(shares: &[Share], threshold: u8) -> Result<[u8; 32], ShamirError> {
     if threshold < 2 {
         return Err(ShamirError::ThresholdTooLow(threshold));
@@ -250,6 +252,7 @@ fn eval_polynomial(coeffs: &[u8], x: u8) -> u8 {
 /// polynomial passing through all points.
 ///
 /// f(0) = sum_i [ y_i * prod_{j!=i} (x_j / (x_j - x_i)) ]
+#[cfg(any(feature = "network-rustls", feature = "testing", test))]
 fn lagrange_interpolate_at_zero(points: &[(u8, u8)]) -> Result<u8, ShamirError> {
     let mut result = 0u8;
 
@@ -301,11 +304,13 @@ fn gf_mul(a: u8, b: u8) -> u8 {
 }
 
 /// GF(256) division: a / b = a * b^-1.
+#[cfg(any(feature = "network-rustls", feature = "testing", test))]
 fn gf_div(a: u8, b: u8) -> Result<u8, ShamirError> {
     Ok(gf_mul(a, gf_inv(b)?))
 }
 
 /// GF(256) multiplicative inverse using a fixed addition chain for a^254.
+#[cfg(any(feature = "network-rustls", feature = "testing", test))]
 fn gf_inv(a: u8) -> Result<u8, ShamirError> {
     if a == 0 {
         return Err(ShamirError::DivisionByZero);

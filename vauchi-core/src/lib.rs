@@ -152,13 +152,15 @@ pub mod aha_moments;
 pub mod avatar;
 pub use aha_moments::AhaMoment;
 pub mod backup;
+#[cfg(feature = "testing")]
+pub use backup::reconstruct_backup_key;
 pub use backup::{
     BackupError, BackupKey, BackupKeyShard, BackupSections, FullBackupEnvelope,
     FullBackupIdentityData, GuardianBackupMetadata, IdentitySection, KeyShardConfig, KeyShardError,
     LabelSection, export_contact_backup, export_full_backup, export_guardian_backup,
     extract_master_seed, import_contact_backup, import_full_backup, import_guardian_backup,
-    open_share_for_guardian, reconstruct_backup_key, restore_contacts_from_envelope,
-    seal_share_for_guardian, split_backup_key,
+    open_share_for_guardian, restore_contacts_from_envelope, seal_share_for_guardian,
+    split_backup_key,
 };
 pub mod demo_contact;
 pub use demo_contact::{

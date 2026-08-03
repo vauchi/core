@@ -9,6 +9,22 @@
 use libfuzzer_sys::fuzz_target;
 use vauchi_core::{BackupKeyShard, GuardianBackupMetadata, reconstruct_backup_key};
 
+fn gf_mul_reference(mut left: u8, mut right: u8) -> u8 {
+    let mut product = 0u8;
+    while right != 0 {
+        if right & 1 != 0 {
+            product ^= left;
+        }
+        let carry = left & 0x80;
+        left <<= 1;
+        if carry != 0 {
+            left ^= 0x1b;
+        }
+        right >>= 1;
+    }
+    product
+}
+
 fuzz_target!(|data: &[u8]| {
     let _ = BackupKeyShard::from_bytes(data);
 
@@ -40,6 +56,16 @@ fuzz_target!(|data: &[u8]| {
             BackupKeyShard::from_parts(metadata, 2, second_value),
         )
     {
-        let _ = reconstruct_backup_key(&[first, second]);
+        let mut expected = [0u8; 32];
+        for position in 0..32 {
+            // For x=1 and x=2, the Lagrange coefficients at zero are
+            // 2/3 = 0xf7 and 1/3 = 0xf6 in the AES field.
+            expected[position] = gf_mul_reference(first_value[position], 0xf7)
+                ^ gf_mul_reference(second_value[position], 0xf6);
+        }
+        match reconstruct_backup_key(&[first, second]) {
+            Ok(reconstructed) => assert_eq!(reconstructed.as_bytes(), &expected),
+            Err(_) => assert!(expected.iter().all(|byte| *byte == 0)),
+        }
     }
 });

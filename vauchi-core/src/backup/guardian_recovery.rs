@@ -26,10 +26,13 @@ pub(crate) fn recover_from_shards(
 ) -> Result<FullBackupEnvelope, BackupError> {
     let metadata = guardian_backup_metadata(data)?;
     let maximum_matching = metadata.count() as usize + 1;
-    let mut matching = Vec::with_capacity(maximum_matching);
+    let mut matching: Vec<BackupKeyShard> = Vec::with_capacity(maximum_matching);
     for shard in shards.iter().filter(|shard| shard.metadata() == metadata) {
-        if !matching.contains(&shard) {
-            matching.push(shard);
+        if !matching
+            .iter()
+            .any(|existing| existing.same_response(shard))
+        {
+            matching.push(shard.clone());
             if matching.len() == maximum_matching {
                 break;
             }

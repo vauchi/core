@@ -21,7 +21,7 @@ serialization.
 | `fuzz_exchange_payload` | `exchange` | Generic exchange payload parsing |
 | `fuzz_encrypted_exchange` | `exchange` | Encrypted exchange envelope parsing |
 | `fuzz_ratchet_state` | `crypto::ratchet` | Ratchet state deserialization |
-| `fuzz_shamir_reconstruct` | `backup::key_shard` | Arbitrary shard parsing plus a guaranteed valid Shamir reconstruction path |
+| `fuzz_shamir_reconstruct` | `backup::key_shard` | Arbitrary shard parsing plus two-point reconstruction checked against an independent field oracle |
 
 ## Running Locally
 

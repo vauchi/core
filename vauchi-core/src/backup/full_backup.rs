@@ -26,6 +26,8 @@ use flate2::write::ZlibEncoder;
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+#[cfg(feature = "network-rustls")]
+use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, Zeroizing};
 
 use super::BackupError;
@@ -70,6 +72,7 @@ const HKDF_INFO: &[u8] = b"vauchi-backup-v3";
 /// separation so that a key accidentally used in another context cannot be
 /// directly reused as a v5 backup key.
 const GUARDIAN_BACKUP_HKDF_INFO: &[u8] = b"vauchi-backup-v5-guardian";
+const GUARDIAN_KEY_CONFIRMATION_HKDF_INFO: &[u8] = b"vauchi-backup-v5-key-confirmation-key";
 const GUARDIAN_KEY_CONFIRMATION_DOMAIN: &[u8] = b"vauchi-backup-v5-key-confirmation";
 
 type HmacSha256 = Hmac<Sha256>;
@@ -222,7 +225,12 @@ fn decompress_backup_with_limit(
     let decoder = ZlibDecoder::new(data);
     let read_limit = maximum_output.saturating_add(1) as u64;
     let mut limited = std::io::Read::take(decoder, read_limit);
-    let initial_capacity = data.len().saturating_mul(4).min(maximum_output);
+    const MAX_INITIAL_DECOMPRESSION_ALLOCATION: usize = 1024 * 1024;
+    let initial_capacity = data
+        .len()
+        .saturating_mul(4)
+        .min(maximum_output)
+        .min(MAX_INITIAL_DECOMPRESSION_ALLOCATION);
     let mut out = Vec::with_capacity(initial_capacity);
     std::io::Read::read_to_end(&mut limited, &mut out)
         .map_err(|e| BackupError::Deserialization(format!("decompression failed: {e}")))?;
@@ -384,7 +392,7 @@ pub fn export_guardian_backup(
     let compressed = compress_backup(&plaintext)?;
 
     let salt: [u8; 16] = random_bytes();
-    let header = guardian_backup_header(metadata, &salt, key);
+    let header = guardian_backup_header(metadata, &salt, key)?;
     let derived_key = derive_guardian_key(key, &salt)?;
     let ciphertext = encrypt_with_ad(&derived_key, &compressed, &header)
         .map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
@@ -402,29 +410,37 @@ fn guardian_backup_header(
     metadata: GuardianBackupMetadata,
     salt: &[u8; 16],
     key: &SymmetricKey,
-) -> [u8; GUARDIAN_BACKUP_HEADER_LENGTH] {
+) -> Result<[u8; GUARDIAN_BACKUP_HEADER_LENGTH], BackupError> {
     let mut header = [0u8; GUARDIAN_BACKUP_HEADER_LENGTH];
     header[0] = GUARDIAN_BACKUP_VERSION;
     header[1] = metadata.threshold();
     header[2] = metadata.count();
     header[3..3 + CEREMONY_ID_LENGTH].copy_from_slice(metadata.ceremony_id());
     header[3 + CEREMONY_ID_LENGTH..GUARDIAN_BACKUP_PREFIX_LENGTH].copy_from_slice(salt);
-    let confirmation = guardian_key_confirmation(key, &header[..GUARDIAN_BACKUP_PREFIX_LENGTH]);
+    let confirmation =
+        guardian_key_confirmation(key, salt, &header[..GUARDIAN_BACKUP_PREFIX_LENGTH])?;
     header[GUARDIAN_BACKUP_PREFIX_LENGTH..].copy_from_slice(&confirmation);
-    header
+    Ok(header)
 }
 
 fn guardian_key_confirmation(
     key: &SymmetricKey,
+    salt: &[u8; 16],
     header_prefix: &[u8],
-) -> [u8; KEY_CONFIRMATION_LENGTH] {
-    let mut mac = HmacSha256::new_from_slice(key.as_bytes()).expect("HMAC accepts 32-byte keys");
+) -> Result<[u8; KEY_CONFIRMATION_LENGTH], BackupError> {
+    let prk = HKDF::extract(Some(salt), key.as_bytes());
+    let confirmation_key = Zeroizing::new(
+        HKDF::expand(&prk, GUARDIAN_KEY_CONFIRMATION_HKDF_INFO, 32)
+            .map_err(|_| BackupError::KeyDerivation)?,
+    );
+    let mut mac = HmacSha256::new_from_slice(&confirmation_key)
+        .expect("HKDF produces a valid HMAC key length");
     mac.update(GUARDIAN_KEY_CONFIRMATION_DOMAIN);
     mac.update(header_prefix);
     let output = mac.finalize().into_bytes();
     let mut confirmation = [0u8; KEY_CONFIRMATION_LENGTH];
     confirmation.copy_from_slice(&output[..KEY_CONFIRMATION_LENGTH]);
-    confirmation
+    Ok(confirmation)
 }
 
 fn parse_guardian_backup_header(
@@ -469,16 +485,10 @@ pub(crate) fn guardian_backup_key_matches(
     data: &[u8],
     key: &SymmetricKey,
 ) -> Result<bool, BackupError> {
-    parse_guardian_backup_header(data)?;
-    let expected = guardian_key_confirmation(key, &data[..GUARDIAN_BACKUP_PREFIX_LENGTH]);
+    let (_, salt) = parse_guardian_backup_header(data)?;
+    let expected = guardian_key_confirmation(key, &salt, &data[..GUARDIAN_BACKUP_PREFIX_LENGTH])?;
     let actual = &data[GUARDIAN_BACKUP_PREFIX_LENGTH..GUARDIAN_BACKUP_HEADER_LENGTH];
-    let difference = expected
-        .iter()
-        .zip(actual)
-        .fold(0u8, |difference, (&left, &right)| {
-            difference | (left ^ right)
-        });
-    Ok(difference == 0)
+    Ok(bool::from(expected.as_slice().ct_eq(actual)))
 }
 
 /// Imports a full v3 backup, returning the decrypted envelope.

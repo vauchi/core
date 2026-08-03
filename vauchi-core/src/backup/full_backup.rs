@@ -58,6 +58,9 @@ const GUARDIAN_BACKUP_HEADER_LENGTH: usize =
 /// Maximum accepted v5 guardian backup size (32 MiB).
 pub(crate) const MAX_GUARDIAN_BACKUP_BYTES: usize = 32 * 1024 * 1024;
 
+/// Maximum decompressed JSON size for any full backup (64 MiB).
+const MAX_DECOMPRESSED_BACKUP_BYTES: usize = 64 * 1024 * 1024;
+
 /// HKDF domain separation info for v3 backup key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-backup-v3";
 
@@ -203,14 +206,47 @@ fn compress_backup(plaintext: &[u8]) -> Result<Vec<u8>, BackupError> {
 /// unchanged if it does not start with the zlib magic byte, preserving
 /// compatibility with pre-compression v3 backups.
 fn decompress_backup(data: &[u8]) -> Result<Vec<u8>, BackupError> {
+    decompress_backup_with_limit(data, MAX_DECOMPRESSED_BACKUP_BYTES)
+}
+
+fn decompress_backup_with_limit(
+    data: &[u8],
+    maximum_output: usize,
+) -> Result<Vec<u8>, BackupError> {
+    if data.len() > maximum_output && (data.is_empty() || data[0] != ZLIB_MAGIC) {
+        return Err(BackupError::TooLarge);
+    }
     if data.is_empty() || data[0] != ZLIB_MAGIC {
         return Ok(data.to_vec());
     }
-    let mut decoder = ZlibDecoder::new(data);
-    let mut out = Vec::with_capacity(data.len() * 4);
-    std::io::Read::read_to_end(&mut decoder, &mut out)
+    let decoder = ZlibDecoder::new(data);
+    let read_limit = maximum_output.saturating_add(1) as u64;
+    let mut limited = std::io::Read::take(decoder, read_limit);
+    let initial_capacity = data.len().saturating_mul(4).min(maximum_output);
+    let mut out = Vec::with_capacity(initial_capacity);
+    std::io::Read::read_to_end(&mut limited, &mut out)
         .map_err(|e| BackupError::Deserialization(format!("decompression failed: {e}")))?;
+    if out.len() > maximum_output {
+        return Err(BackupError::TooLarge);
+    }
     Ok(out)
+}
+
+#[cfg(any(feature = "network-rustls", test))]
+pub(crate) fn decode_guardian_backup_hex(encoded: &str) -> Result<Vec<u8>, BackupError> {
+    decode_guardian_backup_hex_with_limit(encoded, MAX_GUARDIAN_BACKUP_BYTES)
+}
+
+#[cfg(any(feature = "network-rustls", test))]
+fn decode_guardian_backup_hex_with_limit(
+    encoded: &str,
+    maximum_output: usize,
+) -> Result<Vec<u8>, BackupError> {
+    let encoded = encoded.trim();
+    if encoded.len() > maximum_output.saturating_mul(2) {
+        return Err(BackupError::TooLarge);
+    }
+    hex::decode(encoded).map_err(|_| BackupError::DecryptionFailed)
 }
 
 /// Exports a full v3 backup containing identity, contacts, own card, and labels.
@@ -266,6 +302,9 @@ pub fn export_full_backup(
     let plaintext = Zeroizing::new(
         serde_json::to_vec(&envelope).map_err(|e| BackupError::Serialization(e.to_string()))?,
     );
+    if plaintext.len() > MAX_DECOMPRESSED_BACKUP_BYTES {
+        return Err(BackupError::TooLarge);
+    }
     let compressed = compress_backup(&plaintext)?;
 
     let salt: [u8; 16] = random_bytes();
@@ -339,6 +378,9 @@ pub fn export_guardian_backup(
     let plaintext = Zeroizing::new(
         serde_json::to_vec(&envelope).map_err(|e| BackupError::Serialization(e.to_string()))?,
     );
+    if plaintext.len() > MAX_DECOMPRESSED_BACKUP_BYTES {
+        return Err(BackupError::TooLarge);
+    }
     let compressed = compress_backup(&plaintext)?;
 
     let salt: [u8; 16] = random_bytes();
@@ -413,7 +455,8 @@ fn parse_guardian_backup_header(
 /// The values are authenticated only after [`import_guardian_backup`] opens
 /// the ciphertext. Recovery may use them to bound work and select candidate
 /// shards, but must not release plaintext until that authentication succeeds.
-pub fn guardian_backup_metadata(data: &[u8]) -> Result<GuardianBackupMetadata, BackupError> {
+#[cfg(any(feature = "network-rustls", test))]
+pub(crate) fn guardian_backup_metadata(data: &[u8]) -> Result<GuardianBackupMetadata, BackupError> {
     parse_guardian_backup_header(data).map(|(metadata, _)| metadata)
 }
 
@@ -593,6 +636,26 @@ mod tests {
 
         assert!(matches!(
             guardian_backup_metadata(&oversized),
+            Err(BackupError::TooLarge)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn guardian_backup_hex_rejects_oversized_input_before_decode() {
+        assert!(matches!(
+            decode_guardian_backup_hex_with_limit("000000", 2),
+            Err(BackupError::TooLarge)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn decompression_rejects_output_over_limit() {
+        let compressed = compress_backup(&[0u8; 1025]).unwrap();
+
+        assert!(matches!(
+            decompress_backup_with_limit(&compressed, 1024),
             Err(BackupError::TooLarge)
         ));
     }

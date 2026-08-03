@@ -857,9 +857,10 @@ impl Vauchi {
     /// guardians re-sealed to this identity via [`Self::respond_to_recovery`].
     /// Opens each with this identity's own X25519 secret — derived in Core,
     /// never supplied by the caller — and tries bounded threshold-sized share
-    /// subsets. The backup AEAD authenticates both the reconstructed candidate
-    /// key and clear recovery metadata before any plaintext is returned. No
-    /// guardian secret or plaintext share crosses the platform boundary.
+    /// subsets. A 128-bit HMAC confirmation filters reconstructed candidate
+    /// keys, and the final backup AEAD authenticates the ciphertext and clear
+    /// recovery metadata before any plaintext is returned. No guardian secret
+    /// or plaintext share crosses the platform boundary.
     ///
     /// Re-sealed responses are sender-anonymous: this API cannot attribute an
     /// invalid response to a particular guardian. It accepts at most 20 raw
@@ -884,7 +885,8 @@ impl Vauchi {
         backup_data: &str,
         re_sealed_shares: &[Vec<u8>],
     ) -> VauchiResult<crate::backup::FullBackupEnvelope> {
-        let bytes = hex::decode(backup_data.trim()).map_err(|_| guardian_recovery_failed())?;
+        let bytes = crate::backup::decode_guardian_backup_hex(backup_data)
+            .map_err(|_| guardian_recovery_failed())?;
         let metadata = crate::backup::guardian_backup_metadata(&bytes)
             .map_err(|_| guardian_recovery_failed())?;
         let maximum_responses = crate::backup::KeyShardConfig::MAX_COUNT as usize * 2;

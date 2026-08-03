@@ -90,3 +90,25 @@ pub unsafe extern "C" fn vauchi_app_dispatch(
         .unwrap_or(std::ptr::null_mut())
     }
 }
+
+// INLINE_TEST_REQUIRED: this cdylib/staticlib crate has no Rust integration-test target
+#[cfg(test)]
+mod tests {
+    use std::ffi::CStr;
+
+    use super::*;
+
+    #[test]
+    fn c_abi_returns_the_core_owned_fixture_bytes() {
+        let fixture_ptr = vauchi_presentation_contract_fixture();
+        assert!(!fixture_ptr.is_null());
+        // SAFETY: The C ABI returned a valid string owned by this test.
+        let fixture = unsafe { CStr::from_ptr(fixture_ptr) }.to_str().unwrap();
+        assert_eq!(
+            fixture,
+            vauchi_app::ui::presentation_contract_fixture_json()
+        );
+        // SAFETY: The pointer is owned by the C ABI and freed exactly once.
+        unsafe { crate::vauchi_string_free(fixture_ptr) };
+    }
+}

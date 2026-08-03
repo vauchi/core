@@ -329,6 +329,70 @@ fn recover_rejects_insufficient_shares() {
     assert!(result.is_err(), "recovery with 1-of-2 threshold must fail");
 }
 
+/// Supplying a threshold lower than the export policy must not turn a partial
+/// reconstruction into accepted backup plaintext.
+// @scenario: backup_format_versioning :: Guardian backup authenticates reconstructed key
+#[test]
+fn recover_rejects_below_export_threshold_with_lower_claim() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+
+    let (backup_hex, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 3)
+        .unwrap();
+
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+    let re0 = guardians[0]
+        .respond_to_recovery(&sealed_shares[0], &recovering_pk)
+        .unwrap();
+    let re1 = guardians[1]
+        .respond_to_recovery(&sealed_shares[1], &recovering_pk)
+        .unwrap();
+
+    let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re1], 2);
+    assert!(
+        result.is_err(),
+        "backup AEAD must reject a key reconstructed below the export threshold"
+    );
+}
+
+/// Individually valid shares from different backups reconstruct a wrong key,
+/// which must fail backup AEAD authentication.
+// @scenario: backup_format_versioning :: Guardian backup rejects mixed share sets
+#[test]
+fn recover_rejects_mixed_backup_shares() {
+    let alice = setup_vauchi_with_data();
+    let bob = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+
+    let (alice_backup, alice_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+    let (_bob_backup, bob_shares) = bob
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+    let alice_re0 = guardians[0]
+        .respond_to_recovery(&alice_shares[0], &recovering_pk)
+        .unwrap();
+    let bob_re1 = guardians[1]
+        .respond_to_recovery(&bob_shares[1], &recovering_pk)
+        .unwrap();
+
+    let result = recovering.recover_guardian_backup(&alice_backup, &[alice_re0, bob_re1], 2);
+    assert!(
+        result.is_err(),
+        "backup AEAD must reject a key reconstructed from mixed share sets"
+    );
+}
+
 /// A guardian cannot open a share sealed to a *different* guardian, so it
 /// cannot re-seal one it was not designated for.
 // @scenario: backup_format_versioning :: Guardian sealed share rejects wrong recipient

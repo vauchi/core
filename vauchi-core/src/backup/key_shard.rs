@@ -254,7 +254,8 @@ pub fn split_backup_key(
 /// Reconstructs a backup key from at least `threshold` shares.
 ///
 /// # Errors
-/// Returns [`KeyShardError::Shamir`] if shares are insufficient or malformed.
+/// Returns [`KeyShardError::Shamir`] if `threshold` is invalid or the shares
+/// are insufficient or malformed.
 pub fn reconstruct_backup_key(
     shards: &[BackupKeyShard],
     threshold: u8,

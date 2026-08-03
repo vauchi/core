@@ -855,8 +855,9 @@ impl Vauchi {
     /// guardians re-sealed to this identity via [`Self::respond_to_recovery`].
     /// Opens each with this identity's own X25519 secret — derived in Core,
     /// never supplied by the caller — reconstructs the backup key, and returns
-    /// the decrypted [`FullBackupEnvelope`]. No guardian secret or plaintext
-    /// share ever crosses the platform boundary.
+    /// the decrypted [`FullBackupEnvelope`]. The backup AEAD authenticates the
+    /// reconstructed key before any plaintext is returned. No guardian secret
+    /// or plaintext share ever crosses the platform boundary.
     ///
     /// **This method does not restore identity, contacts, or labels to storage.**
     /// The caller must apply the returned envelope the same way
@@ -867,6 +868,7 @@ impl Vauchi {
     /// # Arguments
     /// * `backup_data` - Hex-encoded backup blob from [`Self::export_guardian_backup_with_shards`].
     /// * `re_sealed_shares` - Shares re-sealed to this identity by guardians.
+    /// * `threshold` - Threshold selected when the guardian backup was exported.
     ///
     /// # Errors
     /// Returns [`VauchiError::InvalidState`] if share decryption or key

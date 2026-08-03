@@ -326,7 +326,10 @@ fn recover_rejects_insufficient_shares() {
 
     // One share against a 2-of-3 threshold: reconstruction must fail.
     let result = recovering.recover_guardian_backup(&backup_hex, &[re0], 2);
-    assert!(result.is_err(), "recovery with 1-of-2 threshold must fail");
+    assert!(matches!(
+        result,
+        Err(vauchi_core::VauchiError::InvalidState(_))
+    ));
 }
 
 /// Supplying a threshold lower than the export policy must not turn a partial
@@ -353,10 +356,10 @@ fn recover_rejects_below_export_threshold_with_lower_claim() {
         .unwrap();
 
     let result = recovering.recover_guardian_backup(&backup_hex, &[re0, re1], 2);
-    assert!(
-        result.is_err(),
-        "backup AEAD must reject a key reconstructed below the export threshold"
-    );
+    assert!(matches!(
+        result,
+        Err(vauchi_core::VauchiError::Configuration(_))
+    ));
 }
 
 /// Individually valid shares from different backups reconstruct a wrong key,
@@ -387,10 +390,10 @@ fn recover_rejects_mixed_backup_shares() {
         .unwrap();
 
     let result = recovering.recover_guardian_backup(&alice_backup, &[alice_re0, bob_re1], 2);
-    assert!(
-        result.is_err(),
-        "backup AEAD must reject a key reconstructed from mixed share sets"
-    );
+    assert!(matches!(
+        result,
+        Err(vauchi_core::VauchiError::Configuration(_))
+    ));
 }
 
 /// A guardian cannot open a share sealed to a *different* guardian, so it

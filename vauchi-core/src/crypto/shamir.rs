@@ -407,7 +407,7 @@ mod tests {
 
         assert_eq!(
             reconstruct(&shares[0..2], 2),
-            Err(ShamirError::ReconstructionFailed)
+            Err(ShamirError::InvalidShareIndex)
         );
     }
 

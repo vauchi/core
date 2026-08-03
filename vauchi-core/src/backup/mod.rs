@@ -27,6 +27,8 @@ pub use full_backup::{
     import_guardian_backup, restore_contacts_from_envelope,
 };
 #[cfg(feature = "network-rustls")]
+pub(crate) use full_backup::{decode_backup_hex_with_limit, decode_full_backup_hex};
+#[cfg(feature = "network-rustls")]
 pub(crate) use full_backup::{decode_guardian_backup_hex, guardian_backup_metadata};
 #[cfg(all(feature = "network-rustls", not(feature = "testing")))]
 pub(crate) use key_shard::reconstruct_backup_key;

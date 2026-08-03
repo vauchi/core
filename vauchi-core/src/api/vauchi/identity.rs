@@ -18,6 +18,8 @@ use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
 use super::{SMK_KEY_NAME, Vauchi};
 
+const MAX_IDENTITY_BACKUP_BYTES: usize = 64 * 1024;
+
 impl Vauchi {
     // === Identity Operations ===
 
@@ -197,9 +199,10 @@ impl Vauchi {
     ///
     /// The backup_data should be a hex-encoded string from `export_backup`.
     pub fn import_backup(&mut self, backup_data: &str, password: &str) -> VauchiResult<()> {
-        let bytes = hex::decode(backup_data.trim())
-            .map_err(|e| VauchiError::Configuration(format!("Invalid hex data: {}", e)))?;
-        let backup = crate::identity::IdentityBackup::new(bytes.clone());
+        let bytes =
+            crate::backup::decode_backup_hex_with_limit(backup_data, MAX_IDENTITY_BACKUP_BYTES)
+                .map_err(|e| VauchiError::Configuration(format!("Invalid backup data: {e}")))?;
+        let backup = crate::identity::IdentityBackup::new(bytes);
         let identity = Identity::import_backup(&backup, password, self.clock.unix_seconds())
             .map_err(|e| VauchiError::Configuration(format!("Import failed: {:?}", e)))?;
 
@@ -279,8 +282,8 @@ impl Vauchi {
             return Err(VauchiError::AlreadyInitialized);
         }
 
-        let bytes = hex::decode(backup_data.trim())
-            .map_err(|e| VauchiError::Configuration(format!("Invalid hex data: {e}")))?;
+        let bytes = crate::backup::decode_full_backup_hex(backup_data)
+            .map_err(|e| VauchiError::Configuration(format!("Invalid backup data: {e}")))?;
 
         let envelope = crate::backup::import_full_backup(&bytes, password)
             .map_err(|e| VauchiError::Configuration(format!("Full backup import failed: {e}")))?;

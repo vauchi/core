@@ -245,11 +245,16 @@ fn decompress_backup_with_limit(
 
 #[cfg(any(feature = "network-rustls", test))]
 pub(crate) fn decode_guardian_backup_hex(encoded: &str) -> Result<Vec<u8>, BackupError> {
-    decode_guardian_backup_hex_with_limit(encoded, MAX_GUARDIAN_BACKUP_BYTES)
+    decode_backup_hex_with_limit(encoded, MAX_GUARDIAN_BACKUP_BYTES)
 }
 
 #[cfg(any(feature = "network-rustls", test))]
-fn decode_guardian_backup_hex_with_limit(
+pub(crate) fn decode_full_backup_hex(encoded: &str) -> Result<Vec<u8>, BackupError> {
+    decode_backup_hex_with_limit(encoded, MAX_FULL_BACKUP_BYTES)
+}
+
+#[cfg(any(feature = "network-rustls", test))]
+pub(crate) fn decode_backup_hex_with_limit(
     encoded: &str,
     maximum_output: usize,
 ) -> Result<Vec<u8>, BackupError> {
@@ -674,7 +679,7 @@ mod tests {
     #[test]
     fn guardian_backup_hex_rejects_oversized_input_before_decode() {
         assert!(matches!(
-            decode_guardian_backup_hex_with_limit("000000", 2),
+            decode_backup_hex_with_limit("000000", 2),
             Err(BackupError::TooLarge)
         ));
     }

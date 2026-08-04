@@ -263,7 +263,7 @@ lint:cross-cutting-blocking:
       git -C "${VAUCHI_CI_SCRIPTS_DIR}" init
       git -C "${VAUCHI_CI_SCRIPTS_DIR}" remote add origin https://gitlab.com/vauchi/scripts.git
       git -C "${VAUCHI_CI_SCRIPTS_DIR}" fetch --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
-      git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach "${VAUCHI_SCRIPTS_REF}"
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach FETCH_HEAD
     - !reference [.clone-locales, before_script]
   script:
     # lint:generic-presentation-boundary
@@ -440,7 +440,7 @@ metric:audit-mobile-surface:
       git -C "${VAUCHI_CI_SCRIPTS_DIR}" init
       git -C "${VAUCHI_CI_SCRIPTS_DIR}" remote add origin https://gitlab.com/vauchi/scripts.git
       git -C "${VAUCHI_CI_SCRIPTS_DIR}" fetch --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
-      git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach "${VAUCHI_SCRIPTS_REF}"
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach FETCH_HEAD
   script:
     - |
       set -euo pipefail

@@ -28,6 +28,9 @@ use crate::types::VisibilityRules;
 /// Backup format version byte for contact backups.
 pub(crate) const CONTACT_BACKUP_VERSION: u8 = 0x01;
 
+/// Maximum accepted encrypted contact-backup size.
+const MAX_CONTACT_BACKUP_BYTES: usize = 32 * 1024 * 1024;
+
 /// Error type for contact backup operations.
 #[derive(Debug, Clone, thiserror::Error)]
 #[non_exhaustive]
@@ -363,6 +366,9 @@ pub fn export_contact_backup(contacts: &[Contact], password: &str) -> Result<Vec
 /// Returns an error if the data is corrupted, the version is unknown, or the
 /// password is wrong (authentication tag mismatch).
 pub fn import_contact_backup(data: &[u8], password: &str) -> Result<Vec<Contact>, BackupError> {
+    if data.len() > MAX_CONTACT_BACKUP_BYTES {
+        return Err(BackupError::TooLarge);
+    }
     if data.len() < 1 + 16 {
         return Err(BackupError::TooShort);
     }

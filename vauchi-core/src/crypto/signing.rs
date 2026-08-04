@@ -7,7 +7,7 @@
 //! Provides signing keypair generation and signature operations using the
 //! `ed25519-dalek` cryptographic library.
 
-use ed25519_dalek::{Signer, Verifier};
+use ed25519_dalek::Signer;
 use sha2::Digest;
 use subtle::ConstantTimeEq;
 
@@ -137,7 +137,7 @@ impl PublicKey {
             return false;
         };
         let sig = ed25519_dalek::Signature::from_bytes(&signature.bytes);
-        vk.verify(message, &sig).is_ok()
+        vk.verify_strict(message, &sig).is_ok()
     }
 }
 
@@ -170,7 +170,7 @@ pub fn verify_signature(public_key: &[u8; 32], message: &[u8], signature: &Signa
         return false;
     };
     let sig = ed25519_dalek::Signature::from_bytes(signature.as_bytes());
-    vk.verify(message, &sig).is_ok()
+    vk.verify_strict(message, &sig).is_ok()
 }
 
 // INLINE_TEST_REQUIRED: the guardian seal/open key contract is validated

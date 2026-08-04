@@ -95,11 +95,21 @@ impl Drop for FullBackupIdentityData {
 }
 
 /// The top-level JSON structure inside the encrypted v3 backup.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct FullBackupEnvelope {
     pub version: u32,
     pub created_at: u64,
     pub sections: BackupSections,
+}
+
+impl std::fmt::Debug for FullBackupEnvelope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FullBackupEnvelope")
+            .field("version", &self.version)
+            .field("created_at", &self.created_at)
+            .field("sections", &self.sections)
+            .finish()
+    }
 }
 
 /// Serde adapter that routes `Option<ContactCard>` through [`BackupContactCard`]
@@ -130,7 +140,7 @@ mod backup_contact_card {
 }
 
 /// All data sections inside a full backup.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct BackupSections {
     pub identity: IdentitySection,
     pub contacts: Vec<serde_json::Value>,
@@ -144,13 +154,35 @@ pub struct BackupSections {
     pub labels: Vec<LabelSection>,
 }
 
+impl std::fmt::Debug for BackupSections {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BackupSections")
+            .field("identity", &self.identity)
+            .field("contacts", &"[REDACTED]")
+            .field("own_card", &self.own_card)
+            .field("labels", &self.labels)
+            .finish()
+    }
+}
+
 /// Identity data stored inside the backup envelope.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct IdentitySection {
     pub display_name: String,
     pub master_seed_b64: String,
     pub device_index: u32,
     pub device_name: String,
+}
+
+impl std::fmt::Debug for IdentitySection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IdentitySection")
+            .field("display_name", &self.display_name)
+            .field("master_seed_b64", &"[REDACTED]")
+            .field("device_index", &self.device_index)
+            .field("device_name", &self.device_name)
+            .finish()
+    }
 }
 
 /// A label (group) stored inside the backup envelope.

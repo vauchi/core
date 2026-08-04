@@ -49,6 +49,11 @@ impl ContentEncryptionKey {
     pub fn from_bytes(bytes: [u8; 32]) -> Self {
         Self(SymmetricKey::from_bytes(bytes))
     }
+
+    /// Deserialize untrusted bytes, rejecting a degenerate all-zero key.
+    pub fn try_from_bytes(bytes: [u8; 32]) -> Result<Self, EncryptionError> {
+        SymmetricKey::try_from_bytes(bytes).map(Self)
+    }
 }
 
 /// Security: Clone is required because `Contact` derives `Clone` and holds

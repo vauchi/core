@@ -45,7 +45,7 @@ pub fn verify_signed_pin_config(
     body: &[u8],
     verify_key: &[u8; 32],
 ) -> Result<Vec<PinnedCertificate>, NetworkError> {
-    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+    use ed25519_dalek::{Signature, VerifyingKey};
 
     // Must have at least a 64-byte signature + at least one 32-byte pin
     if body.len() < 64 + 32 {
@@ -66,7 +66,7 @@ pub fn verify_signed_pin_config(
         .map_err(|e| NetworkError::InvalidMessage(format!("invalid pin-config verify key: {e}")))?;
     let sig = Signature::from_slice(sig_bytes)
         .map_err(|e| NetworkError::InvalidMessage(format!("invalid pin-config signature: {e}")))?;
-    vk.verify(pin_data, &sig).map_err(|_| {
+    vk.verify_strict(pin_data, &sig).map_err(|_| {
         NetworkError::InvalidMessage(
             "pin-config signature verification failed — relay response is not authentic".into(),
         )

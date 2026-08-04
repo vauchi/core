@@ -51,7 +51,6 @@ use crate::network::HttpTransport;
 
 /// Result of `start_relay_exchange`: the code to display and secret
 /// material needed to complete the exchange later.
-#[derive(Debug)]
 pub struct RelayExchangeOffer {
     /// The short numeric code the responder enters.
     pub code: String,
@@ -61,6 +60,16 @@ pub struct RelayExchangeOffer {
     sas_key_material: [u8; 32],
     /// Our signing (identity) public key — needed for SAS derivation.
     our_identity_key: [u8; 32],
+}
+
+impl std::fmt::Debug for RelayExchangeOffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RelayExchangeOffer")
+            .field("code", &self.code)
+            .field("sas_key_material", &"[REDACTED]")
+            .field("our_identity_key", &self.our_identity_key)
+            .finish()
+    }
 }
 
 impl RelayExchangeOffer {
@@ -155,7 +164,7 @@ impl Vauchi {
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
-        let our_x3dh = identity.x3dh_keypair();
+        let our_x3dh = X3DHKeyPair::generate();
         let our_identity_key = *identity.signing_public_key();
 
         // Build offer payload

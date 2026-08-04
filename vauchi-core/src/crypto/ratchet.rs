@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use subtle::ConstantTimeEq;
 use thiserror::Error;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::X3DHKeyPair;
 use super::chain::{ChainError, ChainKey, MessageKey};
@@ -308,8 +308,17 @@ impl DoubleRatchetState {
 
     /// Decrypt a received message using the Double Ratchet.
     ///
-    /// Handles DH ratchet steps and out-of-order messages.
+    /// Handles DH ratchet steps and out-of-order messages. State advances only
+    /// after the ciphertext authenticates and its padding validates.
     pub fn decrypt(&mut self, message: &RatchetMessage) -> Result<Vec<u8>, RatchetError> {
+        let mut candidate = Self::deserialize(self.serialize())?;
+        let plaintext = candidate.decrypt_in_place(message)?;
+        *self = candidate;
+        Ok(plaintext)
+    }
+
+    /// Performs decryption on a disposable candidate state.
+    fn decrypt_in_place(&mut self, message: &RatchetMessage) -> Result<Vec<u8>, RatchetError> {
         let ad = message.associated_data();
 
         if let Some(key) = self.try_skipped_key(message) {
@@ -469,13 +478,13 @@ impl DoubleRatchetState {
         }
         // Use std::mem::take to extract values, leaving zeros behind for Drop
         let root_key = std::mem::take(&mut s.root_key);
-        let our_dh_secret = std::mem::take(&mut s.our_dh_secret);
+        let our_dh_secret = Zeroizing::new(std::mem::take(&mut s.our_dh_secret));
         let their_dh = s.their_dh.take();
         let send_chain_data = s.send_chain.take();
         let recv_chain_data = s.recv_chain.take();
         let skipped_keys_data = std::mem::take(&mut s.skipped_keys);
 
-        let our_dh = X3DHKeyPair::from_bytes(our_dh_secret);
+        let our_dh = X3DHKeyPair::from_bytes(*our_dh_secret);
 
         let send_chain = send_chain_data.map(|(key, r#gen)| ChainKey::with_generation(key, r#gen));
         let recv_chain = recv_chain_data.map(|(key, r#gen)| ChainKey::with_generation(key, r#gen));

@@ -1030,7 +1030,8 @@ fn decode_versioned_payload(
         // Version 0x02: CEK-wrapped payload
         match VersionedPayload::decode(plaintext) {
             Ok(VersionedPayload::CekWrapped(wrapped)) => {
-                let cek = ContentEncryptionKey::from_bytes(wrapped.cek);
+                let cek = ContentEncryptionKey::try_from_bytes(wrapped.cek)
+                    .map_err(|_| CardUpdateError::CekDecryptionFailed)?;
                 let decrypted = cek
                     .decrypt(&wrapped.cek_ciphertext)
                     .map_err(|_| CardUpdateError::CekDecryptionFailed)?;

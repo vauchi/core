@@ -73,6 +73,11 @@ test:packaging-matrix:
       trap 'rm -rf "$WORK_DIR"' EXIT
       git archive "$CI_COMMIT_SHA" | tar -x -C "$WORK_DIR"
       cd "$WORK_DIR"
+      # .cargo/config.toml enables sccache even when this variable is unset.
+      # This correctness matrix needs ownership isolation more than cache
+      # reuse: the shared daemon restored read-only .d files into fresh target
+      # directories on both nell slots.
+      export RUSTC_WRAPPER=""
 
       sh ci/tests/build-bindings-environment.test.sh
       case "$RUNNER_OS" in

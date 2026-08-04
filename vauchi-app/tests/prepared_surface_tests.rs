@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_app::ui::{
-    ActionListItem, Component, FormDialogEngine, FormDialogType, InputType, Item, PreparedSurface,
-    ScreenModel, Section, TextStyle, UserAction, WorkflowEngine,
+    A11y, ActionListItem, Component, DropdownOption, FormDialogEngine, FormDialogType, InputType,
+    Item, PreparedSurface, ScreenModel, Section, TextStyle, UserAction, WorkflowEngine,
 };
 use vauchi_core::{
     Command, Event, InputValue, PresentationInputKind, PresentationNode, PresentationTextStyle,
@@ -63,6 +63,81 @@ fn screen_state_projects_to_an_atomic_generic_surface_command() {
             ..
         } if label == "Display name"
     ));
+}
+
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn prepared_choice_carries_every_frontend_decision_in_one_command() {
+    let choice_screen = ScreenModel::new(
+        "appearance",
+        "Choose appearance",
+        vec![Component::Dropdown {
+            id: "theme".to_owned(),
+            label: "Theme".to_owned(),
+            selected: Some("dark".to_owned()),
+            options: vec![
+                DropdownOption {
+                    id: "light".to_owned(),
+                    label: "Light".to_owned(),
+                },
+                DropdownOption {
+                    id: "dark".to_owned(),
+                    label: "Dark".to_owned(),
+                },
+            ],
+            a11y: Some(A11y {
+                label: Some("Theme selection".to_owned()),
+                hint: Some("Choose the app appearance".to_owned()),
+                role: None,
+            }),
+        }],
+        vec![],
+    );
+    let prepared = PreparedSurface::from_screen(
+        SurfaceId::new("appearance").expect("surface id"),
+        12,
+        &choice_screen,
+    )
+    .expect("choice projects to a generic surface");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("choice projection must be atomic");
+    };
+
+    assert_eq!(surface.title, "Choose appearance");
+    assert_eq!(surface.accessibility_label, "Choose appearance");
+    assert_eq!(surface.tokens.spacing_small, 8);
+    assert_eq!(surface.tokens.spacing_medium, 16);
+    assert_eq!(surface.tokens.spacing_large, 24);
+    assert_eq!(surface.tokens.corner_radius, 12);
+    assert_eq!(surface.tokens.minimum_target_size, 44);
+
+    let PresentationNode::Choice {
+        binding_id,
+        label,
+        selected,
+        options,
+        enabled,
+        accessibility,
+    } = &surface.nodes[0]
+    else {
+        panic!("dropdown must project as a generic choice");
+    };
+    assert_eq!(binding_id.as_str(), "surface.12.binding.0");
+    assert_eq!(label, "Theme");
+    assert_eq!(selected.as_deref(), Some("dark"));
+    assert_eq!(
+        options
+            .iter()
+            .map(|option| (option.id.as_str(), option.label.as_str()))
+            .collect::<Vec<_>>(),
+        vec![("light", "Light"), ("dark", "Dark")]
+    );
+    assert!(*enabled);
+    assert_eq!(accessibility.label, "Theme selection");
+    assert_eq!(
+        accessibility.description.as_deref(),
+        Some("Choose the app appearance")
+    );
 }
 
 // @scenario: generic_presentation_protocol.feature :: User interaction returns as an opaque event

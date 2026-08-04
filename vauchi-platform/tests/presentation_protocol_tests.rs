@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use vauchi_core::MAX_EVENT_JSON_BYTES;
 use vauchi_platform::PlatformAppEngine;
 
 fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
@@ -102,4 +103,31 @@ fn test_platform_binding_forwards_available_window_facts_to_core() {
     assert_eq!(profile["window_class"], "medium");
     assert_eq!(profile["pane_layout"], "single");
     assert_eq!(profile["active_surface"], "onboarding");
+}
+
+/// Feature: generic_presentation_protocol.feature
+/// Scenario: Invalid boundary input fails safely
+// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+#[test]
+fn test_platform_binding_rejects_oversized_event_json() {
+    let (engine, _dir) = create_engine();
+    let event = format!(
+        "\"PresentationInvalidated\"{padding}",
+        padding = " ".repeat(MAX_EVENT_JSON_BYTES)
+    );
+
+    let error = engine
+        .dispatch_json(event)
+        .expect_err("oversized event JSON must be rejected");
+
+    match error {
+        vauchi_platform::MobileError::InvalidInput { field, detail } => {
+            assert_eq!(field, "");
+            assert_eq!(
+                detail,
+                format!("event JSON exceeds {MAX_EVENT_JSON_BYTES} bytes")
+            );
+        }
+        other => panic!("expected InvalidInput, got {other:?}"),
+    }
 }

@@ -111,9 +111,9 @@ pub(crate) fn commands_envelope_to_json(commands: &[Command]) -> Result<String, 
 
 /// Deserialize a generic platform event without a hand-maintained FFI mirror.
 pub(crate) fn event_from_json(json: &str) -> Result<Event, MobileError> {
-    serde_json::from_str(json).map_err(|e| MobileError::InvalidInput {
+    vauchi_core::event_from_json(json).map_err(|error| MobileError::InvalidInput {
         field: String::new(),
-        detail: format!("Failed to parse Event JSON: {e}"),
+        detail: error.to_string(),
     })
 }
 

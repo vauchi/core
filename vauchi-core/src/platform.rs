@@ -28,8 +28,10 @@
 
 use serde::{Deserialize, Serialize};
 
+mod event_json;
 mod presentation;
 
+pub use event_json::{EventJsonError, MAX_EVENT_JSON_BYTES, event_from_json};
 pub use presentation::{
     AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, BindingId, ChoiceOption, ContextBar,
     ExportFileSpec, InputMode, InputValue, InteractionId, MotionPreference, NotificationSpec,

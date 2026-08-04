@@ -16,9 +16,11 @@
 //! - Information-theoretic security: fewer than `t` shares reveal *nothing*.
 //! - Each share is 33 bytes: 1-byte index + 32-byte value.
 //! - The secret is the polynomial's constant term `f(0)`.
-//! - Field operations use fixed iteration counts and avoid lookup tables and
-//!   secret-dependent source-level branches. Compiler-level constant-time
-//!   behavior is not formally verified.
+//! - For valid shares, secret-dependent field arithmetic is table-free and
+//!   fixed-work at source level. Control flow may depend on public parameters,
+//!   share indices, and invalid-input handling. Rust/LLVM output and target
+//!   hardware timing have not been formally verified; this is not a
+//!   cross-platform constant-time guarantee.
 //!
 //! Reconstruction does not authenticate shares. Callers must validate the
 //! reconstructed key by opening authenticated ciphertext or using an
@@ -32,7 +34,9 @@
 //! # TODO
 //!
 //! Re-evaluate replacement crates during dependency reviews. Adopt one only
-//! after its relevant implementation has a published independent audit.
+//! after its relevant implementation has a published independent audit and
+//! implementation-level constant-time review; lookup tables alone do not
+//! establish resistance to cache-timing leakage.
 
 use rand_core::OsRng;
 use rand_core::RngCore;

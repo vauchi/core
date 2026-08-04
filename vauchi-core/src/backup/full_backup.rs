@@ -159,8 +159,8 @@ impl std::fmt::Debug for BackupSections {
         f.debug_struct("BackupSections")
             .field("identity", &self.identity)
             .field("contacts", &"[REDACTED]")
-            .field("own_card", &self.own_card)
-            .field("labels", &self.labels)
+            .field("own_card", &"[REDACTED]")
+            .field("labels", &"[REDACTED]")
             .finish()
     }
 }
@@ -186,11 +186,21 @@ impl std::fmt::Debug for IdentitySection {
 }
 
 /// A label (group) stored inside the backup envelope.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct LabelSection {
     pub label_id: String,
     pub name: String,
     pub contacts: Vec<String>,
+}
+
+impl std::fmt::Debug for LabelSection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LabelSection")
+            .field("label_id", &"[REDACTED]")
+            .field("name", &"[REDACTED]")
+            .field("contacts", &"[REDACTED]")
+            .finish()
+    }
 }
 
 /// Derives the v3 encryption key: Argon2id base key -> HKDF domain separation.

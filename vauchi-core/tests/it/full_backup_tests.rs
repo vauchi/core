@@ -9,11 +9,11 @@
 //! salt uniqueness, and backward compatibility with v2 identity backups.
 
 use vauchi_core::contact::Contact;
-use vauchi_core::contact_card::ContactCard;
+use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::{
     BackupError, BackupSections, FullBackupEnvelope, FullBackupIdentityData, IdentitySection,
-    ImportSource, export_contact_backup, export_full_backup, extract_master_seed,
+    ImportSource, LabelSection, export_contact_backup, export_full_backup, extract_master_seed,
     import_contact_backup, import_full_backup, restore_contacts_from_envelope,
 };
 
@@ -35,36 +35,70 @@ fn test_identity_data() -> FullBackupIdentityData {
 fn test_crypto_hardening_full_backup_debug_redacts_secret_material() {
     let master_seed = "MASTER_SEED_BASE64_SENTINEL";
     let relationship_key = "RELATIONSHIP_KEY_BASE64_SENTINEL";
-    let envelope = FullBackupEnvelope {
-        version: 3,
-        created_at: 0,
-        sections: BackupSections {
-            identity: IdentitySection {
-                display_name: "Alice".to_string(),
-                master_seed_b64: master_seed.to_string(),
-                device_index: 0,
-                device_name: "Primary".to_string(),
-            },
-            contacts: vec![serde_json::json!({
-                "kind": {
-                    "type": "exchanged",
-                    "shared_key_b64": relationship_key,
-                }
-            })],
-            own_card: None,
-            labels: Vec::new(),
+    let own_card_name = "OWN_CARD_NAME_SENTINEL";
+    let own_card_label = "OWN_CARD_LABEL_SENTINEL";
+    let own_card_value = "OWN_CARD_VALUE_SENTINEL";
+    let label_id = "LABEL_ID_SENTINEL";
+    let label_name = "LABEL_NAME_SENTINEL";
+    let label_contact = "LABEL_CONTACT_SENTINEL";
+    let mut own_card = ContactCard::new(own_card_name);
+    own_card
+        .add_field(ContactField::new(
+            FieldType::Custom,
+            own_card_label,
+            own_card_value,
+            0,
+        ))
+        .unwrap();
+    let sections = BackupSections {
+        identity: IdentitySection {
+            display_name: "Alice".to_string(),
+            master_seed_b64: master_seed.to_string(),
+            device_index: 0,
+            device_name: "Primary".to_string(),
         },
+        contacts: vec![serde_json::json!({
+            "kind": {
+                "type": "exchanged",
+                "shared_key_b64": relationship_key,
+            }
+        })],
+        own_card: Some(own_card),
+        labels: vec![LabelSection {
+            label_id: label_id.to_string(),
+            name: label_name.to_string(),
+            contacts: vec![label_contact.to_string()],
+        }],
     };
 
-    let debug = format!("{envelope:?}");
-    assert!(
-        !debug.contains(master_seed),
-        "backup Debug must redact the master seed: {debug}"
+    let label_debug = format!("{:?}", sections.labels[0]);
+    let sections_debug = format!("{sections:?}");
+    let envelope_debug = format!(
+        "{:?}",
+        FullBackupEnvelope {
+            version: 3,
+            created_at: 0,
+            sections,
+        }
     );
-    assert!(
-        !debug.contains(relationship_key),
-        "backup Debug must redact relationship keys: {debug}"
-    );
+
+    for debug in [&label_debug, &sections_debug, &envelope_debug] {
+        for sentinel in [
+            master_seed,
+            relationship_key,
+            own_card_name,
+            own_card_label,
+            own_card_value,
+            label_id,
+            label_name,
+            label_contact,
+        ] {
+            assert!(
+                !debug.contains(sentinel),
+                "backup Debug must redact {sentinel}: {debug}"
+            );
+        }
+    }
 }
 
 fn make_exchanged(name: &str) -> Contact {

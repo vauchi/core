@@ -173,8 +173,28 @@ fn bench_hkdf(c: &mut Criterion) {
 
 fn bench_double_ratchet(c: &mut Criterion) {
     use vauchi_core::crypto::SymmetricKey;
-    use vauchi_core::crypto::ratchet::DoubleRatchetState;
+    use vauchi_core::crypto::ratchet::{
+        DoubleRatchetState, RatchetMessage, SerializedRatchetState,
+    };
     use vauchi_core::exchange::X3DHKeyPair;
+
+    fn decrypt_fixture(skipped_keys: usize) -> (SerializedRatchetState, RatchetMessage) {
+        let secret = SymmetricKey::generate();
+        let bob_keys = X3DHKeyPair::generate();
+        let mut alice =
+            DoubleRatchetState::initialize_initiator(&secret, *bob_keys.public_key()).unwrap();
+        let mut bob = DoubleRatchetState::initialize_responder(&secret, bob_keys);
+
+        for _ in 0..skipped_keys {
+            black_box(alice.encrypt(b"skipped benchmark message").unwrap());
+        }
+        let opener = alice.encrypt(b"establish receiving chain").unwrap();
+        black_box(bob.decrypt(&opener).unwrap());
+        assert_eq!(bob.skipped_keys_count(), skipped_keys);
+
+        let target = alice.encrypt(b"measured same-chain message").unwrap();
+        (bob.serialize(), target)
+    }
 
     let mut group = c.benchmark_group("double_ratchet");
 
@@ -233,6 +253,27 @@ fn bench_double_ratchet(c: &mut Criterion) {
             criterion::BatchSize::SmallInput,
         )
     });
+
+    for skipped_keys in [0, 1000] {
+        let (template, target) = decrypt_fixture(skipped_keys);
+        let snapshot_state = DoubleRatchetState::deserialize(template.clone()).unwrap();
+
+        group.bench_function(
+            format!("transactional_snapshot_{skipped_keys}_skipped"),
+            |b| {
+                b.iter(|| {
+                    DoubleRatchetState::deserialize(black_box(snapshot_state.serialize())).unwrap()
+                })
+            },
+        );
+        group.bench_function(format!("decrypt_same_chain_{skipped_keys}_skipped"), |b| {
+            b.iter_batched_ref(
+                || DoubleRatchetState::deserialize(template.clone()).unwrap(),
+                |ratchet| ratchet.decrypt(black_box(&target)).unwrap(),
+                criterion::BatchSize::SmallInput,
+            )
+        });
+    }
 
     group.finish();
 }

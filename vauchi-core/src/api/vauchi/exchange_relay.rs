@@ -14,7 +14,7 @@
 //! 1. **Initiator** calls `start_relay_exchange()` → gets a short numeric `code`.
 //! 2. **Responder** enters the code and calls `claim_relay_exchange(code)` →
 //!    gets `RelayExchangeResult` with the new contact and a SAS code.
-//! 3. **Initiator** polls `complete_relay_exchange(code, &offer)` until it
+//! 3. **Initiator** polls `complete_relay_exchange(code, &mut offer)` until it
 //!    returns `Some(RelayExchangeResult)` with a matching SAS code.
 //! 4. Both sides verbally compare SAS codes to confirm the exchange.
 //!
@@ -39,6 +39,7 @@
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::Vauchi;
 use crate::api::contact_manager::ContactManager;
@@ -51,6 +52,7 @@ use crate::network::HttpTransport;
 
 /// Result of `start_relay_exchange`: the code to display and secret
 /// material needed to complete the exchange later.
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct RelayExchangeOffer {
     /// The short numeric code the responder enters.
     pub code: String,
@@ -65,7 +67,7 @@ pub struct RelayExchangeOffer {
 impl std::fmt::Debug for RelayExchangeOffer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RelayExchangeOffer")
-            .field("code", &self.code)
+            .field("code", &"[REDACTED]")
             .field("sas_key_material", &"[REDACTED]")
             .field("our_identity_key", &self.our_identity_key)
             .finish()
@@ -318,7 +320,7 @@ impl Vauchi {
     pub fn complete_relay_exchange(
         &self,
         code: &str,
-        offer: &RelayExchangeOffer,
+        offer: &mut RelayExchangeOffer,
     ) -> VauchiResult<Option<RelayExchangeResult>> {
         let _identity = self
             .identity
@@ -385,6 +387,10 @@ impl Vauchi {
             &offer.our_identity_key,
             &their_identity_key,
         );
+
+        // The relay offer is single-use. Destroy its private key and claim
+        // capability immediately after successful protocol completion.
+        offer.zeroize();
 
         Ok(Some(RelayExchangeResult {
             contact_id,

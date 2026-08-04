@@ -30,6 +30,8 @@ pub(crate) const CONTACT_BACKUP_VERSION: u8 = 0x01;
 
 /// Maximum accepted encrypted contact-backup size.
 const MAX_CONTACT_BACKUP_BYTES: usize = 32 * 1024 * 1024;
+/// Version, salt, algorithm tag, XChaCha20 nonce, and Poly1305 tag bytes.
+const CONTACT_BACKUP_ENCRYPTION_OVERHEAD: usize = 1 + 16 + 1 + 24 + 16;
 
 /// Error type for contact backup operations.
 #[derive(Debug, Clone, thiserror::Error)]
@@ -344,6 +346,9 @@ pub fn export_contact_backup(contacts: &[Contact], password: &str) -> Result<Vec
     let plaintext = Zeroizing::new(
         serde_json::to_vec(&entries).map_err(|e| BackupError::Serialization(e.to_string()))?,
     );
+    if plaintext.len() > MAX_CONTACT_BACKUP_BYTES - CONTACT_BACKUP_ENCRYPTION_OVERHEAD {
+        return Err(BackupError::TooLarge);
+    }
 
     let salt: [u8; 16] = random_bytes();
 
@@ -358,6 +363,9 @@ pub fn export_contact_backup(contacts: &[Contact], password: &str) -> Result<Vec
     out.push(CONTACT_BACKUP_VERSION);
     out.extend_from_slice(&salt);
     out.extend_from_slice(&ciphertext);
+    if out.len() > MAX_CONTACT_BACKUP_BYTES {
+        return Err(BackupError::TooLarge);
+    }
     Ok(out)
 }
 
@@ -449,5 +457,51 @@ mod tests {
         let json = r#"{"schema_version":1,"id":"abc","display_name":"Test","fields":[],"avatar":[0,1,2,255,254,128]}"#;
         let backup: BackupContactCard = serde_json::from_str(json).unwrap();
         assert_eq!(backup.avatar, Some(vec![0u8, 1, 2, 255, 254, 128]));
+    }
+
+    // @scenario: security :: Every successful contact backup export is importable
+    #[test]
+    fn test_crypto_hardening_contact_backup_export_rejects_output_over_import_limit() {
+        use crate::contact_card::{ContactField, FieldType, MAX_FIELDS};
+
+        let fields: Vec<ContactField> = (0..MAX_FIELDS)
+            .map(|i| {
+                ContactField::new(
+                    FieldType::Custom,
+                    &format!("Field {i}"),
+                    &"v".repeat(1_000),
+                    0,
+                )
+                .with_note("n".repeat(500))
+            })
+            .collect();
+        let contacts: Vec<Contact> = (0..120)
+            .map(|i| {
+                let card = ContactCard::from_backup_parts(
+                    1,
+                    format!("card-{i}"),
+                    format!("Contact {i}"),
+                    fields.clone(),
+                    None,
+                    None,
+                    None,
+                    VisibilityRules::new(),
+                );
+                Contact::from_import_stored(
+                    format!("contact-{i}"),
+                    card,
+                    ImportSource::Manual,
+                    0,
+                    None,
+                )
+            })
+            .collect();
+
+        let result = export_contact_backup(&contacts, "password");
+        assert!(
+            matches!(result, Err(BackupError::TooLarge)),
+            "export must not create a blob that import rejects, got {} bytes",
+            result.as_ref().map_or(0, Vec::len)
+        );
     }
 }

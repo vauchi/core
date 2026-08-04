@@ -10,6 +10,8 @@ use crate::common::mock_relay::{CannedResponse, MockRelay};
 use vauchi_core::api::{VauchiBuilder, VauchiConfig};
 use vauchi_core::network::http_transport::{HttpTransport, HttpTransportConfig};
 
+fn assert_zeroize_on_drop<T: zeroize::ZeroizeOnDrop>() {}
+
 fn test_transport() -> HttpTransport {
     HttpTransport::new(HttpTransportConfig::for_testing("http://localhost:1", 100))
 }
@@ -137,6 +139,8 @@ fn test_crypto_hardening_two_dh_static_responder_compromise_recovers_past_secret
 #[cfg(feature = "testing")]
 #[test]
 fn test_crypto_hardening_relay_exchange_offer_debug_redacts_secret() {
+    assert_zeroize_on_drop::<vauchi_core::api::RelayExchangeOffer>();
+
     let mock = MockRelay::start();
     mock.queue(
         "exchange_offer",
@@ -161,6 +165,10 @@ fn test_crypto_hardening_relay_exchange_offer_debug_redacts_secret() {
     assert!(
         offer_debug.contains("[REDACTED]"),
         "relay offer Debug must make redaction explicit: {offer_debug}"
+    );
+    assert!(
+        !offer_debug.contains(&offer.code),
+        "relay offer Debug must not contain its claim capability: {offer_debug}"
     );
 }
 
@@ -192,6 +200,89 @@ fn test_crypto_hardening_relay_exchange_uses_fresh_key_per_offer() {
         first.sas_key_material(),
         second.sas_key_material(),
         "each relay offer must use fresh X25519 private key material"
+    );
+}
+
+// @scenario: security :: Relay exchange uses matching fresh keys and consumes offer secret
+#[cfg(feature = "testing")]
+#[test]
+fn test_crypto_hardening_relay_exchange_roundtrip_consumes_offer_secret() {
+    use vauchi_protocol::v2::{V2ExchangeClaimRequest, V2ExchangeOfferRequest, V2Response};
+
+    let mock = MockRelay::start();
+    mock.queue(
+        "exchange_offer",
+        CannedResponse::ok_json(br#"{"status":"ok","code":"654321"}"#.to_vec()),
+    );
+
+    let alice_dir = tempfile::tempdir().unwrap();
+    let mut alice_config = VauchiConfig::with_storage_path(alice_dir.path().join("vauchi.db"))
+        .with_relay_url(mock.url());
+    alice_config.ohttp.allow_direct = true;
+    let mut alice = VauchiBuilder::new().config(alice_config).build().unwrap();
+    alice.create_identity("Alice").unwrap();
+
+    let bob_dir = tempfile::tempdir().unwrap();
+    let mut bob_config = VauchiConfig::with_storage_path(bob_dir.path().join("vauchi.db"))
+        .with_relay_url(mock.url());
+    bob_config.ohttp.allow_direct = true;
+    let mut bob = VauchiBuilder::new().config(bob_config).build().unwrap();
+    bob.create_identity("Bob").unwrap();
+
+    let mut offer = alice.start_relay_exchange(Some(300)).unwrap();
+    let offer_request: V2ExchangeOfferRequest =
+        serde_json::from_slice(&mock.received()[0].body).unwrap();
+
+    let mut claim_response = V2Response::new("ok");
+    claim_response.payload = Some(offer_request.payload);
+    mock.queue(
+        "exchange_claim",
+        CannedResponse::ok_v2_response(&claim_response),
+    );
+    let bob_result = bob.claim_relay_exchange(&offer.code).unwrap();
+    let claim_request: V2ExchangeClaimRequest =
+        serde_json::from_slice(&mock.received()[1].body).unwrap();
+
+    let mut complete_response = V2Response::new("ok");
+    complete_response.response = Some(claim_request.response);
+    mock.queue(
+        "exchange_complete",
+        CannedResponse::ok_v2_response(&complete_response),
+    );
+    let code = offer.code.clone();
+    let alice_result = alice
+        .complete_relay_exchange(&code, &mut offer)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(alice_result.sas, bob_result.sas);
+    assert_eq!(alice_result.display_name, "Bob");
+    assert_eq!(bob_result.display_name, "Alice");
+    assert!(
+        alice
+            .get_contact(&alice_result.contact_id)
+            .unwrap()
+            .is_some()
+    );
+    assert!(bob.get_contact(&bob_result.contact_id).unwrap().is_some());
+
+    let mut alice_ratchet = alice
+        .get_ratchet_state(&alice_result.contact_id)
+        .unwrap()
+        .unwrap();
+    let mut bob_ratchet = bob
+        .get_ratchet_state(&bob_result.contact_id)
+        .unwrap()
+        .unwrap();
+    let message = bob_ratchet.encrypt(b"relay exchange ratchet").unwrap();
+    assert_eq!(
+        alice_ratchet.decrypt(&message).unwrap(),
+        b"relay exchange ratchet"
+    );
+    assert_eq!(
+        offer.sas_key_material(),
+        &[0u8; 32],
+        "successful completion must consume the one-use private key"
     );
 }
 

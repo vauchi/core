@@ -64,6 +64,16 @@ test:packaging-matrix:
   script:
     - |
       set -euo pipefail
+      # Shell runners retain the project directory between jobs. A target/
+      # tree created by a different runner context can therefore be
+      # unreadable even when the checkout itself is healthy. Build the exact
+      # tested revision in a private directory so packaging never inherits
+      # stale ownership or permissions.
+      WORK_DIR=$(mktemp -d "/tmp/vauchi-packaging-${CI_JOB_ID}.XXXXXX")
+      trap 'rm -rf "$WORK_DIR"' EXIT
+      git archive "$CI_COMMIT_SHA" | tar -x -C "$WORK_DIR"
+      cd "$WORK_DIR"
+
       sh ci/tests/build-bindings-environment.test.sh
       case "$RUNNER_OS" in
         linux)

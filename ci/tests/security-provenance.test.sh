@@ -55,7 +55,7 @@ fi
 isolated_dirs=$(grep -Fc 'VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)' "$PIPELINE" || true)
 remotes=$(grep -Fc 'git -C "${VAUCHI_CI_SCRIPTS_DIR}" remote add origin https://gitlab.com/vauchi/scripts.git' "$PIPELINE" || true)
 fetches=$(grep -Fc 'git -C "${VAUCHI_CI_SCRIPTS_DIR}" fetch --depth=1 origin "${VAUCHI_SCRIPTS_REF}"' "$PIPELINE" || true)
-checkouts=$(grep -Fc 'git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach "${VAUCHI_SCRIPTS_REF}"' "$PIPELINE" || true)
+checkouts=$(grep -Fc 'git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach FETCH_HEAD' "$PIPELINE" || true)
 [ "$remotes" -eq "$isolated_dirs" ] || fail "a scripts fetch targets a shared directory"
 [ "$fetches" -eq "$isolated_dirs" ] || fail "a scripts checkout does not fetch the exact commit"
 [ "$checkouts" -eq "$isolated_dirs" ] || fail "a scripts checkout can follow a mutable ref"

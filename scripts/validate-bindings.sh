@@ -49,6 +49,7 @@ MIN_KOTLIN_LINES=5000
 BINDINGS_DIR="$PROJECT_ROOT/target/bindings"
 IOS_BINDINGS="$BINDINGS_DIR/ios/generated/vauchi_platform.swift"
 ANDROID_BINDINGS="$BINDINGS_DIR/android/kotlin/uniffi/vauchi_platform/vauchi_platform.kt"
+CABI_HEADER="$PROJECT_ROOT/vauchi-cabi/include/vauchi.h"
 
 # Fallback: check sibling repos (legacy local dev paths)
 if [[ ! -f "$IOS_BINDINGS" && -f "$WORKSPACE_ROOT/ios/Vauchi/Generated/vauchi_platform.swift" ]]; then
@@ -70,6 +71,7 @@ check_bindings() {
     local file="$1"
     local platform="$2"
     local min_lines="$3"
+    local expected_export="$4"
     local missing=()
 
     echo -e "${YELLOW}Checking $platform bindings: $file${NC}"
@@ -80,7 +82,8 @@ check_bindings() {
     fi
 
     # Check line count
-    local lines=$(wc -l < "$file")
+    local lines
+    lines=$(wc -l < "$file")
     if [[ $lines -lt $min_lines ]]; then
         echo -e "${RED}  ERROR: File has $lines lines, expected at least $min_lines${NC}"
         echo -e "${RED}  This suggests bindings were generated from incomplete metadata.${NC}"
@@ -92,7 +95,7 @@ check_bindings() {
 
     # Check for expected types
     for type in "${EXPECTED_TYPES[@]}"; do
-        if ! grep -q "$type" "$file"; then
+        if ! grep -Fq "$type" "$file"; then
             missing+=("$type")
         fi
     done
@@ -107,6 +110,29 @@ check_bindings() {
         echo -e "${GREEN}  All ${#EXPECTED_TYPES[@]} expected types present${NC}"
     fi
 
+    if ! grep -Fq "$expected_export" "$file"; then
+        echo -e "${RED}  ERROR: Missing presentation export: $expected_export${NC}"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo -e "${GREEN}  Presentation export present${NC}"
+    fi
+
+    echo ""
+}
+
+check_cabi_header() {
+    local expected_export="vauchi_presentation_contract_fixture(void)"
+
+    echo -e "${YELLOW}Checking C ABI header: $CABI_HEADER${NC}"
+    if [[ ! -f "$CABI_HEADER" ]]; then
+        echo -e "${RED}  ERROR: File not found!${NC}"
+        ERRORS=$((ERRORS + 1))
+    elif ! grep -Fq "$expected_export" "$CABI_HEADER"; then
+        echo -e "${RED}  ERROR: Missing presentation export: $expected_export${NC}"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo -e "${GREEN}  Presentation export present${NC}"
+    fi
     echo ""
 }
 
@@ -155,14 +181,25 @@ check_xcframework() {
 
 # Check iOS bindings
 if [[ -f "$IOS_BINDINGS" ]]; then
-    check_bindings "$IOS_BINDINGS" "iOS (Swift)" "$MIN_SWIFT_LINES"
+    check_bindings \
+        "$IOS_BINDINGS" \
+        "iOS (Swift)" \
+        "$MIN_SWIFT_LINES" \
+        "func presentationContractFixtureJson("
 else
     echo -e "${YELLOW}iOS bindings not found (skipping - may not be on macOS)${NC}"
     echo ""
 fi
 
 # Check Android bindings
-check_bindings "$ANDROID_BINDINGS" "Android (Kotlin)" "$MIN_KOTLIN_LINES"
+check_bindings \
+    "$ANDROID_BINDINGS" \
+    "Android (Kotlin)" \
+    "$MIN_KOTLIN_LINES" \
+    "fun presentationContractFixtureJson("
+
+# Check the public C ABI declaration used by native frontends
+check_cabi_header
 
 # Check library metadata (if we can build)
 echo -e "${YELLOW}Checking library metadata...${NC}"

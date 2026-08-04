@@ -169,6 +169,16 @@ check:swift-bindings-timeout:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+check:binding-validation-contract:
+  stage: lint
+  extends: [.linux-runner-nocache, .timeout-quick]
+  needs: []
+  script:
+    - sh ci/tests/validate-bindings-contract.test.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 check:packaging-matrix-isolation:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21

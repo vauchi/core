@@ -558,12 +558,10 @@ trigger:windows:
   # bridges below: a red consumer is a consumer problem, not a reason to
   # withhold artifacts other consumers are waiting on.
   #
-  # The 403 itself is a token-scope bug, not a GitLab limit: the MR call
-  # below sends CI_PUSH_TOKEN_WINDOWS, which can push the branch but is
-  # not permitted to create the merge request. Fix the scope/role on that
-  # token — do not reach for a new credential. (Commit 3761e61d claimed
-  # CI_JOB_TOKEN was the blocker; that was asserted without testing and
-  # is wrong — this path never uses CI_JOB_TOKEN.)
+  # CI_PUSH_TOKEN_WINDOWS is deliberately limited to repository writes.
+  # Merge-request API calls use the existing API-capable group token, as
+  # the ios/macos/android version-bump jobs do; widening the dedicated
+  # push credential would grant it unrelated Windows API access.
   allow_failure: true
   interruptible: false
   needs: [build:cabi-windows]
@@ -612,7 +610,7 @@ trigger:windows:
       if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
         OPEN_MR_URL=$(curl --fail --silent --show-error \
           --get \
-          --header "PRIVATE-TOKEN: ${CI_PUSH_TOKEN_WINDOWS}" \
+          --header "PRIVATE-TOKEN: ${PROJECT_ACCESS_TOKEN}" \
           --data-urlencode "state=opened" \
           --data-urlencode "source_branch=$BRANCH" \
           "${CI_API_V4_URL}/projects/vauchi%2Fwindows/merge_requests" \
@@ -667,7 +665,7 @@ trigger:windows:
       )
       MR_RESPONSE=$(curl --fail --silent --show-error \
         --request POST \
-        --header "PRIVATE-TOKEN: ${CI_PUSH_TOKEN_WINDOWS}" \
+        --header "PRIVATE-TOKEN: ${PROJECT_ACCESS_TOKEN}" \
         --header "Content-Type: application/json" \
         --data "$(jq -n \
           --arg source_branch "$BRANCH" \

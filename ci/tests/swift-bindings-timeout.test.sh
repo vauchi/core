@@ -4,7 +4,7 @@
 
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname "$0")/../.." && pwd)
 PIPELINE="$ROOT/ci/publish-and-trigger.yml"
 
 job=$(

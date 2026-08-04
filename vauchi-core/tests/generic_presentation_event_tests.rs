@@ -4,7 +4,8 @@
 
 use serde_json::json;
 use vauchi_core::{
-    Event, EventJsonError, MAX_EVENT_JSON_NESTING_DEPTH, OverlayKind, SurfaceId, event_from_json,
+    Event, EventJsonError, MAX_EVENT_INPUT_VALUE_BYTES, MAX_EVENT_JSON_NESTING_DEPTH, OverlayKind,
+    SurfaceId, event_from_json,
 };
 
 fn surface(id: &str) -> SurfaceId {
@@ -60,5 +61,25 @@ fn test_event_json_rejects_excessive_nesting_before_deserialization() {
     assert_eq!(
         event_from_json(&event).expect_err("excessive nesting must be rejected"),
         EventJsonError::TooDeep
+    );
+}
+
+/// Feature: generic_presentation_protocol.feature
+/// Scenario: Invalid boundary input fails safely
+// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+#[test]
+fn test_event_json_rejects_oversized_input_value() {
+    let event = json!({
+        "ValueChanged": {
+            "surface_id": "main",
+            "binding_id": "display-name",
+            "value": {"text": "x".repeat(MAX_EVENT_INPUT_VALUE_BYTES + 1)},
+        }
+    })
+    .to_string();
+
+    assert_eq!(
+        event_from_json(&event).expect_err("oversized input value must be rejected"),
+        EventJsonError::InputValueTooLarge
     );
 }

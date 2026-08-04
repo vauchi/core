@@ -109,13 +109,13 @@ pub mod platform;
 pub use platform::{
     AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, AuthenticationRequirement, BindingId,
     BleLinkDirection, ChoiceOption, Command, ContextBar, Event, EventJsonError, ExportFileSpec,
-    FilePickPurpose, InputMode, InputValue, InteractionId, MAX_EVENT_JSON_BYTES,
-    MAX_EVENT_JSON_NESTING_DEPTH, MotionPreference, NotificationSpec, NotificationUrgency,
-    Orientation, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis, PresentationIdError,
-    PresentationImageShape, PresentationInputKind, PresentationNode, PresentationPaging,
-    PresentationProfile, PresentationQrPurpose, PresentationRow, PresentationTextStyle,
-    PresentationTokens, PresentationTone, StandardShortcut, SurfaceId, SurfaceLayout, SurfaceSpec,
-    ToastSpec, WindowClass, event_from_json,
+    FilePickPurpose, InputMode, InputValue, InteractionId, MAX_EVENT_INPUT_VALUE_BYTES,
+    MAX_EVENT_JSON_BYTES, MAX_EVENT_JSON_NESTING_DEPTH, MotionPreference, NotificationSpec,
+    NotificationUrgency, Orientation, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis,
+    PresentationIdError, PresentationImageShape, PresentationInputKind, PresentationNode,
+    PresentationPaging, PresentationProfile, PresentationQrPurpose, PresentationRow,
+    PresentationTextStyle, PresentationTokens, PresentationTone, StandardShortcut, SurfaceId,
+    SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass, event_from_json,
 };
 
 pub mod recovery;

@@ -4,9 +4,10 @@
 
 //! Canonical Core presentation reducer C ABI.
 
+use std::ffi::CStr;
 use std::os::raw::c_char;
 
-use super::{VauchiApp, from_c_str, to_c_string};
+use super::{VauchiApp, to_c_string};
 
 /// Return the versioned Core presentation contract corpus as canonical JSON.
 ///
@@ -62,11 +63,14 @@ pub unsafe extern "C" fn vauchi_app_dispatch(
             if handle.is_null() {
                 return std::ptr::null_mut();
             }
-            let json = match from_c_str(event_json) {
-                Some(json) => json,
-                None => return to_c_string(r#"{"error":"null event JSON"}"#),
+            if event_json.is_null() {
+                return to_c_string(r#"{"error":"null event JSON"}"#);
+            }
+            let json = match CStr::from_ptr(event_json).to_str() {
+                Ok(json) => json,
+                Err(_) => return to_c_string(r#"{"error":"event JSON is malformed"}"#),
             };
-            let event = match serde_json::from_str::<vauchi_core::Event>(&json) {
+            let event = match vauchi_core::event_from_json(json) {
                 Ok(event) => event,
                 Err(error) => {
                     return to_c_string(
@@ -94,7 +98,7 @@ pub unsafe extern "C" fn vauchi_app_dispatch(
 // INLINE_TEST_REQUIRED: this cdylib/staticlib crate has no Rust integration-test target
 #[cfg(test)]
 mod tests {
-    use std::ffi::CStr;
+    use std::ffi::{CStr, CString};
 
     use super::*;
 
@@ -111,5 +115,40 @@ mod tests {
         );
         // SAFETY: The pointer is owned by the C ABI and freed exactly once.
         unsafe { crate::vauchi_string_free(fixture_ptr) };
+    }
+
+    /// Feature: generic_presentation_protocol.feature
+    /// Scenario: Invalid boundary input fails safely
+    // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+    #[test]
+    fn c_abi_rejects_oversized_event_json() {
+        // SAFETY: The default constructor has no pointer inputs and returns an owned handle.
+        let app = unsafe { crate::vauchi_app_create() };
+        assert!(!app.is_null());
+        let event = CString::new(format!(
+            "\"PresentationInvalidated\"{padding}",
+            padding = " ".repeat(vauchi_core::MAX_EVENT_JSON_BYTES)
+        ))
+        .unwrap();
+
+        // SAFETY: The handle and NUL-terminated event string are owned by this test.
+        let response_ptr = unsafe { vauchi_app_dispatch(app, event.as_ptr()) };
+        assert!(!response_ptr.is_null());
+        // SAFETY: The C ABI returned a valid string owned by this test.
+        let response = unsafe { CStr::from_ptr(response_ptr) }.to_str().unwrap();
+        let response: serde_json::Value = serde_json::from_str(response).unwrap();
+        assert_eq!(
+            response["error"],
+            format!(
+                "event JSON exceeds {} bytes",
+                vauchi_core::MAX_EVENT_JSON_BYTES
+            )
+        );
+
+        // SAFETY: Both pointers are owned by the C ABI and freed exactly once.
+        unsafe {
+            crate::vauchi_string_free(response_ptr);
+            crate::vauchi_app_destroy(app);
+        }
     }
 }

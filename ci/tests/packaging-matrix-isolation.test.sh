@@ -27,5 +27,6 @@ require() {
 require 'mktemp -d' "create a per-job build directory"
 require 'git archive "$CI_COMMIT_SHA"' "copy only the tested revision"
 require 'cd "$WORK_DIR"' "build outside the shared runner checkout"
+require 'export RUSTC_WRAPPER=""' "avoid shared sccache ownership leaks"
 
 echo "PASS: packaging matrix isolates each build from shared target permissions"

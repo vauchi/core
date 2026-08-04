@@ -381,7 +381,10 @@ release:create:
 # Uses CI_PUSH_TOKEN_SWIFT (scoped project access token) for git push —
 # CI_JOB_TOKEN pushes don't trigger downstream pipelines in ios/macos.
 update:swift-bindings:
-  extends: [.linux-runner, .timeout-quick]
+  # The XCFramework artifact is currently about 684 MB. GitLab downloads
+  # `needs:` artifacts before the script starts, and the 10-minute quick tier
+  # timed out twice while fetching v0.59.2 on the shell runner.
+  extends: [.linux-runner, .timeout-standard]
   stage: trigger
   interruptible: false
   needs: [package:xcframework, publish:packages]

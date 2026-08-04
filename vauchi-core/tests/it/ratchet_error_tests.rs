@@ -64,13 +64,10 @@ fn test_ratchet_handles_message_skip() {
 
     // Bob receives message 3 (skipping 2)
     // This tests the ratchet's ability to handle skipped messages
-    let dec3_result = bob_ratchet.decrypt(&enc3);
-
-    // Result depends on implementation - may succeed or fail
-    // Signal protocol allows skipping up to MAX_SKIP messages
-    if let Ok(decrypted) = dec3_result {
-        assert_eq!(decrypted, msg3);
-    }
+    let decrypted = bob_ratchet
+        .decrypt(&enc3)
+        .expect("message within the supported skip window must decrypt");
+    assert_eq!(decrypted, msg3);
 }
 
 /// Test: Duplicate message detection

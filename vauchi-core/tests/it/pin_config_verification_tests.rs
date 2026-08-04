@@ -101,6 +101,25 @@ fn wrong_verify_key_rejected() {
     );
 }
 
+/// @internal C7: attacker-selected weak Ed25519 trust roots must be rejected
+#[test]
+fn test_crypto_hardening_weak_pin_config_verify_key_rejected() {
+    let mut weak_key = [0u8; 32];
+    weak_key[0] = 1;
+
+    let mut universal_signature = [0u8; 64];
+    universal_signature[0] = 1;
+    let mut payload = universal_signature.to_vec();
+    payload.extend_from_slice(&[0xAA; 32]);
+
+    let error = verify_signed_pin_config(&payload, &weak_key)
+        .expect_err("pin configuration must reject weak Ed25519 trust roots");
+    assert!(
+        error.to_string().contains("signature verification failed"),
+        "weak-key rejection must use the sanitized signature error, got: {error}"
+    );
+}
+
 /// @internal C7: body shorter than 96 bytes must be rejected
 #[test]
 fn too_short_body_rejected() {

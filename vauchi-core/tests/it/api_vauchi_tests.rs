@@ -676,6 +676,69 @@ fn test_process_incoming_card_update() {
     assert!(bob_card.fields().iter().any(|f| f.label() == "work"));
 }
 
+// @scenario: security :: Malformed authenticated CEK payload is rejected without panic
+#[test]
+fn test_crypto_hardening_process_incoming_card_update_zero_cek_returns_error() {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    use vauchi_core::Identity;
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
+    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::sync::delta::{CekWrappedPayload, VersionedPayload};
+
+    let mut alice_wb = create_test_vauchi();
+    alice_wb.create_identity("Alice").unwrap();
+
+    let bob_identity = Identity::create("Bob", 0);
+    let bob_dh = X3DHKeyPair::generate();
+    let shared_secret = SymmetricKey::generate();
+    let contact = Contact::from_exchange(
+        *bob_identity.signing_public_key(),
+        ContactCard::new("Bob"),
+        shared_secret.clone(),
+        0,
+    );
+    let bob_id = contact.id().to_string();
+    alice_wb.add_contact(contact).unwrap();
+    alice_wb
+        .create_ratchet_as_responder(
+            &bob_id,
+            &shared_secret,
+            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+        )
+        .unwrap();
+
+    let mut bob_ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: [0u8; 32],
+        cek_ciphertext: vec![0u8; 41],
+        signature: [0u8; 64],
+        nonce: [0u8; 32],
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let ratchet_message = bob_ratchet.encrypt(&payload).unwrap();
+    let encrypted = serde_json::to_vec(&ratchet_message).unwrap();
+
+    let call = catch_unwind(AssertUnwindSafe(|| {
+        process_single_card_update(
+            alice_wb.identity().unwrap(),
+            alice_wb.storage(),
+            &bob_id,
+            &encrypted,
+        )
+    }));
+
+    assert!(
+        call.is_ok(),
+        "authenticated malformed CEK payload must return an error, not panic"
+    );
+    assert!(
+        matches!(call.unwrap(), Err(CardUpdateError::CekDecryptionFailed)),
+        "zero CEK must be rejected as a CEK decryption failure"
+    );
+}
+
 // @internal
 #[test]
 fn test_update_display_name() {

@@ -12,8 +12,9 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::{
-    BackupError, FullBackupIdentityData, ImportSource, export_contact_backup, export_full_backup,
-    extract_master_seed, import_contact_backup, import_full_backup, restore_contacts_from_envelope,
+    BackupError, BackupSections, FullBackupEnvelope, FullBackupIdentityData, IdentitySection,
+    ImportSource, export_contact_backup, export_full_backup, extract_master_seed,
+    import_contact_backup, import_full_backup, restore_contacts_from_envelope,
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -27,6 +28,43 @@ fn test_identity_data() -> FullBackupIdentityData {
         device_index: 0,
         device_name: "Primary Device".to_string(),
     }
+}
+
+// @scenario: security :: Decrypted backup debug output redacts secret material
+#[test]
+fn test_crypto_hardening_full_backup_debug_redacts_secret_material() {
+    let master_seed = "MASTER_SEED_BASE64_SENTINEL";
+    let relationship_key = "RELATIONSHIP_KEY_BASE64_SENTINEL";
+    let envelope = FullBackupEnvelope {
+        version: 3,
+        created_at: 0,
+        sections: BackupSections {
+            identity: IdentitySection {
+                display_name: "Alice".to_string(),
+                master_seed_b64: master_seed.to_string(),
+                device_index: 0,
+                device_name: "Primary".to_string(),
+            },
+            contacts: vec![serde_json::json!({
+                "kind": {
+                    "type": "exchanged",
+                    "shared_key_b64": relationship_key,
+                }
+            })],
+            own_card: None,
+            labels: Vec::new(),
+        },
+    };
+
+    let debug = format!("{envelope:?}");
+    assert!(
+        !debug.contains(master_seed),
+        "backup Debug must redact the master seed: {debug}"
+    );
+    assert!(
+        !debug.contains(relationship_key),
+        "backup Debug must redact relationship keys: {debug}"
+    );
 }
 
 fn make_exchanged(name: &str) -> Contact {

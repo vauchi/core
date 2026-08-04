@@ -25,6 +25,42 @@ fn test_keypair_from_bytes_roundtrip() {
     assert_eq!(kp1.public_key(), kp2.public_key());
 }
 
+// RFC 7748 section 6.1, X25519 known-answer vectors.
+// @scenario: security :: X25519 implementation matches the published standard
+#[test]
+fn test_crypto_hardening_x25519_rfc7748_vector() {
+    let alice_secret =
+        hex::decode("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a")
+            .unwrap()
+            .try_into()
+            .unwrap();
+    let bob_secret =
+        hex::decode("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb")
+            .unwrap()
+            .try_into()
+            .unwrap();
+    let expected_alice_public =
+        hex::decode("8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a").unwrap();
+    let expected_bob_public =
+        hex::decode("de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f").unwrap();
+    let expected_shared =
+        hex::decode("4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742").unwrap();
+
+    let alice = X3DHKeyPair::from_bytes(alice_secret);
+    let bob = X3DHKeyPair::from_bytes(bob_secret);
+
+    assert_eq!(alice.public_key().as_slice(), expected_alice_public);
+    assert_eq!(bob.public_key().as_slice(), expected_bob_public);
+    assert_eq!(
+        alice.diffie_hellman(bob.public_key()).unwrap().as_slice(),
+        expected_shared
+    );
+    assert_eq!(
+        bob.diffie_hellman(alice.public_key()).unwrap().as_slice(),
+        expected_shared
+    );
+}
+
 // === HKDF Derivation Tests (Item 68) ===
 // Verifies that X3DH applies HKDF to the raw DH output rather than
 // using it directly. Raw DH output has non-uniform distribution;

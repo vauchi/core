@@ -6,6 +6,8 @@
 
 #![cfg(feature = "network-http")]
 
+use crate::common::mock_relay::{CannedResponse, MockRelay};
+use vauchi_core::api::{VauchiBuilder, VauchiConfig};
 use vauchi_core::network::http_transport::{HttpTransport, HttpTransportConfig};
 
 fn test_transport() -> HttpTransport {
@@ -101,6 +103,96 @@ fn test_sas_both_sides_match() {
     let alice_sas = derive_sas(alice_secret.as_bytes(), &alice_id, &bob_id);
     let bob_sas = derive_sas(bob_secret.as_bytes(), &alice_id, &bob_id);
     assert_eq!(alice_sas, bob_sas);
+}
+
+// @scenario: security :: Two-DH static responder compromise recovers past secrets
+#[cfg(feature = "testing")]
+#[test]
+fn test_crypto_hardening_two_dh_static_responder_compromise_recovers_past_secret() {
+    use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+
+    let initiator = X3DHKeyPair::from_bytes([0x11; 32]);
+    let responder = X3DHKeyPair::from_bytes([0x22; 32]);
+    let compromised_responder_secret = *responder.secret_bytes();
+
+    let (past_secret, recorded_ephemeral) =
+        X3DH::initiate(&initiator, responder.public_key()).unwrap();
+
+    let compromised_responder = X3DHKeyPair::from_bytes(compromised_responder_secret);
+    let recovered = X3DH::respond(
+        &compromised_responder,
+        initiator.public_key(),
+        &recorded_ephemeral,
+    )
+    .unwrap();
+
+    assert_eq!(
+        past_secret.as_bytes(),
+        recovered.as_bytes(),
+        "the two-DH construction has no responder-side forward secrecy when its static key leaks"
+    );
+}
+
+// @scenario: security :: Relay exchange offer debug output redacts private key material
+#[cfg(feature = "testing")]
+#[test]
+fn test_crypto_hardening_relay_exchange_offer_debug_redacts_secret() {
+    let mock = MockRelay::start();
+    mock.queue(
+        "exchange_offer",
+        CannedResponse::ok_json(br#"{"status":"ok","code":"123456"}"#.to_vec()),
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut config =
+        VauchiConfig::with_storage_path(dir.path().join("vauchi.db")).with_relay_url(mock.url());
+    config.ohttp.allow_direct = true;
+    let mut vauchi = VauchiBuilder::new().config(config).build().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let offer = vauchi.start_relay_exchange(Some(300)).unwrap();
+    let secret_debug = format!("{:?}", offer.sas_key_material());
+    let offer_debug = format!("{offer:?}");
+
+    assert!(
+        !offer_debug.contains(&secret_debug),
+        "relay offer Debug must not contain its X25519 private key: {offer_debug}"
+    );
+    assert!(
+        offer_debug.contains("[REDACTED]"),
+        "relay offer Debug must make redaction explicit: {offer_debug}"
+    );
+}
+
+// @scenario: security :: Relay exchanges use fresh X25519 key material per offer
+#[cfg(feature = "testing")]
+#[test]
+fn test_crypto_hardening_relay_exchange_uses_fresh_key_per_offer() {
+    let mock = MockRelay::start();
+    mock.queue(
+        "exchange_offer",
+        CannedResponse::ok_json(br#"{"status":"ok","code":"111111"}"#.to_vec()),
+    );
+    mock.queue(
+        "exchange_offer",
+        CannedResponse::ok_json(br#"{"status":"ok","code":"222222"}"#.to_vec()),
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut config =
+        VauchiConfig::with_storage_path(dir.path().join("vauchi.db")).with_relay_url(mock.url());
+    config.ohttp.allow_direct = true;
+    let mut vauchi = VauchiBuilder::new().config(config).build().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let first = vauchi.start_relay_exchange(Some(300)).unwrap();
+    let second = vauchi.start_relay_exchange(Some(300)).unwrap();
+
+    assert_ne!(
+        first.sas_key_material(),
+        second.sas_key_material(),
+        "each relay offer must use fresh X25519 private key material"
+    );
 }
 
 // ── Vauchi relay exchange API tests ──────────────────────────────

@@ -21,7 +21,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::genesis::GenesisEnvelope;
 use vauchi_core::identity::RegistryBroadcast;
 use vauchi_core::network::mailbox_token::current_day_epoch;
-use vauchi_core::sync::delta::VersionedPayload;
+use vauchi_core::sync::delta::{CekWrappedPayload, VersionedPayload};
 use vauchi_core::sync::registry_activation::ActivationState;
 use vauchi_core::sync::safety_alert::{AlertKind, SafetyAlertPayload};
 
@@ -95,6 +95,73 @@ fn genesis_alert_blob(
     )
     .unwrap();
     serde_json::to_vec(&message).unwrap()
+}
+
+fn genesis_zero_cek_blob(
+    alice_wb: &vauchi_core::Vauchi,
+    bob_pk: &[u8; 32],
+    shared: &SymmetricKey,
+) -> Vec<u8> {
+    let alice_identity = alice_wb.identity().unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: [0u8; 32],
+        cek_ciphertext: vec![0u8; 41],
+        signature: [0u8; 64],
+        nonce: [0xC3u8; 32],
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let broadcast = RegistryBroadcast::new(
+        &alice_identity.initial_device_registry(),
+        alice_identity.signing_keypair(),
+        1_753_000_000,
+    );
+    let (message, _session) = GenesisEnvelope::seal(
+        shared,
+        alice_identity,
+        bob_pk,
+        &broadcast,
+        current_day_epoch(1_753_000_000),
+        &payload,
+    )
+    .unwrap();
+    serde_json::to_vec(&message).unwrap()
+}
+
+// @scenario: security :: Genesis route rejects an authenticated malformed CEK
+#[test]
+fn test_crypto_hardening_genesis_zero_cek_returns_typed_error() {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    use vauchi_core::api::CardUpdateError;
+
+    let (alice_wb, bob_wb, alice_contact_id, _registry_version) = cold_start_world();
+    let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
+    let shared = bob_wb
+        .get_contact(&alice_contact_id)
+        .unwrap()
+        .unwrap()
+        .shared_key()
+        .cloned()
+        .unwrap();
+    let blob = genesis_zero_cek_blob(&alice_wb, &bob_pk, &shared);
+
+    let call = catch_unwind(AssertUnwindSafe(|| {
+        process_single_card_update(
+            bob_wb.identity().unwrap(),
+            bob_wb.storage(),
+            &alice_contact_id,
+            &blob,
+        )
+    }));
+
+    assert!(
+        call.is_ok(),
+        "authenticated malformed genesis CEK must return an error, not panic"
+    );
+    assert!(matches!(
+        call.unwrap(),
+        Err(CardUpdateError::CekDecryptionFailed)
+    ));
 }
 
 // @scenario: multi_device_sync :: A genesis alert seeds the sender's registry for activation

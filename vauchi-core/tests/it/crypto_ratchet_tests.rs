@@ -59,6 +59,87 @@ fn test_dr_encrypt_decrypt_roundtrip() {
     assert_eq!(plaintext.as_slice(), decrypted.as_slice());
 }
 
+// @scenario: security :: Failed authentication does not advance ratchet state
+#[test]
+fn test_crypto_hardening_ratchet_same_chain_auth_failure_rolls_back_state() {
+    let (mut alice, mut bob) = create_test_pair();
+
+    let opener = alice.encrypt(b"open receiving chain").unwrap();
+    assert_eq!(bob.decrypt(&opener).unwrap(), b"open receiving chain");
+
+    let genuine = alice.encrypt(b"same-chain message").unwrap();
+    let mut tampered = genuine.clone();
+    tampered.ciphertext[10] ^= 0x80;
+    let before = serde_json::to_vec(&bob.serialize()).unwrap();
+
+    bob.decrypt(&tampered)
+        .expect_err("tampered ciphertext must fail authentication");
+    let after = serde_json::to_vec(&bob.serialize()).unwrap();
+    assert!(
+        after == before,
+        "failed authentication must roll back state"
+    );
+    let plaintext = bob
+        .decrypt(&genuine)
+        .expect("failed authentication must not consume the genuine message key");
+
+    assert_eq!(plaintext, b"same-chain message");
+}
+
+// @scenario: security :: Failed authentication preserves skipped message keys
+#[test]
+fn test_crypto_hardening_ratchet_skipped_key_auth_failure_rolls_back_state() {
+    let (mut alice, mut bob) = create_test_pair();
+    let first = alice.encrypt(b"first skipped message").unwrap();
+    let second = alice.encrypt(b"second delivered message").unwrap();
+
+    let second_plaintext = bob.decrypt(&second).unwrap();
+    assert_eq!(second_plaintext, b"second delivered message");
+
+    let mut tampered_first = first.clone();
+    tampered_first.ciphertext[10] ^= 0x80;
+    let before = serde_json::to_vec(&bob.serialize()).unwrap();
+    bob.decrypt(&tampered_first)
+        .expect_err("tampered skipped message must fail authentication");
+    let after = serde_json::to_vec(&bob.serialize()).unwrap();
+    assert!(
+        after == before,
+        "failed skipped-key use must roll back state"
+    );
+    let first_plaintext = bob
+        .decrypt(&first)
+        .expect("failed authentication must not consume a skipped message key");
+
+    assert_eq!(first_plaintext, b"first skipped message");
+}
+
+// @scenario: security :: Failed authentication rolls back a DH ratchet step
+#[test]
+fn test_crypto_hardening_ratchet_new_dh_auth_failure_rolls_back_state() {
+    let (mut alice, mut bob) = create_test_pair();
+    let opener = alice.encrypt(b"open responder chain").unwrap();
+    let opener_plaintext = bob.decrypt(&opener).unwrap();
+    assert_eq!(opener_plaintext, b"open responder chain");
+
+    let reply = bob.encrypt(b"new DH generation").unwrap();
+    let mut tampered_reply = reply.clone();
+    tampered_reply.ciphertext[10] ^= 0x80;
+    let before = serde_json::to_vec(&alice.serialize()).unwrap();
+    alice
+        .decrypt(&tampered_reply)
+        .expect_err("tampered new-DH message must fail authentication");
+    let after = serde_json::to_vec(&alice.serialize()).unwrap();
+    assert!(
+        after == before,
+        "failed DH ratchet step must roll back state"
+    );
+    let reply_plaintext = alice
+        .decrypt(&reply)
+        .expect("failed authentication must roll back the DH ratchet step");
+
+    assert_eq!(reply_plaintext, b"new DH generation");
+}
+
 // @scenario: security :: Forward secrecy via Double Ratchet
 // @internal
 #[test]

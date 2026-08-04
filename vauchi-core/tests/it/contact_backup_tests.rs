@@ -172,3 +172,18 @@ fn contact_backup_unknown_version_fails() {
         result
     );
 }
+
+// @scenario: security :: Oversized contact backup is rejected before decryption
+#[test]
+fn test_crypto_hardening_contact_backup_oversized_input_fails() {
+    const MAX_CONTACT_BACKUP_BYTES: usize = 32 * 1024 * 1024;
+
+    let mut oversized = vec![0u8; MAX_CONTACT_BACKUP_BYTES + 1];
+    oversized[0] = 0x01;
+
+    let result = import_contact_backup(&oversized, "password");
+    assert!(
+        matches!(result, Err(BackupError::TooLarge)),
+        "expected TooLarge before KDF/decryption, got {result:?}"
+    );
+}

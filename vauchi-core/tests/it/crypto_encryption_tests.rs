@@ -120,6 +120,25 @@ fn test_encrypt_with_ad_prevents_ad_mismatch() {
     assert!(result.is_err(), "Wrong AD must fail AEAD authentication");
 }
 
+// @scenario: security :: AD-bound ciphertext cannot be retagged as legacy ciphertext
+#[test]
+fn test_crypto_hardening_ad_ciphertext_retagged_as_legacy_is_rejected() {
+    let key = SymmetricKey::generate();
+    let mut ciphertext = encrypt_with_ad(&key, b"bound data", b"ratchet header").unwrap();
+    assert_eq!(ciphertext[0], 0x03);
+
+    ciphertext[0] = 0x02;
+    let result = decrypt_with_ad(&key, &ciphertext, b"ratchet header");
+
+    assert!(
+        matches!(
+            result,
+            Err(vauchi_core::crypto::encryption::EncryptionError::DecryptionFailed)
+        ),
+        "retagging AD-bound ciphertext must fail authentication"
+    );
+}
+
 // @scenario: security :: Contact cards are encrypted at rest
 // @internal
 #[test]

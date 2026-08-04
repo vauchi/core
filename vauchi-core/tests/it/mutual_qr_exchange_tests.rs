@@ -9,6 +9,7 @@
 //! Both users display QR codes and scan each other's. Both sides use
 //! fresh ephemeral X25519 keys for full forward secrecy.
 
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use vauchi_core::exchange::{
     ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ExchangeTransport,
     MockProximityVerifier, X3DHKeyPair,
@@ -97,6 +98,39 @@ fn test_qr_ephemeral_roundtrip_via_data_string() {
     assert_eq!(parsed.exchange_key(), qr.exchange_key());
     assert_eq!(parsed.exchange_key(), ephemeral.public_key());
     assert!(parsed.verify_signature());
+}
+
+// @scenario: security :: QR ingestion rejects weak Ed25519 identity keys
+#[test]
+fn test_crypto_hardening_qr_rejects_weak_identity_key() {
+    let identity = Identity::create("Alice", 0);
+    let ephemeral = X3DHKeyPair::generate();
+    let qr = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let encoded = qr.to_data_string();
+    let mut wire = BASE64.decode(encoded).unwrap();
+
+    let mut identity_point = [0u8; 32];
+    identity_point[0] = 1;
+    wire[5..37].copy_from_slice(&identity_point);
+
+    let signature_offset = wire.len() - 64;
+    wire[signature_offset..].fill(0);
+    wire[signature_offset] = 1;
+
+    let forged = BASE64.encode(wire);
+    let result = ExchangeQR::from_data_string(&forged);
+
+    assert!(
+        matches!(
+            result,
+            Err(vauchi_core::exchange::ExchangeError::InvalidSignature)
+        ),
+        "QR parser must reject attacker-selected weak identity keys, got {result:?}"
+    );
 }
 
 // ============================================================

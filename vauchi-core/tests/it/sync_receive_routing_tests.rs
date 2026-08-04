@@ -120,6 +120,27 @@ fn encrypt_update(
     serde_json::to_vec(&ratchet_msg).unwrap()
 }
 
+/// Encrypt an already-versioned payload through the sender's stored ratchet.
+fn encrypt_payload(
+    sender: &vauchi_core::Vauchi,
+    recipient_contact_id: &str,
+    payload: &[u8],
+) -> Vec<u8> {
+    let (mut sender_ratchet, is_init) = sender
+        .storage()
+        .ratchets()
+        .load_ratchet_state(recipient_contact_id)
+        .unwrap()
+        .unwrap();
+    let ratchet_msg = sender_ratchet.encrypt(payload).unwrap();
+    sender
+        .storage()
+        .ratchets()
+        .save_ratchet_state(recipient_contact_id, &sender_ratchet, is_init)
+        .unwrap();
+    serde_json::to_vec(&ratchet_msg).unwrap()
+}
+
 // @scenario: receive_phase :: mailbox_token attribution drives O(1) routing
 /// In-spec input: relay attributes the blob to its mailbox token, the
 /// receive loop resolves to Bob in O(1) and applies the update.
@@ -205,6 +226,51 @@ fn test_receive_routes_via_mailbox_token_fast_path() {
         .iter()
         .any(|f| f.label() == "Email" && f.value() == "bob@a.test");
     assert!(has_email, "Bob's card update must be applied");
+}
+
+// @scenario: security :: Authenticated malformed CEK is rejected on mailbox route
+#[test]
+fn test_crypto_hardening_receive_route_zero_cek_returns_sanitized_rejection() {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let bob_link = link_contacts(&alice, &bob, "Bob");
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+
+    let wrapped = CekWrappedPayload {
+        cek: [0u8; 32],
+        cek_ciphertext: vec![0u8; 41],
+        signature: [0u8; 64],
+        nonce: [0xA5u8; 32],
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let ciphertext = encrypt_payload(&bob, &bob_link.host_contact_id, &payload);
+    let token = token_hex(&compute_mailbox_token(
+        bob_link.shared_secret.as_bytes(),
+        &alice_pk,
+        current_day_epoch(alice.storage().clock().unix_seconds()),
+    ));
+    let contacts = alice.storage().contacts().list_contacts().unwrap();
+
+    let call = catch_unwind(AssertUnwindSafe(|| {
+        process_received_blobs(
+            alice.identity().unwrap(),
+            alice.storage(),
+            &contacts,
+            vec![("zero-cek".to_string(), token, ciphertext, None)],
+        )
+    }));
+
+    assert!(
+        call.is_ok(),
+        "authenticated malformed CEK payload must not panic on the mailbox route"
+    );
+    let outcomes = call.unwrap();
+    assert_eq!(outcomes.len(), 1);
+    assert!(outcomes[0].token_resolved);
+    assert!(!outcomes[0].decrypted);
+    assert_eq!(outcomes[0].reject_reason, Some("cek"));
 }
 
 // @scenario: receive_phase :: blob with empty mailbox_token is dropped

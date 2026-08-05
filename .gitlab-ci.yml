@@ -738,12 +738,21 @@ validate:schema:
       optional: true
   script:
     - cargo test --features schema-gen -p vauchi-core --test schema_gen
+    - cargo test --features schema-gen -p vauchi-core --test domain_vocabulary_boundary_tests
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths:
-          - "vauchi-core/src/ui/**/*.rs"
+          # The schema types live in vauchi-app, not vauchi-core. The former
+          # path here (vauchi-core/src/ui) names a directory that does not
+          # exist, so this job never fired on a change to its own subject.
+          - "vauchi-app/src/ui/**/*.rs"
+          # Command and Event — the two shell-boundary envelopes asserted by
+          # domain_vocabulary_boundary_tests.
+          - "vauchi-core/src/platform.rs"
+          - "vauchi-core/src/platform/**/*.rs"
+          - "vauchi-core/tests/domain_vocabulary_boundary_tests.rs"
           - "vauchi-core/schemas/**"
           - "vauchi-core/Cargo.toml"
 

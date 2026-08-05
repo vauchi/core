@@ -87,7 +87,9 @@ include:
   - local: ci/internal-dev-bindings.yml
 
 variables:
-  VAUCHI_SCRIPTS_REF: "679cedc3a3112273ed35bb68c482da4106b13232"
+  # Bumped for retired_boundary_vocabulary, the shared retired-name list that
+  # domain_vocabulary_boundary_tests reads (vauchi/scripts!502).
+  VAUCHI_SCRIPTS_REF: "aa4f9844996a0e862a7a2b6a1cd9ab94f4bce457"
 
 # Ceiling for jobs that compile the full dependency tree. On a fresh or
 # reinstalled shell runner ALL warm state is gone at once — per-slot
@@ -736,6 +738,19 @@ validate:schema:
       optional: true
     - job: lint:clippy
       optional: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    # domain_vocabulary_boundary_tests reads the retired-name list from the
+    # ratchet's rules file rather than restating it, so this job needs the
+    # scripts checkout. The test fails hard when it is absent — a vocabulary
+    # test that silently skips reports exactly like one that found nothing.
+    - |
+      VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)
+      export VAUCHI_CI_SCRIPTS_DIR
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" init
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" remote add origin https://gitlab.com/vauchi/scripts.git
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" fetch --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach FETCH_HEAD
   script:
     - cargo test --features schema-gen -p vauchi-core --test schema_gen
     - cargo test --features schema-gen -p vauchi-core --test domain_vocabulary_boundary_tests

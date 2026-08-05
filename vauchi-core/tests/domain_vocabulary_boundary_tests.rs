@@ -22,21 +22,54 @@
 use schemars::schema_for;
 use vauchi_core::{Command, Event};
 
-/// Retired public-boundary vocabulary, from the ADR-066 enforcement list in
-/// `wire-humble.md`. These are matched case-insensitively against every
-/// variant tag and property name so that neutralized spellings (`contact_list`,
-/// `contactList`) are caught alongside the original.
-const RETIRED_BOUNDARY_VOCABULARY: &[&str] = &[
-    "screenmodel",
-    "workflowengine",
-    "useraction",
-    "actionresult",
-    "uifieldvisibility",
-    "visibilitymode",
-    "fieldvisibilitychanged",
-    "contactlist",
-    "recoveryscreen",
-];
+/// Read the retired vocabulary from the ratchet's rules file.
+///
+/// `humble_check_rules.json` is the single list of retired boundary names —
+/// restating it here would let the two enforcement sides drift, and the side
+/// that fell behind would report clean. `humble_check.py` fails if a rule
+/// greps for a type the list omits, which keeps the list ahead of the rules.
+///
+/// Resolution mirrors the locales lookup in the contract fixture tests: an
+/// explicit CI directory first, then the sibling checkout. Absence is a hard
+/// failure — a skipped vocabulary test reports exactly like a clean one.
+fn retired_boundary_vocabulary() -> Vec<String> {
+    const RULES_RELATIVE: &str = "scripts/scripts/humble_check_rules.json";
+
+    let rules_path = std::env::var_os("VAUCHI_CI_SCRIPTS_DIR")
+        .map(|dir| std::path::PathBuf::from(dir).join("scripts/humble_check_rules.json"))
+        .filter(|candidate| candidate.is_file())
+        .or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .ancestors()
+                .map(|ancestor| ancestor.join(RULES_RELATIVE))
+                .find(|candidate| candidate.is_file())
+        })
+        .expect(
+            "domain-vocabulary tests need the scripts checkout — set \
+             VAUCHI_CI_SCRIPTS_DIR or clone it beside this repo",
+        );
+
+    let rules: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&rules_path).expect("read ratchet rules"))
+            .expect("parse ratchet rules");
+
+    let vocabulary: Vec<String> = rules["retired_boundary_vocabulary"]
+        .as_array()
+        .expect("ratchet rules must carry retired_boundary_vocabulary")
+        .iter()
+        .map(|term| {
+            term.as_str()
+                .expect("vocabulary entry is a string")
+                .to_owned()
+        })
+        .collect();
+
+    assert!(
+        !vocabulary.is_empty(),
+        "retired_boundary_vocabulary is empty — every schema would look clean"
+    );
+    vocabulary
+}
 
 /// Collect every object key and every string in an `enum`/`const` position —
 /// the two places serde puts a variant tag — from a JSON Schema document.
@@ -89,13 +122,18 @@ fn assert_free_of_domain_vocabulary(
          so a clean result would prove nothing"
     );
 
+    // Fold before matching so a neutralized spelling (`contact_list`,
+    // `contactList`) is caught alongside the original.
+    let retired: Vec<String> = retired_boundary_vocabulary()
+        .iter()
+        .map(|term| term.to_ascii_lowercase())
+        .collect();
+
     let offenders: Vec<&String> = identifiers
         .iter()
         .filter(|identifier| {
             let folded = identifier.to_ascii_lowercase().replace(['_', '-'], "");
-            RETIRED_BOUNDARY_VOCABULARY
-                .iter()
-                .any(|retired| folded.contains(retired))
+            retired.iter().any(|term| folded.contains(term))
         })
         .collect();
 

@@ -198,3 +198,72 @@ fn run_escrow_command_ignores_non_escrow_commands() {
     let (wb, _dir) = vauchi_pointing_at(&mock);
     assert_eq!(wb.run_escrow_command(&Command::BleStopScanning), None);
 }
+
+// @feature: release_privacy_multidevice_certification
+// @rg-8 @fail-closed
+/// An action family with NO resolvable OHTTP key must send nothing at all.
+///
+/// This is the state the rest of the RG-8 lane does not reach. Every other
+/// action oracle resolves a bundled or cached gateway key, so the transport
+/// takes the OHTTP branch and a dynamic `allow_direct` would be invisible.
+/// Here all three sources are empty — no in-memory key (never connected), no
+/// cache entry, and `bundled_gateway_key: None` — so `offline_ohttp_client()`
+/// yields `None` and `allow_direct` alone decides whether anything is sent.
+///
+/// The load-bearing assertion is on the OUTER relay, not the application
+/// relay. `build_relay_transport` resolves the route to the outer hop, so a
+/// direct fallback POSTs a plaintext `/v2/escrow` THERE while the application
+/// relay stays silent — an application-relay-only oracle would pass straight
+/// through the regression. Both hops must see zero requests.
+///
+/// Reintroducing `allow_direct: self.ohttp_key.is_none()` in
+/// `build_relay_transport` turns this red (problem record
+/// 2026-08-05-allow-direct-guard-testing-cfg-blind-spot).
+// @scenario: release_privacy_multidevice_certification :: action families fail closed when no OHTTP key resolves
+#[test]
+fn escrow_sends_nothing_when_no_ohttp_key_resolves() {
+    let application_relay = MockRelay::start();
+    let outer_relay = MockRelay::start();
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let mut config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+        .with_relay_url(application_relay.url())
+        .with_ohttp_relay_url(outer_relay.url());
+    // No bundled key, and connect() is never called, so nothing can populate
+    // the in-memory field or the storage cache.
+    config.ohttp.bundled_gateway_key = None;
+
+    let mut wb = VauchiBuilder::new()
+        .config(config)
+        .build()
+        .expect("build vauchi");
+    wb.create_identity("Alice").expect("create identity");
+
+    let error = wb
+        .escrow_exchange(&EscrowMessage::Put {
+            gate_hash: "aa".repeat(32),
+            slot_hash: "bb".repeat(32),
+            blob: "Zm9v".to_string(),
+            ttl_seconds: 600,
+        })
+        .expect_err("an unresolvable OHTTP key must fail closed, not fall back to direct");
+
+    // Privacy first: what matters is that nothing left the device. The error
+    // kind is secondary — a regression that sends the request and then fails
+    // on the response has already leaked the source IP.
+    assert!(
+        outer_relay.received().is_empty(),
+        "no plaintext action may reach the outer hop: {:?}",
+        outer_relay.received()
+    );
+    assert!(
+        application_relay.received().is_empty(),
+        "no action may reach the application relay: {:?}",
+        application_relay.received()
+    );
+    assert!(
+        matches!(&error, VauchiError::Network(inner)
+            if inner.to_string().contains("direct connections are disabled")),
+        "expected the fail-closed transport error, got: {error:?}"
+    );
+}

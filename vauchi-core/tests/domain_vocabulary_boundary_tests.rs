@@ -72,15 +72,21 @@ fn collect_strings(value: &serde_json::Value, found: &mut Vec<String>) {
     }
 }
 
-fn assert_free_of_domain_vocabulary(envelope: &str, schema: serde_json::Value) {
+/// `known_variant` is a positive control: a tag the walker must find. Without
+/// it a walker that stopped reaching variants would report a clean schema, and
+/// the test would pass by inspecting nothing.
+fn assert_free_of_domain_vocabulary(
+    envelope: &str,
+    schema: serde_json::Value,
+    known_variant: &str,
+) {
     let mut identifiers = Vec::new();
     schema_identifiers(&schema, &mut identifiers);
 
     assert!(
-        identifiers.len() > 50,
-        "{envelope} schema yielded only {} identifiers — the walker is not \
-         reaching the variants, so a clean result would prove nothing",
-        identifiers.len()
+        identifiers.iter().any(|found| found == known_variant),
+        "{envelope} walk did not reach the known variant `{known_variant}`, \
+         so a clean result would prove nothing"
     );
 
     let offenders: Vec<&String> = identifiers
@@ -106,7 +112,7 @@ fn assert_free_of_domain_vocabulary(envelope: &str, schema: serde_json::Value) {
 #[test]
 fn test_command_schema_carries_no_domain_vocabulary() {
     let schema = serde_json::to_value(schema_for!(Command)).expect("serialize command schema");
-    assert_free_of_domain_vocabulary("Command", schema);
+    assert_free_of_domain_vocabulary("Command", schema, "QrDisplay");
 }
 
 /// Feature: generic_presentation_protocol.feature
@@ -115,5 +121,5 @@ fn test_command_schema_carries_no_domain_vocabulary() {
 #[test]
 fn test_event_schema_carries_no_domain_vocabulary() {
     let schema = serde_json::to_value(schema_for!(Event)).expect("serialize event schema");
-    assert_free_of_domain_vocabulary("Event", schema);
+    assert_free_of_domain_vocabulary("Event", schema, "QrScanned");
 }

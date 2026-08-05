@@ -752,7 +752,10 @@ validate:schema:
       git -C "${VAUCHI_CI_SCRIPTS_DIR}" fetch --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
       git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach FETCH_HEAD
   script:
-    - cargo test --features schema-gen -p vauchi-core --test schema_gen
+    # The generated Command/Event schema — not a fixture corpus — so a new
+    # domain-named variant fails even when no fixture exercises it. The
+    # ScreenModel/UserAction/ActionResult schema freshness test retired with
+    # the golden scaffolding; those types no longer cross the shell boundary.
     - cargo test --features schema-gen -p vauchi-core --test domain_vocabulary_boundary_tests
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -768,7 +771,6 @@ validate:schema:
           - "vauchi-core/src/platform.rs"
           - "vauchi-core/src/platform/**/*.rs"
           - "vauchi-core/tests/domain_vocabulary_boundary_tests.rs"
-          - "vauchi-core/schemas/**"
           - "vauchi-core/Cargo.toml"
 
 

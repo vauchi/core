@@ -92,18 +92,6 @@ cp -r "$ANDROID_KOTLIN_DIR/uniffi" "$PACKAGE_DIR/kotlin/"
 KOTLIN_LINES=$(wc -l < "$PACKAGE_DIR/kotlin/uniffi/vauchi_platform/vauchi_platform.kt" 2>/dev/null || echo "0")
 echo "  - vauchi_platform.kt: $KOTLIN_LINES lines"
 
-# Copy golden fixtures for frontend contract tests
-GOLDEN_SRC="$PROJECT_ROOT/vauchi-core/tests/fixtures/golden"
-if [[ -d "$GOLDEN_SRC" ]]; then
-    echo -e "${YELLOW}Copying golden fixtures...${NC}"
-    mkdir -p "$PACKAGE_DIR/golden-fixtures"
-    cp "$GOLDEN_SRC"/*.json "$PACKAGE_DIR/golden-fixtures/"
-    if [[ -f "$GOLDEN_SRC/.version" ]]; then
-        cp "$GOLDEN_SRC/.version" "$PACKAGE_DIR/golden-fixtures/"
-    fi
-    echo "  $(ls "$PACKAGE_DIR/golden-fixtures/"*.json | wc -l | tr -d ' ') fixtures copied"
-fi
-
 # Create README
 cat > "$PACKAGE_DIR/README.md" << EOF
 # VauchiPlatform Android v$VERSION

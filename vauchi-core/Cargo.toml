@@ -185,9 +185,6 @@ ohttp = { version = "0.7", default-features = false, features = ["server", "rust
 # compiles in — without it the whole ADR-049/050 escrow poll is cfg'd out and
 # link_{initiator,responder}_poll_tests fail (broke the nightly mutation baseline).
 vauchi-app = { workspace = true, features = ["content-updates", "network-rustls", "network-http"] }
-# JSON Schema validation for contract tests
-# default-features disabled to avoid pulling in async reqwest/HTTP stack for local-file validation
-jsonschema = { version = "0.28", default-features = false }
 # Temporary directories for storage tests
 tempfile = "3.0"
 # Property-based testing
@@ -210,10 +207,6 @@ harness = false
 # Needs the `testing` exchange seams (MockProximityVerifier) for the two-party
 # exchange steps; run with `--features testing,test-kdf`.
 required-features = ["testing"]
-
-[[test]]
-name = "schema_gen"
-required-features = ["schema-gen"]
 
 [[bench]]
 name = "crypto_benchmarks"

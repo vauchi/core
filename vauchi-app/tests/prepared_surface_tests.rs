@@ -180,28 +180,6 @@ fn value_event_for_another_surface_fails_closed() {
     );
 }
 
-// @scenario: generic_presentation_protocol.feature :: Release contains only the generic action system
-#[test]
-fn every_golden_screen_projects_without_a_legacy_component_escape_hatch() {
-    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../vauchi-core/tests/fixtures/golden");
-    for entry in std::fs::read_dir(fixtures).expect("golden fixture directory") {
-        let path = entry.expect("fixture entry").path();
-        if path.extension().and_then(|value| value.to_str()) != Some("json") {
-            continue;
-        }
-        let raw = std::fs::read_to_string(&path).expect("read fixture");
-        let screen: ScreenModel = serde_json::from_str(&raw)
-            .unwrap_or_else(|error| panic!("{} must decode: {error}", path.display()));
-        PreparedSurface::from_screen(
-            SurfaceId::new(screen.screen_id.clone()).expect("valid fixture surface"),
-            1,
-            &screen,
-        )
-        .unwrap_or_else(|error| panic!("{} must project: {error}", path.display()));
-    }
-}
-
 // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
 #[test]
 fn value_event_from_an_old_surface_revision_fails_closed() {

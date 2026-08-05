@@ -88,6 +88,7 @@ mod help_engine_wiring_tests;
 mod humble_surface_contract_tests;
 mod inline_confirm_action_id_tests;
 mod last_pins_i18n_tests;
+mod legacy_projection_matrix_tests;
 mod link_exchange_i18n_tests;
 mod link_exchange_tests;
 mod more_i18n_tests;

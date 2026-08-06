@@ -77,15 +77,7 @@ impl AppEngine {
     fn form_saved<E: std::fmt::Display>(&mut self, result: Result<(), E>) -> ActionResult {
         match result {
             Ok(()) => {
-                // Invalidate parent screen cache so it refreshes with updated data.
-                // Exception: don't invalidate Onboarding — its state machine
-                // (step, groups, name) must survive FormDialog round-trips.
-                // The onboarding ContactInfo screen syncs fields from storage.
-                if let Some(parent) = self.nav_history.last()
-                    && !matches!(parent, AppScreen::Onboarding)
-                {
-                    self.engine_cache.remove(parent);
-                }
+                self.invalidate_parent_screen_cache();
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }
@@ -93,6 +85,20 @@ impl AppEngine {
                 title: self.t("error.title"),
                 message: format!("{e}"),
             },
+        }
+    }
+
+    /// Drop the parent screen's cached engine so it refreshes with the
+    /// data the form just wrote.
+    ///
+    /// Exception: don't invalidate Onboarding — its state machine (step,
+    /// groups, name) must survive FormDialog round-trips. The onboarding
+    /// ContactInfo screen syncs fields from storage.
+    fn invalidate_parent_screen_cache(&mut self) {
+        if let Some(parent) = self.nav_history.last()
+            && !matches!(parent, AppScreen::Onboarding)
+        {
+            self.engine_cache.remove(parent);
         }
     }
 

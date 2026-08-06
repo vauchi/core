@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 
 use vauchi_platform::{
     DomainCommand, DomainCommandResult, KeychainError, MobilePlatformKeychain, MobileShredStatus,
-    PlatformAppEngine, PlatformAppEngineTestHelpers,
+    PlatformAppEngine,
 };
 
 struct FakeKeychain {

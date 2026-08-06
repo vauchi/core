@@ -18,7 +18,7 @@
 //! executing escrow commands and reporting events) was the dead path this
 //! ADR retires.
 
-use vauchi_platform::{PlatformAppEngine, PlatformAppEngineTestHelpers};
+use vauchi_platform::PlatformAppEngine;
 
 fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");

@@ -214,16 +214,20 @@ impl AppEngine {
             .filter(|s| !s.is_empty())
             .collect();
         let result = self.vauchi.add_own_field(field);
-        // Apply group visibility from selected groups
-        if result.is_ok() && !group_list.is_empty() {
+        // A grant can fail on its own (e.g. the group was deleted while this
+        // form was open). The field is still saved, so count the shortfall
+        // instead of aborting, and report it below — a silently ungranted
+        // field reads to the user as shared when nobody can see it.
+        let mut ungranted_groups = 0_usize;
+        if result.is_ok() {
             for group_id in &group_list {
-                // best-effort: per-group visibility after
-                // field was added successfully; failures
-                // here are recoverable from group settings
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = self
+                if self
                     .vauchi
-                    .set_group_field_visibility(group_id, &field_id, true);
+                    .set_group_field_visibility(group_id, &field_id, true)
+                    .is_err()
+                {
+                    ungranted_groups += 1;
+                }
             }
         }
         // During onboarding, also buffer the field in the cached
@@ -243,6 +247,17 @@ impl AppEngine {
             ))
         {
             tracing::warn!("onboarding PushField not consumed by cached engine");
+        }
+        if result.is_ok() && ungranted_groups > 0 {
+            self.invalidate_parent_screen_cache();
+            return ActionResult::ShowAlert {
+                title: self.t("my_info.add_field.groups_not_shared_title"),
+                message: crate::i18n::get_string_with_args(
+                    self.render_context.resolved_locale(),
+                    "my_info.add_field.groups_not_shared_message",
+                    &[("count", &ungranted_groups.to_string())],
+                ),
+            };
         }
         self.form_saved(result)
     }

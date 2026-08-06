@@ -64,6 +64,7 @@ fn own_card_field_values(engine: &AppEngine) -> Vec<String> {
         .collect()
 }
 
+// @scenario: visibility_labels.feature :: A field that could not be shared with a label says so
 #[test]
 fn add_field_reports_groups_that_did_not_receive_the_new_detail() {
     let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
@@ -110,6 +111,7 @@ fn add_field_reports_groups_that_did_not_receive_the_new_detail() {
     );
 }
 
+// @scenario: visibility_labels.feature :: Associate a field with a label
 #[test]
 fn add_field_navigates_back_when_every_group_grant_lands() {
     let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");

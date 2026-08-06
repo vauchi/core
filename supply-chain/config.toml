@@ -70,10 +70,6 @@ criteria = "safe-to-deploy"
 version = "0.10.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.borrow-or-share]]
-version = "0.2.4"
-criteria = "safe-to-run"
-
 [[exemptions.bs58]]
 version = "0.5.0"
 criteria = "safe-to-deploy"
@@ -238,16 +234,8 @@ criteria = "safe-to-deploy"
 version = "0.1.3"
 criteria = "safe-to-run"
 
-[[exemptions.email_address]]
-version = "0.2.9"
-criteria = "safe-to-run"
-
 [[exemptions.encode_unicode]]
 version = "1.0.0"
-criteria = "safe-to-run"
-
-[[exemptions.fancy-regex]]
-version = "0.14.0"
 criteria = "safe-to-run"
 
 [[exemptions.fancy-regex]]
@@ -265,14 +253,6 @@ criteria = "safe-to-deploy"
 [[exemptions.find-msvc-tools]]
 version = "0.1.9"
 criteria = "safe-to-deploy"
-
-[[exemptions.fluent-uri]]
-version = "0.3.2"
-criteria = "safe-to-run"
-
-[[exemptions.fraction]]
-version = "0.15.4"
-criteria = "safe-to-run"
 
 [[exemptions.fs-err]]
 version = "2.11.0"
@@ -418,10 +398,6 @@ criteria = "safe-to-deploy"
 version = "0.3.103"
 criteria = "safe-to-deploy"
 
-[[exemptions.jsonschema]]
-version = "0.28.3"
-criteria = "safe-to-run"
-
 [[exemptions.keyring]]
 version = "3.6.3"
 criteria = "safe-to-deploy"
@@ -542,10 +518,6 @@ criteria = "safe-to-deploy"
 version = "2.0.0-rc.12"
 criteria = "safe-to-deploy"
 
-[[exemptions.outref]]
-version = "0.5.2"
-criteria = "safe-to-run"
-
 [[exemptions.owned_ttf_parser]]
 version = "0.25.1"
 criteria = "safe-to-deploy"
@@ -641,10 +613,6 @@ criteria = "safe-to-deploy"
 [[exemptions.rawpointer]]
 version = "0.2.1"
 criteria = "safe-to-deploy"
-
-[[exemptions.referencing]]
-version = "0.28.3"
-criteria = "safe-to-run"
 
 [[exemptions.ring]]
 version = "0.17.14"
@@ -877,14 +845,6 @@ criteria = "safe-to-deploy"
 [[exemptions.utf8-zero]]
 version = "0.8.1"
 criteria = "safe-to-deploy"
-
-[[exemptions.uuid-simd]]
-version = "0.8.0"
-criteria = "safe-to-run"
-
-[[exemptions.vsimd]]
-version = "0.8.0"
-criteria = "safe-to-run"
 
 [[exemptions.wasm-bindgen]]
 version = "0.2.126"

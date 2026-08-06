@@ -169,6 +169,61 @@ impl AppEngine {
         self.ble_handshake_session.is_some()
     }
 
+    /// Route one hardware event into the AppEngine-owned handshake machine,
+    /// gated on an active session. Returns `true` when the machine reached a
+    /// terminal event (`Completed`/`Failed`), signalling the platform layer to
+    /// fire a presentation invalidation for observers that are not rendering
+    /// the resulting command batch (P5b, 2026-06-10).
+    ///
+    /// This gate used to live in `PlatformAppEngine::handle_hardware_event`,
+    /// where only the typed UniFFI seam benefited from it — an event arriving
+    /// through the canonical `dispatch_json` envelope never reached the
+    /// machine. It lives here so both envelopes route identically (ADR-066:
+    /// one Event input). Additive on top of the regular dispatch that
+    /// follows, so the `ExchangeEngine::BleExchangeFlow` proximity path runs
+    /// undisturbed.
+    pub fn route_ble_hardware_event_to_machine(&mut self, event: &Event) -> bool {
+        if !matches!(
+            event,
+            Event::BleConnected { .. }
+                | Event::BleCharacteristicNotified { .. }
+                | Event::BleCharacteristicRead { .. }
+                | Event::BleMtuNegotiated { .. }
+                | Event::BleDisconnected { .. }
+        ) {
+            return false;
+        }
+        // A GATT peripheral never scans, so it emits no `BleDeviceDiscovered`
+        // and the discovery routing never built its session. The peripheral
+        // that gets connected to is always the responder — build that session
+        // now so its KeyOffer-onward writes reach the real machine and the
+        // contact persists (`2026-06-08-ios-ble-responder-persist`). No-op
+        // for the central, which already holds an active session from
+        // discovery.
+        if matches!(event, Event::BleConnected { .. })
+            && !self.ble_handshake_session_active()
+            && matches!(self.current_app_screen(), AppScreen::BleExchange { .. })
+        {
+            self.start_ble_handshake_as_responder();
+        }
+        if !self.ble_handshake_session_active() {
+            return false;
+        }
+        let m_event = self.forward_ble_hardware_event(event);
+        let terminal = matches!(
+            m_event,
+            BleMachineEvent::Completed(_) | BleMachineEvent::Failed { .. }
+        );
+        self.apply_ble_machine_event(m_event);
+        terminal
+    }
+
+    /// Drains the pending terminal-BLE invalidation flag. The platform layer
+    /// calls this after dispatch and fires the observer invalidation when set.
+    pub fn take_pending_presentation_invalidation(&mut self) -> bool {
+        std::mem::take(&mut self.pending_ble_terminal_invalidation)
+    }
+
     /// Whether an addressed `BleDisconnected` names a link OTHER than the
     /// one the active, non-terminal handshake machine rides — i.e. the
     /// deliberately torn-down glare loser. Such a disconnect is cleanup,

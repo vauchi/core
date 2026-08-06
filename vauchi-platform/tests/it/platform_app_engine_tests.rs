@@ -1126,3 +1126,201 @@ fn poll_notifications_on_ble_discovery_fires_invalidation() {
         calls.lock().unwrap()
     );
 }
+
+// @internal
+#[test]
+fn ble_discovery_via_dispatch_json_builds_the_same_session_as_the_typed_seam() {
+    // ADR-066 admits one Event input. Today the BLE handshake session is
+    // built only inside PlatformAppEngine::handle_hardware_event — an event
+    // arriving through the canonical dispatch_json envelope misses the
+    // session-building routing. Two identically-driven engines must produce
+    // the same observable outcome (a BleConnect command for the tiebreak
+    // winner) whichever envelope carries the same discovery.
+    let (typed, _dt) = create_engine();
+    drive_onboarding(&typed);
+    typed
+        .navigate_to_json_for_test(r#"{"BleExchange":{"mode":"magic"}}"#.into())
+        .expect("typed: navigate to BLE exchange");
+
+    let (canonical, _dc) = create_engine();
+    drive_onboarding(&canonical);
+    canonical
+        .navigate_to_json_for_test(r#"{"BleExchange":{"mode":"magic"}}"#.into())
+        .expect("canonical: navigate to BLE exchange");
+
+    // Peer token 0xff… sorts above either engine's identity-derived token,
+    // so each engine is the initiator and the discovery must build the
+    // AppEngine-owned handshake session.
+    let typed_json = typed
+        .handle_hardware_event(MobileEvent::BleDeviceDiscovered {
+            id: "AA:BB:CC:DD:EE:FF".into(),
+            rssi: -40,
+            adv_data: vec![0xff, 0xff, 0xff, 0xff],
+        })
+        .expect("typed seam accepts discovery");
+    assert!(
+        typed_json.contains("BleConnect"),
+        "typed seam must emit BleConnect for the tiebreak winner, got: {typed_json}",
+    );
+
+    let canonical_json = canonical
+        .dispatch_json(
+            r#"{"BleDeviceDiscovered": {"id": "AA:BB:CC:DD:EE:FF", "rssi": -40, "adv_data": [255, 255, 255, 255]}}"#
+                .into(),
+        )
+        .expect("canonical envelope accepts discovery");
+    assert!(
+        canonical_json.contains("BleConnect"),
+        "dispatch_json must route the discovery exactly like the typed seam \
+         (ADR-066: one Event input), got: {canonical_json}",
+    );
+}
+
+// @internal
+#[test]
+fn qr_scanned_via_dispatch_json_routes_to_multi_stage_session_like_the_typed_seam() {
+    // Pair 4 — on the multi-stage screen the typed seam auto-routes a scan
+    // into the live session (the frontend never knows a session exists).
+    // The canonical envelope must route identically: an event that only
+    // reaches the generic reducer would surface as an unknown-session
+    // failure instead of a presentation batch.
+    let (typed, _dt) = create_engine();
+    drive_to_multi_stage(&typed);
+    let (canonical, _dc) = create_engine();
+    drive_to_multi_stage(&canonical);
+
+    let typed_json = typed
+        .handle_hardware_event(MobileEvent::QrScanned {
+            data: "garbage-not-an-init-frame".into(),
+        })
+        .expect("typed seam accepts scan");
+
+    let canonical_json = canonical
+        .dispatch_json(r#"{"QrScanned": {"data": "garbage-not-an-init-frame"}}"#.into())
+        .expect("canonical envelope accepts scan");
+
+    for (label, json) in [("typed", &typed_json), ("canonical", &canonical_json)] {
+        let v: serde_json::Value = serde_json::from_str(json).expect("parse envelope");
+        assert!(
+            v.get("action_result").is_none(),
+            "{label}: legacy result escaped: {v:?}"
+        );
+        assert!(
+            v["commands"].is_array(),
+            "{label}: scan must return a generic command envelope, got {v:?}",
+        );
+    }
+    assert_eq!(
+        typed_json, canonical_json,
+        "the canonical envelope must route the scan exactly like the typed seam"
+    );
+}
+
+// @internal
+#[test]
+fn ble_terminal_event_via_dispatch_json_fires_invalidation_like_the_typed_seam() {
+    // The typed seam fires a presentation invalidation when the BLE machine
+    // reaches a terminal event; without it a flipped Failed screen never
+    // reaches the frontend (`2026-06-06-android-ble-execution`). The
+    // canonical envelope must fire it identically.
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+
+    let calls: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
+    engine
+        .set_event_listener(Box::new(RecordingListener {
+            calls: Arc::clone(&calls),
+        }))
+        .expect("register listener");
+
+    engine
+        .navigate_to_json_for_test(r#"{"BleExchange":{"mode":"magic"}}"#.into())
+        .expect("navigate to BLE exchange");
+    engine
+        .dispatch_json(
+            r#"{"BleDeviceDiscovered": {"id": "AA:BB:CC:DD:EE:FF", "rssi": -40, "adv_data": [255, 255, 255, 255]}}"#
+                .into(),
+        )
+        .expect("discovery via canonical envelope");
+
+    // A malformed data chunk drives the machine to a terminal Failed event.
+    engine
+        .dispatch_json(
+            r#"{"BleCharacteristicNotified": {"device_id": "peer-1", "direction": "Outbound", "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567897", "data": [0, 0, 0, 0, 0, 0, 0, 0]}}"#
+                .into(),
+        )
+        .expect("malformed chunk via canonical envelope");
+
+    assert_eq!(
+        current_screen_id(&engine),
+        "exchange_failed",
+        "terminal machine failure must flip the chrome to the failed screen"
+    );
+    assert!(
+        !calls.lock().unwrap().is_empty(),
+        "canonical envelope must fire a presentation invalidation on terminal BLE events"
+    );
+}
+
+// @internal
+#[test]
+fn glance_discovery_via_dispatch_json_connects_to_the_scanned_peer_like_the_typed_seam() {
+    // F1 dissolves via asymmetric connect: the Glance scanner connects only
+    // to the advertiser whose identity matches the scanned QR. The typed
+    // seam routes that through `handle_glance_discovery`; the canonical
+    // envelope must do the same or the one-sided flow never connects.
+    use vauchi_app::ui::GLANCE_SCAN_COMPONENT_ID;
+    use vauchi_core::exchange::oob_bootstrap::OobBootstrapQr;
+
+    let (a, _da) = create_engine();
+    drive_onboarding(&a);
+    let (b, _db) = create_engine();
+    drive_onboarding(&b);
+
+    for e in [&a, &b] {
+        e.navigate_to_json_for_test(r#""Exchange""#.into())
+            .expect("navigate to Exchange");
+        e.handle_action_json(
+            r#"{"ListItemSelected": {"component_id": "category:quick", "item_id": "mode:glance"}}"#
+                .into(),
+        )
+        .expect("select Glance");
+    }
+
+    let b_qr = qr_data_from_screen_json(&b.current_screen_json().expect("b glance screen"));
+    let b_identity = *OobBootstrapQr::from_data_string(&b_qr)
+        .expect("B's QR parses")
+        .identity_key();
+
+    a.handle_action_json(
+        serde_json::json!({
+            "TextChanged": { "component_id": GLANCE_SCAN_COMPONENT_ID, "value": b_qr }
+        })
+        .to_string(),
+    )
+    .expect("A scans B's QR");
+
+    let foreign = a
+        .dispatch_json(
+            r#"{"BleDeviceDiscovered": {"id": "mallory-device", "rssi": -40, "adv_data": [171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171]}}"#
+                .into(),
+        )
+        .expect("foreign discovery accepted");
+    assert!(
+        !foreign.contains("mallory-device"),
+        "A must ignore an advertiser it did not scan (F1 dissolves), got: {foreign}",
+    );
+
+    let discovery = a
+        .dispatch_json(
+            serde_json::json!({
+                "BleDeviceDiscovered": { "id": "b-device", "rssi": -40, "adv_data": b_identity.to_vec() }
+            })
+            .to_string(),
+        )
+        .expect("B discovery accepted");
+    assert!(
+        discovery.contains("BleConnect") && discovery.contains("b-device"),
+        "A must connect specifically to the scanned peer via the canonical envelope, got: {discovery}",
+    );
+}

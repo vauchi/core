@@ -343,6 +343,29 @@ impl AppEngine {
             };
             return Ok(vec![Command::SetAuthenticationRequirement { requirement }]);
         }
+        // BLE handshake machine gate, shared by every envelope that can
+        // carry a hardware event (typed UniFFI seam and canonical
+        // dispatch_json alike). Runs before the regular reduce so a
+        // terminal machine event flips the chrome this batch renders.
+        if self.route_ble_hardware_event_to_machine(&event) {
+            self.pending_ble_terminal_invalidation = true;
+        }
+        // A peer discovery on the BLE exchange screen builds the
+        // AppEngine-owned handshake session, whichever envelope carried it.
+        // Glance connects asymmetrically to the scanned peer (F1); every
+        // other mode lets the advertised tiebreak token decide the role,
+        // matching `BleExchangeFlow`'s connect decision. Idempotent.
+        if let Event::BleDeviceDiscovered { id, adv_data, .. } = &event {
+            match self.screen {
+                AppScreen::BleExchange {
+                    mode: vauchi_core::exchange::mode::ExchangeMode::Glance,
+                } => self.handle_glance_discovery(id, adv_data),
+                AppScreen::BleExchange { .. } => {
+                    self.start_ble_handshake_on_discovery(adv_data);
+                }
+                _ => {}
+            }
+        }
         let next_revision = self
             .surface_revision
             .checked_add(1)

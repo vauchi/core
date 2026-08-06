@@ -28,7 +28,6 @@ use vauchi_app::notification_types::{
     NotificationCategory as CoreNotificationCategory,
     NotificationPriority as CoreNotificationPriority,
 };
-use vauchi_app::orchestrator::ble_handshake_machine::BleMachineEvent;
 use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
 use vauchi_core::api::{HandlerId, Vauchi, VauchiConfig, VauchiEvent};
 use vauchi_core::crypto::SymmetricKey;
@@ -321,18 +320,22 @@ impl PlatformAppEngine {
     /// Reduce one canonical event into the next ordered command batch.
     pub fn dispatch_json(&self, event_json: String) -> Result<String, MobileError> {
         let event = event_from_json(&event_json)?;
-        let commands = {
+        let (commands, fire_invalidation) = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
             })?;
             self_heal_post_auth(&mut engine);
-            engine
+            let commands = engine
                 .dispatch(event)
                 .map_err(|e| MobileError::InvalidInput {
                     field: String::new(),
                     detail: format!("Invalid event: {e}"),
-                })?
+                })?;
+            (commands, engine.take_pending_presentation_invalidation())
         };
+        if fire_invalidation {
+            self.fire_presentation_invalidated();
+        }
         commands_envelope_to_json(&commands)
     }
 }
@@ -500,120 +503,26 @@ impl PlatformAppEngine {
     /// native callers from hand-encoding hardware payloads while preserving the
     /// same Event -> Command protocol used by every presentation interaction.
     pub fn handle_hardware_event(&self, event: crate::MobileEvent) -> Result<String, MobileError> {
+        // Thin typed shim over the canonical dispatch path (ADR-066): the
+        // multi-stage QR auto-route, BLE discovery session-building, the
+        // handshake-machine gate, and the terminal-event invalidation all
+        // live in `AppEngine::dispatch`, shared with `dispatch_json`, so the
+        // two envelopes can never diverge. Retire this shim once the last
+        // native caller moves to the canonical envelope.
         let hw_event: vauchi_core::Event = event.into();
-        // Pair 4 — auto-route QrScanned to the live multi-stage session
-        // when the multi-stage screen is active. The frontend never has
-        // to know there is a session: it just emits the `QrScanned`
-        // hardware event and core delivers it to the protocol.
-        let on_multi_stage = matches!(
-            self.engine
-                .lock()
-                .map_err(|e| MobileError::Other {
-                    detail: format!("Lock failed: {e}"),
-                })?
-                .current_app_screen(),
-            AppScreen::MultiStageExchange { .. }
-        );
-
-        // Set when the BLE handshake machine reaches a terminal event below;
-        // the invalidation fires after the engine lock is released.
-        let mut ble_terminal = false;
-
-        let commands = if on_multi_stage && let vauchi_core::Event::QrScanned { .. } = &hw_event {
-            // T1.2c: route through the AppEngine-owned machine.
+        let (commands, fire_invalidation) = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
             })?;
-            let m_event = engine.forward_multi_stage_hardware_event(&hw_event);
-            engine.apply_multi_stage_event(m_event);
-            engine.initial_commands().map_err(|e| MobileError::Other {
-                detail: format!("Failed to compose presentation after hardware event: {e}"),
-            })?
-        } else {
-            // BLE/Magic completion P2 — a peer discovery on the BLE
-            // exchange screen builds the AppEngine-owned handshake session.
-            // The role is decided from the peer's advertised tiebreak
-            // token (in `adv_data`), matching `BleExchangeFlow`'s connect
-            // decision. Idempotent; falls through to the engine below,
-            // which emits `BleConnect` for the tiebreak winner. Once the
-            // session is active, the `BleConnected`/data events route into
-            // the real machine via the gate that follows.
-            if let vauchi_core::Event::BleDeviceDiscovered { id, adv_data, .. } = &hw_event {
-                let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                    detail: format!("Lock failed: {e}"),
-                })?;
-                match engine.current_app_screen() {
-                    // Glance is asymmetric: connect only to the advertiser
-                    // whose identity matches the scanned QR (no tiebreak, no
-                    // latch race — F1 dissolves). Builds the initiator
-                    // session with the scanned pins + drains a `BleConnect`.
-                    AppScreen::BleExchange {
-                        mode: vauchi_core::exchange::mode::ExchangeMode::Glance,
-                    } => engine.handle_glance_discovery(id, adv_data),
-                    AppScreen::BleExchange { .. } => {
-                        engine.start_ble_handshake_on_discovery(adv_data);
-                    }
-                    _ => {}
-                }
-            }
-
-            // Slice 32m T2.2c — BLE event routing into the AppEngine-owned
-            // `BleHandshakeMachine`, gated on an active session. Additive on top
-            // of the regular `engine.dispatch` below so the existing
-            // `ExchangeEngine::BleExchangeFlow` proximity path runs undisturbed.
-            if matches!(
-                &hw_event,
-                vauchi_core::Event::BleConnected { .. }
-                    | vauchi_core::Event::BleCharacteristicNotified { .. }
-                    | vauchi_core::Event::BleCharacteristicRead { .. }
-                    | vauchi_core::Event::BleMtuNegotiated { .. }
-                    | vauchi_core::Event::BleDisconnected { .. }
-            ) {
-                let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                    detail: format!("Lock failed: {e}"),
-                })?;
-                // A GATT peripheral never scans, so it emits no
-                // `BleDeviceDiscovered` and the discovery branch above never
-                // built its session. The peripheral that gets connected to
-                // is always the responder — build that session now so its
-                // KeyOffer-onward writes reach the real machine and the
-                // contact persists (`2026-06-08-ios-ble-responder-persist`).
-                // No-op for the central, which already holds an active
-                // session from discovery.
-                if matches!(&hw_event, vauchi_core::Event::BleConnected { .. })
-                    && !engine.ble_handshake_session_active()
-                    && matches!(engine.current_app_screen(), AppScreen::BleExchange { .. })
-                {
-                    engine.start_ble_handshake_as_responder();
-                }
-                if engine.ble_handshake_session_active() {
-                    let m_event = engine.forward_ble_hardware_event(&hw_event);
-                    // P3 — on Completed, persist the decrypted peer card +
-                    // Double Ratchet as an exchanged contact; terminal
-                    // events also flip the engine chrome.
-                    // No BLE poll loop: push an invalidation on terminal events
-                    // so observers that are not rendering this command batch
-                    // also leave "Exchanging..." (P5b, 2026-06-10).
-                    ble_terminal = matches!(
-                        m_event,
-                        BleMachineEvent::Completed(_) | BleMachineEvent::Failed { .. }
-                    );
-                    engine.apply_ble_machine_event(m_event);
-                }
-            }
-
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            engine
+            let commands = engine
                 .dispatch(hw_event)
                 .map_err(|e| MobileError::InvalidInput {
                     field: String::new(),
                     detail: format!("Invalid hardware event: {e}"),
-                })?
+                })?;
+            (commands, engine.take_pending_presentation_invalidation())
         };
-
-        if ble_terminal {
+        if fire_invalidation {
             self.fire_presentation_invalidated();
         }
         commands_envelope_to_json(&commands)

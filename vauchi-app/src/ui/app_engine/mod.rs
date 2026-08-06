@@ -195,6 +195,13 @@ pub struct AppEngine {
     /// Replaces the `MobileBleExchangeSession` cycle thread; T2.2c
     /// routes BLE events through `forward_ble_hardware_event`.
     ble_handshake_session: Option<ble_handshake::BleHandshakeHolder>,
+    /// Set when a BLE hardware event routed into the handshake machine
+    /// reached a terminal event (Completed/Failed). Drained by the
+    /// platform layer via [`Self::take_pending_presentation_invalidation`]
+    /// to fire the observer invalidation — the machine flip must reach
+    /// observers that are not rendering the current command batch
+    /// (P5b, 2026-06-10), whichever envelope carried the event.
+    pending_ble_terminal_invalidation: bool,
     /// Glance (one-sided QR) OOB state. `glance_display_nonce` is the nonce
     /// this device shows in its QR and must require as the responder;
     /// `glance_scanned` is the scanner-side binding built from a scanned QR —
@@ -426,6 +433,7 @@ impl AppEngine {
             device_link_responder: None,
             multi_stage_session: None,
             ble_handshake_session: None,
+            pending_ble_terminal_invalidation: false,
             glance_display_nonce: None,
             glance_scanned: None,
             glance_display_qr: None,

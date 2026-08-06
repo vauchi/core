@@ -59,9 +59,9 @@ if [[ ! -f "$ANDROID_BINDINGS" && -f "$WORKSPACE_ROOT/android/app/src/main/kotli
     ANDROID_BINDINGS="$WORKSPACE_ROOT/android/app/src/main/kotlin/uniffi/vauchi_platform/vauchi_platform.kt"
 fi
 
-echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
-echo -e "${YELLOW}║     Vauchi Bindings Validation         ║${NC}"
-echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}"
+printf '%b\n' "${YELLOW}╔════════════════════════════════════════╗${NC}"
+printf '%b\n' "${YELLOW}║     Vauchi Bindings Validation         ║${NC}"
+printf '%b\n' "${YELLOW}╚════════════════════════════════════════╝${NC}"
 echo ""
 
 ERRORS=0
@@ -74,10 +74,10 @@ check_bindings() {
     local expected_export="$4"
     local missing=()
 
-    echo -e "${YELLOW}Checking $platform bindings: $file${NC}"
+    printf '%b\n' "${YELLOW}Checking $platform bindings: $file${NC}"
 
     if [[ ! -f "$file" ]]; then
-        echo -e "${RED}  ERROR: File not found!${NC}"
+        printf '%b\n' "${RED}  ERROR: File not found!${NC}"
         return 1
     fi
 
@@ -85,12 +85,12 @@ check_bindings() {
     local lines
     lines=$(wc -l < "$file")
     if [[ $lines -lt $min_lines ]]; then
-        echo -e "${RED}  ERROR: File has $lines lines, expected at least $min_lines${NC}"
-        echo -e "${RED}  This suggests bindings were generated from incomplete metadata.${NC}"
-        echo -e "${RED}  Run: RUSTFLAGS=\"-Cstrip=none\" cargo build -p vauchi-platform --release${NC}"
+        printf '%b\n' "${RED}  ERROR: File has $lines lines, expected at least $min_lines${NC}"
+        printf '%b\n' "${RED}  This suggests bindings were generated from incomplete metadata.${NC}"
+        printf '%b\n' "${RED}  Run: RUSTFLAGS=\"-Cstrip=none\" cargo build -p vauchi-platform --release${NC}"
         ERRORS=$((ERRORS + 1))
     else
-        echo -e "${GREEN}  Line count OK: $lines lines${NC}"
+        printf '%b\n' "${GREEN}  Line count OK: $lines lines${NC}"
     fi
 
     # Check for expected types
@@ -101,20 +101,20 @@ check_bindings() {
     done
 
     if [[ ${#missing[@]} -gt 0 ]]; then
-        echo -e "${RED}  ERROR: Missing types:${NC}"
+        printf '%b\n' "${RED}  ERROR: Missing types:${NC}"
         for type in "${missing[@]}"; do
-            echo -e "${RED}    - $type${NC}"
+            printf '%b\n' "${RED}    - $type${NC}"
         done
         ERRORS=$((ERRORS + 1))
     else
-        echo -e "${GREEN}  All ${#EXPECTED_TYPES[@]} expected types present${NC}"
+        printf '%b\n' "${GREEN}  All ${#EXPECTED_TYPES[@]} expected types present${NC}"
     fi
 
     if ! grep -Fq "$expected_export" "$file"; then
-        echo -e "${RED}  ERROR: Missing presentation export: $expected_export${NC}"
+        printf '%b\n' "${RED}  ERROR: Missing presentation export: $expected_export${NC}"
         ERRORS=$((ERRORS + 1))
     else
-        echo -e "${GREEN}  Presentation export present${NC}"
+        printf '%b\n' "${GREEN}  Presentation export present${NC}"
     fi
 
     echo ""
@@ -123,15 +123,15 @@ check_bindings() {
 check_cabi_header() {
     local expected_export="vauchi_presentation_contract_fixture(void)"
 
-    echo -e "${YELLOW}Checking C ABI header: $CABI_HEADER${NC}"
+    printf '%b\n' "${YELLOW}Checking C ABI header: $CABI_HEADER${NC}"
     if [[ ! -f "$CABI_HEADER" ]]; then
-        echo -e "${RED}  ERROR: File not found!${NC}"
+        printf '%b\n' "${RED}  ERROR: File not found!${NC}"
         ERRORS=$((ERRORS + 1))
     elif ! grep -Fq "$expected_export" "$CABI_HEADER"; then
-        echo -e "${RED}  ERROR: Missing presentation export: $expected_export${NC}"
+        printf '%b\n' "${RED}  ERROR: Missing presentation export: $expected_export${NC}"
         ERRORS=$((ERRORS + 1))
     else
-        echo -e "${GREEN}  Presentation export present${NC}"
+        printf '%b\n' "${GREEN}  Presentation export present${NC}"
     fi
     echo ""
 }
@@ -140,10 +140,10 @@ check_cabi_header() {
 check_xcframework() {
     local xcfw_path="$1"
 
-    echo -e "${YELLOW}Checking XCFramework: $xcfw_path${NC}"
+    printf '%b\n' "${YELLOW}Checking XCFramework: $xcfw_path${NC}"
 
     if [[ ! -d "$xcfw_path" ]]; then
-        echo -e "${YELLOW}  XCFramework not found (skipping — may not be packaged yet)${NC}"
+        printf '%b\n' "${YELLOW}  XCFramework not found (skipping — may not be packaged yet)${NC}"
         echo ""
         return 0
     fi
@@ -155,7 +155,7 @@ check_xcframework() {
         local exec_name
         exec_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$plist" 2>/dev/null || true)
         if [[ -z "$exec_name" ]]; then
-            echo -e "${RED}  ERROR: Missing CFBundleExecutable in: $plist${NC}"
+            printf '%b\n' "${RED}  ERROR: Missing CFBundleExecutable in: $plist${NC}"
             ERRORS=$((ERRORS + 1))
         else
             local fw_dir
@@ -163,17 +163,17 @@ check_xcframework() {
             if [[ -f "$fw_dir/$exec_name" ]]; then
                 valid_count=$((valid_count + 1))
             else
-                echo -e "${RED}  ERROR: CFBundleExecutable '$exec_name' not found in $fw_dir${NC}"
+                printf '%b\n' "${RED}  ERROR: CFBundleExecutable '$exec_name' not found in $fw_dir${NC}"
                 ERRORS=$((ERRORS + 1))
             fi
         fi
     done < <(find "$xcfw_path" -name "Info.plist" -path "*.framework/Info.plist")
 
     if [[ $slice_count -eq 0 ]]; then
-        echo -e "${RED}  ERROR: No framework slices found in XCFramework${NC}"
+        printf '%b\n' "${RED}  ERROR: No framework slices found in XCFramework${NC}"
         ERRORS=$((ERRORS + 1))
     elif [[ $valid_count -eq $slice_count ]]; then
-        echo -e "${GREEN}  All $slice_count framework slices valid (CFBundleExecutable present)${NC}"
+        printf '%b\n' "${GREEN}  All $slice_count framework slices valid (CFBundleExecutable present)${NC}"
     fi
 
     echo ""
@@ -187,7 +187,7 @@ if [[ -f "$IOS_BINDINGS" ]]; then
         "$MIN_SWIFT_LINES" \
         "func presentationContractFixtureJson("
 else
-    echo -e "${YELLOW}iOS bindings not found (skipping - may not be on macOS)${NC}"
+    printf '%b\n' "${YELLOW}iOS bindings not found (skipping - may not be on macOS)${NC}"
     echo ""
 fi
 
@@ -202,20 +202,20 @@ check_bindings \
 check_cabi_header
 
 # Check library metadata (if we can build)
-echo -e "${YELLOW}Checking library metadata...${NC}"
+printf '%b\n' "${YELLOW}Checking library metadata...${NC}"
 cd "$PROJECT_ROOT"
 
 if [[ -f "target/release/libvauchi_platform.so" ]]; then
     metadata_count=$(cargo run -p vauchi-platform --bin uniffi-bindgen --release -- print-repr target/release/libvauchi_platform.so 2>/dev/null | grep -c "Record\|Enum\|Object\|Interface" || true)
     if [[ $metadata_count -lt 20 ]]; then
-        echo -e "${RED}  WARNING: Library has only $metadata_count metadata entries${NC}"
-        echo -e "${RED}  Library may have been built with symbol stripping.${NC}"
-        echo -e "${RED}  Rebuild with: RUSTFLAGS=\"-Cstrip=none\" cargo build -p vauchi-platform --release${NC}"
+        printf '%b\n' "${RED}  WARNING: Library has only $metadata_count metadata entries${NC}"
+        printf '%b\n' "${RED}  Library may have been built with symbol stripping.${NC}"
+        printf '%b\n' "${RED}  Rebuild with: RUSTFLAGS=\"-Cstrip=none\" cargo build -p vauchi-platform --release${NC}"
     else
-        echo -e "${GREEN}  Library metadata OK: $metadata_count entries${NC}"
+        printf '%b\n' "${GREEN}  Library metadata OK: $metadata_count entries${NC}"
     fi
 else
-    echo -e "${YELLOW}  Native library not found (run cargo build first)${NC}"
+    printf '%b\n' "${YELLOW}  Native library not found (run cargo build first)${NC}"
 fi
 
 # Check XCFramework structure (if packaged)
@@ -228,9 +228,9 @@ echo ""
 
 # Summary
 if [[ $ERRORS -gt 0 ]]; then
-    echo -e "${RED}╔════════════════════════════════════════╗${NC}"
-    echo -e "${RED}║     VALIDATION FAILED: $ERRORS error(s)      ║${NC}"
-    echo -e "${RED}╚════════════════════════════════════════╝${NC}"
+    printf '%b\n' "${RED}╔════════════════════════════════════════╗${NC}"
+    printf '%b\n' "${RED}║     VALIDATION FAILED: $ERRORS error(s)      ║${NC}"
+    printf '%b\n' "${RED}╚════════════════════════════════════════╝${NC}"
     echo ""
     echo "To fix:"
     echo "  1. cd $PROJECT_ROOT"
@@ -238,8 +238,8 @@ if [[ $ERRORS -gt 0 ]]; then
     echo "  3. ./scripts/build-bindings.sh"
     exit 1
 else
-    echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║     VALIDATION PASSED                  ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
+    printf '%b\n' "${GREEN}╔════════════════════════════════════════╗${NC}"
+    printf '%b\n' "${GREEN}║     VALIDATION PASSED                  ║${NC}"
+    printf '%b\n' "${GREEN}╚════════════════════════════════════════╝${NC}"
     exit 0
 fi

@@ -420,7 +420,7 @@ impl PlatformAppEngine {
         }
 
         // Pair 4 — auto-route the peer-scan QR text into the live
-        // cycle-thread session. The QR-scanner Component (iOS
+        // cycle-thread session. The QR-scanner widget (iOS
         // QrCodeView, Android QrCodeComponent) emits
         // `UserAction::TextChanged { component_id: "peer_scan", value }`
         // per the existing `exchange_qr.rs` single-direction contract.
@@ -437,7 +437,7 @@ impl PlatformAppEngine {
             && component_id == vauchi_app::ui::MULTI_STAGE_PEER_SCAN_COMPONENT_ID
         {
             // T1.2c: route the scan through the AppEngine-owned
-            // machine. The QR-scanner Component emits TextChanged
+            // machine. The QR-scanner widget emits TextChanged
             // with the scanned data; we wrap it in a synthetic
             // `Event::QrScanned` so the same machine ingress
             // handles both this UserAction path and the

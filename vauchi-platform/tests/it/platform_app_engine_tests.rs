@@ -542,32 +542,52 @@ fn onboarding_flow_completes_and_transitions_to_my_info() {
 fn navigate_to_json_simple_variant() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
-    let result = engine
+    engine
         .navigate_to_json_for_test(r#""Exchange""#.into())
         .expect("navigate");
-    let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
-    // The wire envelope mobile frontends consume: the Exchange tab root
-    // reports the canonical `exchange` id so the bottom nav bar renders.
-    assert_eq!(envelope["screen"]["screen_id"], "exchange");
+    // The batch mobile frontends consume: the Exchange tab root reports the
+    // canonical `exchange` id so the bottom nav bar renders.
+    assert_eq!(current_screen_id(&engine), "exchange");
 }
 
 // @scenario: exchange.feature :: Multi-stage exchange entry surfaces lifecycle commands in envelope
 #[test]
-fn navigate_to_json_envelope_carries_lifecycle_commands() {
+fn navigate_to_multi_stage_batch_carries_lifecycle_commands() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     // First nav lands on MultiStageExchange — its `screen_entered`
     // hook emits three commands (brightness, idle timer, orientation
     // lock). The previous engine's `screen_exited` is the default
     // empty.
-    let result = engine
+    engine
         .navigate_to_json_for_test(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
         .expect("navigate to multi-stage");
-    let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
-    assert_eq!(envelope["screen"]["screen_id"], "multi_stage_exchange");
-    let commands = envelope["commands"]
-        .as_array()
-        .expect("envelope.commands array");
+    // One batch, read twice: `initial_commands` drains the queued lifecycle
+    // commands, so a second call would return the surface without them.
+    let json = engine
+        .initial_commands_json()
+        .expect("initial_commands_json");
+    let batch: serde_json::Value = serde_json::from_str(&json).expect("parse batch");
+    let commands = batch["commands"].as_array().expect("batch.commands array");
+    let surface_id = commands
+        .iter()
+        .find_map(|c| c["ReplaceSurface"]["surface"]["surface_id"].as_str())
+        .expect("batch must replace a surface");
+    assert_eq!(surface_id, "multi_stage_exchange");
+    // The lifecycle hooks land after the surface commands, in hook order.
+    let commands: Vec<&serde_json::Value> = commands
+        .iter()
+        .filter(|c| {
+            [
+                "SetScreenBrightness",
+                "SetIdleTimerDisabled",
+                "SetOrientationLock",
+                "SwitchCamera",
+            ]
+            .iter()
+            .any(|kind| !c[kind].is_null())
+        })
+        .collect();
     assert_eq!(
         commands.len(),
         4,
@@ -655,14 +675,6 @@ fn on_wakeup_returns_envelope_with_schedule_wakeup_command() {
 fn dispatch_invalid_json_returns_error() {
     let (engine, _dir) = create_engine();
     let result = engine.dispatch_json("not valid json".into());
-    assert!(result.is_err(), "should return error for invalid JSON");
-}
-
-// @internal
-#[test]
-fn navigate_to_invalid_json_returns_error() {
-    let (engine, _dir) = create_engine();
-    let result = engine.navigate_to_json_for_test("not valid json".into());
     assert!(result.is_err(), "should return error for invalid JSON");
 }
 
@@ -1040,7 +1052,7 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
     // multi-stage invalidations because `multi_stage_session_active()`
     // returns false.
     engine
-        .navigate_back_json()
+        .navigate_back()
         .expect("navigate back away from multi_stage_exchange");
     let pre_count = invalidations.lock().expect("lock").len();
     engine.poll_notifications().expect("poll");

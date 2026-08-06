@@ -28,17 +28,14 @@ use vauchi_app::notification_types::{
     NotificationCategory as CoreNotificationCategory,
     NotificationPriority as CoreNotificationPriority,
 };
-use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
+use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::{HandlerId, Vauchi, VauchiConfig, VauchiEvent};
 use vauchi_core::crypto::SymmetricKey;
 
 use crate::error::MobileError;
 use crate::platform_app_engine_internals::self_heal_post_auth;
 
-use crate::json_helpers::{
-    action_result_envelope_to_json, commands_envelope_to_json, event_from_json,
-    screen_envelope_to_json, screen_to_json, user_action_from_json, wakeup_envelope_to_json,
-};
+use crate::json_helpers::{commands_envelope_to_json, event_from_json, wakeup_envelope_to_json};
 
 // ── PlatformEventListener ──────────────────────────────────────────
 
@@ -261,48 +258,6 @@ impl PlatformAppEngine {
     }
 }
 
-impl PlatformAppEngine {
-    /// Returns the cold-start `ScreenModel` JSON for whatever the
-    /// app's current persistent state is.
-    ///
-    /// Frontends call this **once** on cold start (after constructing
-    /// `PlatformAppEngine`) and render the result. They do **not**
-    /// branch on `has_identity` / `is_password_enabled` /
-    /// `is_onboarding_complete` themselves — that decision lives
-    /// inside core's `AppEngine::new()` boot logic and the
-    /// idempotent `self_heal_post_auth` self-heal that follows.
-    ///
-    /// Equivalent to `current_screen_json()` plus an explicit
-    /// contract: the audit
-    /// `2026-04-28-app-launch-and-identity-orchestration-in-core`
-    /// §2.1 elevates "first read after instance construction" from
-    /// "implicit / by convention" to "named API method", so iOS
-    /// `AppState` and Android `UiState` shadow enums can be deleted
-    /// without ambiguity. Subsequent reads use `current_screen_json`.
-    pub(crate) fn boot_for_test(&self) -> Result<String, MobileError> {
-        self.current_screen_json_for_test()
-    }
-
-    /// Returns the current screen as a JSON string.
-    ///
-    /// The JSON structure matches `ScreenModel` from vauchi-core.
-    pub(crate) fn current_screen_json_for_test(&self) -> Result<String, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        // Self-heal: when AppEngine was constructed without an identity
-        // (engine = OnboardingEngine, screen = Onboarding) and a sibling
-        // Vauchi instance — `VauchiPlatform` on iOS/Android — has since
-        // written identity to the shared DB, the live engine is stale.
-        // Auto-navigate to the post-auth default so frontends never have
-        // to hand-code "after onboarding, navigate to MyInfo": the
-        // workflow decision lives in core (ADR-021 Humble UI). Idempotent
-        // — once `screen != Onboarding`, this is a no-op.
-        self_heal_post_auth(&mut engine);
-        screen_to_json(&engine.current_screen())
-    }
-}
-
 #[uniffi::export]
 impl PlatformAppEngine {
     /// Return Core's complete initial presentation command batch.
@@ -366,133 +321,6 @@ impl PlatformAppEngine {
         };
         Ok(items.into_iter().map(MobileTabInfo::from).collect())
     }
-
-    /// Handles a user action (as JSON) and returns the result as JSON.
-    ///
-    /// The action JSON must match the `UserAction` enum format.
-    /// The result JSON matches the `ActionResult` enum. Note:
-    /// `ValidationError` is never returned — validation errors are
-    /// resolved into `UpdateScreen` with the error injected into the
-    /// matching component's `validation_error` field.
-    pub(crate) fn handle_action_json_for_test(
-        &self,
-        action_json: String,
-    ) -> Result<String, MobileError> {
-        let action = user_action_from_json(&action_json)?;
-        // Pair 4 — pre-action retry detection: when the user presses
-        // Retry on the multi-stage screen the underlying session must
-        // restart, not just the engine view-state. Cancel + recreate
-        // before the engine handles the action so the post-retry state
-        // pushes (Idle → Advertising → …) come from a fresh cycle thread.
-        let pre_screen = self
-            .engine
-            .lock()
-            .map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?
-            .current_app_screen()
-            .clone();
-        let on_multi_stage = matches!(pre_screen, AppScreen::MultiStageExchange { .. });
-        let is_retry = matches!(
-            &action,
-            vauchi_app::ui::UserAction::ActionPressed { action_id }
-                if action_id == vauchi_app::ui::MULTI_STAGE_RETRY_ACTION_ID
-        );
-        if on_multi_stage && is_retry {
-            // T1.2c: rebuild the AppEngine-owned machine in place so
-            // the next advance emits a fresh INIT QR. The cycle-thread
-            // path is dead — `cancel_multi_stage_session` /
-            // `ensure_multi_stage_session` on `self` are kept around
-            // for the test helpers (T3.1 deletes them).
-            let mode = match &pre_screen {
-                AppScreen::MultiStageExchange { mode } => *mode,
-                _ => {
-                    return Err(MobileError::Other {
-                        detail: "retry dispatched off multi-stage screen".into(),
-                    });
-                }
-            };
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            engine.cancel_multi_stage_session();
-            engine.ensure_multi_stage_session(mode);
-        }
-
-        // Pair 4 — auto-route the peer-scan QR text into the live
-        // cycle-thread session. The QR-scanner widget (iOS
-        // QrCodeView, Android QrCodeComponent) emits
-        // `UserAction::TextChanged { component_id: "peer_scan", value }`
-        // per the existing `exchange_qr.rs` single-direction contract.
-        // On the multi-stage screen the engine has no session handle,
-        // so without this side-effect the scan would be dropped on
-        // `MultiStageExchangeEngine::handle_action`'s default
-        // `UpdateScreen` fall-through. Mirrors the `QrScanned`
-        // hardware-event auto-route in `handle_hardware_event`.
-        if on_multi_stage
-            && let vauchi_app::ui::UserAction::TextChanged {
-                component_id,
-                value,
-            } = &action
-            && component_id == vauchi_app::ui::MULTI_STAGE_PEER_SCAN_COMPONENT_ID
-        {
-            // T1.2c: route the scan through the AppEngine-owned
-            // machine. The QR-scanner widget emits TextChanged
-            // with the scanned data; we wrap it in a synthetic
-            // `Event::QrScanned` so the same machine ingress
-            // handles both this UserAction path and the
-            // `handle_hardware_event` path below.
-            let qr_event = vauchi_core::Event::QrScanned {
-                data: value.clone(),
-            };
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            let m_event = engine.forward_multi_stage_hardware_event(&qr_event);
-            engine.apply_multi_stage_event(m_event);
-        }
-
-        // Glance one-sided QR: the scan component's TextChanged carries the
-        // scanned OOB payload. Route it to `apply_glance_scan` so the scanner
-        // pins the displayer's identity + exchange key + co-presence nonce; the
-        // subsequent `BleDeviceDiscovered` of that identity then connects
-        // (`handle_glance_discovery`). A malformed / expired QR is rejected
-        // there and latches nothing — the exposure-closer for
-        // `2026-06-10-ble-unauthenticated-peer-identity`.
-        if let vauchi_app::ui::UserAction::TextChanged {
-            component_id,
-            value,
-        } = &action
-            && component_id == vauchi_app::ui::GLANCE_SCAN_COMPONENT_ID
-            && matches!(
-                pre_screen,
-                AppScreen::BleExchange {
-                    mode: vauchi_core::exchange::mode::ExchangeMode::Glance
-                }
-            )
-        {
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            let _ = engine.apply_glance_scan(value);
-        }
-
-        let (result, pending_commands) = {
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            let result = engine.handle_action(action);
-            // Phase 2b: drain the screen-presentation lifecycle commands
-            // that any navigation triggered by this action accumulated.
-            // Frontends process them via the same dispatch path as
-            // `ActionResult::Commands` — they're surfaced separately in
-            // the envelope so the action result and the lifecycle hooks
-            // stay independently typed.
-            let cmds = engine.drain_pending_commands();
-            (result, cmds)
-        };
-        action_result_envelope_to_json(&result, &pending_commands)
-    }
 }
 
 #[uniffi::export]
@@ -530,41 +358,17 @@ impl PlatformAppEngine {
 }
 
 impl PlatformAppEngine {
-    /// Navigate back in the history stack.
+    /// Pop the history stack so a test can leave the current screen.
     ///
-    /// Returns the previous screen model as JSON envelope:
-    /// `{"screen": <ScreenModel>, "commands": [<Command>, ...]}`.
-    /// `commands` carries any screen-presentation `Command`s emitted by
-    /// the lifecycle hooks of the outgoing + incoming engines (Phase 2b).
-    pub(crate) fn navigate_back_json_for_test(&self) -> Result<String, MobileError> {
-        let (model, pending_commands) = {
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            let model = engine.navigate_back();
-            let cmds = engine.drain_pending_commands();
-            (model, cmds)
-        };
-        screen_envelope_to_json(&model, &pending_commands)
-    }
-
-    /// Returns the canonical screen-id of the parent tab the active
-    /// screen belongs to under the given layout, or `None` for
-    /// transient overlays (Lock, FormDialog).
-    ///
-    /// `Mobile` matches the 5-tab bottom nav from `tab_info`;
-    /// `Desktop` matches the 14-tab sidebar from `sidebar_items`.
-    /// Frontends use this to keep tab/sidebar selection in sync with
-    /// the active screen without maintaining their own
-    /// `screen_id` → `parent_tab` map (§1D pure-renderer remediation).
-    pub(crate) fn current_tab_id_for_test(
-        &self,
-        layout: MobileTabLayout,
-    ) -> Result<Option<String>, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+    /// Returns no presentation: the screen-exit/entry lifecycle commands stay
+    /// queued so the next canonical batch carries them, the same way
+    /// `AppEngine::initial_commands` drains them for a real shell.
+    pub(crate) fn navigate_back_for_test(&self) -> Result<(), MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
-        Ok(engine.current_tab_id(layout.into()).map(|s| s.to_string()))
+        engine.navigate_back();
+        Ok(())
     }
 }
 

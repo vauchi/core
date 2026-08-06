@@ -36,15 +36,6 @@ use crate::types::{MobileLocale, MobileTabInfo, MobileTabLayout};
 /// surface frontends route through.
 #[doc(hidden)]
 pub trait PlatformAppEngineTestHelpers {
-    /// Drive the retired screen-model bootstrap boundary in integration tests.
-    fn boot(&self) -> Result<String, MobileError>;
-
-    /// Read the retired screen-model JSON in integration tests.
-    fn current_screen_json(&self) -> Result<String, MobileError>;
-
-    /// Drive the retired user-action/result boundary in integration tests.
-    fn handle_action_json(&self, action_json: String) -> Result<String, MobileError>;
-
     /// Query the retired form-factor-specific navigation list in tests.
     fn nav_items(
         &self,
@@ -52,11 +43,9 @@ pub trait PlatformAppEngineTestHelpers {
         locale: MobileLocale,
     ) -> Result<Vec<MobileTabInfo>, MobileError>;
 
-    /// Drive the retired back-navigation result boundary in tests.
-    fn navigate_back_json(&self) -> Result<String, MobileError>;
-
-    /// Query the retired layout-specific active tab in tests.
-    fn current_tab_id(&self, layout: MobileTabLayout) -> Result<Option<String>, MobileError>;
+    /// Pop the history stack in tests. Emits no presentation — read the
+    /// resulting surface through the canonical command batch.
+    fn navigate_back(&self) -> Result<(), MobileError>;
 
     /// Save a contact directly to storage.
     ///
@@ -123,13 +112,14 @@ pub trait PlatformAppEngineTestHelpers {
     /// `apply_device_link_*_for_test` helpers.
     fn cancel_device_link_session_for_test(&self);
 
-    /// Test-only: navigate to `screen_json` (an `AppScreen` JSON) and
-    /// return the screen envelope. Replaces the retired public
-    /// `navigate_to_json` binding (ADR-043 Am4): the production surface no
-    /// longer lets frontends construct domain targets, but device-link
-    /// listener tests still need a forward-nav seam to land on
-    /// `DeviceLinking` and assert the session spawn/cancel lifecycle.
-    fn navigate_to_json_for_test(&self, screen_json: String) -> Result<String, MobileError>;
+    /// Test-only: navigate to `screen_json` (an `AppScreen` JSON).
+    /// Replaces the retired public `navigate_to_json` binding (ADR-043 Am4):
+    /// the production surface no longer lets frontends construct domain
+    /// targets, but device-link listener tests still need a forward-nav seam
+    /// to land on `DeviceLinking` and assert the session spawn/cancel
+    /// lifecycle. Emits no presentation — read the resulting surface through
+    /// the canonical command batch.
+    fn navigate_to_json_for_test(&self, screen_json: String) -> Result<(), MobileError>;
 
     /// Test-only: establish an initiator ratchet for an already-saved
     /// exchanged contact, so own-card propagation has a real delivery target
@@ -158,18 +148,6 @@ pub trait PlatformAppEngineTestHelpers {
 }
 
 impl PlatformAppEngineTestHelpers for PlatformAppEngine {
-    fn boot(&self) -> Result<String, MobileError> {
-        self.boot_for_test()
-    }
-
-    fn current_screen_json(&self) -> Result<String, MobileError> {
-        self.current_screen_json_for_test()
-    }
-
-    fn handle_action_json(&self, action_json: String) -> Result<String, MobileError> {
-        self.handle_action_json_for_test(action_json)
-    }
-
     fn nav_items(
         &self,
         layout: MobileTabLayout,
@@ -178,12 +156,8 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         self.nav_items_for_test(layout, locale)
     }
 
-    fn navigate_back_json(&self) -> Result<String, MobileError> {
-        self.navigate_back_json_for_test()
-    }
-
-    fn current_tab_id(&self, layout: MobileTabLayout) -> Result<Option<String>, MobileError> {
-        self.current_tab_id_for_test(layout)
+    fn navigate_back(&self) -> Result<(), MobileError> {
+        self.navigate_back_for_test()
     }
 
     fn save_test_contact(&self, contact: &vauchi_core::Contact) -> Result<(), MobileError> {
@@ -251,18 +225,13 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         }
     }
 
-    fn navigate_to_json_for_test(&self, screen_json: String) -> Result<String, MobileError> {
-        use crate::json_helpers::{app_screen_from_json, screen_envelope_to_json};
-        let screen = app_screen_from_json(&screen_json)?;
-        let (model, pending_commands) = {
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            let model = engine.navigate_to(screen);
-            let cmds = engine.drain_pending_commands();
-            (model, cmds)
-        };
-        screen_envelope_to_json(&model, &pending_commands)
+    fn navigate_to_json_for_test(&self, screen_json: String) -> Result<(), MobileError> {
+        let screen = crate::json_helpers::app_screen_from_json(&screen_json)?;
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        engine.navigate_to(screen);
+        Ok(())
     }
 
     fn create_test_ratchet_as_initiator(

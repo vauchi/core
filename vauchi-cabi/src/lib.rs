@@ -26,8 +26,6 @@ mod i18n;
 mod logging;
 pub(crate) mod platform_event;
 #[cfg(test)]
-mod workflow;
-
 pub use app::*;
 #[cfg(test)]
 pub use app_navigation::*;
@@ -35,47 +33,8 @@ pub use app_presentation::*;
 pub use exchange::*;
 pub use i18n::*;
 pub use logging::*;
-#[cfg(test)]
-pub use workflow::*;
 
 use config::CabiConfig;
-
-// ── Type-erased engine wrapper ──────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) trait WorkflowEngineAny: Send {
-    fn current_screen_json(&self) -> String;
-    fn handle_action_json(&mut self, json: &str) -> String;
-}
-
-#[cfg(test)]
-impl<T: WorkflowEngine + Send> WorkflowEngineAny for T {
-    fn current_screen_json(&self) -> String {
-        match serde_json::to_string(&self.current_screen()) {
-            Ok(json) => json,
-            Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
-        }
-    }
-
-    fn handle_action_json(&mut self, json: &str) -> String {
-        match serde_json::from_str::<UserAction>(json) {
-            Ok(action) => {
-                let result = self.handle_action(action);
-                match serde_json::to_string(&result) {
-                    Ok(json) => json,
-                    Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
-                }
-            }
-            Err(e) => format!(r#"{{"error":"{}"}}"#, e),
-        }
-    }
-}
-
-/// Opaque handle to a workflow engine instance.
-#[cfg(test)]
-pub struct VauchiWorkflow {
-    pub(crate) engine: Mutex<Box<dyn WorkflowEngineAny>>,
-}
 
 /// Opaque handle to an AppEngine instance.
 pub struct VauchiApp {
@@ -264,196 +223,6 @@ mod tests {
         (dir, tmp)
     }
 
-    // ── Lifecycle tests (Task 12) ───────────────────────────────────
-
-    #[test]
-    fn create_onboarding_workflow_returns_non_null_handle() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let wtype = CString::new("onboarding").unwrap();
-            let handle = vauchi_workflow_create(wtype.as_ptr());
-            assert!(
-                !handle.is_null(),
-                "onboarding workflow should create successfully"
-            );
-            vauchi_workflow_destroy(handle);
-        }
-    }
-
-    #[test]
-    fn create_emergency_shred_workflow_returns_non_null_handle() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let wtype = CString::new("emergency_shred").unwrap();
-            let handle = vauchi_workflow_create(wtype.as_ptr());
-            assert!(
-                !handle.is_null(),
-                "emergency_shred workflow should create successfully"
-            );
-            vauchi_workflow_destroy(handle);
-        }
-    }
-
-    #[test]
-    fn create_lock_screen_workflow_returns_non_null_handle() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let wtype = CString::new("lock_screen").unwrap();
-            let handle = vauchi_workflow_create(wtype.as_ptr());
-            assert!(
-                !handle.is_null(),
-                "lock_screen workflow should create successfully"
-            );
-            vauchi_workflow_destroy(handle);
-        }
-    }
-
-    #[test]
-    fn create_unknown_workflow_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let wtype = CString::new("nonexistent").unwrap();
-            let handle = vauchi_workflow_create(wtype.as_ptr());
-            assert!(handle.is_null(), "unknown workflow type should return null");
-        }
-    }
-
-    #[test]
-    fn create_with_null_type_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let handle = vauchi_workflow_create(std::ptr::null());
-            assert!(handle.is_null(), "null type should return null");
-        }
-    }
-
-    #[test]
-    fn destroy_null_handle_is_safe() {
-        // allow(zero_assertions) — this test verifies no crash/UB on null input
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            vauchi_workflow_destroy(std::ptr::null_mut());
-        }
-    }
-
-    // ── Screen and action tests (Task 13) ───────────────────────────
-
-    #[test]
-    fn current_screen_returns_valid_json_with_screen_id() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let wtype = CString::new("onboarding").unwrap();
-            let handle = vauchi_workflow_create(wtype.as_ptr());
-            assert!(!handle.is_null());
-
-            let json_ptr = vauchi_workflow_current_screen(handle);
-            assert!(!json_ptr.is_null());
-            let json = CStr::from_ptr(json_ptr).to_str().unwrap();
-            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
-            assert!(
-                screen.get("screen_id").is_some(),
-                "screen should have screen_id"
-            );
-            assert!(
-                screen.get("components").is_some(),
-                "screen should have components"
-            );
-            assert!(screen.get("title").is_some(), "screen should have title");
-
-            vauchi_string_free(json_ptr);
-            vauchi_workflow_destroy(handle);
-        }
-    }
-
-    #[test]
-    fn current_screen_with_null_handle_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let json_ptr = vauchi_workflow_current_screen(std::ptr::null_mut());
-            assert!(json_ptr.is_null());
-        }
-    }
-
-    #[test]
-    fn handle_action_advances_workflow_state() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let wtype = CString::new("onboarding").unwrap();
-            let handle = vauchi_workflow_create(wtype.as_ptr());
-            assert!(!handle.is_null());
-
-            let screen1_ptr = vauchi_workflow_current_screen(handle);
-            let screen1_json = CStr::from_ptr(screen1_ptr).to_str().unwrap().to_string();
-            vauchi_string_free(screen1_ptr);
-
-            // Press "create_new" to advance from identity_check to welcome
-            let action = CString::new(r#"{"ActionPressed":{"action_id":"create_new"}}"#).unwrap();
-            let result_ptr = vauchi_workflow_handle_action(handle, action.as_ptr());
-            assert!(!result_ptr.is_null());
-            let result_json = CStr::from_ptr(result_ptr).to_str().unwrap();
-            let _: serde_json::Value = serde_json::from_str(result_json).unwrap();
-            vauchi_string_free(result_ptr);
-
-            // Get screen after action — should be different
-            let screen2_ptr = vauchi_workflow_current_screen(handle);
-            let screen2_json = CStr::from_ptr(screen2_ptr).to_str().unwrap().to_string();
-            vauchi_string_free(screen2_ptr);
-
-            // Screens should differ (workflow advanced)
-            assert_ne!(
-                screen1_json, screen2_json,
-                "screen should change after action"
-            );
-
-            vauchi_workflow_destroy(handle);
-        }
-    }
-
-    #[test]
-    fn handle_action_with_invalid_json_returns_error() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let wtype = CString::new("onboarding").unwrap();
-            let handle = vauchi_workflow_create(wtype.as_ptr());
-
-            let bad_json = CString::new("not json").unwrap();
-            let result_ptr = vauchi_workflow_handle_action(handle, bad_json.as_ptr());
-            assert!(!result_ptr.is_null());
-            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
-            assert!(result.contains("error"), "invalid JSON should return error");
-
-            vauchi_string_free(result_ptr);
-            vauchi_workflow_destroy(handle);
-        }
-    }
-
-    #[test]
-    fn handle_action_with_null_handle_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let action = CString::new(r#"{"ActionPressed":{"action_id":"test"}}"#).unwrap();
-            let result_ptr = vauchi_workflow_handle_action(std::ptr::null_mut(), action.as_ptr());
-            assert!(result_ptr.is_null());
-        }
-    }
-
-    #[test]
-    fn handle_action_with_null_json_returns_error() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let wtype = CString::new("onboarding").unwrap();
-            let handle = vauchi_workflow_create(wtype.as_ptr());
-
-            let result_ptr = vauchi_workflow_handle_action(handle, std::ptr::null());
-            assert!(!result_ptr.is_null());
-            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
-            assert!(result.contains("error"));
-
-            vauchi_string_free(result_ptr);
-            vauchi_workflow_destroy(handle);
-        }
-    }
-
     // ── AppEngine tests ─────────────────────────────────────────────
 
     #[test]
@@ -475,22 +244,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn app_current_screen_returns_onboarding() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let handle = vauchi_app_create();
-            let json_ptr = vauchi_app_current_screen(handle);
-            assert!(!json_ptr.is_null());
-            let json = CStr::from_ptr(json_ptr).to_str().unwrap();
-            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
-            assert_eq!(screen["screen_id"], "identity_check");
-            vauchi_string_free(json_ptr);
-            vauchi_app_destroy(handle);
-        }
-    }
-
-    // @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
     #[test]
     fn app_c_abi_transports_contextual_commands_and_generic_events() {
         unsafe {
@@ -652,22 +405,6 @@ mod tests {
     }
 
     #[test]
-    fn app_handle_action_advances_onboarding() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let handle = vauchi_app_create();
-            let action = CString::new(r#"{"ActionPressed":{"action_id":"create_new"}}"#).unwrap();
-            let result_ptr = vauchi_app_handle_action(handle, action.as_ptr());
-            assert!(!result_ptr.is_null());
-            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
-            let _: serde_json::Value =
-                serde_json::from_str(result).expect("result should be valid JSON");
-            vauchi_string_free(result_ptr);
-            vauchi_app_destroy(handle);
-        }
-    }
-
-    #[test]
     fn app_navigate_to_unknown_screen_returns_error() {
         // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
@@ -689,19 +426,26 @@ mod tests {
         unsafe {
             let handle = vauchi_app_create();
             let action = CString::new(
-                r#"{"LinkOpened":{"uri":"vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI"}}"#,
+                r#"{"DeepLinkOpened":{"uri":"vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI"}}"#,
             )
             .unwrap();
-            let json_ptr = vauchi_app_handle_action(handle, action.as_ptr());
+            let json_ptr = vauchi_app_dispatch(handle, action.as_ptr());
             assert!(
                 !json_ptr.is_null(),
                 "LinkOpened should return an action result"
             );
             let json = CStr::from_ptr(json_ptr).to_str().unwrap();
             let result: serde_json::Value = serde_json::from_str(json).unwrap();
+            let surface_id = result["commands"].as_array().and_then(|commands| {
+                commands
+                    .iter()
+                    .map(|command| command["ReplaceSurface"]["surface"]["surface_id"].clone())
+                    .next()
+            });
             assert_eq!(
-                result["NavigateTo"]["screen_id"], "device_link_join",
-                "device-link URI should navigate to device_link_join, got: {json}"
+                surface_id,
+                Some(serde_json::Value::String("device_link_join".into())),
+                "device-link URI should replace with the device_link_join surface, got: {json}"
             );
             vauchi_string_free(json_ptr);
             vauchi_app_destroy(handle);
@@ -714,10 +458,10 @@ mod tests {
         // SAFETY: Calling FFI with null handle.
         unsafe {
             let action = CString::new(
-                r#"{"LinkOpened":{"uri":"vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI"}}"#,
+                r#"{"DeepLinkOpened":{"uri":"vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI"}}"#,
             )
             .unwrap();
-            let json_ptr = vauchi_app_handle_action(std::ptr::null_mut(), action.as_ptr());
+            let json_ptr = vauchi_app_dispatch(std::ptr::null_mut(), action.as_ptr());
             assert!(json_ptr.is_null(), "null handle should return null");
         }
     }
@@ -728,7 +472,7 @@ mod tests {
         // SAFETY: Calling FFI with a null action JSON string.
         unsafe {
             let handle = vauchi_app_create();
-            let json_ptr = vauchi_app_handle_action(handle, std::ptr::null());
+            let json_ptr = vauchi_app_dispatch(handle, std::ptr::null());
             assert!(
                 !json_ptr.is_null(),
                 "null action JSON should return error JSON"
@@ -750,19 +494,26 @@ mod tests {
         unsafe {
             let handle = create_app_with_identity();
             let action = CString::new(
-                r#"{"LinkOpened":{"uri":"vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI"}}"#,
+                r#"{"DeepLinkOpened":{"uri":"vauchi://device-link?qr=d2hhdGV2ZXI&code=QlJPS0VSNDI"}}"#,
             )
             .unwrap();
-            let json_ptr = vauchi_app_handle_action(handle, action.as_ptr());
+            let json_ptr = vauchi_app_dispatch(handle, action.as_ptr());
             assert!(
                 !json_ptr.is_null(),
                 "existing identity should return an action result"
             );
             let json = CStr::from_ptr(json_ptr).to_str().unwrap();
             let result: serde_json::Value = serde_json::from_str(json).unwrap();
-            assert!(
-                result.get("ShowAlert").is_some(),
-                "existing identity should surface a ShowAlert, got: {json}"
+            let alert = result["commands"].as_array().and_then(|commands| {
+                commands.iter().find_map(|command| {
+                    let alert = &command["PresentAlert"]["alert"];
+                    alert.is_object().then(|| alert.clone())
+                })
+            });
+            assert_eq!(
+                alert.as_ref().and_then(|a| a["title"].as_str()),
+                Some("Invalid Device Link"),
+                "existing identity should surface the invalid-link alert, got: {json}"
             );
             vauchi_string_free(json_ptr);
             vauchi_app_destroy(handle);
@@ -812,26 +563,8 @@ mod tests {
             let handle = vauchi_app_create();
             assert!(!handle.is_null());
 
-            let steps: &[&str] = &[
-                // identity_check → default_name
-                r#"{"ActionPressed":{"action_id":"create_new"}}"#,
-                // default_name: set display name (also stored as pending_display_name)
-                r#"{"TextChanged":{"component_id":"display_name","value":"TestUser"}}"#,
-                // default_name → groups_setup
-                r#"{"ActionPressed":{"action_id":"continue"}}"#,
-                // groups_setup → contact_info
-                r#"{"ActionPressed":{"action_id":"skip"}}"#,
-                // contact_info → what_next
-                r#"{"ActionPressed":{"action_id":"skip"}}"#,
-                // what_next → CompleteWith(MainScreen) → create_identity
-                r#"{"ActionPressed":{"action_id":"start_app"}}"#,
-            ];
-
-            for step in steps {
-                let action = CString::new(*step).unwrap();
-                let r = vauchi_app_handle_action(handle, action.as_ptr());
-                vauchi_string_free(r);
-            }
+            let name = CString::new("TestUser").unwrap();
+            assert_eq!(vauchi_app_create_identity(handle, name.as_ptr()), 0);
 
             handle
         }
@@ -1141,47 +874,37 @@ mod tests {
         }
     }
 
-    // ── Hardware event tests ────────────────────────────────────────
+    // ── Hardware event tests (canonical dispatch) ────────────────────
 
     #[test]
-    fn handle_hardware_event_null_handle_returns_null() {
+    fn dispatch_null_handle_returns_null() {
         // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let event = CString::new(r#"{"QrScanned":{"data":"test"}}"#).unwrap();
-            let result = vauchi_app_handle_hardware_event(std::ptr::null_mut(), event.as_ptr());
+            let result = vauchi_app_dispatch(std::ptr::null_mut(), event.as_ptr());
             assert!(result.is_null());
         }
     }
 
     #[test]
-    fn handle_hardware_event_null_json_returns_null() {
+    fn dispatch_null_json_returns_error_json() {
         // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create();
-            let result = vauchi_app_handle_hardware_event(handle, std::ptr::null());
-            assert!(result.is_null());
-            vauchi_app_destroy(handle);
-        }
-    }
-
-    #[test]
-    fn handle_hardware_event_not_on_exchange_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            // App starts on onboarding, not exchange — event should be ignored
-            let handle = vauchi_app_create();
-            let event = CString::new(r#"{"QrScanned":{"data":"test"}}"#).unwrap();
-            let result = vauchi_app_handle_hardware_event(handle, event.as_ptr());
+            let result = vauchi_app_dispatch(handle, std::ptr::null());
+            assert!(!result.is_null());
+            let result_str = CStr::from_ptr(result).to_str().unwrap();
             assert!(
-                result.is_null(),
-                "hardware event on non-exchange screen should return null"
+                result_str.contains("error"),
+                "null event JSON should return error JSON, got: {result_str}"
             );
+            vauchi_string_free(result);
             vauchi_app_destroy(handle);
         }
     }
 
     #[test]
-    fn handle_hardware_event_on_exchange_returns_result() {
+    fn dispatch_hardware_unavailable_on_exchange_mentions_transport() {
         // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
@@ -1192,12 +915,12 @@ mod tests {
                 vauchi_string_free(r);
             }
 
-            // Send a HardwareUnavailable event — should return a toast/alert
+            // HardwareUnavailable surfaces through the generic command batch.
             let event = CString::new(r#"{"HardwareUnavailable":{"transport":"BLE"}}"#).unwrap();
-            let result = vauchi_app_handle_hardware_event(app, event.as_ptr());
+            let result = vauchi_app_dispatch(app, event.as_ptr());
             assert!(
                 !result.is_null(),
-                "hardware event on exchange screen should return result"
+                "hardware event on exchange screen should return commands"
             );
             let result_str = CStr::from_ptr(result).to_str().unwrap();
             assert!(
@@ -1247,32 +970,6 @@ mod tests {
             let cstr = CStr::from_ptr(result);
             assert_eq!(cstr.to_str().unwrap(), "");
             drop(CString::from_raw(result));
-        }
-    }
-
-    #[test]
-    fn handle_action_json_serialization_failure_returns_error_json() {
-        // Verify the Ok path returns valid JSON (not empty string) for all ActionResult variants
-        let wtype = CString::new("onboarding").unwrap();
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let handle = vauchi_workflow_create(wtype.as_ptr());
-            assert!(!handle.is_null());
-
-            // A valid action should return non-empty JSON
-            let action = CString::new(r#"{"ActionPressed":{"action_id":"create_new"}}"#).unwrap();
-            let result_ptr = vauchi_workflow_handle_action(handle, action.as_ptr());
-            assert!(!result_ptr.is_null());
-            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
-            assert!(
-                !result.is_empty(),
-                "valid action result should not be empty"
-            );
-            // Must be valid JSON
-            let _: serde_json::Value =
-                serde_json::from_str(result).expect("action result must always be valid JSON");
-            vauchi_string_free(result_ptr);
-            vauchi_workflow_destroy(handle);
         }
     }
 
@@ -1390,21 +1087,8 @@ mod tests {
                 vauchi_app_create_with_key(dir_cstr.as_ptr(), std::ptr::null(), key.as_ptr(), 32);
             assert!(!handle.is_null());
 
-            let steps: &[&str] = &[
-                r#"{"ActionPressed":{"action_id":"create_new"}}"#,
-                r#"{"TextChanged":{"component_id":"display_name","value":"PersistTest"}}"#,
-                r#"{"ActionPressed":{"action_id":"continue"}}"#,
-                r#"{"ActionPressed":{"action_id":"skip"}}"#,
-                r#"{"ActionPressed":{"action_id":"skip"}}"#,
-                r#"{"ActionPressed":{"action_id":"start_app"}}"#,
-            ];
-            for step in steps {
-                let action = CString::new(*step).unwrap();
-                let r = vauchi_app_handle_action(handle, action.as_ptr());
-                if !r.is_null() {
-                    vauchi_string_free(r);
-                }
-            }
+            let name = CString::new("PersistTest").unwrap();
+            assert_eq!(vauchi_app_create_identity(handle, name.as_ptr()), 0);
 
             let screens_ptr = vauchi_app_available_screens(handle);
             let screens_json = CStr::from_ptr(screens_ptr).to_str().unwrap().to_string();
@@ -1447,21 +1131,8 @@ mod tests {
                 vauchi_app_create_with_key(dir_cstr.as_ptr(), std::ptr::null(), key_a.as_ptr(), 32);
             assert!(!handle.is_null());
 
-            let steps: &[&str] = &[
-                r#"{"ActionPressed":{"action_id":"create_new"}}"#,
-                r#"{"TextChanged":{"component_id":"display_name","value":"KeyTest"}}"#,
-                r#"{"ActionPressed":{"action_id":"continue"}}"#,
-                r#"{"ActionPressed":{"action_id":"skip"}}"#,
-                r#"{"ActionPressed":{"action_id":"skip"}}"#,
-                r#"{"ActionPressed":{"action_id":"start_app"}}"#,
-            ];
-            for step in steps {
-                let action = CString::new(*step).unwrap();
-                let r = vauchi_app_handle_action(handle, action.as_ptr());
-                if !r.is_null() {
-                    vauchi_string_free(r);
-                }
-            }
+            let name = CString::new("KeyTest").unwrap();
+            assert_eq!(vauchi_app_create_identity(handle, name.as_ptr()), 0);
             vauchi_app_destroy(handle);
 
             let handle2 =
@@ -1657,12 +1328,8 @@ mod tests {
                 assert!(!handle.is_null());
 
                 // Trigger identity creation
-                let action =
-                    CString::new(r#"{"ActionPressed":{"action_id":"create_new"}}"#).unwrap();
-                let result_ptr = vauchi_app_handle_action(handle, action.as_ptr());
-                if !result_ptr.is_null() {
-                    vauchi_string_free(result_ptr);
-                }
+                let name = CString::new("PersistConfig").unwrap();
+                assert_eq!(vauchi_app_create_identity(handle, name.as_ptr()), 0);
 
                 vauchi_app_destroy(handle);
             }

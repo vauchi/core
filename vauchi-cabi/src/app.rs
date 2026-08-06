@@ -208,39 +208,6 @@ pub unsafe extern "C" fn vauchi_app_destroy(handle: *mut VauchiApp) {
     }
 }
 
-/// Get the current screen as a JSON string.
-///
-/// # Safety
-/// `handle` must be a valid app handle or null.
-// INLINE_TEST_REQUIRED: retired ScreenModel C ABI functions remain test-only
-// so migration regressions are covered without exporting the old protocol.
-#[cfg(test)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn vauchi_app_current_screen(handle: *mut VauchiApp) -> *mut c_char {
-    // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
-    unsafe {
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            if handle.is_null() {
-                return std::ptr::null_mut();
-            }
-            let app = &*handle;
-            match app.engine.lock() {
-                Ok(engine) => {
-                    let screen = engine.current_screen();
-                    match serde_json::to_string(&screen) {
-                        Ok(json) => to_c_string(&json),
-                        Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                    }
-                }
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
-            }
-        })) {
-            Ok(result) => result,
-            Err(_) => std::ptr::null_mut(),
-        }
-    }
-}
-
 /// Poll for any new OS notifications produced by the app engine.
 ///
 /// Returns a JSON-encoded array of `PendingNotification` objects, or
@@ -318,48 +285,6 @@ pub unsafe extern "C" fn vauchi_app_on_wakeup(app: *mut VauchiApp) -> *mut c_cha
     }
 }
 
-/// Handle a user action (JSON) and return the result as JSON.
-///
-/// # Safety
-/// `handle` must be a valid app handle or null.
-/// `action_json` must be a valid null-terminated C string, or null.
-#[cfg(test)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn vauchi_app_handle_action(
-    handle: *mut VauchiApp,
-    action_json: *const c_char,
-) -> *mut c_char {
-    // SAFETY: handle is checked non-null; action_json read via from_c_str which checks null and requires NUL-terminated string.
-    unsafe {
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            if handle.is_null() {
-                return std::ptr::null_mut();
-            }
-            let json = match from_c_str(action_json) {
-                Some(s) => s,
-                None => return to_c_string(r#"{"error":"null action JSON"}"#),
-            };
-            let app = &*handle;
-            match app.engine.lock() {
-                Ok(mut engine) => match serde_json::from_str::<UserAction>(&json) {
-                    Ok(action) => {
-                        let result = engine.handle_action(action);
-                        serde_json::to_string(&result).map_or_else(
-                            |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                            |j| to_c_string(&j),
-                        )
-                    }
-                    Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                },
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
-            }
-        })) {
-            Ok(result) => result,
-            Err(_) => std::ptr::null_mut(),
-        }
-    }
-}
-
 /// Navigate to a screen by name. Returns the new screen as JSON.
 ///
 /// Supported screen names: "home", "contacts", "exchange", "settings",
@@ -376,6 +301,10 @@ pub unsafe extern "C" fn vauchi_app_handle_action(
 /// # Safety
 /// `handle` must be a valid app handle or null.
 /// `screen_name` must be a valid null-terminated C string, or null.
+// INLINE_TEST_REQUIRED: cdylib crate-type prevents integration tests in
+// tests/; the remaining #[cfg(test)] exports in this file are the test-only
+// navigation and lifecycle seams the lib.rs suite drives, kept until the
+// suite itself moves to the generic dispatch path.
 #[cfg(test)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_navigate_to(
@@ -619,52 +548,6 @@ pub unsafe extern "C" fn vauchi_app_create_identity(
                 .unwrap_or(-1)
         }))
         .unwrap_or(-1)
-    }
-}
-
-/// Handle a hardware event during an exchange (ADR-031).
-///
-/// `event_json` must be a JSON-encoded `Event`.
-/// Returns the action result as JSON, or null if the event was ignored
-/// (e.g., not on the exchange screen).
-///
-/// # Safety
-/// `handle` must be a valid app handle or null.
-/// `event_json` must be a valid null-terminated C string, or null.
-#[unsafe(no_mangle)]
-#[cfg(test)]
-pub unsafe extern "C" fn vauchi_app_handle_hardware_event(
-    handle: *mut VauchiApp,
-    event_json: *const c_char,
-) -> *mut c_char {
-    // SAFETY: handle is checked non-null; event_json read via from_c_str which checks null and requires NUL-terminated string.
-    unsafe {
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            if handle.is_null() {
-                return std::ptr::null_mut();
-            }
-            let json = match from_c_str(event_json) {
-                Some(s) => s,
-                None => return std::ptr::null_mut(),
-            };
-            let app = &*handle;
-            match app.engine.lock() {
-                Ok(mut engine) => match serde_json::from_str::<vauchi_core::Event>(&json) {
-                    Ok(event) => match engine.handle_hardware_event(event) {
-                        Some(result) => serde_json::to_string(&result).map_or_else(
-                            |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                            |j| to_c_string(&j),
-                        ),
-                        None => std::ptr::null_mut(),
-                    },
-                    Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                },
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
-            }
-        })) {
-            Ok(result) => result,
-            Err(_) => std::ptr::null_mut(),
-        }
     }
 }
 

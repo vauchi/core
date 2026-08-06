@@ -68,3 +68,40 @@ fn location_result_roundtrips_through_mobile_enum() {
         other => panic!("expected LocationResult, got {other:?}"),
     }
 }
+
+// @internal
+#[test]
+fn hardware_event_json_emits_the_canonical_envelope() {
+    // ADR-066 admits one public dispatch path. The codec must produce JSON
+    // the canonical reader accepts, carrying the same event the typed
+    // conversion produces — byte-bearing payloads included.
+    let mobile = MobileEvent::BleCharacteristicNotified {
+        device_id: "peer-1".into(),
+        direction: vauchi_platform::MobileBleLinkDirection::Outbound,
+        uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567897".into(),
+        data: vec![0xde, 0xad, 0xbe, 0xef],
+    };
+    let expected: Event = mobile.clone().into();
+
+    let json = vauchi_platform::hardware_event_json(mobile);
+    let parsed =
+        vauchi_core::event_from_json(&json).expect("canonical reader accepts codec output");
+
+    assert_eq!(
+        serde_json::to_value(&parsed).expect("serialize parsed"),
+        serde_json::to_value(&expected).expect("serialize expected"),
+        "codec must carry the identical event through the canonical envelope",
+    );
+}
+
+// @internal
+#[test]
+fn hardware_event_json_qr_scan_uses_the_canonical_tag() {
+    let json = vauchi_platform::hardware_event_json(MobileEvent::QrScanned {
+        data: "vauchi://link?token=abc123".into(),
+    });
+    assert_eq!(
+        json, r#"{"QrScanned":{"data":"vauchi://link?token=abc123"}}"#,
+        "shells must be able to feed codec output straight to dispatch_json",
+    );
+}

@@ -137,6 +137,19 @@ pub fn presentation_contract_fixture_json() -> String {
     vauchi_app::ui::presentation_contract_fixture_json().to_owned()
 }
 
+/// Serialize a typed hardware event into the canonical Event JSON envelope.
+///
+/// ADR-066 admits one public dispatch path (`dispatch_json`); this codec is
+/// the language-native wrapper the approved solution provides so native
+/// callers never hand-define Core's serde tags in Swift or Kotlin. Feed the
+/// result to `PlatformAppEngine::dispatch_json` — it is not a submission
+/// API of its own.
+#[uniffi::export]
+pub fn hardware_event_json(event: MobileEvent) -> String {
+    let event: vauchi_core::Event = event.into();
+    serde_json::to_string(&event).expect("Event serialization is infallible")
+}
+
 // === Platform Secure Storage Callback ===
 
 /// Callback interface for platform-specific secure key storage.

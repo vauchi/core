@@ -110,7 +110,13 @@ check_bindings() {
         printf '%b\n' "${GREEN}  All ${#EXPECTED_TYPES[@]} expected types present${NC}"
     fi
 
-    if ! grep -Fq "$expected_export" "$file"; then
+    # UniFFI's Kotlin backend backtick-quotes every generated identifier
+    # (fun `presentationContractFixtureJson`(): kotlin.String), so a name
+    # colliding with a Kotlin keyword still compiles; the Swift backend does
+    # not quote. Strip the quoting before matching so this asserts the export
+    # *exists* rather than how the generator happened to spell it. Matching
+    # the unstripped form is what blocked the v0.60.0 release.
+    if ! tr -d '`' < "$file" | grep -Fq "$expected_export"; then
         printf '%b\n' "${RED}  ERROR: Missing presentation export: $expected_export${NC}"
         ERRORS=$((ERRORS + 1))
     else

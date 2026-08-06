@@ -64,7 +64,17 @@ make_fixture() {
     if [ "$swift_export" = present ]; then
         printf '%s\n' 'public func presentationContractFixtureJson() -> String {' >> "$swift_file"
     fi
+    # `present` reproduces what UniFFI's Kotlin backend actually emits:
+    # every generated identifier is backtick-quoted. The previous fixture
+    # hand-wrote the unquoted form, so it agreed with the validator's own
+    # assumption instead of testing it — both were wrong together, and the
+    # gate first failed on the v0.60.0 release tag. `present_plain` pins the
+    # unquoted spelling too, so the validator stays agnostic to the
+    # generator's escaping rather than trading one brittle literal for
+    # another.
     if [ "$kotlin_export" = present ]; then
+        printf '%s\n' 'fun `presentationContractFixtureJson`(): kotlin.String =' >> "$kotlin_file"
+    elif [ "$kotlin_export" = present_plain ]; then
         printf '%s\n' 'fun presentationContractFixtureJson(): kotlin.String {' >> "$kotlin_file"
     fi
     if [ "$cabi_export" = present ]; then
@@ -93,10 +103,12 @@ assert_fails() {
 }
 
 complete=$(make_fixture complete present present present)
+complete_plain_kotlin=$(make_fixture complete-plain-kotlin present present_plain present)
 missing_language_exports=$(make_fixture missing-language-exports absent absent present)
 missing_cabi_export=$(make_fixture missing-cabi-export present present absent)
 
 assert_passes "$complete"
+assert_passes "$complete_plain_kotlin"
 assert_fails "$missing_language_exports" "bindings without the presentation fixture functions"
 assert_fails "$missing_cabi_export" "a C header without the presentation fixture export"
 

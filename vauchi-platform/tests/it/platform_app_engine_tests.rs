@@ -25,68 +25,104 @@ fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
     (engine, dir)
 }
 
-/// Drive through the full onboarding flow via JSON actions.
+/// Drive through the full onboarding flow via the canonical envelope.
 ///
-/// Sequence mirrors the 6-step onboarding flow:
-/// 1. create_new -> default_name
-/// 2. TextChanged display_name "Alice" -> updates default_name
-/// 3. continue -> groups_setup
-/// 4. continue -> contact_info
-/// 5. continue -> what_next
-/// 6. start_app -> CompleteWith (AppEngine routes to Home)
+/// Every step reads the Core-minted interaction and binding ids from the
+/// current command batch — exactly what a real shell renders — and
+/// dispatches generic events back. No retired action/screen seams.
 fn drive_onboarding(engine: &PlatformAppEngine) {
-    // Phase 2b: handle_action_json now returns
-    // `{"action_result": <ActionResult>, "commands": [<Command>, ...]}`.
-    // Helper indexes through `action_result` to reach the variant.
-    fn act(envelope: &serde_json::Value) -> &serde_json::Value {
-        &envelope["action_result"]
+    fn primary_interaction(batch: &serde_json::Value) -> (String, String) {
+        let bar = batch["commands"]
+            .as_array()
+            .and_then(|commands| commands.iter().find_map(|c| c.get("SetContextBar")))
+            .expect("command batch must carry a context bar");
+        (
+            bar["surface_id"]
+                .as_str()
+                .expect("bar surface id")
+                .to_owned(),
+            bar["bar"]["primary"]["interaction_id"]
+                .as_str()
+                .expect("primary interaction id")
+                .to_owned(),
+        )
     }
 
-    // Step 1: create_new -> default_name
-    let r = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
-        .expect("step 1: create_new");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 1");
-    assert_eq!(act(&v)["NavigateTo"]["screen_id"], "default_name", "step 1");
-
-    // Step 2: enter display name
-    let r = engine
-        .handle_action_json(
-            r#"{"TextChanged": {"component_id": "display_name", "value": "Alice"}}"#.into(),
+    fn dispatch_primary(
+        engine: &PlatformAppEngine,
+        batch: &serde_json::Value,
+    ) -> serde_json::Value {
+        let (surface_id, interaction_id) = primary_interaction(batch);
+        let event = serde_json::json!({
+            "ActionActivated": { "surface_id": surface_id, "interaction_id": interaction_id }
+        });
+        serde_json::from_str(
+            &engine
+                .dispatch_json(event.to_string())
+                .expect("dispatch primary activation"),
         )
-        .expect("step 2: text changed");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 2");
-    assert_eq!(
-        act(&v)["UpdateScreen"]["screen_id"],
-        "default_name",
-        "step 2"
-    );
+        .expect("parse command batch")
+    }
 
-    // Step 3: continue -> groups_setup
-    let r = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
-        .expect("step 3: continue");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 3");
-    assert_eq!(act(&v)["NavigateTo"]["screen_id"], "groups_setup", "step 3");
+    fn find_input<'v>(nodes: &'v [serde_json::Value]) -> Option<&'v serde_json::Value> {
+        nodes.iter().find_map(|node| {
+            if let Some(input) = node.get("Input") {
+                Some(input)
+            } else {
+                node["Group"]["children"]
+                    .as_array()
+                    .and_then(|children| find_input(children))
+            }
+        })
+    }
 
-    // Step 4: continue -> contact_info
-    let r = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
-        .expect("step 4: continue");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 4");
-    assert_eq!(act(&v)["NavigateTo"]["screen_id"], "contact_info", "step 4");
+    fn set_text_input(
+        engine: &PlatformAppEngine,
+        batch: &serde_json::Value,
+        text: &str,
+    ) -> serde_json::Value {
+        let (surface_id, nodes) = batch["commands"]
+            .as_array()
+            .and_then(|commands| {
+                commands.iter().find_map(|c| {
+                    let surface = &c["ReplaceSurface"]["surface"];
+                    surface
+                        .is_object()
+                        .then(|| (surface["surface_id"].clone(), surface["nodes"].clone()))
+                })
+            })
+            .expect("command batch must replace a surface");
+        let nodes: Vec<serde_json::Value> =
+            serde_json::from_value(nodes).expect("surface nodes array");
+        let input = find_input(&nodes).expect("surface must carry a text input");
+        let event = serde_json::json!({
+            "ValueChanged": {
+                "surface_id": surface_id,
+                "binding_id": input["binding_id"],
+                "value": { "text": text },
+            }
+        });
+        serde_json::from_str(
+            &engine
+                .dispatch_json(event.to_string())
+                .expect("dispatch text input"),
+        )
+        .expect("parse command batch")
+    }
 
-    // Step 5: continue -> what_next
-    let r = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
-        .expect("step 5: continue");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 5");
-    assert_eq!(act(&v)["NavigateTo"]["screen_id"], "what_next", "step 5");
+    let mut batch: serde_json::Value = serde_json::from_str(
+        &engine
+            .initial_commands_json()
+            .expect("initial onboarding commands"),
+    )
+    .expect("parse initial batch");
 
-    // Step 6: start_app -> CompleteWith (AppEngine transitions to Home)
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "start_app"}}"#.into())
-        .expect("step 6: start_app");
+    batch = dispatch_primary(engine, &batch); // identity_check → default_name
+    batch = set_text_input(engine, &batch, "Alice"); // enter display name
+    batch = dispatch_primary(engine, &batch); // default_name → groups_setup
+    batch = dispatch_primary(engine, &batch); // groups_setup → contact_info
+    batch = dispatch_primary(engine, &batch); // contact_info → what_next
+    let _ = dispatch_primary(engine, &batch); // what_next → complete → home
 }
 
 // ============================================================================
@@ -95,12 +131,44 @@ fn drive_onboarding(engine: &PlatformAppEngine) {
 
 // @internal
 fn current_screen_id(engine: &PlatformAppEngine) -> String {
-    let json = engine.current_screen_json().expect("current_screen_json");
-    let v: serde_json::Value = serde_json::from_str(&json).expect("parse screen json");
-    v.get("screen_id")
-        .and_then(|s| s.as_str())
-        .unwrap_or("")
-        .to_string()
+    // initial_commands re-composes the current presentation — the same
+    // refresh path a shell hits on load — so the current surface id is
+    // readable without the retired screen seam.
+    let json = engine
+        .initial_commands_json()
+        .expect("initial_commands_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse commands json");
+    v["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                c["ReplaceSurface"]["surface"]["surface_id"]
+                    .as_str()
+                    .map(str::to_owned)
+            })
+        })
+        .unwrap_or_default()
+}
+
+/// Title of the current top surface, read through the canonical
+/// re-composition path. The title is Core-prepared copy a shell renders
+/// verbatim, so it is the honest observable for "which screen state" —
+/// the retired granular screen_id was Core-internal vocabulary.
+fn current_surface_title(engine: &PlatformAppEngine) -> String {
+    let json = engine
+        .initial_commands_json()
+        .expect("initial_commands_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse commands json");
+    v["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                c["ReplaceSurface"]["surface"]["title"]
+                    .as_str()
+                    .map(str::to_owned)
+            })
+        })
+        .unwrap_or_default()
 }
 
 #[test]
@@ -116,7 +184,9 @@ fn new_engine_starts_on_onboarding() {
 fn initial_screen_id_is_identity_check() {
     let (engine, _dir) = create_engine();
     let id = current_screen_id(&engine);
-    assert_eq!(id, "identity_check");
+    // The presentation surface id for the whole onboarding flow —
+    // "identity_check" was the retired Core-internal screen id.
+    assert_eq!(id, "onboarding");
 }
 
 // @internal
@@ -721,19 +791,24 @@ fn picking_glance_from_mode_selection_auto_navigates_to_ble_exchange() {
                 .into(),
         )
         .expect("select Glance");
+    // G3: the Glance surface carries its title and the one-sided OOB QR
+    // node (generated once on entry) so the exposure-closing pin material
+    // is on-screen, not aspirational. "exchange_ble_glance" was the retired
+    // Core-internal screen id; the Qr node is what a shell actually renders.
     assert_eq!(
-        current_screen_id(&engine),
-        "exchange_ble_glance",
+        current_surface_title(&engine),
+        "Glance",
         "Glance must route through its one-sided-QR BLE screen (G3) — frontend never makes this decision",
     );
-    // The dedicated Glance screen shows this device's OOB QR (generated once on
-    // entry) so the exposure-closing pin material is on-screen, not aspirational.
-    let screen_json = engine
-        .current_screen_json()
-        .expect("render the Glance screen");
+    let batch_json = engine.initial_commands_json().expect("glance batch");
+    let batch: serde_json::Value = serde_json::from_str(&batch_json).expect("parse glance batch");
+    let has_qr = batch["commands"]
+        .as_array()
+        .map(|commands| commands.iter().any(|c| c.to_string().contains(r#""Qr""#)))
+        .unwrap_or(false);
     assert!(
-        screen_json.contains("QrCode"),
-        "the Glance screen must render the one-sided QR, got: {screen_json}",
+        has_qr,
+        "the Glance screen must render the one-sided QR, got: {batch_json}"
     );
 }
 
@@ -1080,8 +1155,8 @@ fn ble_machine_terminal_event_fires_invalidation_and_flips_chrome() {
         .expect("malformed chunk");
 
     assert_eq!(
-        current_screen_id(&engine),
-        "exchange_failed",
+        current_surface_title(&engine),
+        "Failed",
         "terminal machine failure must flip the chrome to the failed screen"
     );
     assert!(
@@ -1252,8 +1327,8 @@ fn ble_terminal_event_via_dispatch_json_fires_invalidation_like_the_typed_seam()
         .expect("malformed chunk via canonical envelope");
 
     assert_eq!(
-        current_screen_id(&engine),
-        "exchange_failed",
+        current_surface_title(&engine),
+        "Failed",
         "terminal machine failure must flip the chrome to the failed screen"
     );
     assert!(

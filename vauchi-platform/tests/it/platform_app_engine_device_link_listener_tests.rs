@@ -33,23 +33,104 @@ fn create_engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) 
     (engine, dir)
 }
 
+/// Drive through the full onboarding flow via the canonical envelope.
+///
+/// Every step reads the Core-minted interaction and binding ids from the
+/// current command batch — exactly what a real shell renders — and
+/// dispatches generic events back. No retired action/screen seams.
 fn drive_onboarding(engine: &PlatformAppEngine) {
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
-        .expect("create_new");
-    engine
-        .handle_action_json(
-            r#"{"TextChanged": {"component_id": "display_name", "value": "Alice"}}"#.into(),
+    fn primary_interaction(batch: &serde_json::Value) -> (String, String) {
+        let bar = batch["commands"]
+            .as_array()
+            .and_then(|commands| commands.iter().find_map(|c| c.get("SetContextBar")))
+            .expect("command batch must carry a context bar");
+        (
+            bar["surface_id"]
+                .as_str()
+                .expect("bar surface id")
+                .to_owned(),
+            bar["bar"]["primary"]["interaction_id"]
+                .as_str()
+                .expect("primary interaction id")
+                .to_owned(),
         )
-        .expect("display_name");
-    for _ in 0..3 {
-        engine
-            .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
-            .expect("continue");
     }
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "start_app"}}"#.into())
-        .expect("start_app");
+
+    fn dispatch_primary(
+        engine: &PlatformAppEngine,
+        batch: &serde_json::Value,
+    ) -> serde_json::Value {
+        let (surface_id, interaction_id) = primary_interaction(batch);
+        let event = serde_json::json!({
+            "ActionActivated": { "surface_id": surface_id, "interaction_id": interaction_id }
+        });
+        serde_json::from_str(
+            &engine
+                .dispatch_json(event.to_string())
+                .expect("dispatch primary activation"),
+        )
+        .expect("parse command batch")
+    }
+
+    fn find_input<'v>(nodes: &'v [serde_json::Value]) -> Option<&'v serde_json::Value> {
+        nodes.iter().find_map(|node| {
+            if let Some(input) = node.get("Input") {
+                Some(input)
+            } else {
+                node["Group"]["children"]
+                    .as_array()
+                    .and_then(|children| find_input(children))
+            }
+        })
+    }
+
+    fn set_text_input(
+        engine: &PlatformAppEngine,
+        batch: &serde_json::Value,
+        text: &str,
+    ) -> serde_json::Value {
+        let (surface_id, nodes) = batch["commands"]
+            .as_array()
+            .and_then(|commands| {
+                commands.iter().find_map(|c| {
+                    let surface = &c["ReplaceSurface"]["surface"];
+                    surface
+                        .is_object()
+                        .then(|| (surface["surface_id"].clone(), surface["nodes"].clone()))
+                })
+            })
+            .expect("command batch must replace a surface");
+        let nodes: Vec<serde_json::Value> =
+            serde_json::from_value(nodes).expect("surface nodes array");
+        let input = find_input(&nodes).expect("surface must carry a text input");
+        let event = serde_json::json!({
+            "ValueChanged": {
+                "surface_id": surface_id,
+                "binding_id": input["binding_id"],
+                "value": { "text": text },
+            }
+        });
+        serde_json::from_str(
+            &engine
+                .dispatch_json(event.to_string())
+                .expect("dispatch text input"),
+        )
+        .expect("parse command batch")
+    }
+
+    let mut batch: serde_json::Value = serde_json::from_str(
+        &engine
+            .initial_commands_json()
+            .expect("initial onboarding commands"),
+    )
+    .expect("parse initial batch");
+
+    batch = dispatch_primary(engine, &batch); // identity_check → default_name
+    batch = set_text_input(engine, &batch, "Alice"); // enter display name
+    batch = dispatch_primary(engine, &batch); // default_name → groups_setup
+    batch = dispatch_primary(engine, &batch); // groups_setup → contact_info
+    batch = dispatch_primary(engine, &batch); // contact_info → what_next
+    let _ = dispatch_primary(engine, &batch); // what_next → complete → home
 }
 
 fn navigate_to_device_linking(engine: &PlatformAppEngine) {
@@ -68,12 +149,69 @@ fn navigate_to_device_linking_quiescent(engine: &PlatformAppEngine) {
 }
 
 fn current_screen_id(engine: &PlatformAppEngine) -> String {
-    let json = engine.current_screen_json().expect("current_screen_json");
-    let v: serde_json::Value = serde_json::from_str(&json).expect("parse screen json");
-    v.get("screen_id")
-        .and_then(|s| s.as_str())
-        .unwrap_or("")
-        .to_string()
+    // initial_commands re-composes the current presentation — the same
+    // refresh path a shell hits on load — so the current surface id is
+    // readable without the retired screen seam.
+    let json = engine
+        .initial_commands_json()
+        .expect("initial_commands_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse commands json");
+    v["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                c["ReplaceSurface"]["surface"]["surface_id"]
+                    .as_str()
+                    .map(str::to_owned)
+            })
+        })
+        .unwrap_or_default()
+}
+
+/// Title of the current top surface, read through the canonical
+/// re-composition path. The title is Core-prepared copy a shell renders
+/// verbatim, so it is the honest observable for "which screen state" —
+/// the retired granular screen_id was Core-internal vocabulary.
+fn current_surface_title(engine: &PlatformAppEngine) -> String {
+    let json = engine
+        .initial_commands_json()
+        .expect("initial_commands_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse commands json");
+    v["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                c["ReplaceSurface"]["surface"]["title"]
+                    .as_str()
+                    .map(str::to_owned)
+            })
+        })
+        .unwrap_or_default()
+}
+
+/// Titles of every surface in the re-composed command batch (main and
+/// secondary pane alike), read through the canonical path. The batch is
+/// what a shell renders, so title membership is the honest observable
+/// for flow state — the retired granular screen_id was Core-internal
+/// vocabulary.
+fn surface_titles(engine: &PlatformAppEngine) -> Vec<String> {
+    let json = engine
+        .initial_commands_json()
+        .expect("initial_commands_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse commands json");
+    v["commands"]
+        .as_array()
+        .map(|commands| {
+            commands
+                .iter()
+                .filter_map(|c| {
+                    c["ReplaceSurface"]["surface"]["title"]
+                        .as_str()
+                        .map(str::to_owned)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────
@@ -131,7 +269,10 @@ fn request_received_bridge_advances_engine_to_confirming_device() {
             "deadbeef".into(),
         )
         .expect("apply request_received");
-    assert_eq!(current_screen_id(&engine), "link_confirming_device");
+    assert!(
+        surface_titles(&engine).contains(&"Device Wants to Link".to_string()),
+        "request_received must present the confirmation surface"
+    );
 }
 
 // @scenario: pair5_device_link_listener :: on_failed("qr_expired") routes to the expired screen
@@ -142,7 +283,10 @@ fn qr_expired_bridge_routes_to_qr_expired_screen() {
     engine
         .apply_device_link_qr_expired_for_test()
         .expect("apply qr_expired");
-    assert_eq!(current_screen_id(&engine), "link_qr_expired");
+    assert!(
+        surface_titles(&engine).contains(&"QR Code Expired".to_string()),
+        "qr_expired must present the expired surface"
+    );
 }
 
 // ── Action interception ───────────────────────────────────────
@@ -173,7 +317,10 @@ fn codes_match_action_emits_typed_action_result_json() {
         .expect("DeviceLinkConfirmManual variant");
     assert_eq!(confirm.get("code").and_then(|c| c.as_str()), Some("654321"));
     // Engine has advanced to Completing.
-    assert_eq!(current_screen_id(&engine), "link_completing");
+    assert!(
+        surface_titles(&engine).contains(&"Completing Link".to_string()),
+        "codes_match must present the completing surface"
+    );
 }
 
 // @scenario: pair5_device_link_listener :: deny surfaces DeviceLinkDeny JSON
@@ -203,7 +350,10 @@ fn retry_from_expired_emits_device_link_retry_and_rotates_session() {
     engine
         .apply_device_link_qr_expired_for_test()
         .expect("apply qr_expired");
-    assert_eq!(current_screen_id(&engine), "link_qr_expired");
+    assert!(
+        surface_titles(&engine).contains(&"QR Code Expired".to_string()),
+        "qr_expired must present the expired surface"
+    );
 
     let result_json = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "retry"}}"#.into())
@@ -236,5 +386,8 @@ fn cancel_from_device_link_screen_drops_session() {
         !engine.device_link_session_is_active_for_test(),
         "session not dropped after cancel"
     );
-    assert_ne!(current_screen_id(&engine), "link_confirming_device");
+    assert!(
+        !surface_titles(&engine).contains(&"Device Wants to Link".to_string()),
+        "the confirmation surface must be gone after retry rotates the session"
+    );
 }

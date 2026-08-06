@@ -32,23 +32,104 @@ fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
     (engine, dir)
 }
 
+/// Drive through the full onboarding flow via the canonical envelope.
+///
+/// Every step reads the Core-minted interaction and binding ids from the
+/// current command batch — exactly what a real shell renders — and
+/// dispatches generic events back. No retired action/screen seams.
 fn drive_onboarding(engine: &PlatformAppEngine) {
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
-        .expect("create_new");
-    engine
-        .handle_action_json(
-            r#"{"TextChanged": {"component_id": "display_name", "value": "Bob"}}"#.into(),
+    fn primary_interaction(batch: &serde_json::Value) -> (String, String) {
+        let bar = batch["commands"]
+            .as_array()
+            .and_then(|commands| commands.iter().find_map(|c| c.get("SetContextBar")))
+            .expect("command batch must carry a context bar");
+        (
+            bar["surface_id"]
+                .as_str()
+                .expect("bar surface id")
+                .to_owned(),
+            bar["bar"]["primary"]["interaction_id"]
+                .as_str()
+                .expect("primary interaction id")
+                .to_owned(),
         )
-        .expect("text changed");
-    for _ in 0..3 {
-        engine
-            .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
-            .expect("continue");
     }
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "start_app"}}"#.into())
-        .expect("start_app");
+
+    fn dispatch_primary(
+        engine: &PlatformAppEngine,
+        batch: &serde_json::Value,
+    ) -> serde_json::Value {
+        let (surface_id, interaction_id) = primary_interaction(batch);
+        let event = serde_json::json!({
+            "ActionActivated": { "surface_id": surface_id, "interaction_id": interaction_id }
+        });
+        serde_json::from_str(
+            &engine
+                .dispatch_json(event.to_string())
+                .expect("dispatch primary activation"),
+        )
+        .expect("parse command batch")
+    }
+
+    fn find_input<'v>(nodes: &'v [serde_json::Value]) -> Option<&'v serde_json::Value> {
+        nodes.iter().find_map(|node| {
+            if let Some(input) = node.get("Input") {
+                Some(input)
+            } else {
+                node["Group"]["children"]
+                    .as_array()
+                    .and_then(|children| find_input(children))
+            }
+        })
+    }
+
+    fn set_text_input(
+        engine: &PlatformAppEngine,
+        batch: &serde_json::Value,
+        text: &str,
+    ) -> serde_json::Value {
+        let (surface_id, nodes) = batch["commands"]
+            .as_array()
+            .and_then(|commands| {
+                commands.iter().find_map(|c| {
+                    let surface = &c["ReplaceSurface"]["surface"];
+                    surface
+                        .is_object()
+                        .then(|| (surface["surface_id"].clone(), surface["nodes"].clone()))
+                })
+            })
+            .expect("command batch must replace a surface");
+        let nodes: Vec<serde_json::Value> =
+            serde_json::from_value(nodes).expect("surface nodes array");
+        let input = find_input(&nodes).expect("surface must carry a text input");
+        let event = serde_json::json!({
+            "ValueChanged": {
+                "surface_id": surface_id,
+                "binding_id": input["binding_id"],
+                "value": { "text": text },
+            }
+        });
+        serde_json::from_str(
+            &engine
+                .dispatch_json(event.to_string())
+                .expect("dispatch text input"),
+        )
+        .expect("parse command batch")
+    }
+
+    let mut batch: serde_json::Value = serde_json::from_str(
+        &engine
+            .initial_commands_json()
+            .expect("initial onboarding commands"),
+    )
+    .expect("parse initial batch");
+
+    batch = dispatch_primary(engine, &batch); // identity_check → default_name
+    batch = set_text_input(engine, &batch, "Bob"); // enter display name
+    batch = dispatch_primary(engine, &batch); // default_name → groups_setup
+    batch = dispatch_primary(engine, &batch); // groups_setup → contact_info
+    batch = dispatch_primary(engine, &batch); // contact_info → what_next
+    let _ = dispatch_primary(engine, &batch); // what_next → complete → home
 }
 
 fn fresh_link_url() -> String {
@@ -58,12 +139,69 @@ fn fresh_link_url() -> String {
 
 // @internal
 fn current_screen_id(engine: &PlatformAppEngine) -> String {
-    let json = engine.current_screen_json().expect("current_screen_json");
-    let v: serde_json::Value = serde_json::from_str(&json).expect("parse screen json");
-    v.get("screen_id")
-        .and_then(|s| s.as_str())
-        .unwrap_or("")
-        .to_string()
+    // initial_commands re-composes the current presentation — the same
+    // refresh path a shell hits on load — so the current surface id is
+    // readable without the retired screen seam.
+    let json = engine
+        .initial_commands_json()
+        .expect("initial_commands_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse commands json");
+    v["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                c["ReplaceSurface"]["surface"]["surface_id"]
+                    .as_str()
+                    .map(str::to_owned)
+            })
+        })
+        .unwrap_or_default()
+}
+
+/// Title of the current top surface, read through the canonical
+/// re-composition path. The title is Core-prepared copy a shell renders
+/// verbatim, so it is the honest observable for "which screen state" —
+/// the retired granular screen_id was Core-internal vocabulary.
+fn current_surface_title(engine: &PlatformAppEngine) -> String {
+    let json = engine
+        .initial_commands_json()
+        .expect("initial_commands_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse commands json");
+    v["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                c["ReplaceSurface"]["surface"]["title"]
+                    .as_str()
+                    .map(str::to_owned)
+            })
+        })
+        .unwrap_or_default()
+}
+
+/// Titles of every surface in the re-composed command batch (main and
+/// secondary pane alike), read through the canonical path. The batch is
+/// what a shell renders, so title membership is the honest observable
+/// for flow state — the retired granular screen_id was Core-internal
+/// vocabulary.
+fn surface_titles(engine: &PlatformAppEngine) -> Vec<String> {
+    let json = engine
+        .initial_commands_json()
+        .expect("initial_commands_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse commands json");
+    v["commands"]
+        .as_array()
+        .map(|commands| {
+            commands
+                .iter()
+                .filter_map(|c| {
+                    c["ReplaceSurface"]["surface"]["title"]
+                        .as_str()
+                        .map(str::to_owned)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 #[test]
@@ -74,14 +212,16 @@ fn grant_navigates_to_responder_with_no_frontend_escrow_commands() {
     engine
         .handle_action_json(format!(r#"{{"LinkOpened":{{"uri":"{link_url}"}}}}"#))
         .expect("LinkOpened routes exchange URI to consent");
-    assert_eq!(current_screen_id(&engine), "deep_link_consent",);
+    assert!(
+        surface_titles(&engine).contains(&"Exchange Request".to_string()),
+        "LinkOpened must present the consent surface"
+    );
 
     let grant_json = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "grant"}}"#.into())
         .expect("grant action");
-    assert_eq!(
-        current_screen_id(&engine),
-        "link_responder_waiting",
+    assert!(
+        surface_titles(&engine).contains(&"Waiting for Response".to_string()),
         "grant must route to the responder waiting screen — action returned {grant_json}",
     );
 

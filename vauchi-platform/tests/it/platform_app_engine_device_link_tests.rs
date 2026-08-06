@@ -14,7 +14,7 @@
 
 use std::sync::Arc;
 
-use vauchi_platform::{PlatformAppEngine, PlatformAppEngineTestHelpers};
+use vauchi_platform::PlatformAppEngine;
 
 fn create_engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -29,23 +29,104 @@ fn create_engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) 
     (engine, dir)
 }
 
+/// Drive through the full onboarding flow via the canonical envelope.
+///
+/// Every step reads the Core-minted interaction and binding ids from the
+/// current command batch — exactly what a real shell renders — and
+/// dispatches generic events back. No retired action/screen seams.
 fn drive_onboarding(engine: &PlatformAppEngine) {
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
-        .expect("create_new");
-    engine
-        .handle_action_json(
-            r#"{"TextChanged": {"component_id": "display_name", "value": "Alice"}}"#.into(),
+    fn primary_interaction(batch: &serde_json::Value) -> (String, String) {
+        let bar = batch["commands"]
+            .as_array()
+            .and_then(|commands| commands.iter().find_map(|c| c.get("SetContextBar")))
+            .expect("command batch must carry a context bar");
+        (
+            bar["surface_id"]
+                .as_str()
+                .expect("bar surface id")
+                .to_owned(),
+            bar["bar"]["primary"]["interaction_id"]
+                .as_str()
+                .expect("primary interaction id")
+                .to_owned(),
         )
-        .expect("display_name");
-    for _ in 0..3 {
-        engine
-            .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
-            .expect("continue");
     }
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "start_app"}}"#.into())
-        .expect("start_app");
+
+    fn dispatch_primary(
+        engine: &PlatformAppEngine,
+        batch: &serde_json::Value,
+    ) -> serde_json::Value {
+        let (surface_id, interaction_id) = primary_interaction(batch);
+        let event = serde_json::json!({
+            "ActionActivated": { "surface_id": surface_id, "interaction_id": interaction_id }
+        });
+        serde_json::from_str(
+            &engine
+                .dispatch_json(event.to_string())
+                .expect("dispatch primary activation"),
+        )
+        .expect("parse command batch")
+    }
+
+    fn find_input<'v>(nodes: &'v [serde_json::Value]) -> Option<&'v serde_json::Value> {
+        nodes.iter().find_map(|node| {
+            if let Some(input) = node.get("Input") {
+                Some(input)
+            } else {
+                node["Group"]["children"]
+                    .as_array()
+                    .and_then(|children| find_input(children))
+            }
+        })
+    }
+
+    fn set_text_input(
+        engine: &PlatformAppEngine,
+        batch: &serde_json::Value,
+        text: &str,
+    ) -> serde_json::Value {
+        let (surface_id, nodes) = batch["commands"]
+            .as_array()
+            .and_then(|commands| {
+                commands.iter().find_map(|c| {
+                    let surface = &c["ReplaceSurface"]["surface"];
+                    surface
+                        .is_object()
+                        .then(|| (surface["surface_id"].clone(), surface["nodes"].clone()))
+                })
+            })
+            .expect("command batch must replace a surface");
+        let nodes: Vec<serde_json::Value> =
+            serde_json::from_value(nodes).expect("surface nodes array");
+        let input = find_input(&nodes).expect("surface must carry a text input");
+        let event = serde_json::json!({
+            "ValueChanged": {
+                "surface_id": surface_id,
+                "binding_id": input["binding_id"],
+                "value": { "text": text },
+            }
+        });
+        serde_json::from_str(
+            &engine
+                .dispatch_json(event.to_string())
+                .expect("dispatch text input"),
+        )
+        .expect("parse command batch")
+    }
+
+    let mut batch: serde_json::Value = serde_json::from_str(
+        &engine
+            .initial_commands_json()
+            .expect("initial onboarding commands"),
+    )
+    .expect("parse initial batch");
+
+    batch = dispatch_primary(engine, &batch); // identity_check → default_name
+    batch = set_text_input(engine, &batch, "Alice"); // enter display name
+    batch = dispatch_primary(engine, &batch); // default_name → groups_setup
+    batch = dispatch_primary(engine, &batch); // groups_setup → contact_info
+    batch = dispatch_primary(engine, &batch); // contact_info → what_next
+    let _ = dispatch_primary(engine, &batch); // what_next → complete → home
 }
 
 // ── get_devices / device_count / is_primary_device ───────────────────
@@ -212,6 +293,6 @@ fn unlink_device_invalidates_device_management_cache() {
         .dispatch_json(r#""PresentationInvalidated""#.into())
         .expect("presentation invalidation");
     let _ = engine
-        .current_screen_json()
-        .expect("current_screen_json after unlink_device");
+        .initial_commands_json()
+        .expect("initial_commands_json after unlink_device");
 }

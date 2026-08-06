@@ -212,8 +212,9 @@ impl PlatformAppEngine {
     }
 
     /// Fire `on_presentation_invalidated` on the direct listener, if any.
-    /// Used by paths whose state change produces no `ActionResult` for
-    /// the frontend to render (machine-held protocol advances).
+    /// Used by paths whose state changes outside a dispatch, so no command
+    /// batch reaches the frontend on its own (machine-held protocol
+    /// advances).
     pub(crate) fn fire_presentation_invalidated(&self) {
         let listener = self
             .direct_listener

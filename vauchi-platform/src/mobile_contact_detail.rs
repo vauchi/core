@@ -17,7 +17,7 @@
 //! and `actions` lists fully specify what the frontend renders.
 //! Frontends iterate; they never branch on contact properties.
 //!
-//! Closes G4 of the four-phase ScreenModel API gap workstream tracked in
+//! Closes G4 of the four-phase binding API gap workstream tracked in
 //! `_private/docs/problems/2026-04-27-screenmodel-api-gaps-symmetric-frontend-violations`.
 
 use vauchi_app::i18n::Locale;

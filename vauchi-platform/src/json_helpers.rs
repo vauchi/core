@@ -66,7 +66,7 @@ pub(crate) fn event_from_json(json: &str) -> Result<Event, MobileError> {
 ///    tagged object (`{"ContactDetail": {"contact_id": "…"}}`). Used for
 ///    parameterized screens.
 /// 2. A canonical screen-id string the frontend received from core
-///    (`tab_info.id` / `ScreenModel.screen_id`), e.g. `"contacts"`. Lets
+///    (`tab_info.id` / a surface's `surface_id`), e.g. `"contacts"`. Lets
 ///    frontends navigate by the opaque id core handed them instead of
 ///    constructing the serde variant name (ADR-043 Am4 — zero domain
 ///    vocabulary in frontends). Only simple (non-parameterized) screens
@@ -109,7 +109,7 @@ mod tests {
     }
 
     // ADR-043 Am4: a frontend navigates by the opaque canonical screen-id
-    // core handed it (`tab_info.id` / `ScreenModel.screen_id`) — e.g.
+    // core handed it (`tab_info.id` / a surface's `surface_id`) — e.g.
     // "contacts" — never by constructing the serde variant name
     // ("Contacts"). The canonical-id fallback resolves these.
     // @internal

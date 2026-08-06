@@ -522,29 +522,51 @@ mod tests {
 
     // @internal
     #[test]
-    fn app_navigate_back_returns_a_screen() {
-        // After navigating into a sub-screen, navigate_back returns a valid
-        // ScreenModel (the prior screen) — the C-ABI path desktop frontends
-        // use for their back chrome instead of a footer "Back" action.
+    fn app_navigate_back_replaces_the_previous_surface() {
+        // After navigating into a sub-screen, back returns the batch that
+        // re-renders the screen behind it — the generic command shape every
+        // shell already applies, not a screen payload of its own.
         // SAFETY: Calling FFI with valid inputs from this test scope.
+        // SAFETY: every pointer below is produced by the FFI in this scope and
+        // freed once; the batch strings are read before their free.
+        unsafe fn surface_id_of(ptr: *mut c_char) -> String {
+            assert!(!ptr.is_null(), "navigation must return a batch");
+            // SAFETY: caller passes a live batch pointer from the FFI.
+            let json = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap();
+            let batch: serde_json::Value = serde_json::from_str(json).expect("parse batch");
+            batch["commands"]
+                .as_array()
+                .and_then(|commands| {
+                    commands
+                        .iter()
+                        .find_map(|c| c["ReplaceSurface"]["surface"]["surface_id"].as_str())
+                })
+                .unwrap_or_else(|| panic!("batch must replace a surface, got: {json}"))
+                .to_owned()
+        }
+
         unsafe {
             let handle = create_app_with_identity();
+            let start = vauchi_app_initial_commands(handle);
+            let start_id = surface_id_of(start);
+            vauchi_string_free(start);
+
             let settings = CString::new("settings").unwrap();
             let fwd = vauchi_app_navigate_to(handle, settings.as_ptr());
+            let fwd_id = surface_id_of(fwd);
             vauchi_string_free(fwd);
+            assert_ne!(
+                fwd_id, start_id,
+                "navigating to settings must leave the starting surface"
+            );
 
             let back_ptr = vauchi_app_navigate_back(handle);
-            assert!(!back_ptr.is_null(), "navigate_back must return a screen");
-            let json = CStr::from_ptr(back_ptr).to_str().unwrap();
-            assert!(
-                json.contains("screen_id"),
-                "navigate_back must return a ScreenModel, got: {json}"
-            );
-            assert!(
-                !json.contains(r#""error""#),
-                "navigate_back must not error, got: {json}"
-            );
+            let back_id = surface_id_of(back_ptr);
             vauchi_string_free(back_ptr);
+            assert_eq!(
+                back_id, start_id,
+                "back must re-render the surface we navigated away from"
+            );
             vauchi_app_destroy(handle);
         }
         // Null handle is tolerated and returns null.

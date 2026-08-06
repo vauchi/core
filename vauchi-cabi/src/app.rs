@@ -285,7 +285,20 @@ pub unsafe extern "C" fn vauchi_app_on_wakeup(app: *mut VauchiApp) -> *mut c_cha
     }
 }
 
-/// Navigate to a screen by name. Returns the new screen as JSON.
+/// Compose the canonical batch after a test-only navigation.
+///
+/// Mirrors `vauchi_app_initial_commands`: `initial_commands` re-composes the
+/// surface and appends the lifecycle commands the navigation queued, so the
+/// seams report the same shape a frontend gets from `vauchi_app_dispatch`.
+#[cfg(test)]
+fn batch_after_navigation(engine: &mut AppEngine) -> *mut c_char {
+    match engine.initial_commands() {
+        Ok(commands) => to_c_string(&serde_json::json!({ "commands": commands }).to_string()),
+        Err(error) => to_c_string(&serde_json::json!({ "error": error.to_string() }).to_string()),
+    }
+}
+
+/// Navigate to a screen by name. Returns the resulting Core command batch.
 ///
 /// Supported screen names: "home", "contacts", "exchange", "settings",
 /// "help", "backup", "lock", "onboarding", "emergency_shred",
@@ -293,10 +306,10 @@ pub unsafe extern "C" fn vauchi_app_on_wakeup(app: *mut VauchiApp) -> *mut c_cha
 /// "sync", "recovery", "groups", "privacy", "support",
 /// "contact_duplicates", "contact_limit", "more".
 ///
-/// **Deprecated (Tier-0 d, ADR-043 Amendment 4):** a forward-navigate surface.
-/// Desktop frontends should forward tab taps via `UserAction::NavigateToTab`
-/// (carrying the `TabInfo.action_id` core minted) and render the returned
-/// `NavigateTo`. Do not add new callers; retires once frontends migrate.
+/// Test-only arrange seam: it lets the suite land on a screen without
+/// replaying the interactions that lead there. Frontends never construct
+/// domain targets — they activate a Core-minted interaction id and render
+/// the batch `vauchi_app_dispatch` returns (ADR-066).
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.
@@ -328,11 +341,8 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
             let app = &*handle;
             match app.engine.lock() {
                 Ok(mut engine) => {
-                    let model = engine.navigate_to(screen);
-                    serde_json::to_string(&model).map_or_else(
-                        |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                        |j| to_c_string(&j),
-                    )
+                    engine.navigate_to(screen);
+                    batch_after_navigation(&mut engine)
                 }
                 Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
             }
@@ -343,12 +353,12 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
     }
 }
 
-/// Navigate back one step. Returns the resulting screen as JSON.
+/// Navigate back one step. Returns the resulting Core command batch.
 ///
 /// Pops the engine's `AppScreen` nav history, or rewinds one in-engine
-/// sub-flow step (the exchange flow). Deprecated for the OS back gesture:
-/// frontends should forward system back as a generic `BackRequested` event
-/// using `vauchi_app_dispatch`. Kept only for internal migration tests.
+/// sub-flow step (the exchange flow). Test-only: frontends forward the OS
+/// back gesture as a generic `BackRequested` event through
+/// `vauchi_app_dispatch`.
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.
@@ -364,11 +374,8 @@ pub unsafe extern "C" fn vauchi_app_navigate_back(handle: *mut VauchiApp) -> *mu
             let app = &*handle;
             match app.engine.lock() {
                 Ok(mut engine) => {
-                    let model = engine.navigate_back();
-                    serde_json::to_string(&model).map_or_else(
-                        |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                        |j| to_c_string(&j),
-                    )
+                    engine.navigate_back();
+                    batch_after_navigation(&mut engine)
                 }
                 Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
             }

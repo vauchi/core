@@ -13,7 +13,7 @@
 //!   engine's receiver-side state via the test-only
 //!   `apply_device_link_*_for_test` helpers.
 //! - Action interception: the engine's typed device-link
-//!   `ActionResult` variants surface in `handle_action_json` so the
+//!   `ActionResult` variants are consumed inside Core so the
 //!   frontend never has to call session methods directly.
 
 use std::sync::Arc;
@@ -173,6 +173,78 @@ fn surface_titles(engine: &PlatformAppEngine) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Dispatch one canonical event and return the parsed command batch.
+fn link_dispatch(engine: &PlatformAppEngine, event: serde_json::Value) -> serde_json::Value {
+    serde_json::from_str(
+        &engine
+            .dispatch_json(event.to_string())
+            .expect("event must dispatch"),
+    )
+    .expect("parse command batch")
+}
+
+/// The `(surface_id, interaction_id)` of a context-bar role for the
+/// device-linking surface in the current batch.
+fn link_bar_role(engine: &PlatformAppEngine, role: &str) -> (String, String) {
+    let batch: serde_json::Value =
+        serde_json::from_str(&engine.initial_commands_json().expect("re-compose batch"))
+            .expect("parse batch");
+    batch["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                let bar = &c["SetContextBar"];
+                (bar["surface_id"].as_str() == Some("device_linking")).then(|| {
+                    (
+                        bar["surface_id"].as_str().unwrap().to_owned(),
+                        bar["bar"][role]["interaction_id"]
+                            .as_str()
+                            .unwrap_or_else(|| panic!("bar must carry a {role} interaction"))
+                            .to_owned(),
+                    )
+                })
+            })
+        })
+        .expect("device_linking context bar must be present")
+}
+
+/// Activate a context-bar role on the device-linking surface.
+fn activate_link_bar(engine: &PlatformAppEngine, role: &str) -> serde_json::Value {
+    let (surface_id, interaction_id) = link_bar_role(engine, role);
+    link_dispatch(
+        engine,
+        serde_json::json!({
+            "ActionActivated": { "surface_id": surface_id, "interaction_id": interaction_id }
+        }),
+    )
+}
+
+/// Open the secondary action menu and activate the named destructive item.
+fn activate_link_menu_item(engine: &PlatformAppEngine, label: &str) -> serde_json::Value {
+    let menu = activate_link_bar(engine, "secondary");
+    let (surface_id, interaction_id) = menu["commands"]
+        .as_array()
+        .and_then(|commands| commands.iter().find_map(|c| c.get("PresentOverlay")))
+        .and_then(|overlay| {
+            let item = overlay["overlay"]["items"].as_array().and_then(|items| {
+                items
+                    .iter()
+                    .find(|item| item["label"].as_str() == Some(label))
+            })?;
+            Some((
+                overlay["surface_id"].as_str()?.to_owned(),
+                item["interaction_id"].as_str()?.to_owned(),
+            ))
+        })
+        .unwrap_or_else(|| panic!("action menu must carry {label}"));
+    link_dispatch(
+        engine,
+        serde_json::json!({
+            "ActionActivated": { "surface_id": surface_id, "interaction_id": interaction_id }
+        }),
+    )
+}
+
 // ── Lifecycle ──────────────────────────────────────────────────
 
 // @scenario: pair5_device_link_listener :: navigation into DeviceLinking spawns a session
@@ -265,17 +337,10 @@ fn codes_match_action_emits_typed_action_result_json() {
             "deadbeef".into(),
         )
         .expect("apply request_received");
-    let result_json = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "codes_match"}}"#.into())
-        .expect("codes_match");
-    let parsed: serde_json::Value =
-        serde_json::from_str(&result_json).expect("parse action result");
-    let confirm = parsed
-        .get("action_result")
-        .and_then(|r| r.get("DeviceLinkConfirmManual"))
-        .expect("DeviceLinkConfirmManual variant");
-    assert_eq!(confirm.get("code").and_then(|c| c.as_str()), Some("654321"));
-    // Engine has advanced to Completing.
+    // Confirming via the context bar primary feeds the displayed code to
+    // the engine-owned machine (DeviceLinkConfirmManual is consumed
+    // internally — the completing surface is the observable outcome).
+    let _ = activate_link_bar(&engine, "primary");
     assert!(
         surface_titles(&engine).contains(&"Completing Link".to_string()),
         "codes_match must present the completing surface"
@@ -294,11 +359,24 @@ fn deny_action_emits_device_link_deny_json() {
             "deadbeef".into(),
         )
         .expect("apply request_received");
-    let result_json = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "deny"}}"#.into())
-        .expect("deny");
-    let parsed: serde_json::Value = serde_json::from_str(&result_json).expect("parse envelope");
-    assert_eq!(parsed["action_result"], serde_json::json!("DeviceLinkDeny"));
+    // Deny lives in the secondary action menu (destructive item). Through
+    // the generic envelope the DeviceLinkDeny result is consumed
+    // internally (its machine side effect runs in Core), so the dispatch
+    // must succeed and return a generic command batch — not the retired
+    // typed envelope and not an unresolved-variant error.
+    // The machine-synced denial (machine.deny() → Failed) is covered by
+    // the machine's own tests (`deny_fails_with_user_denied`); the
+    // quiescent helper here deliberately holds no session, so only the
+    // boundary contract is pinned at this level.
+    let batch = activate_link_menu_item(&engine, "Deny");
+    assert!(
+        batch["commands"].is_array(),
+        "deny must resolve to a generic command batch, got: {batch}"
+    );
+    assert!(
+        batch.get("action_result").is_none(),
+        "deny must not leak the retired action envelope, got: {batch}"
+    );
 }
 
 // @scenario: pair5_device_link_listener :: retry from QrExpired emits DeviceLinkRetry and rotates session
@@ -314,15 +392,9 @@ fn retry_from_expired_emits_device_link_retry_and_rotates_session() {
         "qr_expired must present the expired surface"
     );
 
-    let result_json = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "retry"}}"#.into())
-        .expect("retry");
-    let parsed: serde_json::Value = serde_json::from_str(&result_json).expect("parse envelope");
-    assert_eq!(
-        parsed["action_result"],
-        serde_json::json!("DeviceLinkRetry")
-    );
-    // Session rotated — a fresh one is held.
+    // Retry via the expired surface's primary rotates the session — a
+    // fresh one is held (DeviceLinkRetry is consumed internally).
+    let _ = activate_link_bar(&engine, "primary");
     assert!(engine.device_link_session_is_active_for_test());
 }
 
@@ -336,9 +408,7 @@ fn cancel_from_device_link_screen_drops_session() {
         "session not held after navigating in"
     );
 
-    let _ = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "cancel"}}"#.into())
-        .expect("cancel");
+    let _ = activate_link_bar(&engine, "back");
     // route_result(Complete) → handle_completion → navigate away;
     // after_screen_transition then drops the session.
     assert!(

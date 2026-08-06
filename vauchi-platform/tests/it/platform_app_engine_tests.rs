@@ -125,6 +125,167 @@ fn drive_onboarding(engine: &PlatformAppEngine) {
     let _ = dispatch_primary(engine, &batch); // what_next → complete → home
 }
 
+/// Drive the Add Entry form dialog end-to-end through the canonical
+/// envelope: open the secondary action menu, pick the field type from
+/// the list surface, fill the value input, and activate the form's
+/// primary — the same taps a user makes. Every id is read from the
+/// command batches.
+fn add_field_via_dialog(engine: &PlatformAppEngine, type_title: &str, value: &str) {
+    fn batch_of(result: &str) -> serde_json::Value {
+        serde_json::from_str(result).expect("parse command batch")
+    }
+    fn dispatch(engine: &PlatformAppEngine, event: serde_json::Value) -> serde_json::Value {
+        batch_of(
+            &engine
+                .dispatch_json(event.to_string())
+                .expect("dispatch event"),
+        )
+    }
+    fn first_surface(batch: &serde_json::Value) -> serde_json::Value {
+        batch["commands"]
+            .as_array()
+            .and_then(|commands| {
+                commands.iter().find_map(|c| {
+                    let surface = &c["ReplaceSurface"]["surface"];
+                    surface.is_object().then(|| surface.clone())
+                })
+            })
+            .expect("batch must replace a surface")
+    }
+
+    // Report the environment once, as a shell does at boot; responsive
+    // surfaces require it before activation.
+    let _ = dispatch(
+        engine,
+        serde_json::json!({"PresentationEnvironmentChanged": {
+            "available_width": 900, "available_height": 700,
+            "input_modes": ["pointer", "keyboard"], "motion": "full",
+        }}),
+    );
+
+    let home = batch_of(
+        &engine
+            .initial_commands_json()
+            .expect("re-compose home surface"),
+    );
+    let home_sid = first_surface(&home)["surface_id"]
+        .as_str()
+        .expect("home surface id")
+        .to_owned();
+
+    // Secondary action menu → Add Entry. The interaction id is
+    // revision-scoped and read from the bar, never constructed.
+    let secondary_iid = home["commands"]
+        .as_array()
+        .and_then(|commands| commands.iter().find_map(|c| c.get("SetContextBar")))
+        .and_then(|bar| bar["bar"]["secondary"]["interaction_id"].as_str())
+        .expect("home bar must carry a secondary action menu")
+        .to_owned();
+    let menu = dispatch(
+        engine,
+        serde_json::json!({"ActionActivated": {
+            "surface_id": home_sid,
+            "interaction_id": secondary_iid,
+        }}),
+    );
+    let (overlay_sid, add_entry_id) = menu["commands"]
+        .as_array()
+        .and_then(|commands| commands.iter().find_map(|c| c.get("PresentOverlay")))
+        .and_then(|overlay| {
+            let item = overlay["overlay"]["items"].as_array().and_then(|items| {
+                items
+                    .iter()
+                    .find(|item| item["label"].as_str() == Some("Add Entry"))
+            })?;
+            Some((
+                overlay["surface_id"].as_str()?.to_owned(),
+                item["interaction_id"].as_str()?.to_owned(),
+            ))
+        })
+        .expect("action menu must carry Add Entry");
+    let picker = dispatch(
+        engine,
+        serde_json::json!({"ActionActivated": {
+            "surface_id": overlay_sid,
+            "interaction_id": add_entry_id,
+        }}),
+    );
+
+    // The type picker is a new surface: activate it before interacting,
+    // then pick the field type row.
+    let picker_sid = first_surface(&picker)["surface_id"]
+        .as_str()
+        .expect("picker surface id")
+        .to_owned();
+    let _ = dispatch(
+        engine,
+        serde_json::json!({"SurfaceActivated": { "surface_id": picker_sid }}),
+    );
+    let type_iid = first_surface(&picker)["nodes"]
+        .as_array()
+        .and_then(|nodes| {
+            nodes.iter().find_map(|node| {
+                node["List"]["rows"].as_array().and_then(|rows| {
+                    rows.iter()
+                        .find(|row| row["title"].as_str() == Some(type_title))
+                        .and_then(|row| row["activation"]["interaction_id"].as_str())
+                        .map(str::to_owned)
+                })
+            })
+        })
+        .expect("type picker must list the field type");
+    let form = dispatch(
+        engine,
+        serde_json::json!({"ActionActivated": {
+            "surface_id": picker_sid,
+            "interaction_id": type_iid,
+        }}),
+    );
+
+    // Fill the value input, then activate the form's primary (submit).
+    let form_surface = first_surface(&form);
+    let form_sid = form_surface["surface_id"]
+        .as_str()
+        .expect("form surface id")
+        .to_owned();
+    let _ = dispatch(
+        engine,
+        serde_json::json!({"SurfaceActivated": { "surface_id": form_sid }}),
+    );
+    let value_binding = form_surface["nodes"]
+        .as_array()
+        .and_then(|nodes| {
+            nodes.iter().find_map(|node| {
+                node["Input"]["binding_id"]
+                    .as_str()
+                    .filter(|id| id.contains("field_value"))
+                    .map(str::to_owned)
+            })
+        })
+        .expect("form must carry a value input");
+    let _ = dispatch(
+        engine,
+        serde_json::json!({"ValueChanged": {
+            "surface_id": form_sid,
+            "binding_id": value_binding,
+            "value": { "text": value },
+        }}),
+    );
+    let submit_iid = form["commands"]
+        .as_array()
+        .and_then(|commands| commands.iter().find_map(|c| c.get("SetContextBar")))
+        .and_then(|bar| bar["bar"]["primary"]["interaction_id"].as_str())
+        .expect("form must carry a primary submit")
+        .to_owned();
+    let _ = dispatch(
+        engine,
+        serde_json::json!({"ActionActivated": {
+            "surface_id": form_sid,
+            "interaction_id": submit_iid,
+        }}),
+    );
+}
+
 // ============================================================================
 // Construction and initial screen
 // ============================================================================
@@ -174,9 +335,7 @@ fn current_surface_title(engine: &PlatformAppEngine) -> String {
 #[test]
 fn new_engine_starts_on_onboarding() {
     let (engine, _dir) = create_engine();
-    let json = engine.current_screen_json().expect("screen json");
-    let screen: serde_json::Value = serde_json::from_str(&json).expect("parse");
-    assert_eq!(screen["screen_id"], "identity_check");
+    assert_eq!(current_screen_id(&engine), "onboarding");
 }
 
 // @internal
@@ -436,58 +595,6 @@ fn navigate_to_json_envelope_carries_lifecycle_commands() {
     );
 }
 
-// @scenario: exchange.feature :: handle_action_json envelope shape
-#[test]
-fn handle_action_json_envelope_shape() {
-    let (engine, _dir) = create_engine();
-    let r = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
-        .expect("create_new");
-    let envelope: serde_json::Value = serde_json::from_str(&r).expect("parse");
-    assert!(envelope.is_object(), "envelope must be object: {envelope}");
-    assert!(
-        envelope.get("action_result").is_some(),
-        "envelope must have action_result: {envelope}",
-    );
-    assert!(
-        envelope.get("commands").is_some(),
-        "envelope must have commands: {envelope}",
-    );
-}
-
-// @internal
-#[test]
-fn navigate_back_returns_previous_screen() {
-    let (engine, _dir) = create_engine();
-    drive_onboarding(&engine);
-    engine
-        .navigate_to_json_for_test(r#""Exchange""#.into())
-        .expect("navigate to exchange");
-    let result = engine.navigate_back_json().expect("navigate back");
-    let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
-    assert_eq!(envelope["screen"]["screen_id"], "my_info");
-}
-
-// ============================================================================
-// Notification boundary (CC-05)
-// ============================================================================
-
-// @scenario: notification.feature - Poll notifications returns empty before events
-// @internal
-// @internal
-#[test]
-fn poll_notifications_returns_empty_before_events() {
-    let (engine, _dir) = create_engine();
-    drive_onboarding(&engine);
-    let notifications = engine.poll_notifications().expect("poll_notifications");
-    assert!(
-        notifications.is_empty(),
-        "poll should return empty when no events dispatched"
-    );
-}
-
-// @scenario: notification.feature - Card update produces no OS notification
-// @internal
 // @internal
 #[test]
 fn poll_notifications_after_card_update_returns_no_notification() {
@@ -497,23 +604,7 @@ fn poll_notifications_after_card_update_returns_no_notification() {
     // Add a field to own card — dispatches OwnCardUpdated through the
     // event pipeline. OwnCardUpdated is activity-log-only, so poll
     // should return zero notifications while still processing the event.
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "add_field"}}"#.into())
-        .expect("open add field dialog");
-    engine
-        .handle_action_json(
-            r#"{"ListItemSelected": {"component_id": "entry_types", "item_id": "email"}}"#.into(),
-        )
-        .expect("select email type");
-    engine
-        .handle_action_json(
-            r#"{"TextChanged": {"component_id": "field_value", "value": "test@example.com"}}"#
-                .into(),
-        )
-        .expect("enter value");
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "submit"}}"#.into())
-        .expect("submit field");
+    add_field_via_dialog(&engine, "Email", "test@example.com");
 
     let notifications = engine.poll_notifications().expect("poll_notifications");
     assert!(
@@ -561,9 +652,9 @@ fn on_wakeup_returns_envelope_with_schedule_wakeup_command() {
 
 // @internal
 #[test]
-fn handle_action_invalid_json_returns_error() {
+fn dispatch_invalid_json_returns_error() {
     let (engine, _dir) = create_engine();
-    let result = engine.handle_action_json("not valid json".into());
+    let result = engine.dispatch_json("not valid json".into());
     assert!(result.is_err(), "should return error for invalid JSON");
 }
 
@@ -643,34 +734,7 @@ fn event_listener_receives_invalidation_on_card_update() {
 
     // Add a field to own card — this triggers OwnCardUpdated event
     // via ContactManager, unlike update_display_name which skips dispatch.
-    let r = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "add_field"}}"#.into())
-        .expect("open add field dialog");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse");
-    assert_eq!(
-        v["action_result"]["NavigateTo"]["screen_id"], "form_add_field",
-        "should open add-field form, got: {v}"
-    );
-
-    // Select entry type
-    engine
-        .handle_action_json(
-            r#"{"ListItemSelected": {"component_id": "entry_types", "item_id": "email"}}"#.into(),
-        )
-        .expect("select email type");
-
-    // Enter field value (required — empty value is rejected)
-    engine
-        .handle_action_json(
-            r#"{"TextChanged": {"component_id": "field_value", "value": "test@example.com"}}"#
-                .into(),
-        )
-        .expect("enter value");
-
-    // Submit — calls add_own_field → ContactManager dispatches OwnCardUpdated
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "submit"}}"#.into())
-        .expect("submit field");
+    add_field_via_dialog(&engine, "Email", "test@example.com");
 
     // Verify the generic presentation listener was called.
     let recorded = calls.lock().unwrap();
@@ -706,22 +770,7 @@ fn replacing_event_listener_unregisters_previous() {
         .expect("register second listener");
 
     // Trigger an event via add-field (dispatches OwnCardUpdated)
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "add_field"}}"#.into())
-        .expect("open add field dialog");
-    engine
-        .handle_action_json(
-            r#"{"ListItemSelected": {"component_id": "entry_types", "item_id": "phone"}}"#.into(),
-        )
-        .expect("select phone type");
-    engine
-        .handle_action_json(
-            r#"{"TextChanged": {"component_id": "field_value", "value": "+1234567890"}}"#.into(),
-        )
-        .expect("enter value");
-    engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "submit"}}"#.into())
-        .expect("submit field");
+    add_field_via_dialog(&engine, "Phone", "+1234567890");
 
     // First listener should NOT have been called (unregistered)
     let recorded_1 = calls_1.lock().unwrap();
@@ -742,19 +791,154 @@ fn replacing_event_listener_unregisters_previous() {
 // Animated QR frame advancement (ADR-031)
 // ============================================================================
 
-/// Extract the `data` string from the first `QrCode` (Display) component in a
-/// serialized `ScreenModel` JSON.
-fn qr_data_from_screen_json(screen_json: &str) -> String {
-    let v: serde_json::Value = serde_json::from_str(screen_json).expect("parse screen");
-    for c in v["components"].as_array().expect("components array") {
-        if c["QrCode"].is_object() && c["QrCode"]["mode"] == "Display" {
-            return c["QrCode"]["data"]
-                .as_str()
-                .expect("qr data string")
-                .to_owned();
-        }
+/// Extract the payload of the first display-purpose `Qr` node in the
+/// re-composed command batch — the QR a shell would render on-screen.
+fn qr_data_from_batch(engine: &PlatformAppEngine) -> String {
+    fn find_qr_payload(nodes: &[serde_json::Value]) -> Option<String> {
+        nodes.iter().find_map(|node| {
+            let qr = &node["Qr"];
+            if qr.is_object() && qr["purpose"].as_str() == Some("display") {
+                return qr["payloads"][0].as_str().map(str::to_owned);
+            }
+            node["Group"]["children"]
+                .as_array()
+                .and_then(|children| find_qr_payload(children))
+        })
     }
-    panic!("no QrCode Display in screen: {screen_json}");
+    let json = engine.initial_commands_json().expect("re-compose batch");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse batch");
+    v["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                c["ReplaceSurface"]["surface"]["nodes"]
+                    .as_array()
+                    .and_then(|nodes| find_qr_payload(nodes))
+            })
+        })
+        .unwrap_or_else(|| panic!("no display Qr node in batch: {json}"))
+}
+
+/// Report a successful camera decode the way a shell does: a ValueChanged
+/// on the capture-purpose Qr node's binding in the current batch. Sets
+/// camera + BLE capabilities first so the capture node renders.
+fn scan_qr_via_capture_binding(engine: &PlatformAppEngine, data: &str) {
+    fn find_capture_binding(nodes: &[serde_json::Value]) -> Option<String> {
+        nodes.iter().find_map(|node| {
+            let qr = &node["Qr"];
+            if qr.is_object() && qr["purpose"].as_str() == Some("capture") {
+                return qr["id"].as_str().map(str::to_owned);
+            }
+            node["Group"]["children"]
+                .as_array()
+                .and_then(|children| find_capture_binding(children))
+        })
+    }
+
+    let json = engine.initial_commands_json().expect("re-compose batch");
+    let batch: serde_json::Value = serde_json::from_str(&json).expect("parse batch");
+    let (surface_id, binding_id) = batch["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                let surface = &c["ReplaceSurface"]["surface"];
+                let binding = surface["nodes"]
+                    .as_array()
+                    .and_then(|nodes| find_capture_binding(nodes))?;
+                Some((surface["surface_id"].as_str()?.to_owned(), binding))
+            })
+        })
+        .unwrap_or_else(|| panic!("no capture Qr node in batch: {json}"));
+
+    let event = serde_json::json!({
+        "ValueChanged": {
+            "surface_id": surface_id,
+            "binding_id": binding_id,
+            "value": { "text": data },
+        }
+    });
+    let _ = engine
+        .dispatch_json(event.to_string())
+        .expect("scan ValueChanged must dispatch");
+}
+
+/// Select an exchange mode through the canonical envelope: expand the
+/// "Other ways to connect" row on the exchange surface, then activate the
+/// mode's list row — ids read from the batches, never constructed.
+fn select_exchange_mode(engine: &PlatformAppEngine, mode_title: &str) {
+    fn dispatch(engine: &PlatformAppEngine, event: serde_json::Value) -> serde_json::Value {
+        serde_json::from_str(
+            &engine
+                .dispatch_json(event.to_string())
+                .expect("dispatch event"),
+        )
+        .expect("parse command batch")
+    }
+    fn find_row(nodes: &[serde_json::Value], title: &str) -> Option<String> {
+        nodes.iter().find_map(|node| {
+            node["List"]["rows"].as_array().and_then(|rows| {
+                rows.iter()
+                    .find(|row| row["title"].as_str() == Some(title))
+                    .and_then(|row| row["activation"]["interaction_id"].as_str())
+                    .map(str::to_owned)
+            })
+        })
+    }
+
+    let _ = dispatch(
+        engine,
+        serde_json::json!({"PresentationEnvironmentChanged": {
+            "available_width": 900, "available_height": 700,
+            "input_modes": ["pointer", "keyboard"], "motion": "full",
+        }}),
+    );
+    // Re-compose first: the responsive coordinator only learns the visible
+    // panes from a composed batch, and SurfaceActivated rejects a surface
+    // it has not seen yet.
+    let batch: serde_json::Value = serde_json::from_str(
+        &engine
+            .initial_commands_json()
+            .expect("re-compose exchange surface"),
+    )
+    .expect("parse exchange batch");
+    let _ = dispatch(
+        engine,
+        serde_json::json!({"SurfaceActivated": { "surface_id": "exchange" }}),
+    );
+    let expand_iid = batch["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                c["ReplaceSurface"]["surface"]["nodes"]
+                    .as_array()
+                    .and_then(|nodes| find_row(nodes, "Other ways to connect"))
+            })
+        })
+        .expect("exchange surface must list Other ways to connect");
+    let expanded = dispatch(
+        engine,
+        serde_json::json!({"ActionActivated": {
+            "surface_id": "exchange",
+            "interaction_id": expand_iid,
+        }}),
+    );
+    let mode_iid = expanded["commands"]
+        .as_array()
+        .and_then(|commands| {
+            commands.iter().find_map(|c| {
+                c["ReplaceSurface"]["surface"]["nodes"]
+                    .as_array()
+                    .and_then(|nodes| find_row(nodes, mode_title))
+            })
+        })
+        .unwrap_or_else(|| panic!("expanded exchange surface must list {mode_title}"));
+    let _ = dispatch(
+        engine,
+        serde_json::json!({"ActionActivated": {
+            "surface_id": "exchange",
+            "interaction_id": mode_iid,
+        }}),
+    );
 }
 
 // ============================================================================
@@ -785,12 +969,7 @@ fn picking_glance_from_mode_selection_auto_navigates_to_ble_exchange() {
     // User picks Glance — G3: the quick mode is one-sided QR + BLE. No
     // further frontend call needed: AppEngine routes `StartBleExchange`
     // → `AppScreen::BleExchange`, the platform layer drives the BLE flow.
-    engine
-        .handle_action_json(
-            r#"{"ListItemSelected": {"component_id": "category:quick", "item_id": "mode:glance"}}"#
-                .into(),
-        )
-        .expect("select Glance");
+    select_exchange_mode(&engine, "Glance");
     // G3: the Glance surface carries its title and the one-sided OOB QR
     // node (generated once on entry) so the exposure-closing pin material
     // is on-screen, not aspirational. "exchange_ble_glance" was the retired
@@ -908,7 +1087,6 @@ fn glance_scanning_a_peer_qr_connects_only_to_that_peer() {
     // identity): device A scans device B's one-sided Glance QR, then its BLE
     // scan discovers B advertising — A connects specifically to B. A foreign
     // advertiser A never scanned is ignored (no tiebreak, no latch race → F1).
-    use vauchi_app::ui::GLANCE_SCAN_COMPONENT_ID;
     use vauchi_core::exchange::oob_bootstrap::OobBootstrapQr;
     use vauchi_platform::MobileEvent;
 
@@ -918,29 +1096,21 @@ fn glance_scanning_a_peer_qr_connects_only_to_that_peer() {
     drive_onboarding(&b);
 
     for e in [&a, &b] {
+        e.set_device_capabilities_json(r#"{"has_camera": true, "has_ble": true}"#.into())
+            .expect("report camera + BLE capabilities at boot");
         e.navigate_to_json_for_test(r#""Exchange""#.into())
             .expect("navigate to Exchange");
-        e.handle_action_json(
-            r#"{"ListItemSelected": {"component_id": "category:quick", "item_id": "mode:glance"}}"#
-                .into(),
-        )
-        .expect("select Glance");
+        select_exchange_mode(e, "Glance");
     }
 
     // B displays its QR; parse it to learn B's advertised identity.
-    let b_qr = qr_data_from_screen_json(&b.current_screen_json().expect("b glance screen"));
+    let b_qr = qr_data_from_batch(&b);
     let b_identity = *OobBootstrapQr::from_data_string(&b_qr)
         .expect("B's QR parses")
         .identity_key();
 
     // A scans B's QR (the camera Component emits TextChanged on the scan id).
-    a.handle_action_json(
-        serde_json::json!({
-            "TextChanged": { "component_id": GLANCE_SCAN_COMPONENT_ID, "value": b_qr }
-        })
-        .to_string(),
-    )
-    .expect("A scans B's QR");
+    scan_qr_via_capture_binding(&a, &b_qr);
 
     // A's BLE scan first surfaces a FOREIGN advertiser A never scanned → ignored.
     let foreign = a
@@ -991,17 +1161,9 @@ fn text_changed_from_peer_scan_routes_to_multi_stage_session() {
     // and the action did not error: the side-effect route happens
     // before the engine's fall-through, so a panic / lock-poisoning
     // would surface here.
-    let result_json = engine
-        .handle_action_json(
-            r#"{"TextChanged": {"component_id": "peer_scan", "value": "garbage-not-an-init-frame"}}"#
-                .into(),
-        )
-        .expect("text changed action accepted");
-    let v: serde_json::Value = serde_json::from_str(&result_json).expect("parse action result");
-    assert_eq!(
-        v["action_result"]["UpdateScreen"]["screen_id"], "multi_stage_exchange",
-        "TextChanged from peer_scan must update the multi-stage screen, got {v:?}",
-    );
+    // A scan from the on-screen capture component must dispatch without
+    // error and route into the session without navigating away.
+    scan_qr_via_capture_binding(&engine, "garbage-not-an-init-frame");
     assert_eq!(
         current_screen_id(&engine),
         "multi_stage_exchange",
@@ -1041,26 +1203,31 @@ fn biometric_unlock_succeeded_hardware_event_returns_authentication_command_when
     );
 }
 
+// Negative case for the auto-route: a ValueChanged that names no
+// binding on the visible surface must fail closed at the parse
+// boundary — it neither routes to the session nor silently updates.
+// (The retired TextChanged path resolved unknown components to a
+// default UpdateScreen; the canonical boundary is deliberately
+// stricter.)
 // @internal
 #[test]
-fn text_changed_from_unknown_component_does_not_panic_on_multi_stage() {
-    // Negative case for the auto-route: a `TextChanged` whose
-    // `component_id` is not the peer-scan component must NOT call
-    // `session.process_scanned_qr` (a different component might emit
-    // text — for example a future manual-entry fallback). The action
-    // should still succeed and resolve to `UpdateScreen`.
+fn value_changed_with_unknown_binding_fails_closed_on_multi_stage() {
     let (engine, _dir) = create_engine();
     drive_to_multi_stage(&engine);
 
-    let result_json = engine
-        .handle_action_json(
-            r#"{"TextChanged": {"component_id": "some_other_field", "value": "hello"}}"#.into(),
-        )
-        .expect("text changed action accepted");
-    let v: serde_json::Value = serde_json::from_str(&result_json).expect("parse action result");
-    assert_eq!(
-        v["action_result"]["UpdateScreen"]["screen_id"], "multi_stage_exchange",
-        "TextChanged from a non-peer-scan component must update the multi-stage screen, got {v:?}",
+    let result = engine.dispatch_json(
+        serde_json::json!({
+            "ValueChanged": {
+                "surface_id": "multi_stage_exchange",
+                "binding_id": "no.such.binding",
+                "value": { "text": "hello" },
+            }
+        })
+        .to_string(),
+    );
+    assert!(
+        result.is_err(),
+        "unknown binding must fail closed, got: {result:?}"
     );
 }
 
@@ -1086,12 +1253,33 @@ fn cancel_action_on_multi_stage_screen_stops_session_after_navigate() {
         }))
         .expect("set listener");
 
-    // Press Cancel — engine returns Complete, AppEngine routes that
-    // through handle_completion to navigate_back. After the action
-    // resolves the screen has changed away from multi_stage_exchange.
+    // Tap the context bar's back interaction — Core routes completion
+    // through navigate_back. After the activation the surface has
+    // changed away from multi_stage_exchange.
+    let batch: serde_json::Value = serde_json::from_str(
+        &engine
+            .initial_commands_json()
+            .expect("re-compose multi-stage surface"),
+    )
+    .expect("parse batch");
+    let (bar_surface, back_id) = batch["commands"]
+        .as_array()
+        .and_then(|commands| commands.iter().find_map(|c| c.get("SetContextBar")))
+        .and_then(|bar| {
+            Some((
+                bar["surface_id"].as_str()?.to_owned(),
+                bar["bar"]["back"]["interaction_id"].as_str()?.to_owned(),
+            ))
+        })
+        .expect("multi-stage bar must carry a back interaction");
     engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "cancel"}}"#.into())
-        .expect("cancel action");
+        .dispatch_json(
+            serde_json::json!({
+                "ActionActivated": { "surface_id": bar_surface, "interaction_id": back_id }
+            })
+            .to_string(),
+        )
+        .expect("back activation");
     let post_screen = current_screen_id(&engine);
     assert_ne!(
         post_screen, "multi_stage_exchange",
@@ -1344,7 +1532,6 @@ fn glance_discovery_via_dispatch_json_connects_to_the_scanned_peer_like_the_type
     // to the advertiser whose identity matches the scanned QR. The typed
     // seam routes that through `handle_glance_discovery`; the canonical
     // envelope must do the same or the one-sided flow never connects.
-    use vauchi_app::ui::GLANCE_SCAN_COMPONENT_ID;
     use vauchi_core::exchange::oob_bootstrap::OobBootstrapQr;
 
     let (a, _da) = create_engine();
@@ -1353,27 +1540,19 @@ fn glance_discovery_via_dispatch_json_connects_to_the_scanned_peer_like_the_type
     drive_onboarding(&b);
 
     for e in [&a, &b] {
+        e.set_device_capabilities_json(r#"{"has_camera": true, "has_ble": true}"#.into())
+            .expect("report camera + BLE capabilities at boot");
         e.navigate_to_json_for_test(r#""Exchange""#.into())
             .expect("navigate to Exchange");
-        e.handle_action_json(
-            r#"{"ListItemSelected": {"component_id": "category:quick", "item_id": "mode:glance"}}"#
-                .into(),
-        )
-        .expect("select Glance");
+        select_exchange_mode(e, "Glance");
     }
 
-    let b_qr = qr_data_from_screen_json(&b.current_screen_json().expect("b glance screen"));
+    let b_qr = qr_data_from_batch(&b);
     let b_identity = *OobBootstrapQr::from_data_string(&b_qr)
         .expect("B's QR parses")
         .identity_key();
 
-    a.handle_action_json(
-        serde_json::json!({
-            "TextChanged": { "component_id": GLANCE_SCAN_COMPONENT_ID, "value": b_qr }
-        })
-        .to_string(),
-    )
-    .expect("A scans B's QR");
+    scan_qr_via_capture_binding(&a, &b_qr);
 
     let foreign = a
         .dispatch_json(

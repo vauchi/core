@@ -221,8 +221,45 @@ impl AppEngine {
         action: UserAction,
         cause: Option<(SurfaceId, InteractionId)>,
     ) -> Result<Vec<Command>, AppPresentationError> {
+        // Glance one-sided QR: the scan binding's text carries the scanned
+        // OOB payload. Route it to `apply_glance_scan` so the scanner pins
+        // the displayer's identity + exchange key + co-presence nonce; the
+        // subsequent `BleDeviceDiscovered` of that identity then connects
+        // (`handle_glance_discovery`). A malformed / expired QR is rejected
+        // there and latches nothing — the exposure-closer for
+        // `2026-06-10-ble-unauthenticated-peer-identity`. This match used to
+        // live only in the retired UniFFI action seam; it belongs here so
+        // the canonical envelope routes identically (ADR-066).
+        if let UserAction::TextChanged {
+            component_id,
+            value,
+        } = &action
+            && component_id == crate::ui::GLANCE_SCAN_COMPONENT_ID
+            && matches!(
+                self.screen,
+                AppScreen::BleExchange {
+                    mode: vauchi_core::exchange::mode::ExchangeMode::Glance
+                }
+            )
+        {
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.apply_glance_scan(value);
+        }
         let before = self.projected_visible_surface();
         let result = self.handle_action(action);
+        // DeviceLinkConfirmManual/Deny/Retry are Core-internal signals:
+        // their machine side effects already ran inside `handle_action`
+        // (`dispatch_device_link_side_effects`), and the completing/expired
+        // screen state they leave behind is fully rendered by
+        // `surface_commands` below. They carry nothing a shell can render,
+        // so they are consumed here rather than rejected as unresolved
+        // command variants.
+        let internally_consumed = matches!(
+            result,
+            ActionResult::DeviceLinkConfirmManual { .. }
+                | ActionResult::DeviceLinkDeny
+                | ActionResult::DeviceLinkRetry
+        );
         if !self.preserves_binding_meaning(before.as_ref()) {
             self.surface_revision = self
                 .surface_revision
@@ -232,8 +269,10 @@ impl AppEngine {
         let screen = self.current_screen();
         let mut commands = self.surface_commands(&screen)?;
         commands.extend(self.offer_causal_undo(&result, cause.as_ref()));
-        super::result_commands::append_result_commands(result, &mut commands)
-            .map_err(|variant| AppPresentationError::UnresolvedActionResult { variant })?;
+        if !internally_consumed {
+            super::result_commands::append_result_commands(result, &mut commands)
+                .map_err(|variant| AppPresentationError::UnresolvedActionResult { variant })?;
+        }
         commands.extend(self.drain_pending_commands());
         Ok(commands)
     }

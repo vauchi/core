@@ -167,17 +167,41 @@ fn grant_navigates_to_responder_with_no_frontend_escrow_commands() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     let link_url = fresh_link_url();
-    engine
-        .handle_action_json(format!(r#"{{"LinkOpened":{{"uri":"{link_url}"}}}}"#))
-        .expect("LinkOpened routes exchange URI to consent");
+    let consent_batch: serde_json::Value = serde_json::from_str(
+        &engine
+            .dispatch_json(serde_json::json!({"DeepLinkOpened": {"uri": link_url}}).to_string())
+            .expect("DeepLinkOpened routes exchange URI to consent"),
+    )
+    .expect("consent envelope");
     assert!(
         surface_titles(&engine).contains(&"Exchange Request".to_string()),
         "LinkOpened must present the consent surface"
     );
 
+    let (consent_surface, grant_id) = {
+        let bar = consent_batch["commands"]
+            .as_array()
+            .and_then(|commands| commands.iter().find_map(|c| c.get("SetContextBar")))
+            .expect("consent batch must carry a context bar");
+        (
+            bar["surface_id"]
+                .as_str()
+                .expect("bar surface id")
+                .to_owned(),
+            bar["bar"]["primary"]["interaction_id"]
+                .as_str()
+                .expect("grant interaction id")
+                .to_owned(),
+        )
+    };
     let grant_json = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "grant"}}"#.into())
-        .expect("grant action");
+        .dispatch_json(
+            serde_json::json!({
+                "ActionActivated": { "surface_id": consent_surface, "interaction_id": grant_id }
+            })
+            .to_string(),
+        )
+        .expect("grant activation");
     assert!(
         surface_titles(&engine).contains(&"Waiting for Response".to_string()),
         "grant must route to the responder waiting screen — action returned {grant_json}",

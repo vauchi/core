@@ -71,7 +71,7 @@ fn drive_onboarding(engine: &PlatformAppEngine) {
         .expect("parse command batch")
     }
 
-    fn find_input<'v>(nodes: &'v [serde_json::Value]) -> Option<&'v serde_json::Value> {
+    fn find_input(nodes: &[serde_json::Value]) -> Option<&serde_json::Value> {
         nodes.iter().find_map(|node| {
             if let Some(input) = node.get("Input") {
                 Some(input)
@@ -135,48 +135,6 @@ fn drive_onboarding(engine: &PlatformAppEngine) {
 fn fresh_link_url() -> String {
     let (init, _) = vauchi_core::exchange::link_mode::initiator_generate();
     init.url
-}
-
-// @internal
-fn current_screen_id(engine: &PlatformAppEngine) -> String {
-    // initial_commands re-composes the current presentation — the same
-    // refresh path a shell hits on load — so the current surface id is
-    // readable without the retired screen seam.
-    let json = engine
-        .initial_commands_json()
-        .expect("initial_commands_json");
-    let v: serde_json::Value = serde_json::from_str(&json).expect("parse commands json");
-    v["commands"]
-        .as_array()
-        .and_then(|commands| {
-            commands.iter().find_map(|c| {
-                c["ReplaceSurface"]["surface"]["surface_id"]
-                    .as_str()
-                    .map(str::to_owned)
-            })
-        })
-        .unwrap_or_default()
-}
-
-/// Title of the current top surface, read through the canonical
-/// re-composition path. The title is Core-prepared copy a shell renders
-/// verbatim, so it is the honest observable for "which screen state" —
-/// the retired granular screen_id was Core-internal vocabulary.
-fn current_surface_title(engine: &PlatformAppEngine) -> String {
-    let json = engine
-        .initial_commands_json()
-        .expect("initial_commands_json");
-    let v: serde_json::Value = serde_json::from_str(&json).expect("parse commands json");
-    v["commands"]
-        .as_array()
-        .and_then(|commands| {
-            commands.iter().find_map(|c| {
-                c["ReplaceSurface"]["surface"]["title"]
-                    .as_str()
-                    .map(str::to_owned)
-            })
-        })
-        .unwrap_or_default()
 }
 
 /// Titles of every surface in the re-composed command batch (main and

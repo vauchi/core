@@ -80,7 +80,7 @@ fn drive_onboarding(engine: &PlatformAppEngine) {
         .expect("parse command batch")
     }
 
-    fn find_input<'v>(nodes: &'v [serde_json::Value]) -> Option<&'v serde_json::Value> {
+    fn find_input(nodes: &[serde_json::Value]) -> Option<&serde_json::Value> {
         nodes.iter().find_map(|node| {
             if let Some(input) = node.get("Input") {
                 Some(input)

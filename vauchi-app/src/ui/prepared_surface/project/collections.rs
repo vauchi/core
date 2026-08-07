@@ -109,17 +109,17 @@ impl Projection {
                 }
                 SettingsItemKind::Value { value } => (
                     Some(value.clone()),
-                    Some(self.settings_action(item)?),
+                    Some(self.settings_action(id, item)?),
                     Vec::new(),
                 ),
                 SettingsItemKind::Link { detail } => (
                     detail.clone(),
-                    Some(self.settings_action(item)?),
+                    Some(self.settings_action(id, item)?),
                     Vec::new(),
                 ),
                 SettingsItemKind::Destructive { label } => (
                     Some(label.clone()),
-                    Some(self.settings_action(item)?),
+                    Some(self.settings_action(id, item)?),
                     Vec::new(),
                 ),
             };
@@ -148,8 +148,13 @@ impl Projection {
         })
     }
 
+    /// Settings rows route through `ListItemSelected` — the same contract
+    /// `list()`/`action_list()` use — because `intercept_settings_action`
+    /// and the settings/consent engines match on `component_id` + `item_id`
+    /// (GTK-3/QT-3: `ActionPressed` routed nowhere, leaving every row inert).
     fn settings_action(
         &mut self,
+        component_id: &str,
         item: &SettingsItem,
     ) -> Result<vauchi_core::ActionSpec, PreparedSurfaceError> {
         self.action(
@@ -160,8 +165,9 @@ impl Projection {
             } else {
                 ActionTone::Standard
             },
-            UserAction::ActionPressed {
-                action_id: item.id.clone(),
+            UserAction::ListItemSelected {
+                component_id: component_id.to_owned(),
+                item_id: item.id.clone(),
             },
         )
     }

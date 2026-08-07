@@ -151,11 +151,21 @@ impl AppEngine {
     }
 
     /// Intercept settings item selection to route to proper sub-screens.
+    ///
+    /// Runs on the Advanced sub-screen too: `relay_url` and
+    /// `failed_deliveries` live there, so a `Settings`-only guard left
+    /// those rows inert on every shell (GTK-3/QT-3). `emergency_wipe` is
+    /// scoped to the main screen: its row is built only by
+    /// `advanced_screen()`, which owns it through the inline-confirm flow
+    /// (M6 D6.1), so an unscoped arm would hijack that flow here.
     pub(in crate::ui::app_engine) fn intercept_settings_action(
         &mut self,
         action: &UserAction,
     ) -> Option<ActionResult> {
-        if self.screen != AppScreen::Settings {
+        if !matches!(
+            self.screen,
+            AppScreen::Settings | AppScreen::SettingsAdvanced
+        ) {
             return None;
         }
         if let UserAction::ListItemSelected { item_id, .. } = action {
@@ -196,7 +206,14 @@ impl AppEngine {
                     });
                     return Some(ActionResult::NavigateTo(screen));
                 }
-                "emergency_wipe" => {
+                // Only on the main screen. The `danger` group that carries this
+                // row is built solely by `advanced_screen()`, which owns the
+                // inline-confirm flow, so widening the guard without this
+                // scope would hijack that flow (M6 D6.1). The arm is kept —
+                // rather than deleted as unreachable — because it guards a
+                // destructive action and `app_engine_settings_lock_tests::
+                // settings_emergency_wipe_navigates_to_shred` still pins it.
+                "emergency_wipe" if self.screen == AppScreen::Settings => {
                     let screen = self.navigate_to(AppScreen::EmergencyShred);
                     return Some(ActionResult::NavigateTo(screen));
                 }

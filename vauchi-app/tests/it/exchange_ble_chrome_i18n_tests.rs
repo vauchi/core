@@ -5,17 +5,15 @@
 //! M3 S4b-3 (`2026-07-03-core-screens-bypass-i18n`): the BLE exchange
 //! chrome (per-mode discovering / exchanging / verifying) and the Glance
 //! active screen render in the user's locale. Keys in `exchange.ble.*`
-//! (locales!88). Exact German assertions per CC-03.
+//! (locales!88).
+//!
+//! Asserts that the screen resolved a translation, not what the
+//! translation says — see `i18n_support::assert_translated`.
 
-use vauchi_app::i18n::{Locale, load_locale_from_bytes};
+use super::i18n_support::{assert_translated, load_german};
+use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{BleExchangeEngine, ScreenModel, WorkflowEngine};
 use vauchi_core::exchange::mode::ExchangeMode;
-
-fn load_german() {
-    let bytes = std::fs::read("../../locales/de.json")
-        .expect("locales checkout present as sibling repo (CI: .clone-locales)");
-    load_locale_from_bytes("de", &bytes).expect("German locale parses");
-}
 
 fn bump_engine(locale: Locale) -> BleExchangeEngine {
     BleExchangeEngine::new(
@@ -44,26 +42,28 @@ fn text_of(screen: &ScreenModel) -> String {
 // @scenario: exchange :: BLE discovering chrome renders in the active locale
 // @internal
 #[test]
-fn ble_discovering_renders_german() {
+fn ble_discovering_renders_the_active_locale() {
     load_german();
-    let engine = bump_engine(Locale::German);
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_ble_discovering");
-    // Bump mode's per-mode discovering copy.
-    assert_eq!(screen.title, "Bereit zum Anstoßen");
-    assert_eq!(
-        screen.subtitle.as_deref(),
-        Some("Stoße die Telefone zum Austausch aneinander")
+    let de = bump_engine(Locale::German).current_screen();
+    let en = bump_engine(Locale::English).current_screen();
+
+    // Screen ids are identifiers, not copy — they must NOT translate.
+    assert_eq!(de.screen_id, "exchange_ble_discovering");
+    assert_eq!(de.screen_id, en.screen_id);
+
+    assert_translated("discovering title", &de.title, &en.title);
+    assert_translated(
+        "discovering subtitle",
+        de.subtitle.as_deref().expect("subtitle present"),
+        en.subtitle.as_deref().expect("subtitle present"),
     );
-    // The scanning status line is localized too.
-    let text = text_of(&screen);
-    assert!(
-        text.contains("Suche in der Nähe") || text.contains("Suche nach Geräten"),
-        "scanning status localized; got {text}"
-    );
+    // The scanning status line rides the same screen body.
+    assert_translated("scanning status body", &text_of(&de), &text_of(&en));
 }
 
-// English stays exactly as before (regression pin).
+// English stays exactly as before (regression pin). English is the source
+// language and ships in this repo's bundled locale, so pinning it here
+// couples nothing external.
 // @internal
 #[test]
 fn ble_discovering_english_copy_unchanged() {

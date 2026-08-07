@@ -2,28 +2,23 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! M3 S4b-1 (`2026-07-03-core-screens-bypass-i18n`): the exchange mode
-//! picker renders in the user's locale — title/subtitle, the disclosure
-//! entry, per-mode instructions, and the Recommended/Unauthenticated
-//! markers via the `exchange.picker.*` templates (locales!84). Mode NAMES
-//! stay the canonical product vocabulary in every locale. Locale threads
+//! M3 S4b (`2026-07-03-core-screens-bypass-i18n`): the exchange mode
+//! picker renders in the user's locale, threaded from the engine entry
 //! via `ExchangeConfig.locale` (the one seam every exchange sub-engine
-//! reads). Exact German assertions per CC-03.
+//! reads).
+//!
+//! Asserts that the picker resolved a translation, not what the
+//! translation says — see `i18n_support::assert_translated`.
 
-use vauchi_app::i18n::{Locale, load_locale_from_bytes};
+use super::i18n_support::{assert_translated, load_german};
+use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{
     ActionListItem, Component, ExchangeConfig, ExchangeEngine, ScreenModel, UserAction,
     WorkflowEngine,
 };
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 
-fn load_german() {
-    let bytes = std::fs::read("../../locales/de.json")
-        .expect("locales checkout present as sibling repo (CI: .clone-locales)");
-    load_locale_from_bytes("de", &bytes).expect("German locale parses");
-}
-
-fn german_config() -> ExchangeConfig {
+fn config_for(locale: Locale) -> ExchangeConfig {
     ExchangeConfig {
         own_name: "Alice".into(),
         own_qr_data: "qr".into(),
@@ -40,7 +35,7 @@ fn german_config() -> ExchangeConfig {
         card_snapshot: None,
         transport_readiness: Default::default(),
         available_group_data: Vec::new(),
-        locale: Locale::German,
+        locale,
     }
 }
 
@@ -51,33 +46,33 @@ fn find_item<'a>(screen: &'a ScreenModel, id_prefix: &str) -> Option<&'a ActionL
     })
 }
 
-// @scenario: exchange :: mode picker renders in the active locale
-// @internal
-#[test]
-fn mode_picker_renders_german() {
-    load_german();
-    let mut engine =
-        ExchangeEngine::new(german_config(), vauchi_core::clock::SystemClock::shared());
+/// Copy a shell would show on the picker, collapsed then expanded.
+struct PickerCopy {
+    screen_id: String,
+    title: String,
+    subtitle: String,
+    disclosure_label: String,
+    hero_label: String,
+    hero_detail: String,
+    bump_detail: String,
+}
+
+fn walk_picker(locale: Locale) -> PickerCopy {
+    let mut engine = ExchangeEngine::new(
+        config_for(locale),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let picker = engine.current_screen();
-    assert_eq!(picker.screen_id, "exchange_mode_selection");
-    assert_eq!(picker.title, "Austauschmodus");
-    assert_eq!(
-        picker.subtitle.as_deref(),
-        Some("Wähle, wie Kontaktkarten ausgetauscht werden")
-    );
+    let screen_id = picker.screen_id.clone();
+    let title = picker.title.clone();
+    let subtitle = picker.subtitle.clone().expect("subtitle present");
 
-    // Collapsed: the disclosure row is localized; the hero (first-run
-    // Glance) keeps its product name and carries the localized
-    // Recommended marker + instruction.
     let more = find_item(&picker, "show_other_modes").expect("disclosure entry present");
-    assert_eq!(more.label, "Weitere Verbindungsmöglichkeiten");
+    let disclosure_label = more.label.clone();
     let hero = find_item(&picker, "mode:glance").expect("Glance hero present");
-    assert_eq!(hero.label, "Glance");
-    assert_eq!(
-        hero.detail.as_deref(),
-        Some("Empfohlen · Zeige deinen Code oder scanne ihren")
-    );
+    let hero_label = hero.label.clone();
+    let hero_detail = hero.detail.clone().expect("hero detail present");
 
     // Expanded: an unauthenticated mode carries the localized marker.
     let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -86,22 +81,52 @@ fn mode_picker_renders_german() {
     });
     let expanded = engine.current_screen();
     let bump = find_item(&expanded, "mode:bump").expect("Bump listed after disclosure");
-    let detail = bump.detail.as_deref().unwrap_or_default();
-    assert!(
-        detail.starts_with("Nicht authentifiziert · "),
-        "Bump carries the localized unauthenticated marker; got {detail:?}"
-    );
+
+    PickerCopy {
+        screen_id,
+        title,
+        subtitle,
+        disclosure_label,
+        hero_label,
+        hero_detail,
+        bump_detail: bump.detail.clone().unwrap_or_default(),
+    }
 }
 
-// English stays exactly as before the threading (regression pin).
+// @scenario: exchange :: mode picker renders in the active locale
+// @internal
+#[test]
+fn mode_picker_renders_the_active_locale() {
+    load_german();
+    let de = walk_picker(Locale::German);
+    let en = walk_picker(Locale::English);
+
+    // Screen ids are identifiers, not copy — they must NOT translate.
+    assert_eq!(de.screen_id, "exchange_mode_selection");
+    assert_eq!(de.screen_id, en.screen_id);
+
+    assert_translated("picker title", &de.title, &en.title);
+    assert_translated("picker subtitle", &de.subtitle, &en.subtitle);
+    assert_translated("disclosure row", &de.disclosure_label, &en.disclosure_label);
+    assert_translated("Glance hero detail", &de.hero_detail, &en.hero_detail);
+    assert_translated("Bump detail marker", &de.bump_detail, &en.bump_detail);
+
+    // Exemption: "Glance" is the product name for the mode and is
+    // deliberately identical in every locale, so it cannot be asserted
+    // as translated. Pinning it exactly is the point — a translated
+    // product name would be the defect.
+    assert_eq!(de.hero_label, "Glance");
+    assert_eq!(de.hero_label, en.hero_label);
+}
+
+// English stays exactly as before the threading (regression pin). English
+// is the source language and ships in this repo's bundled locale, so
+// pinning it here couples nothing external.
 // @internal
 #[test]
 fn mode_picker_english_copy_unchanged() {
     let engine = ExchangeEngine::new(
-        ExchangeConfig {
-            locale: Locale::English,
-            ..german_config()
-        },
+        config_for(Locale::English),
         vauchi_core::clock::SystemClock::shared(),
     );
     let picker = engine.current_screen();

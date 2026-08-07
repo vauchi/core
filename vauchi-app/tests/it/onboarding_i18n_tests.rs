@@ -54,7 +54,7 @@ fn onboarding_welcome_and_name_render_german() {
         action_id: "create_new".into(),
     });
     let name = engine.current_screen();
-    assert_eq!(name.title, "Wie heißen Sie?");
+    assert_eq!(name.title, "Wie heißt du?");
 
     // Empty name → localized validation.
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -63,7 +63,7 @@ fn onboarding_welcome_and_name_render_german() {
     let ActionResult::ValidationError { message, .. } = result else {
         panic!("empty name must validation-error, got {result:?}");
     };
-    assert_eq!(message, "Bitte geben Sie Ihren Namen ein.");
+    assert_eq!(message, "Bitte gib deinen Namen ein.");
 }
 
 // English stays as it was (with the one deliberate convergence:

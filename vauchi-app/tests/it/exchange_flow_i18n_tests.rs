@@ -76,7 +76,7 @@ fn group_gate_and_preview_render_german() {
     });
     let preview = engine.current_screen();
     assert_eq!(preview.screen_id, "exchange_field_preview");
-    assert_eq!(preview.title, "Sie teilen");
+    assert_eq!(preview.title, "Du teilst");
     assert_eq!(
         action_label(&preview, "start_exchange"),
         "Austausch starten"

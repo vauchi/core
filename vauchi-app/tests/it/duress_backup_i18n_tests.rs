@@ -60,7 +60,7 @@ fn duress_wizard_renders_german() {
     let ActionResult::ValidationError { message, .. } = result else {
         panic!("empty PIN must validation-error, got {result:?}");
     };
-    assert_eq!(message, "Bitte geben Sie eine PIN ein");
+    assert_eq!(message, "Bitte gib eine PIN ein");
 
     // Mismatched confirm → localized mismatch error.
     let _ = engine.handle_action(UserAction::TextChanged {

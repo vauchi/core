@@ -28,7 +28,7 @@ fn device_linking_transport_and_qr_render_german() {
     assert_eq!(screen.title, "Neues Gerät verknüpfen");
     assert_eq!(
         screen.subtitle.as_deref(),
-        Some("Wie möchten Sie verknüpfen?")
+        Some("Wie möchtest du verknüpfen?")
     );
 
     let qr_engine = DeviceLinkingEngine::new("qr-data".into()).with_locale(Locale::German);

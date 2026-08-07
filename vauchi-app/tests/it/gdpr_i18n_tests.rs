@@ -63,7 +63,7 @@ fn gdpr_overview_and_delete_review_render_german() {
         panic!("review screen leads with the deletion InfoPanel");
     };
     assert_eq!(title, "Folgendes wird gelöscht");
-    assert_eq!(items[0].title, "Ihre Identität");
+    assert_eq!(items[0].title, "Deine Identität");
     // {count} placeholders resolve through get_string_with_args.
     assert_eq!(items[1].title, "3 Kontakt(e)");
     assert!(

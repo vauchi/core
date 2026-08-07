@@ -70,6 +70,17 @@ pub enum VauchiEvent {
         contact_id: String,
     },
 
+    /// A first-time milestone fired, with its copy already resolved.
+    ///
+    /// Core owns both the "has this been seen" ledger (encrypted `ux_state`)
+    /// and the decision of when a milestone fires. A frontend that kept its
+    /// own tracker re-showed every moment per install and disagreed with
+    /// every other frontend on the same identity (ADR-069).
+    AhaMomentTriggered {
+        /// The moment, carrying its type and any context needed to render it.
+        moment: crate::aha_moments::AhaMoment,
+    },
+
     /// A message was successfully delivered.
     MessageDelivered {
         /// The contact ID the message was sent to.

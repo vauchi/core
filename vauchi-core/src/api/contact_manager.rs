@@ -333,8 +333,30 @@ impl<'a> ContactManager<'a> {
             contact_id,
             origin: crate::api::events::EventOrigin::Local,
         });
+        self.trigger_first_contact_moment(contact.card().display_name());
 
         Ok(())
+    }
+
+    /// Fires the first-contact milestone, if it has not fired before.
+    ///
+    /// A failure here must not fail the add: the contact is already saved,
+    /// and a milestone is decoration. Swallowing keeps a storage hiccup from
+    /// rolling back a successful exchange.
+    fn trigger_first_contact_moment(&self, display_name: &str) {
+        let Ok(mut tracker) = self.storage.ux().load_or_create_aha_tracker() else {
+            return;
+        };
+        let Some(moment) = tracker.try_trigger_with_context(
+            crate::types::AhaMomentType::FirstContactAdded,
+            display_name.to_string(),
+        ) else {
+            return;
+        };
+        if self.storage.ux().save_aha_tracker(&tracker).is_ok() {
+            self.events
+                .dispatch(VauchiEvent::AhaMomentTriggered { moment });
+        }
     }
 
     /// Updates an existing contact.

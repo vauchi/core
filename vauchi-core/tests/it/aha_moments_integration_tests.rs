@@ -15,7 +15,7 @@
 
 use vauchi_core::{
     AhaMoment, AhaMomentTracker, AhaMomentType, Contact, ContactCard, ContactField, FieldType,
-    SymmetricKey, Vauchi,
+    SymmetricKey, Vauchi, api::events::VauchiEvent,
 };
 
 // ============================================================
@@ -508,4 +508,62 @@ fn test_demo_contact_skipped_with_contacts() {
 
     // Demo should not be active (user already has contacts)
     assert!(!wb.is_demo_contact_active().unwrap());
+}
+
+/// Test: Core, not a frontend, decides when an aha moment fires.
+// @scenario: aha_moments :: First contact added triggers the moment once
+// @internal
+#[test]
+fn adding_a_first_contact_emits_the_aha_moment_once() {
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
+    wb.create_identity("Owner").unwrap();
+
+    let events: std::sync::Arc<std::sync::Mutex<Vec<VauchiEvent>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let captured = events.clone();
+    wb.add_event_handler(std::sync::Arc::new(move |event: VauchiEvent| {
+        captured.lock().unwrap().push(event);
+    }));
+
+    wb.add_contact(Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    ))
+    .unwrap();
+    wb.add_contact(Contact::from_exchange(
+        [2u8; 32],
+        ContactCard::new("Carol"),
+        SymmetricKey::generate(),
+        0,
+    ))
+    .unwrap();
+
+    let captured = events.lock().unwrap();
+    let moments: Vec<&AhaMoment> = captured
+        .iter()
+        .filter_map(|e| match e {
+            VauchiEvent::AhaMomentTriggered { moment } => Some(moment),
+            _ => None,
+        })
+        .filter(|m| m.moment_type == AhaMomentType::FirstContactAdded)
+        .collect();
+
+    assert_eq!(
+        moments.len(),
+        1,
+        "the first-contact moment fires once and only once; a shell that owns the tracker \
+         re-fires it per install and per frontend, got: {moments:?}"
+    );
+    assert_eq!(
+        moments[0].context.as_deref(),
+        Some("Bob"),
+        "the moment carries the contact that caused it, so no shell has to look it up"
+    );
+    assert!(
+        wb.has_seen_aha_moment(AhaMomentType::FirstContactAdded)
+            .unwrap(),
+        "the moment must persist to core's encrypted ux_state, not a frontend file"
+    );
 }

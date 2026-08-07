@@ -14,6 +14,7 @@
 use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::contact::labels::SUGGESTED_LABELS;
+use vauchi_core::contact_card::{FieldType, validate_value};
 use vauchi_core::types::OnboardingStep as Step;
 use vauchi_core::{Command, FilePickPurpose};
 
@@ -861,6 +862,9 @@ impl OnboardingEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ActionPressed { action_id } if action_id == "continue" => {
+                if let Some(error) = self.quick_add_validation_error() {
+                    return error;
+                }
                 self.sync_quick_add_fields();
                 self.navigate_to(Step::WhatNext)
             }
@@ -871,9 +875,43 @@ impl OnboardingEngine {
         }
     }
 
+    /// First validation error among the visible quick-add inputs, phone
+    /// before email.
+    ///
+    /// Invalid values must block the step here: `complete_onboarding`
+    /// persists `data.fields` best-effort, so an invalid value collected
+    /// now would be dropped silently at completion (exploratory
+    /// verification 2026-08-07, TUI-3). Gated on the input being visible
+    /// because the shell boundary is untrusted (DC-02): a value reported
+    /// for a hidden input has no component to anchor the error on, so it
+    /// is ignored rather than validated or collected.
+    fn quick_add_validation_error(&self) -> Option<ActionResult> {
+        if self.phone_input_visible {
+            let phone = self.phone_value.trim();
+            if !phone.is_empty() && validate_value(&FieldType::Phone, phone).is_err() {
+                return Some(ActionResult::ValidationError {
+                    component_id: "phone_input".into(),
+                    message: self.t("validation.invalid_phone"),
+                });
+            }
+        }
+        if self.email_input_visible {
+            let email = self.email_value.trim();
+            if !email.is_empty() && validate_value(&FieldType::Email, email).is_err() {
+                return Some(ActionResult::ValidationError {
+                    component_id: "email_input".into(),
+                    message: self.t("validation.invalid_email"),
+                });
+            }
+        }
+        None
+    }
+
     /// Sync non-empty phone/email values to OnboardingData.fields.
+    /// Hidden inputs are ignored per the visibility gate documented on
+    /// `quick_add_validation_error`.
     fn sync_quick_add_fields(&mut self) {
-        if !self.phone_value.trim().is_empty() {
+        if self.phone_input_visible && !self.phone_value.trim().is_empty() {
             self.data.fields.push(FieldSetup {
                 field_type: "phone".into(),
                 label: self.t("field_type.phone"),
@@ -882,7 +920,7 @@ impl OnboardingEngine {
                 shown: true,
             });
         }
-        if !self.email_value.trim().is_empty() {
+        if self.email_input_visible && !self.email_value.trim().is_empty() {
             self.data.fields.push(FieldSetup {
                 field_type: "email".into(),
                 label: self.t("field_type.email"),

@@ -222,175 +222,182 @@ impl ContactField {
 
     /// Validates the field value based on its type.
     pub fn validate(&self) -> Result<(), ValidationError> {
-        if self.value.len() > MAX_VALUE_LENGTH {
-            return Err(ValidationError::ValueTooLong {
-                max: MAX_VALUE_LENGTH,
-            });
-        }
-
-        match self.field_type {
-            FieldType::Phone => self.validate_phone(),
-            FieldType::Email => self.validate_email(),
-            FieldType::Website => self.validate_website(),
-            FieldType::Birthday => self.validate_birthday(),
-            FieldType::Social => self.validate_social(),
-            _ => Ok(()), // Address, Custom accept any value
-        }
+        validate_parts(&self.field_type, &self.label, &self.value)
     }
+}
 
-    /// Validates phone number format.
-    fn validate_phone(&self) -> Result<(), ValidationError> {
-        let value = &self.value;
+/// Validates a raw value for a field type without constructing a
+/// `ContactField`.
+///
+/// Step-level input validation (onboarding quick-add) must judge a value
+/// before any field exists; constructing a throwaway field just to
+/// validate would burn RNG on the unused id. The value is normalized the
+/// same way `ContactField::new` normalizes, so both entry points judge the
+/// same string. Label-keyed rules (social-network username formats) are
+/// not applied here — they need the field's label.
+pub fn validate_value(field_type: &FieldType, value: &str) -> Result<(), ValidationError> {
+    validate_parts(field_type, "", &normalize_text(value))
+}
 
-        // Reasonable max phone length (international with formatting)
-        if value.len() > 30 {
-            return Err(ValidationError::InvalidPhone);
-        }
-
-        let digit_count = value.chars().filter(|c| c.is_ascii_digit()).count();
-        if digit_count < 7 {
-            return Err(ValidationError::InvalidPhone);
-        }
-
-        let valid_chars = value.chars().all(|c| {
-            c.is_ascii_digit() || c == ' ' || c == '-' || c == '(' || c == ')' || c == '+'
+fn validate_parts(field_type: &FieldType, label: &str, value: &str) -> Result<(), ValidationError> {
+    if value.len() > MAX_VALUE_LENGTH {
+        return Err(ValidationError::ValueTooLong {
+            max: MAX_VALUE_LENGTH,
         });
-
-        if !valid_chars {
-            return Err(ValidationError::InvalidPhone);
-        }
-
-        Ok(())
     }
 
-    /// Validates email format.
-    fn validate_email(&self) -> Result<(), ValidationError> {
-        let value = &self.value;
+    match field_type {
+        FieldType::Phone => validate_phone_value(value),
+        FieldType::Email => validate_email_value(value),
+        FieldType::Website => validate_website_value(value),
+        FieldType::Birthday => validate_birthday_value(value),
+        FieldType::Social => validate_social_value(label, value),
+        _ => Ok(()), // Address, Custom accept any value
+    }
+}
 
-        if !value.contains('@') {
-            return Err(ValidationError::InvalidEmail);
-        }
-
-        let parts: Vec<&str> = value.split('@').collect();
-        if parts.len() != 2 {
-            return Err(ValidationError::InvalidEmail);
-        }
-
-        let local = parts[0];
-        let domain = parts[1];
-
-        if local.is_empty() {
-            return Err(ValidationError::InvalidEmail);
-        }
-
-        // Domain must be non-empty. We intentionally allow domains
-        // without a dot (e.g. `user@localhost`) — only emptiness is
-        // a hard reject.
-        if domain.is_empty() {
-            return Err(ValidationError::InvalidEmail);
-        }
-
-        Ok(())
+fn validate_phone_value(value: &str) -> Result<(), ValidationError> {
+    // Reasonable max phone length (international with formatting)
+    if value.len() > 30 {
+        return Err(ValidationError::InvalidPhone);
     }
 
-    /// Validates website URL format.
-    fn validate_website(&self) -> Result<(), ValidationError> {
-        let value = self.value.trim();
-        if value.starts_with("http://") || value.starts_with("https://") {
-            return Ok(());
-        }
-        if value.contains('.') && !value.contains(' ') {
-            return Ok(());
-        }
-        Err(ValidationError::InvalidUrl)
+    let digit_count = value.chars().filter(|c| c.is_ascii_digit()).count();
+    if digit_count < 7 {
+        return Err(ValidationError::InvalidPhone);
     }
 
-    /// Validates ISO 8601 birthday format (YYYY-MM-DD) and checks date validity.
-    fn validate_birthday(&self) -> Result<(), ValidationError> {
-        let value = &self.value;
+    let valid_chars = value
+        .chars()
+        .all(|c| c.is_ascii_digit() || c == ' ' || c == '-' || c == '(' || c == ')' || c == '+');
 
-        if value.len() != 10 || value.as_bytes()[4] != b'-' || value.as_bytes()[7] != b'-' {
-            return Err(ValidationError::InvalidEmail); // Reuse validation error for invalid birthday
-        }
+    if !valid_chars {
+        return Err(ValidationError::InvalidPhone);
+    }
 
-        let year_str = &value[0..4];
-        let month_str = &value[5..7];
-        let day_str = &value[8..10];
+    Ok(())
+}
 
-        let year: u16 = year_str
-            .parse()
-            .map_err(|_| ValidationError::InvalidEmail)?;
-        let month: u8 = month_str
-            .parse()
-            .map_err(|_| ValidationError::InvalidEmail)?;
-        let day: u8 = day_str.parse().map_err(|_| ValidationError::InvalidEmail)?;
+fn validate_email_value(value: &str) -> Result<(), ValidationError> {
+    if !value.contains('@') {
+        return Err(ValidationError::InvalidEmail);
+    }
 
-        if !(1..=12).contains(&month) {
-            return Err(ValidationError::InvalidEmail);
-        }
+    let parts: Vec<&str> = value.split('@').collect();
+    if parts.len() != 2 {
+        return Err(ValidationError::InvalidEmail);
+    }
 
-        let days_in_month = match month {
-            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-            4 | 6 | 9 | 11 => 30,
-            2 => {
-                if year.is_multiple_of(400) {
-                    29
-                } else if year.is_multiple_of(100) {
-                    28
-                } else if year.is_multiple_of(4) {
-                    29
-                } else {
-                    28
-                }
+    let local = parts[0];
+    let domain = parts[1];
+
+    if local.is_empty() {
+        return Err(ValidationError::InvalidEmail);
+    }
+
+    // Domain must be non-empty. We intentionally allow domains
+    // without a dot (e.g. `user@localhost`) — only emptiness is
+    // a hard reject.
+    if domain.is_empty() {
+        return Err(ValidationError::InvalidEmail);
+    }
+
+    Ok(())
+}
+
+fn validate_website_value(value: &str) -> Result<(), ValidationError> {
+    let value = value.trim();
+    if value.starts_with("http://") || value.starts_with("https://") {
+        return Ok(());
+    }
+    if value.contains('.') && !value.contains(' ') {
+        return Ok(());
+    }
+    Err(ValidationError::InvalidUrl)
+}
+
+/// Validates ISO 8601 birthday format (YYYY-MM-DD) and checks date validity.
+fn validate_birthday_value(value: &str) -> Result<(), ValidationError> {
+    if value.len() != 10 || value.as_bytes()[4] != b'-' || value.as_bytes()[7] != b'-' {
+        return Err(ValidationError::InvalidEmail); // Reuse validation error for invalid birthday
+    }
+
+    let year_str = &value[0..4];
+    let month_str = &value[5..7];
+    let day_str = &value[8..10];
+
+    let year: u16 = year_str
+        .parse()
+        .map_err(|_| ValidationError::InvalidEmail)?;
+    let month: u8 = month_str
+        .parse()
+        .map_err(|_| ValidationError::InvalidEmail)?;
+    let day: u8 = day_str.parse().map_err(|_| ValidationError::InvalidEmail)?;
+
+    if !(1..=12).contains(&month) {
+        return Err(ValidationError::InvalidEmail);
+    }
+
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if year.is_multiple_of(400) {
+                29
+            } else if year.is_multiple_of(100) {
+                28
+            } else if year.is_multiple_of(4) {
+                29
+            } else {
+                28
             }
-            _ => return Err(ValidationError::InvalidEmail),
-        };
-
-        if !(1..=days_in_month).contains(&day) {
-            return Err(ValidationError::InvalidEmail);
         }
+        _ => return Err(ValidationError::InvalidEmail),
+    };
 
-        Ok(())
+    if !(1..=days_in_month).contains(&day) {
+        return Err(ValidationError::InvalidEmail);
     }
 
-    /// Validates social network usernames when the label identifies a known network.
-    /// URL-formatted values (http/https) are accepted as-is; unknown networks accept any non-empty value.
-    fn validate_social(&self) -> Result<(), ValidationError> {
-        let v = self.value.as_str();
-        if v.starts_with("http://") || v.starts_with("https://") {
-            return Ok(());
-        }
-        let username = v.trim_start_matches('@');
-        match self.label.to_lowercase().as_str() {
-            "twitter" | "x" => {
-                // Twitter: max 15 chars, alphanumeric + underscore only (ADR-spec: social-registry)
-                if username.len() > 15
-                    || !username
-                        .chars()
-                        .all(|c| c.is_ascii_alphanumeric() || c == '_')
-                    || username.is_empty()
-                {
-                    return Err(ValidationError::InvalidSocialUsername);
-                }
-            }
-            "github" | "gh" => {
-                // GitHub: max 39 chars, alphanumeric + hyphens, no leading/trailing/consecutive hyphens
-                if username.is_empty()
-                    || username.len() > 39
-                    || username.starts_with('-')
-                    || username.ends_with('-')
-                    || username.contains("--")
-                    || !username
-                        .chars()
-                        .all(|c| c.is_ascii_alphanumeric() || c == '-')
-                {
-                    return Err(ValidationError::InvalidSocialUsername);
-                }
-            }
-            _ => {}
-        }
-        Ok(())
+    Ok(())
+}
+
+/// Validates social network usernames when the label identifies a known network.
+/// URL-formatted values (http/https) are accepted as-is; unknown networks accept any non-empty value.
+fn validate_social_value(label: &str, value: &str) -> Result<(), ValidationError> {
+    if value.starts_with("http://") || value.starts_with("https://") {
+        return Ok(());
     }
+    let username = value.trim_start_matches('@');
+    match label.to_lowercase().as_str() {
+        "twitter" | "x" => {
+            // Twitter: max 15 chars, alphanumeric + underscore only (ADR-spec: social-registry)
+            if username.len() > 15
+                || !username
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+                || username.is_empty()
+            {
+                return Err(ValidationError::InvalidSocialUsername);
+            }
+        }
+        "github" | "gh" => {
+            // GitHub: max 39 chars, alphanumeric + hyphens, no leading/trailing/consecutive hyphens
+            if username.is_empty()
+                || username.len() > 39
+                || username.starts_with('-')
+                || username.ends_with('-')
+                || username.contains("--")
+                || !username
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-')
+            {
+                return Err(ValidationError::InvalidSocialUsername);
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 // INLINE_TEST_REQUIRED: FieldType::icon is the single source of truth for the

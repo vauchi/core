@@ -110,13 +110,32 @@ check_bindings() {
         printf '%b\n' "${GREEN}  All ${#EXPECTED_TYPES[@]} expected types present${NC}"
     fi
 
-    # UniFFI's Kotlin backend backtick-quotes every generated identifier
-    # (fun `presentationContractFixtureJson`(): kotlin.String), so a name
-    # colliding with a Kotlin keyword still compiles; the Swift backend does
-    # not quote. Strip the quoting before matching so this asserts the export
-    # *exists* rather than how the generator happened to spell it. Matching
-    # the unstripped form is what blocked the v0.60.0 release.
-    if ! tr -d '`' < "$file" | grep -Fq "$expected_export"; then
+    # UniFFI's Kotlin backend backtick-quotes the identifiers it generates
+    # from the interface metadata, so a name colliding with a Kotlin keyword
+    # still compiles:
+    #
+    #     fun `presentationContractFixtureJson`(): kotlin.String =
+    #
+    # Its own runtime scaffolding (asByteBuffer, lift, lower, read) is
+    # unquoted, so "every identifier" would be wrong — but every export this
+    # gate checks comes from the metadata and is therefore quoted. The Swift
+    # backend does not quote at all. Accept either spelling of the name, so
+    # the check asserts the export *exists* rather than how the generator
+    # happened to spell it; matching only the unquoted form is what blocked
+    # the v0.60.0 release.
+    #
+    # Matching two known spellings, rather than deleting every backtick in
+    # the file before matching, keeps unrelated quoting from combining into
+    # an accidental match and states the accepted forms explicitly.
+    #
+    # KNOWN LIMIT: this is still a text search, so the name appearing only in
+    # a doc comment satisfies it — verified, not assumed. Distinguishing a
+    # declaration from a mention needs the bindings compiled against a smoke
+    # consumer, which is the durable replacement for this whole gate.
+    export_quoted=$(printf '%s' "$expected_export" \
+        | sed 's/\([A-Za-z_][A-Za-z0-9_]*\)(/`\1`(/')
+    if ! grep -Fq "$expected_export" "$file" \
+        && ! grep -Fq "$export_quoted" "$file"; then
         printf '%b\n' "${RED}  ERROR: Missing presentation export: $expected_export${NC}"
         ERRORS=$((ERRORS + 1))
     else

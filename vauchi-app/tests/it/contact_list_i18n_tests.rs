@@ -2,39 +2,37 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! M3 S6b-2 (`2026-07-03-core-screens-bypass-i18n`): the contact-list
-//! screen (title, empty state, add-contact/all-contacts/exchange-now
-//! buttons, also-search toggle) renders in the user's locale. Keys in
-//! `contacts.*` (locales!91). Exact German assertions per CC-03.
+//! M3 (`2026-07-03-core-screens-bypass-i18n`): the contact-list empty
+//! state renders in the user's locale.
+//!
+//! Asserts that the screen resolved a translation, not what the
+//! translation says — see `i18n_support::assert_translated`.
 
-use vauchi_app::i18n::{Locale, load_locale_from_bytes};
+use super::i18n_support::{action_label, assert_translated, load_german};
+use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{ContactListEngine, WorkflowEngine};
 
-fn load_german() {
-    let bytes = std::fs::read("../../locales/de.json")
-        .expect("locales checkout present as sibling repo (CI: .clone-locales)");
-    load_locale_from_bytes("de", &bytes).expect("German locale parses");
+/// `(title, add-contact action label)` for the empty state.
+fn empty_state_copy(locale: Locale) -> (String, String) {
+    let engine = ContactListEngine::new(vec![]).with_locale(locale);
+    let screen = engine.current_screen();
+    (screen.title.clone(), action_label(&screen, "add_contact"))
 }
 
 // @scenario: contacts :: empty contact list renders in the active locale
 // @internal
 #[test]
-fn contact_list_empty_state_renders_german() {
+fn contact_list_empty_state_renders_the_active_locale() {
     load_german();
-    let engine = ContactListEngine::new(vec![]).with_locale(Locale::German);
-    let screen = engine.current_screen();
-    assert_eq!(screen.title, "Kontakte");
-    assert!(
-        screen
-            .contextual_actions
-            .iter()
-            .any(|a| a.id == "add_contact" && a.label == "Kontakt hinzufügen"),
-        "add-contact action localized; actions: {:?}",
-        screen.contextual_actions
-    );
+    let (de_title, de_add) = empty_state_copy(Locale::German);
+    let (en_title, en_add) = empty_state_copy(Locale::English);
+
+    assert_translated("contact-list title", &de_title, &en_title);
+    assert_translated("add-contact action", &de_add, &en_add);
 }
 
-// English stays exactly as before (regression pin).
+// English stays exactly as before (regression pin). English is the source
+// language and ships bundled, so pinning it here couples nothing external.
 // @internal
 #[test]
 fn contact_list_english_copy_unchanged() {

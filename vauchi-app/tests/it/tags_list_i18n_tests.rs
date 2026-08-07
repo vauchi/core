@@ -2,18 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! M3 S5-15 (`2026-07-04-m3-i18n-threading-plan`): tags_list.rs renders
-//! in the user's locale. Keys under `tags_list.*` (locales!114). Exact
-//! German assertion per CC-03; closes out the M3 S5 sweep entirely.
+//! M3 (`2026-07-03-core-screens-bypass-i18n`): the tags-list screen
+//! renders in the user's locale.
+//!
+//! Asserts that the screen resolved a translation, not what the
+//! translation says — see `i18n_support::assert_translated`.
 
-use vauchi_app::i18n::{Locale, load_locale_from_bytes};
+use super::i18n_support::{assert_translated, load_german};
+use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{TagSummary, TagsEngine, WorkflowEngine};
-
-fn load_german() {
-    let bytes = std::fs::read("../../locales/de.json")
-        .expect("locales checkout present as sibling repo (CI: .clone-locales)");
-    load_locale_from_bytes("de", &bytes).expect("German locale parses");
-}
 
 fn sample_tags() -> Vec<TagSummary> {
     vec![TagSummary {
@@ -23,21 +20,37 @@ fn sample_tags() -> Vec<TagSummary> {
     }]
 }
 
+/// The first row action label — the "promote to group" affordance.
+fn promote_label(locale: Locale) -> String {
+    let engine = TagsEngine::new(sample_tags()).with_locale(locale);
+    engine
+        .current_screen()
+        .components
+        .iter()
+        .find_map(|c| match c {
+            vauchi_app::ui::Component::List { items, .. } => items
+                .iter()
+                .find_map(|i| i.actions.first().map(|a| a.label.clone())),
+            _ => None,
+        })
+        .expect("tag rows carry a promote action")
+}
+
 // @scenario: tags-list :: screen renders in the active locale
 // @internal
 #[test]
-fn tags_list_renders_german() {
+fn tags_list_renders_the_active_locale() {
     load_german();
-    let engine = TagsEngine::new(sample_tags()).with_locale(Locale::German);
-    let screen = engine.current_screen();
-    let has_promote_label = screen.components.iter().any(|c| {
-        matches!(c, vauchi_app::ui::Component::List { items, .. }
-            if items.iter().any(|i| i.actions.iter().any(|a| a.label == "Zu Gruppe befördern")))
-    });
-    assert!(has_promote_label, "Promote action must render in German");
+    assert_translated(
+        "promote-to-group action",
+        &promote_label(Locale::German),
+        &promote_label(Locale::English),
+    );
 }
 
 // @scenario: tags-list :: English copy unchanged (regression pin)
+// English is the source language and ships bundled, so pinning it here
+// couples nothing external.
 // @internal
 #[test]
 fn tags_list_english_copy_unchanged() {

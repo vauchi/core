@@ -71,6 +71,44 @@ impl AppEngine {
         }
     }
 
+    /// Localized inline message for a field-value validation failure,
+    /// anchored on the value input.
+    ///
+    /// Validating before the save is what keeps the error out of the UI as
+    /// a `Display` chain: letting `update_own_card` fail surfaced
+    /// `invalid state: Validation error: Invalid phone number format` to
+    /// users (verification 2026-08-07, TUI-12/QT-5). Core owns the
+    /// error-to-copy translation (ADR-045 Amendment 1) — a shell must
+    /// never receive the chain and never classify it.
+    fn field_value_validation_error(
+        &self,
+        field_type: &FieldType,
+        value: &str,
+    ) -> Option<ActionResult> {
+        use vauchi_core::contact_card::ValidationError as Ve;
+        let message = match vauchi_core::contact_card::validate_value(field_type, value) {
+            Ok(()) => return None,
+            Err(Ve::InvalidPhone) => self.t("validation.invalid_phone"),
+            Err(Ve::InvalidEmail) => self.t("validation.invalid_email"),
+            Err(Ve::InvalidUrl) => self.t("validation.invalid_url"),
+            Err(Ve::EmptyValue) => self.t("validation.field_empty"),
+            Err(Ve::ValueTooLong { max }) => crate::i18n::get_string_with_args(
+                self.render_context.resolved_locale(),
+                "validation.too_long",
+                &[("max", &max.to_string())],
+            ),
+            Err(Ve::InvalidSocialUsername) => self.t("validation.invalid_format"),
+            // ValidationError is #[non_exhaustive]: a variant added later
+            // must degrade to generic copy here rather than fall through to
+            // the save and reach the user as a Display chain.
+            Err(_) => self.t("validation.invalid_format"),
+        };
+        Some(ActionResult::ValidationError {
+            component_id: "field_value".into(),
+            message,
+        })
+    }
+
     /// Common tail for a saved form dialog: invalidate the parent cache
     /// (except Onboarding, whose state must survive round-trips) and
     /// navigate back, or surface the save error.
@@ -121,6 +159,15 @@ impl AppEngine {
         let now = self.vauchi.clock().unix_seconds();
         let result = match self.vauchi.own_card() {
             Ok(Some(mut card)) => {
+                if let Some(field_type) = card
+                    .fields()
+                    .iter()
+                    .find(|f| f.id() == field_id)
+                    .map(|f| f.field_type())
+                    && let Some(invalid) = self.field_value_validation_error(&field_type, &value)
+                {
+                    return invalid;
+                }
                 if let Err(e) = card.update_field_value(field_id, &value, now) {
                     return ActionResult::ShowAlert {
                         title: self.t("error.title"),
@@ -173,7 +220,7 @@ impl AppEngine {
         if value.is_empty() {
             return ActionResult::ValidationError {
                 component_id: "field_value".into(),
-                message: "Value cannot be empty".into(),
+                message: self.t("validation.field_empty"),
             };
         }
         let field_type = match entry_type {
@@ -186,6 +233,9 @@ impl AppEngine {
             "birthday" => FieldType::Birthday,
             _ => FieldType::Custom,
         };
+        if let Some(invalid) = self.field_value_validation_error(&field_type, value) {
+            return invalid;
+        }
         // Use label_input if provided, otherwise derive from catalog
         let label = if !label_input.is_empty() {
             label_input.to_string()

@@ -926,7 +926,7 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_hardware_unavailable_on_exchange_mentions_transport() {
+    fn dispatch_hardware_unavailable_on_exchange_names_the_capability() {
         // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
@@ -945,9 +945,18 @@ mod tests {
                 "hardware event on exchange screen should return commands"
             );
             let result_str = CStr::from_ptr(result).to_str().unwrap();
+            // Core names the capability rather than echoing the token the
+            // shell reported: "BLE" is our vocabulary, "Bluetooth" is the
+            // user's (GTK-5). Matching is case-insensitive, so the
+            // uppercase token above still resolves.
             assert!(
-                result_str.contains("BLE"),
-                "result should mention BLE transport: {}",
+                result_str.contains("Bluetooth"),
+                "result should name the Bluetooth capability: {}",
+                result_str
+            );
+            assert!(
+                !result_str.contains("BLE"),
+                "result must not leak the raw transport token: {}",
                 result_str
             );
             vauchi_string_free(result);

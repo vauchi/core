@@ -12,6 +12,41 @@ use crate::ui::action::{ActionResult, ContactActionKind};
 use crate::ui::form_dialog::FormDialogType;
 use vauchi_core::Event;
 
+/// Capability tokens Core has user-facing copy for.
+///
+/// A token outside this list degrades to generic copy instead of reaching
+/// the UI verbatim. The token is shell-supplied and the shell boundary is
+/// generic and untrusted (DC-02), so an unknown capability must not become
+/// user-facing text — that is how `camera_switch is not available on this
+/// device` shipped (verification 2026-08-07, GTK-5). A new capability
+/// becomes nameable by landing its `capability.*` key and adding it here.
+const NAMEABLE_CAPABILITIES: &[&str] = &[
+    "audio",
+    "ble",
+    "bluetooth",
+    "camera",
+    "camera_switch",
+    "location",
+    "nfc",
+    "qr_scan",
+    "usb",
+];
+
+impl AppEngine {
+    /// Localized label for a shell-reported capability token, or `None`
+    /// when Core has no name for it.
+    ///
+    /// Matching is case-insensitive because shells differ on casing for the
+    /// same capability — `vauchi-cabi` reports `BLE` where others report
+    /// `ble`.
+    fn capability_label(&self, transport: &str) -> Option<String> {
+        let token = transport.trim().to_ascii_lowercase();
+        NAMEABLE_CAPABILITIES
+            .contains(&token.as_str())
+            .then(|| self.t(&format!("capability.{token}")))
+    }
+}
+
 impl AppEngine {
     /// Returns `true` if the current engine has user-entered data that differs
     /// from the original. Used by frontends to show a "discard changes?" prompt.
@@ -199,17 +234,38 @@ impl AppEngine {
         // before delegating to the engine (which may transition to Failed).
         let ui_override = match &event {
             Event::HardwareUnavailable { transport } => Some(ActionResult::ShowToast {
-                message: format!("{} is not available on this device", transport),
+                message: match self.capability_label(transport) {
+                    Some(name) => crate::i18n::get_string_with_args(
+                        self.render_context.resolved_locale(),
+                        "hardware.unavailable",
+                        &[("name", &name)],
+                    ),
+                    None => self.t("hardware.unavailable_generic"),
+                },
                 undo_action_id: None,
                 undo_label: None,
             }),
             Event::PermissionDenied { transport } => Some(ActionResult::ShowToast {
-                message: format!("{} access was denied", transport),
+                message: match self.capability_label(transport) {
+                    Some(name) => crate::i18n::get_string_with_args(
+                        self.render_context.resolved_locale(),
+                        "hardware.permission_denied",
+                        &[("name", &name)],
+                    ),
+                    None => self.t("hardware.permission_denied_generic"),
+                },
                 undo_action_id: None,
                 undo_label: None,
             }),
             Event::HardwareError { transport, error } => Some(ActionResult::ShowAlert {
-                title: format!("{} error", transport),
+                title: match self.capability_label(transport) {
+                    Some(name) => crate::i18n::get_string_with_args(
+                        self.render_context.resolved_locale(),
+                        "hardware.error_title",
+                        &[("name", &name)],
+                    ),
+                    None => self.t("hardware.error_title_generic"),
+                },
                 message: error.clone(),
             }),
             _ => None,

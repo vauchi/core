@@ -290,7 +290,16 @@ fn exchange_hardware_unavailable_shows_toast() {
 
     match result {
         Some(ActionResult::ShowToast { message, .. }) => {
-            assert!(message.contains("BLE"), "Toast should mention BLE");
+            // The toast names the capability, not the token the shell sent
+            // (GTK-5). "BLE" is internal vocabulary.
+            assert!(
+                message.contains("Bluetooth"),
+                "toast should name the Bluetooth capability, got {message:?}"
+            );
+            assert!(
+                !message.contains("BLE"),
+                "toast must not leak the raw transport token, got {message:?}"
+            );
         }
         other => panic!("Expected ShowToast, got {:?}", other),
     }

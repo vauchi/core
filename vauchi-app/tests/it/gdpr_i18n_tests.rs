@@ -57,7 +57,7 @@ fn gdpr_overview_and_delete_review_render_german() {
     assert_eq!(review.title, "Identität löschen");
     assert_eq!(
         review.subtitle.as_deref(),
-        Some("Überprüfen Sie, was gelöscht wird")
+        Some("Überprüfe, was gelöscht wird")
     );
     let Component::InfoPanel { title, items, .. } = &review.components[0] else {
         panic!("review screen leads with the deletion InfoPanel");

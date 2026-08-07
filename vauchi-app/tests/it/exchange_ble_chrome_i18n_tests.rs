@@ -53,7 +53,7 @@ fn ble_discovering_renders_german() {
     assert_eq!(screen.title, "Bereit zum Anstoßen");
     assert_eq!(
         screen.subtitle.as_deref(),
-        Some("Stoßen Sie die Telefone zum Austausch aneinander")
+        Some("Stoße die Telefone zum Austausch aneinander")
     );
     // The scanning status line is localized too.
     let text = text_of(&screen);

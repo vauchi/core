@@ -61,7 +61,7 @@ fn shred_wizard_renders_german() {
     let Component::TextInput { label, .. } = &confirm.components[0] else {
         panic!("confirm screen leads with the typed-confirmation input");
     };
-    assert_eq!(label, "Geben Sie DELETE ein, um zu bestätigen");
+    assert_eq!(label, "Gib DELETE ein, um zu bestätigen");
     assert_eq!(action_label(&confirm, "wipe"), "Alle Daten löschen");
 
     // The wrong-text validation message is localized too.
@@ -71,7 +71,7 @@ fn shred_wizard_renders_german() {
     let ActionResult::ValidationError { message, .. } = result else {
         panic!("empty confirmation must validation-error, got {result:?}");
     };
-    assert_eq!(message, "Geben Sie DELETE ein, um zu bestätigen");
+    assert_eq!(message, "Gib DELETE ein, um zu bestätigen");
 }
 
 // English stays exactly as it was before the threading (regression pin).

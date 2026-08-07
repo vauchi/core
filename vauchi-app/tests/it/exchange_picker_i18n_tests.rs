@@ -64,7 +64,7 @@ fn mode_picker_renders_german() {
     assert_eq!(picker.title, "Austauschmodus");
     assert_eq!(
         picker.subtitle.as_deref(),
-        Some("Wählen Sie, wie Kontaktkarten ausgetauscht werden")
+        Some("Wähle, wie Kontaktkarten ausgetauscht werden")
     );
 
     // Collapsed: the disclosure row is localized; the hero (first-run
@@ -76,7 +76,7 @@ fn mode_picker_renders_german() {
     assert_eq!(hero.label, "Glance");
     assert_eq!(
         hero.detail.as_deref(),
-        Some("Empfohlen · Zeigen Sie Ihren Code oder scannen Sie ihren")
+        Some("Empfohlen · Zeige deinen Code oder scanne ihren")
     );
 
     // Expanded: an unauthenticated mode carries the localized marker.

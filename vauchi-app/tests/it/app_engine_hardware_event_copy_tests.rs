@@ -6,7 +6,7 @@
 //! from the locale catalog (ADR-038) and must never leak the raw
 //! capability token a shell reports (verification finding GTK-5).
 
-use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, WorkflowEngine};
+use vauchi_app::ui::{ActionResult, AppEngine, AppScreen};
 use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
 

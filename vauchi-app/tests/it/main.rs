@@ -10,6 +10,8 @@ mod activity_log_writer_tests;
 mod affected_screens_tests;
 mod app_engine_activity_log_tests;
 mod app_engine_add_field_group_grant_tests;
+mod app_engine_add_field_validation_tests;
+mod app_engine_hardware_event_copy_tests;
 mod app_engine_invalidation_tests;
 mod app_engine_navigation_tests;
 mod app_engine_onboarding_completion_tests;

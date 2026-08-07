@@ -6,8 +6,16 @@
 //! localized validation copy inline — never the nested `Display` chain
 //! of the underlying error types (verification finding TUI-12/QT-5,
 //! ADR-045 Amendment 1).
+//!
+//! The engine resolves `ValidationError` into an `UpdateScreen` carrying
+//! the message on the offending component, so a shell never receives
+//! `ValidationError` and never patches the `ScreenModel` itself
+//! (`resolve_validation_error`, ADR-066 "commands are complete"). These
+//! tests therefore assert the prepared screen, not the internal variant.
 
-use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, FormDialogType, UserAction, WorkflowEngine};
+use vauchi_app::ui::{
+    ActionResult, AppEngine, AppScreen, Component, FormDialogType, UserAction, WorkflowEngine,
+};
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact_card::{ContactField, FieldType};
 
@@ -54,6 +62,31 @@ fn submit(engine: &mut AppEngine) -> ActionResult {
     })
 }
 
+/// The localized validation message the prepared screen carries for
+/// `component_id`, or a panic describing what came back instead.
+fn inline_validation_error(result: ActionResult, component_id: &str) -> String {
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("expected an updated screen, got {result:?}");
+    };
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::TextInput {
+                id,
+                validation_error: Some(message),
+                ..
+            } if id == component_id => Some(message.clone()),
+            _ => None,
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "no validation error on {component_id}: {:?}",
+                screen.components
+            )
+        })
+}
+
 // @scenario: contact_card_management.feature :: Phone number validation
 #[test]
 fn invalid_phone_value_reports_localized_message_inline() {
@@ -62,14 +95,7 @@ fn invalid_phone_value_reports_localized_message_inline() {
 
     let result = submit(&mut engine);
 
-    let ActionResult::ValidationError {
-        component_id,
-        message,
-    } = result
-    else {
-        panic!("expected inline validation, got {result:?}");
-    };
-    assert_eq!(component_id, "field_value");
+    let message = inline_validation_error(result, "field_value");
     assert_eq!(message, "Please enter a valid phone number");
 }
 
@@ -81,9 +107,7 @@ fn invalid_email_value_reports_localized_message_inline() {
 
     let result = submit(&mut engine);
 
-    let ActionResult::ValidationError { message, .. } = result else {
-        panic!("expected inline validation, got {result:?}");
-    };
+    let message = inline_validation_error(result, "field_value");
     assert_eq!(message, "Please enter a valid email address");
 }
 
@@ -95,14 +119,7 @@ fn empty_value_reports_localized_message_inline() {
 
     let result = submit(&mut engine);
 
-    let ActionResult::ValidationError {
-        component_id,
-        message,
-    } = result
-    else {
-        panic!("expected inline validation, got {result:?}");
-    };
-    assert_eq!(component_id, "field_value");
+    let message = inline_validation_error(result, "field_value");
     assert_eq!(message, "Field cannot be empty");
 }
 
@@ -140,13 +157,6 @@ fn editing_a_field_to_an_invalid_value_reports_localized_message_inline() {
 
     let result = submit(&mut engine);
 
-    let ActionResult::ValidationError {
-        component_id,
-        message,
-    } = result
-    else {
-        panic!("expected inline validation, got {result:?}");
-    };
-    assert_eq!(component_id, "field_value");
+    let message = inline_validation_error(result, "field_value");
     assert_eq!(message, "Please enter a valid phone number");
 }

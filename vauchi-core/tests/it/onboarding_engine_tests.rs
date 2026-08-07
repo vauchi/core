@@ -611,6 +611,188 @@ fn contact_info_continue_goes_to_what_next() {
     }
 }
 
+// @scenario: onboarding :: Quick add phone and email
+// @internal
+#[test]
+fn contact_info_continue_rejects_invalid_phone() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_contact_info(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_phone".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "phone_input".into(),
+        value: "9abc".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    match result {
+        ActionResult::ValidationError {
+            component_id,
+            message,
+        } => {
+            assert_eq!(component_id, "phone_input");
+            assert_eq!(message, "Please enter a valid phone number");
+        }
+        other => panic!("invalid phone must validation-error, got {other:?}"),
+    }
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "contact_info",
+        "rejected value must keep the user on the step"
+    );
+    assert!(
+        engine.data().fields.is_empty(),
+        "rejected value must not be collected"
+    );
+}
+
+// @scenario: onboarding :: Quick add phone and email
+// @internal
+#[test]
+fn contact_info_continue_rejects_invalid_email() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_contact_info(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_email".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "email_input".into(),
+        value: "not-an-email".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    match result {
+        ActionResult::ValidationError {
+            component_id,
+            message,
+        } => {
+            assert_eq!(component_id, "email_input");
+            assert_eq!(message, "Please enter a valid email address");
+        }
+        other => panic!("invalid email must validation-error, got {other:?}"),
+    }
+    assert_eq!(engine.current_screen().screen_id, "contact_info");
+    assert!(engine.data().fields.is_empty());
+}
+
+// @scenario: onboarding :: Quick add phone and email
+// @internal
+#[test]
+fn contact_info_continue_reports_phone_before_email() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_contact_info(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_phone".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "phone_input".into(),
+        value: "9abc".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_email".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "email_input".into(),
+        value: "not-an-email".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    match result {
+        ActionResult::ValidationError { component_id, .. } => {
+            assert_eq!(
+                component_id, "phone_input",
+                "phone is validated before email"
+            );
+        }
+        other => panic!("invalid values must validation-error, got {other:?}"),
+    }
+}
+
+/// A shell can report a TextChanged for an input the screen is not
+/// showing (the boundary is untrusted, DC-02). The value of a hidden
+/// input is ignored — never validated (the error would have no
+/// component to land on) and never collected.
+// @scenario: onboarding :: Quick add phone and email
+// @internal
+#[test]
+fn contact_info_continue_ignores_hidden_input_value() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_contact_info(&mut engine);
+
+    // No show_phone: phone_input is not on the screen.
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "phone_input".into(),
+        value: "9abc".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(ref s) if s.screen_id == "what_next"),
+        "hidden input value must not block navigation, got {result:?}"
+    );
+    assert!(
+        engine.data().fields.is_empty(),
+        "hidden input value must not be collected"
+    );
+}
+
+// @scenario: onboarding :: Quick add phone and email
+// @internal
+#[test]
+fn contact_info_corrected_value_then_continue_collects_field() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_contact_info(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_phone".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "phone_input".into(),
+        value: "9abc".into(),
+    });
+    let rejected = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    assert!(
+        matches!(rejected, ActionResult::ValidationError { .. }),
+        "setup: invalid phone must be rejected first"
+    );
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "phone_input".into(),
+        value: "+41 79 000 0000".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(ref s) if s.screen_id == "what_next"),
+        "corrected value must navigate, got {result:?}"
+    );
+    let phone = engine
+        .data()
+        .fields
+        .iter()
+        .find(|f| f.field_type == "phone");
+    assert_eq!(
+        phone.map(|f| f.value.as_str()),
+        Some("+41 79 000 0000"),
+        "corrected value must be collected"
+    );
+}
+
 // ── Screen 4: WhatNext ─────────────────────────────────────────────
 
 /// Final onboarding step: one filled primary ("Start using the app"

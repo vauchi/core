@@ -247,3 +247,100 @@ fn test_email_internationalized_domain() {
         let _ = result;
     }
 }
+
+// =============================================================================
+// validate_value: raw-value validation seam (no throwaway ContactField)
+// Onboarding quick-add validates at the step boundary before a field is
+// ever constructed; the seam must judge the same strings `validate()` does.
+// =============================================================================
+
+// @scenario: field_validation :: Validate a contact's phone number
+#[test]
+fn validate_value_rejects_invalid_phone() {
+    use vauchi_core::contact_card::{FieldType, ValidationError, validate_value};
+
+    let result = validate_value(&FieldType::Phone, "9abc");
+    assert!(
+        matches!(result, Err(ValidationError::InvalidPhone)),
+        "'9abc' must be InvalidPhone, got {result:?}"
+    );
+}
+
+// @scenario: field_validation :: Validate a contact's phone number
+#[test]
+fn validate_value_accepts_valid_phone() {
+    use vauchi_core::contact_card::{FieldType, validate_value};
+
+    assert!(
+        validate_value(&FieldType::Phone, "+41 79 123 45 67").is_ok(),
+        "valid phone must be accepted"
+    );
+}
+
+// @scenario: field_validation :: Validate a contact's email address
+#[test]
+fn validate_value_rejects_invalid_email() {
+    use vauchi_core::contact_card::{FieldType, ValidationError, validate_value};
+
+    let result = validate_value(&FieldType::Email, "not-an-email");
+    assert!(
+        matches!(result, Err(ValidationError::InvalidEmail)),
+        "'not-an-email' must be InvalidEmail, got {result:?}"
+    );
+}
+
+// @scenario: field_validation :: Validate a contact's email address
+#[test]
+fn validate_value_accepts_valid_email() {
+    use vauchi_core::contact_card::{FieldType, validate_value};
+
+    assert!(
+        validate_value(&FieldType::Email, "alice@example.com").is_ok(),
+        "valid email must be accepted"
+    );
+}
+
+// @scenario: field_validation :: Validate a contact's phone number
+#[test]
+fn validate_value_enforces_max_value_length() {
+    use vauchi_core::contact_card::field::MAX_VALUE_LENGTH;
+    use vauchi_core::contact_card::{FieldType, ValidationError, validate_value};
+
+    let oversized = "1".repeat(MAX_VALUE_LENGTH + 1);
+    let result = validate_value(&FieldType::Custom, &oversized);
+    match result {
+        Err(ValidationError::ValueTooLong { max }) => {
+            assert_eq!(max, MAX_VALUE_LENGTH);
+        }
+        other => panic!("oversized value must be ValueTooLong, got {other:?}"),
+    }
+}
+
+/// The seam must not drift from `ContactField::validate`: both judge the
+/// same strings the same way, including the constructor's normalization.
+// @scenario: field_validation :: Validate a contact's phone number
+#[test]
+fn validate_value_agrees_with_constructed_field() {
+    use vauchi_core::contact_card::{ContactField, FieldType, validate_value};
+
+    let cases = [
+        (FieldType::Phone, "+41 79 123 45 67"),
+        (FieldType::Phone, "9abc"),
+        (FieldType::Phone, "  +41 79 123 45 67  "),
+        (FieldType::Email, "alice@example.com"),
+        (FieldType::Email, "not-an-email"),
+        (FieldType::Website, "example.com"),
+        (FieldType::Website, "not a url"),
+        (FieldType::Custom, "anything goes"),
+    ];
+    for (field_type, value) in cases {
+        let via_seam = validate_value(&field_type, value).is_ok();
+        let via_field = ContactField::new(field_type, "Label", value, 0)
+            .validate()
+            .is_ok();
+        assert_eq!(
+            via_seam, via_field,
+            "validate_value and ContactField::validate disagree on {value:?}"
+        );
+    }
+}

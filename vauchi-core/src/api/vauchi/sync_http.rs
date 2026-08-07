@@ -169,6 +169,8 @@ impl Vauchi {
             errors.push(format!("{ctx}: {msg}"));
         }
 
+        self.trigger_sync_aha_moments(received, send_result.sent);
+
         Ok(VauchiSyncOutcome::Ok {
             received,
             fetched,
@@ -589,6 +591,39 @@ impl Vauchi {
 
     /// Send phase: delegate to `SendPhase` for outgoing updates + ACKs.
     ///
+    /// Fires the sync-driven milestones for a completed cycle.
+    ///
+    /// Counts, not storage state, decide: a cycle that moved nothing is not
+    /// a first delivery. Non-fatal for the same reason as the first-contact
+    /// moment — the sync already succeeded.
+    fn trigger_sync_aha_moments(&self, received: usize, sent: usize) {
+        let candidates = [
+            (
+                received > 0,
+                crate::types::AhaMomentType::FirstUpdateReceived,
+            ),
+            (
+                sent > 0,
+                crate::types::AhaMomentType::FirstOutboundDelivered,
+            ),
+        ];
+        for (happened, moment_type) in candidates {
+            if !happened {
+                continue;
+            }
+            let Ok(mut tracker) = self.storage.ux().load_or_create_aha_tracker() else {
+                return;
+            };
+            let Some(moment) = tracker.try_trigger(moment_type) else {
+                continue;
+            };
+            if self.storage.ux().save_aha_tracker(&tracker).is_ok() {
+                self.events
+                    .dispatch(crate::api::events::VauchiEvent::AhaMomentTriggered { moment });
+            }
+        }
+    }
+
     /// Moves the adapter into a `RelayClient` which is wrapped by a
     /// `SendPhase`. Pending payloads are pre-encrypted at queue time
     /// (propagation/features), so no ratchet state is loaded here.

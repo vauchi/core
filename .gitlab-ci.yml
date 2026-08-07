@@ -290,6 +290,9 @@ lint:cross-cutting-blocking:
     # lint:locale-key-coverage
     - bash ../locales/scripts/check-locale-key-coverage.sh
         vauchi-app/src ../locales '*.rs'
+    # lint:vendored-locales — the copy consumers build against must not
+    # drift from locales, or a build without a checkout ships stale copy
+    - sh scripts/vendor-locales.sh --check
     # lint:portable-content-links
     - |
       set -eu

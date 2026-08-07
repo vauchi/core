@@ -230,15 +230,29 @@ pub const BUNDLED_LOCALES_REV: &str = "{locales_rev}";
     fs::write(&tokens_dest, tokens_bytes).expect("write OUT_DIR/tokens.json");
 }
 
-/// Resolves the git revision of the `locales` checkout that supplied
-/// `locale_path`.
+/// Resolves the `locales` revision that supplied `locale_path`.
 ///
-/// Best-effort by design: a missing git, a tarball checkout or a vendored
-/// copy all yield `None`, and the build records `unknown` rather than
-/// failing. This is a record, not a gate — nothing downstream may depend
-/// on it resolving.
+/// A `REVISION` file beside the catalogue wins over git. The vendored copy
+/// lives inside THIS repo, so asking git about its directory would answer
+/// with core's own revision and misreport it as the locales revision —
+/// `vendor-locales.sh` writes the marker so the copy carries its true
+/// provenance.
+///
+/// Best-effort otherwise: a missing git or a tarball checkout yields
+/// `None` and the build records `unknown` rather than failing. This is a
+/// record, not a gate — nothing downstream may depend on it resolving.
 fn locales_revision(locale_path: &str) -> Option<String> {
     let dir = Path::new(locale_path).parent()?;
+
+    let marker = dir.join("REVISION");
+    if let Ok(rev) = fs::read_to_string(&marker) {
+        let rev = rev.trim().to_string();
+        if !rev.is_empty() {
+            println!("cargo::rerun-if-changed={}", marker.display());
+            return Some(rev);
+        }
+    }
+
     let output = std::process::Command::new("git")
         .arg("-C")
         .arg(dir)

@@ -30,9 +30,11 @@ path = [".gitignore", "**/.gitignore", ".DS_Store", "**/.gitkeep", ".dockerignor
 SPDX-FileCopyrightText = "2026 Mattia Egloff <mattia.egloff@pm.me>"
 SPDX-License-Identifier = "GPL-3.0-or-later"
 
-# JSON data files (can't have comments)
+# JSON data files (can't have comments). `locales/REVISION` is the
+# vendored catalogue's provenance marker — a bare revision string, read by
+# vauchi-app's build.rs, so it cannot carry a header either.
 [[annotations]]
-path = ["**/*.json", "**/.version"]
+path = ["**/*.json", "**/.version", "vauchi-app/locales/REVISION"]
 SPDX-FileCopyrightText = "2026 Mattia Egloff <mattia.egloff@pm.me>"
 SPDX-License-Identifier = "GPL-3.0-or-later"
 

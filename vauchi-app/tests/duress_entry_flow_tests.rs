@@ -243,6 +243,52 @@ fn completing_duress_setup_terminates_the_entry_flow() {
     );
 }
 
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn a_filled_password_input_reports_as_filled_to_the_shell() {
+    let mut app = AppEngine::for_duress_setup(identity_core());
+    let commands = app
+        .initial_commands()
+        .expect("initial duress-entry commands");
+    let surface = surface_named(&commands, "change_password").expect("password setup surface");
+    let surface_id = surface.surface_id.clone();
+    let binding = all_input_bindings(&surface.nodes)
+        .into_iter()
+        .next()
+        .expect("a password input");
+
+    let after = app
+        .dispatch(Event::ValueChanged {
+            surface_id,
+            binding_id: binding.clone(),
+            value: InputValue::Text("first-pin-1234".into()),
+        })
+        .expect("value change");
+
+    let surface = surface_named(&after, "change_password").expect("password surface re-rendered");
+    let value = find_input_value(&surface.nodes, &binding).expect("the input is still presented");
+    assert!(
+        !value.is_empty(),
+        "a secret input must still report that it holds a value; a permanently empty `value` \
+         leaves a shell unable to tell 'needs input' from 'already answered', and the CLI's \
+         prompt loop re-offers the field forever"
+    );
+    assert!(
+        !value.contains("first-pin-1234"),
+        "the masked echo must not carry the secret itself, got {value:?}"
+    );
+}
+
+fn find_input_value(nodes: &[PresentationNode], wanted: &BindingId) -> Option<String> {
+    nodes.iter().find_map(|node| match node {
+        PresentationNode::Input {
+            binding_id, value, ..
+        } if binding_id == wanted => Some(value.clone()),
+        PresentationNode::Group { children, .. } => find_input_value(children, wanted),
+        _ => None,
+    })
+}
+
 // @scenario: generic_presentation_protocol.feature :: Release contains only the generic action system
 #[test]
 fn duress_entry_flow_never_requires_the_shell_to_name_a_screen() {

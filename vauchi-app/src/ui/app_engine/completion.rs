@@ -10,7 +10,7 @@
 //! that screen's workflow. Splitting one method per screen keeps the
 //! dispatcher flat and each handler independently testable.
 
-use super::{AppEngine, AppScreen};
+use super::{AppEngine, AppScreen, EntryFlow};
 use crate::ui::action::{ActionResult, UserAction};
 use vauchi_core::api::AuthMode;
 use vauchi_core::contact_card::FieldType;
@@ -531,6 +531,14 @@ impl AppEngine {
                 };
             }
         }
+        // A duress-setup entry flow only opened this screen to satisfy core's
+        // app-password precondition; on success it continues to the PIN step
+        // rather than unwinding to a navigation root it never came from.
+        if password_was_set && self.entry_flow == Some(EntryFlow::DuressSetup) {
+            self.engine_cache.remove(&AppScreen::ChangePassword);
+            let screen = self.navigate_to_internal(AppScreen::DuressPin);
+            return ActionResult::NavigateTo(screen);
+        }
         let screen = self.navigate_back();
         if password_was_set {
             // Setting the first password flips this screen setup→change mode;
@@ -576,6 +584,11 @@ impl AppEngine {
                     message: format!("Failed to disable duress: {e}"),
                 };
             }
+        }
+        // The duress-setup entry flow has done the one job it was constructed
+        // for; hand control back so a shell's reducer loop can exit.
+        if self.entry_flow == Some(EntryFlow::DuressSetup) {
+            return ActionResult::PerformNativeBack;
         }
         let screen = self.navigate_back();
         ActionResult::NavigateTo(screen)

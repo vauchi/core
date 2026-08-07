@@ -3,11 +3,36 @@
 
 //! Core-owned application reducer entry points.
 
-use super::{AppEngine, AppScreen};
+use super::{AppEngine, AppScreen, EntryFlow};
 use crate::ui::{DeviceReplacementEngine, ReplacementRole};
 use vauchi_core::api::Vauchi;
 
 impl AppEngine {
+    /// Create the reducer at the duress-setup entry point.
+    ///
+    /// Core picks the starting step because the choice is derived from
+    /// domain state: `Vauchi::setup_duress_password` rejects an identity
+    /// with no app password (`VauchiError::InvalidState`), so the flow
+    /// opens password setup first and chains into the PIN step. A shell
+    /// deriving that itself would have to import `AppScreen`, which
+    /// ADR-066 retires from the shell boundary.
+    pub fn for_duress_setup(vauchi: Vauchi) -> Self {
+        let mut app = Self::new(vauchi);
+        let screen = if app.vauchi.is_password_enabled().unwrap_or(false) {
+            AppScreen::DuressPin
+        } else {
+            AppScreen::ChangePassword
+        };
+
+        app.entry_flow = Some(EntryFlow::DuressSetup);
+        app.engine_cache.clear();
+        app.nav_history.clear();
+        app.pending_commands.clear();
+        app.contextual_actions.clear();
+        app.set_initial_screen(screen);
+        app
+    }
+
     /// Create the reducer at a device-replacement entry point.
     ///
     /// The selector is construction data, not a presentation boundary:

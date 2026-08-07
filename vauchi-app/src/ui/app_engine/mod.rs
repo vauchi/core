@@ -228,6 +228,24 @@ pub struct AppEngine {
     /// that opened an overlay closes it instead of re-presenting it. Cleared
     /// when the shell reports its own dismissal via `Event::OverlayDismissed`.
     open_overlay: Option<(vauchi_core::SurfaceId, vauchi_core::OverlayKind)>,
+    /// Set when the reducer was constructed at a single-purpose entry point
+    /// rather than booted as a full app (ADR-069).
+    entry_flow: Option<EntryFlow>,
+}
+
+/// A reducer constructed to carry out one task and then hand control back.
+///
+/// Rust-native shells reach domain mutations through a Core-owned entry
+/// point instead of calling `Vauchi` directly (ADR-069 §2). Such a reducer
+/// has no navigation root to fall back to: `navigate_back` with an empty
+/// history lands on `AppScreen::MyInfo`, which would leave the shell's
+/// reducer loop rendering an app it never asked for. The marker lets
+/// completion routing terminate the flow instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum EntryFlow {
+    /// Configure the duress PIN, setting the app password first when core's
+    /// `setup_duress_password` precondition is unmet.
+    DuressSetup,
 }
 
 impl AppEngine {
@@ -450,6 +468,7 @@ impl AppEngine {
             surface_revision: 1,
             contextual_actions: HashMap::new(),
             open_overlay: None,
+            entry_flow: None,
         }
     }
 

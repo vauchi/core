@@ -245,10 +245,16 @@ fn default_name_validation_rejects_whitespace_only() {
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    assert!(
-        matches!(result, ActionResult::ValidationError { .. }),
-        "Whitespace-only name should be rejected"
-    );
+    match result {
+        ActionResult::ValidationError {
+            component_id,
+            message,
+        } => {
+            assert_eq!(component_id, "display_name");
+            assert_eq!(message, "Please enter your name.");
+        }
+        other => panic!("Whitespace-only name should be rejected, got {other:?}"),
+    }
 }
 
 // @internal

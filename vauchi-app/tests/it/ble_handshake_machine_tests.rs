@@ -557,6 +557,73 @@ fn glare_yield_drops_the_losing_outbound_link_and_rides_inbound() {
     );
 }
 
+// Device-observed (Pixel 3a -> peer, 2026-08-07): the yielding side does not
+// always hold two links. When the peer's KeyOffer arrives on the link we
+// dialed — the peer is the GATT server there and answers over the same
+// connection — yielding leaves us the responder *and* the GATT central.
+//
+// A central has no notify egress: notify characteristics are the peripheral's
+// side of the link, and writing one is rejected by the peer's GATT server. On
+// hardware that showed up as
+//
+//   BleCentral: GATT write ...ef1234567895 ok=false try=0 .. try=8
+//   BleCentral: GATT op gave up (rejected) after 8 retries
+//
+// where ...895 is CHAR_HANDSHAKE_NOTIFY.
+//
+// The GATT layout binds the two: HANDSHAKE_WRITE is "initiator -> responder"
+// (write), HANDSHAKE_NOTIFY is "responder -> initiator" (notify). That is only
+// coherent while initiator == central and responder == peripheral, which is
+// exactly what the design mandates ("role becomes direction-driven:
+// outbound-central = Initiator, inbound-peripheral = Responder"). So the fix is
+// to keep the invariant rather than swap characteristics: the yield is
+// conditioned on holding an INBOUND link ("token-larger, when holding BOTH an
+// outbound and an inbound link, drops its outbound and acts Responder on
+// inbound"). A glare offer arriving on our own outbound link cannot be yielded
+// to, and must leave us initiator.
+// @internal
+#[test]
+fn glare_offer_on_our_outbound_link_does_not_yield_to_responder() {
+    let mut alice = fresh_initiator(); // identity [1;32] — smaller
+    let mut bob = fresh_peer_initiator(); // identity [3;32] — larger
+    let offer_a = key_offer_on(&mut alice, "peer-1");
+    let _offer_b = key_offer_on(&mut bob, "peer-1");
+
+    // Bob is the larger identity, so he is the one who would yield — but the
+    // offer arrived on the link HE dialed, where he is the GATT central. There
+    // is no inbound link to move onto.
+    let (_eb, cmds_b) = bob.on_data_received(
+        "peer-1",
+        BleLinkDirection::Outbound,
+        CHAR_HANDSHAKE_WRITE,
+        &offer_a,
+        0,
+    );
+
+    assert_eq!(
+        bob.role(),
+        BleRole::Initiator,
+        "cannot become responder on a link where we are the central",
+    );
+
+    let notify_on_outbound: Vec<_> = cmds_b
+        .iter()
+        .filter(|c| {
+            matches!(
+                c,
+                Command::BleWriteCharacteristic { uuid, direction, .. }
+                    if *direction == BleLinkDirection::Outbound
+                        && (uuid == CHAR_HANDSHAKE_NOTIFY || uuid == CHAR_DATA_NOTIFY)
+            )
+        })
+        .collect();
+    assert!(
+        notify_on_outbound.is_empty(),
+        "a GATT central cannot write a notify characteristic; the peer's \
+         server rejects it: {notify_on_outbound:?}",
+    );
+}
+
 // After glare where this side STAYS initiator (smaller identity), events
 // arriving on the losing inbound link are stale — feeding them into the
 // surviving session would corrupt it (design: reject stale-device_id

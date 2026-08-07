@@ -584,6 +584,19 @@ impl BleHandshakeMachine {
                 // Smaller identity → stay initiator; the peer will yield.
                 return (BleMachineEvent::None, Vec::new());
             }
+            // Yielding is only possible on a link where we are the peripheral.
+            // The design makes the role direction-driven ("outbound-central =
+            // Initiator, inbound-peripheral = Responder") and conditions the
+            // yield on holding BOTH links; the GATT layout enforces the same
+            // thing physically, since a responder answers on notify
+            // characteristics and a central has no notify egress. An offer on
+            // our own outbound link is the peer's traffic on the connection we
+            // dialed — there is nothing to yield onto, and treating it as glare
+            // produced writes to CHAR_HANDSHAKE_NOTIFY that the peer's GATT
+            // server rejected (Pixel 3a, 2026-08-07).
+            if direction != BleLinkDirection::Inbound {
+                return (BleMachineEvent::None, Vec::new());
+            }
             // Larger identity → yield: rewind to a fresh Idle responder
             // session and fall through to process the peer's KeyOffer below.
             // The handshake now rides the link the offer arrived on; the

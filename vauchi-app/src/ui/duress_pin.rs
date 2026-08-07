@@ -327,8 +327,13 @@ impl DuressPinEngine {
                     id: "save".into(),
                     label: self.t("action.save"),
                     style: ActionStyle::Primary,
-                    // A duress alert with no recipient reaches nobody — require ≥1.
-                    enabled: !self.config.selected_contact_ids.is_empty(),
+                    // A duress alert with no recipient reaches nobody — require ≥1
+                    // whenever there is anybody to pick (2026-07-03-coercion-
+                    // safety-config-gaps). With an empty pool the gate is
+                    // unsatisfiable, and enforcing it would deny the PIN's local
+                    // decoy protection to everyone who has not exchanged yet.
+                    enabled: self.config.available_contacts.is_empty()
+                        || !self.config.selected_contact_ids.is_empty(),
                     a11y: Some(A11y::labeled(self.t("action.save"))),
                 },
             ],
@@ -511,10 +516,14 @@ impl WorkflowEngine for DuressPinEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
             // Save is gated on ≥1 recipient; with none, this arm's guard fails
-            // and the fallback re-renders (the disabled Save is a no-op).
+            // and the fallback re-renders (the disabled Save is a no-op). An
+            // empty contact pool cannot satisfy that gate, so it is exempt —
+            // the guard must mirror the Save affordance's enabled rule exactly,
+            // or the button renders active and does nothing.
             (DuressPinStep::ConfigureAlerts, UserAction::ActionPressed { action_id })
                 if (action_id == "save" || action_id == "submit_alert_message")
-                    && !self.config.selected_contact_ids.is_empty() =>
+                    && (self.config.available_contacts.is_empty()
+                        || !self.config.selected_contact_ids.is_empty()) =>
             {
                 self.config.enabled = true;
                 ActionResult::Complete

@@ -111,6 +111,21 @@ impl Vauchi {
         Ok(moment)
     }
 
+    /// Records moments as already seen, without firing them.
+    ///
+    /// Union with whatever is already stored — the caller's set is evidence
+    /// that a moment was shown, never evidence that one was not. Exists so a
+    /// frontend migrating off its own tracker can hand its history over
+    /// without replaying every milestone at the user (ADR-069).
+    pub fn mark_aha_moments_seen(&self, moment_types: &[AhaMomentType]) -> VauchiResult<()> {
+        let mut tracker = self.storage.ux().load_or_create_aha_tracker()?;
+        for moment_type in moment_types {
+            tracker.mark_seen(*moment_type);
+        }
+        self.storage.ux().save_aha_tracker(&tracker)?;
+        Ok(())
+    }
+
     /// Checks if an aha moment has been seen.
     pub fn has_seen_aha_moment(&self, moment_type: AhaMomentType) -> VauchiResult<bool> {
         let tracker = self.storage.ux().load_or_create_aha_tracker()?;

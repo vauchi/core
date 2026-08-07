@@ -52,3 +52,11 @@ vauchi-core/tests/it/ble_handshake_tests.rs 1275
 # with the F4 genesis-card fan-out fix (2026-07-26). SPLIT-queued.
 vauchi-core/src/api/sync/card_update.rs 1006
 vauchi-core/src/api/vauchi/propagation.rs 1030
+
+# Crossed threshold 2026-08-07 adding step-level onboarding validation
+# (TUI-3). Numbered, not exempt: onboarding.rs has a clean seam between
+# its build_* screen constructors and its handle_* action handlers and
+# should be split — tracked in
+# backlog/2026-08-07-onboarding-rs-screen-builder-split.
+vauchi-app/src/ui/onboarding.rs 1031
+vauchi-core/tests/it/onboarding_engine_tests.rs 1240

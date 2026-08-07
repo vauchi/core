@@ -446,12 +446,20 @@ fn test_add_contact_triggers_first_contact_moment() {
 
     assert_eq!(wb.contact_count().unwrap(), 1);
 
-    // Trigger first contact moment with context
-    let moment = wb
+    // Adding the contact is itself the trigger — core owns the decision, so
+    // the milestone is already spent by the time anyone asks (ADR-069).
+    assert!(
+        wb.has_seen_aha_moment(AhaMomentType::FirstContactAdded)
+            .unwrap(),
+        "adding the first contact must have fired the moment"
+    );
+    let replay = wb
         .try_trigger_aha_moment_with_context(AhaMomentType::FirstContactAdded, bob_name)
         .unwrap();
-    assert!(moment.is_some(), "expected Some value");
-    assert!(moment.unwrap().message().contains("Bob"));
+    assert!(
+        replay.is_none(),
+        "a caller asking again must get nothing back, or the moment shows twice, got {replay:?}"
+    );
 }
 
 /// Test: Demo contact API integration

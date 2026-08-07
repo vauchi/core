@@ -812,8 +812,13 @@ mod tests {
         let event_count = Arc::new(AtomicUsize::new(0));
 
         let count = event_count.clone();
-        dispatcher.on_event(move |_| {
-            count.fetch_add(1, Ordering::SeqCst);
+        // Count the variant under test, not every dispatch: adding a contact
+        // also fires the first-contact milestone, and a bare total would
+        // break on any future event without describing a real regression.
+        dispatcher.on_event(move |event| {
+            if matches!(event, VauchiEvent::ContactAdded { .. }) {
+                count.fetch_add(1, Ordering::SeqCst);
+            }
         });
 
         let events = Arc::new(dispatcher);

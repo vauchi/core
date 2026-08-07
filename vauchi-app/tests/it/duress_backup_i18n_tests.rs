@@ -110,7 +110,7 @@ fn backup_wizard_renders_german() {
     let Component::TextInput { label, .. } = &password.components[0] else {
         panic!("password step leads with the password input");
     };
-    assert_eq!(label, "Wählen Sie ein Sicherungspasswort");
+    assert_eq!(label, "Wähle ein Sicherungspasswort");
 }
 
 // English copy unchanged (regression pin for both wizards).

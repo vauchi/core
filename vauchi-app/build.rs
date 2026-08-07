@@ -84,10 +84,16 @@ fn main() {
         }
     }
 
+    let locales_rev = found_path.as_deref().map_or_else(
+        || "none".to_string(),
+        |path| locales_revision(path).unwrap_or_else(|| "unknown".to_string()),
+    );
+
     let generated = if let Some(content) = locale_content {
         eprintln!(
-            "cargo:warning=Bundling English locale from: {}",
-            found_path.unwrap()
+            "cargo:warning=Bundling English locale from: {} (rev {})",
+            found_path.clone().unwrap(),
+            locales_rev
         );
 
         // Escape for Rust string - convert to bytes representation
@@ -113,6 +119,19 @@ pub const BUNDLED_EN_JSON: &str = "{\"app.name\":\"Vauchi\",\"welcome.title\":\"
         .to_string()
     };
 
+    let generated = format!(
+        r#"{generated}
+/// Revision of the `locales` checkout this build embedded, or `unknown`
+/// when the checkout is not a git working tree, or `none` when no locale
+/// file was found at all.
+///
+/// Recorded, never enforced: a release can answer which copy it shipped
+/// without freezing what developers get. Pinning would stall translations
+/// behind a manual bump — see
+/// `problems/2026-08-07-locale-content-consumed-from-unpinned-head/`.
+pub const BUNDLED_LOCALES_REV: &str = "{locales_rev}";
+"#
+    );
     fs::write(&dest_path, generated).unwrap();
 
     // ── themes.json bundling (Phase 2a/A3a) ───────────────────────
@@ -209,4 +228,26 @@ pub const BUNDLED_EN_JSON: &str = "{\"app.name\":\"Vauchi\",\"welcome.title\":\"
     };
 
     fs::write(&tokens_dest, tokens_bytes).expect("write OUT_DIR/tokens.json");
+}
+
+/// Resolves the git revision of the `locales` checkout that supplied
+/// `locale_path`.
+///
+/// Best-effort by design: a missing git, a tarball checkout or a vendored
+/// copy all yield `None`, and the build records `unknown` rather than
+/// failing. This is a record, not a gate — nothing downstream may depend
+/// on it resolving.
+fn locales_revision(locale_path: &str) -> Option<String> {
+    let dir = Path::new(locale_path).parent()?;
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let rev = String::from_utf8(output.stdout).ok()?.trim().to_string();
+    if rev.is_empty() { None } else { Some(rev) }
 }

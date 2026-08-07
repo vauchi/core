@@ -2,59 +2,42 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! M3 S4a (`2026-07-03-core-screens-bypass-i18n`, user decision 2026-07-04:
-//! the flat key generation wins): the onboarding wizard renders in the
-//! user's locale via the live-copy `onboarding.*` flat keys (locales!83).
-//! Exact German assertions per CC-03.
+//! M3 (`2026-07-03-core-screens-bypass-i18n`): the onboarding welcome
+//! and name screens render in the user's locale.
+//!
+//! Asserts that the screens resolved a translation, not what the
+//! translation says — see `i18n_support::assert_translated`.
 
-use vauchi_app::i18n::{Locale, load_locale_from_bytes};
-use vauchi_app::ui::{
-    ActionResult, Component, OnboardingEngine, ScreenModel, UserAction, WorkflowEngine,
-};
+use super::i18n_support::{action_label, assert_translated, load_german};
+use vauchi_app::i18n::Locale;
+use vauchi_app::ui::{ActionResult, Component, OnboardingEngine, UserAction, WorkflowEngine};
 
-fn load_german() {
-    let bytes = std::fs::read("../../locales/de.json")
-        .expect("locales checkout present as sibling repo (CI: .clone-locales)");
-    load_locale_from_bytes("de", &bytes).expect("German locale parses");
+/// Copy a shell would show across welcome, name, and the empty-name error.
+struct OnboardingCopy {
+    welcome_title: String,
+    welcome_subtitle: String,
+    create_action: String,
+    first_value_prop: String,
+    name_title: String,
+    empty_name_error: String,
 }
 
-fn action_label(screen: &ScreenModel, id: &str) -> String {
-    screen
-        .contextual_actions
-        .iter()
-        .find(|a| a.id == id)
-        .unwrap_or_else(|| panic!("action {id} present"))
-        .label
-        .clone()
-}
-
-// @scenario: onboarding :: first launch renders in the active locale
-// @internal
-#[test]
-fn onboarding_welcome_and_name_render_german() {
-    load_german();
-    let mut engine = OnboardingEngine::new().with_locale(Locale::German);
+fn walk_onboarding(locale: Locale) -> OnboardingCopy {
+    let mut engine = OnboardingEngine::new().with_locale(locale);
 
     let welcome = engine.current_screen();
-    assert_eq!(welcome.title, "Willkommen bei Vauchi");
-    assert_eq!(
-        welcome.subtitle.as_deref(),
-        Some("Datenschutzfreundliche Kontaktkarten.")
-    );
-    assert_eq!(
-        action_label(&welcome, "create_new"),
-        "Neue Identität erstellen"
-    );
+    let welcome_title = welcome.title.clone();
+    let welcome_subtitle = welcome.subtitle.clone().expect("welcome subtitle present");
+    let create_action = action_label(&welcome, "create_new");
     let Component::InfoPanel { items, .. } = &welcome.components[0] else {
         panic!("welcome leads with the value-props InfoPanel");
     };
-    assert_eq!(items[0].title, "Privat von Grund auf");
+    let first_value_prop = items[0].title.clone();
 
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    let name = engine.current_screen();
-    assert_eq!(name.title, "Wie heißt du?");
+    let name_title = engine.current_screen().title.clone();
 
     // Empty name → localized validation.
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -63,11 +46,53 @@ fn onboarding_welcome_and_name_render_german() {
     let ActionResult::ValidationError { message, .. } = result else {
         panic!("empty name must validation-error, got {result:?}");
     };
-    assert_eq!(message, "Bitte gib deinen Namen ein.");
+
+    OnboardingCopy {
+        welcome_title,
+        welcome_subtitle,
+        create_action,
+        first_value_prop,
+        name_title,
+        empty_name_error: message,
+    }
 }
 
-// English stays as it was (with the one deliberate convergence:
-// the Skip buttons now read the canonical onboarding.skip value).
+// @scenario: onboarding :: first launch renders in the active locale
+// @internal
+#[test]
+fn onboarding_welcome_and_name_render_the_active_locale() {
+    load_german();
+    let de = walk_onboarding(Locale::German);
+    let en = walk_onboarding(Locale::English);
+
+    assert_translated("welcome title", &de.welcome_title, &en.welcome_title);
+    assert_translated(
+        "welcome subtitle",
+        &de.welcome_subtitle,
+        &en.welcome_subtitle,
+    );
+    assert_translated(
+        "create-identity action",
+        &de.create_action,
+        &en.create_action,
+    );
+    assert_translated(
+        "first value prop",
+        &de.first_value_prop,
+        &en.first_value_prop,
+    );
+    assert_translated("name-step title", &de.name_title, &en.name_title);
+    assert_translated(
+        "empty-name validation",
+        &de.empty_name_error,
+        &en.empty_name_error,
+    );
+}
+
+// English stays as it was (with the one deliberate convergence: the Skip
+// buttons now read the canonical onboarding.skip value). English is the
+// source language and ships bundled, so pinning it couples nothing
+// external.
 // @internal
 #[test]
 fn onboarding_english_copy_unchanged() {

@@ -11,15 +11,10 @@
 //! stays on the wire for the sanctioned theme-palette color mapping,
 //! mirroring `IndicatorKind`.
 
-use vauchi_app::i18n::{Locale, get_string, load_locale_from_bytes};
+use super::i18n_support::{assert_translated, load_german};
+use vauchi_app::i18n::{Locale, get_string};
 use vauchi_app::ui::{Component, LinkResponderEngine, Status, WorkflowEngine};
 use vauchi_core::exchange::link_mode::{initiator_generate, parse_exchange_deep_link};
-
-fn load_german() {
-    let bytes = std::fs::read("../../locales/de.json")
-        .expect("locales checkout present as sibling repo (CI: .clone-locales)");
-    load_locale_from_bytes("de", &bytes).expect("German locale parses");
-}
 
 const ALL_STATUSES: [Status; 5] = [
     Status::Pending,
@@ -45,23 +40,18 @@ fn status_label_key_resolves_for_every_variant() {
     }
 }
 
-// @scenario: component_serialization :: status badge label resolves exact German
+// @scenario: component_serialization :: status badge label is translated per locale
 // @internal
 #[test]
-fn status_label_key_resolves_exact_german() {
+fn status_label_key_is_translated_for_every_variant() {
     load_german();
-    assert_eq!(
-        get_string(Locale::German, Status::Success.label_key()),
-        "Erfolg"
-    );
-    assert_eq!(
-        get_string(Locale::German, Status::Pending.label_key()),
-        "Ausstehend"
-    );
-    assert_eq!(
-        get_string(Locale::German, Status::InProgress.label_key()),
-        "In Bearbeitung"
-    );
+    for status in ALL_STATUSES {
+        assert_translated(
+            &format!("{status:?} badge label"),
+            &get_string(Locale::German, status.label_key()),
+            &get_string(Locale::English, status.label_key()),
+        );
+    }
 }
 
 // @scenario: component_serialization :: StatusIndicator carries status_label on the wire
@@ -102,27 +92,34 @@ fn status_indicator_deserializes_legacy_payload_without_label() {
 // @scenario: link-responder :: waiting badge label is catalog-resolved
 // @internal
 #[test]
-fn link_responder_waiting_badge_is_catalog_resolved_german() {
+fn link_responder_waiting_badge_is_catalog_resolved() {
     load_german();
-    let (init, _) = initiator_generate();
-    let payload = parse_exchange_deep_link(&init.url).expect("canonical URL parses");
-    let engine = LinkResponderEngine::new(payload).with_locale(Locale::German);
 
-    let screen = engine.current_screen();
-    let badge_label = screen
-        .components
-        .iter()
-        .find_map(|c| match c {
-            Component::StatusIndicator {
-                status_label,
-                status,
-                ..
-            } => {
-                assert_eq!(*status, Status::InProgress);
-                Some(status_label.clone())
-            }
-            _ => None,
-        })
-        .expect("waiting screen renders a StatusIndicator");
-    assert_eq!(badge_label, "In Bearbeitung");
+    let waiting_badge = |locale: Locale| {
+        let (init, _) = initiator_generate();
+        let payload = parse_exchange_deep_link(&init.url).expect("canonical URL parses");
+        let engine = LinkResponderEngine::new(payload).with_locale(locale);
+        engine
+            .current_screen()
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::StatusIndicator {
+                    status_label,
+                    status,
+                    ..
+                } => {
+                    assert_eq!(*status, Status::InProgress);
+                    Some(status_label.clone())
+                }
+                _ => None,
+            })
+            .expect("waiting screen renders a StatusIndicator")
+    };
+
+    assert_translated(
+        "waiting badge label",
+        &waiting_badge(Locale::German),
+        &waiting_badge(Locale::English),
+    );
 }

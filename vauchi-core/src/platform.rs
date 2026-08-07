@@ -356,6 +356,18 @@ pub enum Command {
         revision: u64,
         overlay: OverlaySpec,
     },
+    /// Dismiss an overlay Core previously presented for a surface.
+    ///
+    /// Core emits this when the affordance that opened an overlay is
+    /// activated again, so the context-bar buttons toggle. A shell that has
+    /// already dismissed the overlay natively — and said so with
+    /// [`Event::OverlayDismissed`] — treats this as a no-op; dismissal is
+    /// idempotent so the two paths cannot race into an inconsistent view.
+    DismissOverlay {
+        surface_id: SurfaceId,
+        revision: u64,
+        kind: OverlayKind,
+    },
     /// Apply Core's structural composition for the current window.
     SetPresentationProfile { profile: PresentationProfile },
     /// Atomically replace one named surface with fully prepared,
@@ -529,6 +541,7 @@ impl Command {
             Self::Celebrate { .. } => "Celebrate",
             Self::SetContextBar { .. } => "SetContextBar",
             Self::PresentOverlay { .. } => "PresentOverlay",
+            Self::DismissOverlay { .. } => "DismissOverlay",
             Self::SetPresentationProfile { .. } => "SetPresentationProfile",
             Self::ReplaceSurface { .. } => "ReplaceSurface",
             Self::PresentAlert { .. } => "PresentAlert",

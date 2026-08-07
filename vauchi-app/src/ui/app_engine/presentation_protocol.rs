@@ -33,6 +33,57 @@ pub enum AppPresentationError {
 }
 
 impl AppEngine {
+    /// Turn a re-request for the already-open overlay into a dismissal.
+    ///
+    /// The context-bar affordances emit `PresentOverlay` unconditionally —
+    /// `ContextualSurface` is rebuilt per event and cannot know what is on
+    /// screen. Core holds that state instead, so activating the same
+    /// affordance twice closes the overlay rather than re-presenting it.
+    /// Asking for a *different* overlay still opens it: the user named
+    /// which menu they want, so it must not resolve to a dismissal merely
+    /// because some overlay was open.
+    fn resolve_overlay_toggle(&mut self, commands: Vec<Command>) -> Vec<Command> {
+        commands
+            .into_iter()
+            .map(|command| match command {
+                Command::PresentOverlay {
+                    surface_id,
+                    revision,
+                    overlay,
+                } => {
+                    let requested = (surface_id.clone(), overlay.kind);
+                    if self.open_overlay.as_ref() == Some(&requested) {
+                        self.open_overlay = None;
+                        Command::DismissOverlay {
+                            surface_id,
+                            revision,
+                            kind: overlay.kind,
+                        }
+                    } else {
+                        self.open_overlay = Some(requested);
+                        Command::PresentOverlay {
+                            surface_id,
+                            revision,
+                            overlay,
+                        }
+                    }
+                }
+                other => other,
+            })
+            .collect()
+    }
+
+    /// Forget the open overlay when the shell reports it dismissed itself
+    /// (tap outside, Close). Without this the next activation would toggle
+    /// closed against state that no longer matches the screen.
+    fn clear_open_overlay(&mut self, event: &Event) {
+        if let Event::OverlayDismissed { surface_id, kind } = event
+            && self.open_overlay.as_ref() == Some(&(surface_id.clone(), *kind))
+        {
+            self.open_overlay = None;
+        }
+    }
+
     /// Return the complete initial renderer state as one ordered command batch.
     pub fn initial_commands(&mut self) -> Result<Vec<Command>, AppPresentationError> {
         let screen = self.current_screen();
@@ -43,6 +94,8 @@ impl AppEngine {
 
     /// Reduce one raw shell event into the next ordered command batch.
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
+        self.clear_open_overlay(&event);
+
         if matches!(event, Event::PresentationInvalidated) {
             self.invalidate_all();
             return self.initial_commands();
@@ -120,7 +173,8 @@ impl AppEngine {
         };
 
         match route {
-            ContextualSurfaceRoute::Commands(mut commands) => {
+            ContextualSurfaceRoute::Commands(commands) => {
+                let mut commands = self.resolve_overlay_toggle(commands);
                 commands.extend(self.drain_pending_commands());
                 Ok(commands)
             }

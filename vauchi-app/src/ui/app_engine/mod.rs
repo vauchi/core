@@ -220,6 +220,14 @@ pub struct AppEngine {
     surface_revision: u64,
     /// Contextual roles and causal Undo state retained per visible surface.
     contextual_actions: HashMap<vauchi_core::SurfaceId, crate::ui::ContextualActionCoordinator>,
+    /// The overlay Core currently believes is presented, if any.
+    ///
+    /// `ContextualSurface` is composed fresh for every event and so cannot
+    /// remember this, which is why the state lives on the engine. It exists
+    /// to make the context-bar buttons toggle: activating the affordance
+    /// that opened an overlay closes it instead of re-presenting it. Cleared
+    /// when the shell reports its own dismissal via `Event::OverlayDismissed`.
+    open_overlay: Option<(vauchi_core::SurfaceId, vauchi_core::OverlayKind)>,
 }
 
 impl AppEngine {
@@ -441,6 +449,7 @@ impl AppEngine {
             retained_detail_screen: None,
             surface_revision: 1,
             contextual_actions: HashMap::new(),
+            open_overlay: None,
         }
     }
 

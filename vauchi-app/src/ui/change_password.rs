@@ -27,6 +27,17 @@ use crate::ui::*;
 use zeroize::Zeroize;
 
 /// Engine that drives the set/change-app-password form.
+/// Presented stand-in for a secret the engine holds but must not echo.
+///
+/// A permanently empty `value` makes a filled secret input indistinguishable
+/// from an untouched one, and a shell that picks the first empty input to
+/// prompt for re-offers the same field forever. Mirrors the `PinInput`
+/// projection, which already presents `"•".repeat(filled)`; only the length
+/// is exposed, never the secret.
+fn masked_echo(secret: &str) -> String {
+    "•".repeat(secret.chars().count())
+}
+
 pub struct ChangePasswordEngine {
     /// True when a password already exists → change mode; false → setup mode.
     password_enabled: bool,
@@ -115,7 +126,7 @@ impl ChangePasswordEngine {
         Component::TextInput {
             id: "current_password".into(),
             label: self.t("change_password.current_password_label"),
-            value: String::new(),
+            value: masked_echo(&self.current),
             placeholder: Some(self.t("change_password.current_password_placeholder")),
             max_length: Some(128),
             validation_error: None,
@@ -148,7 +159,7 @@ impl ChangePasswordEngine {
         Component::TextInput {
             id: "new_password".into(),
             label,
-            value: String::new(),
+            value: masked_echo(&self.new_pw),
             placeholder: Some(placeholder),
             max_length: Some(128),
             validation_error: self.new_validation_error(),
@@ -181,7 +192,7 @@ impl ChangePasswordEngine {
         Component::TextInput {
             id: "confirm_password".into(),
             label,
-            value: String::new(),
+            value: masked_echo(&self.confirm),
             placeholder: Some(placeholder),
             max_length: Some(128),
             validation_error: self.confirm_validation_error(),

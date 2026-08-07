@@ -121,6 +121,35 @@ fn duress_setup_persists_pin_and_recipient_via_core() {
     assert_eq!(settings.alert_contact_ids, vec![bob]);
 }
 
+// @scenario: duress_mode :: Enable duress password (requires app password)
+#[test]
+fn duress_setup_completes_with_no_contacts_to_alert() {
+    let mut engine = engine_ready(); // no contacts at all
+    engine.navigate_to(AppScreen::DuressPin);
+
+    advance_to_alerts(&mut engine);
+    let result = press(&mut engine, "save");
+
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "with an empty contact pool the ≥1-recipient gate is unsatisfiable; blocking here would \
+         deny the PIN's decoy protection to every user who has not exchanged yet, got {result:?}"
+    );
+    assert!(
+        engine.vauchi().is_duress_enabled().unwrap(),
+        "duress PIN must be enabled even when there is nobody to alert"
+    );
+    let settings = engine
+        .vauchi()
+        .load_duress_settings()
+        .unwrap()
+        .expect("duress settings persisted");
+    assert!(
+        settings.alert_contact_ids.is_empty(),
+        "no recipients were selectable, so none may be persisted"
+    );
+}
+
 // @internal — the contact-picker rework gates completion on ≥1 recipient
 // (2026-07-03-coercion-safety-config-gaps). Save with none selected must
 // not persist; this is the exact regression that silently broke the

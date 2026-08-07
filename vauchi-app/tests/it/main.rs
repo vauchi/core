@@ -128,6 +128,7 @@ mod render_context_tests;
 #[path = "../responsive_presentation_tests.rs"]
 mod responsive_presentation_tests;
 mod result_routing_wiring_tests;
+mod settings_link_routing_tests;
 mod settings_more_parity_tests;
 mod settings_profile_i18n_tests;
 mod settings_render_context_tests;

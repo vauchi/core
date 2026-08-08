@@ -316,9 +316,26 @@ impl BleHandshakeMachine {
         Some(Command::BleWriteCharacteristic {
             device_id: self.link_device_id(),
             direction: self.link_direction(),
-            uuid: CHAR_HANDSHAKE_NOTIFY.to_string(),
+            uuid: self.handshake_egress_char().to_string(),
             data: ack,
         })
+    }
+
+    /// The handshake characteristic this side may actually write on its
+    /// current link.
+    ///
+    /// The GATT layout gives each side exactly one egress: a central writes
+    /// the write characteristic, a peripheral notifies the notify one. Sending
+    /// on the other is rejected by the peer's GATT server, so this follows the
+    /// transport direction rather than the protocol role — the two agree
+    /// during the handshake, but the post-persist reciprocity ack is sent by
+    /// whichever side completed, including an initiator that is always the
+    /// central.
+    fn handshake_egress_char(&self) -> &'static str {
+        match self.link_direction() {
+            BleLinkDirection::Inbound => CHAR_HANDSHAKE_NOTIFY,
+            _ => CHAR_HANDSHAKE_WRITE,
+        }
     }
 
     /// Latched peer device id for stamping outgoing commands. Empty until
@@ -471,7 +488,13 @@ impl BleHandshakeMachine {
         // terminal guard drops it. `process_reciprocity_ack` rejects anything
         // that is not a valid ack (wrong version / undecryptable / token
         // mismatch), so residue never yields a false Confirmed.
-        if matches!(self.phase, BleMachinePhase::Completed) && uuid == CHAR_HANDSHAKE_NOTIFY {
+        // Either handshake characteristic: the sender picks it from its own
+        // link direction, so a completed central acks on the write
+        // characteristic and a completed peripheral notifies. Accepting only
+        // one spelling here would drop half the acks.
+        if matches!(self.phase, BleMachinePhase::Completed)
+            && (uuid == CHAR_HANDSHAKE_NOTIFY || uuid == CHAR_HANDSHAKE_WRITE)
+        {
             if let Ok(Some(their_identity)) = self.inner.process_reciprocity_ack(data) {
                 return (
                     BleMachineEvent::ReciprocityConfirmed { their_identity },

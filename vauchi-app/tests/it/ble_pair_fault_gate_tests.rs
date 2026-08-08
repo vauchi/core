@@ -28,7 +28,8 @@ use vauchi_app::orchestrator::ble_handshake_machine::{
 use vauchi_core::Command;
 use vauchi_core::crypto::X3DHKeyPair;
 use vauchi_core::exchange::{
-    BleCardPayload, BleExchangeResult, CHAR_DATA_NOTIFY, CHAR_HANDSHAKE_NOTIFY,
+    BleCardPayload, BleExchangeResult, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY,
+    CHAR_HANDSHAKE_WRITE,
 };
 use vauchi_core::platform::BleLinkDirection;
 
@@ -273,6 +274,48 @@ fn reorder_to_back(queue: &mut VecDeque<Msg>, uuid: &str) -> bool {
         return true;
     }
     false
+}
+
+// A GATT central has no notify egress and a peripheral has no write egress:
+// notify characteristics are the peripheral's side of a link, write
+// characteristics the central's. So the egress characteristic has to follow
+// the link direction on every command, not only during the handshake.
+//
+// This harness routes by content and never noticed. Hardware did — a Pixel 3a
+// acting as central had its post-persist reciprocity ack rejected eight times
+// and abandoned, so the peer never emitted ReciprocityConfirmed and both
+// screens sat on discovery over a completed exchange
+// (`2026-08-07-ble-exchange-ui-never-shows-completion`).
+// @internal
+#[test]
+fn every_emitted_command_addresses_a_characteristic_its_link_can_use() {
+    let mut pair = Pair::connected();
+    assert!(pair.pump() < MAX_STEPS, "exchange livelocked");
+    pair.assert_both_completed_and_cross_verified();
+
+    let acks = [
+        pair.alice.build_reciprocity_ack_command(),
+        pair.bob.build_reciprocity_ack_command(),
+    ];
+
+    for cmd in acks.into_iter().flatten() {
+        let Command::BleWriteCharacteristic {
+            uuid, direction, ..
+        } = cmd
+        else {
+            continue;
+        };
+        match direction {
+            BleLinkDirection::Outbound => assert!(
+                uuid != CHAR_HANDSHAKE_NOTIFY && uuid != CHAR_DATA_NOTIFY,
+                "a central cannot write the notify characteristic {uuid}",
+            ),
+            _ => assert!(
+                uuid != CHAR_HANDSHAKE_WRITE && uuid != CHAR_DATA_WRITE,
+                "a peripheral cannot write the write characteristic {uuid}",
+            ),
+        }
+    }
 }
 
 // @internal

@@ -557,19 +557,18 @@ fn glare_yield_drops_the_losing_outbound_link_and_rides_inbound() {
     );
 }
 
-// Device-observed (Pixel 3a -> peer, 2026-08-07): the yielding side does not
-// always hold two links. When the peer's KeyOffer arrives on the link we
-// dialed — the peer is the GATT server there and answers over the same
-// connection — yielding leaves us the responder *and* the GATT central.
+// The yielding side does not always hold two links. When the peer's KeyOffer
+// arrives on the link we dialed — the peer is the GATT server there and
+// answers over the same connection — yielding leaves us the responder *and*
+// the GATT central.
 //
 // A central has no notify egress: notify characteristics are the peripheral's
-// side of the link, and writing one is rejected by the peer's GATT server. On
-// hardware that showed up as
+// side of the link, and writing one is rejected by the peer's GATT server.
 //
-//   BleCentral: GATT write ...ef1234567895 ok=false try=0 .. try=8
-//   BleCentral: GATT op gave up (rejected) after 8 retries
-//
-// where ...895 is CHAR_HANDSHAKE_NOTIFY.
+// This comment previously cited a Pixel 3a GATT rejection as the symptom this
+// test prevents. That was wrong: the device rejection came from the
+// reciprocity ack on a session that was initiator throughout, where no glare
+// occurs. This case is justified by the invariant below, not by that log.
 //
 // The GATT layout binds the two: HANDSHAKE_WRITE is "initiator -> responder"
 // (write), HANDSHAKE_NOTIFY is "responder -> initiator" (notify). That is only

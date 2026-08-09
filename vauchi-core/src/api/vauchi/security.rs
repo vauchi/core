@@ -10,9 +10,32 @@ use super::super::app_password::{AppPasswordConfig, AuthResult};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventCallback, VauchiEvent};
 use super::{AuthMode, BiometricUnlockOutcome, Vauchi};
+use crate::emergency::DURESS_PIN_LENGTH;
 use crate::sleeper::Sleeper;
 use crate::storage::ActivityLogRow;
 use crate::types::DuressSettings;
+
+/// Rejects anything that is not exactly [`DURESS_PIN_LENGTH`] ASCII digits.
+///
+/// Validation lives in core because every shell crosses this boundary —
+/// CLI, mobile dispatch and the app engine — and a check written five
+/// times drifts (ADR-066). It is deliberately applied on the **write**
+/// path only: `verify` stays unconstrained so a PIN stored before this
+/// rule existed keeps working. Enforcing it on the read path would lock
+/// someone out of duress mode under coercion, which is the one moment the
+/// feature exists for.
+///
+/// `is_ascii_digit` rather than `char::is_numeric`: the latter accepts
+/// Devanagari and fullwidth digits, which a user cannot reproduce on a
+/// numeric keypad under stress.
+pub fn validate_duress_pin(pin: &str) -> VauchiResult<()> {
+    if pin.len() != DURESS_PIN_LENGTH || !pin.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(VauchiError::InvalidState(format!(
+            "duress PIN must be exactly {DURESS_PIN_LENGTH} digits"
+        )));
+    }
+    Ok(())
+}
 
 /// Minimum wall-clock duration for [`Vauchi::biometric_unlock_check`].
 ///
@@ -263,8 +286,13 @@ impl Vauchi {
 
     /// Sets up a duress PIN.
     ///
-    /// Requires an app password to be configured first.
+    /// Requires an app password to be configured first, and the PIN to be
+    /// exactly [`DURESS_PIN_LENGTH`] ASCII digits — see
+    /// [`validate_duress_pin`] for why the check lives here and not in the
+    /// shells.
     pub fn setup_duress_password(&mut self, duress_password: &str) -> VauchiResult<()> {
+        validate_duress_pin(duress_password)?;
+
         let mut config = self
             .storage
             .identity()

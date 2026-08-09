@@ -7,7 +7,7 @@
 //! construction (M3 S3c of `2026-07-03-core-screens-bypass-i18n`); keys
 //! live in the `resistance.duress.*` + shared `action.*` families.
 
-use crate::i18n::{Locale, get_string};
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
@@ -25,7 +25,30 @@ pub struct DuressConfig {
     pub include_location: bool,
 }
 
-const PIN_LENGTH: usize = 6;
+/// Taken from core so the reducer and the API cannot disagree about how
+/// long a PIN is. A local copy is how they drifted: this reducer capped
+/// typed input at six while a pasted value bypassed the cap entirely and
+/// `setup_duress_password` accepted whatever arrived.
+use vauchi_core::emergency::DURESS_PIN_LENGTH as PIN_LENGTH;
+
+/// Folds one input event into a PIN buffer.
+///
+/// A shell may deliver a single keystroke or a whole string — a paste, an
+/// autofill, an accessibility insertion, or a harness typing the field at
+/// once. Treating the multi-character case as "assign it verbatim" is what
+/// let the literal string `undefined` become a duress credential on a real
+/// device, so every shape arrives here and is filtered to ASCII digits and
+/// truncated identically.
+fn accept_pin_input(current: &str, value: &str) -> String {
+    let mut out = String::from(current);
+    for b in value.bytes().filter(|b| b.is_ascii_digit()) {
+        if out.len() == PIN_LENGTH {
+            break;
+        }
+        out.push(char::from(b));
+    }
+    out
+}
 
 /// Engine that drives the duress PIN setup workflow.
 pub struct DuressPinEngine {
@@ -407,12 +430,8 @@ impl WorkflowEngine for DuressPinEngine {
             ) if component_id == "pin" => {
                 if value.is_empty() {
                     self.new_pin.pop();
-                } else if value.len() == 1 {
-                    if self.new_pin.len() < PIN_LENGTH {
-                        self.new_pin.push_str(&value);
-                    }
                 } else {
-                    self.new_pin = value;
+                    self.new_pin = accept_pin_input(&self.new_pin, &value);
                 }
                 ActionResult::UpdateScreen(self.current_screen())
             }
@@ -423,6 +442,19 @@ impl WorkflowEngine for DuressPinEngine {
                     ActionResult::ValidationError {
                         component_id: "pin".into(),
                         message: self.t("resistance.duress.error_empty"),
+                    }
+                } else if self.new_pin.len() < PIN_LENGTH {
+                    // `error_too_short` shipped translated in every
+                    // catalogue with nothing emitting it — the rule was
+                    // designed and never wired. Advancing on a short PIN
+                    // let core reject it later as a generic failure.
+                    ActionResult::ValidationError {
+                        component_id: "pin".into(),
+                        message: get_string_with_args(
+                            self.locale,
+                            "resistance.duress.error_too_short",
+                            &[("min", &PIN_LENGTH.to_string())],
+                        ),
                     }
                 } else {
                     self.step = DuressPinStep::ConfirmPin;
@@ -446,12 +478,8 @@ impl WorkflowEngine for DuressPinEngine {
             ) if component_id == "confirm_pin" => {
                 if value.is_empty() {
                     self.confirm_pin.pop();
-                } else if value.len() == 1 {
-                    if self.confirm_pin.len() < PIN_LENGTH {
-                        self.confirm_pin.push_str(&value);
-                    }
                 } else {
-                    self.confirm_pin = value;
+                    self.confirm_pin = accept_pin_input(&self.confirm_pin, &value);
                 }
                 ActionResult::UpdateScreen(self.current_screen())
             }

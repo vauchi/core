@@ -45,6 +45,15 @@ pub const DEFAULT_EMERGENCY_MESSAGE: &str = "I may be in danger. Please check on
 /// Maximum number of trusted contacts for emergency broadcast.
 pub const MAX_TRUSTED_CONTACTS: usize = 10;
 
+/// The number of digits in a duress PIN.
+///
+/// Lives beside `DuressSettings` rather than in the API layer so the UI
+/// reducer can reach it without pulling in a network feature. Keeping a
+/// second copy in the reducer is how the two drifted: it capped typed
+/// input at six while a pasted value bypassed the cap entirely and the
+/// API accepted whatever arrived.
+pub const DURESS_PIN_LENGTH: usize = 6;
+
 impl EmergencyBroadcastConfig {
     /// Returns `true` if the alert message is the default (not customized).
     pub fn is_default_message(&self) -> bool {

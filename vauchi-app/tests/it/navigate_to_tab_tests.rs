@@ -165,3 +165,48 @@ fn navigate_back_after_navigate_to_tab_returns_to_prior_screen() {
         "navigate_back must return to the screen visited before the last NavigateToTab"
     );
 }
+
+/// Every entry the desktop/drawer navigation renders must navigate, not just
+/// the five bottom tabs.
+///
+/// `navigate_to_tab_routes_each_tab_to_canonical_screen` above iterates
+/// `available_screens()`, which is the mobile tab bar. `sidebar_items()` is a
+/// strictly larger list — Settings, Recovery, Devices, Backup, Privacy,
+/// Support, Help and Activity are rendered from it and were covered by
+/// nothing. On 2026-08-09 tapping Settings on a device left the menu open
+/// while My Card from the same list navigated, and no test disagreed.
+// @internal
+#[test]
+fn navigate_to_tab_routes_every_sidebar_item_to_canonical_screen() {
+    let items = engine_with_identity().sidebar_items(vauchi_app::i18n::Locale::English);
+    assert!(
+        items.len() > engine_with_identity().available_screens().len(),
+        "sidebar is expected to offer more destinations than the tab bar"
+    );
+
+    for item in items {
+        let target = AppScreen::from_screen_id(&item.action_id).unwrap_or_else(|| {
+            panic!(
+                "sidebar item `{}` ({}) must parse to an AppScreen — an id the \
+                 dispatcher cannot resolve renders as a dead menu row",
+                item.action_id, item.label
+            )
+        });
+
+        let expected = engine_with_identity().navigate_to(target).screen_id;
+        let mut engine = engine_with_identity();
+        match engine.handle_action(UserAction::NavigateToTab {
+            action_id: item.action_id.clone(),
+        }) {
+            ActionResult::NavigateTo(screen) => assert_eq!(
+                screen.screen_id, expected,
+                "sidebar item `{}` must land on the same screen as canonical navigation",
+                item.action_id
+            ),
+            other => panic!(
+                "sidebar item `{}` must return NavigateTo, got {other:?}",
+                item.action_id
+            ),
+        }
+    }
+}

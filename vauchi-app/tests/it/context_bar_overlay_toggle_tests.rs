@@ -168,3 +168,50 @@ fn a_native_dismissal_clears_the_toggle_state() {
         "after a native dismissal the button must open again; got {reopened:?}"
     );
 }
+
+/// Choosing a destination from the navigation overlay closes it.
+///
+/// The overlay tracked by `open_overlay` was dismissed only by re-activating
+/// the affordance that opened it, or by the shell reporting
+/// `OverlayDismissed`. Activating an item *inside* it navigated and left it
+/// on screen, covering the destination the user had just chosen. On
+/// 2026-08-09 that read on a device as "Settings does not work": the Groups
+/// screen was underneath the whole time, still showing the drawer.
+///
+/// Core owns the dismissal because core owns the overlay state — a shell
+/// closing menus on its own would be deciding navigation behaviour.
+// @internal
+#[test]
+fn activating_a_navigation_destination_dismisses_the_overlay() {
+    let mut engine = engine_with_identity();
+    let (surface_id, nav_interaction) = context_interaction(&mut engine, "navigation");
+
+    let opened = activate(&mut engine, &surface_id, &nav_interaction);
+    let items = opened
+        .iter()
+        .find_map(|command| match command {
+            Command::PresentOverlay { overlay, .. } => Some(overlay.items.clone()),
+            _ => None,
+        })
+        .expect("activating the navigation affordance must present the overlay");
+
+    // A destination other than the current screen, so the batch cannot be
+    // confused with a no-op re-render of where we already are.
+    let destination = items
+        .iter()
+        .find(|item| item.interaction_id.as_str().ends_with("groups"))
+        .expect("navigation overlay must offer Groups");
+
+    let commands = activate(
+        &mut engine,
+        &surface_id,
+        destination.interaction_id.as_str(),
+    );
+
+    assert!(
+        commands
+            .iter()
+            .any(|c| matches!(c, Command::DismissOverlay { .. })),
+        "choosing a destination must dismiss the navigation overlay; got {commands:#?}"
+    );
+}

@@ -59,18 +59,53 @@ pub fn build_exchange_success_screen(
         detail: Some(if summary.peer_name.is_empty() {
             t("exchange.success_title")
         } else {
-            format!("Exchanged with {}", summary.peer_name)
+            crate::i18n::get_string_with_args(
+                locale,
+                "exchange.success.exchanged_with",
+                &[("name", summary.peer_name.as_str())],
+            )
         }),
         status: Status::Success,
         status_label: t(Status::Success.label_key()),
         a11y: None,
     }];
 
+    // The living-connection promise. This is the only line on the surface that
+    // says something NameDrop and AirDrop cannot: the copy stays current, and
+    // both sides keep control of it.
+    //
+    // Says nothing about physical presence on purpose. Neither the mutual QR
+    // scan nor the audio proximity attestation distance-bounds — audio is a
+    // location-limited out-of-band channel, not a distance-bounding primitive,
+    // and both are relayable in principle. Claiming "verified in person" here
+    // would assert more than the protocol establishes.
+    components.push(Component::Text {
+        id: "stays_updated".into(),
+        content: if summary.peer_name.is_empty() {
+            t("exchange.success.stays_updated_generic")
+        } else {
+            crate::i18n::get_string_with_args(
+                locale,
+                "exchange.success.stays_updated",
+                &[("name", they.as_str())],
+            )
+        },
+        style: TextStyle::Body,
+    });
+
     // What they shared with us — the received card fields, read-only.
     if !summary.received_fields.is_empty() {
         components.push(Component::Text {
             id: "received_header".into(),
-            content: format!("What {they} shared"),
+            content: if summary.peer_name.is_empty() {
+                t("exchange.success.what_they_shared_generic")
+            } else {
+                crate::i18n::get_string_with_args(
+                    locale,
+                    "exchange.success.what_they_shared",
+                    &[("name", they.as_str())],
+                )
+            },
             style: TextStyle::Caption,
         });
         let fields = summary

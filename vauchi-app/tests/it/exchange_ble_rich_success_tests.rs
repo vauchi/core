@@ -156,4 +156,19 @@ fn ble_completion_renders_rich_success_summary() {
         text.contains("Bob"),
         "the summary names the new contact; screen text: {text}"
     );
+    // The ending is the only place Vauchi can state what it just established.
+    // "Exchange complete" describes a transfer — which is also all NameDrop or
+    // AirDrop can claim. What Vauchi alone establishes is a connection that
+    // stays live: if the peer changes what they share, this copy updates, and
+    // either side can change or end it.
+    //
+    // Worded as a durable connection under both parties' control, deliberately
+    // NOT as proof of physical presence: neither the visual nor the audio
+    // channel distance-bounds, so the copy must never imply "verified in
+    // person".
+    assert!(
+        text.contains("your copy updates"),
+        "the ending must state the living-connection promise, not only that a \
+         transfer finished; screen text: {text}"
+    );
 }

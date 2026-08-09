@@ -68,10 +68,10 @@ fn test_verify_wrong_password_returns_invalid() {
 fn test_verify_duress_password_returns_duress() {
     let mut config = AppPasswordConfig::create("my-password").expect("create should succeed");
     config
-        .setup_duress("duress-pin")
+        .setup_duress("112233")
         .expect("setup duress should succeed");
 
-    let result = config.verify("duress-pin");
+    let result = config.verify("112233");
     assert!(
         matches!(result, AuthResult::Duress),
         "duress password should return Duress, got {:?}",
@@ -96,7 +96,7 @@ fn test_verify_constant_time_both_checked() {
 
     let mut config = AppPasswordConfig::create("my-password").expect("create should succeed");
     config
-        .setup_duress("duress-pin")
+        .setup_duress("112233")
         .expect("setup duress should succeed");
 
     // Wrong password should still be Invalid (not Normal or Duress)
@@ -176,7 +176,7 @@ fn test_change_password_old_no_longer_verifies() {
 #[test]
 fn test_change_password_preserves_duress_pin() {
     let mut config = AppPasswordConfig::create("old-password").expect("create");
-    config.setup_duress("duress-pin").expect("setup duress");
+    config.setup_duress("112233").expect("setup duress");
     let duress_hash_before = *config.duress_hash().expect("duress configured");
     let duress_salt_before = *config.duress_salt().expect("duress configured");
 
@@ -197,7 +197,7 @@ fn test_change_password_preserves_duress_pin() {
 
     // Duress PIN still verifies as Duress
     assert!(
-        matches!(config.verify("duress-pin"), AuthResult::Duress),
+        matches!(config.verify("112233"), AuthResult::Duress),
         "duress PIN must still authenticate after rotation"
     );
 }
@@ -207,9 +207,9 @@ fn test_change_password_preserves_duress_pin() {
 fn test_change_password_collision_with_duress_rejected() {
     // Maintains the setup_duress invariant: normal != duress.
     let mut config = AppPasswordConfig::create("old-password").expect("create");
-    config.setup_duress("duress-pin").expect("setup duress");
+    config.setup_duress("112233").expect("setup duress");
 
-    let result = config.change_password("duress-pin");
+    let result = config.change_password("112233");
     assert!(
         result.is_err(),
         "rotating to a password equal to the configured duress PIN must be rejected"
@@ -314,7 +314,7 @@ fn test_save_load_duress_password_roundtrip() {
         .expect("save app password should succeed");
 
     password_config
-        .setup_duress("duress-pin")
+        .setup_duress("112233")
         .expect("setup duress should succeed");
     storage
         .identity()
@@ -362,7 +362,7 @@ fn test_disable_duress_clears_data() {
         )
         .expect("save app password should succeed");
     password_config
-        .setup_duress("duress-pin")
+        .setup_duress("112233")
         .expect("setup duress should succeed");
     storage
         .identity()
@@ -579,10 +579,10 @@ fn test_authenticate_duress_password_sets_mode() {
 
     wb.setup_app_password("my-pin-1234")
         .expect("setup should succeed");
-    wb.setup_duress_password("duress-999")
+    wb.setup_duress_password("654321")
         .expect("setup duress should succeed");
 
-    let mode = wb.authenticate("duress-999").expect("auth should succeed");
+    let mode = wb.authenticate("654321").expect("auth should succeed");
 
     assert_eq!(
         mode,
@@ -597,7 +597,7 @@ fn test_authenticate_duress_password_sets_mode() {
 fn test_setup_duress_password_requires_app_password_first() {
     let mut wb = create_vauchi_with_identity("Alice");
 
-    let result = wb.setup_duress_password("duress-999");
+    let result = wb.setup_duress_password("654321");
     assert!(
         result.is_err(),
         "setting up duress without app password should fail"
@@ -611,7 +611,7 @@ fn test_disable_duress() {
 
     wb.setup_app_password("my-pin-1234")
         .expect("setup should succeed");
-    wb.setup_duress_password("duress-999")
+    wb.setup_duress_password("654321")
         .expect("setup duress should succeed");
 
     assert!(wb.is_duress_enabled().expect("check should succeed"));
@@ -691,11 +691,10 @@ fn test_change_app_password_duress_unlock_cannot_change_password() {
     // access; it must never escalate to credential management.
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password("real-pin-1234").expect("setup");
-    wb.setup_duress_password("duress-9999")
-        .expect("setup duress");
+    wb.setup_duress_password("654322").expect("setup duress");
 
     let err = wb
-        .change_app_password("duress-9999", "attacker-pin")
+        .change_app_password("654322", "attacker-pin")
         .expect_err("duress PIN must not authorize a password change");
     let _ = err;
 
@@ -769,8 +768,7 @@ fn biometric_unlock_decision_unlocked_when_no_duress() {
 fn biometric_unlock_decision_prompts_for_pin_when_duress_enabled() {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password("my-pin-1234").expect("setup app pw");
-    wb.setup_duress_password("duress-999")
-        .expect("setup duress");
+    wb.setup_duress_password("654321").expect("setup duress");
 
     let outcome = wb
         .biometric_unlock_check()
@@ -822,7 +820,7 @@ fn biometric_unlock_check_constant_time_across_duress_states() {
     let mut wb_with_duress = create_vauchi_with_identity("Bob");
     wb_with_duress.setup_app_password("pw").expect("setup");
     wb_with_duress
-        .setup_duress_password("duress-999")
+        .setup_duress_password("654321")
         .expect("setup duress");
 
     let t_no = {
@@ -934,7 +932,7 @@ fn test_list_contacts_duress_mode_returns_decoy() {
         .setup_app_password("my-pin")
         .expect("setup should succeed");
     alice_wb
-        .setup_duress_password("duress-pin")
+        .setup_duress_password("112233")
         .expect("setup duress should succeed");
 
     let decoy_card = ContactCard::new("Decoy Contact");
@@ -943,7 +941,7 @@ fn test_list_contacts_duress_mode_returns_decoy() {
         .expect("add decoy should succeed");
 
     let mode = alice_wb
-        .authenticate("duress-pin")
+        .authenticate("112233")
         .expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
@@ -1031,7 +1029,7 @@ fn test_queue_duress_alert_on_duress_authenticate() {
 
     wb.setup_app_password("my-pin-1234")
         .expect("setup should succeed");
-    wb.setup_duress_password("duress-999")
+    wb.setup_duress_password("654321")
         .expect("setup duress should succeed");
 
     // Create a trusted contact with a ratchet so the alert can be queued.
@@ -1067,7 +1065,7 @@ fn test_queue_duress_alert_on_duress_authenticate() {
         .expect("save settings should succeed");
 
     // Authenticate with duress PIN — should queue an alert
-    let mode = wb.authenticate("duress-999").expect("auth should succeed");
+    let mode = wb.authenticate("654321").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
     // Verify the alert was queued as a storage-backed PendingUpdate
@@ -1092,13 +1090,13 @@ fn test_queue_duress_alert_without_settings_is_noop() {
 
     wb.setup_app_password("my-pin-1234")
         .expect("setup should succeed");
-    wb.setup_duress_password("duress-999")
+    wb.setup_duress_password("654321")
         .expect("setup duress should succeed");
 
     // Do NOT configure duress settings
 
     // Authenticate with duress PIN — should NOT fail, just no alerts
-    let mode = wb.authenticate("duress-999").expect("auth should succeed");
+    let mode = wb.authenticate("654321").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
     // Verify no pending updates were queued (no settings = no recipients).
@@ -1120,7 +1118,7 @@ fn test_duress_alert_contains_timestamp_and_device_id() {
 
     wb.setup_app_password("my-pin-1234")
         .expect("setup should succeed");
-    wb.setup_duress_password("duress-999")
+    wb.setup_duress_password("654321")
         .expect("setup duress should succeed");
 
     // Create a trusted contact with a ratchet so the alert can be queued.
@@ -1155,7 +1153,7 @@ fn test_duress_alert_contains_timestamp_and_device_id() {
         .expect("save settings should succeed");
 
     let before = wb.clock().unix_seconds();
-    let mode = wb.authenticate("duress-999").expect("auth should succeed");
+    let mode = wb.authenticate("654321").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
     // Verify the alert was queued as a storage-backed PendingUpdate.
@@ -1191,7 +1189,7 @@ fn test_full_duress_flow_setup_to_alert() {
         .expect("setup app password should succeed");
 
     // 2. Set up duress password
-    wb.setup_duress_password("duress-999")
+    wb.setup_duress_password("654321")
         .expect("setup duress should succeed");
 
     // 3. Add decoy contacts
@@ -1241,7 +1239,7 @@ fn test_full_duress_flow_setup_to_alert() {
     assert_eq!(loaded_settings.alert_contact_ids.len(), 1);
 
     // 7. Authenticate with duress PIN — triggers full flow
-    let mode = wb.authenticate("duress-999").expect("auth should succeed");
+    let mode = wb.authenticate("654321").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
     // 8a. Verify duress mode shows decoy contacts

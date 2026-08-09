@@ -558,9 +558,13 @@ proptest! {
     }
 
     /// DuressPin: overview → configure → enter pin → confirm pin → alerts → save = Complete.
+    ///
+    /// Six digits or more: the reducer truncates to `DURESS_PIN_LENGTH`, so
+    /// anything at or above it advances. Shorter values are held back by
+    /// design and covered by `duress_short_pin_does_not_advance`.
 // @internal
     #[test]
-    fn duress_forward_progress(pin in "[0-9]{4,8}") {
+    fn duress_forward_progress(pin in "[0-9]{6,8}") {
         let mut engine = make_duress();
 
         // Overview → EnterPin
@@ -598,6 +602,35 @@ proptest! {
             action_id: "save".into(),
         });
         prop_assert!(matches!(result, ActionResult::Complete));
+    }
+
+    /// DuressPin: a PIN shorter than `DURESS_PIN_LENGTH` must not advance.
+    ///
+    /// The counterpart to `duress_forward_progress`, which was written when
+    /// any 4-to-8 digit value advanced. Letting a short PIN through meant
+    /// core rejected it later as a generic save failure, after the user had
+    /// confirmed it twice.
+// @internal
+    #[test]
+    fn duress_short_pin_does_not_advance(pin in "[0-9]{1,5}") {
+        let mut engine = make_duress();
+
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "configure".into(),
+        });
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "pin".into(),
+            value: pin,
+        });
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+
+        prop_assert!(
+            matches!(result, ActionResult::ValidationError { .. }),
+            "a short PIN must be refused at the field that collected it"
+        );
+        prop_assert_eq!(engine.current_screen().screen_id, "duress_enter_pin");
     }
 
     /// EmergencyShred: warning → confirm → type DELETE → wipe → wipe_complete → done = WipeComplete.

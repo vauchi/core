@@ -243,7 +243,7 @@ fn duress_unlock_from_secondary_device_should_queue_alert() {
     let mut secondary = secondary;
 
     secondary.setup_app_password("normal-pin-1234").unwrap();
-    secondary.setup_duress_password("duress-pin-9876").unwrap();
+    secondary.setup_duress_password("987654").unwrap();
     secondary
         .save_duress_settings(&DuressSettings {
             alert_contact_ids: vec![bob_id.clone()],
@@ -253,7 +253,7 @@ fn duress_unlock_from_secondary_device_should_queue_alert() {
         .unwrap();
 
     let mode = secondary
-        .authenticate("duress-pin-9876")
+        .authenticate("987654")
         .expect("duress unlock must succeed");
     assert_eq!(mode, AuthMode::Duress);
 

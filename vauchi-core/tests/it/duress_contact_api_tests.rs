@@ -28,7 +28,7 @@ fn setup_duress_with_decoy() -> (vauchi_core::Vauchi, String /* bob_real_id */) 
         .setup_app_password("normal-pin")
         .expect("setup app password");
     alice_wb
-        .setup_duress_password("duress-pin")
+        .setup_duress_password("112233")
         .expect("setup duress");
 
     let decoy_card = ContactCard::new("Decoy Dana");
@@ -36,7 +36,7 @@ fn setup_duress_with_decoy() -> (vauchi_core::Vauchi, String /* bob_real_id */) 
         .add_decoy_contact("decoy-dana", "Decoy Dana", &decoy_card)
         .expect("add decoy");
 
-    let mode = alice_wb.authenticate("duress-pin").expect("auth");
+    let mode = alice_wb.authenticate("112233").expect("auth");
     assert_eq!(mode, AuthMode::Duress);
 
     (alice_wb, bob_id)
@@ -215,7 +215,7 @@ fn test_all_apis_normal_mode_still_return_real() {
 
     alice_wb.setup_app_password("normal-pin").expect("setup");
     alice_wb
-        .setup_duress_password("duress-pin")
+        .setup_duress_password("112233")
         .expect("setup duress");
 
     let decoy_card = ContactCard::new("Decoy Dana");

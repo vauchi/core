@@ -226,7 +226,7 @@ fn completing_duress_setup_terminates_the_entry_flow() {
         .initial_commands()
         .expect("initial duress-entry commands");
 
-    let after_submit = drive_until_native_back(&mut app, commands, "duress-pin-9876", 12);
+    let after_submit = drive_until_native_back(&mut app, commands, "987654", 12);
 
     assert!(
         after_submit.contains(&Command::PerformNativeBack),

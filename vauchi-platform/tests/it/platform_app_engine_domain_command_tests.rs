@@ -1401,7 +1401,7 @@ fn setup_duress_password_enables_duress() {
         .expect("app pw");
     engine
         .dispatch_domain_command(DomainCommand::SetupDuressPassword {
-            duress_password: "duresspw".into(),
+            duress_password: "654321".into(),
         })
         .expect("duress");
 
@@ -1426,13 +1426,13 @@ fn authenticate_with_duress_password_returns_duress_mode() {
         .expect("app pw");
     engine
         .dispatch_domain_command(DomainCommand::SetupDuressPassword {
-            duress_password: "duresspw".into(),
+            duress_password: "654321".into(),
         })
         .expect("duress");
 
     match engine
         .dispatch_domain_command(DomainCommand::Authenticate {
-            password: "duresspw".into(),
+            password: "654321".into(),
         })
         .expect("auth")
     {
@@ -1455,7 +1455,7 @@ fn disable_duress_clears_duress_state() {
         .expect("app pw");
     engine
         .dispatch_domain_command(DomainCommand::SetupDuressPassword {
-            duress_password: "duresspw".into(),
+            duress_password: "654321".into(),
         })
         .expect("duress");
     engine

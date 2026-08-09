@@ -215,3 +215,64 @@ fn activating_a_navigation_destination_dismisses_the_overlay() {
         "choosing a destination must dismiss the navigation overlay; got {commands:#?}"
     );
 }
+
+/// Returning to the screen whose menu was open still opens that menu.
+///
+/// `open_overlay` is keyed by `(surface_id, kind)`, so a stale entry for a
+/// screen the user has left could make the next activation there resolve to
+/// a dismissal — the menu refusing to open once, for no visible reason.
+///
+/// This passes with or without the dismissal in `handle_event`; it is a
+/// regression guard on the toggle state surviving a round trip, not
+/// evidence for that change. It exists because an earlier version of this
+/// test only *looked* like it navigated back — `context_interaction`
+/// re-reads the bar from whatever surface is current, so it was asserting
+/// about Groups while claiming to be home.
+// @internal
+#[test]
+fn the_menu_reopens_after_navigating_away_and_back() {
+    fn destination(commands: &[Command], suffix: &str) -> String {
+        commands
+            .iter()
+            .find_map(|command| match command {
+                Command::PresentOverlay { overlay, .. } => overlay
+                    .items
+                    .iter()
+                    .find(|item| item.interaction_id.as_str().ends_with(suffix))
+                    .map(|item| item.interaction_id.as_str().to_owned()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("navigation overlay must offer `{suffix}`"))
+    }
+
+    let mut engine = engine_with_identity();
+    let (home_surface, home_nav) = context_interaction(&mut engine, "navigation");
+    let opened = activate(&mut engine, &home_surface, &home_nav);
+    let groups = destination(&opened, "groups");
+    activate(&mut engine, &home_surface, &groups);
+
+    // Now genuinely on Groups: its own bar, its own surface id.
+    let (groups_surface, groups_nav) = context_interaction(&mut engine, "navigation");
+    assert_ne!(
+        groups_surface, home_surface,
+        "the engine must actually have moved to another surface"
+    );
+    let opened_on_groups = activate(&mut engine, &groups_surface, &groups_nav);
+    let my_info = destination(&opened_on_groups, "my_info");
+    activate(&mut engine, &groups_surface, &my_info);
+
+    // Home again — the affordance must present, not toggle closed.
+    let (home_again, nav_again) = context_interaction(&mut engine, "navigation");
+    assert_eq!(
+        home_again, home_surface,
+        "navigation should have returned to the original surface"
+    );
+    let reopened = activate(&mut engine, &home_again, &nav_again);
+
+    assert!(
+        reopened
+            .iter()
+            .any(|c| matches!(c, Command::PresentOverlay { .. })),
+        "the menu must open again after a round trip; got {reopened:#?}"
+    );
+}

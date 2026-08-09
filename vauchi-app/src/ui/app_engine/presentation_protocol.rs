@@ -73,6 +73,28 @@ impl AppEngine {
             .collect()
     }
 
+    /// Close whatever overlay is open, because the user acted on something
+    /// inside it.
+    ///
+    /// `resolve_overlay_toggle` only closes an overlay when the affordance
+    /// that opened it is activated again; the shell only reports
+    /// `OverlayDismissed` for a tap-outside or Close. Choosing an item —
+    /// a navigation destination, an action-list entry — was neither, so
+    /// the menu stayed on screen over the destination it had just opened.
+    /// That presented as the destination "not working".
+    ///
+    /// Returns the command batch to prepend, empty when nothing is open.
+    fn dismiss_open_overlay(&mut self) -> Vec<Command> {
+        let Some((surface_id, kind)) = self.open_overlay.take() else {
+            return Vec::new();
+        };
+        vec![Command::DismissOverlay {
+            surface_id,
+            revision: self.surface_revision,
+            kind,
+        }]
+    }
+
     /// Forget the open overlay when the shell reports it dismissed itself
     /// (tap outside, Close). Without this the next activation would toggle
     /// closed against state that no longer matches the screen.
@@ -180,7 +202,13 @@ impl AppEngine {
             }
             ContextualSurfaceRoute::UserAction(action) => {
                 self.activate_visible_screen(event_screen);
-                self.reduce_user_action(action, cause)
+                let dismissal = self.dismiss_open_overlay();
+                let mut commands = self.reduce_user_action(action, cause)?;
+                // Prepended: the shell applies the batch in order, so the
+                // menu must close before the destination renders, or it
+                // covers the screen the user just chose.
+                commands.splice(0..0, dismissal);
+                Ok(commands)
             }
         }
     }

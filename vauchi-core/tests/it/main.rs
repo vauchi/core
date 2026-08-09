@@ -185,6 +185,7 @@ mod duress_alert_secondary_device_tests;
 mod duress_contact_api_tests;
 mod duress_pin_engine_tests;
 mod duress_pin_tests;
+mod duress_pin_validation_tests;
 mod edge_cases_tests;
 mod emergency_broadcast_tests;
 mod emergency_shred_engine_tests;

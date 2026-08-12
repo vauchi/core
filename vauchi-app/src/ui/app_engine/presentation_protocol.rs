@@ -245,11 +245,23 @@ impl AppEngine {
         screen: &crate::ui::ScreenModel,
     ) -> Result<ContextualSurface, ContextualSurfaceError> {
         let locale = self.render_context.resolved_locale();
+        // A locked app publishes no destinations. Composing them anyway put a
+        // navigation overlay on the lock surface and registered every entry as
+        // a routed `NavigateToTab`, so two taps reached the whole app without
+        // the password — and because Core supplies the bar, every shell
+        // inherited it (2026-08-12-android-app-password-bypass). Dispatch
+        // refuses the route as well; an affordance that is never offered and a
+        // route that always refuses fail independently.
+        let destinations = if self.is_locked() {
+            Vec::new()
+        } else {
+            self.sidebar_items(locale)
+        };
         ContextualSurface::compose_revisioned(
             surface_id,
             self.surface_revision,
             screen,
-            &self.sidebar_items(locale),
+            &destinations,
             &self.t("nav.more"),
             &self.t("action_list.title"),
         )

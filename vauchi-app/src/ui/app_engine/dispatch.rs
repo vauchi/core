@@ -106,6 +106,15 @@ impl AppEngine {
         // where it is rather than navigating somewhere wrong — same
         // unknown-id stance as `route_result` (`from_screen_id` → `None`).
         if let UserAction::NavigateToTab { action_id } = action {
+            // A locked app goes nowhere but through the password. Surface
+            // composition already withholds these destinations, so reaching
+            // here means a stale id from an earlier revision or a composition
+            // path that regressed — either way the route refuses, and the two
+            // guards fail independently
+            // (2026-08-12-android-app-password-bypass).
+            if self.is_locked() {
+                return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+            }
             return Some(match AppScreen::from_screen_id(action_id) {
                 Some(target) => ActionResult::NavigateTo(self.navigate_to(target)),
                 None => ActionResult::UpdateScreen(self.engine.current_screen()),

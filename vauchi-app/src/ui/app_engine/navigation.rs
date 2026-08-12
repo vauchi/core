@@ -166,6 +166,16 @@ impl AppEngine {
         self.set_initial_screen(screen)
     }
 
+    /// Whether the app is sitting behind the password gate.
+    ///
+    /// Surface composition withholds every destination while this holds, and
+    /// dispatch refuses `NavigateToTab`. Both consult this so the two guards
+    /// cannot disagree about what "locked" means
+    /// (`problems/2026-08-12-android-app-password-bypass`).
+    pub(super) fn is_locked(&self) -> bool {
+        matches!(self.screen, AppScreen::Lock)
+    }
+
     /// Navigate without pushing to history (used by back-navigation and completion routing).
     pub(super) fn navigate_to_internal(&mut self, screen: AppScreen) -> ScreenModel {
         // Refresh identity from storage if a sibling `Vauchi` instance

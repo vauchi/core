@@ -112,6 +112,7 @@ mod transport_readiness_wiring_tests;
 // Needs `FakeClock`, behind `vauchi-core/testing`. Gated so plain
 // `cargo clippy --all-targets` (no testing feature) still compiles.
 mod context_bar_overlay_toggle_tests;
+mod lock_screen_navigation_tests;
 #[cfg(feature = "testing")]
 mod multi_stage_persist_reciprocity_tests;
 #[cfg(feature = "testing")]

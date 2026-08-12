@@ -247,7 +247,14 @@ impl DuressPinEngine {
     fn confirm_pin_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "duress_confirm_pin".into(),
-            title: self.t("resistance.duress.confirm_pin"),
+            // Titled like the entry step rather than repeating the field's
+            // own label: shells derive the surface's accessibility label from
+            // the title, so reusing `confirm_pin` here put the same string on
+            // the surface, the heading, the input and the input's label. A
+            // screen reader then announced "Confirm Duress PIN" four times
+            // with nothing to distinguish the field, and anything selecting by
+            // label reached the surface instead of the input.
+            title: self.t("resistance.duress.setup"),
             subtitle: None,
             components: vec![Component::PinInput {
                 id: "confirm_pin".into(),

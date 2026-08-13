@@ -9,8 +9,8 @@
 //! Replaces WebSocket for relay communication — request/response model
 //! suited for contact card sync (not real-time chat).
 
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, RwLock};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -168,7 +168,11 @@ impl HttpTransportConfig {
 pub struct HttpTransport {
     config: HttpTransportConfig,
     agent: Result<ureq::Agent, NetworkError>,
-    ohttp: Option<OhttpClient>,
+    /// Behind a lock so a stale-key rejection can swap in a freshly
+    /// fetched key from `&self` request paths (`post_action`), which is
+    /// where the relay's 24 h key rotation surfaces. A read guard is held
+    /// across the round-trip, so concurrent requests still proceed.
+    ohttp: RwLock<Option<OhttpClient>>,
     last_version_policy: Mutex<Option<VersionPolicy>>,
     /// Count of `post_action` calls that took the direct-HTTP branch
     /// because OHTTP was not configured. Every tick represents one
@@ -190,7 +194,7 @@ impl HttpTransport {
         Self {
             config,
             agent,
-            ohttp: None,
+            ohttp: RwLock::new(None),
             last_version_policy: Mutex::new(None),
             direct_fallback_count: AtomicU64::new(0),
         }
@@ -212,7 +216,7 @@ impl HttpTransport {
     /// validate the `Key-Fingerprint` response header against a pinned value
     /// before passing the key here.
     pub fn set_ohttp(&mut self, client: OhttpClient) {
-        self.ohttp = Some(client);
+        *self.ohttp_slot() = Some(client);
     }
 
     /// Remove the OHTTP client, reverting to direct HTTP requests.
@@ -220,12 +224,28 @@ impl HttpTransport {
     /// Use when key bootstrap fails during rotation and the transport needs
     /// to fall back to re-fetching the key before re-enabling OHTTP.
     pub fn clear_ohttp(&mut self) {
-        self.ohttp = None;
+        *self.ohttp_slot() = None;
     }
 
     /// Returns whether OHTTP encryption is active.
     pub fn has_ohttp(&self) -> bool {
-        self.ohttp.is_some()
+        self.ohttp_reader().is_some()
+    }
+
+    /// Read guard over the OHTTP client. Poisoning would mean a panic
+    /// while the lock was held, which nothing here can do — it only moves
+    /// and reads the client — so recovering beats propagating.
+    fn ohttp_reader(&self) -> std::sync::RwLockReadGuard<'_, Option<OhttpClient>> {
+        self.ohttp
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Write guard over the OHTTP client. See [`Self::ohttp_reader`].
+    fn ohttp_slot(&self) -> std::sync::RwLockWriteGuard<'_, Option<OhttpClient>> {
+        self.ohttp
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// Returns the relay URL.
@@ -571,7 +591,7 @@ impl HttpTransport {
             obj.insert("escrow_action".to_string(), action);
         }
 
-        let value: serde_json::Value = if let Some(ohttp) = &self.ohttp {
+        let value: serde_json::Value = if let Some(ohttp) = &*self.ohttp_reader() {
             self.post_via_ohttp(ohttp, "escrow", &body)?
         } else if self.config.allow_direct {
             self.direct_fallback_count.fetch_add(1, Ordering::Relaxed);
@@ -687,7 +707,7 @@ impl HttpTransport {
         action: &str,
         body: &Req,
     ) -> Result<V2Response, NetworkError> {
-        if let Some(ohttp) = &self.ohttp {
+        if let Some(ohttp) = &*self.ohttp_reader() {
             self.post_via_ohttp(ohttp, action, body)
         } else if self.config.allow_direct {
             // Direct-HTTP fallback exposes the caller's source IP to the

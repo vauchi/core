@@ -591,8 +591,10 @@ impl HttpTransport {
             obj.insert("escrow_action".to_string(), action);
         }
 
-        let value: serde_json::Value = if let Some(ohttp) = &*self.ohttp_reader() {
-            self.post_via_ohttp(ohttp, "escrow", &body)?
+        // Deliberately not binding the read guard: the refresh path needs the
+        // write lock, and `RwLock` is not reentrant.
+        let value: serde_json::Value = if self.ohttp_reader().is_some() {
+            self.post_via_ohttp_refreshing_stale_key("escrow", &body)?
         } else if self.config.allow_direct {
             self.direct_fallback_count.fetch_add(1, Ordering::Relaxed);
             let url = format!("{}/v2/escrow", self.config.relay_url);
@@ -732,11 +734,16 @@ impl HttpTransport {
     /// until reinstall: `api::vauchi::sync_http` carries its own
     /// evict-refetch-retry, so sync self-heals after each rotation while
     /// device linking did not (2026-05-25-relay-ohttp-forward-hop-502).
-    fn post_via_ohttp_refreshing_stale_key<Req: Serialize>(
+    ///
+    /// `escrow` calls this directly rather than through `post_action`
+    /// because it posts a bare `EscrowResponse` instead of a `V2Response` —
+    /// which is why it stayed broken after the device-link fix and left
+    /// link-mode exchange depositing nothing.
+    fn post_via_ohttp_refreshing_stale_key<Req: Serialize, Resp: serde::de::DeserializeOwned>(
         &self,
         action: &str,
         body: &Req,
-    ) -> Result<V2Response, NetworkError> {
+    ) -> Result<Resp, NetworkError> {
         let first = {
             let guard = self.ohttp_reader();
             match guard.as_ref() {

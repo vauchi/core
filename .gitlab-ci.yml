@@ -674,7 +674,15 @@ test:app:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - cargo nextest run --profile ci -p vauchi-app --features test-kdf
+    # network-http is not in vauchi-app's defaults, and `-p` builds the
+    # package alone rather than the workspace — so without it, everything
+    # behind `cfg(all(feature = "network-http", feature = "storage"))`
+    # compiles out and is never tested here. That silently excluded the
+    # whole device-link initiator (25 tests). Local `just check core`
+    # builds the workspace, where vauchi-platform enables the feature and
+    # unification hides the gap, so a test can pass locally and vanish in
+    # CI. No network is touched: those tests drive fakes.
+    - cargo nextest run --profile ci -p vauchi-app --features test-kdf,network-http
   artifacts:
     when: always
     reports:

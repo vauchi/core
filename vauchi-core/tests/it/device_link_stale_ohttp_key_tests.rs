@@ -26,6 +26,8 @@
 #![cfg(feature = "network-http")]
 
 use crate::common::mock_relay::{CannedResponse, MockRelay};
+use vauchi_protocol::escrow::EscrowMessage;
+
 use vauchi_core::network::OhttpClient;
 use vauchi_core::network::http_transport::{HttpTransport, HttpTransportConfig};
 
@@ -98,6 +100,43 @@ fn device_link_refetches_the_ohttp_key_after_a_stale_key_rejection() {
         paths.iter().filter(|p| p.ends_with("/v2/ohttp")).count(),
         2,
         "the request must be retried once after the key is refreshed. \
+         Requests seen: {paths:?}"
+    );
+}
+
+// @scenario: ohttp_stale_key :: link-mode exchange recovers from a rotated relay key
+#[test]
+fn escrow_refetches_the_ohttp_key_after_a_stale_key_rejection() {
+    let mock = MockRelay::start();
+    mock.set_default(CannedResponse::status(400));
+    mock.queue("ohttp-key", key_response());
+
+    let mut transport = HttpTransport::new(HttpTransportConfig::for_testing(mock.url(), 2_000));
+    transport.set_ohttp(test_ohttp_client());
+
+    let result = transport.escrow(&EscrowMessage::Count {
+        gate_hash: "ab".repeat(32),
+    });
+
+    assert!(
+        result.is_err(),
+        "the retry also hits a refusing relay here, so the call still fails"
+    );
+
+    let paths: Vec<String> = mock.received().iter().map(|r| r.path.clone()).collect();
+
+    assert!(
+        paths.iter().any(|p| p.contains("ohttp-key")),
+        "escrow reaches the relay through its own OHTTP call rather than \
+         `post_action`, so it must refresh a rotated key itself — otherwise \
+         link-mode exchange deposits nothing and both peers wait forever. \
+         Requests seen: {paths:?}"
+    );
+
+    assert_eq!(
+        paths.iter().filter(|p| p.ends_with("/v2/ohttp")).count(),
+        2,
+        "the escrow request must be retried once after the key is refreshed. \
          Requests seen: {paths:?}"
     );
 }

@@ -152,6 +152,35 @@ fn a_session_that_cannot_start_renders_the_failure_not_the_spinner() {
     );
 }
 
+// The poll tick advances the machine, pushes the new step into the cached
+// engine, then fires invalidation so the shell re-reads it. The shell echoes
+// `PresentationInvalidated`, which calls `invalidate_all` — and that used to
+// clear the engine cache and rebuild a fresh `DeviceLinkingEngine` at its
+// default `QrPending`. The invalidation destroyed the very state it was fired
+// to publish, so device linking sat on "Generating link..." forever with a
+// valid QR held in Core (observed on a Pixel 3a, 2026-08-13:
+// `qr_ready: applied=true screen_id=link_waiting` followed 20ms later by
+// `initial_commands: screen_id=link_qr_pending`).
+// @scenario: pair5_device_link_bridge :: invalidation keeps a live session
+#[test]
+fn invalidation_does_not_discard_a_live_device_link_session() {
+    let mut engine = engine_on_device_linking();
+    let _ = engine.device_link_qr_ready("vauchi://join?x=1".into(), 1_700_000_300);
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "link_waiting",
+        "precondition: the QR was published"
+    );
+
+    engine.invalidate_all();
+
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "link_waiting",
+        "invalidation must not discard the QR the poll tick just published"
+    );
+}
+
 // @scenario: pair5_device_link_bridge :: on_completed transitions to terminal Complete screen
 #[test]
 fn completed_bridge_renders_complete_screen() {

@@ -389,7 +389,7 @@ impl AppEngine {
     /// (2026-07-01-android-contacts-list-stale-after-mutation).
     pub fn invalidate_screen(&mut self, screen: &AppScreen) {
         self.engine_cache.remove(screen);
-        if *screen == self.screen {
+        if *screen == self.screen && !Self::holds_live_machine_state(screen) {
             self.engine = Self::create_engine(
                 &self.vauchi,
                 &self.screen,
@@ -401,6 +401,35 @@ impl AppEngine {
                 self.glance_display_qr.as_deref(),
             );
         }
+    }
+
+    /// Screens whose engine holds state advanced by a background machine
+    /// rather than derived from storage.
+    ///
+    /// Rebuilding one discards the transition the invalidation was fired to
+    /// publish. The device-link poll tick pushes `QrReady` into the cached
+    /// engine and fires invalidation so the shell re-reads it; the shell
+    /// echoes `PresentationInvalidated`, and rebuilding here reset the
+    /// engine to its default `QrPending`. Linking therefore sat on
+    /// "Generating link..." forever while Core held a valid QR — observed on
+    /// a Pixel 3a with `applied=true screen_id=link_waiting` followed 20ms
+    /// later by `screen_id=link_qr_pending`.
+    ///
+    /// These are the same screens `poll_tick_invalidation_targets` re-fetches
+    /// on every wakeup: needing the re-fetch and surviving it are two halves
+    /// of the same property.
+    fn holds_live_machine_state(screen: &AppScreen) -> bool {
+        matches!(
+            screen,
+            AppScreen::DeviceLinking
+                | AppScreen::DeviceLinkJoin { .. }
+                | AppScreen::LinkExchange
+                | AppScreen::DeepLinkResponder { .. }
+                | AppScreen::MultiStageExchange { .. }
+                | AppScreen::BleExchange { .. }
+                | AppScreen::NfcExchange
+                | AppScreen::DirectTransport
+        )
     }
 
     /// Invalidates all cached engines. Use after bulk mutations.

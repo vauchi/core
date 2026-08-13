@@ -13,6 +13,9 @@
 #[cfg(feature = "network-http")]
 pub mod device_link_relay;
 
+/// Host-side rendezvous for local (non-relay) device linking, ADR-070.
+pub mod local_rendezvous;
+
 #[cfg(all(feature = "network-http", feature = "storage"))]
 pub mod device_link_machine;
 

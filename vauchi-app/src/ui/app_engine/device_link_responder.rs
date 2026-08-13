@@ -28,7 +28,7 @@ use vauchi_core::exchange::DeviceLinkJoinInvitation;
 use vauchi_core::network::HttpTransport;
 
 /// QR-expiry / relay-poll budget (ADR-035 device-link window = 300 s).
-pub(crate) const RELAY_TIMEOUT_SECS: u64 = 300;
+pub(crate) const QR_WINDOW_SECS: u64 = 300;
 
 /// Holds the responder machine plus the broker it posts on. The broker is
 /// boxed so tests can inject a fake without changing the holder's shape.
@@ -74,7 +74,7 @@ impl AppEngine {
             .map_err(|e| format!("invalid invitation: {e}"))?;
         let broker: Box<dyn DeviceLinkBroker + Send> =
             Box::new(self.build_device_link_transport(invitation.relay_url.as_deref())?);
-        let machine = DeviceLinkResponderMachine::new(invitation, device_name, RELAY_TIMEOUT_SECS)
+        let machine = DeviceLinkResponderMachine::new(invitation, device_name, QR_WINDOW_SECS)
             .map_err(|e| format!("cannot start responder: {e}"))?;
         self.device_link_responder = Some(DeviceLinkResponderHolder { machine, broker });
         Ok(())

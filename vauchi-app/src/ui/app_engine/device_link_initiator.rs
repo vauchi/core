@@ -27,7 +27,7 @@ use crate::ui::ActionResult;
 use vauchi_core::network::HttpTransport;
 
 /// QR-expiry / relay-listen budget (ADR-035 device-link window = 300 s).
-pub(crate) const RELAY_TIMEOUT_SECS: u64 = 300;
+pub(crate) const QR_WINDOW_SECS: u64 = 300;
 
 /// Holds the initiator machine plus the relay broker it offered on;
 /// `advance` polls the same broker each tick. Boxed as a trait object so
@@ -82,7 +82,7 @@ impl AppEngine {
         let machine = DeviceLinkInitiatorMachine::new(
             initiator,
             identity_id,
-            RELAY_TIMEOUT_SECS,
+            QR_WINDOW_SECS,
             Some(persistence),
         );
         self.device_link_initiator = Some(DeviceLinkInitiatorHolder {
@@ -286,8 +286,7 @@ mod tests {
             let initiator = identity.create_device_link_initiator(registry, now);
             (initiator, hex::encode(identity.signing_public_key()))
         };
-        let machine =
-            DeviceLinkInitiatorMachine::new(initiator, identity_id, RELAY_TIMEOUT_SECS, None);
+        let machine = DeviceLinkInitiatorMachine::new(initiator, identity_id, QR_WINDOW_SECS, None);
         app.device_link_initiator = Some(DeviceLinkInitiatorHolder {
             machine,
             // Fake broker whose offer succeeds → machine reaches AwaitingClaim.

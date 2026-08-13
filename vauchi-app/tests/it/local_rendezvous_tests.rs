@@ -12,6 +12,9 @@
 //! existing `FakeBroker`s are stubs returning a fixed code and an empty
 //! claim, so they pin the machines' call ordering and say nothing about
 //! what a broker must actually do.
+//!
+//! The broker tests are gated on `network-http` because the
+//! `DeviceLinkBroker` trait lives behind that feature.
 
 use vauchi_app::orchestrator::local_rendezvous::{RendezvousError, SingleCeremonyRendezvous};
 
@@ -94,4 +97,61 @@ fn one_instance_serves_one_ceremony() {
         r.offer(CODE.to_string(), "b64-other".to_string()),
         Err(RendezvousError::AlreadyOffered)
     );
+}
+
+#[cfg(feature = "network-http")]
+mod broker {
+    use super::{CODE, OFFERED, RESPONSE};
+    use std::sync::Arc;
+    use vauchi_app::orchestrator::device_link_relay::DeviceLinkBroker;
+    use vauchi_app::orchestrator::local_rendezvous::{
+        LocalDeviceLinkBroker, SingleCeremonyRendezvous,
+    };
+    use vauchi_core::network::NetworkError;
+
+    // @scenario: local_device_link :: a non-relay broker satisfies the same contract
+    #[test]
+    fn a_local_broker_serves_the_whole_offer_claim_complete_cycle() {
+        let rendezvous = Arc::new(SingleCeremonyRendezvous::new());
+        let owned = LocalDeviceLinkBroker::new(CODE.to_string(), rendezvous);
+        // Held as a trait object on purpose: the machines only ever see
+        // `&dyn DeviceLinkBroker`, so that is the shape that must work.
+        let broker: &dyn DeviceLinkBroker = &owned;
+
+        let code = broker
+            .exchange_offer(OFFERED, Some(300))
+            .expect("offer accepted");
+        assert_eq!(code, CODE);
+        assert_eq!(
+            broker.exchange_complete(&code).expect("poll before claim"),
+            None
+        );
+        assert_eq!(
+            broker.exchange_claim(&code, RESPONSE).expect("claim"),
+            OFFERED
+        );
+        assert_eq!(
+            broker.exchange_complete(&code).expect("poll after claim"),
+            Some(RESPONSE.to_string())
+        );
+    }
+
+    // @scenario: local_device_link :: a refusal reaches the caller as a network error
+    #[test]
+    fn a_refusal_surfaces_as_a_network_error() {
+        let rendezvous = Arc::new(SingleCeremonyRendezvous::new());
+        let broker = LocalDeviceLinkBroker::new(CODE.to_string(), rendezvous);
+        broker
+            .exchange_offer(OFFERED, None)
+            .expect("offer accepted");
+
+        let err = broker
+            .exchange_claim("WRONG", RESPONSE)
+            .expect_err("a wrong code must be refused");
+
+        assert!(
+            matches!(err, NetworkError::RelayRejected(_)),
+            "a refusal must reach the machine as a rejection, got {err:?}"
+        );
+    }
 }

@@ -19,6 +19,10 @@
 //!
 //! The code is supplied rather than minted here so the type stays pure and
 //! deterministic under test; callers mint it from the app's secure RNG.
+//!
+//! The rendezvous itself is plain `std` and always available. The
+//! [`DeviceLinkBroker`] implementation below is gated on `network-http`,
+//! because the trait it satisfies lives behind that feature.
 
 use std::sync::Mutex;
 
@@ -113,3 +117,64 @@ impl SingleCeremonyRendezvous {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 }
+
+#[cfg(feature = "network-http")]
+mod broker {
+    use super::{RendezvousError, SingleCeremonyRendezvous};
+    use crate::orchestrator::device_link_relay::DeviceLinkBroker;
+    use std::sync::Arc;
+    use vauchi_core::network::NetworkError;
+
+    /// A [`DeviceLinkBroker`] served by a local rendezvous, not the relay.
+    ///
+    /// The machines are indifferent to which one they hold — that
+    /// indifference is the basis of ADR-070, and these tests exist to keep
+    /// it true.
+    ///
+    /// The code is minted by the caller from the app's secure RNG and
+    /// handed in, because on a LAN there is no third party to mint one.
+    pub struct LocalDeviceLinkBroker {
+        code: String,
+        rendezvous: Arc<SingleCeremonyRendezvous>,
+    }
+
+    impl LocalDeviceLinkBroker {
+        /// Serve `rendezvous` under a caller-minted `code`.
+        pub fn new(code: String, rendezvous: Arc<SingleCeremonyRendezvous>) -> Self {
+            Self { code, rendezvous }
+        }
+    }
+
+    /// `RelayRejected` predates non-relay brokers; it is the refusal
+    /// variant regardless of who is refusing.
+    fn refused(e: RendezvousError) -> NetworkError {
+        NetworkError::RelayRejected(e.to_string())
+    }
+
+    impl DeviceLinkBroker for LocalDeviceLinkBroker {
+        /// `expires_secs` is ignored: the ceremony deadline belongs to the
+        /// machine (ADR-035's QR window), not the pipe, so a local
+        /// rendezvous has nothing to expire independently.
+        fn exchange_offer(
+            &self,
+            payload_b64: &str,
+            _expires_secs: Option<u64>,
+        ) -> Result<String, NetworkError> {
+            self.rendezvous
+                .offer(self.code.clone(), payload_b64.to_string())
+                .map_err(refused)?;
+            Ok(self.code.clone())
+        }
+
+        fn exchange_claim(&self, code: &str, response_b64: &str) -> Result<String, NetworkError> {
+            self.rendezvous.claim(code, response_b64).map_err(refused)
+        }
+
+        fn exchange_complete(&self, code: &str) -> Result<Option<String>, NetworkError> {
+            self.rendezvous.complete(code).map_err(refused)
+        }
+    }
+}
+
+#[cfg(feature = "network-http")]
+pub use broker::LocalDeviceLinkBroker;

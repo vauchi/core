@@ -124,7 +124,32 @@ fn retry_from_expired_emits_device_link_retry_and_advances_to_pending() {
         matches!(result, ActionResult::DeviceLinkRetry),
         "expected DeviceLinkRetry, got {result:?}"
     );
+    // Retry drops the stale machine and builds a fresh one, so this now
+    // asserts a session that actually started. It passed before only because
+    // build failures were silent and the engine's default screen — the same
+    // spinner — showed through without an initiator ever existing.
     assert_eq!(engine.current_screen().screen_id, "link_qr_pending");
+}
+
+// `ensure_device_link_session` treated a build failure as non-fatal and
+// returned, leaving the `DeviceLinkingEngine` default on screen — and that
+// default is the `link_qr_pending` spinner. No machine was stored either, so
+// every later `advance_device_link_session()` returned at its `None` arm and
+// nothing ever cleared it. Observed on a Pixel 3a as "Generating link..."
+// past 150s (2026-08-13-device-link-generation-never-completes).
+// @scenario: pair5_device_link_bridge :: a session that cannot start reports instead of spinning
+#[test]
+fn a_session_that_cannot_start_renders_the_failure_not_the_spinner() {
+    // No identity, so `build_device_link_initiator` fails on its first step.
+    let vauchi = Vauchi::in_memory().unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let _ = engine.navigate_to(AppScreen::DeviceLinking);
+
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "link_failed",
+        "a device-link session that cannot be built must say so, not spin"
+    );
 }
 
 // @scenario: pair5_device_link_bridge :: on_completed transitions to terminal Complete screen

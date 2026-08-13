@@ -556,11 +556,16 @@ impl Vauchi {
         rng: Arc<dyn SecureRng>,
     ) -> VauchiResult<Self> {
         let storage_key = SymmetricKey::generate();
-        let storage = Storage::in_memory(storage_key)?.with_clock(clock.clone());
+        let storage = Storage::in_memory(storage_key.clone())?.with_clock(clock.clone());
         let events = Arc::new(EventDispatcher::new());
 
         Ok(Vauchi {
-            config: VauchiConfig::default(),
+            // Config must name the key `Storage` is actually using. Leaving it
+            // unset made `config().storage_key` disagree with reality, so
+            // anything reading it — device-link persistence — failed to build
+            // in every in-memory test, silently
+            // (2026-08-13-device-link-generation-never-completes).
+            config: VauchiConfig::default().with_storage_key(storage_key),
             identity: None,
             storage,
             events,

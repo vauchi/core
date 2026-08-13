@@ -63,6 +63,15 @@ impl AppEngine {
                 Ok(parts) => parts,
                 Err(e) => {
                     tracing::warn!("device-link: cannot start initiator: {e}");
+                    // Surface it rather than falling back to the engine
+                    // default: that default is the QrPending spinner, and
+                    // with no machine stored every later
+                    // `advance_device_link_session()` returns at its `None`
+                    // arm, so nothing ever clears it. `failure_detail` maps
+                    // an unrecognised reason to honest generic copy, so the
+                    // raw build error never reaches the screen
+                    // (2026-08-13-device-link-generation-never-completes).
+                    let _ = self.device_link_failed(e);
                     return;
                 }
             };
@@ -98,6 +107,13 @@ impl AppEngine {
             Some(holder) => holder.machine.advance(holder.transport.as_ref(), now),
             None => return false,
         };
+        // Only transitions, never the idle tick: this runs every ~30s on any
+        // screen. Without it a relay rejection is invisible — the offer
+        // failing with HTTP 502 was diagnosable only by instrumenting this
+        // line (2026-08-13-device-link-generation-never-completes).
+        if !matches!(event, InitiatorEvent::None) {
+            tracing::info!("device-link: advance -> {event:?}");
+        }
         self.apply_initiator_event(event)
     }
 

@@ -674,6 +674,65 @@ mod tests {
         assert_eq!(m.phase(), InitiatorPhase::Completed);
     }
 
+    /// The headline claim of ADR-070 Phase 1: a whole ceremony runs with
+    /// no relay in it. Uses the real rendezvous rather than `FakeBroker`,
+    /// so the claim genuinely travels initiator → rendezvous → initiator,
+    /// and real crypto throughout (ADR-002 — nothing mocked).
+    ///
+    /// If the local broker stopped wiring through, the claim would never
+    /// reach the machine and the second advance would not be
+    /// `ConfirmationRequired`.
+    // @internal
+    #[test]
+    fn a_whole_ceremony_runs_against_a_local_broker_with_no_relay() {
+        use crate::orchestrator::local_rendezvous::{
+            LocalDeviceLinkBroker, SingleCeremonyRendezvous,
+        };
+        use std::sync::Arc;
+
+        let initiator = build_initiator("Alice", 0x11);
+        let claim_b64 = responder_claim_b64(&initiator, "RESP_CODE");
+        let rendezvous = Arc::new(SingleCeremonyRendezvous::new());
+        let broker = LocalDeviceLinkBroker::new("LOCAL".to_string(), Arc::clone(&rendezvous));
+        let mut m = machine(initiator);
+
+        // The offer lands in the local rendezvous; no relay is reachable.
+        let e0 = m.advance(&broker, NOW);
+        assert!(
+            matches!(e0, InitiatorEvent::QrReady { .. }),
+            "expected QrReady, got {e0:?}"
+        );
+
+        // The joiner opens its response channel, whose code it embeds in
+        // the claim below. The initiator claims *that* in `Finalizing` to
+        // deliver its response — the second leg of the ceremony.
+        rendezvous
+            .offer("RESP_CODE".to_string(), "b64-joiner-channel".to_string())
+            .expect("joiner opens its response channel");
+
+        // The joiner deposits its claim through the same rendezvous — the
+        // step the relay would otherwise have brokered.
+        rendezvous
+            .claim("LOCAL", &claim_b64)
+            .expect("joiner claims the ceremony");
+
+        let e1 = m.advance(&broker, NOW + 1);
+        let code = match e1 {
+            InitiatorEvent::ConfirmationRequired {
+                confirmation_code, ..
+            } => confirmation_code,
+            other => panic!("expected ConfirmationRequired, got {other:?}"),
+        };
+
+        let _ = m.confirm_manual(code, NOW + 2);
+        let e3 = m.advance(&broker, NOW + 3);
+        assert!(
+            matches!(e3, InitiatorEvent::Completed { .. }),
+            "expected Completed, got {e3:?}"
+        );
+        assert_eq!(m.phase(), InitiatorPhase::Completed);
+    }
+
     // @internal
     #[test]
     fn deny_fails_with_user_denied() {

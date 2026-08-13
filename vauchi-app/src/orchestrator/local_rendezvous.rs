@@ -10,39 +10,53 @@
 //! already sees the peer's payload by virtue of being the peer, so hosting
 //! adds no exposure.
 //!
-//! One instance serves exactly one ceremony. That is the whole security
-//! posture: there is no code space to enumerate, no second ceremony to
-//! confuse it with, and nothing to garbage-collect.
+//! # One ceremony, two legs
+//!
+//! A device-link ceremony is not one code. The initiator offers under its
+//! own code and the joiner claims it; the joiner separately offers a
+//! *response channel*, whose code it embeds in that claim, and the
+//! initiator claims **that** to deliver its response
+//! (`device_link_machine.rs` `Finalizing`). Both legs need a rendezvous,
+//! and on a LAN there is only this one — so it holds up to
+//! [`MAX_CEREMONY_SLOTS`] offers.
+//!
+//! That bound is the security posture: only codes someone explicitly
+//! offered exist, there is no space to enumerate, each is claimable once,
+//! and a ceremony cannot grow past its two legs.
 //!
 //! Payloads are opaque base64 (ADR-004). This type never interprets them,
 //! which is what lets a non-relay broker be safe at all.
 //!
-//! The code is supplied rather than minted here so the type stays pure and
-//! deterministic under test; callers mint it from the app's secure RNG.
+//! Codes are supplied rather than minted here so the type stays pure and
+//! deterministic under test; callers mint them from the app's secure RNG.
 //!
-//! The rendezvous itself is plain `std` and always available. The
+//! The rendezvous is plain `std` and always available. The
 //! [`DeviceLinkBroker`] implementation below is gated on `network-http`,
 //! because the trait it satisfies lives behind that feature.
 
 use std::sync::Mutex;
 
+/// A ceremony has exactly two legs: the initiator's offer and the
+/// joiner's response channel.
+pub const MAX_CEREMONY_SLOTS: usize = 2;
+
 /// Why a rendezvous operation was refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RendezvousError {
-    /// A ceremony is already offered — one instance serves exactly one.
-    #[error("rendezvous already holds a ceremony")]
+    /// Both legs are already offered, or this code is.
+    #[error("rendezvous is full or already holds this code")]
     AlreadyOffered,
 
-    /// No ceremony is offered, or the code does not match the one held.
+    /// No offer exists under this code.
     #[error("unknown rendezvous code")]
     UnknownCode,
 
-    /// A peer already claimed this ceremony.
+    /// A peer already claimed this code.
     #[error("rendezvous already claimed")]
     AlreadyClaimed,
 }
 
-struct Ceremony {
+struct Slot {
     code: String,
     offered: String,
     response: Option<String>,
@@ -51,22 +65,25 @@ struct Ceremony {
 /// Host-side state for one local device-link ceremony.
 #[derive(Default)]
 pub struct SingleCeremonyRendezvous {
-    ceremony: Mutex<Option<Ceremony>>,
+    slots: Mutex<Vec<Slot>>,
 }
 
 impl SingleCeremonyRendezvous {
-    /// Empty rendezvous, holding no ceremony.
+    /// Empty rendezvous, holding no offers.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Post the offered payload under `code`. Mirrors `exchange_offer`.
+    /// Post `payload` under `code`. Mirrors `exchange_offer`.
+    ///
+    /// Refuses a duplicate code and refuses to grow past the two legs a
+    /// ceremony has, so this never becomes an open relay.
     pub fn offer(&self, code: String, payload: String) -> Result<(), RendezvousError> {
-        let mut held = self.held();
-        if held.is_some() {
+        let mut slots = self.slots();
+        if slots.len() >= MAX_CEREMONY_SLOTS || slots.iter().any(|s| s.code == code) {
             return Err(RendezvousError::AlreadyOffered);
         }
-        *held = Some(Ceremony {
+        slots.push(Slot {
             code,
             offered: payload,
             response: None,
@@ -78,19 +95,19 @@ impl SingleCeremonyRendezvous {
     /// `exchange_claim`.
     ///
     /// A second claim is refused rather than allowed to overwrite: once
-    /// this is on a socket, two peers racing is reachable, and the winner's
-    /// response must survive the loser.
+    /// this is on a socket, two peers racing is reachable, and the
+    /// winner's response must survive the loser.
     pub fn claim(&self, code: &str, response: &str) -> Result<String, RendezvousError> {
-        let mut held = self.held();
-        let ceremony = held
-            .as_mut()
-            .filter(|c| c.code == code)
+        let mut slots = self.slots();
+        let slot = slots
+            .iter_mut()
+            .find(|s| s.code == code)
             .ok_or(RendezvousError::UnknownCode)?;
-        if ceremony.response.is_some() {
+        if slot.response.is_some() {
             return Err(RendezvousError::AlreadyClaimed);
         }
-        ceremony.response = Some(response.to_string());
-        Ok(ceremony.offered.clone())
+        slot.response = Some(response.to_string());
+        Ok(slot.offered.clone())
     }
 
     /// Single-shot poll: `Ok(None)` until a peer has claimed. Mirrors
@@ -99,20 +116,20 @@ impl SingleCeremonyRendezvous {
     /// Repeatable by design — the machine polls once per `advance()`, so a
     /// consuming read would lose the response on the following tick.
     pub fn complete(&self, code: &str) -> Result<Option<String>, RendezvousError> {
-        let held = self.held();
-        let ceremony = held
-            .as_ref()
-            .filter(|c| c.code == code)
+        let slots = self.slots();
+        let slot = slots
+            .iter()
+            .find(|s| s.code == code)
             .ok_or(RendezvousError::UnknownCode)?;
-        Ok(ceremony.response.clone())
+        Ok(slot.response.clone())
     }
 
     /// Nothing inside the lock can panic — only string moves and
     /// comparisons — so poisoning would mean a bug elsewhere. Recovering
     /// keeps a network-reachable path from turning that into a hard
     /// failure (DC-01: fail closed, not loudly).
-    fn held(&self) -> std::sync::MutexGuard<'_, Option<Ceremony>> {
-        self.ceremony
+    fn slots(&self) -> std::sync::MutexGuard<'_, Vec<Slot>> {
+        self.slots
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
@@ -128,18 +145,20 @@ mod broker {
     /// A [`DeviceLinkBroker`] served by a local rendezvous, not the relay.
     ///
     /// The machines are indifferent to which one they hold — that
-    /// indifference is the basis of ADR-070, and these tests exist to keep
+    /// indifference is the basis of ADR-070, and the tests exist to keep
     /// it true.
     ///
-    /// The code is minted by the caller from the app's secure RNG and
-    /// handed in, because on a LAN there is no third party to mint one.
+    /// `code` is this side's own offer code, minted by the caller from the
+    /// app's secure RNG, because on a LAN there is no third party to mint
+    /// one. Claims and polls address whatever code they are given, which
+    /// is how the initiator reaches the joiner's response channel.
     pub struct LocalDeviceLinkBroker {
         code: String,
         rendezvous: Arc<SingleCeremonyRendezvous>,
     }
 
     impl LocalDeviceLinkBroker {
-        /// Serve `rendezvous` under a caller-minted `code`.
+        /// Serve `rendezvous`, offering under a caller-minted `code`.
         pub fn new(code: String, rendezvous: Arc<SingleCeremonyRendezvous>) -> Self {
             Self { code, rendezvous }
         }

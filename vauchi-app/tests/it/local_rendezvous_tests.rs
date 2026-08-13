@@ -89,13 +89,47 @@ fn exactly_one_peer_wins_a_ceremony() {
     );
 }
 
-// @scenario: local_device_link :: one instance serves one ceremony
+// @scenario: local_device_link :: a ceremony's second leg gets its own slot
 #[test]
-fn one_instance_serves_one_ceremony() {
+fn both_legs_of_a_ceremony_can_be_offered() {
+    let r = offered_rendezvous();
+    // The joiner's response channel: the initiator claims this in
+    // `Finalizing` to deliver its response, so it needs a slot of its own.
+    r.offer("RESP".to_string(), "b64-joiner-channel".to_string())
+        .expect("second leg accepted");
+
+    assert_eq!(
+        r.claim("RESP", "b64-initiator-response"),
+        Ok("b64-joiner-channel".to_string())
+    );
+    assert_eq!(
+        r.complete(CODE).expect("first leg still intact"),
+        None,
+        "the legs are independent"
+    );
+}
+
+// @scenario: local_device_link :: the same code cannot be offered twice
+#[test]
+fn a_duplicate_code_is_refused() {
     let r = offered_rendezvous();
     assert_eq!(
         r.offer(CODE.to_string(), "b64-other".to_string()),
         Err(RendezvousError::AlreadyOffered)
+    );
+}
+
+// @scenario: local_device_link :: a ceremony cannot grow past its two legs
+#[test]
+fn a_third_offer_is_refused_so_this_never_becomes_an_open_relay() {
+    let r = offered_rendezvous();
+    r.offer("RESP".to_string(), "b64-joiner-channel".to_string())
+        .expect("second leg accepted");
+
+    assert_eq!(
+        r.offer("THIRD".to_string(), "b64-stranger".to_string()),
+        Err(RendezvousError::AlreadyOffered),
+        "a ceremony has two legs; a third caller must not get a slot"
     );
 }
 

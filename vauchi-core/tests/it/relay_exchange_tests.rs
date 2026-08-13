@@ -341,6 +341,14 @@ fn test_complete_exchange_needs_identity() {
 fn test_start_exchange_with_identity_fails_at_network() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
+    // A closed port, so "fails at network" is a property of the test rather
+    // than of the world. This previously used the default production relay
+    // and passed only because the client could not recover from a rotated
+    // OHTTP key; once it could, the exchange genuinely succeeded and the
+    // assertion below started failing.
+    vauchi
+        .set_relay_url("http://127.0.0.1:1")
+        .expect("relay url accepted");
     let result = vauchi.start_relay_exchange(Some(300));
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();

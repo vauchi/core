@@ -707,20 +707,76 @@ impl HttpTransport {
         action: &str,
         body: &Req,
     ) -> Result<V2Response, NetworkError> {
-        if let Some(ohttp) = &*self.ohttp_reader() {
-            self.post_via_ohttp(ohttp, action, body)
-        } else if self.config.allow_direct {
+        if self.ohttp_reader().is_some() {
+            return self.post_via_ohttp_refreshing_stale_key(action, body);
+        }
+        if self.config.allow_direct {
             // Direct-HTTP fallback exposes the caller's source IP to the
             // relay. Count every occurrence so diagnostics can detect
             // the privacy regression (see `direct_fallback_count`).
             self.direct_fallback_count.fetch_add(1, Ordering::Relaxed);
             let url = format!("{}/v2/{action}", self.config.relay_url);
-            self.post_json(&url, body)
-        } else {
-            Err(NetworkError::ConnectionFailed(
-                "OHTTP not configured and direct connections are disabled".into(),
-            ))
+            return self.post_json(&url, body);
         }
+        Err(NetworkError::ConnectionFailed(
+            "OHTTP not configured and direct connections are disabled".into(),
+        ))
+    }
+
+    /// Post via OHTTP, refetching the gateway key and retrying once when the
+    /// relay refuses our key id.
+    ///
+    /// The relay rotates its OHTTP key (`RELAY_OHTTP_KEY_ROTATION_HOURS`), so
+    /// a client holding the previous id is told "the key ID was invalid".
+    /// Without recovery here, every OHTTP caller *except* sync stays broken
+    /// until reinstall: `api::vauchi::sync_http` carries its own
+    /// evict-refetch-retry, so sync self-heals after each rotation while
+    /// device linking did not (2026-05-25-relay-ohttp-forward-hop-502).
+    fn post_via_ohttp_refreshing_stale_key<Req: Serialize>(
+        &self,
+        action: &str,
+        body: &Req,
+    ) -> Result<V2Response, NetworkError> {
+        let first = {
+            let guard = self.ohttp_reader();
+            match guard.as_ref() {
+                Some(ohttp) => self.post_via_ohttp(ohttp, action, body),
+                None => return Err(NetworkError::NotConnected),
+            }
+        };
+
+        match first {
+            Err(e) if Self::is_rejected_ohttp_key(&e) => {
+                // The read guard above is dropped before this point on
+                // purpose: `RwLock` is not reentrant, so refreshing while
+                // holding it would deadlock.
+                self.refresh_ohttp_key()?;
+                let guard = self.ohttp_reader();
+                let ohttp = guard.as_ref().ok_or(NetworkError::NotConnected)?;
+                self.post_via_ohttp(ohttp, action, body)
+            }
+            other => other,
+        }
+    }
+
+    /// Fetch a fresh gateway key and install it.
+    fn refresh_ohttp_key(&self) -> Result<(), NetworkError> {
+        let key = self.fetch_ohttp_key()?;
+        let client = OhttpClient::new(key)?;
+        *self.ohttp_slot() = Some(client);
+        Ok(())
+    }
+
+    /// Does this error look like the relay refusing our OHTTP key id?
+    ///
+    /// Unhandled statuses become `ConnectionFailed("HTTP {status}")`. The
+    /// relay answers a rotated key with 400, and the OHTTP relay never
+    /// forwards an upstream status, so the same condition reaches us as 502.
+    /// A false positive costs one key fetch; a false negative leaves the
+    /// caller broken until reinstall.
+    fn is_rejected_ohttp_key(err: &NetworkError) -> bool {
+        let msg = err.to_string();
+        msg.contains("HTTP 400") || msg.contains("HTTP 502")
     }
 
     /// Build the OHTTP inner envelope JSON: merges the serialized body with

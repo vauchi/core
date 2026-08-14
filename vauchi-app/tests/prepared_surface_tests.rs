@@ -16,6 +16,7 @@ fn screen() -> ScreenModel {
         "Edit profile",
         vec![
             Component::Text {
+                a11y: None,
                 id: "intro".into(),
                 content: "Choose how your name appears.".into(),
                 style: TextStyle::Body,
@@ -34,6 +35,78 @@ fn screen() -> ScreenModel {
         ],
         vec![],
     )
+}
+
+/// A screen reader speaks `PresentationNode::Text.accessibility.label`
+/// (`PresentationNodeRenderer.kt` sets `contentDescription` from it). The
+/// projection derives that from `content`, which is right for prose and
+/// wrong for a payload: the exchange link carries a 43-character public
+/// key, and TalkBack recited it aloud, character group by character
+/// group, to everyone in earshot.
+// @scenario: generic_presentation_protocol.feature :: A screen can name what a payload is instead of reciting it
+#[test]
+fn a_supplied_text_label_is_spoken_instead_of_the_payload() {
+    const URL: &str = "vauchi://exchange?pk=eYBapim5PowxWTe64UQiPYZX23Zl5jazykMxsI5pikg&n=Plsk";
+    let screen = ScreenModel::new(
+        "exchange.share",
+        "Share Link",
+        vec![Component::Text {
+            id: "link_url".into(),
+            content: URL.into(),
+            style: TextStyle::Body,
+            a11y: Some(A11y {
+                label: Some("Exchange link".into()),
+                hint: Some("Share it with the person you are meeting".into()),
+                role: None,
+            }),
+        }],
+        vec![],
+    );
+
+    let prepared =
+        PreparedSurface::from_screen(SurfaceId::new("exchange.share").unwrap(), 3, &screen)
+            .expect("supported generic projection");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("surface projection must be atomic");
+    };
+    let PresentationNode::Text {
+        content,
+        accessibility,
+        ..
+    } = &surface.nodes[0]
+    else {
+        panic!("expected a Text node, got {:?}", surface.nodes[0]);
+    };
+
+    assert_eq!(
+        content, URL,
+        "the URL must still be rendered — the user has to be able to share it"
+    );
+    assert_eq!(
+        accessibility.label, "Exchange link",
+        "a supplied label must reach the shell, which speaks exactly this"
+    );
+    assert!(
+        !accessibility.label.contains("pk="),
+        "the spoken label must not recite key material: {}",
+        accessibility.label
+    );
+}
+
+/// The default is unchanged for ordinary prose, which must stay readable.
+// @internal
+#[test]
+fn text_without_a_supplied_label_is_still_spoken_as_written() {
+    let prepared =
+        PreparedSurface::from_screen(SurfaceId::new("profile.edit").unwrap(), 7, &screen())
+            .expect("supported generic projection");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("surface projection must be atomic");
+    };
+    let PresentationNode::Text { accessibility, .. } = &surface.nodes[0] else {
+        panic!("expected a Text node");
+    };
+    assert_eq!(accessibility.label, "Choose how your name appears.");
 }
 
 // @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation

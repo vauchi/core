@@ -67,6 +67,7 @@ impl ContactMergeEngine {
 
         let components = vec![
             Component::Text {
+                a11y: None,
                 id: "merge_title".into(),
                 content: get_string_with_args(
                     self.locale,
@@ -101,6 +102,7 @@ impl ContactMergeEngine {
                 a11y: None,
             },
             Component::Text {
+                a11y: None,
                 id: "merge_note".into(),
                 content: self.t("contact_merge.note"),
                 style: TextStyle::Body,

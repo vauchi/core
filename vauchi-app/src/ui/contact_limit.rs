@@ -67,11 +67,13 @@ impl ContactLimitEngine {
 
         let components = vec![
             Component::Text {
+                a11y: None,
                 id: "info".into(),
                 content: self.t("contact_limit.info"),
                 style: TextStyle::Body,
             },
             Component::Text {
+                a11y: None,
                 id: "usage".into(),
                 content: usage,
                 style: TextStyle::Subtitle,

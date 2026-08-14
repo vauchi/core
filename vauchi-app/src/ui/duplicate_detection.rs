@@ -98,6 +98,7 @@ impl DuplicateDetectionEngine {
     fn build_screen(&self) -> ScreenModel {
         let components = if self.pairs.is_empty() {
             vec![Component::Text {
+                a11y: None,
                 id: "no_duplicates".into(),
                 content: self.t("duplicate_detection.empty"),
                 style: TextStyle::Body,
@@ -114,6 +115,7 @@ impl DuplicateDetectionEngine {
             };
             vec![
                 Component::Text {
+                    a11y: None,
                     id: "header".into(),
                     content: header,
                     style: TextStyle::Subtitle,

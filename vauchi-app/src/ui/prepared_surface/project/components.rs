@@ -19,11 +19,23 @@ impl Projection {
         component: &Component,
     ) -> Result<PresentationNode, PreparedSurfaceError> {
         match component {
-            Component::Text { id, content, style } => Ok(PresentationNode::Text {
+            Component::Text {
+                id,
+                content,
+                style,
+                a11y,
+            } => Ok(PresentationNode::Text {
                 id: Some(BindingId::new(id)?),
                 content: content.clone(),
                 style: text_style(style),
-                accessibility: AccessibilitySpec::label(content),
+                // Speaking `content` is right for prose and wrong for a
+                // payload. A screen that supplies a label is saying the
+                // two must differ.
+                accessibility: AccessibilitySpec::label(
+                    a11y.as_ref()
+                        .and_then(|a| a.label.as_deref())
+                        .unwrap_or(content),
+                ),
             }),
             Component::TextInput {
                 id,

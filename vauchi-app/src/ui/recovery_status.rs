@@ -287,6 +287,7 @@ impl RecoveryEngine {
     fn build_enter_old_key_screen(&self) -> ScreenModel {
         let components = vec![
             Component::Text {
+                a11y: None,
                 id: "instructions".into(),
                 content: self.t("recovery.enter_old_key_full_instruction"),
                 style: TextStyle::Body,
@@ -356,6 +357,7 @@ impl RecoveryEngine {
                     a11y: None,
                 },
                 Component::Text {
+                    a11y: None,
                     id: "claim_data".into(),
                     content: claim.into(),
                     style: TextStyle::Caption,
@@ -493,6 +495,7 @@ impl RecoveryEngine {
                     }),
                 },
                 Component::Text {
+                    a11y: None,
                     id: "claim_instructions".into(),
                     content: self.t("recovery.claim_meet_instruction"),
                     style: TextStyle::Body,
@@ -622,11 +625,13 @@ impl RecoveryEngine {
                     a11y: None,
                 },
                 Component::Text {
+                    a11y: None,
                     id: "what_is_recovered".into(),
                     content: self.t("recovery.what_is_recovered"),
                     style: TextStyle::Body,
                 },
                 Component::Text {
+                    a11y: None,
                     id: "what_is_not_recovered".into(),
                     content: self.t("recovery.what_is_not_recovered"),
                     style: TextStyle::Caption,

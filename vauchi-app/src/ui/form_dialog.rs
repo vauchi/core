@@ -426,6 +426,7 @@ impl FormDialogEngine {
             subtitle: None,
             components: vec![
                 Component::Text {
+                    a11y: None,
                     id: "field_info".into(),
                     content: get_string_with_args(
                         self.locale,

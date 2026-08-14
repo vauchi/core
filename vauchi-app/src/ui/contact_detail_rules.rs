@@ -221,6 +221,7 @@ pub fn place_components(
         None => "Exchange location recorded".to_string(),
     };
     out.push(Component::Text {
+        a11y: None,
         id: "exchange_place_label".into(),
         content: label,
         style: TextStyle::Subtitle,

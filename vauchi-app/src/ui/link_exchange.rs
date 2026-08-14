@@ -189,6 +189,16 @@ impl LinkExchangeEngine {
                 id: "link_url".into(),
                 content: self.share_url.clone(),
                 style: TextStyle::Body,
+                // The URL carries a public key. Rendering it is necessary
+                // — the user has to share it — but reciting 43 characters
+                // of base64 to everyone in earshot is not, and
+                // `logging-rules.md` already forbids the same material
+                // reaching a log.
+                a11y: Some(A11y {
+                    label: Some(self.t("link_exchange.share_link_a11y")),
+                    hint: Some(self.t("link_exchange.share_link_a11y_hint")),
+                    role: None,
+                }),
             }],
             contextual_actions: vec![
                 ScreenAction {

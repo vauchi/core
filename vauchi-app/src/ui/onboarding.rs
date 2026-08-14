@@ -349,6 +349,7 @@ impl OnboardingEngine {
             subtitle: Some(self.t("onboarding.name_subtitle")),
             components: vec![
                 Component::Text {
+                    a11y: None,
                     id: "name_instruction".into(),
                     content: self.t("onboarding.name_instruction"),
                     style: TextStyle::Body,
@@ -419,6 +420,7 @@ impl OnboardingEngine {
             subtitle: Some(self.t("onboarding.groups_subtitle")),
             components: vec![
                 Component::Text {
+                    a11y: None,
                     id: "groups_recommendation".into(),
                     content: self.t("onboarding.groups_recommendation"),
                     style: TextStyle::Body,
@@ -529,6 +531,7 @@ impl OnboardingEngine {
 
         for field in &self.data.fields {
             components.push(Component::Text {
+                a11y: None,
                 id: format!("social_{}", field.label.to_lowercase()),
                 content: format!("{}: {}", field.label, field.value),
                 style: TextStyle::Body,

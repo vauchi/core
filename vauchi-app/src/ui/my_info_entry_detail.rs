@@ -124,6 +124,7 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
 
         // Field info
         components.push(Component::Text {
+            a11y: None,
             id: "field_info".into(),
             content: format!("{} ({})", self.value, self.label),
             style: TextStyle::Title,
@@ -177,12 +178,14 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
         // Contacts who can see this entry (read-only list)
         if self.visible_contacts.is_empty() {
             components.push(Component::Text {
+                a11y: None,
                 id: "no_contacts".into(),
                 content: self.t("my_info_entry_detail.no_contacts"),
                 style: TextStyle::Caption,
             });
         } else {
             components.push(Component::Text {
+                a11y: None,
                 id: "contacts_header".into(),
                 content: get_string_with_args(
                     self.locale,

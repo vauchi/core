@@ -505,6 +505,7 @@ impl MultiStageExchangeEngine {
             })
             .unwrap_or_else(|| self.t("multi_stage.exchange_complete_detail"));
         components.push(Component::Text {
+            a11y: None,
             id: COMPONENT_ID_PEER_NAME.into(),
             content: detail,
             style: TextStyle::Body,
@@ -647,6 +648,7 @@ impl MultiStageExchangeEngine {
                     a11y: None,
                 },
                 Component::Text {
+                    a11y: None,
                     id: COMPONENT_ID_PEER_NAME.into(),
                     content: detail,
                     style: TextStyle::Body,

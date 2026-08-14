@@ -161,6 +161,7 @@ impl DeliveryStatusEngine {
 
 fn section_header(id: &str, label: &str) -> Component {
     Component::Text {
+        a11y: None,
         id: id.into(),
         content: label.into(),
         style: TextStyle::Subtitle,

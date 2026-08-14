@@ -275,6 +275,7 @@ const EXPECTED_VARIANT_TAGS: &[&str] = &[
 fn all_components() -> Vec<Component> {
     vec![
         Component::Text {
+            a11y: None,
             id: "t".to_string(),
             content: "hello".to_string(),
             style: TextStyle::Body,

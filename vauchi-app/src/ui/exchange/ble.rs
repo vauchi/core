@@ -96,6 +96,7 @@ pub(super) fn build_discovering_screen(mode: ExchangeMode, locale: Locale) -> Sc
         title: t(title_key),
         subtitle: Some(t(subtitle_key)),
         components: vec![Component::Text {
+            a11y: None,
             id: "ble_status".into(),
             content: t("exchange.ble.scanning"),
             style: TextStyle::Body,
@@ -125,6 +126,7 @@ pub(super) fn build_exchanging_screen(mode: ExchangeMode, locale: Locale) -> Scr
         title: t(title_key),
         subtitle: Some(t("exchange.ble.transferring_subtitle")),
         components: vec![Component::Text {
+            a11y: None,
             id: "ble_exchange_status".into(),
             content: t("exchange.ble.transferring_status"),
             style: TextStyle::Body,

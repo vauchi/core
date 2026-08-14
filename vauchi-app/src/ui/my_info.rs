@@ -172,6 +172,7 @@ impl MyInfoEngine {
                 )
             };
             out.push(Component::Text {
+                a11y: None,
                 id: "pending_updates_caption".into(),
                 content: label,
                 style: TextStyle::Caption,
@@ -180,6 +181,7 @@ impl MyInfoEngine {
         if let Some(then) = self.last_sync_seconds {
             let relative = format_relative_time(self.now_seconds, then, self.locale);
             out.push(Component::Text {
+                a11y: None,
                 id: "last_sync_caption".into(),
                 content: get_string_with_args(
                     self.locale,
@@ -197,6 +199,7 @@ impl MyInfoEngine {
 
         if self.own_fields.is_empty() {
             components.push(Component::Text {
+                a11y: None,
                 id: "empty_hint".into(),
                 content: self.t("my_info.empty_entries"),
                 style: TextStyle::Caption,
@@ -249,6 +252,7 @@ impl MyInfoEngine {
 
         if self.groups.is_empty() {
             components.push(Component::Text {
+                a11y: None,
                 id: "no_groups".into(),
                 content: self.t("my_info.empty_groups"),
                 style: TextStyle::Caption,
@@ -284,6 +288,7 @@ impl MyInfoEngine {
         if let Some(group) = self.groups.get(selected_tab) {
             if group.field_indices.is_empty() {
                 components.push(Component::Text {
+                    a11y: None,
                     id: "group_empty".into(),
                     content: format!(
                         "No entries visible to {}. Assign entries via entry detail.",
@@ -623,7 +628,10 @@ mod tests {
     fn caption_content(screen: &ScreenModel, id: &str) -> Option<String> {
         screen.components.iter().find_map(|c| match c {
             Component::Text {
-                id: cid, content, ..
+                a11y: None,
+                id: cid,
+                content,
+                ..
             } if cid == id => Some(content.clone()),
             _ => None,
         })

@@ -57,7 +57,11 @@ fn link_peer_connected_shows_verify() {
 
     match &screen.components[0] {
         Component::Text {
-            id, content, style, ..
+            a11y: None,
+            id,
+            content,
+            style,
+            ..
         } => {
             assert_eq!(id, "code");
             assert_eq!(content, "ABC-123");

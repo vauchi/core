@@ -80,6 +80,7 @@ pub fn build_exchange_success_screen(
     // and both are relayable in principle. Claiming "verified in person" here
     // would assert more than the protocol establishes.
     components.push(Component::Text {
+        a11y: None,
         id: "stays_updated".into(),
         content: if summary.peer_name.is_empty() {
             t("exchange.success.stays_updated_generic")
@@ -96,6 +97,7 @@ pub fn build_exchange_success_screen(
     // What they shared with us — the received card fields, read-only.
     if !summary.received_fields.is_empty() {
         components.push(Component::Text {
+            a11y: None,
             id: "received_header".into(),
             content: if summary.peer_name.is_empty() {
                 t("exchange.success.what_they_shared_generic")

@@ -493,6 +493,7 @@ fn test_text_style_variants() {
 
     for style in &styles {
         let component = Component::Text {
+            a11y: None,
             id: "t".into(),
             content: "hello".into(),
             style: style.clone(),
@@ -501,6 +502,7 @@ fn test_text_style_variants() {
         let restored: Component = serde_json::from_str(&json).unwrap();
         match restored {
             Component::Text {
+                a11y: None,
                 style: restored_style,
                 ..
             } => assert_eq!(restored_style, *style),

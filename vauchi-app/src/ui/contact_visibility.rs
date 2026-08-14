@@ -46,6 +46,7 @@ impl ContactVisibilityEngine {
             subtitle: None,
             components: vec![
                 Component::Text {
+                    a11y: None,
                     id: "visibility_info".into(),
                     content: self.t("contact_visibility.info"),
                     style: TextStyle::Body,

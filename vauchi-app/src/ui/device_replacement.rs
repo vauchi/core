@@ -297,6 +297,7 @@ impl DeviceReplacementEngine {
             subtitle: None,
             components: vec![
                 Component::Text {
+                    a11y: None,
                     id: "code".into(),
                     content: code.to_string(),
                     style: TextStyle::Title,

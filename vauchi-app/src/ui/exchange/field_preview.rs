@@ -108,6 +108,7 @@ pub(super) fn build_field_preview_screen(
         }
     } else {
         Component::Text {
+            a11y: None,
             id: "preview_name".into(),
             content: config.display_name.clone(),
             style: TextStyle::Title,

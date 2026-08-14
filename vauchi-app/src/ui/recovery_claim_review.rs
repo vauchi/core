@@ -323,16 +323,19 @@ impl RecoveryClaimReviewEngine {
             subtitle: Some(self.t("recovery.verify_screen_subtitle")),
             components: vec![
                 Component::Text {
+                    a11y: None,
                     id: "fingerprint_label".into(),
                     content: self.t("recovery.old_fingerprint_label"),
                     style: TextStyle::Caption,
                 },
                 Component::Text {
+                    a11y: None,
                     id: "fingerprint".into(),
                     content: self.context.old_pk_fingerprint.clone(),
                     style: TextStyle::Title,
                 },
                 Component::Text {
+                    a11y: None,
                     id: "instructions".into(),
                     content: self.t("recovery.verify_call_instruction"),
                     style: TextStyle::Body,

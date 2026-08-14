@@ -37,6 +37,17 @@ pub enum Component {
         id: String,
         content: String,
         style: TextStyle,
+        /// Spoken label, when it must differ from `content`.
+        ///
+        /// The projection speaks `content` when this is `None`, which is
+        /// right for prose and wrong for anything a screen reader should
+        /// not recite — an exchange URL carries a public key, and
+        /// `logging-rules.md` already forbids the same material reaching
+        /// a log. Same shape as `TextInput`/`ToggleList`, so a screen
+        /// supplies accessibility copy rather than the shell deriving it
+        /// (ADR-066).
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     TextInput {
         id: String,

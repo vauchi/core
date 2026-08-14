@@ -37,6 +37,7 @@ impl ArchivedContactsEngine {
     fn build_screen(&self) -> ScreenModel {
         let components = if self.contacts.is_empty() {
             vec![Component::Text {
+                a11y: None,
                 id: "no_archived".into(),
                 content: self.t("archived_contacts.empty"),
                 style: TextStyle::Body,

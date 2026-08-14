@@ -395,6 +395,7 @@ pub(super) fn build_nfc_screen(step: &NfcStep, locale: crate::i18n::Locale) -> S
         title: title.clone(),
         subtitle: Some(subtitle.clone()),
         components: vec![Component::Text {
+            a11y: None,
             id: "nfc_status".into(),
             content: subtitle,
             style: TextStyle::Body,

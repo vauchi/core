@@ -79,6 +79,7 @@ impl FingerprintVerifyEngine {
 
         let mut components = vec![
             Component::Text {
+                a11y: None,
                 id: "instructions".into(),
                 content: status_text,
                 style: if self.is_verified {
@@ -88,21 +89,25 @@ impl FingerprintVerifyEngine {
                 },
             },
             Component::Text {
+                a11y: None,
                 id: "their_label".into(),
                 content: self.t("fingerprint_verify.their_label"),
                 style: TextStyle::Caption,
             },
             Component::Text {
+                a11y: None,
                 id: "their_fingerprint".into(),
                 content: self.their_fingerprint.clone(),
                 style: TextStyle::Body,
             },
             Component::Text {
+                a11y: None,
                 id: "our_label".into(),
                 content: self.t("fingerprint_verify.our_label"),
                 style: TextStyle::Caption,
             },
             Component::Text {
+                a11y: None,
                 id: "our_fingerprint".into(),
                 content: self.our_fingerprint.clone(),
                 style: TextStyle::Body,
@@ -111,6 +116,7 @@ impl FingerprintVerifyEngine {
 
         if self.is_verified {
             components.push(Component::Text {
+                a11y: None,
                 id: "verified_badge".into(),
                 content: self.t("contacts.verified"),
                 style: TextStyle::Subtitle,

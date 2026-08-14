@@ -218,6 +218,7 @@ impl RecoveryHelpEngine {
     fn build_paste_claim_screen(&self) -> ScreenModel {
         let components = vec![
             Component::Text {
+                a11y: None,
                 id: "paste_instructions".into(),
                 content: self.t("recovery.paste_instructions"),
                 style: TextStyle::Body,
@@ -366,6 +367,7 @@ impl RecoveryHelpEngine {
                     a11y: None,
                 },
                 Component::Text {
+                    a11y: None,
                     id: "voucher_data".into(),
                     content: voucher.into(),
                     style: TextStyle::Caption,

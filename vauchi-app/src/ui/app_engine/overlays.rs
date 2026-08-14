@@ -300,6 +300,7 @@ impl AppEngine {
                 "update_required",
                 self.t("update.required_title"),
                 vec![Component::Text {
+                    a11y: None,
                     id: "update_message".into(),
                     content: self.t("update.unsupported_message"),
                     style: TextStyle::Body,

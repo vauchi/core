@@ -192,6 +192,7 @@ impl DirectTransportEngine {
             title: self.t("exchange.usb.title"),
             subtitle: Some(self.t("exchange.usb.connect_subtitle")),
             components: vec![Component::Text {
+                a11y: None,
                 id: "instructions".into(),
                 content: self.t("exchange.usb.instructions"),
                 style: TextStyle::Body,
@@ -213,6 +214,7 @@ impl DirectTransportEngine {
             title: self.t("exchange.usb.title"),
             subtitle: Some(self.t("exchange.usb.exchanging_subtitle")),
             components: vec![Component::Text {
+                a11y: None,
                 id: "status".into(),
                 content: self.t("exchange.usb.exchanging_status"),
                 style: TextStyle::Body,

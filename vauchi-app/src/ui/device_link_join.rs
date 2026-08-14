@@ -173,6 +173,7 @@ impl DeviceLinkJoinEngine {
             subtitle: Some(self.t("devices.link.confirm_code_match")),
             components: vec![
                 Component::Text {
+                    a11y: None,
                     id: "confirmation_code".into(),
                     content: confirmation_code.to_string(),
                     style: TextStyle::Title,

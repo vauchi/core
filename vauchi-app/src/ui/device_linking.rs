@@ -417,6 +417,7 @@ impl DeviceLinkingEngine {
             subtitle: None,
             components: vec![
                 Component::Text {
+                    a11y: None,
                     id: "code".into(),
                     content: code.to_string(),
                     style: TextStyle::Title,
@@ -558,6 +559,7 @@ impl DeviceLinkingEngine {
                     }),
                 },
                 Component::Text {
+                    a11y: None,
                     id: "expires_at".into(),
                     content: get_string_with_args(
                         self.locale,
@@ -629,6 +631,7 @@ impl DeviceLinkingEngine {
             )),
             components: vec![
                 Component::Text {
+                    a11y: None,
                     id: "code".into(),
                     content: code.to_string(),
                     style: TextStyle::Title,

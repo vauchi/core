@@ -83,6 +83,7 @@ impl DecoyContactsEngine {
 
         if self.decoys.is_empty() {
             components.push(Component::Text {
+                a11y: None,
                 id: "empty_state".into(),
                 content: self.t("decoy_contacts.empty_state"),
                 style: TextStyle::Body,

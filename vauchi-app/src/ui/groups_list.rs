@@ -104,6 +104,7 @@ impl GroupsEngine {
 
         if self.education_banner {
             components.push(Component::Text {
+                a11y: None,
                 id: "first_group_education".into(),
                 content: self.t("groups_list.first_group_education"),
                 style: TextStyle::Caption,

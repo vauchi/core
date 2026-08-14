@@ -43,6 +43,7 @@ impl ActivityLogEngine {
     fn build_screen(&self) -> ScreenModel {
         let components = if self.items.is_empty() {
             vec![Component::Text {
+                a11y: None,
                 id: "empty_state".into(),
                 content: get_string(self.locale, "activity_log.empty_state"),
                 style: TextStyle::Body,

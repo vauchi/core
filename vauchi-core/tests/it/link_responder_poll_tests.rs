@@ -121,6 +121,36 @@ fn poll_drives_retrieve_then_rejects_a_self_bootstrap() {
         "the cascade reaches completion, where a self-bootstrap is rejected",
     );
     assert_contact_count(engine.vauchi(), 0);
+
+    // The blob decrypted — that is what reaching completion means. Naming
+    // this a decryption failure sends the user, and anyone debugging, at
+    // the wrong layer
+    // (2026-08-14-link-responder-reports-every-completion-failure-as-decrypt-error).
+    let detail = failed_detail(&engine);
+    assert!(
+        !detail.contains("could not be decrypted"),
+        "a completion rejection must not be reported as a decryption failure — \
+         the AEAD decrypt succeeded. Got: {detail}"
+    );
+    assert!(
+        detail.contains("your own"),
+        "a self-exchange must say so, so the user knows retrying cannot help. \
+         Got: {detail}"
+    );
+}
+
+/// The `StatusIndicator` detail rendered on `link_responder_failed` — the
+/// only user-visible statement of *why* the exchange failed.
+fn failed_detail(engine: &AppEngine) -> String {
+    engine
+        .current_screen()
+        .components
+        .iter()
+        .find_map(|c| match c {
+            vauchi_app::ui::Component::StatusIndicator { detail, .. } => detail.clone(),
+            _ => None,
+        })
+        .expect("the failed screen must render a StatusIndicator detail")
 }
 
 // @internal

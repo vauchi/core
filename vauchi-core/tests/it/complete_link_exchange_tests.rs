@@ -17,7 +17,7 @@
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::exchange::link_mode::{serialize_card_payload, serialize_card_payload_v2};
-use vauchi_core::{ExchangeTransport, ImportSource, Vauchi};
+use vauchi_core::{ExchangeTransport, ImportSource, Vauchi, VauchiError};
 
 fn vauchi_with_identity(name: &str) -> Vauchi {
     let mut v = Vauchi::in_memory().expect("in-memory vauchi");
@@ -228,10 +228,44 @@ fn v2_rejects_completing_our_own_bootstrap() {
     let err = alice
         .complete_link_exchange(&alice_payload, &alice_x3dh)
         .expect_err("completing our own bootstrap must fail");
-    let _ = err;
+    // The engine picks the user-facing consequence from the variant, so an
+    // untyped rejection here becomes "the card could not be decrypted" — the
+    // message that misdirected
+    // 2026-08-14-link-exchange-responder-cannot-decrypt-the-card.
+    assert!(
+        matches!(
+            err,
+            VauchiError::Exchange(vauchi_core::exchange::ExchangeError::SelfExchange)
+        ),
+        "a self-exchange must be typed so the engine can name it, got {err:?}"
+    );
     assert_eq!(
         alice.list_contacts().expect("list").len(),
         0,
         "a self-exchange must not create a contact",
+    );
+}
+
+// @scenario: link_exchange :: a full contact list names the limit, not a crypto failure
+#[test]
+fn v2_completion_at_the_contact_limit_reports_the_limit() {
+    let alice = vauchi_with_identity("Alice");
+    let bob = vauchi_with_identity("Bob");
+    let (bob_payload, _, _) = build_v2(&bob, "https://relay.bob.example");
+    let (_, alice_x3dh, _) = build_v2(&alice, "https://relay.alice.example");
+
+    alice
+        .storage()
+        .contacts()
+        .set_contact_limit(0)
+        .expect("set contact limit");
+
+    let err = alice
+        .complete_link_exchange(&bob_payload, &alice_x3dh)
+        .expect_err("completing past the contact limit must fail");
+    assert!(
+        matches!(err, VauchiError::ContactLimitReached(0)),
+        "the limit must be typed so the user is told to free a slot rather \
+         than to retry, got {err:?}"
     );
 }

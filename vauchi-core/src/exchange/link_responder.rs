@@ -244,7 +244,10 @@ impl LinkResponderSession {
         self.state = LinkResponderState::Retrieving;
         self.pending.push(Command::RelayEscrowRetrieve {
             gate_hash: self.gate_hash_bytes.clone(),
-            slot_hash: hex::decode(&self.keys.their_slot)
+            // Our own slot, not the peer's: the relay authenticates the
+            // requester by the slot it names and answers with the *other*
+            // slot's blob (`relay/src/escrow.rs::get`).
+            slot_hash: hex::decode(&self.keys.our_slot)
                 .expect("hex from hex::encode is always valid"),
         });
     }

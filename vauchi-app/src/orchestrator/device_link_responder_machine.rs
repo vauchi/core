@@ -20,7 +20,6 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 
-use vauchi_core::crypto::random_bytes;
 use vauchi_core::exchange::{
     DeviceLinkJoinInvitation, DeviceLinkQR, DeviceLinkResponder, DeviceLinkResponse, ExchangeError,
 };
@@ -198,8 +197,25 @@ impl DeviceLinkResponderMachine {
             Err(e) => return self.fail(&e),
         };
 
-        // Unguessable return channel the initiator posts the response to.
-        let response_code = BASE64.encode(random_bytes::<16>());
+        // Return channel the initiator posts the response to. It must be
+        // *minted by the broker*, not invented here: the relay only
+        // accepts six-digit codes it issued, so a locally generated one is
+        // refused at `exchange_claim` — after the user has already
+        // confirmed, which is the worst moment to fail
+        // (2026-08-14-device-link-host-never-shows-the-confirmation-code).
+        // Offering also opens the slot, which a rendezvous that does not
+        // create slots on claim requires (ADR-070's local broker).
+        // Unguessability now rests on the relay's issuance and its
+        // per-code and global claim rate limits, not on our entropy.
+        let response_code = match broker.exchange_offer("", Some(self.relay_timeout_secs)) {
+            Ok(code) => code,
+            Err(_) => {
+                self.state = State::Failed;
+                return ResponderEvent::Failed {
+                    reason: "relay_failed".to_string(),
+                };
+            }
+        };
         let claim = ClaimPayload {
             request,
             response_code: response_code.clone(),

@@ -205,6 +205,73 @@ fn both_machines_complete_a_link_and_show_the_same_confirmation_code() {
     assert_eq!(response.display_name(), "Alice");
 }
 
+/// The same ceremony with no relay at all, over ADR-070's local
+/// rendezvous. This only became possible once the joiner opened its
+/// return channel through the broker: `SingleCeremonyRendezvous` answers
+/// `UnknownCode` for a code nobody offered, so a self-minted channel was
+/// unreachable there as well as at the relay.
+// @scenario: device_management :: two devices link over a local rendezvous
+#[test]
+fn both_machines_complete_a_link_over_a_local_rendezvous() {
+    use std::sync::Arc;
+    use vauchi_app::orchestrator::local_rendezvous::{
+        LocalDeviceLinkBroker, SingleCeremonyRendezvous,
+    };
+
+    let master_seed = [0x77u8; 32];
+    let (initiator, _identity) = initiator_for("Alice", master_seed);
+    let rendezvous = Arc::new(SingleCeremonyRendezvous::new());
+    let host_broker = LocalDeviceLinkBroker::new("100001".to_string(), Arc::clone(&rendezvous));
+    let joiner_broker = LocalDeviceLinkBroker::new("100002".to_string(), Arc::clone(&rendezvous));
+
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+    let _ = host.advance(&host_broker, NOW);
+    let invitation = host
+        .join_invitation()
+        .expect("a QR-ready host must expose an invitation");
+
+    let mut joiner =
+        DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
+            .expect("invitation parses");
+    let joiner_code = match joiner.advance(&joiner_broker, NOW + 1) {
+        ResponderEvent::RequestPosted { confirmation_code } => confirmation_code,
+        other => panic!("expected RequestPosted over the local rendezvous, got {other:?}"),
+    };
+
+    let host_code = match host.advance(&host_broker, NOW + 2) {
+        InitiatorEvent::ConfirmationRequired {
+            confirmation_code, ..
+        } => confirmation_code,
+        other => panic!("expected ConfirmationRequired, got {other:?}"),
+    };
+    assert_eq!(host_code, joiner_code, "the codes must agree off-relay too");
+
+    let _ = host.confirm_manual(host_code, NOW + 3);
+    let completed = host.advance(&host_broker, NOW + 4);
+    assert!(
+        matches!(completed, InitiatorEvent::Completed { .. }),
+        "expected Completed with no relay involved, got {completed:?}"
+    );
+
+    let ready = joiner.advance(&joiner_broker, NOW + 5);
+    assert!(
+        matches!(ready, ResponderEvent::ResponseReady),
+        "the joiner must decrypt the response off-relay, got {ready:?}"
+    );
+    assert_eq!(
+        joiner
+            .take_response()
+            .expect("a ready joiner holds a response")
+            .master_seed(),
+        &master_seed
+    );
+}
+
 // @scenario: device_management :: a joiner that never confirms cannot obtain the seed
 #[test]
 fn the_joiner_gets_nothing_until_the_user_confirms_on_the_host() {

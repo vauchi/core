@@ -82,6 +82,45 @@ impl DeviceLinkBroker for FakeBroker {
 }
 
 // @internal
+/// The two devices must stop waiting at the same moment. The host's
+/// window opens when it mints the QR; the joiner's opened when it
+/// *scanned* one, so a QR that sat on screen for a while left the joiner
+/// outliving the host — observed on hardware as the host showing "QR code
+/// expired" while the joiner still said "Waiting for approval…"
+/// (2026-08-14-device-link-host-never-shows-the-confirmation-code).
+///
+/// `DeviceLinkQR` carries an absolute `expires_at`, so the ceremony has
+/// one deadline rather than two clocks started at different times.
+// @scenario: device_management :: a late joiner expires with the QR, not 300s later
+#[test]
+fn the_joiner_deadline_follows_the_qr_not_the_moment_it_was_scanned() {
+    let initiator = build_initiator("Alice", 0x11);
+    let qr_expires_at = initiator.qr().expires_at();
+    let invitation = build_invitation(&initiator);
+    let broker = FakeBroker::new();
+
+    // Scanned late in the QR's own window.
+    let scanned_at = qr_expires_at - 50;
+    let mut m =
+        DeviceLinkResponderMachine::new(invitation, "My Phone".to_string(), TIMEOUT).unwrap();
+    assert!(
+        matches!(
+            m.advance(&broker, scanned_at),
+            ResponderEvent::RequestPosted { .. }
+        ),
+        "a QR inside its window must still be joinable"
+    );
+
+    // One second past the QR's expiry — the host has already given up.
+    broker.push_complete(Ok(None));
+    let event = m.advance(&broker, qr_expires_at + 1);
+    assert!(
+        matches!(event, ResponderEvent::Failed { ref reason } if reason == "qr_expired"),
+        "the joiner must expire with the QR rather than run its own \
+         window from the scan, got {event:?}"
+    );
+}
+
 #[test]
 fn new_parses_invitation_without_relay_io() {
     let initiator = build_initiator("Alice", 0x11);

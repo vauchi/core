@@ -184,6 +184,12 @@ impl DeviceLinkResponderMachine {
         device_name: String,
         now: u64,
     ) -> ResponderEvent {
+        // Read before `from_qr` consumes the QR. The ceremony's deadline
+        // belongs to the QR (ADR-035), not to whenever this device
+        // happened to scan it: a clock started at scan time always
+        // outlives the host's, leaving the joiner waiting on a peer that
+        // has already given up.
+        let qr_expires_at = qr.expires_at();
         let mut responder = match DeviceLinkResponder::from_qr(qr, device_name, now) {
             Ok(r) => r,
             Err(e) => return self.fail(&e),
@@ -232,7 +238,12 @@ impl DeviceLinkResponderMachine {
         self.state = State::AwaitingResponse {
             responder,
             response_code,
-            deadline_unix: now.saturating_add(self.relay_timeout_secs),
+            // Whichever comes first: the QR's own expiry, or this
+            // machine's budget. `relay_timeout_secs` stays the ceiling so
+            // a caller can still poll for less than the full window.
+            deadline_unix: now
+                .saturating_add(self.relay_timeout_secs)
+                .min(qr_expires_at),
         };
         ResponderEvent::RequestPosted { confirmation_code }
     }

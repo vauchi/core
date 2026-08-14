@@ -1,0 +1,229 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Both device-link machines, real, against one broker.
+//!
+//! Everything else drives **one** machine and simulates its peer: the
+//! `FakeBroker`s return a fixed code and an empty claim,
+//! `a_whole_ceremony_runs_against_a_local_broker_with_no_relay` hand-mints
+//! the joiner's claim and offers a literal `"b64-joiner-channel"`, and
+//! `device_link_join_adopt_tests` runs the crypto dance directly without
+//! either machine. So no test has ever observed the two machines agreeing
+//! with each other, and on hardware a completed link has never been
+//! observed either — the Maestro flow asserts only that QR generation
+//! finishes (`2026-08-14-two-device-linking-has-no-automatable-path`).
+//!
+//! The property that matters to a user is the confirmation code: both
+//! devices show one, the human compares them, and a mismatch means abort.
+//! Nothing asserted they agree until here.
+
+#![cfg(feature = "network-http")]
+
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+use vauchi_app::orchestrator::device_link_machine::{
+    DeviceLinkInitiatorMachine, InitiatorEvent, InitiatorPhase,
+};
+use vauchi_app::orchestrator::device_link_relay::DeviceLinkBroker;
+use vauchi_app::orchestrator::device_link_responder_machine::{
+    DeviceLinkResponderMachine, ResponderEvent,
+};
+use vauchi_core::exchange::DeviceLinkInitiator;
+use vauchi_core::identity::{DeviceRegistry, Identity};
+use vauchi_core::network::NetworkError;
+
+const NOW: u64 = 1_800_000_000;
+const TIMEOUT_SECS: u64 = 300;
+
+/// A broker with the relay's semantics rather than a stub's.
+///
+/// Deliberately *not* `SingleCeremonyRendezvous`: that one answers
+/// `UnknownCode` for a code nobody offered, and the joiner mints its
+/// return-channel code privately and never offers it — so the two
+/// machines cannot complete a ceremony against it today. The relay
+/// creates the slot on first claim, which is what this mirrors and what
+/// production depends on.
+#[derive(Default)]
+struct RelayLikeBroker {
+    slots: Mutex<HashMap<String, Slot>>,
+    next_code: Mutex<u32>,
+}
+
+#[derive(Default)]
+struct Slot {
+    offered: String,
+    response: Option<String>,
+}
+
+impl RelayLikeBroker {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl DeviceLinkBroker for RelayLikeBroker {
+    fn exchange_offer(
+        &self,
+        payload_b64: &str,
+        _expires_secs: Option<u64>,
+    ) -> Result<String, NetworkError> {
+        let mut n = self.next_code.lock().expect("uncontended");
+        *n += 1;
+        let code = format!("CODE{n}");
+        self.slots.lock().expect("uncontended").insert(
+            code.clone(),
+            Slot {
+                offered: payload_b64.to_string(),
+                response: None,
+            },
+        );
+        Ok(code)
+    }
+
+    fn exchange_claim(&self, code: &str, response_b64: &str) -> Result<String, NetworkError> {
+        let mut slots = self.slots.lock().expect("uncontended");
+        // The joiner's return channel is claimed before it is ever
+        // offered — the relay creates it here.
+        let slot = slots.entry(code.to_string()).or_default();
+        if slot.response.is_some() {
+            return Err(NetworkError::RelayRejected("already claimed".into()));
+        }
+        slot.response = Some(response_b64.to_string());
+        Ok(slot.offered.clone())
+    }
+
+    fn exchange_complete(&self, code: &str) -> Result<Option<String>, NetworkError> {
+        Ok(self
+            .slots
+            .lock()
+            .expect("uncontended")
+            .get(code)
+            .and_then(|s| s.response.clone()))
+    }
+}
+
+/// A real initiator for an identity that owns exactly one device.
+fn initiator_for(display_name: &str, master_seed: [u8; 32]) -> (DeviceLinkInitiator, Identity) {
+    let identity = Identity::create(display_name, NOW);
+    let registry = DeviceRegistry::new(
+        identity.device_info().to_registered(&master_seed),
+        identity.signing_keypair(),
+    );
+    (
+        DeviceLinkInitiator::new(master_seed, &identity, registry, NOW),
+        identity,
+    )
+}
+
+// @scenario: device_management :: two devices complete a link and agree on the code
+#[test]
+fn both_machines_complete_a_link_and_show_the_same_confirmation_code() {
+    let master_seed = [0x5Au8; 32];
+    let (initiator, _identity) = initiator_for("Alice", master_seed);
+    let broker = RelayLikeBroker::new();
+
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+
+    // 1. The host publishes its offer and renders the QR.
+    let first = host.advance(&broker, NOW);
+    assert!(
+        matches!(first, InitiatorEvent::QrReady { .. }),
+        "the host must publish an offer before a joiner can find it, got {first:?}"
+    );
+    let invitation = host
+        .join_invitation()
+        .expect("a QR-ready host must expose the invitation the joiner scans");
+
+    // 2. The joiner scans it and posts its request.
+    let mut joiner =
+        DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
+            .expect("a freshly minted invitation must parse");
+
+    let joiner_code = match joiner.advance(&broker, NOW + 1) {
+        ResponderEvent::RequestPosted { confirmation_code } => confirmation_code,
+        other => panic!("expected RequestPosted, got {other:?}"),
+    };
+
+    // 3. The host picks the request up and shows its own code.
+    let host_code = match host.advance(&broker, NOW + 2) {
+        InitiatorEvent::ConfirmationRequired {
+            confirmation_code, ..
+        } => confirmation_code,
+        other => panic!("expected ConfirmationRequired, got {other:?}"),
+    };
+
+    // The whole point of the ceremony: the human compares two screens.
+    assert_eq!(
+        host_code, joiner_code,
+        "both devices must show the same confirmation code — if they can \
+         disagree, comparing them proves nothing and the ritual is theatre"
+    );
+
+    // 4. The user confirms on the host, which releases the response.
+    let _ = host.confirm_manual(host_code, NOW + 3);
+    let completed = host.advance(&broker, NOW + 4);
+    assert!(
+        matches!(completed, InitiatorEvent::Completed { .. }),
+        "expected Completed after confirmation, got {completed:?}"
+    );
+    assert_eq!(host.phase(), InitiatorPhase::Completed);
+
+    // 5. The joiner collects the response it can actually decrypt.
+    let ready = joiner.advance(&broker, NOW + 5);
+    assert!(
+        matches!(ready, ResponderEvent::ResponseReady),
+        "the joiner must decrypt the host's response, got {ready:?}"
+    );
+
+    let response = joiner
+        .take_response()
+        .expect("ResponseReady means a decrypted response is waiting");
+    assert_eq!(
+        response.master_seed(),
+        &master_seed,
+        "the joiner must end up holding the identity's master seed — this \
+         is what makes it the same identity on a second device"
+    );
+    assert_eq!(response.display_name(), "Alice");
+}
+
+// @scenario: device_management :: a joiner that never confirms cannot obtain the seed
+#[test]
+fn the_joiner_gets_nothing_until_the_user_confirms_on_the_host() {
+    let (initiator, _identity) = initiator_for("Alice", [0x5Au8; 32]);
+    let broker = RelayLikeBroker::new();
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+
+    let _ = host.advance(&broker, NOW);
+    let invitation = host.join_invitation().expect("invitation");
+    let mut joiner =
+        DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
+            .expect("invitation parses");
+
+    let _ = joiner.advance(&broker, NOW + 1);
+    let _ = host.advance(&broker, NOW + 2); // ConfirmationRequired — not confirmed
+
+    // Poll the joiner without the host ever confirming.
+    let stalled = joiner.advance(&broker, NOW + 3);
+    assert!(
+        matches!(stalled, ResponderEvent::None),
+        "without confirmation there is nothing to collect, got {stalled:?}"
+    );
+    assert!(
+        joiner.take_response().is_none(),
+        "proximity confirmation is what gates the master seed (ADR-035); a \
+         joiner that skipped it must hold nothing"
+    );
+}

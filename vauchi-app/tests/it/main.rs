@@ -56,6 +56,7 @@ mod contextual_surface_tests;
 mod contextual_undo_tests;
 mod deep_link_consent_engine_tests;
 mod device_link_bridge_tests;
+mod device_link_two_machine_tests;
 mod device_linking_i18n_tests;
 mod device_linking_receiver_i18n_tests;
 mod device_management_i18n_tests;

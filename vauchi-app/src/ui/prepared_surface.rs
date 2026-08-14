@@ -123,6 +123,42 @@ impl PreparedSurface {
                     value,
                 )
             }
+            // Both resolve through the same binding map as `ValueChanged`,
+            // so an id the surface does not own fails closed rather than
+            // reaching a screen. Only text bindings can be submitted or
+            // blurred; anything else is an unknown binding.
+            Event::InputSubmitted {
+                surface_id,
+                binding_id,
+            } => {
+                self.ensure_surface(&surface_id)?;
+                match self
+                    .value_routes
+                    .get(&binding_id)
+                    .ok_or(PreparedSurfaceError::UnknownBinding)?
+                {
+                    ValueRoute::Text { component_id } => Ok(UserAction::TextSubmitted {
+                        component_id: component_id.clone(),
+                    }),
+                    _ => Err(PreparedSurfaceError::UnknownBinding),
+                }
+            }
+            Event::InputFocusEnded {
+                surface_id,
+                binding_id,
+            } => {
+                self.ensure_surface(&surface_id)?;
+                match self
+                    .value_routes
+                    .get(&binding_id)
+                    .ok_or(PreparedSurfaceError::UnknownBinding)?
+                {
+                    ValueRoute::Text { component_id } => Ok(UserAction::TextFocusEnded {
+                        component_id: component_id.clone(),
+                    }),
+                    _ => Err(PreparedSurfaceError::UnknownBinding),
+                }
+            }
             Event::ActionActivated {
                 surface_id,
                 interaction_id,

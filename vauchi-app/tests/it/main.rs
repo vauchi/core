@@ -127,6 +127,7 @@ mod navigate_to_tab_tests;
 mod notification_contract_tests;
 mod notification_emitter_tests;
 mod notification_proptest;
+mod onboarding_custom_group_tests;
 mod onboarding_i18n_tests;
 mod reciprocity_confirmer_tests;
 mod recovery_claim_review_i18n_tests;

@@ -64,6 +64,11 @@ pub struct OnboardingEngine {
     step: Step,
     data: OnboardingData,
     custom_group_input: String,
+    /// Focus left the custom-group field with text still uncommitted, so
+    /// the commit is offered on the context bar instead of staying
+    /// collapsed in its overflow
+    /// (`2026-08-13-custom-group-add-is-hidden-in-the-overflow`).
+    custom_group_awaiting_add: bool,
     phone_input_visible: bool,
     email_input_visible: bool,
     phone_value: String,
@@ -111,6 +116,7 @@ impl OnboardingEngine {
                 fields: Vec::new(),
             },
             custom_group_input: String::new(),
+            custom_group_awaiting_add: false,
             phone_input_visible: false,
             email_input_visible: false,
             phone_value: String::new(),
@@ -461,14 +467,26 @@ impl OnboardingEngine {
                 ScreenAction {
                     id: "submit_custom_group".into(),
                     label: self.t("onboarding.groups_add"),
-                    style: ActionStyle::Secondary,
+                    // Primary only while a typed name is waiting to be
+                    // committed: the context bar keeps the primary on the
+                    // bar and collapses the rest, so this is what makes
+                    // Add visible at the moment it is wanted.
+                    style: if self.custom_group_awaiting_add {
+                        ActionStyle::Primary
+                    } else {
+                        ActionStyle::Secondary
+                    },
                     enabled: !self.custom_group_input.trim().is_empty(),
                     a11y: Some(A11y::labeled(self.t("onboarding.groups_add"))),
                 },
                 ScreenAction {
                     id: "continue".into(),
                     label: self.t("action.continue"),
-                    style: ActionStyle::Primary,
+                    style: if self.custom_group_awaiting_add {
+                        ActionStyle::Secondary
+                    } else {
+                        ActionStyle::Primary
+                    },
                     enabled: true,
                     a11y: Some(A11y::labeled(self.t("action.continue"))),
                 },
@@ -779,6 +797,9 @@ impl OnboardingEngine {
                 value,
             } if component_id == "custom_group" => {
                 self.custom_group_input = value.clone();
+                // Typing again means Return is back on the table, so the
+                // bar returns to Continue until focus leaves once more.
+                self.custom_group_awaiting_add = false;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::TextChanged {
@@ -798,46 +819,59 @@ impl OnboardingEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ActionPressed { action_id } if action_id == "submit_custom_group" => {
-                let name = self.custom_group_input.trim().to_string();
-                if !name.is_empty()
-                    && !self
-                        .data
-                        .selected_groups
-                        .iter()
-                        .any(|g| g.name.eq_ignore_ascii_case(&name))
-                {
-                    self.data.selected_groups.push(GroupSetup {
-                        name,
-                        selected: true,
-                        name_override: None,
-                    });
-                }
-                self.custom_group_input.clear();
+                self.commit_pending_custom_group();
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            // Return in the field is a commit: the user said "done" with
+            // the platform's own affordance, so no button is needed.
+            UserAction::TextSubmitted { component_id } if component_id == "custom_group" => {
+                self.commit_pending_custom_group();
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            // Focus left with text still uncommitted. Committing for the
+            // user would be a silent write; instead the bar offers the
+            // commit, where it can actually be seen.
+            UserAction::TextFocusEnded { component_id } if component_id == "custom_group" => {
+                self.custom_group_awaiting_add = !self.custom_group_input.trim().is_empty();
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ActionPressed { action_id }
                 if action_id == "continue" || action_id == "skip" =>
             {
-                // Auto-add any pending custom group text before advancing
-                let pending = self.custom_group_input.trim().to_string();
-                if !pending.is_empty()
-                    && !self
-                        .data
-                        .selected_groups
-                        .iter()
-                        .any(|g| g.name.eq_ignore_ascii_case(&pending))
-                {
-                    self.data.selected_groups.push(GroupSetup {
-                        name: pending,
-                        selected: true,
-                        name_override: None,
-                    });
-                    self.custom_group_input.clear();
-                }
+                // Advancing with text still in the field commits it too,
+                // so a name the user typed is never silently discarded.
+                self.commit_pending_custom_group();
                 self.navigate_to(Step::ContactInfo)
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
+    }
+
+    /// Commit whatever is pending in the custom-group field: add it as a
+    /// selected group, clear the field so the next one can be typed, and
+    /// drop the context bar back to Continue.
+    ///
+    /// Shared by the Add action, Return in the field, and Continue/Skip,
+    /// so the three ways to commit cannot drift apart. Duplicates are
+    /// ignored case-insensitively rather than rejected — re-typing an
+    /// existing group is a no-op, not an error worth interrupting for.
+    fn commit_pending_custom_group(&mut self) {
+        let name = self.custom_group_input.trim().to_string();
+        if !name.is_empty()
+            && !self
+                .data
+                .selected_groups
+                .iter()
+                .any(|g| g.name.eq_ignore_ascii_case(&name))
+        {
+            self.data.selected_groups.push(GroupSetup {
+                name,
+                selected: true,
+                name_override: None,
+            });
+        }
+        self.custom_group_input.clear();
+        self.custom_group_awaiting_add = false;
     }
 
     fn handle_contact_info(&mut self, action: &UserAction) -> ActionResult {

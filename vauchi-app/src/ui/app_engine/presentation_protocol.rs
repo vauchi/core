@@ -147,6 +147,8 @@ impl AppEngine {
         if !matches!(
             event,
             Event::ValueChanged { .. }
+                | Event::InputSubmitted { .. }
+                | Event::InputFocusEnded { .. }
                 | Event::ActionActivated { .. }
                 | Event::BackRequested { .. }
                 | Event::OverlayDismissed { .. }
@@ -179,7 +181,9 @@ impl AppEngine {
         }
 
         let route = match &event {
-            Event::ValueChanged { .. } => {
+            Event::ValueChanged { .. }
+            | Event::InputSubmitted { .. }
+            | Event::InputFocusEnded { .. } => {
                 ContextualSurfaceRoute::UserAction(prepared.reduce(event)?)
             }
             Event::ActionActivated { .. } => match prepared.reduce(event.clone()) {
@@ -522,6 +526,8 @@ fn presentation_event_surface_id(event: &Event) -> Option<&SurfaceId> {
     match event {
         Event::ActionActivated { surface_id, .. }
         | Event::ValueChanged { surface_id, .. }
+        | Event::InputSubmitted { surface_id, .. }
+        | Event::InputFocusEnded { surface_id, .. }
         | Event::BackRequested { surface_id }
         | Event::OverlayDismissed { surface_id, .. } => Some(surface_id),
         _ => None,

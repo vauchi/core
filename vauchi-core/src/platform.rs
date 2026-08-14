@@ -777,6 +777,25 @@ pub enum Event {
         binding_id: BindingId,
         value: InputValue,
     },
+    /// The user signalled completion on an opaque binding — the
+    /// platform's own "done" affordance (Return, IME action, Enter).
+    ///
+    /// An observation, not an intent: the shell reports that the gesture
+    /// happened and Core decides what it means. A shell that has no such
+    /// affordance simply never sends it.
+    InputSubmitted {
+        surface_id: SurfaceId,
+        binding_id: BindingId,
+    },
+    /// An opaque binding lost input focus without the user submitting.
+    ///
+    /// Paired with `InputSubmitted` so Core can tell "finished typing and
+    /// confirmed" from "typed, then went elsewhere" — the two need
+    /// different treatment when text is still uncommitted.
+    InputFocusEnded {
+        surface_id: SurfaceId,
+        binding_id: BindingId,
+    },
     /// The operating system delivered an opaque application deep link.
     DeepLinkOpened { uri: String },
     /// The application moved to the background or lost its active session.

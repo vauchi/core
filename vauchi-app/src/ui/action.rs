@@ -19,6 +19,18 @@ pub enum UserAction {
         component_id: String,
         value: String,
     },
+    /// The user pressed the platform's "done" affordance in a field
+    /// (Return / IME action). A screen may treat this as a commit; one
+    /// that does not simply ignores it.
+    TextSubmitted {
+        component_id: String,
+    },
+    /// A field lost focus with the user having pressed nothing. Screens
+    /// that hold uncommitted text use this to offer a way to commit it,
+    /// rather than committing silently on the user's behalf.
+    TextFocusEnded {
+        component_id: String,
+    },
     ItemToggled {
         component_id: String,
         item_id: String,

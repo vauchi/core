@@ -152,11 +152,12 @@ impl AppEngine {
                             crate::ui::exchange::ceremony::exchange_celebrate(),
                         ]);
                     }
-                    Err(_) => {
+                    Err(e) => {
+                        let id = super::link_responder::link_completion_failure_id(&e);
                         let _ = self
                             .engine
                             .apply_update(crate::ui::EngineUpdate::LinkExchange(
-                                crate::ui::LinkExchangeUpdate::Failed("decrypt_error".to_string()),
+                                crate::ui::LinkExchangeUpdate::Failed(id),
                             ));
                     }
                 }

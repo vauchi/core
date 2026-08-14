@@ -227,6 +227,8 @@ fn failure_detail(reason: &str, locale: Locale) -> String {
         "polling_timed_out" => "link_responder.failure_timed_out",
         "deposit_rejected" => "link_responder.failure_rejected",
         "decrypt_error" => "link_responder.failure_decrypt_error",
+        "self_exchange" => "link_responder.failure_self_exchange",
+        "contact_limit" => "link_responder.failure_contact_limit",
         "cancelled" => "link_responder.failure_cancelled",
         _ => "link_responder.failure_generic",
     };

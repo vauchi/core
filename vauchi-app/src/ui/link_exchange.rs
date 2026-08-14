@@ -349,6 +349,8 @@ fn failure_detail(reason: &str, locale: Locale) -> String {
         "handshake_failed" => "link_exchange.reason_handshake_failed",
         "deposit_rejected" => "link_exchange.reason_deposit_rejected",
         "decrypt_error" => "link_exchange.reason_decrypt_error",
+        "self_exchange" => "link_exchange.reason_self_exchange",
+        "contact_limit" => "link_exchange.reason_contact_limit",
         "cancelled" => "link_exchange.reason_cancelled",
         _ => "link_exchange.reason_generic",
     };

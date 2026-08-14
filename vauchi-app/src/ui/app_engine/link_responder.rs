@@ -36,6 +36,22 @@ use vauchi_core::exchange::link_mode::{
 use vauchi_core::exchange::link_responder::{
     LinkResponderFailureReason, LinkResponderSession, LinkResponderState,
 };
+use vauchi_core::{VauchiError, exchange::ExchangeError};
+
+/// Map a completion failure to the stable `LinkResponder` failure id.
+///
+/// Everything reaching here happened *after* a successful AEAD decrypt, so
+/// none of it is a decryption failure. The two deterministic cases get
+/// their own id because "please try again" is wrong advice for both — no
+/// retry resolves exchanging with yourself or a full contact list.
+pub(super) fn link_completion_failure_id(error: &VauchiError) -> String {
+    match error {
+        VauchiError::Exchange(ExchangeError::SelfExchange) => "self_exchange",
+        VauchiError::ContactLimitReached(_) => "contact_limit",
+        _ => "completion_failed",
+    }
+    .to_string()
+}
 
 /// Responder polling budget — mirrors the ADR-035 device-link window
 /// (300 s). After this many seconds without a `RelayEscrowReady`, a
@@ -186,8 +202,8 @@ impl AppEngine {
                     Ok(contact_id) => {
                         self.link_responder_completed(&contact_id);
                     }
-                    Err(_) => {
-                        self.link_responder_failed("decrypt_error".to_string());
+                    Err(e) => {
+                        self.link_responder_failed(link_completion_failure_id(&e));
                     }
                 }
                 self.link_responder = None;
@@ -215,11 +231,10 @@ impl AppEngine {
     /// persist it via the core import path (ADR-034 trust derivation +
     /// idempotent dedup live there). The frontend never sees the bytes.
     /// Returns the persisted contact id (for building the success summary).
-    pub(super) fn import_link_card_bytes(&self, card_bytes: &[u8]) -> Result<String, String> {
-        let (_signing_key, card) = parse_card_payload(card_bytes).map_err(|e| e.to_string())?;
-        self.vauchi
-            .import_received_link_card(card)
-            .map_err(|e| e.to_string())
+    pub(super) fn import_link_card_bytes(&self, card_bytes: &[u8]) -> Result<String, VauchiError> {
+        let (_signing_key, card) = parse_card_payload(card_bytes)
+            .map_err(|e| VauchiError::Exchange(ExchangeError::InvalidState(e.to_string())))?;
+        self.vauchi.import_received_link_card(card)
     }
 
     /// Complete a link exchange from the peer's finalized payload using the
@@ -232,10 +247,8 @@ impl AppEngine {
         &self,
         card_bytes: &[u8],
         our_x3dh: &X3DHKeyPair,
-    ) -> Result<String, String> {
-        self.vauchi
-            .complete_link_exchange(card_bytes, our_x3dh)
-            .map_err(|e| e.to_string())
+    ) -> Result<String, VauchiError> {
+        self.vauchi.complete_link_exchange(card_bytes, our_x3dh)
     }
 
     /// Advance the engine-owned link responder one relay step (ADR-049).

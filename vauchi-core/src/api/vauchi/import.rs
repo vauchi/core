@@ -243,10 +243,11 @@ impl Vauchi {
             .signing_public_key();
 
         // Reject our own bootstrap (degenerate self-exchange) before any write.
+        // Typed, not a message: the engine picks the user-facing consequence
+        // from the variant (ADR-045 Amendment 1 forbids substring matching),
+        // and every other exchange transport already raises this same variant.
         if identity_pubkey == our_identity {
-            return Err(VauchiError::InvalidState(
-                "cannot complete a link exchange with our own identity".into(),
-            ));
+            return Err(VauchiError::Exchange(ExchangeError::SelfExchange));
         }
 
         let contact_id = hex::encode(identity_pubkey);
@@ -261,9 +262,7 @@ impl Vauchi {
         let count = self.storage.contacts().count_contacts()?;
         let limit = self.storage.contacts().get_contact_limit()?;
         if count >= limit {
-            return Err(VauchiError::InvalidState(format!(
-                "contact limit reached ({limit})"
-            )));
+            return Err(VauchiError::ContactLimitReached(limit));
         }
 
         // Symmetric link shared key (commutative DH — both sides derive the

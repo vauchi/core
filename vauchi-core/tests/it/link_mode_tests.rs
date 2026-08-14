@@ -546,6 +546,55 @@ proptest::proptest! {
 /// The crypto layer (RustCrypto AEAD) is already covered by `escrow.rs`
 /// tests; this pin is specifically for the link-mode wrapper so the
 /// cycle thread's happy path stays sound under refactoring.
+/// The two parties never share an `EscrowKeys`: each derives its own from
+/// its half of the ECDH. Every other round-trip test in this file encrypts
+/// and decrypts with the *same* keys object, so none of them can observe a
+/// derivation asymmetry — which is how link-mode exchange reached hardware
+/// with the initiator completing while the responder failed to decrypt
+/// (2026-08-14-link-exchange-responder-cannot-decrypt-the-card).
+// @scenario: link_exchange :: the responder decrypts the initiator's deposit
+#[test]
+fn responder_decrypts_a_card_encrypted_with_independently_derived_initiator_keys() {
+    let (init, _) = initiator_generate();
+    let parsed = parse_link_url(&init.url).expect("a freshly generated url must parse");
+
+    let (responder_keys, responder_commands) =
+        responder_respond_with_card_bytes(&parsed, b"bob serialized card")
+            .expect("responder_respond_with_card_bytes must succeed");
+
+    // The responder's epk reaches the initiator through the handshake gate.
+    let responder_epk = match &responder_commands[0] {
+        Command::RelayEscrowDeposit { encrypted_card, .. } => {
+            <[u8; 32]>::try_from(encrypted_card.as_slice()).expect("an epk is 32 bytes")
+        }
+        other => panic!("expected the epk deposit at index 0, got {other:?}"),
+    };
+
+    let initiator_keys = initiator_derive_keys(&init.secret_key_bytes, &responder_epk)
+        .expect("initiator_derive_keys must succeed for a well-formed epk");
+
+    let plaintext = b"alice serialized card";
+    let ciphertext = initiator_keys
+        .encrypt_card(plaintext)
+        .expect("encrypting with the initiator's own keys must succeed");
+
+    let recovered = responder_complete(&responder_keys, &ciphertext).expect(
+        "the responder must decrypt what the initiator encrypted — both sides \
+         derive from the same ECDH, so a failure here means the two derivations \
+         disagree and only the initiator ever completes",
+    );
+    assert_eq!(recovered.as_slice(), plaintext);
+
+    // Symmetry is the actual contract, so assert the other direction too.
+    let responder_ciphertext = responder_keys
+        .encrypt_card(b"bob serialized card")
+        .expect("encrypting with the responder's own keys must succeed");
+    let initiator_recovered = initiator_keys
+        .decrypt_card(&responder_ciphertext)
+        .expect("the initiator must decrypt what the responder encrypted");
+    assert_eq!(initiator_recovered.as_slice(), b"bob serialized card");
+}
+
 // @internal
 #[test]
 fn responder_complete_round_trips_initiator_payload() {

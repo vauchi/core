@@ -31,6 +31,62 @@ fn make_session(deadline_unix: u64) -> LinkResponderSession {
     LinkResponderSession::new(keys, deposits, deadline_unix)
 }
 
+/// The relay authenticates a retrieval by the requester's *own* slot and
+/// then returns the *other* slot's blob (`relay/src/escrow.rs::get`).
+/// Passing the peer's slot therefore hands back our own deposit, which
+/// decrypts perfectly — both parties share one `card_key` — and only
+/// fails later, as "cannot complete a link exchange with our own
+/// identity" surfaced to the user as a decryption error
+/// (2026-08-14-link-exchange-responder-cannot-decrypt-the-card).
+// @scenario: link_exchange :: the responder retrieves the initiator's deposit
+#[test]
+fn responder_retrieves_using_its_own_slot_so_the_relay_returns_the_peers_blob() {
+    let (init, _) = initiator_generate();
+    let parsed = parse_link_url(&init.url).expect("a freshly generated url must parse");
+    let (keys, deposits) =
+        responder_respond(&parsed, b"responder_card".to_vec()).expect("responder_respond");
+
+    let gate_hash = hex_bytes(&keys.gate_hash);
+    let our_slot = hex_bytes(&keys.our_slot);
+    let their_slot = hex_bytes(&keys.their_slot);
+
+    let mut session = LinkResponderSession::new(keys, deposits, NOW + 300);
+    let _ = session.drain_pending_commands();
+
+    session.apply_hardware_event(Event::RelayEscrowReady {
+        gate_hash: gate_hash.clone(),
+    });
+
+    let retrieve_slot = session
+        .drain_pending_commands()
+        .into_iter()
+        .find_map(|c| match c {
+            Command::RelayEscrowRetrieve { slot_hash, .. } => Some(slot_hash),
+            _ => None,
+        })
+        .expect("a ready gate must queue a RelayEscrowRetrieve");
+
+    assert_ne!(
+        retrieve_slot, their_slot,
+        "retrieving with the peer's slot makes the relay return our own \
+         deposit, so the responder decrypts its own card and rejects it as \
+         a self-exchange"
+    );
+    assert_eq!(
+        retrieve_slot, our_slot,
+        "the relay verifies the requester owns the slot it names and then \
+         returns the other slot's blob, so the responder must name its own"
+    );
+}
+
+/// Decode a hex slot/gate identifier the way the session does internally.
+fn hex_bytes(hex_string: &str) -> Vec<u8> {
+    (0..hex_string.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex_string[i..i + 2], 16).expect("valid hex"))
+        .collect()
+}
+
 // ================================================================
 // Construction + initial state
 // ================================================================

@@ -56,7 +56,13 @@ enum JoinStep {
 #[derive(Clone, Debug)]
 pub struct DeviceLinkJoinEngine {
     step: JoinStep,
+    /// What the user typed. Empty until they do — the default is offered
+    /// as a placeholder rather than as content, because a caret lands
+    /// after existing text and typing would otherwise concatenate the
+    /// two.
     device_name: String,
+    /// The device's own name, applied when the field is left untouched.
+    default_device_name: String,
     locale: Locale,
 }
 
@@ -65,7 +71,8 @@ impl DeviceLinkJoinEngine {
     pub fn new(default_device_name: String) -> Self {
         Self {
             step: JoinStep::EnterName,
-            device_name: default_device_name,
+            device_name: String::new(),
+            default_device_name,
             locale: Locale::English,
         }
     }
@@ -76,9 +83,14 @@ impl DeviceLinkJoinEngine {
         self
     }
 
-    /// The device name the user has entered or confirmed.
+    /// The name to register this device under: what the user typed, or
+    /// the device's own name when the field was left untouched.
     pub fn device_name(&self) -> &str {
-        &self.device_name
+        if self.device_name.trim().is_empty() {
+            &self.default_device_name
+        } else {
+            &self.device_name
+        }
     }
 
     fn t(&self, key: &str) -> String {
@@ -99,7 +111,9 @@ impl DeviceLinkJoinEngine {
     }
 
     fn enter_name_screen(&self) -> ScreenModel {
-        let can_join = !self.device_name.trim().is_empty();
+        // Gated on the effective name, so an untouched field still joins
+        // under the device's own name.
+        let can_join = !self.device_name().trim().is_empty();
         ScreenModel {
             screen_id: "device_link_join".into(),
             title: self.t("devices.link.join_title"),
@@ -108,7 +122,7 @@ impl DeviceLinkJoinEngine {
                 id: DEVICE_NAME_INPUT_ID.into(),
                 label: self.t("devices.link.device_name"),
                 value: self.device_name.clone(),
-                placeholder: Some(self.t("devices.link.device_name")),
+                placeholder: Some(self.default_device_name.clone()),
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Text,
@@ -341,13 +355,16 @@ impl WorkflowEngine for DeviceLinkJoinEngine {
             }
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
                 JOIN_ACTION_ID => {
-                    if self.device_name.trim().is_empty() {
+                    // Effective name: an untouched field means "use this
+                    // device's own name", so only a blank *default* is a
+                    // validation failure.
+                    if self.device_name().trim().is_empty() {
                         return ActionResult::ValidationError {
                             component_id: DEVICE_NAME_INPUT_ID.into(),
                             message: self.t("devices.link.device_name"),
                         };
                     }
-                    let name = self.device_name.clone();
+                    let name = self.device_name().to_string();
                     self.step = JoinStep::PostingRequest;
                     ActionResult::DeviceLinkJoinStart { device_name: name }
                 }

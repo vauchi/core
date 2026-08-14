@@ -39,12 +39,12 @@ const TIMEOUT_SECS: u64 = 300;
 
 /// A broker with the relay's semantics rather than a stub's.
 ///
-/// Deliberately *not* `SingleCeremonyRendezvous`: that one answers
-/// `UnknownCode` for a code nobody offered, and the joiner mints its
-/// return-channel code privately and never offers it — so the two
-/// machines cannot complete a ceremony against it today. The relay
-/// creates the slot on first claim, which is what this mirrors and what
-/// production depends on.
+/// Two rules matter and both are enforced here, because production hit
+/// each of them: the relay **mints** every code
+/// (`relay/src/exchange_broker.rs`), and it rejects any code that is not
+/// exactly six digits (`relay/src/http_api.rs:1250`). A broker that
+/// accepts whatever string it is handed cannot observe a peer inventing
+/// its own channel name, which is what shipped.
 #[derive(Default)]
 struct RelayLikeBroker {
     slots: Mutex<HashMap<String, Slot>>,
@@ -71,7 +71,7 @@ impl DeviceLinkBroker for RelayLikeBroker {
     ) -> Result<String, NetworkError> {
         let mut n = self.next_code.lock().expect("uncontended");
         *n += 1;
-        let code = format!("CODE{n}");
+        let code = format!("{:06}", 100_000 + *n);
         self.slots.lock().expect("uncontended").insert(
             code.clone(),
             Slot {
@@ -83,9 +83,15 @@ impl DeviceLinkBroker for RelayLikeBroker {
     }
 
     fn exchange_claim(&self, code: &str, response_b64: &str) -> Result<String, NetworkError> {
+        // Mirrors the relay's own guard, verbatim in effect.
+        if code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit()) {
+            return Err(NetworkError::InvalidMessage(
+                "exchange_claim failed: code must be exactly 6 digits".into(),
+            ));
+        }
         let mut slots = self.slots.lock().expect("uncontended");
-        // The joiner's return channel is claimed before it is ever
-        // offered — the relay creates it here.
+        // The relay creates the slot on first claim, so a peer may claim
+        // a code before anything was offered under it.
         let slot = slots.entry(code.to_string()).or_default();
         if slot.response.is_some() {
             return Err(NetworkError::RelayRejected("already claimed".into()));
@@ -95,6 +101,11 @@ impl DeviceLinkBroker for RelayLikeBroker {
     }
 
     fn exchange_complete(&self, code: &str) -> Result<Option<String>, NetworkError> {
+        if code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit()) {
+            return Err(NetworkError::InvalidMessage(
+                "exchange_complete failed: code must be exactly 6 digits".into(),
+            ));
+        }
         Ok(self
             .slots
             .lock()

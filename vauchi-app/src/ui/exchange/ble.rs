@@ -202,6 +202,12 @@ pub(super) struct BleExchangeFlow {
     /// so a re-negotiation mid-session overwrites cleanly without
     /// resetting connection state.
     negotiated_mtu: Option<u32>,
+    /// Device whose GATT link the shell has reported ready to carry payload
+    /// (`Event::BleGattReady`). `None` until a platform says so — and a
+    /// platform that never emits it leaves this `None` forever, which is
+    /// why nothing may treat `None` as "not ready" without also handling
+    /// the platforms that stay silent.
+    gatt_ready_device: Option<String>,
     /// This device's role-tiebreak token (advertised in
     /// `BleStartAdvertising.payload`). Two peers discover each other
     /// symmetrically; on discovery each compares its own token against
@@ -234,6 +240,7 @@ impl BleExchangeFlow {
             received_card: None,
             shake_envelope_sent: false,
             negotiated_mtu: None,
+            gatt_ready_device: None,
             own_token,
             is_responder: false,
             fallback_connect_emitted: false,
@@ -276,6 +283,15 @@ impl BleExchangeFlow {
     #[cfg(test)]
     pub(super) fn negotiated_mtu(&self) -> Option<u32> {
         self.negotiated_mtu
+    }
+
+    /// Device the shell has reported a payload-ready GATT link for, or
+    /// `None` if no platform has said so yet. The write gate that consumes
+    /// this lands with the iOS serialized write queue; until then this is
+    /// the seam, and tests assert the event updates it.
+    #[cfg(test)]
+    pub(super) fn gatt_ready_device(&self) -> Option<&str> {
+        self.gatt_ready_device.as_deref()
     }
 
     pub(super) fn step(&self) -> &BleStep {
@@ -330,6 +346,15 @@ impl BleExchangeFlow {
         // the flow stays in its current step.
         if let Event::BleMtuNegotiated { mtu, .. } = event {
             self.negotiated_mtu = Some(*mtu);
+            return BleHardwareOutcome::Consumed { commands: vec![] };
+        }
+
+        // GATT readiness, like MTU, is tracked wherever it arrives rather
+        // than being tied to a step: a platform may report it before or
+        // after `BleConnected`, and holding it here means the writer can
+        // consult it without either machine owning the ordering.
+        if let Event::BleGattReady { device_id } = event {
+            self.gatt_ready_device = Some(device_id.clone());
             return BleHardwareOutcome::Consumed { commands: vec![] };
         }
 
@@ -1224,6 +1249,30 @@ mod tests {
         }
         assert_eq!(flow.negotiated_mtu(), Some(247));
         assert_eq!(*flow.step(), BleStep::Exchanging);
+    }
+
+    // @internal
+    #[test]
+    fn ble_gatt_ready_is_recorded_whatever_step_it_arrives_in() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
+        assert_eq!(flow.gatt_ready_device(), None);
+
+        // Before any connection: iOS resolves subscriptions on its own
+        // schedule, so readiness must not depend on the flow's step.
+        let outcome = flow.handle_event(&Event::BleGattReady {
+            device_id: "d1".into(),
+        });
+        assert!(
+            matches!(outcome, BleHardwareOutcome::Consumed { .. }),
+            "readiness is consumed, not ignored — an ignored event would \
+             leave the writer unable to tell ready from silent",
+        );
+        assert_eq!(flow.gatt_ready_device(), Some("d1"));
+        assert_eq!(
+            *flow.step(),
+            BleStep::Discovering,
+            "recording readiness must not advance the flow",
+        );
     }
 
     // @internal

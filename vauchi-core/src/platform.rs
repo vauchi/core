@@ -806,6 +806,32 @@ pub enum Event {
     /// canonical event. Core owns cache invalidation and emits the complete
     /// replacement command batch; no screen identifiers cross the boundary.
     PresentationInvalidated,
+
+    // Appended to preserve serde discriminant ordering.
+    /// The GATT link to `device_id` is ready to carry payload: services
+    /// discovered, characteristics resolved, and the peer's notification
+    /// subscription confirmed.
+    ///
+    /// Decoupled from [`Event::BleConnected`] for the same reason as
+    /// [`Event::BleMtuNegotiated`]: platforms reach "connected" and "usable"
+    /// at different moments, and delaying `BleConnected` until both hold
+    /// would lose the connection signal the chrome needs.
+    ///
+    /// It exists because treating "connected" as "ready" is what breaks the
+    /// BLE modes. iOS reports connection before subscriptions resolve and
+    /// applies no write backpressure, so a card write can reach the peer
+    /// ahead of its KeyAck — which
+    /// `orchestrator::ble_handshake_machine` treats as terminal, dropping
+    /// the late KeyAck and killing the exchange. Android already waits for
+    /// the same conditions internally, so it can report this immediately
+    /// after its existing wait.
+    ///
+    /// Optional: a platform that never emits it leaves Core exactly as it
+    /// was, so this cannot regress the shells that do not send it.
+    ///
+    /// Phase C of
+    /// `_private/docs/planning/todo/2026-07-20-exchange-modes-regression-safe-completion-plan.md`.
+    BleGattReady { device_id: String },
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

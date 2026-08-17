@@ -538,7 +538,7 @@ mod tests {
             "nav.settings",
             "nav.groups",
             "nav.more",
-            "nav.myCard",
+            "nav.my_card",
             "error.generic",
             "action.save",
             "action.cancel",

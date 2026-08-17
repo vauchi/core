@@ -421,6 +421,7 @@ impl AppEngine {
         // dropping it: the old `add_contact` rejected the duplicate id and
         // returned before the ratchet was saved. Repeat-exchange decision
         // 2026-06-27.
+        self.exchange_was_reconnection = self.contact_already_held(contact.id());
         let persisted = match ratchet {
             Some((ratchet, is_initiator)) => {
                 self.vauchi
@@ -488,6 +489,7 @@ impl AppEngine {
             received_fields,
             my_visible_fields,
             group_names,
+            is_reconnection: false,
         };
         self.apply_multi_stage_success_summary(summary);
     }
@@ -536,6 +538,13 @@ impl AppEngine {
     /// so every exchange engine can render the same terminal screen
     /// (2026-06-04-exchange-terminal-screens). Returns the default
     /// (status-only) summary if the contact can't be read back.
+    /// Whether storage already holds `contact_id`. Only meaningful *before*
+    /// the exchange upsert: the id is derived from the peer's key, so after
+    /// it an update and an insert are indistinguishable.
+    pub(crate) fn contact_already_held(&self, contact_id: &str) -> bool {
+        self.vauchi.get_contact(contact_id).ok().flatten().is_some()
+    }
+
     pub(crate) fn build_exchange_summary(
         &self,
         contact_id: &str,
@@ -578,6 +587,7 @@ impl AppEngine {
             received_fields,
             my_visible_fields,
             group_names,
+            is_reconnection: self.exchange_was_reconnection,
         }
     }
 

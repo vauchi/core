@@ -63,6 +63,7 @@ fn success_screen_renders_rich_summary_when_attached() {
         received_fields: vec![("email".into(), "Email".into(), "bob@example.com".into())],
         my_visible_fields: vec!["Phone".into()],
         group_names: Vec::new(),
+        is_reconnection: false,
     });
     let screen = engine.build_screen();
     assert!(

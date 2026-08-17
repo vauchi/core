@@ -1276,6 +1276,7 @@ fn build_legacy_success_summary(
         received_fields,
         my_visible_fields,
         group_names: Vec::new(),
+        is_reconnection: false,
     }
 }
 
@@ -1396,6 +1397,7 @@ mod tests {
             received_fields: vec![("Email".into(), "Email".into(), "bob@example.com".into())],
             my_visible_fields: vec!["Phone".into()],
             group_names: Vec::new(),
+            is_reconnection: false,
         });
         engine.step = ExchangeStep::Success;
         let screen = engine.build_screen();

@@ -162,6 +162,12 @@ pub struct AppEngine {
     /// (`2026-06-04-exchange-terminal-screens`). Reset when a fresh exchange
     /// engine is built (`screens_exchange::rebuild_exchange_engine`).
     legacy_exchange_persisted: Option<String>,
+    /// Whether the exchange being finalized re-met a contact we already
+    /// held. Captured at the persist seams *before* the upsert, because
+    /// afterwards storage cannot tell an update from an insert — the
+    /// contact id is derived from the peer's key, so both look identical.
+    /// Read by `build_exchange_summary` for the terminal screen's wording.
+    exchange_was_reconnection: bool,
     /// Engine-owned link-mode responder machine (slice 32l Phase 2), live
     /// only on `AppScreen::DeepLinkResponder`. See `app_engine/link_responder.rs`.
     link_responder: Option<vauchi_core::exchange::link_responder::LinkResponderSession>,
@@ -449,6 +455,7 @@ impl AppEngine {
             pending_commands: std::collections::VecDeque::new(),
             pending_location_contact: None,
             legacy_exchange_persisted: None,
+            exchange_was_reconnection: false,
             link_responder: None,
             link_responder_x3dh: None,
             link_initiator: None,

@@ -272,6 +272,7 @@ fn grace_screen_defers_rich_summary_until_session_ends() {
         received_fields: vec![("email".into(), "Email".into(), "bob@example.com".into())],
         my_visible_fields: vec!["Phone".into()],
         group_names: Vec::new(),
+        is_reconnection: false,
     });
 
     let grace = engine.current_screen();

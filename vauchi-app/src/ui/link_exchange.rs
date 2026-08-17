@@ -279,7 +279,9 @@ impl LinkExchangeEngine {
         if let Some(summary) = &self.success_summary {
             return crate::ui::exchange::success::build_exchange_success_screen(
                 "exchange_link_success",
-                self.t("link_exchange.contact_added_title"),
+                self.t(crate::ui::exchange::success::completion_title_key(
+                    summary.is_reconnection,
+                )),
                 ACTION_DONE,
                 summary,
                 self.locale,
@@ -472,6 +474,7 @@ mod success_summary_tests {
             received_fields: vec![("email".into(), "Email".into(), "bob@example.com".into())],
             my_visible_fields: vec!["Phone".into()],
             group_names: Vec::new(),
+            is_reconnection: false,
         });
         engine.transition_to_success();
         let screen = engine.build_screen();

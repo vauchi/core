@@ -574,6 +574,7 @@ impl AppEngine {
         // updates the peer's card and rekeys, instead of silently dropping it:
         // the old `add_contact` rejected the duplicate id and returned before
         // the ratchet was saved. Repeat-exchange decision 2026-06-27.
+        self.exchange_was_reconnection = self.contact_already_held(contact.id());
         if let Err(e) = self
             .vauchi
             .save_exchanged_contact(&contact, &ratchet, is_initiator)

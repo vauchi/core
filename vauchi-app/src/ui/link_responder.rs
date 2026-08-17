@@ -19,6 +19,7 @@
 //! and `_private/docs/designs/2026-05-25-slice-32l-phase-2-responder-screen-driven-design.md`.
 
 use crate::i18n::{Locale, get_string};
+use crate::ui::exchange::success::completion_title_key;
 use crate::ui::*;
 use vauchi_core::exchange::link_mode::DeepLinkPayload;
 
@@ -155,7 +156,7 @@ impl LinkResponderEngine {
         if let Some(summary) = &self.success_summary {
             return crate::ui::exchange::success::build_exchange_success_screen(
                 "link_responder_completed",
-                self.t("link_exchange.contact_added_title"),
+                self.t(completion_title_key(summary.is_reconnection)),
                 ACTION_DONE,
                 summary,
                 self.locale,
@@ -302,6 +303,42 @@ mod success_summary_tests {
 
     // @internal
     #[test]
+    fn completed_screen_says_updated_when_the_contact_already_existed() {
+        let mut engine = LinkResponderEngine::new(payload());
+        engine.set_success_summary(ExchangeSuccessSummary {
+            peer_name: "Bob".into(),
+            is_reconnection: true,
+            ..Default::default()
+        });
+        engine.transition_to_completed();
+        let screen = engine.build_screen();
+        assert_eq!(
+            screen.title,
+            get_string(Locale::English, "link_exchange.contact_updated_title"),
+            "re-exchanging with a known contact updates it; claiming it was \
+             added tells the user something that did not happen",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn completed_screen_says_added_for_a_first_exchange() {
+        let mut engine = LinkResponderEngine::new(payload());
+        engine.set_success_summary(ExchangeSuccessSummary {
+            peer_name: "Bob".into(),
+            is_reconnection: false,
+            ..Default::default()
+        });
+        engine.transition_to_completed();
+        let screen = engine.build_screen();
+        assert_eq!(
+            screen.title,
+            get_string(Locale::English, "link_exchange.contact_added_title"),
+        );
+    }
+
+    // @internal
+    #[test]
     fn completed_screen_renders_rich_summary_when_attached() {
         let mut engine = LinkResponderEngine::new(payload());
         engine.set_success_summary(ExchangeSuccessSummary {
@@ -309,6 +346,7 @@ mod success_summary_tests {
             received_fields: vec![("email".into(), "Email".into(), "bob@example.com".into())],
             my_visible_fields: vec!["Phone".into()],
             group_names: Vec::new(),
+            is_reconnection: false,
         });
         engine.transition_to_completed();
         let screen = engine.build_screen();

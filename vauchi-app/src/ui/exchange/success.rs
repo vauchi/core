@@ -31,6 +31,25 @@ pub struct ExchangeSuccessSummary {
     pub my_visible_fields: Vec<String>,
     /// Names of the groups the contact was added to (may be empty).
     pub group_names: Vec<String>,
+    /// Whether this exchange updated a contact we already had, rather than
+    /// adding a new one. Re-running the ceremony with the same peer is a
+    /// supported flow (it re-syncs and can raise trust), and the terminal
+    /// screen must not claim a contact was added when none was.
+    pub is_reconnection: bool,
+}
+
+/// Locale key for an exchange's terminal title.
+///
+/// Re-running the ceremony with a peer we already hold is a supported
+/// flow — it re-syncs the cards and can raise trust — so the terminal
+/// screen has to say which of the two happened. Every engine shares this
+/// so the wording cannot drift between modes.
+pub(crate) fn completion_title_key(is_reconnection: bool) -> &'static str {
+    if is_reconnection {
+        "link_exchange.contact_updated_title"
+    } else {
+        "link_exchange.contact_added_title"
+    }
 }
 
 /// Build the shared success `ScreenModel`.
@@ -219,6 +238,7 @@ mod tests {
             received_fields: vec![("email".into(), "Email".into(), "bob@example.com".into())],
             my_visible_fields: vec!["Phone".into(), "Website".into()],
             group_names: vec!["Friends".into()],
+            is_reconnection: false,
         };
         let screen = build_exchange_success_screen(
             "exchange_success",

@@ -221,6 +221,9 @@ impl AppEngine {
                 }));
             }
         };
+        // Before the upsert: afterwards an update is indistinguishable from
+        // an insert, so the terminal screen would have to guess.
+        self.exchange_was_reconnection = self.contact_already_held(contact.id());
         if let Err(e) = self
             .vauchi
             .save_exchanged_contact(&contact, &ratchet, is_initiator)

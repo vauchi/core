@@ -582,3 +582,48 @@ impl AppEngine {
         }
     }
 }
+
+// INLINE_TEST_REQUIRED: asserts on the private tab_metadata table, which has no public accessor
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every screen `tab_metadata` names a key for, so the test covers the
+    /// whole table rather than the handful of screens a tab bar shows.
+    const SCREENS_WITH_NAV_LABELS: &[AppScreen] = &[
+        AppScreen::MyInfo,
+        AppScreen::Contacts,
+        AppScreen::Exchange,
+        AppScreen::Groups,
+        AppScreen::More,
+        AppScreen::Onboarding,
+        AppScreen::Settings,
+        AppScreen::Help,
+        AppScreen::Recovery,
+        AppScreen::DeviceManagement,
+        AppScreen::Backup,
+        AppScreen::Privacy,
+        AppScreen::Support,
+        AppScreen::ActivityLog,
+    ];
+
+    /// A renamed key in the catalogue leaves `tab_info_for` serving its
+    /// hardcoded English fallback, which reads as correct in English and
+    /// drops the translation in every other locale. Assert on the key
+    /// resolving, because the label cannot tell the two cases apart.
+    // @internal
+    #[test]
+    fn every_nav_label_key_resolves_in_the_catalogue() {
+        let unresolved: Vec<&str> = SCREENS_WITH_NAV_LABELS
+            .iter()
+            .map(|screen| AppEngine::tab_metadata(screen).0)
+            .filter(|key| get_string(Locale::English, key).starts_with("Missing:"))
+            .collect();
+
+        assert!(
+            unresolved.is_empty(),
+            "nav label keys absent from the locale catalogue: {:?}",
+            unresolved
+        );
+    }
+}

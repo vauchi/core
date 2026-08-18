@@ -1031,7 +1031,20 @@ impl MultiStageSession {
                 // reached Confirming needs our CONF (card hash), which is
                 // always computable here — without it, that peer starves
                 // (device-proven deadlock 2026-07-24). No shake in Verifying.
-                let qr = self.build_finalization_qr(false);
+                // Keep advertising our ACK bitmap on a few frames. It rides
+                // only on DATA, and we reach Verifying the moment the peer's
+                // last chunk lands — so the frame that would have told the
+                // peer we hold it is never sent, and a peer whose own chunks
+                // are all acked is left in Transferring until it happens to
+                // catch our VRFY. That is the same "must catch one specific
+                // frame" stall as the chunk aliasing in `random_below`
+                // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+                let qr = if self.display_cycle % 7 < 2 {
+                    self.get_data_chunk_qr()
+                        .unwrap_or_else(|| self.build_finalization_qr(false))
+                } else {
+                    self.build_finalization_qr(false)
+                };
                 // If we stashed the peer's reveal key (received VRFY while still
                 // Transferring), process it now that we've generated our own VRFY
                 // for the peer to scan.

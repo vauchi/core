@@ -1485,10 +1485,40 @@ fn qr_scanned_via_dispatch_json_routes_to_multi_stage_session_like_the_typed_sea
             "{label}: scan must return a generic command envelope, got {v:?}",
         );
     }
+    // Compare routing and shape, not key material. Each engine owns an
+    // independent session, so their INIT QRs carry different ephemeral
+    // material by construction — two sessions agreeing on that payload would
+    // be a defect, not a passing test. The QR became session-specific here
+    // once a session started advertising on creation instead of on the next
+    // heartbeat.
     assert_eq!(
-        typed_json, canonical_json,
+        without_qr_payloads(&typed_json),
+        without_qr_payloads(&canonical_json),
         "the canonical envelope must route the scan exactly like the typed seam"
     );
+}
+
+/// The same envelope with every QR payload blanked, so two independent
+/// sessions can be compared on structure alone.
+fn without_qr_payloads(json: &str) -> serde_json::Value {
+    fn blank(v: &mut serde_json::Value) {
+        match v {
+            serde_json::Value::Object(map) => {
+                for (key, child) in map.iter_mut() {
+                    if key == "payloads" {
+                        *child = serde_json::Value::Null;
+                    } else {
+                        blank(child);
+                    }
+                }
+            }
+            serde_json::Value::Array(items) => items.iter_mut().for_each(blank),
+            _ => {}
+        }
+    }
+    let mut v: serde_json::Value = serde_json::from_str(json).expect("parse envelope");
+    blank(&mut v);
+    v
 }
 
 // @internal

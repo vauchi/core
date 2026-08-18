@@ -109,3 +109,23 @@ fn first_wakeup_earliest_secs(engine: &mut AppEngine) -> u32 {
         })
         .expect("a ScheduleWakeup is emitted")
 }
+
+/// Opening the exchange screen must produce our QR immediately, not on the
+/// next heartbeat. Until it exists we are still `Idle`, and `handle_init`
+/// accepts a peer INIT only while `Advertising` — so every peer frame decoded
+/// in the meantime is discarded. Device-measured at 29.1 s from
+/// "Exchange started" to the first QR, during which 40 peer INITs were thrown
+/// away (2026-08-19 Hover run).
+// @internal
+#[test]
+fn starting_an_exchange_builds_our_qr_without_waiting_for_a_heartbeat() {
+    let mut engine = engine_with_identity();
+    engine.ensure_multi_stage_session(vauchi_core::exchange::mode::ExchangeMode::Hover);
+
+    assert_eq!(
+        engine.multi_stage_phase(),
+        Some(vauchi_app::orchestrator::multi_stage_machine::MultiStagePhase::Advertising),
+        "a session must be advertising as soon as it is created — anything \
+         earlier means peer INITs are being dropped"
+    );
+}

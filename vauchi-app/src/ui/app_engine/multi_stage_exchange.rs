@@ -121,6 +121,13 @@ impl AppEngine {
             _ => MultiStageMachine::new_glance(payload, now),
         };
         self.multi_stage_session = Some(MultiStageHolder { machine });
+        // Build our QR now rather than on the next heartbeat. Until it exists
+        // the machine is still `Idle`, and `handle_init` accepts a peer INIT
+        // only while `Advertising` — so every peer frame the camera decodes in
+        // the meantime is discarded in silence. Device-measured at 29.1 s from
+        // "Exchange started" to the first QR, throwing away 40 peer INITs
+        // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+        self.advance_multi_stage_session();
     }
 
     /// Cancel + drop the active machine. Idempotent. `pub` so

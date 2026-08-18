@@ -540,7 +540,7 @@ impl AppEngine {
     /// drops the translation everywhere else.
     fn tab_metadata(screen: &AppScreen) -> (&'static str, &'static str, &'static str) {
         match screen {
-            AppScreen::MyInfo => ("nav.myCard", "person.crop.rectangle", "My Card"),
+            AppScreen::MyInfo => ("nav.my_card", "person.crop.rectangle", "My Card"),
             AppScreen::Contacts => ("nav.contacts", "person.2", "Contacts"),
             AppScreen::Exchange => ("nav.exchange", "qrcode", "Exchange"),
             AppScreen::Groups => ("nav.groups", "folder", "Groups"),

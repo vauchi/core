@@ -788,6 +788,24 @@ impl AppEngine {
     /// for runtime-elapsed) refines the *values* without changing the command
     /// shape or the shell contract.
     fn compute_next_wakeup(&self) -> vauchi_core::Command {
+        // A live multi-stage exchange is driven entirely by this heartbeat:
+        // `advance_multi_stage_session` runs inside `poll_notifications`, which
+        // runs only on wakeup. At the idle cadence the QR advanced once every
+        // 30 s while the protocol is built for a ~300 ms frame — device-observed
+        // as one displayed frame against 110 camera decodes, 40 peer INITs
+        // dropped before our own QR existed, and 43 s from "Exchange started" to
+        // any state change
+        // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+        //
+        // One second is this command's floor, not the right cadence: the frame
+        // dwell core already computes cannot be expressed in whole seconds.
+        if self.multi_stage_session_active() {
+            return vauchi_core::Command::ScheduleWakeup {
+                earliest_secs: 1,
+                deadline_secs: 1,
+                min_interval_secs: 1,
+            };
+        }
         vauchi_core::Command::ScheduleWakeup {
             earliest_secs: 30,
             deadline_secs: 90,

@@ -67,3 +67,45 @@ fn on_wakeup_reschedules_once_per_call() {
         .count();
     assert_eq!(count, 1, "each on_wakeup emits exactly one reschedule");
 }
+
+/// A live Hover/Glance exchange is driven entirely by this heartbeat:
+/// `advance_multi_stage_session` runs inside `poll_notifications`, which only
+/// runs on wakeup. At the idle 30 s cadence the QR advances once every 30 s
+/// while the protocol is built for a ~300 ms frame — device-observed as one
+/// `[MSX] tx` against 110 camera decodes, 40 peer INITs dropped before our own
+/// QR existed, and 43 s from "Exchange started" to any state change
+/// (2026-08-19 Hover run).
+// @internal
+#[test]
+fn an_active_exchange_schedules_a_far_shorter_wakeup_than_the_idle_heartbeat() {
+    let mut idle = engine_with_identity();
+    let _ = idle.on_wakeup();
+    let idle_secs = first_wakeup_earliest_secs(&mut idle);
+
+    let mut exchanging = engine_with_identity();
+    exchanging.ensure_multi_stage_session(vauchi_core::exchange::mode::ExchangeMode::Hover);
+    assert!(
+        exchanging.multi_stage_session_active(),
+        "precondition: a multi-stage session is live"
+    );
+    let _ = exchanging.on_wakeup();
+    let active_secs = first_wakeup_earliest_secs(&mut exchanging);
+
+    assert_eq!(idle_secs, 30, "the idle heartbeat is unchanged");
+    assert!(
+        active_secs <= 1,
+        "a live exchange must be driven at least once a second, got {active_secs}s \
+         (the QR frame it advances is designed to show for ~300ms)"
+    );
+}
+
+fn first_wakeup_earliest_secs(engine: &mut AppEngine) -> u32 {
+    engine
+        .drain_pending_commands()
+        .into_iter()
+        .find_map(|c| match c {
+            Command::ScheduleWakeup { earliest_secs, .. } => Some(earliest_secs),
+            _ => None,
+        })
+        .expect("a ScheduleWakeup is emitted")
+}

@@ -101,7 +101,33 @@ const ACCEL_LISTEN_TIMEOUT: Duration = Duration::from_secs(8);
 /// Tuned for <5s total exchange on typical hardware.
 /// Shorter = more scan opportunities per second = faster convergence.
 const DISPLAY_MS_INIT: u32 = 400;
-const DISPLAY_MS_DATA: u32 = 100; // 10fps animated — rxing decodes in ~10ms at 240p
+/// A frame must stay up long enough for the peer to *capture* it, which is
+/// not the same as decoding it. The 100 ms this replaced was validated on
+/// Pixel 3a ↔ Galaxy S7 with the ML Kit scanner at 240p (`56c3cff1`); the
+/// analyzer has since moved to rxing at 480p, whose per-frame capture is
+/// correspondingly slower, and dim-room auto-exposure alone can integrate
+/// longer than 100 ms.
+///
+/// Device-measured 2026-08-18 (Pixel 3a ↔ iPhone SE), counting the scanner's
+/// own decodes of the peer's DATA frames over comparable windows:
+///
+/// | dwell  | DATA frames decoded | transfer reached |
+/// |--------|---------------------|------------------|
+/// | 100 ms | 0                   | nothing          |
+/// | 300 ms | 1048                | `recv=2/3`       |
+/// | 400 ms | 105                 | `recv=1/3`       |
+///
+/// 300 ms is the empirical optimum: long enough to be captured at all, short
+/// enough to keep the frame rate that gives the peer repeated attempts.
+/// Raising it to `DISPLAY_MS_INIT` decoded *fewer* frames and got *less* far,
+/// so DATA keeps its own value rather than being tied to INIT.
+///
+/// Note DATA renders at EC level `L` against INIT's `M` (`get_data_chunk_qr`),
+/// so at equal module count — both measure 41 modules, i.e. DATA is *not* the
+/// denser code — it carries less error correction and tolerates less capture
+/// noise. That asymmetry, not size, is the likely reason DATA needs
+/// comparable dwell to a payload that decodes far more readily.
+const DISPLAY_MS_DATA: u32 = 300;
 const DISPLAY_MS_VRFY: u32 = 300;
 const DISPLAY_MS_CONF: u32 = 300;
 const DISPLAY_MS_RDYY: u32 = 400;
@@ -969,7 +995,12 @@ impl MultiStageSession {
                     Some(QrPayload {
                         data: qr_data,
                         error_correction: "M".to_string(),
-                        display_duration_ms: jittered(DISPLAY_MS_DATA), // S3: adaptive
+                        // INIT dwell, not DATA: this frame exists so a peer
+                        // still in Advertising can discover us, and that peer
+                        // is scanning for an INIT at INIT cadence. Emitting
+                        // the rescue frame at the shorter DATA dwell made the
+                        // recovery path itself too brief to capture.
+                        display_duration_ms: jittered(DISPLAY_MS_INIT),
                     })
                 } else {
                     self.get_data_chunk_qr()

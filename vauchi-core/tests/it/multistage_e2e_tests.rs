@@ -774,12 +774,32 @@ fn test_adaptive_display_durations() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&init_qr.data);
 
-    // DATA should be ~100ms (±20%: 80–120ms) — animated V4 QR at 10fps
+    // DATA should be ~300ms (±20%: 240–360ms). Raised from 100ms, at which a
+    // Pixel 3a decoded zero of the peer's DATA frames; 300ms decoded 1048 and
+    // got the transfer to recv=2/3. Dwell has to cover the peer's *capture*,
+    // not just rxing's decode
+    // (2026-08-18-multistage-data-frames-too-brief-to-capture).
     let data_qr = alice.get_display_qr().unwrap();
     assert!(
-        (80..=120).contains(&data_qr.display_duration_ms),
-        "DATA display should be ~100ms, got {}",
+        (240..=360).contains(&data_qr.display_duration_ms),
+        "DATA display should be ~300ms, got {}",
         data_qr.display_duration_ms
+    );
+
+    // The rescue frame a Transferring session re-shows for a peer still in
+    // Advertising must carry INIT dwell, not the shorter DATA dwell — that
+    // peer scans at INIT cadence, so emitting the recovery path briefly
+    // made the recovery itself uncapturable. Walk the cycle until the INIT
+    // re-show comes round.
+    let rescue = (0..8)
+        .filter_map(|_| alice.get_display_qr())
+        .find(|qr| qr.data.starts_with("INI"))
+        .expect("Transferring re-shows INIT within one cycle group");
+    assert!(
+        (320..=480).contains(&rescue.display_duration_ms),
+        "the re-shown INIT must use INIT dwell so a lagging peer can \
+         actually capture it, got {}",
+        rescue.display_duration_ms
     );
 
     for _ in 0..500 {

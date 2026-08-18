@@ -533,11 +533,13 @@ impl AppEngine {
         self.screen.parent_tab_for(layout).map(|s| s.screen_id())
     }
 
-    /// Resolve a `TabInfo` for a single `AppScreen`: looks up the
-    /// localized label, returns the SF Symbol icon name, and produces
-    /// a zero badge count (callers can overlay badge counts separately).
-    fn tab_info_for(screen: AppScreen, locale: Locale) -> TabInfo {
-        let (key, icon, fallback) = match &screen {
+    /// The locale key, SF Symbol, and hardcoded English label for a
+    /// screen. Split out from [`Self::tab_info_for`] so tests can assert
+    /// every key still resolves: `tab_info_for` masks a missing key with
+    /// `fallback`, which hides a renamed key in English and silently
+    /// drops the translation everywhere else.
+    fn tab_metadata(screen: &AppScreen) -> (&'static str, &'static str, &'static str) {
+        match screen {
             AppScreen::MyInfo => ("nav.myCard", "person.crop.rectangle", "My Card"),
             AppScreen::Contacts => ("nav.contacts", "person.2", "Contacts"),
             AppScreen::Exchange => ("nav.exchange", "qrcode", "Exchange"),
@@ -553,7 +555,14 @@ impl AppEngine {
             AppScreen::Support => ("nav.support", "bubble.left.and.bubble.right", "Support"),
             AppScreen::ActivityLog => ("nav.activity", "list.bullet.rectangle", "Activity"),
             _ => ("nav.home", "house", "Home"),
-        };
+        }
+    }
+
+    /// Resolve a `TabInfo` for a single `AppScreen`: looks up the
+    /// localized label, returns the SF Symbol icon name, and produces
+    /// a zero badge count (callers can overlay badge counts separately).
+    fn tab_info_for(screen: AppScreen, locale: Locale) -> TabInfo {
+        let (key, icon, fallback) = Self::tab_metadata(&screen);
         // `get_string` returns the sentinel "Missing: <key>" when the key
         // is absent from both the requested locale and the English
         // fallback; fall back to the hardcoded English label so UIs

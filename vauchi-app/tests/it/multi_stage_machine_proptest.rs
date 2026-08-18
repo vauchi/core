@@ -628,10 +628,19 @@ fn drive_two_to_confirming() -> (MultiStageMachine, MultiStageMachine, u64) {
         let t = i * 1_000; // step past the per-frame display-duration gate
         let ae = a.advance(t);
         let be = b.advance(t);
-        if let MultiStageEvent::QrFrameReady(p) = ae {
+        // Stop feeding a side that has already arrived. Frames are drawn per
+        // display rather than taken from a cycle position, so two identical
+        // machines no longer advance in lockstep, and a COMBO landing on an
+        // already-Confirming peer carries it to Complete before the other
+        // side gets there.
+        if let MultiStageEvent::QrFrameReady(p) = ae
+            && b.phase() != MultiStagePhase::Confirming
+        {
             let _ = b.handle_hardware_event(&Event::QrScanned { data: p.data }, t);
         }
-        if let MultiStageEvent::QrFrameReady(p) = be {
+        if let MultiStageEvent::QrFrameReady(p) = be
+            && a.phase() != MultiStagePhase::Confirming
+        {
             let _ = a.handle_hardware_event(&Event::QrScanned { data: p.data }, t);
         }
         if a.phase() == MultiStagePhase::Confirming && b.phase() == MultiStagePhase::Confirming {
@@ -644,12 +653,14 @@ fn drive_two_to_confirming() -> (MultiStageMachine, MultiStageMachine, u64) {
 /// Poll `advance` until the machine emits a SHAK QR frame, returning its data.
 fn capture_shake_frame(m: &mut MultiStageMachine, start_now: u64) -> String {
     // Each advance must clear the per-frame display-duration gate, so step
-    // `now` well past it. Phase 6 of the mod-7 Confirming cycle carries SHAK,
-    // so 20 fresh frames cover several full cycles. `now` continues from when
-    // Confirming was entered (`start_now`) — a continuous poll cadence — so the
-    // per-step stall deadline (MULTI_STAGE_STEP_TIMEOUT_MS, measured from phase
-    // entry) is not tripped by an artificial far-future jump.
-    for i in 0..20u64 {
+    // `now` well past it. Roughly one Confirming frame in seven carries SHAK,
+    // drawn per frame rather than landing on a fixed cycle position, so the
+    // poll budget is sized to make a miss vanishingly unlikely rather than to
+    // cover a whole cycle. `now` continues from when Confirming was entered
+    // (`start_now`) — a continuous poll cadence — so the per-step stall
+    // deadline (MULTI_STAGE_STEP_TIMEOUT_MS, measured from phase entry) is not
+    // tripped by an artificial far-future jump.
+    for i in 0..200u64 {
         let now = start_now + (i + 1) * 2_000;
         if let MultiStageEvent::QrFrameReady(p) = m.advance(now)
             && p.data.starts_with("SHAK")

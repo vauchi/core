@@ -148,6 +148,20 @@ fn jittered(base_ms: u32) -> u32 {
     base_ms - jitter_range + jitter
 }
 
+/// Uniformly pick a slot below `bound`, drawn fresh for each displayed frame.
+///
+/// Choosing which frame to show from a position in a display cycle makes the
+/// frame a function of that counter, and a camera samples on its own clock:
+/// when the two periods share a factor the scanner lands on the same slot
+/// forever and never sees the others. Device-proven — a scanner aliased to
+/// the 4-slot Transferring cycle received the same chunk 692 times while the
+/// two chunks it still needed were never once displayed to it
+/// (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`). Drawing each frame
+/// independently leaves every slot reachable from every sampling phase.
+fn random_below(bound: u32) -> u32 {
+    u32::from_le_bytes(crate::crypto::random_bytes::<4>()) % bound.max(1)
+}
+
 /// Audio-proximity state transition error.
 ///
 /// The session enforces a strict transition graph to prevent the
@@ -273,8 +287,9 @@ pub struct MultiStageSession {
     // INIT QR cache (avoid regenerating)
     init_qr_cache: Option<String>,
 
-    // Current outbound chunk index for round-robin display
-    current_chunk_idx: u16,
+    // Outbound chunks still to show this pass, in shuffled order (popped from
+    // the back). Rebuilt from the unacked set whenever a pass drains.
+    pending_chunk_order: Vec<u16>,
 
     // Display cycle counter — every Nth cycle, re-show INIT so a slower
     // peer still in Advertising can discover us.
@@ -423,7 +438,7 @@ impl MultiStageSession {
             state: ProtocolState::Idle,
             received_data: None,
             init_qr_cache: None,
-            current_chunk_idx: 0,
+            pending_chunk_order: Vec::new(),
             display_cycle: 0,
             phase_entered_at: None,
             last_progress_at: None,
@@ -853,8 +868,10 @@ impl MultiStageSession {
     /// starved for CONF and timed out. A peer that receives a frame it is not
     /// yet ready for ignores it (`handle_confirm`/`handle_verify` no-op
     /// off-state). Deterministic (no RNG) so the exchange timing is
-    /// reproducible; the coprime-7 cadence keeps a scanner from locking onto
-    /// one phase.
+    /// reproducible. The cadence alone does not stop a scanner locking onto
+    /// one phase — COMBO is what makes finalization robust to that, since any
+    /// single COMBO decode advances the peer (see `random_below` for the
+    /// DATA-phase instance where no such frame exists).
     fn build_finalization_qr(&self, include_shake: bool) -> QrPayload {
         let phase = self.display_cycle % 7;
         // SHAK carries the advisory accel envelope (TapHoverShake);
@@ -985,11 +1002,11 @@ impl MultiStageSession {
             }
             ProtocolState::Transferring { .. } => {
                 self.display_cycle += 1;
-                // Every 4th cycle, re-show INIT so a slower peer still in
-                // Advertising can discover us (fixes the race condition where
+                // Roughly one frame in four re-shows INIT so a slower peer
+                // still in Advertising can discover us (fixes the race where
                 // one device transitions to Transferring before the other
-                // scans our INIT).
-                if self.display_cycle.is_multiple_of(4) {
+                // scans our INIT). Drawn, not counted — see `random_below`.
+                if random_below(4) == 0 {
                     let qr_data = self
                         .init_qr_cache
                         .clone()
@@ -1498,6 +1515,7 @@ impl MultiStageSession {
             }
         }
         self.outbound_chunks = chunks;
+        self.pending_chunk_order.clear();
     }
 
     fn get_data_chunk_qr(&mut self) -> Option<QrPayload> {
@@ -1505,50 +1523,40 @@ impl MultiStageSession {
             return None;
         }
 
-        let start = self.current_chunk_idx;
         let total = self.outbound_total;
 
-        for offset in 0..total {
-            let idx = (start + offset) % total;
-
-            let already_acked = self
-                .peer_ack_bitmap
-                .as_ref()
-                .map(|b| b.has(idx))
-                .unwrap_or(false);
-
-            if !already_acked {
-                self.current_chunk_idx = (idx + 1) % total;
-
-                let ack_bytes = self
-                    .inbound_bitmap
-                    .as_ref()
-                    .map(|b| b.to_bytes())
-                    .unwrap_or_default();
-
-                let chunk_data = &self.outbound_chunks[idx as usize];
-                let qr_data =
-                    qr_codec::format_data_qr(&self.session_id, idx, total, &ack_bytes, chunk_data);
-
-                return Some(QrPayload {
-                    data: qr_data,
-                    error_correction: "L".to_string(),
-                    display_duration_ms: jittered(DISPLAY_MS_DATA),
-                });
+        // Show each chunk the peer still needs once per pass, in a fresh
+        // random order. A fixed rotation ties the chunk index to the display
+        // cycle and a camera sampling on its own clock then receives one index
+        // forever (see `random_below`); drawing independently every frame
+        // would instead cost a coupon-collector factor on a large card.
+        // Reshuffling per pass keeps full coverage in `n` frames with no fixed
+        // phase for a scanner to lock onto.
+        let mut order = std::mem::take(&mut self.pending_chunk_order);
+        order.retain(|idx| !self.peer_ack_bitmap.as_ref().is_some_and(|b| b.has(*idx)));
+        if order.is_empty() {
+            order = (0..total)
+                .filter(|idx| !self.peer_ack_bitmap.as_ref().is_some_and(|b| b.has(*idx)))
+                .collect();
+            for i in (1..order.len()).rev() {
+                order.swap(i, random_below(i as u32 + 1) as usize);
             }
         }
 
-        // All our chunks are ACK'd, but we may still need to send our ACK bitmap
-        // so the peer knows which of their chunks we've received. Resend chunk 0
-        // as a carrier for the updated bitmap.
+        // Everything is ACK'd: chunk 0 goes out as the carrier for our own ACK
+        // bitmap, which is how the peer learns which of *their* chunks we hold.
+        let idx = order.pop().unwrap_or(0);
+        self.pending_chunk_order = order;
+
         let ack_bytes = self
             .inbound_bitmap
             .as_ref()
             .map(|b| b.to_bytes())
             .unwrap_or_default();
 
-        let chunk_data = &self.outbound_chunks[0];
-        let qr_data = qr_codec::format_data_qr(&self.session_id, 0, total, &ack_bytes, chunk_data);
+        let chunk_data = &self.outbound_chunks[idx as usize];
+        let qr_data =
+            qr_codec::format_data_qr(&self.session_id, idx, total, &ack_bytes, chunk_data);
 
         Some(QrPayload {
             data: qr_data,

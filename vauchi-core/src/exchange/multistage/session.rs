@@ -122,11 +122,13 @@ const DISPLAY_MS_INIT: u32 = 400;
 /// Raising it to `DISPLAY_MS_INIT` decoded *fewer* frames and got *less* far,
 /// so DATA keeps its own value rather than being tied to INIT.
 ///
-/// Note DATA renders at EC level `L` against INIT's `M` (`get_data_chunk_qr`),
-/// so at equal module count — both measure 41 modules, i.e. DATA is *not* the
-/// denser code — it carries less error correction and tolerates less capture
-/// noise. That asymmetry, not size, is the likely reason DATA needs
-/// comparable dwell to a payload that decodes far more readily.
+/// Note DATA is *not* the denser code, despite being longer: 152 bytes on the
+/// wire against INI2's 139, yet both render to 41 modules. Byte length stops
+/// tracking density once both payloads are base45, whose alphabet is exactly
+/// the QR alphanumeric charset. The `error_correction` these frames declare
+/// does not explain the gap either — no shell reads it (Android's
+/// `generateQrBitmap` defaults every code to Medium, iOS never references the
+/// field), so INIT and DATA render identically on device.
 const DISPLAY_MS_DATA: u32 = 300;
 const DISPLAY_MS_VRFY: u32 = 300;
 const DISPLAY_MS_CONF: u32 = 300;
@@ -1587,10 +1589,34 @@ impl MultiStageSession {
         // chunk (decode phase-lock or repeated AEAD failure); with
         // `ours_acked=false` the peer never confirmed one of ours
         // (2026-07-25 Pixel↔Samsung transfer-stall diagnosis).
+        // Which indices are outstanding, not just how many. A stall pins the
+        // same pair every tick, and the index is what separates "one specific
+        // chunk never lands" from "progress is merely slow"
+        // (2026-08-18-hover-transfer-stalls-on-the-last-chunk).
+        let unacked: Vec<u16> = (0..self.outbound_total)
+            .filter(|i| {
+                !self
+                    .peer_ack_bitmap
+                    .as_ref()
+                    .map(|b| b.has(*i))
+                    .unwrap_or(false)
+            })
+            .collect();
+        let missing: Vec<u16> = (0..peer_total)
+            .filter(|i| {
+                !self
+                    .inbound_bitmap
+                    .as_ref()
+                    .map(|b| b.has(*i))
+                    .unwrap_or(false)
+            })
+            .collect();
         tracing::info!(
             "[MSX] xfer ack={chunks_acked}/{} recv={chunks_received}/{peer_total} \
-             ours_acked={all_ours_acked} theirs_recv={all_theirs_received}",
-            self.outbound_total
+             ours_acked={all_ours_acked} theirs_recv={all_theirs_received} \
+             unacked={unacked:?} missing={missing:?} decrypt_fail={}",
+            self.outbound_total,
+            self.transport_decrypt_failures
         );
 
         if all_ours_acked && all_theirs_received {

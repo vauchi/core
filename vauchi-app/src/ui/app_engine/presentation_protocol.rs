@@ -343,6 +343,24 @@ impl AppEngine {
             #[allow(clippy::let_underscore_must_use)]
             let _ = self.apply_glance_scan(value);
         }
+        // Hover / TapHoverShake / Glance-on-the-multi-stage-screen: the
+        // capture node's text carries the frame the camera just decoded.
+        // Route it into the AppEngine-owned machine before `handle_action`
+        // so the screen this batch renders already reflects the new phase.
+        // The engine itself is a pure projection and drops the action
+        // (`MultiStageExchangeEngine::handle_action`), so without this the
+        // decode is parsed and discarded —
+        // `2026-08-18-hover-decodes-the-peer-qr-but-never-advances`.
+        if let UserAction::TextChanged {
+            component_id,
+            value,
+        } = &action
+            && component_id == crate::ui::MULTI_STAGE_PEER_SCAN_COMPONENT_ID
+            && matches!(self.screen, AppScreen::MultiStageExchange { .. })
+        {
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.apply_multi_stage_peer_scan(value);
+        }
         let before = self.projected_visible_surface();
         let result = self.handle_action(action);
         // DeviceLinkConfirmManual/Deny/Retry are Core-internal signals:

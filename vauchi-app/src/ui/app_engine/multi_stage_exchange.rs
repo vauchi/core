@@ -289,6 +289,26 @@ impl AppEngine {
         self.multi_stage_session.as_ref().map(|h| h.machine.phase())
     }
 
+    /// Feed one frame the shell decoded off the peer's screen into the
+    /// machine. Returns true if the machine consumed it.
+    ///
+    /// The shell reports a decode as an opaque text value on the capture
+    /// node's binding — it has no `Event::QrScanned` to send and no
+    /// domain vocabulary to name the node with (ADR-021 / ADR-066). The
+    /// reducer resolves that binding back to `peer_scan` and lands here,
+    /// which is the only production path from a camera to this machine.
+    /// Its absence was
+    /// `2026-08-18-hover-decodes-the-peer-qr-but-never-advances`: a Pixel
+    /// decoded 1146 `INI2` frames while the machine sat in `Advertising`,
+    /// because the only callers of
+    /// [`Self::forward_multi_stage_hardware_event`] were tests.
+    pub(crate) fn apply_multi_stage_peer_scan(&mut self, qr: &str) -> bool {
+        let event = self.forward_multi_stage_hardware_event(&vauchi_core::Event::QrScanned {
+            data: qr.to_string(),
+        });
+        self.apply_multi_stage_event(event)
+    }
+
     /// Drain any commands the machine emitted that aren't routed
     /// through the standard `extend_pending_commands` path. T1.2b /
     /// T1.2c emit all commands via `apply_multi_stage_event`

@@ -976,6 +976,12 @@ impl MultiStageSession {
                 let qr_data = self.build_init_qr();
                 self.init_qr_cache = Some(qr_data.clone());
                 self.state = ProtocolState::Advertising;
+                // Dev instrumentation (dev-logging only; no PII). This is the
+                // instant our QR first exists, and until it does every peer
+                // INIT we decode is discarded. Nothing recorded it, so the
+                // 43 s an exchange spent looking frozen could not be
+                // attributed (2026-08-19 Hover run).
+                tracing::info!("[MSX] INIT built — now Advertising");
                 // Use "L" error correction for INIT/INID — produces less dense QR
                 // that scans faster on older cameras (Samsung S7).
                 Some(QrPayload {
@@ -1261,6 +1267,16 @@ impl MultiStageSession {
     ) -> ProtocolState {
         // Only accept INIT while Advertising
         if !matches!(self.state, ProtocolState::Advertising) {
+            // Dev instrumentation (dev-logging only; no PII — state name).
+            // A peer INIT decoded before our own INIT exists is dropped in
+            // silence: we only reach Advertising once `get_display_qr` has
+            // built our QR. On device that swallowed 40 successfully decoded
+            // peer INITs in three seconds while the exchange looked frozen
+            // (2026-08-19 Hover run).
+            tracing::info!(
+                "[MSX] INIT dropped — not Advertising yet (state={:?})",
+                self.state
+            );
             return self.state.clone();
         }
 

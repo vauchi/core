@@ -298,6 +298,7 @@ mod multistage_chunker_tests;
 mod multistage_commitment_tests;
 mod multistage_crc16_tests;
 mod multistage_e2e_tests;
+mod multistage_lossy_link_tests;
 mod multistage_proptest;
 mod multistage_qr_codec_inid_ready_tests;
 mod multistage_qr_codec_tests;

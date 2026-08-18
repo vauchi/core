@@ -3,8 +3,8 @@
 
 > **Mirror:** This repo is a read-only mirror of [gitlab.com/vauchi/core](https://gitlab.com/vauchi/core). Please open issues and merge requests there.
 
-[![Pipeline](https://img.shields.io/endpoint?url=https://vauchi.gitlab.io/core/badges/pipeline.json&label=pipeline)](https://gitlab.com/vauchi/core/-/pipelines)
-[![Coverage](https://img.shields.io/endpoint?url=https://vauchi.gitlab.io/core/badges/coverage.json&label=coverage)](https://gitlab.com/vauchi/core/-/pipelines)
+[![Pipeline](https://img.shields.io/endpoint?url=https://vauchi.gitlab.io/core/badges/pipeline.json&label=pipeline)](https://gitlab.com/vauchi/core)
+[![Coverage](https://img.shields.io/endpoint?url=https://vauchi.gitlab.io/core/badges/coverage.json&label=coverage)](https://gitlab.com/vauchi/core)
 [![REUSE](https://api.reuse.software/badge/gitlab.com/vauchi/core)](https://api.reuse.software/info/gitlab.com/vauchi/core)
 
 > [!NOTE]

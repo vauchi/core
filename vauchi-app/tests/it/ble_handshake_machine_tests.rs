@@ -20,7 +20,7 @@
 //! `BleHandshakeSession` + `BleChunker` types the machine owns.
 
 use vauchi_app::orchestrator::ble_handshake_machine::{
-    BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleOobBinding, BleRole,
+    BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleOobBinding, BleRole, decide_ble_role,
 };
 use vauchi_core::Command;
 use vauchi_core::crypto::X3DHKeyPair;
@@ -1102,5 +1102,67 @@ fn card_before_commitment_reorder_should_be_quarantined_not_terminal() {
                 if uuid.as_str() == CHAR_HANDSHAKE_NOTIFY
         )),
         "responder must emit its reveal after the reordered pair completes"
+    );
+}
+
+// ── role tiebreak across advertised token widths ─────────────────────
+//
+// `decide_ble_role` is handed asymmetric widths in production: `own_token`
+// is the full 32-byte identity signing key, while `peer_token` is only the
+// leading bytes recovered from the advertisement — 2 on iOS
+// (`BleUuids.advTokenBytes`). Slices compare element-wise and then by
+// length, so a peer token that is a prefix of our own key makes us the
+// larger value regardless of the remaining 30 bytes.
+
+/// The advertised prefix, not the whole key, decides the role.
+// @internal
+#[test]
+fn role_is_decided_by_the_advertised_prefix() {
+    let peer_prefix = [0x20u8, 0x30];
+
+    assert_eq!(
+        decide_ble_role(&[0x10u8; 32], &peer_prefix),
+        BleRole::Initiator,
+        "a lower leading byte must dial"
+    );
+    assert_eq!(
+        decide_ble_role(&[0x40u8; 32], &peer_prefix),
+        BleRole::Responder,
+        "a higher leading byte must wait"
+    );
+}
+
+/// Two devices whose identity keys share their leading two bytes both
+/// compute `Responder`, so neither dials and the exchange cannot start.
+///
+/// **This documents a defect, not desired behaviour.** It passes because
+/// it pins what the code does today; do not read the green as approval.
+/// Whether the tie should instead resolve to `Initiator` — glare is
+/// handled, deadlock is not — is a design decision, recorded in
+/// `problems/2026-06-27-ios-android-ble-discovery-gap`.
+///
+/// `decides_initiator` in `ui/exchange/ble.rs` reasons that equal tokens
+/// are "effectively impossible for distinct identities", which holds for
+/// full keys. It stops holding once the peer side is truncated to the two
+/// bytes iOS can advertise: the collision only has to land in that prefix.
+// @internal
+#[test]
+fn a_shared_two_byte_prefix_deadlocks_both_devices_as_responder() {
+    let mut alice = [0xAAu8; 32];
+    let mut bob = [0xAAu8; 32];
+    // Distinct identities — they differ well past the advertised prefix.
+    alice[2] = 0x01;
+    bob[2] = 0x02;
+
+    let advertised = |key: &[u8; 32]| [key[0], key[1]];
+
+    assert_eq!(
+        decide_ble_role(&alice, &advertised(&bob)),
+        BleRole::Responder
+    );
+    assert_eq!(
+        decide_ble_role(&bob, &advertised(&alice)),
+        BleRole::Responder,
+        "both sides wait for the other to dial — nobody connects"
     );
 }

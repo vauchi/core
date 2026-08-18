@@ -60,7 +60,7 @@ optional = true
 default-features = false
 
 [dependencies.lru]
-version = "0.16"
+version = "0.18"
 
 [dev-dependencies.image]
 version = ">= 0.24, <= 0.25"

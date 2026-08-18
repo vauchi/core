@@ -154,3 +154,35 @@ fn every_outstanding_chunk_reaches_a_periodically_sampling_scanner() {
          (every, phase, chunks seen): {starved:?}"
     );
 }
+
+/// The device stall of 2026-08-19 left the Pixel holding the peer's chunks
+/// 0 and 2 while the peer kept re-showing chunk 2 — the behaviour of a peer
+/// that believes we hold 0 and 1. If a `{0, 2}` ACK survived the wire as
+/// `{0, 1}`, that would explain it exactly.
+// @internal
+#[test]
+fn a_sparse_ack_bitmap_survives_the_data_frame_round_trip() {
+    let session_id = [7u8; 16];
+    let mut held = vauchi_core::exchange::multistage::types::ChunkBitmap::new(3);
+    held.mark_received(0);
+    held.mark_received(2);
+
+    let qr = vauchi_core::exchange::multistage::qr_codec::format_data_qr(
+        &session_id,
+        1,
+        3,
+        &held.to_bytes(),
+        b"ciphertext",
+    );
+
+    let StageQr::Data { ack_bitmap, .. } = parse_qr(&qr).expect("DATA parses") else {
+        panic!("expected a DATA frame");
+    };
+    let decoded = vauchi_core::exchange::multistage::types::ChunkBitmap::from_bytes(&ack_bitmap, 3);
+
+    assert_eq!(
+        (decoded.has(0), decoded.has(1), decoded.has(2)),
+        (true, false, true),
+        "an ACK for chunks 0 and 2 must arrive as 0 and 2"
+    );
+}

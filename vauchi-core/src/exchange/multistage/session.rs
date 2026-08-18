@@ -1392,6 +1392,23 @@ impl MultiStageSession {
             self.outbound_total,
         ));
 
+        // Dev instrumentation (dev-logging only; no PII — indices only). Which
+        // chunk the peer actually *chose to show* is not derivable from our own
+        // side: a stall pins `missing` without saying whether the frames we keep
+        // decoding carry the chunk we need. Two rounds of the 2026-08 Hover
+        // diagnosis were spent inferring the peer's display from our receipts
+        // and were wrong both times
+        // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+        let peer_holds: Vec<u16> = (0..self.outbound_total)
+            .filter(|i| {
+                self.peer_ack_bitmap
+                    .as_ref()
+                    .map(|b| b.has(*i))
+                    .unwrap_or(false)
+            })
+            .collect();
+        tracing::info!("[MSX] rx idx={chunk_idx}/{chunk_total} peer_holds={peer_holds:?}");
+
         // Only advance transfer state if not already past Transferring.
         // In Verifying, we accept DATA only for the ACK bitmap update.
         if !matches!(self.state, ProtocolState::Verifying) {
@@ -1570,6 +1587,14 @@ impl MultiStageSession {
         let chunk_data = &self.outbound_chunks[idx as usize];
         let qr_data =
             qr_codec::format_data_qr(&self.session_id, idx, total, &ack_bytes, chunk_data);
+
+        // Dev instrumentation (dev-logging only; no PII — indices only). Pairs
+        // with `[MSX] rx`: together the two sides' logs say whether a chunk the
+        // peer needs was ever put on screen, which neither side can answer alone.
+        tracing::info!(
+            "[MSX] tx idx={idx}/{total} rest_of_pass={:?}",
+            self.pending_chunk_order
+        );
 
         Some(QrPayload {
             data: qr_data,

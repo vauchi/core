@@ -167,3 +167,36 @@ fn starting_an_exchange_builds_our_qr_without_waiting_for_a_heartbeat() {
          earlier means peer INITs are being dropped"
     );
 }
+
+/// The sub-second interval has to survive serialisation to reach a shell.
+/// On device the Pixel advanced its display every 2–4 seconds while core was
+/// asking for ~300 ms, and the field being absent or renamed on the wire is
+/// the first thing that could explain it
+/// (2026-08-19, `2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+// @internal
+#[test]
+fn the_sub_second_wakeup_survives_json() {
+    let mut engine = engine_with_identity();
+    engine.ensure_multi_stage_session(vauchi_core::exchange::mode::ExchangeMode::Hover);
+    let _ = engine.on_wakeup();
+    let scheduled = engine
+        .drain_pending_commands()
+        .into_iter()
+        .find(|c| matches!(c, Command::ScheduleWakeup { .. }))
+        .expect("a ScheduleWakeup is emitted");
+
+    let json = serde_json::to_string(&scheduled).expect("serialises");
+    assert!(
+        json.contains("earliest_millis"),
+        "the shell keys on `earliest_millis`; got {json}"
+    );
+    let parsed: serde_json::Value = serde_json::from_str(&json).expect("parses");
+    let millis = parsed
+        .pointer("/ScheduleWakeup/earliest_millis")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or_else(|| panic!("no sub-second interval in {json}"));
+    assert!(
+        (100..=500).contains(&millis),
+        "a live exchange must ask for its frame dwell, got {millis}ms"
+    );
+}

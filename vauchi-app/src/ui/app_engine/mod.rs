@@ -118,6 +118,10 @@ pub struct AppEngine {
     update_dismissed: bool,
     /// Last timestamp (seconds) when activity log was polled for OS notifications.
     last_poll_time: u64,
+    /// Wall-clock of the previous poll while an exchange is live, and how many
+    /// there have been — the pace at which a Hover QR can advance.
+    last_poll_ms: Option<u64>,
+    poll_count: u32,
     /// Channel receiver for events to be persisted to the activity log.
     event_rx: mpsc::Receiver<VauchiEvent>,
     /// Active event handler ID, used to unregister on drop.
@@ -446,6 +450,8 @@ impl AppEngine {
             update_status: AppUpdateStatus::UpToDate,
             update_dismissed: false,
             last_poll_time: now,
+            last_poll_ms: None,
+            poll_count: 0,
             event_rx,
             _event_handler_id: event_handler_id,
             pending_merge: None,
@@ -821,6 +827,25 @@ impl AppEngine {
     /// Poll the activity log and produce pending OS notifications.
     /// Public so PlatformAppEngine can expose it via UniFFI.
     pub fn poll_notifications(&mut self) -> Vec<PendingNotification> {
+        // Dev instrumentation (dev-logging only; no PII — a count and a
+        // gap). This is the one route into `advance_multi_stage_session`, so
+        // whatever calls it sets the pace at which a Hover QR advances. On
+        // device the display moved every 2-4 s while core asked for ~300 ms,
+        // and the foreground heartbeat that was supposed to drive it turned
+        // out never to run — so the real driver is unidentified, and only a
+        // counter here is agnostic about who it is
+        // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+        if self.multi_stage_session_active() {
+            let now_ms = self.vauchi.clock().unix_millis();
+            let gap = self.last_poll_ms.map(|t| now_ms.saturating_sub(t));
+            self.last_poll_ms = Some(now_ms);
+            self.poll_count = self.poll_count.saturating_add(1);
+            tracing::info!(
+                "[MSX] poll n={} gap={}ms",
+                self.poll_count,
+                gap.map_or(-1i64, |g| g as i64)
+            );
+        }
         self.advance_relay_sessions();
 
         let now = self.vauchi.clock().unix_seconds();

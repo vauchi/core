@@ -53,6 +53,7 @@ mod link_responder;
 mod lock_screen;
 mod more;
 pub mod multi_stage_exchange;
+mod multi_stage_status;
 mod my_info;
 mod my_info_entry_detail;
 mod onboarding;

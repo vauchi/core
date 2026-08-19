@@ -186,3 +186,132 @@ fn a_sparse_ack_bitmap_survives_the_data_frame_round_trip() {
         "an ACK for chunks 0 and 2 must arrive as 0 and 2"
     );
 }
+
+// ── ADR-071: a session re-handshakes when its peer restarts ──────────────
+//
+// Two people never tap Hover on the same second. Whichever side scans first
+// advances alone, and from `Verifying` on it can no longer accept the other's
+// INIT — device-observed as 19 decodes per second in which not one frame was
+// usable by either side (2026-08-19 Pixel ↔ iPhone).
+
+/// Drive `session` to `Verifying` against a throwaway peer, so it is bound to
+/// a peer that will never be heard from again — the state a side lands in when
+/// its partner restarts.
+fn session_stranded_in_verifying() -> (MultiStageSession, MultiStageSession, StrandedClock) {
+    let clock = std::sync::Arc::new(vauchi_core::monotonic::FakeMonotonicClock::new());
+    let mut ahead = MultiStageSession::new(three_chunk_card(0xA1)).with_monotonic(clock.clone());
+    let mut gone = MultiStageSession::new(three_chunk_card(0xB2));
+    let ai = ahead.get_display_qr().expect("advertises");
+    let bi = gone.get_display_qr().expect("advertises");
+    ahead.process_scanned_qr(&bi.data);
+    gone.process_scanned_qr(&ai.data);
+    for _ in 0..400 {
+        if matches!(ahead.get_state(), ProtocolState::Verifying) {
+            break;
+        }
+        let aq = ahead.get_display_qr();
+        let bq = gone.get_display_qr();
+        if let Some(bq) = &bq {
+            ahead.process_scanned_qr(&bq.data);
+        }
+        if let Some(aq) = &aq {
+            gone.process_scanned_qr(&aq.data);
+        }
+    }
+    (ahead, gone, clock)
+}
+
+/// The stranded side's clock, so a stall can be reached without waiting for
+/// one (CC-06: no real-time sleeps in tests).
+type StrandedClock = std::sync::Arc<vauchi_core::monotonic::FakeMonotonicClock>;
+
+/// A single stray INIT decode must never disturb a session. The guard exists
+/// because a bystander's QR reaching the camera once is not evidence of
+/// anything.
+// @internal
+#[test]
+fn one_foreign_init_does_not_reset_a_session() {
+    let (mut ahead, _gone, clock) = session_stranded_in_verifying();
+    // Even long past the stall threshold, one sighting is not evidence.
+    clock.advance(std::time::Duration::from_secs(60));
+    assert!(
+        matches!(ahead.get_state(), ProtocolState::Verifying),
+        "precondition: stranded past Advertising, got {:?}",
+        ahead.get_state()
+    );
+
+    let mut stranger = MultiStageSession::new(three_chunk_card(0xCC));
+    let init = stranger.get_display_qr().expect("advertises");
+    ahead.process_scanned_qr(&init.data);
+
+    assert!(
+        matches!(ahead.get_state(), ProtocolState::Verifying),
+        "one foreign INIT must not reset, got {:?}",
+        ahead.get_state()
+    );
+}
+
+/// A peer that restarted shows its new INIT continuously. Once that has gone
+/// on long enough with no progress, the stranded side must stand down and
+/// re-advertise, or the pair is deadlocked until the 120 s step timeout.
+// @internal
+#[test]
+fn a_restarted_peer_pulls_a_stranded_session_back_to_advertising() {
+    let (mut ahead, _gone, clock) = session_stranded_in_verifying();
+    let mut restarted = MultiStageSession::new(three_chunk_card(0xCC));
+    let init = restarted.get_display_qr().expect("advertises");
+
+    clock.advance(std::time::Duration::from_secs(6));
+    for _ in 0..40 {
+        ahead.process_scanned_qr(&init.data);
+        let _ = ahead.get_display_qr();
+    }
+
+    assert!(
+        !matches!(ahead.get_state(), ProtocolState::Verifying),
+        "a peer advertising a different session must break the stranded \
+         binding, got {:?}",
+        ahead.get_state()
+    );
+    assert_eq!(
+        ahead.peer_session_id(),
+        Some(restarted.session_id()),
+        "after standing down we must be bound to the peer that is actually \
+         there, not the one that went away"
+    );
+}
+
+/// After the reset the pair must actually complete — a reset that only
+/// re-advertises without re-handshaking would trade one deadlock for another.
+// @internal
+#[test]
+fn a_pair_recovers_and_completes_after_a_staggered_start() {
+    let (mut ahead, _gone, clock) = session_stranded_in_verifying();
+    let mut late = MultiStageSession::new(three_chunk_card(0xCC));
+    clock.advance(std::time::Duration::from_secs(6));
+
+    let mut finished = false;
+    for _ in 0..4000 {
+        let aq = ahead.get_display_qr();
+        let lq = late.get_display_qr();
+        if let Some(lq) = &lq {
+            ahead.process_scanned_qr(&lq.data);
+        }
+        if let Some(aq) = &aq {
+            late.process_scanned_qr(&aq.data);
+        }
+        if matches!(ahead.get_state(), ProtocolState::Finalized)
+            && matches!(late.get_state(), ProtocolState::Finalized)
+        {
+            finished = true;
+            break;
+        }
+    }
+
+    assert!(
+        finished,
+        "a staggered start must recover and complete; ahead={:?} late={:?}",
+        ahead.get_state(),
+        late.get_state()
+    );
+}

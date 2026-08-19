@@ -52,6 +52,20 @@ use crate::exchange::{key_order, ratchet_bootstrap};
 /// Produces small, trivially decodable QR codes at 240p in ~9ms.
 const CHUNK_PAYLOAD_SIZE: usize = 80;
 
+/// ADR-071. A session past `Advertising` re-handshakes when its peer restarts.
+/// Two people never tap the same second, so whichever side scans first runs
+/// ahead — and from `Verifying` on it can no longer accept the other's INIT.
+/// Device-observed as 19 decodes per second in which not one frame was usable
+/// by either side (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+///
+/// Silence this long is a stall, not a pause: a healthy exchange advances
+/// every few frames at a ~300 ms cadence.
+const REJOIN_IDLE: Duration = Duration::from_secs(5);
+/// One stray decode of a bystander's QR must not reset anything.
+const REJOIN_INIT_THRESHOLD: u16 = 3;
+/// Keeps two sides that reset together from thrashing.
+const REJOIN_COOLDOWN: Duration = Duration::from_secs(5);
+
 /// HKDF info string for transport key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-multistage-v1";
 
@@ -298,6 +312,14 @@ pub struct MultiStageSession {
     // Wall-clock timestamps for timeout management.
     phase_entered_at: Option<Instant>,
     last_progress_at: Option<Instant>,
+    /// Last time a peer frame was *accepted* or the state advanced — the
+    /// ADR-071 stall signal. Distinct from `last_progress_at`, which only
+    /// tracks RDYY for the finalization deadline.
+    last_accepted_at: Option<Instant>,
+    /// Peer INITs bearing a session id we are not bound to, since the last
+    /// accepted frame.
+    foreign_inits: u16,
+    last_rehandshake_at: Option<Instant>,
 
     // Track whether we've already used the auto-retry.
     retry_used: bool,
@@ -442,6 +464,9 @@ impl MultiStageSession {
             display_cycle: 0,
             phase_entered_at: None,
             last_progress_at: None,
+            last_accepted_at: None,
+            foreign_inits: 0,
+            last_rehandshake_at: None,
             retry_used: false,
             fail_broadcast_until: None,
             our_relay_url: relay_url,
@@ -1267,6 +1292,13 @@ impl MultiStageSession {
     ) -> ProtocolState {
         // Only accept INIT while Advertising
         if !matches!(self.state, ProtocolState::Advertising) {
+            if self.peer_restart_warrants_rehandshake(&session_id) {
+                self.rehandshake_after_peer_restart();
+                // Deliberately not applied to the session we just discarded —
+                // the peer is handled by an ordinary handshake now that we are
+                // advertising again (ADR-071).
+                return self.state.clone();
+            }
             // Dev instrumentation (dev-logging only; no PII — state name).
             // A peer INIT decoded before our own INIT exists is dropped in
             // silence: we only reach Advertising once `get_display_qr` has
@@ -1279,6 +1311,7 @@ impl MultiStageSession {
             );
             return self.state.clone();
         }
+        self.note_progress();
 
         self.peer_session_id = Some(session_id);
         self.peer_ephemeral = Some(ephemeral);
@@ -1925,6 +1958,84 @@ impl MultiStageSession {
         let mut hash = [0u8; 32];
         hash.copy_from_slice(d.as_ref());
         hash
+    }
+
+    /// Any accepted peer frame or state advance. Receiving bytes is not
+    /// progress — a stalled peer produces those continuously (ADR-071).
+    fn note_progress(&mut self) {
+        self.last_accepted_at = Some(self.monotonic.now());
+        self.foreign_inits = 0;
+    }
+
+    /// Whether a peer INIT bearing an unfamiliar session id, arriving while we
+    /// are stalled past `Advertising`, is enough to conclude the peer restarted
+    /// (ADR-071). Every guard is a reason not to act: the state must be one
+    /// that can be abandoned, the exchange must already be failing, a single
+    /// stray decode must not count, and two sides resetting together must not
+    /// thrash.
+    fn peer_restart_warrants_rehandshake(&mut self, session_id: &[u8; 16]) -> bool {
+        let resettable = matches!(
+            self.state,
+            ProtocolState::Transferring { .. }
+                | ProtocolState::Verifying
+                | ProtocolState::Confirming
+                | ProtocolState::Complete
+                | ProtocolState::RetryReady
+        );
+        if !resettable {
+            return false;
+        }
+        // Finalized and Failed are excluded above: one succeeded and persisted
+        // a contact, the other owns a FAIL broadcast the user has been shown.
+        if self.peer_session_id == Some(*session_id) {
+            return false;
+        }
+
+        let now = self.monotonic.now();
+        self.foreign_inits = self.foreign_inits.saturating_add(1);
+        if self.foreign_inits < REJOIN_INIT_THRESHOLD {
+            return false;
+        }
+        let idle = self
+            .last_accepted_at
+            .is_none_or(|t| now.duration_since(t) >= REJOIN_IDLE);
+        if !idle {
+            return false;
+        }
+        if self
+            .last_rehandshake_at
+            .is_some_and(|t| now.duration_since(t) < REJOIN_COOLDOWN)
+        {
+            return false;
+        }
+        true
+    }
+
+    /// Abandon the current peer binding and advertise a brand-new session.
+    ///
+    /// A full fresh handshake, never a partial reuse: new session id, new
+    /// ephemeral, new commitment, with the old transport and reveal keys
+    /// zeroized first (ADR-002). Local configuration — our card, relay,
+    /// display name, clock — is carried across; everything peer-derived is
+    /// discarded.
+    fn rehandshake_after_peer_restart(&mut self) {
+        tracing::info!(
+            "[MSX] peer restarted — re-handshaking from {:?} (ADR-071)",
+            self.state
+        );
+        let display_name = self.display_name.clone();
+        let monotonic = self.monotonic.clone();
+        let mode_audio = self.audio_proximity;
+        let mut fresh = Self::new_with_relay(self.local_card.clone(), self.our_relay_url.clone());
+        fresh.display_name = display_name;
+        fresh.monotonic = monotonic;
+        fresh.audio_proximity = mode_audio;
+        fresh.last_rehandshake_at = Some(fresh.monotonic.now());
+        // Drops `self`, whose `Drop` zeroizes the discarded key material.
+        *self = fresh;
+        // Mint our INIT immediately so the peer has something to scan on its
+        // next frame rather than after the next heartbeat.
+        let _ = self.get_display_qr();
     }
 
     fn clear_sensitive(&mut self) {

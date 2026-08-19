@@ -79,6 +79,15 @@ pub enum Command {
         deadline_secs: u32,
         /// Minimum spacing between wakes the shell should honor (coalesce).
         min_interval_secs: u32,
+        /// Sub-second override for `earliest_secs`, when the work being driven
+        /// is finer-grained than a second. A shell that cannot schedule below
+        /// a second ignores this and uses `earliest_secs`, so it is additive.
+        ///
+        /// Exists because a live QR exchange advances its display from this
+        /// heartbeat: whole seconds pinned it at one frame per second against
+        /// a ~300 ms design, and the peer's camera decodes ~30 frames per
+        /// second (device-measured 2026-08-19).
+        earliest_millis: Option<u32>,
     },
 
     /// Start advertising the vauchi BLE service with the given payload.

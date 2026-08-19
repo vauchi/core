@@ -804,12 +804,17 @@ impl AppEngine {
                 earliest_secs: 1,
                 deadline_secs: 1,
                 min_interval_secs: 1,
+                // The frame currently on screen names its own dwell, so the
+                // display runs at the protocol's cadence rather than the
+                // coarsest interval a whole-second field can express.
+                earliest_millis: Some(self.multi_stage_frame_ms().unwrap_or(300)),
             };
         }
         vauchi_core::Command::ScheduleWakeup {
             earliest_secs: 30,
             deadline_secs: 90,
             min_interval_secs: 30,
+            earliest_millis: None,
         }
     }
 

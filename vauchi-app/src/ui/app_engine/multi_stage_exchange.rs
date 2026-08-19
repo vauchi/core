@@ -70,6 +70,11 @@ fn serialize_exchange_payload(public_key: &[u8; 32], card: &ContactCard) -> Vec<
 /// have rotated) so we don't cache it across screen entries.
 pub(crate) struct MultiStageHolder {
     machine: MultiStageMachine,
+    /// How long the frame we last put on screen is meant to be shown. The
+    /// heartbeat that drives this machine reads it to schedule the next
+    /// advance, so the display runs at the protocol's own cadence instead of
+    /// the idle app heartbeat.
+    last_frame_ms: Option<u32>,
 }
 
 impl AppEngine {
@@ -120,7 +125,10 @@ impl AppEngine {
             // maps to the Glance constructor — no proximity handshake.
             _ => MultiStageMachine::new_glance(payload, now),
         };
-        self.multi_stage_session = Some(MultiStageHolder { machine });
+        self.multi_stage_session = Some(MultiStageHolder {
+            machine,
+            last_frame_ms: None,
+        });
         // Build our QR now rather than on the next heartbeat. Until it exists
         // the machine is still `Idle`, and `handle_init` accepts a peer INIT
         // only while `Advertising` — so every peer frame the camera decodes in
@@ -222,7 +230,12 @@ impl AppEngine {
         }
         match event {
             MultiStageEvent::None => false,
-            MultiStageEvent::QrFrameReady(payload) => self.apply_multi_stage_qr_payload(&payload),
+            MultiStageEvent::QrFrameReady(payload) => {
+                if let Some(holder) = self.multi_stage_session.as_mut() {
+                    holder.last_frame_ms = Some(payload.display_duration_ms);
+                }
+                self.apply_multi_stage_qr_payload(&payload)
+            }
             MultiStageEvent::AudioProximityChanged(state) => {
                 self.apply_multi_stage_audio_proximity(state)
             }
@@ -281,6 +294,14 @@ impl AppEngine {
                 self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Failed(reason))
             }
         }
+    }
+
+    /// How long the frame currently on screen should be shown, if a machine
+    /// is live. `None` when idle or before the first frame.
+    pub(crate) fn multi_stage_frame_ms(&self) -> Option<u32> {
+        self.multi_stage_session
+            .as_ref()
+            .and_then(|h| h.last_frame_ms)
     }
 
     /// Whether a multi-stage machine is currently held. Used by the

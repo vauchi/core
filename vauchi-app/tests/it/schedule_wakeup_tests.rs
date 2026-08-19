@@ -40,6 +40,7 @@ fn on_wakeup_emits_a_schedule_wakeup_command() {
         earliest_secs,
         deadline_secs,
         min_interval_secs,
+        ..
     } = scheduled[0]
     {
         assert!(
@@ -97,6 +98,43 @@ fn an_active_exchange_schedules_a_far_shorter_wakeup_than_the_idle_heartbeat() {
         "a live exchange must be driven at least once a second, got {active_secs}s \
          (the QR frame it advances is designed to show for ~300ms)"
     );
+
+    // Whole seconds cannot express the frame dwell, so the sub-second field is
+    // what actually fixes the cadence; a shell reading only `earliest_secs`
+    // still gets a working, if coarser, exchange.
+    let idle_millis = first_wakeup_earliest_millis(&mut engine_with_identity());
+    assert_eq!(
+        idle_millis, None,
+        "the idle heartbeat needs no sub-second precision"
+    );
+
+    let mut exchanging2 = engine_with_identity();
+    exchanging2.ensure_multi_stage_session(vauchi_core::exchange::mode::ExchangeMode::Hover);
+    let _ = exchanging2.on_wakeup();
+    let active_millis =
+        first_wakeup_earliest_millis_from(&mut exchanging2).expect("a live exchange names its ms");
+    assert!(
+        (100..=500).contains(&active_millis),
+        "a live exchange must be driven at its frame dwell (~300ms), got {active_millis}ms"
+    );
+}
+
+fn first_wakeup_earliest_millis(engine: &mut AppEngine) -> Option<u32> {
+    let _ = engine.on_wakeup();
+    first_wakeup_earliest_millis_from(engine)
+}
+
+fn first_wakeup_earliest_millis_from(engine: &mut AppEngine) -> Option<u32> {
+    engine
+        .drain_pending_commands()
+        .into_iter()
+        .find_map(|c| match c {
+            Command::ScheduleWakeup {
+                earliest_millis, ..
+            } => Some(earliest_millis),
+            _ => None,
+        })
+        .expect("a ScheduleWakeup is emitted")
 }
 
 fn first_wakeup_earliest_secs(engine: &mut AppEngine) -> u32 {

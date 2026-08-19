@@ -345,3 +345,50 @@ fn a_data_frame_with_an_empty_ack_still_parses() {
     assert_eq!(chunk_idx, 2);
     assert!(ack_bitmap.is_empty(), "an empty ACK stays empty");
 }
+
+/// Both sides bound to a peer that is gone — the device case. Each one's
+/// reset mints a new ephemeral, invalidating the key the other just derived,
+/// so a reset that waits to be advertised at again can race forever: three
+/// re-handshakes on device each ended with decrypt_fail still climbing
+/// (2026-08-19). They must converge.
+// @internal
+#[test]
+#[ignore = "ADR-071 does not yet cover the mutual case: a re-handshake mints a \
+new ephemeral and commitment, which invalidates whatever the peer derived from \
+our previous INIT, so two stranded sides reset past one another. Neither shows \
+INIT from Verifying/Failed either, so neither can trigger the other. The fix \
+under consideration is to rebind — keep our own session identity and discard \
+only the peer binding — which needs a decision on the double-key-agreement \
+guard first."]
+fn two_mutually_stranded_sessions_converge_instead_of_racing() {
+    let (mut left, _gone_l, clock_l) = session_stranded_in_verifying();
+    let (mut right, _gone_r, clock_r) = session_stranded_in_verifying();
+    clock_l.advance(std::time::Duration::from_secs(6));
+    clock_r.advance(std::time::Duration::from_secs(6));
+
+    let mut finished = false;
+    for _ in 0..4000 {
+        let lq = left.get_display_qr();
+        let rq = right.get_display_qr();
+        if let Some(rq) = &rq {
+            left.process_scanned_qr(&rq.data);
+        }
+        if let Some(lq) = &lq {
+            right.process_scanned_qr(&lq.data);
+        }
+        if matches!(left.get_state(), ProtocolState::Finalized)
+            && matches!(right.get_state(), ProtocolState::Finalized)
+        {
+            finished = true;
+            break;
+        }
+    }
+
+    assert!(
+        finished,
+        "two stranded sessions must re-handshake with each other rather than \
+         resetting past one another; left={:?} right={:?}",
+        left.get_state(),
+        right.get_state()
+    );
+}

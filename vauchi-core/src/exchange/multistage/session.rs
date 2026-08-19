@@ -322,6 +322,10 @@ pub struct MultiStageSession {
     last_rehandshake_at: Option<Instant>,
     /// Peer frames the machine declined, for the rate-limited drop log.
     dropped_frames: u32,
+    /// Set when we failed because the peer's material did not line up with
+    /// ours — the signature of a peer that restarted mid-exchange, as opposed
+    /// to a cancel or a peer-reported failure, which are meant to be final.
+    failed_from_mismatch: bool,
 
     // Track whether we've already used the auto-retry.
     retry_used: bool,
@@ -470,6 +474,7 @@ impl MultiStageSession {
             foreign_inits: 0,
             last_rehandshake_at: None,
             dropped_frames: 0,
+            failed_from_mismatch: false,
             retry_used: false,
             fail_broadcast_until: None,
             our_relay_url: relay_url,
@@ -1297,10 +1302,18 @@ impl MultiStageSession {
         if !matches!(self.state, ProtocolState::Advertising) {
             if self.peer_restart_warrants_rehandshake(&session_id) {
                 self.rehandshake_after_peer_restart();
-                // Deliberately not applied to the session we just discarded —
-                // the peer is handled by an ordinary handshake now that we are
-                // advertising again (ADR-071).
-                return self.state.clone();
+                // Fall through and accept this INIT into the fresh session.
+                //
+                // ADR-071 first discarded it and waited to be advertised at
+                // again. That cost a round trip, and the round trip is a race:
+                // our new ephemeral invalidates the key the peer derived from
+                // our old INIT, so the peer must reset too — and can reset
+                // again before we catch its next INIT. Device-observed as three
+                // re-handshakes that each ended in decrypt_fail climbing
+                // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+                // Binding to the ephemeral in the frame that triggered the
+                // reset closes the window; it is an ordinary handshake, just
+                // without the wait.
             }
             // Dev instrumentation (dev-logging only; no PII — state name).
             // A peer INIT decoded before our own INIT exists is dropped in
@@ -1308,11 +1321,13 @@ impl MultiStageSession {
             // built our QR. On device that swallowed 40 successfully decoded
             // peer INITs in three seconds while the exchange looked frozen
             // (2026-08-19 Hover run).
-            tracing::info!(
-                "[MSX] INIT dropped — not Advertising yet (state={:?})",
-                self.state
-            );
-            return self.state.clone();
+            if !matches!(self.state, ProtocolState::Advertising) {
+                tracing::info!(
+                    "[MSX] INIT dropped — not Advertising yet (state={:?})",
+                    self.state
+                );
+                return self.state.clone();
+            }
         }
         self.note_progress();
 
@@ -1501,7 +1516,7 @@ impl MultiStageSession {
         let ciphertext = match self.inbound_buffer.as_ref().and_then(|b| b.assemble()) {
             Some(ct) => ct,
             None => {
-                self.state = ProtocolState::Failed("incomplete reassembly".to_string());
+                self.fail_from_mismatch("incomplete reassembly");
                 return self.state.clone();
             }
         };
@@ -1509,7 +1524,7 @@ impl MultiStageSession {
         let peer_hash = match &self.peer_commitment_hash {
             Some(h) => *h,
             None => {
-                self.state = ProtocolState::Failed("missing peer commitment hash".to_string());
+                self.fail_from_mismatch("missing peer commitment hash");
                 return self.state.clone();
             }
         };
@@ -1523,7 +1538,7 @@ impl MultiStageSession {
             &peer_hash,
             &peer_context,
         ) {
-            self.state = ProtocolState::Failed("commitment verification failed".to_string());
+            self.fail_from_mismatch("commitment verification failed");
             return self.state.clone();
         }
 
@@ -1534,7 +1549,7 @@ impl MultiStageSession {
                 self.state = ProtocolState::Confirming;
             }
             Err(_) => {
-                self.state = ProtocolState::Failed("decryption failed".to_string());
+                self.fail_from_mismatch("decryption failed");
             }
         }
 
@@ -1576,7 +1591,7 @@ impl MultiStageSession {
             self.last_progress_at = None;
             self.display_cycle = 0;
         } else {
-            self.state = ProtocolState::Failed("confirmation mismatch".to_string());
+            self.fail_from_mismatch("confirmation mismatch");
         }
 
         self.state.clone()
@@ -1967,6 +1982,13 @@ impl MultiStageSession {
         hash
     }
 
+    /// Fail in a way a peer restart can explain, and so a way ADR-071 may
+    /// recover from. A cancel or a peer-reported failure stays final.
+    fn fail_from_mismatch(&mut self, reason: &str) {
+        self.failed_from_mismatch = true;
+        self.state = ProtocolState::Failed(reason.to_string());
+    }
+
     /// Report a frame the machine declined, once per distinct reason per
     /// state, with a running count.
     ///
@@ -2008,7 +2030,7 @@ impl MultiStageSession {
                 | ProtocolState::Confirming
                 | ProtocolState::Complete
                 | ProtocolState::RetryReady
-        );
+        ) || (matches!(self.state, ProtocolState::Failed(_)) && self.failed_from_mismatch);
         if !resettable {
             return false;
         }

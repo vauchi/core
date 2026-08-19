@@ -432,3 +432,53 @@ fn an_early_peer_vrfy_does_not_kill_an_incomplete_transfer() {
         ours.get_state()
     );
 }
+
+/// Once the peer has told us it holds a chunk, we must stop showing that
+/// chunk while others are outstanding. On device the peer displayed only
+/// chunk 2 — the one already delivered — while both sides still needed 0 and
+/// 1, and the exchange sat at `unacked=[1] missing=[0, 1]` indefinitely
+/// (2026-08-19, `2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+// @internal
+#[test]
+fn an_acked_chunk_is_not_shown_while_others_are_outstanding() {
+    let mut ours = MultiStageSession::new(three_chunk_card(0xA1));
+    let mut peer = MultiStageSession::new(three_chunk_card(0xB2));
+    let oi = ours.get_display_qr().expect("advertises");
+    let pi = peer.get_display_qr().expect("advertises");
+    ours.process_scanned_qr(&pi.data);
+    peer.process_scanned_qr(&oi.data);
+
+    // The peer reports holding our chunk 2 and nothing else — the device
+    // state, arriving on a DATA frame the way a real ack does.
+    let mut held = vauchi_core::exchange::multistage::types::ChunkBitmap::new(3);
+    held.mark_received(2);
+    let ack_frame = vauchi_core::exchange::multistage::qr_codec::format_data_qr(
+        &peer.session_id(),
+        0,
+        3,
+        &held.to_bytes(),
+        b"whatever-the-peer-sent",
+    );
+    ours.process_scanned_qr(&ack_frame);
+
+    let mut shown = Vec::new();
+    for _ in 0..60 {
+        if let Some(qr) = ours.get_display_qr()
+            && let Ok(StageQr::Data { chunk_idx, .. }) = parse_qr(&qr.data)
+            && !shown.contains(&chunk_idx)
+        {
+            shown.push(chunk_idx);
+        }
+    }
+    shown.sort_unstable();
+
+    assert!(
+        !shown.contains(&2),
+        "chunk 2 is already delivered; showing it starves 0 and 1. shown={shown:?}"
+    );
+    assert_eq!(
+        shown,
+        vec![0, 1],
+        "both outstanding chunks must get airtime"
+    );
+}

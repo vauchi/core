@@ -1697,8 +1697,16 @@ impl MultiStageSession {
         // Dev instrumentation (dev-logging only; no PII — indices only). Pairs
         // with `[MSX] rx`: together the two sides' logs say whether a chunk the
         // peer needs was ever put on screen, which neither side can answer alone.
+        let we_hold: Vec<u16> = (0..self.peer_chunks_total.unwrap_or(0))
+            .filter(|i| {
+                self.inbound_bitmap
+                    .as_ref()
+                    .map(|b| b.has(*i))
+                    .unwrap_or(false)
+            })
+            .collect();
         tracing::info!(
-            "[MSX] tx idx={idx}/{total} rest_of_pass={:?}",
+            "[MSX] tx idx={idx}/{total} rest_of_pass={:?} we_advertise_holding={we_hold:?}",
             self.pending_chunk_order
         );
 

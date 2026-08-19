@@ -1513,9 +1513,24 @@ impl MultiStageSession {
         // fast-track to Verifying so we can send our own VRFY in the next display cycle.
         if matches!(self.state, ProtocolState::Transferring { .. }) {
             self.peer_reveal_key = Some(reveal_key);
-            // Fast-track: peer sending VRFY proves they have all our chunks.
-            // Move to Verifying so we send our own VRFY to the peer.
-            self.state = ProtocolState::Verifying;
+            // The peer's VRFY proves it holds all of *our* chunks. It says
+            // nothing about whether we hold all of *its*, and advancing
+            // regardless meant the next VRFY reached `process_reveal_key`,
+            // found nothing to assemble and killed a transfer that was still
+            // progressing — the mechanism behind ADR-071 recovery converging
+            // only six runs in ten
+            // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+            //
+            // So stash the key and stay put until our own side is complete.
+            // `try_process_stashed_reveal_key` picks it up from the Verifying
+            // display arm once we get there.
+            let ours_complete = self
+                .inbound_buffer
+                .as_ref()
+                .is_some_and(|b| b.assemble().is_some());
+            if ours_complete {
+                self.state = ProtocolState::Verifying;
+            }
             return self.state.clone();
         }
 
@@ -1533,7 +1548,10 @@ impl MultiStageSession {
         let ciphertext = match self.inbound_buffer.as_ref().and_then(|b| b.assemble()) {
             Some(ct) => ct,
             None => {
-                self.fail_from_mismatch("incomplete reassembly");
+                // Not a failure while chunks can still arrive: keep the key and
+                // let the stashed-key path retry. The step timeout still ends a
+                // transfer that genuinely never completes, so this cannot hang.
+                self.peer_reveal_key = Some(reveal_key);
                 return self.state.clone();
             }
         };

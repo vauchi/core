@@ -291,13 +291,6 @@ fn a_restarted_peer_pulls_a_stranded_session_back_to_advertising() {
 /// re-advertises without re-handshaking would trade one deadlock for another.
 // @internal
 #[test]
-#[ignore = "ADR-071 recovery is not yet reliable: this converges in roughly \
-six runs in ten (measured 2026-08-19, lossless in-process harness). The rebind \
-itself is sound — it fixed the key mismatch on device, decrypt_fail 616 to 0 — \
-but whether the two sides find each other again depends on the interleaving of \
-a random stall re-advertisement, the foreign-INIT threshold and the cooldown. \
-Left as a specification of the intended behaviour rather than tuned until \
-green; the constants are a symptom, not the cause."]
 fn a_pair_recovers_and_completes_after_a_staggered_start() {
     let (mut ahead, _gone, clock) = session_stranded_in_verifying();
     let mut late = MultiStageSession::new(three_chunk_card(0xCC)).with_monotonic(clock.clone());
@@ -367,13 +360,6 @@ fn a_data_frame_with_an_empty_ack_still_parses() {
 /// (2026-08-19). They must converge.
 // @internal
 #[test]
-#[ignore = "ADR-071 recovery is not yet reliable: this converges in roughly \
-six runs in ten (measured 2026-08-19, lossless in-process harness). The rebind \
-itself is sound — it fixed the key mismatch on device, decrypt_fail 616 to 0 — \
-but whether the two sides find each other again depends on the interleaving of \
-a random stall re-advertisement, the foreign-INIT threshold and the cooldown. \
-Left as a specification of the intended behaviour rather than tuned until \
-green; the constants are a symptom, not the cause."]
 fn two_mutually_stranded_sessions_converge_instead_of_racing() {
     let (mut left, _gone_l, clock_l) = session_stranded_in_verifying();
     let (mut right, _gone_r, clock_r) = session_stranded_in_verifying();
@@ -406,5 +392,43 @@ fn two_mutually_stranded_sessions_converge_instead_of_racing() {
          resetting past one another; left={:?} right={:?}",
         left.get_state(),
         right.get_state()
+    );
+}
+
+/// A peer that finishes first sends VRFY while we are still collecting its
+/// chunks. That proves it has all of *ours*; it says nothing about whether we
+/// have all of *its*. Fast-tracking to Verifying regardless meant the next
+/// VRFY hit an incomplete reassembly and killed an exchange that was
+/// progressing — the mechanism behind ADR-071 recovery converging only six
+/// runs in ten (2026-08-19).
+// @internal
+#[test]
+fn an_early_peer_vrfy_does_not_kill_an_incomplete_transfer() {
+    let mut ours = MultiStageSession::new(three_chunk_card(0xA1));
+    let mut peer = MultiStageSession::new(three_chunk_card(0xB2));
+    let oi = ours.get_display_qr().expect("advertises");
+    let pi = peer.get_display_qr().expect("advertises");
+    ours.process_scanned_qr(&pi.data);
+    peer.process_scanned_qr(&oi.data);
+    assert!(
+        matches!(ours.get_state(), ProtocolState::Transferring { .. }),
+        "precondition: mid-transfer, got {:?}",
+        ours.get_state()
+    );
+
+    // The peer reaches Verifying and repeats its VRFY, as it would while
+    // waiting for us.
+    let vrfy = vauchi_core::exchange::multistage::qr_codec::format_verify_qr(
+        &peer.session_id(),
+        &[7u8; 32],
+    );
+    for _ in 0..5 {
+        ours.process_scanned_qr(&vrfy);
+    }
+
+    assert!(
+        !matches!(ours.get_state(), ProtocolState::Failed(_)),
+        "an early VRFY must not fail a transfer that can still complete, got {:?}",
+        ours.get_state()
     );
 }

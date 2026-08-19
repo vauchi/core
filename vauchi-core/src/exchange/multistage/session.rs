@@ -320,6 +320,8 @@ pub struct MultiStageSession {
     /// accepted frame.
     foreign_inits: u16,
     last_rehandshake_at: Option<Instant>,
+    /// Peer frames the machine declined, for the rate-limited drop log.
+    dropped_frames: u32,
 
     // Track whether we've already used the auto-retry.
     retry_used: bool,
@@ -467,6 +469,7 @@ impl MultiStageSession {
             last_accepted_at: None,
             foreign_inits: 0,
             last_rehandshake_at: None,
+            dropped_frames: 0,
             retry_used: false,
             fail_broadcast_until: None,
             our_relay_url: relay_url,
@@ -1393,12 +1396,16 @@ impl MultiStageSession {
                 | ProtocolState::Discovered
                 | ProtocolState::Verifying
         ) {
+            self.note_dropped_frame("DATA", "wrong-state");
             return self.state.clone();
         }
 
         let transport_key = match &self.transport_key {
             Some(k) => *k,
-            None => return self.state.clone(),
+            None => {
+                self.note_dropped_frame("DATA", "no-transport-key");
+                return self.state.clone();
+            }
         };
 
         if self.inbound_buffer.is_none() {
@@ -1958,6 +1965,26 @@ impl MultiStageSession {
         let mut hash = [0u8; 32];
         hash.copy_from_slice(d.as_ref());
         hash
+    }
+
+    /// Report a frame the machine declined, once per distinct reason per
+    /// state, with a running count.
+    ///
+    /// Every handler here early-returns in silence on a frame it cannot use,
+    /// and each of those silences has cost a device iteration to rediscover:
+    /// on 2026-08-19 the Pixel dropped 435 decoded DATA frames without a
+    /// single line explaining why
+    /// (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`). Counting rather
+    /// than logging each keeps a stalled peer from flooding the log.
+    fn note_dropped_frame(&mut self, kind: &str, reason: &str) {
+        self.dropped_frames = self.dropped_frames.saturating_add(1);
+        if self.dropped_frames == 1 || self.dropped_frames.is_multiple_of(50) {
+            tracing::info!(
+                "[MSX] dropped {kind} n={} reason={reason} state={:?}",
+                self.dropped_frames,
+                self.state
+            );
+        }
     }
 
     /// Any accepted peer frame or state advance. Receiving bytes is not

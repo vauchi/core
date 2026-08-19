@@ -351,6 +351,19 @@ impl AppEngine {
         // (`MultiStageExchangeEngine::handle_action`), so without this the
         // decode is parsed and discarded —
         // `2026-08-18-hover-decodes-the-peer-qr-but-never-advances`.
+        if let UserAction::TextChanged { component_id, .. } = &action {
+            // Dev instrumentation (dev-logging only; no PII — the component id
+            // and a length). A camera decode that never reaches the machine is
+            // indistinguishable from one the machine rejected: on device 87
+            // decoded DATA frames produced no receipt while 7 did, with
+            // `decrypt_fail=0` proving they never arrived
+            // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`). This line
+            // is the seam between "the shell forwarded it" and "core acted".
+            tracing::info!(
+                "[MSX] text binding id={component_id} on_screen={}",
+                matches!(self.screen, AppScreen::MultiStageExchange { .. })
+            );
+        }
         if let UserAction::TextChanged {
             component_id,
             value,

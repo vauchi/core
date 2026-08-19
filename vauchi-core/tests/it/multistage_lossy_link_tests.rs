@@ -315,3 +315,33 @@ fn a_pair_recovers_and_completes_after_a_staggered_start() {
         late.get_state()
     );
 }
+
+/// A DATA frame carries an empty ACK until its sender has received anything,
+/// which is every frame at the start of an exchange. On device 87 such frames
+/// were decoded and none reached the machine, while the 7 carrying a one-byte
+/// ACK all did (2026-08-19 Hover run, `decrypt_fail=0` throughout — they never
+/// arrived, rather than arriving broken).
+// @internal
+#[test]
+fn a_data_frame_with_an_empty_ack_still_parses() {
+    let session_id = [9u8; 16];
+    let qr = vauchi_core::exchange::multistage::qr_codec::format_data_qr(
+        &session_id,
+        2,
+        3,
+        &[],
+        b"short-final-chunk",
+    );
+
+    let parsed = parse_qr(&qr).expect("a DATA frame with no ACK yet must parse");
+    let StageQr::Data {
+        chunk_idx,
+        ack_bitmap,
+        ..
+    } = parsed
+    else {
+        panic!("expected a DATA frame");
+    };
+    assert_eq!(chunk_idx, 2);
+    assert!(ack_bitmap.is_empty(), "an empty ACK stays empty");
+}

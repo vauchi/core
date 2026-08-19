@@ -1987,28 +1987,29 @@ impl MultiStageSession {
         }
         // Finalized and Failed are excluded above: one succeeded and persisted
         // a contact, the other owns a FAIL broadcast the user has been shown.
-        if self.peer_session_id == Some(*session_id) {
-            return false;
-        }
-
+        let same_peer = self.peer_session_id == Some(*session_id);
         let now = self.monotonic.now();
-        self.foreign_inits = self.foreign_inits.saturating_add(1);
-        if self.foreign_inits < REJOIN_INIT_THRESHOLD {
-            return false;
+        if !same_peer {
+            self.foreign_inits = self.foreign_inits.saturating_add(1);
         }
         let idle = self
             .last_accepted_at
             .is_none_or(|t| now.duration_since(t) >= REJOIN_IDLE);
-        if !idle {
-            return false;
-        }
-        if self
+        let cooling = self
             .last_rehandshake_at
-            .is_some_and(|t| now.duration_since(t) < REJOIN_COOLDOWN)
-        {
-            return false;
-        }
-        true
+            .is_some_and(|t| now.duration_since(t) < REJOIN_COOLDOWN);
+
+        // Dev instrumentation (dev-logging only; no PII — booleans and a
+        // count). A rule that logs only when it fires cannot explain why it
+        // stayed quiet, and on device it stayed quiet through ten peer INITs
+        // while every frame failed AEAD
+        // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+        tracing::info!(
+            "[MSX] rejoin check same_peer={same_peer} foreign={} idle={idle} cooling={cooling}",
+            self.foreign_inits
+        );
+
+        !same_peer && self.foreign_inits >= REJOIN_INIT_THRESHOLD && idle && !cooling
     }
 
     /// Abandon the current peer binding and advertise a brand-new session.

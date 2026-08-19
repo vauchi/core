@@ -85,7 +85,7 @@ fn discovered_state_narrates_starting_exchange() {
 
 // @internal
 #[test]
-fn transferring_state_includes_chunk_progress() {
+fn transferring_state_names_both_directions() {
     assert_eq!(
         own_qr_label(
             &ProtocolState::Transferring {
@@ -96,7 +96,27 @@ fn transferring_state_includes_chunk_progress() {
             },
             Locale::English
         ),
-        "Transferring 3/7",
+        "Sending 3/7 · Receiving 5/9",
+    );
+}
+
+/// Until the peer's first chunk arrives its size is unknown, and a
+/// "Receiving 0/0" would read as a stalled transfer rather than one that has
+/// not been told how much to expect.
+// @internal
+#[test]
+fn transferring_names_one_direction_until_the_peer_size_is_known() {
+    assert_eq!(
+        own_qr_label(
+            &ProtocolState::Transferring {
+                chunks_sent: 1,
+                chunks_total: 4,
+                chunks_received: 0,
+                peer_chunks_total: 0,
+            },
+            Locale::English
+        ),
+        "Transferring 1/4",
     );
 }
 
@@ -392,7 +412,7 @@ fn own_qr_label_maps_every_protocol_state() {
             },
             Locale::English
         ),
-        "Transferring 2/5",
+        "Sending 2/5 · Receiving 1/5",
     );
     assert_eq!(
         own_qr_label(

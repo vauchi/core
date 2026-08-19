@@ -802,9 +802,29 @@ pub(crate) fn own_qr_label(state: &ProtocolState, locale: Locale) -> String {
         ProtocolState::Transferring {
             chunks_sent,
             chunks_total,
-            ..
+            chunks_received,
+            peer_chunks_total,
         } => {
-            if *chunks_total > 0 {
+            // Both directions, because an exchange is two transfers and a
+            // single number cannot say which it counts. On device a peer
+            // reading "Transferring 1/3" was equally consistent with having
+            // sent one chunk or received one, and those imply opposite
+            // diagnoses — with iOS logs unavailable, this label is the only
+            // instrument on that device
+            // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
+            if *chunks_total > 0 && *peer_chunks_total > 0 {
+                get_string_with_args(
+                    locale,
+                    "multi_stage.own_qr_transferring_both",
+                    &[
+                        ("sent", &chunks_sent.to_string()),
+                        ("total", &chunks_total.to_string()),
+                        ("recv", &chunks_received.to_string()),
+                        ("peer_total", &peer_chunks_total.to_string()),
+                    ],
+                )
+            } else if *chunks_total > 0 {
+                // The peer's size is unknown until its first chunk arrives.
                 get_string_with_args(
                     locale,
                     "multi_stage.own_qr_transferring_progress",

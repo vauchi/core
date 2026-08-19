@@ -1004,6 +1004,23 @@ impl MultiStageSession {
     /// Returns `None` after the finalized grace period expires or after
     /// the FAIL broadcast window closes.
     pub fn get_display_qr(&mut self) -> Option<QrPayload> {
+        // A stalled session re-advertises. Recovery is driven by *receiving* a
+        // peer INIT, but no state past Transferring shows one — so two stalled
+        // sides can neither act on each other nor announce themselves, which is
+        // the mutual deadlock in
+        // `2026-08-18-hover-transfer-stalls-on-the-last-chunk`. Offering our
+        // unchanged advertisement costs one frame in four and gives the other
+        // side something it can act on.
+        if self.stalled_long_enough_to_readvertise()
+            && random_below(4) == 0
+            && let Some(qr_data) = self.init_qr_cache.clone()
+        {
+            return Some(QrPayload {
+                data: qr_data,
+                error_correction: "L".to_string(),
+                display_duration_ms: jittered(DISPLAY_MS_INIT),
+            });
+        }
         match &self.state {
             ProtocolState::Idle => {
                 let qr_data = self.build_init_qr();
@@ -2009,6 +2026,20 @@ impl MultiStageSession {
         }
     }
 
+    /// Whether we have been stuck long enough that re-advertising is worth a
+    /// frame. Never in the states that are working as intended: `Idle` and
+    /// `Advertising` already show INIT, and `Finalized` is done.
+    fn stalled_long_enough_to_readvertise(&self) -> bool {
+        if matches!(
+            self.state,
+            ProtocolState::Idle | ProtocolState::Advertising | ProtocolState::Finalized
+        ) {
+            return false;
+        }
+        self.last_accepted_at
+            .is_some_and(|t| self.monotonic.now().duration_since(t) >= REJOIN_IDLE)
+    }
+
     /// Any accepted peer frame or state advance. Receiving bytes is not
     /// progress — a stalled peer produces those continuously (ADR-071).
     fn note_progress(&mut self) {
@@ -2070,22 +2101,55 @@ impl MultiStageSession {
     /// discarded.
     fn rehandshake_after_peer_restart(&mut self) {
         tracing::info!(
-            "[MSX] peer restarted — re-handshaking from {:?} (ADR-071)",
+            "[MSX] peer restarted — rebinding from {:?} (ADR-071)",
             self.state
         );
-        let display_name = self.display_name.clone();
-        let monotonic = self.monotonic.clone();
-        let mode_audio = self.audio_proximity;
-        let mut fresh = Self::new_with_relay(self.local_card.clone(), self.our_relay_url.clone());
-        fresh.display_name = display_name;
-        fresh.monotonic = monotonic;
-        fresh.audio_proximity = mode_audio;
-        fresh.last_rehandshake_at = Some(fresh.monotonic.now());
-        // Drops `self`, whose `Drop` zeroizes the discarded key material.
-        *self = fresh;
-        // Mint our INIT immediately so the peer has something to scan on its
-        // next frame rather than after the next heartbeat.
-        let _ = self.get_display_qr();
+        if let Some(ref mut key) = self.transport_key {
+            key.zeroize();
+        }
+        if let Some(ref mut key) = self.peer_reveal_key {
+            key.zeroize();
+        }
+        self.transport_key = None;
+        self.peer_reveal_key = None;
+        self.peer_ephemeral = None;
+        self.peer_commitment_hash = None;
+        self.peer_session_id = None;
+        self.peer_ack_bitmap = None;
+        self.peer_chunks_total = None;
+        self.peer_relay_url = None;
+        self.inbound_buffer = None;
+        self.inbound_bitmap = None;
+        self.received_data = None;
+        // Encrypted under the transport key we just discarded.
+        self.outbound_chunks.clear();
+        self.outbound_total = 0;
+        self.pending_chunk_order.clear();
+        self.transport_decrypt_failures = 0;
+        self.failed_from_mismatch = false;
+        self.foreign_inits = 0;
+        self.dropped_frames = 0;
+        self.retry_used = false;
+        self.fail_broadcast_until = None;
+        self.phase_entered_at = None;
+        self.last_progress_at = None;
+
+        // Our own identity is deliberately kept — session id, ephemeral and
+        // commitment. Minting fresh ones invalidates whatever the peer already
+        // derived from our INIT, which forces it to reset in turn and lets two
+        // stranded sides reset past one another indefinitely (device-observed:
+        // three re-handshakes, decrypt_fail climbing throughout). Keeping them
+        // means our advertisement stays true, so only the side that actually
+        // restarted brings new material and a single rebind converges.
+        //
+        // This is a second key agreement with the same ephemeral, which
+        // `handle_init` otherwise refuses. It is sound here: our INIT QR is
+        // public and unchanged, so a peer scanning it twice learns nothing new,
+        // and each peer's shared secret still differs by its own ephemeral.
+        self.ephemeral_secret = self.ephemeral_secret.take().or_else(|| self.ratchet_ephemeral.take());
+        self.state = ProtocolState::Advertising;
+        self.last_rehandshake_at = Some(self.monotonic.now());
+        self.last_accepted_at = Some(self.monotonic.now());
     }
 
     fn clear_sensitive(&mut self) {

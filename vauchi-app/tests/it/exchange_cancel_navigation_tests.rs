@@ -126,7 +126,7 @@ fn reentering_multi_stage_after_cancel_starts_fresh() {
         peer_chunks_total: 3,
     }));
     assert!(
-        rendered(&engine).contains("Transferring 0/3"),
+        rendered(&engine).contains("Sending 0/3 · Receiving 0/3"),
         "precondition: the first session renders mid-transfer chrome"
     );
 

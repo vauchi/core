@@ -204,3 +204,54 @@ fn dismiss_demo_contact_action_removes_banner() {
         "Demo banner must disappear after dismiss action is dispatched",
     );
 }
+
+/// Importing contacts is offered on the Contacts screen.
+///
+/// The action lived only in the More menu, which is being retired, and
+/// `contacts.import_contacts` was already in the locale file with no
+/// caller — the affordance belongs here, next to `view_archived` and
+/// `find_duplicates`.
+// @internal
+#[test]
+fn contacts_screen_offers_importing_contacts() {
+    let vauchi = new_vauchi_with_identity();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Contacts);
+
+    let screen = engine.current_screen();
+    assert!(
+        screen
+            .contextual_actions
+            .iter()
+            .any(|a| a.id == "import_contacts"),
+        "Contacts must offer import_contacts; actions: {:?}",
+        screen
+            .contextual_actions
+            .iter()
+            .map(|a| &a.id)
+            .collect::<Vec<_>>()
+    );
+}
+
+/// Pressing it asks the shell for a file rather than navigating.
+// @internal
+#[test]
+fn importing_contacts_asks_the_shell_for_a_file() {
+    let vauchi = new_vauchi_with_identity();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Contacts);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "import_contacts".into(),
+    });
+
+    match result {
+        ActionResult::Commands { ref commands } => assert!(
+            commands
+                .iter()
+                .any(|c| matches!(c, vauchi_core::Command::FilePickFromUser { .. })),
+            "import_contacts must request a file pick, got: {commands:?}"
+        ),
+        other => panic!("import_contacts must return Commands, got: {other:?}"),
+    }
+}

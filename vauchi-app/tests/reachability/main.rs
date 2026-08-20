@@ -43,7 +43,6 @@ mod help;
 mod link_exchange;
 mod link_responder;
 mod lock_screen;
-mod more;
 mod multi_stage_exchange;
 mod my_info;
 mod my_info_entry_detail;

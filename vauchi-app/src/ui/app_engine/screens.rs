@@ -30,7 +30,6 @@ use crate::ui::group_detail::GroupDetailEngine;
 use crate::ui::groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 use crate::ui::help::HelpEngine;
 use crate::ui::lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
-use crate::ui::more::MoreEngine;
 use crate::ui::my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, OwnFieldInfo};
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 use crate::ui::onboarding::OnboardingEngine;
@@ -587,7 +586,6 @@ impl AppEngine {
                 FormDialogEngine::new(dialog_type.clone())
                     .with_locale(render_context.resolved_locale()),
             ),
-            AppScreen::More => Box::new(MoreEngine::new(render_context.resolved_locale())),
             AppScreen::ActivityLog => {
                 use crate::notification_types::ActivityLogEntry;
                 let now = vauchi.clock().unix_seconds();

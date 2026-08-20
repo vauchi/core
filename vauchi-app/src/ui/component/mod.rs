@@ -360,7 +360,7 @@ pub enum Component {
     /// the section grouping degrades UX from "structured menu" to
     /// "flat dump", so the discriminant belongs at variant level.
     ///
-    /// Used by `MoreEngine` to emit grouped settings entries
+    /// Emits grouped settings entries
     /// (primary / secondary / data / legal) without forcing
     /// each frontend's renderer to special-case action_ids or
     /// reproduce a section table.

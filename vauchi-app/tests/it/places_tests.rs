@@ -110,23 +110,6 @@ fn engine_with_a_place() -> AppEngine {
 
 // @internal
 #[test]
-fn more_menu_places_entry_navigates_to_places_screen() {
-    let mut vauchi = Vauchi::in_memory().unwrap();
-    vauchi.create_identity("Me").unwrap();
-    let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::More);
-    let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "more_menu".into(),
-        item_id: "places".into(),
-    });
-    match result {
-        ActionResult::NavigateTo(ref screen) => assert_eq!(screen.screen_id, "places"),
-        other => panic!("expected NavigateTo(places), got: {other:?}"),
-    }
-}
-
-// @internal
-#[test]
 fn confirm_delete_place_removes_it_via_intercept() {
     let mut engine = engine_with_a_place();
     let screen = engine.navigate_to(AppScreen::Places);

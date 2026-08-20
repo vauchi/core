@@ -167,21 +167,21 @@ fn navigate_back_after_navigate_to_tab_returns_to_prior_screen() {
 }
 
 /// Every entry the desktop/drawer navigation renders must navigate, not just
-/// the five bottom tabs.
+/// every destination the overlay offers.
 ///
-/// `navigate_to_tab_routes_each_tab_to_canonical_screen` above iterates
-/// `available_screens()`, which is the mobile tab bar. `sidebar_items()` is a
-/// strictly larger list — Settings, Recovery, Devices, Backup, Privacy,
-/// Support, Help and Activity are rendered from it and were covered by
-/// nothing. On 2026-08-09 tapping Settings on a device left the menu open
-/// while My Card from the same list navigated, and no test disagreed.
+/// `sidebar_items()` and `available_screens()` are the same flat list since
+/// the More overflow tab was retired, so this no longer covers a wider set
+/// than the test above — it still guards the property that matters: every
+/// id the overlay renders parses to a screen and routes there. On
+/// 2026-08-09 tapping Settings on a device left the menu open while My Card
+/// from the same list navigated, and no test disagreed.
 // @internal
 #[test]
 fn navigate_to_tab_routes_every_sidebar_item_to_canonical_screen() {
     let items = engine_with_identity().sidebar_items(vauchi_app::i18n::Locale::English);
     assert!(
-        items.len() > engine_with_identity().available_screens().len(),
-        "sidebar is expected to offer more destinations than the tab bar"
+        !items.is_empty(),
+        "the overlay must offer destinations, or this test proves nothing"
     );
 
     for item in items {

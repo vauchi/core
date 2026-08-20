@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Cross-platform parity contract for the Settings + More screens.
+//! Cross-platform parity contract for the Settings screen.
 //!
 //! G7 of `2026-05-02-ios-humble-ui-deep-retirement`. Both iOS and
-//! Android render the same `ScreenModel` JSON for `AppScreen::Settings`
-//! and `AppScreen::More`, so platform-level parity is enforced as
+//! Android render the same `ScreenModel` JSON for `AppScreen::Settings`,
+//! so platform-level parity is enforced as
 //! long as core's emitted shape stays stable. These tests pin that
 //! shape: a single canonical group/action list, in a fixed order,
 //! matching what every Humble UI renderer must walk.
@@ -20,7 +20,7 @@
 //! through review diffs rather than through user reports.
 
 use vauchi_app::ui::{
-    AppEngine, AppScreen, Component, DropdownOption, MoreEngine, SettingsConfig, SettingsEngine,
+    AppEngine, AppScreen, Component, DropdownOption, SettingsConfig, SettingsEngine,
     SettingsItemKind, WorkflowEngine,
 };
 use vauchi_core::api::Vauchi;
@@ -47,39 +47,6 @@ const EXPECTED_SETTINGS_GROUP_IDS: &[&str] = &[
 ];
 
 const EXPECTED_ADVANCED_GROUP_IDS: &[&str] = &["network", "delivery", "danger"];
-
-/// The canonical MoreEngine action_ids in render order — the
-/// cumulative iteration across the four sections (primary →
-/// secondary → data → legal). Mirrors the section grouping in
-/// `core/vauchi-app/src/ui/more.rs`'s `MORE_SECTIONS`.
-///
-/// iOS currently hand-rolls its More tab (`ios/Vauchi/Views/MoreView.swift`)
-/// with the same 3-section structure for the items it surfaces
-/// (Settings, Help, Sync, Devices, Backup, Import, Privacy);
-/// adopting `CoreScreenView(screenName: "More")` is a like-for-like
-/// swap once G1 of `2026-05-02-ios-humble-ui-deep-retirement`
-/// flips on. The extra Android/TUI items (Activity, Archived,
-/// Merge, Replace, Backup-flat) live under the `secondary` / `data`
-/// section ids; iOS surfaces a subset.
-const EXPECTED_MORE_ACTION_IDS: &[&str] = &[
-    // primary
-    "settings",
-    "help",
-    // secondary
-    "device_management",
-    "device_replacement",
-    "recovery",
-    "backup",
-    // data
-    "tags",
-    "places",
-    "archived_contacts",
-    "contact_duplicates",
-    "import_contacts",
-    "activity_log",
-    // legal
-    "privacy",
-];
 
 fn sample_settings_config() -> SettingsConfig {
     SettingsConfig {
@@ -310,82 +277,6 @@ fn settings_screen_about_version_renders_non_empty_semver() {
          (regressing to the F-005 empty-Version-row state) or the SettingsEngine \
          no longer renders the value. Fix at the construction site, not here. \
          Source: 2026-05-10 device-test campaign F-005."
-    );
-}
-
-// @internal
-#[test]
-fn more_screen_emits_full_action_set_in_stable_order() {
-    let engine = MoreEngine::new(vauchi_app::i18n::Locale::English);
-    let screen = engine.current_screen();
-
-    assert_eq!(screen.screen_id, "more");
-    assert_eq!(screen.title, "More");
-
-    let sections = screen
-        .components
-        .iter()
-        .find_map(|c| match c {
-            Component::SectionedActionList { sections, .. } => Some(sections),
-            _ => None,
-        })
-        .expect("MoreEngine must emit a single Component::SectionedActionList");
-
-    let actual_action_ids: Vec<&str> = sections
-        .iter()
-        .flat_map(|sec| sec.items.iter())
-        .map(|item| item.id.as_str())
-        .collect();
-
-    assert_eq!(
-        actual_action_ids, EXPECTED_MORE_ACTION_IDS,
-        "MoreEngine emitted action_ids (cumulative across sections) do not \
-         match the cross-platform contract. Android renders these via \
-         CoreScreenView; iOS will adopt the same renderer when MoreView \
-         retires (deferred per G1 of \
-         `2026-05-02-ios-humble-ui-deep-retirement`)."
-    );
-}
-
-/// Section headers must describe their *contents*, not their priority
-/// rank. "Primary"/"Secondary" are meaningless to a user (you cannot
-/// guess what "Secondary" holds), so the headers are semantic. The two
-/// backup/recovery entries must also be distinguishable: the entry that
-/// opens the **Social Recovery** screen says exactly that — not a second
-/// "Backup …" string sitting next to the file-`backup` entry, which read
-/// as a confusing duplicate on device (2026-06-05-screen-ux-declutter).
-// @internal
-#[test]
-fn more_section_headers_are_semantic_and_backup_recovery_disambiguated() {
-    let engine = MoreEngine::new(vauchi_app::i18n::Locale::English);
-    let screen = engine.current_screen();
-    let sections = screen
-        .components
-        .iter()
-        .find_map(|c| match c {
-            Component::SectionedActionList { sections, .. } => Some(sections),
-            _ => None,
-        })
-        .expect("MoreEngine must emit a single Component::SectionedActionList");
-
-    let section_labels: Vec<&str> = sections.iter().map(|s| s.label.as_str()).collect();
-    for banned in ["Primary", "Secondary"] {
-        assert!(
-            !section_labels.contains(&banned),
-            "section headers must be semantic, not priority-rank — found `{banned}` in {section_labels:?}"
-        );
-    }
-
-    let recovery_label = sections
-        .iter()
-        .flat_map(|s| s.items.iter())
-        .find(|i| i.id == "recovery")
-        .map(|i| i.label.as_str())
-        .expect("`recovery` entry must exist");
-    assert_eq!(
-        recovery_label, "Social Recovery",
-        "the entry opening the Social-Recovery screen must be labeled for it, \
-         not a second `Backup & Recovery` string adjacent to the file-backup entry"
     );
 }
 

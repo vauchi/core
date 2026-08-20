@@ -365,7 +365,7 @@ fn nav_items_mobile_pre_identity_returns_only_onboarding() {
 
 // @internal
 #[test]
-fn nav_items_mobile_post_identity_returns_top_level_tabs() {
+fn nav_items_post_identity_returns_the_flat_destination_list() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     let tabs = engine
@@ -374,8 +374,23 @@ fn nav_items_mobile_post_identity_returns_top_level_tabs() {
     let ids: Vec<&str> = tabs.iter().map(|t| t.id.as_str()).collect();
     assert_eq!(
         ids,
-        vec!["my_info", "contacts", "exchange", "groups", "more"],
-        "post-identity tab order must be stable for frontends"
+        vec![
+            "my_info",
+            "contacts",
+            "exchange",
+            "groups",
+            "settings",
+            "recovery",
+            "device_management",
+            "backup",
+            "privacy",
+            "support",
+            "help",
+            "activity_log",
+            "tags",
+            "places",
+        ],
+        "post-identity order must be stable for frontends"
     );
     for tab in &tabs {
         assert!(
@@ -393,7 +408,7 @@ fn nav_items_mobile_post_identity_returns_top_level_tabs() {
 
 // @internal
 #[test]
-fn nav_items_mobile_english_labels_come_from_locale() {
+fn nav_items_english_labels_come_from_locale() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     let tabs = engine
@@ -407,7 +422,7 @@ fn nav_items_mobile_english_labels_come_from_locale() {
     assert_eq!(by_id.get("contacts"), Some(&"Contacts"));
     assert_eq!(by_id.get("exchange"), Some(&"Exchange"));
     assert_eq!(by_id.get("groups"), Some(&"Groups"));
-    assert_eq!(by_id.get("more"), Some(&"More"));
+    assert_eq!(by_id.get("settings"), Some(&"Settings"));
 }
 
 // @internal
@@ -438,33 +453,33 @@ fn nav_items_mobile_german_labels_differ_from_english_once_locales_loaded() {
     assert_eq!(de_contacts.label, "Kontakte");
 }
 
+/// Both layouts return the same list.
+///
+/// `TabLayout` predates the retirement of the More overflow tab, when
+/// mobile showed five tabs and folded everything else away. Every shell
+/// renders one flat list now. The parameter stays because it is on the
+/// binding surface; this pins that it no longer changes the answer.
 // @internal
 #[test]
-fn nav_items_dispatches_on_layout() {
+fn nav_items_agree_across_layouts() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
-    let mobile = engine
+    let mobile: Vec<String> = engine
         .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
-        .expect("mobile nav");
-    let desktop = engine
+        .expect("mobile nav")
+        .iter()
+        .map(|t| t.id.clone())
+        .collect();
+    let desktop: Vec<String> = engine
         .nav_items(MobileTabLayout::Desktop, MobileLocale::English)
-        .expect("desktop nav");
-    let mobile_ids: Vec<String> = mobile.iter().map(|t| t.id.clone()).collect();
-    let desktop_ids: Vec<String> = desktop.iter().map(|t| t.id.clone()).collect();
-    assert_eq!(
-        mobile_ids,
-        vec!["my_info", "contacts", "exchange", "groups", "more"],
-        "nav_items(Mobile) must return the five-tab mobile bar"
-    );
+        .expect("desktop nav")
+        .iter()
+        .map(|t| t.id.clone())
+        .collect();
+    assert_eq!(mobile, desktop);
     assert!(
-        desktop_ids.contains(&"settings".to_string()),
-        "nav_items(Desktop) must expose desktop-only entries the mobile bar omits"
-    );
-    assert!(
-        desktop.len() > mobile.len(),
-        "desktop sidebar must be broader than the mobile bar (mobile={}, desktop={})",
-        mobile.len(),
-        desktop.len()
+        mobile.contains(&"settings".to_string()),
+        "the flat list carries what the mobile bar used to omit: {mobile:?}"
     );
 }
 
@@ -477,47 +492,6 @@ fn nav_items_desktop_pre_identity_returns_only_onboarding() {
         .expect("desktop nav");
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].id, "onboarding");
-}
-
-// @internal
-#[test]
-fn nav_items_desktop_post_identity_is_broader_than_mobile() {
-    let (engine, _dir) = create_engine();
-    drive_onboarding(&engine);
-    let tabs = engine
-        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
-        .expect("mobile nav");
-    let items = engine
-        .nav_items(MobileTabLayout::Desktop, MobileLocale::English)
-        .expect("desktop nav");
-    assert!(
-        items.len() > tabs.len(),
-        "sidebar must be broader than the mobile tab bar (tabs={}, sidebar={})",
-        tabs.len(),
-        items.len()
-    );
-    let sidebar_ids: Vec<&str> = items.iter().map(|t| t.id.as_str()).collect();
-    // Desktop-specific entries that the mobile tab bar does not expose
-    for expected in [
-        "settings",
-        "recovery",
-        "device_management",
-        "backup",
-        "privacy",
-        "support",
-        "help",
-        "activity_log",
-    ] {
-        assert!(
-            sidebar_ids.contains(&expected),
-            "sidebar missing expected entry: {}",
-            expected
-        );
-    }
-    for item in &items {
-        assert!(!item.label.is_empty(), "label must be non-empty");
-        assert!(!item.icon.is_empty(), "icon must be non-empty");
-    }
 }
 
 // ============================================================================

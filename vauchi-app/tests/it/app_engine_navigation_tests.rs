@@ -40,7 +40,7 @@ fn navigate_to_pushes_history() {
 #[test]
 fn navigate_back_chain_returns_through_history() {
     let mut engine = engine_with_identity();
-    engine.navigate_to(AppScreen::More);
+    engine.navigate_to(AppScreen::Tags);
     engine.navigate_to(AppScreen::Settings);
     engine.navigate_to(AppScreen::Privacy);
 
@@ -48,7 +48,7 @@ fn navigate_back_chain_returns_through_history() {
     assert_eq!(*engine.current_app_screen(), AppScreen::Settings);
 
     engine.navigate_back();
-    assert_eq!(*engine.current_app_screen(), AppScreen::More);
+    assert_eq!(*engine.current_app_screen(), AppScreen::Tags);
 
     engine.navigate_back();
     assert_eq!(*engine.current_app_screen(), AppScreen::MyInfo);
@@ -372,7 +372,6 @@ fn can_go_back_false_at_every_root_screen() {
         AppScreen::Contacts,
         AppScreen::Exchange,
         AppScreen::Groups,
-        AppScreen::More,
     ] {
         let mut engine = engine_with_identity();
         engine.navigate_to(AppScreen::Settings);

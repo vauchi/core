@@ -81,37 +81,35 @@ fn group_detail_resolves_to_groups() {
 
 // @internal
 #[test]
-fn recovery_subscreens_resolve_to_recovery_on_desktop_more_on_mobile() {
+fn recovery_subscreens_resolve_to_recovery_on_both_layouts() {
     for screen in [AppScreen::RecoveryHelp, AppScreen::RecoveryClaimReview] {
-        assert_eq!(
-            screen.parent_tab_for(TabLayout::Desktop),
-            Some(AppScreen::Recovery)
-        );
-        assert_eq!(
-            screen.parent_tab_for(TabLayout::Mobile),
-            Some(AppScreen::More)
-        );
+        for layout in [TabLayout::Desktop, TabLayout::Mobile] {
+            assert_eq!(
+                screen.parent_tab_for(layout),
+                Some(AppScreen::Recovery),
+                "{screen:?} on {layout:?}"
+            );
+        }
     }
 }
 
 // @internal
 #[test]
-fn device_link_subscreens_resolve_to_device_management_on_desktop_more_on_mobile() {
+fn device_link_subscreens_resolve_to_device_management_on_both_layouts() {
     for screen in [AppScreen::DeviceLinking, AppScreen::DeviceReplacement] {
-        assert_eq!(
-            screen.parent_tab_for(TabLayout::Desktop),
-            Some(AppScreen::DeviceManagement)
-        );
-        assert_eq!(
-            screen.parent_tab_for(TabLayout::Mobile),
-            Some(AppScreen::More)
-        );
+        for layout in [TabLayout::Desktop, TabLayout::Mobile] {
+            assert_eq!(
+                screen.parent_tab_for(layout),
+                Some(AppScreen::DeviceManagement),
+                "{screen:?} on {layout:?}"
+            );
+        }
     }
 }
 
 // @internal
 #[test]
-fn duress_and_emergency_shred_collapse_to_settings_or_more() {
+fn duress_and_emergency_shred_collapse_to_settings() {
     for screen in [AppScreen::DuressPin, AppScreen::EmergencyShred] {
         assert_eq!(
             screen.parent_tab_for(TabLayout::Desktop),
@@ -119,7 +117,7 @@ fn duress_and_emergency_shred_collapse_to_settings_or_more() {
         );
         assert_eq!(
             screen.parent_tab_for(TabLayout::Mobile),
-            Some(AppScreen::More)
+            Some(AppScreen::Settings)
         );
     }
 }
@@ -158,7 +156,6 @@ fn top_level_mobile_tabs_resolve_to_themselves() {
         AppScreen::Contacts,
         AppScreen::Exchange,
         AppScreen::Groups,
-        AppScreen::More,
         AppScreen::Onboarding,
     ] {
         assert_eq!(
@@ -249,7 +246,16 @@ fn mobile_parent_ids_match_tab_info_set() {
         "contacts",
         "exchange",
         "groups",
-        "more",
+        "settings",
+        "recovery",
+        "device_management",
+        "backup",
+        "privacy",
+        "support",
+        "help",
+        "activity_log",
+        "tags",
+        "places",
         "onboarding",
     ]
     .into_iter()

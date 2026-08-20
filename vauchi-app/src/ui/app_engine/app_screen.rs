@@ -73,7 +73,6 @@ pub enum AppScreen {
     VerifyFingerprint {
         contact_id: String,
     },
-    More,
     ActivityLog,
     ArchivedContacts,
     DeviceReplacement,
@@ -165,12 +164,7 @@ impl AppScreen {
     pub fn is_root(&self) -> bool {
         matches!(
             self,
-            Self::Onboarding
-                | Self::MyInfo
-                | Self::Contacts
-                | Self::Exchange
-                | Self::Groups
-                | Self::More
+            Self::Onboarding | Self::MyInfo | Self::Contacts | Self::Exchange | Self::Groups
         )
     }
 
@@ -215,7 +209,6 @@ impl AppScreen {
             Self::ContactMerge { .. } => "contact_merge",
             Self::ContactLimit => "contact_limit",
             Self::VerifyFingerprint { .. } => "verify_fingerprint",
-            Self::More => "more",
             Self::ActivityLog => "activity_log",
             Self::ArchivedContacts => "archived_contacts",
             Self::DeviceReplacement => "device_replacement",
@@ -262,7 +255,6 @@ impl AppScreen {
             "support" => Self::Support,
             "contact_duplicates" => Self::ContactDuplicates,
             "contact_limit" => Self::ContactLimit,
-            "more" => Self::More,
             "activity_log" => Self::ActivityLog,
             "archived_contacts" => Self::ArchivedContacts,
             "device_replacement" => Self::DeviceReplacement,
@@ -345,8 +337,7 @@ impl AppScreen {
             | Self::NfcExchange
             | Self::DirectTransport => "exchange",
             Self::Groups | Self::GroupDetail { .. } => "groups",
-            Self::More
-            | Self::Settings
+            Self::Settings
             | Self::SettingsAdvanced
             | Self::Help
             | Self::Backup

@@ -96,13 +96,6 @@ impl AppEngine {
             ActionResult::VerifyFingerprint { contact_id } => ActionResult::NavigateTo(
                 self.navigate_to(AppScreen::VerifyFingerprint { contact_id }),
             ),
-            // MoreEngine reuses OpenContact to signal menu selection.
-            ActionResult::OpenContact { contact_id } if self.screen == AppScreen::More => {
-                match AppScreen::from_screen_id(&contact_id) {
-                    Some(target) => ActionResult::NavigateTo(self.navigate_to(target)),
-                    None => ActionResult::UpdateScreen(self.engine.current_screen()),
-                }
-            }
             // GroupsEngine reuses OpenContact to signal group selection.
             ActionResult::OpenContact { contact_id } if self.screen == AppScreen::Groups => {
                 ActionResult::NavigateTo(self.navigate_to(AppScreen::GroupDetail {

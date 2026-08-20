@@ -21,6 +21,21 @@ use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::engine::WorkflowEngine;
 use vauchi_core::version::AppUpdateStatus;
 
+/// MIME types accepted for vCard import. Frontends may filter the
+/// native picker to these; on platforms where the OS picker doesn't
+/// filter by MIME (older Android variants), the frontend defaults to
+/// `*/*` — the parser rejects non-vCard payloads anyway.
+///
+/// Lives beside its only caller: in a module of its own it is dead code
+/// whenever this one is compiled out, which the featureless lint trips on.
+fn vcf_mime_types() -> Vec<String> {
+    vec![
+        "text/vcard".into(),
+        "text/x-vcard".into(),
+        "text/directory".into(),
+    ]
+}
+
 impl AppEngine {
     /// The single back decision shared by the OS back gesture
     /// (`UserAction::NavigateBack`) and the visible `go_back` chrome
@@ -306,7 +321,7 @@ impl AppEngine {
         {
             return Some(ActionResult::Commands {
                 commands: vec![vauchi_core::Command::FilePickFromUser {
-                    accepted_mime_types: crate::ui::contact_import::vcf_mime_types(),
+                    accepted_mime_types: vcf_mime_types(),
                     purpose: vauchi_core::FilePickPurpose::ImportContacts,
                 }],
             });

@@ -321,10 +321,6 @@ fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
             "emergency_shred",
             EmergencyShredEngine::new(vauchi_app::i18n::Locale::English).current_screen(),
         ),
-        (
-            "more",
-            MoreEngine::new(vauchi_app::i18n::Locale::English).current_screen(),
-        ),
         ("support", SupportEngine::new().current_screen()),
         ("recovery_help", RecoveryHelpEngine::new().current_screen()),
         (
@@ -358,7 +354,7 @@ fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
         ),
     ];
 
-    assert_eq!(screens.len(), 23, "expected 23 engine screens");
+    assert_eq!(screens.len(), 22, "expected 22 engine screens");
     screens
 }
 
@@ -372,8 +368,8 @@ fn every_legacy_screen_projects_without_a_legacy_component_escape_hatch() {
     matrix.extend(walk_onboarding_screens());
     assert_eq!(
         matrix.len(),
-        29,
-        "the matrix replaces 29 golden fixtures — a dropped screen is lost coverage"
+        28,
+        "the matrix replaces 28 golden fixtures — a dropped screen is lost coverage"
     );
 
     for (name, screen) in &matrix {

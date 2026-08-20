@@ -51,30 +51,6 @@ fn engine_with_tagged_contact() -> AppEngine {
 
 // @internal
 #[test]
-fn more_menu_tags_entry_navigates_to_tags_screen() {
-    let mut vauchi = Vauchi::in_memory().unwrap();
-    vauchi.create_identity("Me").unwrap();
-    let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::More);
-
-    let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "more_menu".into(),
-        item_id: "tags".into(),
-    });
-
-    match result {
-        ActionResult::NavigateTo(ref screen) => {
-            assert_eq!(
-                screen.screen_id, "tags",
-                "the More → Tags entry must navigate to the Tags screen"
-            );
-        }
-        other => panic!("expected NavigateTo(tags), got: {other:?}"),
-    }
-}
-
-// @internal
-#[test]
 fn tags_screen_lists_the_seeded_tag_with_its_member_count() {
     let mut engine = engine_with_tagged_contact();
     let screen = engine.navigate_to(AppScreen::Tags);

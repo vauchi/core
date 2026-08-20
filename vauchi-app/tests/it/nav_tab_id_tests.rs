@@ -34,7 +34,7 @@ fn tab_roots_own_themselves() {
         Some("exchange")
     );
     assert_eq!(AppScreen::Groups.nav_tab_id().as_deref(), Some("groups"));
-    assert_eq!(AppScreen::More.nav_tab_id().as_deref(), Some("more"));
+    assert_eq!(AppScreen::Tags.nav_tab_id().as_deref(), Some("more"));
 }
 
 /// A sub-screen resolves to the bottom-nav tab that owns it — the same

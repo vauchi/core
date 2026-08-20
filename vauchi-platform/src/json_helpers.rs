@@ -123,7 +123,7 @@ mod tests {
             app_screen_from_json("\"my_info\"").unwrap(),
             AppScreen::MyInfo
         );
-        assert_eq!(app_screen_from_json("\"more\"").unwrap(), AppScreen::More);
+        assert_eq!(app_screen_from_json("\"tags\"").unwrap(), AppScreen::Tags);
     }
 
     // @internal

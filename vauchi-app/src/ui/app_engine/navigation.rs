@@ -60,63 +60,40 @@ impl AppScreen {
             other => other.clone(),
         };
 
-        Some(match layout {
-            TabLayout::Desktop => match canonical {
-                // Top-level sidebar items (must mirror `sidebar_items`)
-                Self::MyInfo
-                | Self::Contacts
-                | Self::Exchange
-                | Self::Groups
-                | Self::Settings
-                | Self::Recovery
-                | Self::DeviceManagement
-                | Self::Backup
-                | Self::Privacy
-                | Self::Support
-                | Self::Help
-                | Self::ActivityLog
-                | Self::Tags
-                | Self::Places
-                | Self::Onboarding => canonical,
-                // Settings sub-flows — collapse under Settings on
-                // desktop (no More tab in the desktop sidebar).
-                Self::DuressPin | Self::ChangePassword | Self::EmergencyShred => Self::Settings,
-                // Exchange-side sync indicator.
-                Self::DeliveryStatus => Self::Exchange,
-                // Multi-stage face-to-face exchange — collapses under
-                // Exchange on every layout (it's an active sub-flow,
-                // not a top-level destination).
-                Self::MultiStageExchange { .. } => Self::Exchange,
-                // Defensive default — should never trip thanks to the
-                // canonical reduction above; kept so the match stays
-                // total even if AppScreen grows.
-                _ => return None,
-            },
-            TabLayout::Mobile => match canonical {
-                // Top-level mobile tabs (must mirror
-                // `available_screens` / `tab_info`).
-                Self::MyInfo
-                | Self::Contacts
-                | Self::Exchange
-                | Self::Groups
-                | Self::More
-                | Self::Onboarding => canonical,
-                // Everything else lives under More on mobile.
-                Self::Settings
-                | Self::Recovery
-                | Self::DeviceManagement
-                | Self::Backup
-                | Self::Privacy
-                | Self::Support
-                | Self::Help
-                | Self::ActivityLog
-                | Self::DuressPin
-                | Self::ChangePassword
-                | Self::EmergencyShred => Self::More,
-                Self::DeliveryStatus => Self::Exchange,
-                Self::MultiStageExchange { .. } => Self::Exchange,
-                _ => return None,
-            },
+        // Both layouts resolve identically since the More overflow tab was
+        // retired: every shell renders the same flat destination list, so
+        // there is no longer a screen that is top-level on one and folded
+        // away on the other. `TabLayout` is kept because it is on the
+        // binding surface.
+        let _ = layout;
+        Some(match canonical {
+            // Top-level destinations (must mirror `available_screens`)
+            Self::MyInfo
+            | Self::Contacts
+            | Self::Exchange
+            | Self::Groups
+            | Self::Settings
+            | Self::Recovery
+            | Self::DeviceManagement
+            | Self::Backup
+            | Self::Privacy
+            | Self::Support
+            | Self::Help
+            | Self::ActivityLog
+            | Self::Tags
+            | Self::Places
+            | Self::Onboarding => canonical,
+            // Settings sub-flows collapse under Settings.
+            Self::DuressPin | Self::ChangePassword | Self::EmergencyShred => Self::Settings,
+            // Exchange-side sync indicator.
+            Self::DeliveryStatus => Self::Exchange,
+            // Multi-stage face-to-face exchange is an active sub-flow,
+            // not a top-level destination.
+            Self::MultiStageExchange { .. } => Self::Exchange,
+            // Defensive default — should never trip thanks to the
+            // canonical reduction above; kept so the match stays total
+            // even if AppScreen grows.
+            _ => return None,
         })
     }
 }
@@ -469,7 +446,16 @@ impl AppEngine {
             AppScreen::Contacts,
             AppScreen::Exchange,
             AppScreen::Groups,
-            AppScreen::More,
+            AppScreen::Settings,
+            AppScreen::Recovery,
+            AppScreen::DeviceManagement,
+            AppScreen::Backup,
+            AppScreen::Privacy,
+            AppScreen::Support,
+            AppScreen::Help,
+            AppScreen::ActivityLog,
+            AppScreen::Tags,
+            AppScreen::Places,
         ]
     }
 
@@ -498,28 +484,10 @@ impl AppEngine {
     /// frontends can stop maintaining their own `AppScreen`-to-label
     /// match tables (§6 pure-renderer remediation).
     pub fn sidebar_items(&self, locale: Locale) -> Vec<TabInfo> {
-        if !self.vauchi.has_identity() {
-            return vec![Self::tab_info_for(AppScreen::Onboarding, locale)];
-        }
-        [
-            AppScreen::MyInfo,
-            AppScreen::Contacts,
-            AppScreen::Exchange,
-            AppScreen::Groups,
-            AppScreen::Settings,
-            AppScreen::Recovery,
-            AppScreen::DeviceManagement,
-            AppScreen::Backup,
-            AppScreen::Privacy,
-            AppScreen::Support,
-            AppScreen::Help,
-            AppScreen::ActivityLog,
-            AppScreen::Tags,
-            AppScreen::Places,
-        ]
-        .into_iter()
-        .map(|s| Self::tab_info_for(s, locale))
-        .collect()
+        self.available_screens()
+            .into_iter()
+            .map(|s| Self::tab_info_for(s, locale))
+            .collect()
     }
 
     /// Returns the canonical screen-id of the parent tab the active
@@ -546,7 +514,6 @@ impl AppEngine {
             AppScreen::Contacts => ("nav.contacts", "person.2", "Contacts"),
             AppScreen::Exchange => ("nav.exchange", "qrcode", "Exchange"),
             AppScreen::Groups => ("nav.groups", "folder", "Groups"),
-            AppScreen::More => ("nav.more", "ellipsis.circle", "More"),
             AppScreen::Tags => ("more.tags", "tag", "Tags"),
             AppScreen::Places => ("more.places", "mappin.and.ellipse", "Places"),
             AppScreen::Onboarding => ("nav.onboarding", "person.badge.plus", "Welcome"),
@@ -599,7 +566,6 @@ mod tests {
         AppScreen::Contacts,
         AppScreen::Exchange,
         AppScreen::Groups,
-        AppScreen::More,
         AppScreen::Onboarding,
         AppScreen::Settings,
         AppScreen::Help,

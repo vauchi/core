@@ -39,7 +39,7 @@ END:VCARD\r\n";
 #[test]
 fn import_contacts_action_emits_file_pick_command() {
     let mut engine = engine_with_identity();
-    let _ = engine.navigate_to(AppScreen::More);
+    let _ = engine.navigate_to(AppScreen::Contacts);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "import_contacts".into(),
     });
@@ -70,11 +70,11 @@ fn import_contacts_action_emits_file_pick_command() {
     }
 }
 
-// @scenario: core_file_picker :: FilePickedFromUser on More imports vCard
+// @scenario: core_file_picker :: FilePickedFromUser on Contacts imports vCard
 #[test]
-fn file_picked_from_more_imports_vcards() {
+fn file_picked_on_contacts_imports_vcards() {
     let mut engine = engine_with_identity();
-    let _ = engine.navigate_to(AppScreen::More);
+    let _ = engine.navigate_to(AppScreen::Contacts);
 
     let result = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: VALID_VCF.to_vec(),
@@ -95,9 +95,9 @@ fn file_picked_from_more_imports_vcards() {
 
 // @scenario: core_file_picker :: imported contacts persisted in storage
 #[test]
-fn file_picked_from_more_persists_contacts() {
+fn file_picked_on_contacts_persists_contacts() {
     let mut engine = engine_with_identity();
-    let _ = engine.navigate_to(AppScreen::More);
+    let _ = engine.navigate_to(AppScreen::Contacts);
 
     let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: VALID_VCF.to_vec(),
@@ -117,7 +117,7 @@ fn file_picked_with_non_vcard_bytes_imports_zero_contacts() {
     // toast, not an error. This is the desired UX: the user sees a
     // clear empty-result message instead of a stack trace.
     let mut engine = engine_with_identity();
-    let _ = engine.navigate_to(AppScreen::More);
+    let _ = engine.navigate_to(AppScreen::Contacts);
 
     let garbage = b"NOT A VCARD AT ALL".to_vec();
     let result = engine.handle_hardware_event(Event::FilePickedFromUser {
@@ -145,7 +145,7 @@ fn file_picked_with_non_vcard_bytes_imports_zero_contacts() {
 #[test]
 fn file_pick_cancelled_returns_none() {
     let mut engine = engine_with_identity();
-    let _ = engine.navigate_to(AppScreen::More);
+    let _ = engine.navigate_to(AppScreen::Contacts);
 
     let result = engine.handle_hardware_event(Event::FilePickCancelledByUser);
     assert!(
@@ -157,7 +157,7 @@ fn file_pick_cancelled_returns_none() {
 
 // @scenario: core_file_picker :: bytes from non-More screen are ignored
 #[test]
-fn file_picked_outside_more_is_ignored() {
+fn file_picked_outside_contacts_is_ignored() {
     let mut engine = engine_with_identity();
     // Settings is not a participating screen for Phase 2A.
     let _ = engine.navigate_to(AppScreen::Settings);
@@ -184,7 +184,7 @@ fn file_picked_outside_more_is_ignored() {
 #[test]
 fn file_picked_with_duplicates_reports_skipped_count() {
     let mut engine = engine_with_identity();
-    let _ = engine.navigate_to(AppScreen::More);
+    let _ = engine.navigate_to(AppScreen::Contacts);
 
     // Import once — both succeed.
     let _ = engine.handle_hardware_event(Event::FilePickedFromUser {

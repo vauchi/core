@@ -142,6 +142,7 @@ mod settings_link_routing_tests;
 mod settings_more_parity_tests;
 mod settings_profile_i18n_tests;
 mod settings_render_context_tests;
+mod settings_row_control_label_tests;
 mod settings_security_i18n_tests;
 mod shred_i18n_tests;
 mod status_indicator_label_tests;

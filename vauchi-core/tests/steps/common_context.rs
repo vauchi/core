@@ -282,7 +282,6 @@ fn on_named_screen(world: &mut VauchiWorld, screen: String) {
         "help" => Some(AppScreen::Help),
         "backup" => Some(AppScreen::Backup),
         "lock" => Some(AppScreen::Lock),
-        "more" => Some(AppScreen::Tags),
         _ => None,
     };
     if let Some(t) = target {

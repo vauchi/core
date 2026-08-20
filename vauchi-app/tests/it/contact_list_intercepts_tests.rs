@@ -219,6 +219,15 @@ fn contacts_screen_offers_importing_contacts() {
     engine.navigate_to(AppScreen::Contacts);
 
     let screen = engine.current_screen();
+    let import = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "import_contacts");
+    assert!(
+        import.is_some_and(|a| !a.label.starts_with("Missing:") && !a.label.is_empty()),
+        "import_contacts must carry a resolved label, got {:?}",
+        import.map(|a| &a.label)
+    );
     assert!(
         screen
             .contextual_actions

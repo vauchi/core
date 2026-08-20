@@ -52,6 +52,7 @@ fn collect(nodes: &[PresentationNode], pairs: &mut Vec<(String, String)>) {
     }
 }
 
+// @internal
 #[test]
 fn settings_toggle_does_not_repeat_its_row_title() {
     let pairs = toggle_rows();
@@ -70,6 +71,7 @@ fn settings_toggle_does_not_repeat_its_row_title() {
     }
 }
 
+// @internal
 #[test]
 fn settings_toggle_still_names_its_setting_to_assistive_tech() {
     let mut labels = Vec::new();

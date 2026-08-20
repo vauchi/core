@@ -98,9 +98,14 @@ impl Projection {
                     (
                         None,
                         None,
+                        // The row title already names the setting. Repeating
+                        // it here made Android draw the name twice and iOS
+                        // draw a control it could not explain, so the visible
+                        // label stays empty and only assistive tech gets the
+                        // name.
                         vec![PresentationNode::Toggle {
                             binding_id,
-                            label: item.label.clone(),
+                            label: String::new(),
                             value: *enabled,
                             enabled: true,
                             accessibility: accessibility(&item.a11y, &item.label),

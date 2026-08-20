@@ -298,6 +298,20 @@ impl AppEngine {
             return Some(ActionResult::NavigateTo(screen));
         }
 
+        // "Import contacts" from contacts → ask the shell for a vCard.
+        // ADR-031: core drives the native file picker, it does not navigate.
+        // The bytes return through `Event::FilePickedFromUser`.
+        if matches!(action, UserAction::ActionPressed { action_id } if action_id == "import_contacts")
+            && matches!(self.screen, AppScreen::Contacts)
+        {
+            return Some(ActionResult::Commands {
+                commands: vec![vauchi_core::Command::FilePickFromUser {
+                    accepted_mime_types: crate::ui::contact_import::vcf_mime_types(),
+                    purpose: vauchi_core::FilePickPurpose::ImportContacts,
+                }],
+            });
+        }
+
         // "Find duplicates" from contacts → navigate to ContactDuplicates screen
         if matches!(action, UserAction::ActionPressed { action_id } if action_id == "find_duplicates")
             && matches!(self.screen, AppScreen::Contacts)

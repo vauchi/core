@@ -361,6 +361,17 @@ impl WorkflowEngine for ContactListEngine {
             a11y: None,
         });
 
+        // Import contacts action. Lived only in the More menu, which is
+        // being retired; `contacts.import_contacts` was already in the
+        // locale file with no caller.
+        actions.push(ScreenAction {
+            id: "import_contacts".into(),
+            label: self.t("contacts.import_contacts"),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: None,
+        });
+
         // Add exchange shortcut when empty
         if self.all_contacts.is_empty() {
             actions.insert(

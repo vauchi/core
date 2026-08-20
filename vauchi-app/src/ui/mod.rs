@@ -21,6 +21,7 @@ mod component;
 mod contact_detail;
 mod contact_detail_rules;
 mod contact_edit;
+pub(crate) mod contact_import;
 mod contact_limit;
 mod contact_list;
 mod contact_merge;

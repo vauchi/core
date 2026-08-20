@@ -46,6 +46,10 @@ const HANDLED: &[&str] = &[
     "filter_group:work",
     "view_archived",
     "find_duplicates",
+    // Like its two neighbours above, intercepted by `AppEngine` — it asks
+    // the shell for a vCard rather than navigating, so the engine itself
+    // never handles it.
+    "import_contacts",
 ];
 
 fn factory() -> ContactListEngine {

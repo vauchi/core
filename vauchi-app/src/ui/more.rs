@@ -94,18 +94,6 @@ fn iter_all_items() -> impl Iterator<Item = &'static (&'static str, &'static str
     MORE_SECTIONS.iter().flat_map(|s| s.items.iter())
 }
 
-/// MIME types accepted for vCard import. Frontends may filter the
-/// native picker to these; on platforms where the OS picker doesn't
-/// filter by MIME (older Android variants), the frontend defaults to
-/// `*/*` — the parser rejects non-vCard payloads anyway.
-fn vcf_mime_types() -> Vec<String> {
-    vec![
-        "text/vcard".into(),
-        "text/x-vcard".into(),
-        "text/directory".into(),
-    ]
-}
-
 /// Engine that renders a list of navigation targets for the "More" tab.
 #[derive(Clone, Debug)]
 pub struct MoreEngine {
@@ -174,7 +162,7 @@ impl WorkflowEngine for MoreEngine {
                     // `Vauchi::import_contacts_from_vcf`.
                     return ActionResult::Commands {
                         commands: vec![Command::FilePickFromUser {
-                            accepted_mime_types: vcf_mime_types(),
+                            accepted_mime_types: crate::ui::contact_import::vcf_mime_types(),
                             purpose: FilePickPurpose::ImportContacts,
                         }],
                     };

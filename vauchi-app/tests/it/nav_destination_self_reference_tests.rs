@@ -44,11 +44,14 @@ fn navigation_destinations_do_not_include_the_overlay_itself() {
     );
 }
 
-/// Screens the More menu used to be the only in-app route to.
+/// Screens the More menu is the only in-app route to.
 ///
-/// Archived Contacts is absent deliberately: the Contacts screen offers
-/// `view_archived`, so it never depended on More.
-const FORMERLY_MORE_ONLY: &[&str] = &["tags", "places", "device_replacement", "contact_duplicates"];
+/// Deliberately short. Most of what the More menu lists is reachable
+/// without it and must not be promoted twice: `archived_contacts` and
+/// `contact_duplicates` hang off the Contacts screen's `view_archived`
+/// and `find_duplicates`, and `device_replacement` off `setup_new_device`.
+/// Only these two have no other route.
+const FORMERLY_MORE_ONLY: &[&str] = &["tags", "places"];
 
 // @internal
 #[test]

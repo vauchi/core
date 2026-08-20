@@ -46,11 +46,11 @@ impl AppScreen {
             | Self::ContactVisibility { .. }
             | Self::VerifyFingerprint { .. }
             | Self::ContactMerge { .. } => Self::Contacts,
-            Self::ContactLimit | Self::ArchivedContacts => Self::Contacts,
+            Self::ContactDuplicates | Self::ContactLimit | Self::ArchivedContacts => Self::Contacts,
             Self::MyInfoEntryDetail { .. } | Self::AvatarEditor => Self::MyInfo,
             Self::GroupDetail { .. } => Self::Groups,
             Self::RecoveryHelp | Self::RecoveryClaimReview => Self::Recovery,
-            Self::DeviceLinking => Self::DeviceManagement,
+            Self::DeviceLinking | Self::DeviceReplacement => Self::DeviceManagement,
             Self::FormDialog { .. } => return None,
             Self::Lock => return None,
             // Deep-link consent + responder + device-link join are modal-shaped — no parent tab.
@@ -77,8 +77,6 @@ impl AppScreen {
                 | Self::ActivityLog
                 | Self::Tags
                 | Self::Places
-                | Self::ContactDuplicates
-                | Self::DeviceReplacement
                 | Self::Onboarding => canonical,
                 // Settings sub-flows — collapse under Settings on
                 // desktop (no More tab in the desktop sidebar).
@@ -518,8 +516,6 @@ impl AppEngine {
             AppScreen::ActivityLog,
             AppScreen::Tags,
             AppScreen::Places,
-            AppScreen::ContactDuplicates,
-            AppScreen::DeviceReplacement,
         ]
         .into_iter()
         .map(|s| Self::tab_info_for(s, locale))
@@ -553,14 +549,6 @@ impl AppEngine {
             AppScreen::More => ("nav.more", "ellipsis.circle", "More"),
             AppScreen::Tags => ("more.tags", "tag", "Tags"),
             AppScreen::Places => ("more.places", "mappin.and.ellipse", "Places"),
-            AppScreen::ContactDuplicates => {
-                ("more.contact_duplicates", "person.2.slash", "Duplicates")
-            }
-            AppScreen::DeviceReplacement => (
-                "more.device_replacement",
-                "arrow.triangle.2.circlepath",
-                "Replace Device",
-            ),
             AppScreen::Onboarding => ("nav.onboarding", "person.badge.plus", "Welcome"),
             AppScreen::Settings => ("nav.settings", "gearshape", "Settings"),
             AppScreen::Help => ("nav.help", "questionmark.circle", "Help"),

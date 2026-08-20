@@ -30,6 +30,7 @@ fn parameterized_contact_screens_resolve_to_contacts_on_both_layouts() {
         AppScreen::VerifyFingerprint {
             contact_id: cid("c"),
         },
+        AppScreen::ContactDuplicates,
         AppScreen::ContactLimit,
         AppScreen::ArchivedContacts,
     ] {
@@ -96,7 +97,7 @@ fn recovery_subscreens_resolve_to_recovery_on_desktop_more_on_mobile() {
 // @internal
 #[test]
 fn device_link_subscreens_resolve_to_device_management_on_desktop_more_on_mobile() {
-    for screen in [AppScreen::DeviceLinking] {
+    for screen in [AppScreen::DeviceLinking, AppScreen::DeviceReplacement] {
         assert_eq!(
             screen.parent_tab_for(TabLayout::Desktop),
             Some(AppScreen::DeviceManagement)
@@ -185,8 +186,6 @@ fn top_level_desktop_sidebar_items_resolve_to_themselves() {
         AppScreen::ActivityLog,
         AppScreen::Tags,
         AppScreen::Places,
-        AppScreen::ContactDuplicates,
-        AppScreen::DeviceReplacement,
         AppScreen::Onboarding,
     ] {
         assert_eq!(

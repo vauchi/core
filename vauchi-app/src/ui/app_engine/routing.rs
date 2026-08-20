@@ -345,9 +345,14 @@ impl AppEngine {
     }
 
     /// ADR-031 file-picker handler: route picked bytes by the screen
-    /// that requested the pick. Phase 2A wires only `AppScreen::More`
+    /// that requested the pick. Phase 2A wires `AppScreen::Contacts`
     /// (contacts import via vCard); Phase 2B adds `AppScreen::Onboarding`
     /// (backup restore — needs multi-step password flow).
+    ///
+    /// The import affordance moved off the retired More menu onto the
+    /// Contacts screen. This arm has to move with it: the pick is routed
+    /// by the screen that asked for it, so bytes arriving on Contacts
+    /// while this matched More were silently dropped.
     ///
     /// Returns `Some(ActionResult)` describing the outcome (toast on
     /// success, alert on failure, or further commands if a multi-step
@@ -355,7 +360,7 @@ impl AppEngine {
     /// participate in the file-picker protocol.
     fn handle_file_picked(&mut self, bytes: Vec<u8>, _filename: String) -> Option<ActionResult> {
         match self.screen {
-            AppScreen::More => {
+            AppScreen::Contacts => {
                 // Contacts import (vCard / VCF). Core handles bytes →
                 // import_contacts_from_vcf; result rendered as a toast
                 // with imported / skipped counts. Warnings beyond the

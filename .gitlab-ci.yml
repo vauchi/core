@@ -38,7 +38,7 @@
 include:
   - project: 'vauchi/scripts'
     # Pin the commit because tags are not protected.
-    ref: 50ef738a54b44b0695795a12131ee47d6c4b7a67
+    ref: bc85708320a3af1e251aa0e60d87354b76c49d22
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -89,7 +89,7 @@ include:
 variables:
   # Bumped for retired_boundary_vocabulary, the shared retired-name list that
   # domain_vocabulary_boundary_tests reads (vauchi/scripts!502).
-  VAUCHI_SCRIPTS_REF: "50ef738a54b44b0695795a12131ee47d6c4b7a67"
+  VAUCHI_SCRIPTS_REF: "bc85708320a3af1e251aa0e60d87354b76c49d22"
 
 # Ceiling for jobs that compile the full dependency tree. On a fresh or
 # reinstalled shell runner ALL warm state is gone at once — per-slot

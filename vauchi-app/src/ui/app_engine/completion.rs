@@ -38,7 +38,7 @@ impl AppEngine {
         if name.trim().is_empty() {
             return ActionResult::ValidationError {
                 component_id: "display_name".into(),
-                message: "Please enter a display name".into(),
+                message: self.t("onboarding.error_display_name_required"),
             };
         }
         let onboarding_groups: Vec<String> = onboarding_data
@@ -125,7 +125,7 @@ impl AppEngine {
             _ => {
                 return ActionResult::ValidationError {
                     component_id: "pin".into(),
-                    message: "Please enter your password".into(),
+                    message: self.t("lock_screen.enter_password_error"),
                 };
             }
         };
@@ -369,13 +369,13 @@ impl AppEngine {
                     Ok(export) => match serde_json::to_string_pretty(&export) {
                         Ok(json) => ActionResult::GdprExportComplete { json },
                         Err(_) => ActionResult::ShowToast {
-                            message: "Export failed: could not serialize data.".into(),
+                            message: self.t("privacy.export_failed_serialize"),
                             undo_action_id: None,
                             undo_label: None,
                         },
                     },
                     Err(_) => ActionResult::ShowToast {
-                        message: "Export failed: could not read data.".into(),
+                        message: self.t("privacy.export_failed_read"),
                         undo_action_id: None,
                         undo_label: None,
                     },
@@ -392,14 +392,13 @@ impl AppEngine {
                         // cached ConfirmDelete sub-step.
                         self.engine_cache.remove(&AppScreen::Privacy);
                         ActionResult::ShowToast {
-                            message: "Identity deletion scheduled. You have 7 days to cancel."
-                                .into(),
+                            message: self.t("privacy.deletion_scheduled_toast"),
                             undo_action_id: None,
                             undo_label: None,
                         }
                     }
                     Err(_) => ActionResult::ShowToast {
-                        message: "Could not schedule deletion.".into(),
+                        message: self.t("privacy.deletion_schedule_failed"),
                         undo_action_id: None,
                         undo_label: None,
                     },
@@ -413,13 +412,13 @@ impl AppEngine {
                         let _ = self.navigate_back();
                         self.engine_cache.remove(&AppScreen::Privacy);
                         ActionResult::ShowToast {
-                            message: "Identity deletion cancelled.".into(),
+                            message: self.t("privacy.deletion_cancelled"),
                             undo_action_id: None,
                             undo_label: None,
                         }
                     }
                     Err(_) => ActionResult::ShowToast {
-                        message: "Could not cancel deletion.".into(),
+                        message: self.t("privacy.deletion_cancel_failed"),
                         undo_action_id: None,
                         undo_label: None,
                     },
@@ -451,7 +450,7 @@ impl AppEngine {
                         ActionResult::WipeComplete
                     }
                     None => ActionResult::ShowToast {
-                        message: "Could not execute deletion.".into(),
+                        message: self.t("privacy.deletion_execute_failed"),
                         undo_action_id: None,
                         undo_label: None,
                     },
@@ -463,7 +462,7 @@ impl AppEngine {
                     ActionResult::WipeComplete
                 }
                 Err(_) => ActionResult::ShowToast {
-                    message: "Emergency wipe failed.".into(),
+                    message: self.t("privacy.emergency_wipe_failed"),
                     undo_action_id: None,
                     undo_label: None,
                 },

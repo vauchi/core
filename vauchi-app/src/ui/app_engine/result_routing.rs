@@ -77,7 +77,7 @@ impl AppEngine {
                     let _ = device_name;
                     ActionResult::ShowAlert {
                         title: self.t("device_link.unavailable_title"),
-                        message: "This build does not support device-link join.".into(),
+                        message: self.t("device_link.unsupported_build"),
                     }
                 }
             }

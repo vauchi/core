@@ -37,7 +37,7 @@ impl AppEngine {
                 self.engine_cache.remove(&AppScreen::Contacts);
                 self.navigate_back();
                 Some(ActionResult::ShowToast {
-                    message: "Contact archived".into(),
+                    message: self.t("contacts.toast_archived"),
                     undo_action_id: Some(format!("undo_archive_contact:{contact_id}")),
                     undo_label: Some(self.t("action.undo")),
                 })
@@ -85,11 +85,7 @@ impl AppEngine {
         if primary.is_imported() != secondary.is_imported() {
             return Some(ActionResult::ShowAlert {
                 title: self.t("contact_merge.cant_merge_title"),
-                message: "These contacts can't be merged because one was \
-                          exchanged in person and the other was imported. \
-                          Delete the imported one if it duplicates the \
-                          exchanged contact."
-                    .into(),
+                message: self.t("contact_merge.cant_merge_cross_kind"),
             });
         }
 
@@ -165,7 +161,7 @@ impl AppEngine {
         );
 
         Some(ActionResult::ShowToast {
-            message: "Duplicate dismissed".into(),
+            message: self.t("contacts.toast_duplicate_dismissed"),
             undo_action_id: None,
             undo_label: None,
         })

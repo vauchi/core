@@ -93,7 +93,7 @@ impl AppEngine {
                         // frontend to re-query current_screen() for the updated view.
                         self.navigate_back();
                         ActionResult::ShowToast {
-                            message: "Contacts merged".into(),
+                            message: self.t("contacts.toast_merged"),
                             undo_action_id: None,
                             undo_label: None,
                         }

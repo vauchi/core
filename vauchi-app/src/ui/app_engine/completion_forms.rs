@@ -146,7 +146,7 @@ impl AppEngine {
         if name.trim().is_empty() {
             return ActionResult::ValidationError {
                 component_id: "display_name".into(),
-                message: "Display name cannot be empty".into(),
+                message: self.t("settings.error_empty_name"),
             };
         }
         let result = self.vauchi.update_display_name(&name);
@@ -186,7 +186,7 @@ impl AppEngine {
             Ok(None) => {
                 return ActionResult::ShowAlert {
                     title: self.t("error.title"),
-                    message: "No contact card found".into(),
+                    message: self.t("contact_detail.card_not_found"),
                 };
             }
             Err(e) => Err(e),
@@ -318,7 +318,7 @@ impl AppEngine {
         if name.trim().is_empty() {
             return ActionResult::ValidationError {
                 component_id: "group_name".into(),
-                message: "Group name cannot be empty".into(),
+                message: self.t("groups.error_empty_name"),
             };
         }
         let result = self.vauchi.create_group(name.trim()).map(|_| ());
@@ -331,7 +331,7 @@ impl AppEngine {
         if name.trim().is_empty() {
             return ActionResult::ValidationError {
                 component_id: "group_name".into(),
-                message: "Group name cannot be empty".into(),
+                message: self.t("groups.error_empty_name"),
             };
         }
         let result = self.vauchi.rename_group(group_id, name.trim());

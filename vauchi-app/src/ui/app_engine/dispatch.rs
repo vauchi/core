@@ -242,7 +242,7 @@ impl AppEngine {
         //    delivered). Surface a single, core-owned error.
         Some(ActionResult::ShowAlert {
             title: self.t("deep_link.invalid_title"),
-            message: "This link cannot be opened in Vauchi.".into(),
+            message: self.t("deep_link.cannot_open"),
         })
     }
 
@@ -402,7 +402,7 @@ impl AppEngine {
                 self.glance_display_qr.as_deref(),
             );
             return Some(ActionResult::ShowToast {
-                message: "Contact unarchived".into(),
+                message: self.t("contacts.toast_unarchived"),
                 undo_action_id: None,
                 undo_label: None,
             });

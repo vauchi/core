@@ -194,7 +194,7 @@ impl AppEngine {
                 self.engine_cache.remove(&AppScreen::MyInfo);
                 self.navigate_back();
                 return Some(ActionResult::ShowToast {
-                    message: "Field deleted".into(),
+                    message: self.t("contacts.toast_field_deleted"),
                     undo_action_id: Some(format!("undo_delete_field:{field_id}")),
                     undo_label: Some(self.t("action.undo")),
                 });

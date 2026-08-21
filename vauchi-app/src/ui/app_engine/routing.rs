@@ -508,7 +508,7 @@ impl AppEngine {
                 self.reset_onboarding_to_identity_check();
                 return ActionResult::ShowAlert {
                     title: self.t("backup.restore_error_title"),
-                    message: "The selected file does not look like a Vauchi backup.".into(),
+                    message: self.t("backup.error_not_a_backup"),
                 };
             }
         };
@@ -637,7 +637,7 @@ impl AppEngine {
                 Ok(()) => {
                     self.pending_contact_undo = Some(super::PendingContactUndo::Archive);
                     ActionResult::ShowToast {
-                        message: "Contact archived".into(),
+                        message: self.t("contacts.toast_archived"),
                         undo_action_id: Some(format!("undo_archive_contact:{contact_id}")),
                         undo_label: Some(self.t("action.undo")),
                     }
@@ -649,7 +649,7 @@ impl AppEngine {
             },
             ContactActionKind::Unarchive => match self.vauchi.unarchive_contact(contact_id) {
                 Ok(()) => ActionResult::ShowToast {
-                    message: "Contact unarchived".into(),
+                    message: self.t("contacts.toast_unarchived"),
                     undo_action_id: None,
                     undo_label: None,
                 },
@@ -660,7 +660,7 @@ impl AppEngine {
             },
             ContactActionKind::Hide => match self.vauchi.hide_contact(contact_id) {
                 Ok(()) => ActionResult::ShowToast {
-                    message: "Contact hidden".into(),
+                    message: self.t("contacts.toast_hidden"),
                     undo_action_id: Some(format!("undo_hide_contact:{contact_id}")),
                     undo_label: Some(self.t("action.undo")),
                 },
@@ -671,7 +671,7 @@ impl AppEngine {
             },
             ContactActionKind::Unhide => match self.vauchi.unhide_contact(contact_id) {
                 Ok(()) => ActionResult::ShowToast {
-                    message: "Contact unhidden".into(),
+                    message: self.t("contacts.toast_unhidden"),
                     undo_action_id: None,
                     undo_label: None,
                 },
@@ -683,7 +683,7 @@ impl AppEngine {
             ContactActionKind::Delete => match self.vauchi.soft_delete_imported_contact(contact_id)
             {
                 Ok(()) => ActionResult::ShowToast {
-                    message: "Contact deleted".into(),
+                    message: self.t("contacts.toast_deleted"),
                     undo_action_id: Some(format!("undo_delete_contact:{contact_id}")),
                     undo_label: Some(self.t("action.undo")),
                 },
@@ -695,7 +695,7 @@ impl AppEngine {
             ContactActionKind::Undelete => {
                 match self.vauchi.undo_delete_imported_contact(contact_id) {
                     Ok(()) => ActionResult::ShowToast {
-                        message: "Contact restored".into(),
+                        message: self.t("contacts.toast_restored"),
                         undo_action_id: None,
                         undo_label: None,
                     },

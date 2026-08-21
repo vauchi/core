@@ -973,7 +973,7 @@ impl WorkflowEngine for ContactDetailEngine {
             }
             UserAction::ActionPressed { action_id } if action_id == "archive_contact" => {
                 ActionResult::ShowToast {
-                    message: "Contact archived".into(),
+                    message: self.t("contacts.toast_archived"),
                     undo_action_id: Some(format!("undo_archive_contact:{}", self.contact.id)),
                     undo_label: Some(self.t("action.undo")),
                 }

@@ -95,6 +95,7 @@ impl Projection {
                 component_id: input.id.to_owned(),
             },
         );
+        let prepared = accessibility(input.a11y, input.label);
         Ok(PresentationNode::Input {
             binding_id,
             label: input.label.to_owned(),
@@ -102,9 +103,19 @@ impl Projection {
             placeholder: input.placeholder,
             input_kind: input.input_kind,
             max_length: input.max_length,
-            validation_error: input.validation_error,
             enabled: true,
-            accessibility: accessibility(input.a11y, input.label),
+            // A rejected field must announce why. Only GTK4 offers an
+            // error-message relation; Qt has no public equivalent and
+            // replacing QAccessibleLineEdit to add one would cost the field
+            // its text interface. So Core puts the reason where every shell
+            // already maps it — the accessible description, which outranks
+            // the usage hint while the value is rejected
+            // (problems/2026-08-21-linux-shells-drop-core-a11y).
+            accessibility: AccessibilitySpec {
+                description: input.validation_error.clone().or(prepared.description),
+                ..prepared
+            },
+            validation_error: input.validation_error,
         })
     }
 

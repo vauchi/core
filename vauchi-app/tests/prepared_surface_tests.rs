@@ -467,3 +467,128 @@ fn binding_rejects_a_value_of_the_wrong_generic_type() {
             .is_err()
     );
 }
+
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn a_node_that_is_both_content_and_affordance_carries_one_prepared_name() {
+    // Neither AT-SPI toolkit lets an application set an action description,
+    // so a shell can surface exactly one name for a widget that is both the
+    // content and the way to act on it. Core therefore prepares one, rather
+    // than leaving each shell to choose between two
+    // (problems/2026-08-21-linux-shells-drop-core-a11y).
+    let screen = ScreenModel::new(
+        "sync",
+        "Sync",
+        vec![
+            Component::Banner {
+                text: "Sync failed".into(),
+                action_label: "Retry".into(),
+                action_id: "retry_sync".into(),
+                a11y: None,
+            },
+            Component::List {
+                id: "contacts".into(),
+                items: vec![Item {
+                    id: "contact_1".into(),
+                    name: "Ada".into(),
+                    subtitle: None,
+                    initials: "A".into(),
+                    status: None,
+                    actions: vec![],
+                    a11y: None,
+                }],
+                searchable: false,
+                total_count: 1,
+                offset: 0,
+                window: 1,
+            },
+        ],
+        vec![],
+    );
+    let prepared = PreparedSurface::from_screen(SurfaceId::new("sync").expect("id"), 1, &screen)
+        .expect("prepared surface");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("expected a surface replacement");
+    };
+
+    let mut checked = 0;
+    for node in &surface.nodes {
+        match node {
+            PresentationNode::Status {
+                activation: Some(action),
+                accessibility,
+                ..
+            } => {
+                assert_eq!(
+                    action.accessibility_label, accessibility.label,
+                    "an activatable banner must announce one name, not one per slot"
+                );
+                assert_eq!(accessibility.label, "Sync failed");
+                checked += 1;
+            }
+            PresentationNode::List { rows, .. } => {
+                for row in rows {
+                    let action = row.activation.as_ref().expect("row activation");
+                    assert_eq!(
+                        action.accessibility_label, row.accessibility.label,
+                        "an activatable row must announce one name, not one per slot"
+                    );
+                    assert_eq!(row.accessibility.label, "Ada");
+                    checked += 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(checked, 2, "expected the banner and the row to be checked");
+}
+
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn a_rejected_input_announces_the_reason_in_its_accessibility_copy() {
+    // Only GTK4 has an error-message relation; Qt has no public equivalent,
+    // so the reason has to reach the description every shell already maps
+    // (problems/2026-08-21-linux-shells-drop-core-a11y).
+    let screen = ScreenModel::new(
+        "profile.edit",
+        "Edit profile",
+        vec![Component::TextInput {
+            id: "display_name".into(),
+            label: "Display name".into(),
+            value: String::new(),
+            placeholder: None,
+            max_length: None,
+            validation_error: Some("Name cannot be empty".into()),
+            input_type: InputType::Text,
+            a11y: Some(A11y {
+                label: Some("Display name".into()),
+                hint: Some("Shown to your contacts".into()),
+                role: None,
+            }),
+            info_key: None,
+        }],
+        vec![],
+    );
+    let prepared =
+        PreparedSurface::from_screen(SurfaceId::new("profile.edit").expect("id"), 1, &screen)
+            .expect("prepared surface");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("expected a surface replacement");
+    };
+
+    let Some(PresentationNode::Input {
+        accessibility,
+        validation_error,
+        ..
+    }) = surface.nodes.first()
+    else {
+        panic!("expected an input node, got {:?}", surface.nodes.first());
+    };
+    assert_eq!(validation_error.as_deref(), Some("Name cannot be empty"));
+    assert_eq!(
+        accessibility.description.as_deref(),
+        Some("Name cannot be empty"),
+        "the rejection reason must outrank the usage hint while the value is rejected"
+    );
+    assert_eq!(accessibility.label, "Display name");
+}

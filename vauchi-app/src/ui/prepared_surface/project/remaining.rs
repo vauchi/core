@@ -101,9 +101,15 @@ impl Projection {
                 icon_token: None,
                 badge: None,
                 tone: PresentationTone::Accent,
+                // A banner is one widget that is both the content and the
+                // affordance, so it gets one prepared name. Shells cannot
+                // surface two: neither AT-SPI toolkit lets an application set
+                // an action description, and naming the widget after the verb
+                // hides what it is about
+                // (problems/2026-08-21-linux-shells-drop-core-a11y).
                 activation: Some(self.action(
                     action_label,
-                    accessibility(a11y, action_label),
+                    accessibility(a11y, text),
                     ActionTone::Standard,
                     UserAction::ActionPressed {
                         action_id: action_id.clone(),

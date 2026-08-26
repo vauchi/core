@@ -459,10 +459,13 @@ impl AppEngine {
         ]
     }
 
-    /// Returns metadata for the mobile bottom-tab bar — the 5 top-level
-    /// tabs after identity creation (MyInfo, Contacts, Exchange, Groups,
-    /// More); just Onboarding before. Labels resolve via
-    /// `i18n::get_string(locale, "nav.*")` with English fallback.
+    /// Returns metadata for the mobile bottom-tab bar — every screen in
+    /// [`Self::available_screens`] after identity creation, just Onboarding
+    /// before. Labels resolve via `i18n::get_string(locale, "nav.*")` with
+    /// English fallback.
+    ///
+    /// Identical to [`Self::sidebar_items`] since the More overflow tab was
+    /// retired; both names are kept because both are on the binding surface.
     ///
     /// Frontends render the returned `TabInfo` directly — no local
     /// screen-to-tab map or label lookup needed.
@@ -473,12 +476,10 @@ impl AppEngine {
             .collect()
     }
 
-    /// Returns metadata for a desktop sidebar — all top-level navigable
-    /// screens (MyInfo, Contacts, Exchange, Groups, Settings, Recovery,
-    /// Device Management, Backup, Privacy, Support, Help, Activity Log,
-    /// Sync, More). Wider than `tab_info()` because desktop frames have
-    /// vertical space that a phone bottom-tab bar does not. Labels
-    /// resolve via `i18n::get_string(locale, "nav.*")`.
+    /// Returns metadata for a desktop sidebar — every screen in
+    /// [`Self::available_screens`], which is the same flat list
+    /// [`Self::tab_info`] returns. Labels resolve via
+    /// `i18n::get_string(locale, "nav.*")`.
     ///
     /// Used by linux-gtk, linux-qt, Windows, macOS sidebars so those
     /// frontends can stop maintaining their own `AppScreen`-to-label

@@ -131,10 +131,11 @@ impl AppEngine {
         }
 
         // ADR-031 file-picker: dispatched by current screen, not by the
-        // narrow screen guard below. The picker is reachable from More
-        // (contacts import) and — once Phase 2B lands — Onboarding
-        // (backup restore). Phase 2A handles contacts only; backup
-        // restore is deferred (multi-step password flow).
+        // narrow screen guard below. The picker is reachable from Contacts
+        // (contacts import — the affordance moved there off the retired
+        // More menu) and — once Phase 2B lands — Onboarding (backup
+        // restore). Phase 2A handles contacts only; backup restore is
+        // deferred (multi-step password flow).
         match &event {
             Event::FilePickedFromUser { bytes, filename } => {
                 return self.handle_file_picked(bytes.clone(), filename.clone());

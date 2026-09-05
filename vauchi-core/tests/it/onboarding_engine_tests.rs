@@ -1077,7 +1077,7 @@ fn what_next_step_has_expected_subtitle() {
     assert_eq!(screen.screen_id, "what_next");
     assert_eq!(
         screen.subtitle.as_deref(),
-        Some("This is what contacts will see")
+        Some("Your card is ready — pick where to start")
     );
 }
 

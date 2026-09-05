@@ -38,7 +38,7 @@
 include:
   - project: 'vauchi/scripts'
     # Pin the commit because tags are not protected.
-    ref: bc85708320a3af1e251aa0e60d87354b76c49d22
+    ref: abf10bebb2cbff5266c8ad5652eea3e50848286c
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -87,9 +87,12 @@ include:
   - local: ci/internal-dev-bindings.yml
 
 variables:
-  # Bumped for retired_boundary_vocabulary, the shared retired-name list that
-  # domain_vocabulary_boundary_tests reads (vauchi/scripts!502).
-  VAUCHI_SCRIPTS_REF: "bc85708320a3af1e251aa0e60d87354b76c49d22"
+  # MUST match the include: ref above. The templates come from that ref and
+  # the scripts this variable fetches at job runtime come from this one; two
+  # different commits would mix template and script versions silently.
+  # Bumped 2026-09-05 for the lint:typos linux tag (vauchi/scripts!552);
+  # before that, retired_boundary_vocabulary (vauchi/scripts!502).
+  VAUCHI_SCRIPTS_REF: "abf10bebb2cbff5266c8ad5652eea3e50848286c"
 
 # Ceiling for jobs that compile the full dependency tree. On a fresh or
 # reinstalled shell runner ALL warm state is gone at once — per-slot

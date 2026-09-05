@@ -19,6 +19,9 @@ pub mod local_rendezvous;
 /// Wire format between a local joiner and the host rendezvous, ADR-070.
 pub mod local_wire;
 
+/// Host-side socket serving the local rendezvous, ADR-070.
+pub mod local_listener;
+
 #[cfg(all(feature = "network-http", feature = "storage"))]
 pub mod device_link_machine;
 

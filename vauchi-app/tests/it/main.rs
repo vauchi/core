@@ -96,6 +96,7 @@ mod last_pins_i18n_tests;
 mod legacy_projection_matrix_tests;
 mod link_exchange_i18n_tests;
 mod link_exchange_tests;
+mod local_listener_tests;
 mod local_rendezvous_tests;
 mod local_wire_tests;
 mod locale_provenance_tests;

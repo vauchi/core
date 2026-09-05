@@ -1505,7 +1505,7 @@
   "onboarding.create_identity": "Create new identity",
   "onboarding.device_link_guidance_body": "To move your account to this device, export a backup on your other signed-in device (Settings → Backup), then restore it here. Live device linking is coming soon.",
   "onboarding.device_link_guidance_title": "Add another device",
-  "onboarding.done_subtitle": "This is what contacts will see",
+  "onboarding.done_subtitle": "Your card is ready — pick where to start",
   "onboarding.done_title": "What would you like to do?",
   "onboarding.email_a11y": "Email address input",
   "onboarding.email_a11y_hint": "Enter your email address",

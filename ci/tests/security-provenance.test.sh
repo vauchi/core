@@ -8,7 +8,7 @@ ROOT=$(CDPATH='' cd -- "$(dirname "$0")/../.." && pwd)
 PIPELINE="$ROOT/.gitlab-ci.yml"
 RULESET="$ROOT/.gitlab/sast-ruleset.toml"
 BUILD="$ROOT/ci/build.yml"
-EXPECTED_REF=bc85708320a3af1e251aa0e60d87354b76c49d22
+EXPECTED_REF=abf10bebb2cbff5266c8ad5652eea3e50848286c
 failed=0
 
 fail() {

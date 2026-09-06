@@ -594,6 +594,17 @@ pub enum Event {
         frame_skipped: bool,
     },
 
+    /// Where this device is reachable on the network it just joined, or
+    /// `None` when it left one (ADR-070).
+    ///
+    /// An observation about the platform, like every other variant here:
+    /// the shell enumerates its interfaces — core cannot, for the same
+    /// reason it cannot browse for peers (ADR-030/031) — and core decides
+    /// what to do with it. Shells report on network change and pass `None`
+    /// when leaving, so a stale address is never advertised to a joiner
+    /// that cannot reach it.
+    LocalNetworkAddressChanged { address: Option<String> },
+
     /// A BLE peripheral was discovered during scanning.
     BleDeviceDiscovered {
         id: String,

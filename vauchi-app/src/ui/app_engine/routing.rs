@@ -136,6 +136,14 @@ impl AppEngine {
         // More menu) and — once Phase 2B lands — Onboarding (backup
         // restore). Phase 2A handles contacts only; backup restore is
         // deferred (multi-step password flow).
+        // ADR-070: a platform fact, not a screen interaction — recorded
+        // whatever is on screen, because the next device-link ceremony
+        // needs it and the network can change at any time.
+        if let Event::LocalNetworkAddressChanged { address } = &event {
+            self.set_local_network_address(address.clone());
+            return None;
+        }
+
         match &event {
             Event::FilePickedFromUser { bytes, filename } => {
                 return self.handle_file_picked(bytes.clone(), filename.clone());

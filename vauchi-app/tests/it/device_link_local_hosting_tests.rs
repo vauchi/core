@@ -14,6 +14,7 @@ use std::time::Duration;
 
 use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::Vauchi;
+use vauchi_core::platform::Event;
 
 fn engine_with_identity() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
@@ -28,7 +29,9 @@ const REPORTED: &str = "192.168.1.50";
 #[test]
 fn the_invitation_advertises_the_socket_when_the_shell_reports_an_address() {
     let mut engine = engine_with_identity();
-    engine.set_local_network_address(Some(REPORTED.to_string()));
+    let _ = engine.handle_hardware_event(Event::LocalNetworkAddressChanged {
+        address: Some(REPORTED.to_string()),
+    });
 
     let _ = engine.navigate_to(AppScreen::DeviceLinking);
 
@@ -66,7 +69,9 @@ fn no_reported_address_means_no_socket_and_no_advertisement() {
 #[test]
 fn navigating_away_closes_the_socket_not_just_the_session() {
     let mut engine = engine_with_identity();
-    engine.set_local_network_address(Some(REPORTED.to_string()));
+    let _ = engine.handle_hardware_event(Event::LocalNetworkAddressChanged {
+        address: Some(REPORTED.to_string()),
+    });
     let _ = engine.navigate_to(AppScreen::DeviceLinking);
 
     let advertised = engine

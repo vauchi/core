@@ -9,10 +9,14 @@
 //! `a_whole_ceremony_runs_against_a_local_broker_with_no_relay` hand-mints
 //! the joiner's claim and offers a literal `"b64-joiner-channel"`, and
 //! `device_link_join_adopt_tests` runs the crypto dance directly without
-//! either machine. So no test has ever observed the two machines agreeing
-//! with each other, and on hardware a completed link has never been
-//! observed either — the Maestro flow asserts only that QR generation
-//! finishes (`2026-08-14-two-device-linking-has-no-automatable-path`).
+//! either machine. So no test had observed the two machines agreeing with
+//! each other until this file.
+//!
+//! Hardware is covered separately now: `device_link_live_device_tests`
+//! joined a ceremony hosted by a Pixel 3a over Wi-Fi on 2026-09-06 and both
+//! sides derived `711-629`. The Maestro flow still asserts only that QR
+//! generation finishes
+//! (`2026-08-14-two-device-linking-has-no-automatable-path`).
 //!
 //! The property that matters to a user is the confirmation code: both
 //! devices show one, the human compares them, and a mismatch means abort.

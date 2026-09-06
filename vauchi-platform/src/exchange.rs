@@ -278,6 +278,12 @@ pub enum MobileEvent {
     QrScanned {
         data: String,
     },
+    // Network (ADR-070): where this device is reachable, or `None` on
+    // leaving a network. Shells report it; core cannot enumerate
+    // interfaces (ADR-030/031).
+    LocalNetworkAddressChanged {
+        address: Option<String>,
+    },
     // BLE
     BleDeviceDiscovered {
         id: String,
@@ -390,6 +396,9 @@ impl From<MobileEvent> for Event {
     fn from(evt: MobileEvent) -> Self {
         match evt {
             MobileEvent::QrScanned { data } => Self::QrScanned { data },
+            MobileEvent::LocalNetworkAddressChanged { address } => {
+                Self::LocalNetworkAddressChanged { address }
+            }
             MobileEvent::BleDeviceDiscovered { id, rssi, adv_data } => {
                 Self::BleDeviceDiscovered { id, rssi, adv_data }
             }

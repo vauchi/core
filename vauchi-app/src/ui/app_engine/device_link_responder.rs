@@ -24,8 +24,13 @@ use crate::ui::{
     ActionResult, DeviceLinkJoinEngine, DeviceLinkJoinUpdate, EngineUpdate, ScreenModel,
 };
 
+use std::net::SocketAddr;
+use std::time::Duration;
 use vauchi_core::exchange::DeviceLinkJoinInvitation;
+
 use vauchi_core::network::HttpTransport;
+
+use crate::orchestrator::local_client::RemoteRendezvousBroker;
 
 /// QR-expiry / relay-poll budget (ADR-035 device-link window = 300 s).
 pub(crate) const QR_WINDOW_SECS: u64 = 300;
@@ -72,8 +77,7 @@ impl AppEngine {
         }
         let invitation = DeviceLinkJoinInvitation::parse_url(invitation_url)
             .map_err(|e| format!("invalid invitation: {e}"))?;
-        let broker: Box<dyn DeviceLinkBroker + Send> =
-            Box::new(self.build_device_link_transport(invitation.relay_url.as_deref())?);
+        let broker = self.build_device_link_broker(&invitation)?;
         let machine = DeviceLinkResponderMachine::new(invitation, device_name, QR_WINDOW_SECS)
             .map_err(|e| format!("cannot start responder: {e}"))?;
         self.device_link_responder = Some(DeviceLinkResponderHolder { machine, broker });
@@ -183,10 +187,41 @@ impl AppEngine {
             .then(|| self.engine.current_screen())
     }
 
+    /// Choose the broker this invitation points at.
+    ///
+    /// A local rendezvous wins when present: the initiator is hosting the
+    /// ceremony itself, so there is no relay in it at all (ADR-070). The
+    /// address was already bounded at parse time — it must be a socket
+    /// address on a link-local range — because it arrives in a scanned QR.
+    ///
+    /// Core makes this choice, never the shell (ADR-021/066): the shell
+    /// reports what it scanned and renders what it is sent.
+    fn build_device_link_broker(
+        &self,
+        invitation: &DeviceLinkJoinInvitation,
+    ) -> Result<Box<dyn DeviceLinkBroker + Send>, String> {
+        if let Some(addr) = invitation.local_rendezvous.as_deref() {
+            let parsed: SocketAddr = addr
+                .parse()
+                .map_err(|_| "local rendezvous is not a socket address".to_string())?;
+            let timeout =
+                Duration::from_millis(self.vauchi.config().relay.connect_timeout_ms.max(10_000));
+            return Ok(Box::new(RemoteRendezvousBroker::new(
+                parsed, timeout, timeout,
+            )));
+        }
+        Ok(Box::new(self.build_device_link_transport(
+            invitation.relay_url.as_deref(),
+        )?))
+    }
+
     /// Build a fail-closed transport for the device-link responder.
     ///
     /// A foreign invitation relay cannot be used until the invitation also
     /// carries its distinct outer OHTTP endpoint, gateway key, and pin set.
+    /// Untouched by ADR-070: a peer hosting its own rendezvous is handled
+    /// above and never reaches here, so this refusal keeps its original
+    /// meaning rather than learning to parse strings.
     fn build_device_link_transport(
         &self,
         relay_url: Option<&str>,
@@ -247,6 +282,7 @@ mod tests {
             qr_data: initiator.qr().to_data_string(),
             broker_code: "BROKER42".to_string(),
             relay_url: None,
+            local_rendezvous: None,
         }
         .to_url();
         (url, initiator)
@@ -327,6 +363,7 @@ mod tests {
             qr_data: initiator.qr().to_data_string(),
             broker_code: "BROKER42".to_string(),
             relay_url: Some("https://foreign-relay.example".to_string()),
+            local_rendezvous: None,
         }
         .to_url();
         let _ = app.open_device_link_invitation(&url);

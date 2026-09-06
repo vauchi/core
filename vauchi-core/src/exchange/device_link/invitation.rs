@@ -10,14 +10,20 @@
 //! - the [`DeviceLinkQR`] data (identity public key + link key + signature)
 //! - the relay's rendezvous `broker_code`
 //! - an optional explicit relay base URL
+//! - or, off-relay, the `host:port` of a rendezvous the initiator hosts
+//!   itself (ADR-070)
 //!
 //! It is encoded as a shareable URL so the same payload works for QR scan,
 //! messaging/email, deep links, and (in the future) BLE broadcast.
+
+use std::net::{IpAddr, SocketAddr};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD as B64};
 
 const MAX_INVITATION_URL_LENGTH: usize = 8 * 1024;
 const MAX_ENCODED_RELAY_LENGTH: usize = (crate::relay_url::MAX_URL_LENGTH * 4).div_ceil(3) * 3;
+/// `[ipv6]:port` at its longest is well under this; bounded before decode.
+const MAX_ENCODED_LOCAL_LENGTH: usize = 128;
 
 /// Join invitation: public rendezvous data that lets a fresh device claim
 /// the initiator's relay slot and decrypt the join response.
@@ -35,6 +41,18 @@ pub struct DeviceLinkJoinInvitation {
     /// Optional explicit relay base URL. `None` means "use the app's
     /// configured default relay".
     pub relay_url: Option<String>,
+    /// Optional `host:port` of a rendezvous the initiator is hosting itself
+    /// (ADR-070). `None` means the ceremony goes through a relay.
+    ///
+    /// Deliberately *not* folded into [`Self::relay_url`]. That field means
+    /// "use this relay", and the responder refuses a foreign one until the
+    /// invitation also carries its outer OHTTP endpoint, key and pin set. A
+    /// peer hosting its own rendezvous is a different thing with different
+    /// trust: there is no relay operator to hide from, so no OHTTP metadata
+    /// exists to demand. Overloading the field would have meant teaching
+    /// that refusal to parse strings, and a mistake there would let a
+    /// foreign relay through.
+    pub local_rendezvous: Option<String>,
 }
 
 /// Errors when parsing a join invitation URL.
@@ -66,6 +84,9 @@ impl DeviceLinkJoinInvitation {
         if let Some(relay) = &self.relay_url {
             url.push_str(&format!("&relay={}", B64.encode(relay.as_bytes())));
         }
+        if let Some(local) = &self.local_rendezvous {
+            url.push_str(&format!("&local={}", B64.encode(local.as_bytes())));
+        }
         url
     }
 
@@ -90,6 +111,7 @@ impl DeviceLinkJoinInvitation {
         let mut qr_raw: Option<&str> = None;
         let mut code_raw: Option<&str> = None;
         let mut relay_raw: Option<&str> = None;
+        let mut local_raw: Option<&str> = None;
 
         for pair in query.split('&') {
             let Some((key, value)) = pair.split_once('=') else {
@@ -102,6 +124,7 @@ impl DeviceLinkJoinInvitation {
                 "qr" => qr_raw = Some(value),
                 "code" => code_raw = Some(value),
                 "relay" => relay_raw = Some(value),
+                "local" => local_raw = Some(value),
                 _ => {}
             }
         }
@@ -109,11 +132,13 @@ impl DeviceLinkJoinInvitation {
         let qr_data = decode_required_param(qr_raw, "qr")?;
         let broker_code = decode_required_param(code_raw, "code")?;
         let relay_url = decode_relay_url(relay_raw)?;
+        let local_rendezvous = decode_local_rendezvous(local_raw)?;
 
         Ok(Self {
             qr_data,
             broker_code,
             relay_url,
+            local_rendezvous,
         })
     }
 }
@@ -160,6 +185,46 @@ fn decode_relay_url(value: Option<&str>) -> Result<Option<String>, JoinInvitatio
     crate::relay_url::validate_relay_url(&relay_url)
         .map_err(|_| JoinInvitationError::UnsupportedUrl)?;
     Ok(Some(relay_url))
+}
+
+/// Decode and bound a local rendezvous address.
+///
+/// The address arrives in a scanned QR, so it is attacker-controlled. It
+/// must parse as a socket address and point somewhere link-local: without
+/// that check a crafted QR turns any joiner into a "connect to this host"
+/// primitive aimed at whatever the attacker names. ADR-070 links in
+/// presence, so a globally routable address is never the right answer here.
+fn decode_local_rendezvous(value: Option<&str>) -> Result<Option<String>, JoinInvitationError> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.len() > MAX_ENCODED_LOCAL_LENGTH {
+        return Err(JoinInvitationError::UnsupportedUrl);
+    }
+    let addr = decode_value(value, "local").map_err(|_| JoinInvitationError::UnsupportedUrl)?;
+    let parsed: SocketAddr = addr
+        .parse()
+        .map_err(|_| JoinInvitationError::UnsupportedUrl)?;
+    if !is_link_local_target(&parsed.ip()) {
+        return Err(JoinInvitationError::UnsupportedUrl);
+    }
+    Ok(Some(addr))
+}
+
+/// Whether `ip` is somewhere a device on the same network could be.
+///
+/// Loopback, RFC1918, IPv4 link-local, IPv6 unique-local (`fc00::/7`) and
+/// IPv6 link-local (`fe80::/10`). Everything else — including CGNAT and any
+/// globally routable address — is refused.
+fn is_link_local_target(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => v4.is_loopback() || v4.is_private() || v4.is_link_local(),
+        IpAddr::V6(v6) => {
+            let first = v6.octets()[0];
+            let second = v6.octets()[1];
+            v6.is_loopback() || (first & 0xfe) == 0xfc || (first == 0xfe && (second & 0xc0) == 0x80)
+        }
+    }
 }
 
 fn decode_value(value: &str, name: &'static str) -> Result<String, JoinInvitationError> {
@@ -227,6 +292,7 @@ mod tests {
             qr_data: "d2hhdGV2ZXI".to_string(),
             broker_code: "BROKER42".to_string(),
             relay_url: None,
+            local_rendezvous: None,
         }
     }
 
@@ -246,6 +312,7 @@ mod tests {
             qr_data: "d2hhdGV2ZXI".to_string(),
             broker_code: "BROKER42".to_string(),
             relay_url: Some("https://relay.example.com".to_string()),
+            local_rendezvous: None,
         };
         let url = inv.to_url();
         let parsed = DeviceLinkJoinInvitation::parse_url(&url).unwrap();

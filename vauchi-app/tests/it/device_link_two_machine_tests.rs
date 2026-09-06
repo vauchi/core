@@ -371,6 +371,73 @@ fn both_machines_complete_a_link_over_a_socket_with_no_relay() {
     );
 }
 
+/// The whole point of the invitation field: a joiner handed a local
+/// address talks to the peer, and a joiner handed none still talks to the
+/// relay. Routing is Core's call, never the shell's (ADR-021/066).
+// @scenario: device_management :: an invitation routes the joiner to the peer
+#[test]
+fn a_local_invitation_routes_the_joiner_to_the_peer_not_the_relay() {
+    use std::sync::Arc;
+    use std::time::Duration;
+    use vauchi_app::orchestrator::local_listener::{ListenerRuntime, LocalRendezvousListener};
+    use vauchi_app::orchestrator::local_rendezvous::{
+        LocalDeviceLinkBroker, SingleCeremonyRendezvous,
+    };
+    use vauchi_core::monotonic::SystemMonotonicClock;
+    use vauchi_core::rng::OsSecureRng;
+    use vauchi_core::sleeper::SystemSleeper;
+
+    let master_seed = [0x21u8; 32];
+    let (initiator, _identity) = initiator_for("Alice", master_seed);
+
+    let rendezvous = Arc::new(SingleCeremonyRendezvous::new());
+    let listener = LocalRendezvousListener::bind(
+        Arc::clone(&rendezvous),
+        ListenerRuntime {
+            rng: OsSecureRng::shared(),
+            clock: SystemMonotonicClock::shared(),
+            sleeper: SystemSleeper::shared(),
+        },
+        Duration::from_secs(30),
+        Duration::from_millis(200),
+    )
+    .expect("host binds");
+
+    let host_broker = LocalDeviceLinkBroker::new("100001".to_string(), Arc::clone(&rendezvous));
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+    // Loopback stands in for the address a shell would report. The bind is
+    // on `0.0.0.0`, and advertising that wildcard would hand the joiner an
+    // address it cannot connect to.
+    let advertised = format!("127.0.0.1:{}", listener.port());
+    host.set_local_rendezvous(advertised.clone());
+    let _ = host.advance(&host_broker, NOW);
+
+    let invitation = host.join_invitation().expect("invitation");
+    assert_eq!(
+        invitation.local_rendezvous.as_deref(),
+        Some(advertised.as_str()),
+        "a hosting initiator must advertise where it is listening"
+    );
+
+    // The URL is what actually crosses to the other device, so the address
+    // has to survive encoding — not just live in the struct.
+    let scanned = vauchi_core::exchange::DeviceLinkJoinInvitation::parse_url(&invitation.to_url())
+        .expect("the joiner parses what it scanned");
+    assert_eq!(
+        scanned.local_rendezvous, invitation.local_rendezvous,
+        "the address must survive the QR round trip"
+    );
+    assert_eq!(
+        scanned.relay_url, None,
+        "a peer-hosted ceremony names no relay"
+    );
+}
+
 // @scenario: device_management :: a joiner that never confirms cannot obtain the seed
 #[test]
 fn the_joiner_gets_nothing_until_the_user_confirms_on_the_host() {

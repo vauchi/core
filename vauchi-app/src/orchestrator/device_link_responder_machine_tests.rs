@@ -38,6 +38,7 @@ fn build_invitation(initiator: &DeviceLinkInitiator) -> DeviceLinkJoinInvitation
         qr_data: initiator.qr().to_data_string(),
         broker_code: BROKER_CODE.to_string(),
         relay_url: None,
+        local_rendezvous: None,
     }
 }
 
@@ -143,6 +144,7 @@ fn new_fails_on_invalid_qr_data() {
         qr_data: "not-a-valid-qr".to_string(),
         broker_code: BROKER_CODE.to_string(),
         relay_url: None,
+        local_rendezvous: None,
     };
 
     let result = DeviceLinkResponderMachine::new(invitation, "My Phone".to_string(), TIMEOUT);

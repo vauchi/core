@@ -132,6 +132,7 @@ pub struct DeviceLinkInitiatorMachine {
     deadline_unix: u64,
     confirm_deadline_unix: Option<u64>,
     persistence: Option<DeviceLinkPersistence>,
+    local_rendezvous: Option<String>,
 }
 
 impl DeviceLinkInitiatorMachine {
@@ -152,6 +153,7 @@ impl DeviceLinkInitiatorMachine {
             deadline_unix: 0,
             confirm_deadline_unix: None,
             persistence,
+            local_rendezvous: None,
         }
     }
 
@@ -166,6 +168,16 @@ impl DeviceLinkInitiatorMachine {
             State::Failed => InitiatorPhase::Failed,
             State::Cancelled => InitiatorPhase::Cancelled,
         }
+    }
+
+    /// Advertise `addr` as the rendezvous this device hosts itself, so the
+    /// invitation points a joiner at us instead of the relay (ADR-070).
+    ///
+    /// Set separately rather than passed to `new` because the address only
+    /// exists once a listener has bound, and `new` performs no I/O by
+    /// design.
+    pub fn set_local_rendezvous(&mut self, addr: String) {
+        self.local_rendezvous = Some(addr);
     }
 
     /// Build a [`DeviceLinkJoinInvitation`] for the current session.
@@ -183,6 +195,7 @@ impl DeviceLinkInitiatorMachine {
             qr_data: self.initiator.qr().to_data_string(),
             broker_code,
             relay_url: None,
+            local_rendezvous: self.local_rendezvous.clone(),
         })
     }
 

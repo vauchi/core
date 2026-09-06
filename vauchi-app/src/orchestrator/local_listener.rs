@@ -124,9 +124,23 @@ impl LocalRendezvousListener {
         })
     }
 
-    /// The address a joiner should be pointed at.
+    /// The address this listener is bound to.
+    ///
+    /// **Not** what belongs in an invitation. The bind is on
+    /// `0.0.0.0` so every interface is served, and the wildcard is
+    /// meaningless as a destination — a joiner cannot connect to it. The
+    /// advertisable address is the host's actual address on the network
+    /// the two devices share, which core cannot enumerate: interfaces are
+    /// the shell's to report, the same way discovery is (ADR-030/031,
+    /// ADR-070 Decision 6). Callers pair [`Self::port`] with an address
+    /// the shell supplies.
     pub fn addr(&self) -> SocketAddr {
         self.addr
+    }
+
+    /// The port the OS assigned, for composing an advertisable address.
+    pub fn port(&self) -> u16 {
+        self.addr.port()
     }
 }
 

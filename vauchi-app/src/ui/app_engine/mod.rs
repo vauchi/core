@@ -187,6 +187,14 @@ pub struct AppEngine {
     /// only on `AppScreen::DeviceLinking`. See `app_engine/device_link_initiator.rs`.
     #[cfg(all(feature = "network-http", feature = "storage"))]
     device_link_initiator: Option<device_link_initiator::DeviceLinkInitiatorHolder>,
+    /// Where this device is reachable on the network it is attached to, as
+    /// reported by the shell (ADR-070).
+    ///
+    /// Deliberately not part of `DeviceCapabilities`: that struct is
+    /// serde-serialized and feeds exchange negotiation, and an address is
+    /// materially more sensitive than "has a camera". Kept here it stays
+    /// process-local and per-foreground, with nothing to persist or send.
+    local_network_address: Option<String>,
     /// Engine-owned device-link **join** (responder) machine (M5 B3 Slice 3),
     /// live only on `AppScreen::DeviceLinkJoin`. See
     /// `app_engine/device_link_responder.rs`.
@@ -278,6 +286,17 @@ impl AppEngine {
     ///
     /// Invalidates the exchange screen cache so mode availability is
     /// recalculated on next visit.
+    /// Report where this device is reachable on its current network, or
+    /// `None` when it is not on one (ADR-070).
+    ///
+    /// Core cannot work this out: enumerating interfaces is the shell's job
+    /// for the same reason discovery is (ADR-030/031). Without it a
+    /// device-link ceremony stays on the relay, because a listener nobody
+    /// can be told about is attack surface with no benefit.
+    pub fn set_local_network_address(&mut self, address: Option<String>) {
+        self.local_network_address = address;
+    }
+
     pub fn set_device_capabilities(&mut self, caps: DeviceCapabilities) {
         self.device_capabilities = caps;
         self.engine_cache.remove(&AppScreen::Exchange);
@@ -468,6 +487,7 @@ impl AppEngine {
             link_initiator_x3dh: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_initiator: None,
+            local_network_address: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_responder: None,
             multi_stage_session: None,

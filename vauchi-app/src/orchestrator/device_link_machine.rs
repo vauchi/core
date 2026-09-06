@@ -180,6 +180,12 @@ impl DeviceLinkInitiatorMachine {
         self.local_rendezvous = Some(addr);
     }
 
+    /// The rendezvous this device is hosting, if any. `None` means the
+    /// ceremony is going through the relay.
+    pub fn local_rendezvous(&self) -> Option<&str> {
+        self.local_rendezvous.as_deref()
+    }
+
     /// Build a [`DeviceLinkJoinInvitation`] for the current session.
     ///
     /// Available once the offer has been posted and the relay returned the

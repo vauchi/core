@@ -24,10 +24,21 @@ use crate::orchestrator::device_link_machine::DeviceLinkPersistence;
 use crate::orchestrator::device_link_machine::{DeviceLinkInitiatorMachine, InitiatorEvent};
 use crate::orchestrator::device_link_relay::DeviceLinkBroker;
 use crate::ui::ActionResult;
+use std::sync::Arc;
+use std::time::Duration;
+
 use vauchi_core::network::HttpTransport;
+
+use crate::orchestrator::local_listener::{ListenerRuntime, LocalRendezvousListener, mint_code};
+use crate::orchestrator::local_rendezvous::{LocalDeviceLinkBroker, SingleCeremonyRendezvous};
 
 /// QR-expiry / relay-listen budget (ADR-035 device-link window = 300 s).
 pub(crate) const QR_WINDOW_SECS: u64 = 300;
+
+/// How long a local peer may hold a connection without sending a frame.
+/// Generous for a LAN round trip, short enough that a silent peer costs
+/// one connection rather than the ceremony.
+const LOCAL_READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Holds the initiator machine plus the relay broker it offered on;
 /// `advance` polls the same broker each tick. Boxed as a trait object so
@@ -35,6 +46,9 @@ pub(crate) const QR_WINDOW_SECS: u64 = 300;
 pub(crate) struct DeviceLinkInitiatorHolder {
     machine: DeviceLinkInitiatorMachine,
     transport: Box<dyn DeviceLinkBroker + Send>,
+    /// Held only so the socket lives exactly as long as the ceremony:
+    /// dropping the holder stops the listener (ADR-070).
+    _listener: Option<LocalRendezvousListener>,
 }
 
 impl AppEngine {
@@ -79,16 +93,70 @@ impl AppEngine {
         let _ = self.device_link_qr_pending();
         // No relay I/O here — the offer posts on the first
         // `advance_device_link_session()`, so navigation never blocks.
-        let machine = DeviceLinkInitiatorMachine::new(
+        let mut machine = DeviceLinkInitiatorMachine::new(
             initiator,
             identity_id,
             QR_WINDOW_SECS,
             Some(persistence),
         );
+
+        // Host the ceremony ourselves when the shell has told us where we
+        // are on the network; fall back to the relay when it has not. The
+        // two devices are in the same room by construction, so the local
+        // path is the direct one — and ADR-070 keeps the relay as the
+        // fallback rather than removing it.
+        let (transport, listener): (Box<dyn DeviceLinkBroker + Send>, _) =
+            match self.host_device_link_locally(&mut machine) {
+                Some((local, listener)) => (local, Some(listener)),
+                None => (Box::new(transport), None),
+            };
+
         self.device_link_initiator = Some(DeviceLinkInitiatorHolder {
             machine,
-            transport: Box::new(transport),
+            transport,
+            _listener: listener,
         });
+    }
+
+    /// Bind a rendezvous this device serves itself, and point `machine` at
+    /// it so the invitation advertises where a joiner should connect.
+    ///
+    /// Returns `None` — leaving the ceremony on the relay — when the shell
+    /// has reported no address, or when the socket cannot be bound. A
+    /// listener nobody can be told about is pure attack surface, so not
+    /// knowing our address is a reason not to open one at all.
+    fn host_device_link_locally(
+        &self,
+        machine: &mut DeviceLinkInitiatorMachine,
+    ) -> Option<(Box<dyn DeviceLinkBroker + Send>, LocalRendezvousListener)> {
+        let host_address = self.local_network_address.as_deref()?;
+
+        let rendezvous = Arc::new(SingleCeremonyRendezvous::new());
+        let listener = LocalRendezvousListener::bind(
+            Arc::clone(&rendezvous),
+            ListenerRuntime {
+                rng: Arc::clone(self.vauchi.rng()),
+                clock: Arc::clone(self.vauchi.monotonic()),
+                sleeper: Arc::clone(self.vauchi.sleeper()),
+            },
+            Duration::from_secs(QR_WINDOW_SECS),
+            LOCAL_READ_TIMEOUT,
+        )
+        .map_err(|e| tracing::warn!("device-link: cannot host locally: {e}"))
+        .ok()?;
+
+        machine.set_local_rendezvous(format!("{host_address}:{}", listener.port()));
+        let broker = LocalDeviceLinkBroker::new(mint_code(self.vauchi.rng().as_ref()), rendezvous);
+        Some((Box::new(broker), listener))
+    }
+
+    /// The address the active device-link ceremony is advertising, if it
+    /// is hosting one. `None` means no ceremony, or one on the relay.
+    pub fn device_link_local_rendezvous(&self) -> Option<String> {
+        self.device_link_initiator
+            .as_ref()
+            .and_then(|holder| holder.machine.local_rendezvous())
+            .map(str::to_string)
     }
 
     /// Cancel + drop the active initiator machine. Idempotent. `pub`
@@ -293,6 +361,7 @@ mod tests {
             transport: Box::new(FakeBroker {
                 code: "BROKER42".to_string(),
             }),
+            _listener: None,
         });
 
         // First advance posts the offer → QrReady → renders the waiting screen.

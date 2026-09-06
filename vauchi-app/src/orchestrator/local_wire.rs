@@ -166,6 +166,37 @@ pub fn serve(
     }
 }
 
+/// Encode a request for the wire. The joiner's half of [`decode_request`].
+pub fn encode_request(request: &LocalRequest) -> Vec<u8> {
+    serde_json::to_vec(request).unwrap_or_default()
+}
+
+/// Parse a reply, bounded exactly as the host bounds a request.
+///
+/// The joiner reached this peer via a scanned QR, so the address is as
+/// untrusted as anything the host receives — the bounds run in both
+/// directions (DC-01).
+pub fn decode_response(frame: &[u8]) -> Result<LocalResponse, WireError> {
+    if frame.len() > MAX_FRAME_BYTES {
+        return Err(WireError::FrameTooLarge);
+    }
+    let response: LocalResponse =
+        serde_json::from_slice(frame).map_err(|_| WireError::Malformed)?;
+
+    let within = match &response {
+        LocalResponse::Offered { code } => code.len() <= MAX_CODE_BYTES,
+        LocalResponse::Claimed { payload } => payload.len() <= MAX_PAYLOAD_BYTES,
+        LocalResponse::Polled { response } => response
+            .as_ref()
+            .is_none_or(|r| r.len() <= MAX_PAYLOAD_BYTES),
+        LocalResponse::Error { error } => error.len() <= MAX_CODE_BYTES,
+    };
+    if !within {
+        return Err(WireError::FieldTooLarge);
+    }
+    Ok(response)
+}
+
 /// Encode a response for the wire.
 pub fn encode_response(response: &LocalResponse) -> Vec<u8> {
     serde_json::to_vec(response)

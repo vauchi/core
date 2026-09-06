@@ -22,6 +22,10 @@ pub mod local_wire;
 /// Host-side socket serving the local rendezvous, ADR-070.
 pub mod local_listener;
 
+/// Joiner-side broker reaching a host rendezvous over TCP, ADR-070.
+#[cfg(feature = "network-http")]
+pub mod local_client;
+
 #[cfg(all(feature = "network-http", feature = "storage"))]
 pub mod device_link_machine;
 

@@ -272,6 +272,105 @@ fn both_machines_complete_a_link_over_a_local_rendezvous() {
     );
 }
 
+/// The same ceremony again, but the joiner reaches the host **across a
+/// socket** rather than sharing its rendezvous in-process. Everything
+/// before this shared a `SingleCeremonyRendezvous` by `Arc`, so no test had
+/// yet put a transport between the two machines — the wire format, the host
+/// listener, and the joiner broker were each covered alone.
+///
+/// The host mints its own code here; only the initiator knows it in
+/// advance, and the joiner learns the response channel through the
+/// invitation exactly as it would from a scanned QR.
+// @scenario: device_management :: two devices link over a local socket
+#[test]
+fn both_machines_complete_a_link_over_a_socket_with_no_relay() {
+    use std::sync::Arc;
+    use std::time::Duration;
+    use vauchi_app::orchestrator::local_client::RemoteRendezvousBroker;
+    use vauchi_app::orchestrator::local_listener::{ListenerRuntime, LocalRendezvousListener};
+    use vauchi_app::orchestrator::local_rendezvous::{
+        LocalDeviceLinkBroker, SingleCeremonyRendezvous,
+    };
+    use vauchi_core::monotonic::SystemMonotonicClock;
+    use vauchi_core::rng::OsSecureRng;
+    use vauchi_core::sleeper::SystemSleeper;
+
+    let master_seed = [0x33u8; 32];
+    let (initiator, _identity) = initiator_for("Alice", master_seed);
+
+    // The host owns the rendezvous and also serves it on a socket.
+    let rendezvous = Arc::new(SingleCeremonyRendezvous::new());
+    let listener = LocalRendezvousListener::bind(
+        Arc::clone(&rendezvous),
+        ListenerRuntime {
+            rng: OsSecureRng::shared(),
+            clock: SystemMonotonicClock::shared(),
+            sleeper: SystemSleeper::shared(),
+        },
+        Duration::from_secs(30),
+        Duration::from_millis(200),
+    )
+    .expect("host binds");
+
+    let host_broker = LocalDeviceLinkBroker::new("100001".to_string(), Arc::clone(&rendezvous));
+    let joiner_broker = RemoteRendezvousBroker::new(
+        listener.addr(),
+        Duration::from_millis(500),
+        Duration::from_millis(500),
+    );
+
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+    let _ = host.advance(&host_broker, NOW);
+    let invitation = host
+        .join_invitation()
+        .expect("a QR-ready host must expose an invitation");
+
+    let mut joiner =
+        DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
+            .expect("invitation parses");
+    let joiner_code = match joiner.advance(&joiner_broker, NOW + 1) {
+        ResponderEvent::RequestPosted { confirmation_code } => confirmation_code,
+        other => panic!("expected RequestPosted over the socket, got {other:?}"),
+    };
+
+    let host_code = match host.advance(&host_broker, NOW + 2) {
+        InitiatorEvent::ConfirmationRequired {
+            confirmation_code, ..
+        } => confirmation_code,
+        other => panic!("expected ConfirmationRequired, got {other:?}"),
+    };
+    assert_eq!(
+        host_code, joiner_code,
+        "the codes must agree across a transport, not just in-process"
+    );
+
+    let _ = host.confirm_manual(host_code, NOW + 3);
+    let completed = host.advance(&host_broker, NOW + 4);
+    assert!(
+        matches!(completed, InitiatorEvent::Completed { .. }),
+        "expected Completed over the socket, got {completed:?}"
+    );
+
+    let ready = joiner.advance(&joiner_broker, NOW + 5);
+    assert!(
+        matches!(ready, ResponderEvent::ResponseReady),
+        "the joiner must decrypt the response received over the socket, got {ready:?}"
+    );
+    assert_eq!(
+        joiner
+            .take_response()
+            .expect("a ready joiner holds a response")
+            .master_seed(),
+        &master_seed,
+        "the seed must survive the whole ceremony over a real transport"
+    );
+}
+
 // @scenario: device_management :: a joiner that never confirms cannot obtain the seed
 #[test]
 fn the_joiner_gets_nothing_until_the_user_confirms_on_the_host() {

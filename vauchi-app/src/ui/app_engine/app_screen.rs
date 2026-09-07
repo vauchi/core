@@ -297,19 +297,25 @@ impl AppScreen {
     }
 
     /// The bottom-nav tab that owns this screen, surfaced through
-    /// `ScreenModel.nav_tab_id` so the mobile / TUI 5-tab shells highlight
-    /// the active tab without hand-maintaining a `match AppScreen -> tab
-    /// index`. Returns one of the five bottom-nav roots (`my_info` /
-    /// `contacts` / `exchange` / `groups` / `more`), or `None` for pre-auth
-    /// and transient overlay screens that show no bottom nav.
+    /// `ScreenModel.nav_tab_id` so the mobile / TUI shells highlight the
+    /// active tab without hand-maintaining a `match AppScreen -> tab
+    /// index`. Returns one of the five primary destinations (`contacts` /
+    /// `my_info` / `exchange` / `device_management` / `settings`), or
+    /// `None` for pre-auth and transient overlay screens that show no
+    /// bottom nav.
+    ///
+    /// Every arm must name a destination `AppEngine::primary_destinations`
+    /// actually offers — a tab the shell never rendered is a highlight on
+    /// nothing, with no error to say so. The old `groups` and `more` roots
+    /// went away with that cut, so what used to bucket under More now
+    /// resolves to whichever primary destination routes to it: the
+    /// contact-book vocabularies to `contacts`, the rest to `settings`.
     ///
     /// Distinct from [`Self::parent_screen_id`], which stops at the
     /// immediate parent (`settings`, `recovery`, `tags`, `device_management`)
     /// for the *desktop sidebar* highlight — widening that to the tab would
     /// move the sidebar wrongly. This method instead resolves transitively
-    /// to a tab root: those intermediates all live under **More**, and the
-    /// top-level-non-tab screens the 5-tab shells bucket there (Settings,
-    /// Help, Backup, device/recovery/duress flows, …) map to `more`.
+    /// to a destination root.
     ///
     /// Exhaustive — a new variant without a mapping is a compile error.
     pub fn nav_tab_id(&self) -> Option<String> {
@@ -338,14 +344,21 @@ impl AppScreen {
             | Self::BleExchange { .. }
             | Self::NfcExchange
             | Self::DirectTransport => "exchange",
-            Self::Groups | Self::GroupDetail { .. } => "groups",
+            // The contact-book vocabularies are reached from the Contacts
+            // screen, so that is the destination that stays selected while
+            // the user is inside one.
+            Self::Groups
+            | Self::GroupDetail { .. }
+            | Self::Tags
+            | Self::Places
+            | Self::TagPromotion { .. } => "contacts",
+            Self::DeviceLinking | Self::DeviceManagement | Self::DeviceReplacement => {
+                "device_management"
+            }
             Self::Settings
             | Self::SettingsAdvanced
             | Self::Help
             | Self::Backup
-            | Self::DeviceLinking
-            | Self::DeviceManagement
-            | Self::DeviceReplacement
             | Self::DuressPin
             | Self::ChangePassword
             | Self::DecoyContacts
@@ -354,12 +367,9 @@ impl AppScreen {
             | Self::Recovery
             | Self::RecoveryHelp
             | Self::RecoveryClaimReview
-            | Self::Tags
-            | Self::Places
-            | Self::TagPromotion { .. }
             | Self::Privacy
             | Self::Support
-            | Self::ActivityLog => "more",
+            | Self::ActivityLog => "settings",
         };
         Some(tab.to_string())
     }

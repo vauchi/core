@@ -20,7 +20,7 @@
 
 use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{
-    ActionResult, AppEngine, AppScreen, PreparedSurface, UserAction, WorkflowEngine,
+    ActionResult, AppEngine, AppScreen, PreparedSurface, TabLayout, UserAction, WorkflowEngine,
 };
 use vauchi_core::api::Vauchi;
 use vauchi_core::{Command, Event, InteractionId, PresentationNode, SurfaceId};
@@ -238,6 +238,45 @@ fn the_demoted_set_is_exactly_the_screens_with_declared_routes() {
         "every screen the nav stopped offering needs a declared replacement \
          route; add it to DEMOTED_SCREEN_ROUTES and give it an affordance"
     );
+}
+
+/// A highlight id Core hands a shell must name a destination that shell
+/// actually rendered.
+///
+/// `current_tab_id` documents exactly that — "The id matches one of the
+/// `id` values returned by `tab_info` / `sidebar_items`" — and
+/// `nav_tab_id` is the bottom-bar equivalent stamped on every
+/// `ScreenModel`. Cutting the nav without cutting these mappings left
+/// Settings pointing at `more` and Groups at a `groups` tab no shell
+/// renders any more: a selection on nothing, and no error to say so.
+// @internal
+#[test]
+fn every_top_level_screen_highlights_a_rendered_destination() {
+    let engine = engine_with_identity();
+    let rendered = screen_ids(engine.primary_destinations());
+
+    for screen in engine.available_screens() {
+        let stamped = screen
+            .nav_tab_id()
+            .unwrap_or_else(|| panic!("{screen:?} is a destination but stamps no nav tab"));
+        assert!(
+            rendered.contains(&stamped),
+            "{screen:?} stamps nav_tab_id `{stamped}`, which is not a rendered \
+             destination: {rendered:?}"
+        );
+
+        for layout in [TabLayout::Mobile, TabLayout::Desktop] {
+            let probe = engine_on(screen.clone());
+            let current = probe
+                .current_tab_id(layout)
+                .unwrap_or_else(|| panic!("{screen:?} selects no tab on {layout:?}"));
+            assert!(
+                rendered.iter().any(|id| id == current),
+                "{screen:?} selects `{current}` on {layout:?}, which is not a \
+                 rendered destination: {rendered:?}"
+            );
+        }
+    }
 }
 
 /// Each demoted screen is reached by activating the affordance declared

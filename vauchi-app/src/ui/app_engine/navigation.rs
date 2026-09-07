@@ -49,6 +49,11 @@ impl AppScreen {
             Self::ContactDuplicates | Self::ContactLimit | Self::ArchivedContacts => Self::Contacts,
             Self::MyInfoEntryDetail { .. } | Self::AvatarEditor => Self::MyInfo,
             Self::GroupDetail { .. } => Self::Groups,
+            Self::TagPromotion { .. } => Self::Tags,
+            // Without this the Advanced sub-screen reduced to itself and
+            // fell through to `None`, so the sidebar cleared its selection
+            // on entry. `parent_screen_id` has always said `settings`.
+            Self::SettingsAdvanced => Self::Settings,
             Self::RecoveryHelp | Self::RecoveryClaimReview => Self::Recovery,
             Self::DeviceLinking | Self::DeviceReplacement => Self::DeviceManagement,
             Self::FormDialog { .. } => return None,
@@ -67,22 +72,24 @@ impl AppScreen {
         // binding surface.
         let _ = layout;
         Some(match canonical {
-            // Top-level destinations (must mirror `available_screens`)
+            // Must mirror `AppEngine::primary_destinations` — this id is
+            // handed to shells as a selection target, so naming a screen the
+            // nav never rendered selects nothing at all.
             Self::MyInfo
             | Self::Contacts
             | Self::Exchange
-            | Self::Groups
             | Self::Settings
-            | Self::Recovery
             | Self::DeviceManagement
+            | Self::Onboarding => canonical,
+            // The contact-book vocabularies are reached from Contacts.
+            Self::Groups | Self::Tags | Self::Places => Self::Contacts,
+            // Everything else the nav demoted is reached from Settings.
+            Self::Recovery
             | Self::Backup
             | Self::Privacy
             | Self::Support
             | Self::Help
-            | Self::ActivityLog
-            | Self::Tags
-            | Self::Places
-            | Self::Onboarding => canonical,
+            | Self::ActivityLog => Self::Settings,
             // Settings sub-flows collapse under Settings.
             Self::DuressPin | Self::ChangePassword | Self::EmergencyShred => Self::Settings,
             // Exchange-side sync indicator.

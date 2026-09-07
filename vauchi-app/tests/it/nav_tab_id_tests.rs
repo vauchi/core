@@ -3,13 +3,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! `AppScreen::nav_tab_id()` — the owning bottom-nav tab for each screen,
-//! surfaced on `ScreenModel.nav_tab_id` so the mobile/TUI 5-tab shells
-//! stop hand-maintaining a `match AppScreen -> tab index` to highlight the
+//! surfaced on `ScreenModel.nav_tab_id` so the mobile/TUI shells stop
+//! hand-maintaining a `match AppScreen -> tab index` to highlight the
 //! active tab. Unlike `parent_screen_id()` (which stops at the immediate
 //! parent — `settings`, `recovery`, `tags`, … — for the desktop sidebar),
-//! this resolves transitively to one of the five bottom-nav roots
-//! (`my_info` / `contacts` / `exchange` / `groups` / `more`), or `None`
-//! for pre-auth / transient screens that show no bottom nav.
+//! this resolves transitively to one of the five primary destinations
+//! (`contacts` / `my_info` / `exchange` / `device_management` /
+//! `settings`), or `None` for pre-auth / transient screens that show no
+//! bottom nav.
+//!
+//! The `groups` and `more` roots went away when the nav was cut to those
+//! five; that a returned id names a destination shells actually render is
+//! guarded in `nav_primary_destinations_tests`.
 
 use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
 use vauchi_core::api::Vauchi;
@@ -33,8 +38,14 @@ fn tab_roots_own_themselves() {
         AppScreen::Exchange.nav_tab_id().as_deref(),
         Some("exchange")
     );
-    assert_eq!(AppScreen::Groups.nav_tab_id().as_deref(), Some("groups"));
-    assert_eq!(AppScreen::Tags.nav_tab_id().as_deref(), Some("more"));
+    assert_eq!(
+        AppScreen::DeviceManagement.nav_tab_id().as_deref(),
+        Some("device_management")
+    );
+    assert_eq!(
+        AppScreen::Settings.nav_tab_id().as_deref(),
+        Some("settings")
+    );
 }
 
 /// A sub-screen resolves to the bottom-nav tab that owns it — the same
@@ -64,50 +75,84 @@ fn sub_screens_resolve_to_their_owning_tab() {
         }
         .nav_tab_id()
         .as_deref(),
-        Some("groups"),
+        Some("contacts"),
     );
     // Archived contacts is a contacts screen even though the More menu
-    // links to it — the owning tab is contacts, not more.
+    // linked to it — the owning tab is contacts.
     assert_eq!(
         AppScreen::ArchivedContacts.nav_tab_id().as_deref(),
         Some("contacts"),
     );
 }
 
-/// The top-level-non-tab screens the 5-tab shells bucket under **More**,
-/// plus their deeper sub-screens which `parent_screen_id()` routes through
-/// an intermediate (`settings` / `recovery` / `tags`) that this method
-/// resolves the rest of the way to `more`.
+/// The contact-book vocabularies, and their deeper sub-screens, keep
+/// Contacts selected: that is the destination whose secondary actions
+/// reach them.
 // @internal
 #[test]
-fn more_bucket_screens_resolve_to_more() {
+fn contact_vocabulary_screens_resolve_to_contacts() {
+    for screen in [
+        AppScreen::Groups,
+        AppScreen::Tags,
+        AppScreen::Places,
+        AppScreen::TagPromotion {
+            tag_id: "t1".into(),
+        },
+    ] {
+        assert_eq!(
+            screen.nav_tab_id().as_deref(),
+            Some("contacts"),
+            "{screen:?} must resolve to the Contacts destination",
+        );
+    }
+}
+
+/// The device-linking flows keep Devices selected.
+// @internal
+#[test]
+fn device_flows_resolve_to_device_management() {
+    for screen in [
+        AppScreen::DeviceManagement,
+        AppScreen::DeviceLinking,
+        AppScreen::DeviceReplacement,
+    ] {
+        assert_eq!(
+            screen.nav_tab_id().as_deref(),
+            Some("device_management"),
+            "{screen:?} must resolve to the Devices destination",
+        );
+    }
+}
+
+/// The top-level-non-tab screens the shells bucket under Settings, plus
+/// their deeper sub-screens which `parent_screen_id()` routes through an
+/// intermediate (`settings` / `recovery`) that this method resolves the
+/// rest of the way.
+// @internal
+#[test]
+fn settings_bucket_screens_resolve_to_settings() {
     for screen in [
         AppScreen::Settings,
         AppScreen::Help,
         AppScreen::Backup,
-        AppScreen::DeviceManagement,
         AppScreen::Recovery,
         AppScreen::DeliveryStatus,
         AppScreen::ActivityLog,
         AppScreen::Privacy,
         AppScreen::Support,
         AppScreen::DuressPin,
-        AppScreen::DeviceReplacement,
-        AppScreen::DeviceLinking,
-        // Resolve through an intermediate parent (settings / recovery / tags).
+        // Resolve through an intermediate parent (settings / recovery).
         AppScreen::SettingsAdvanced,
         AppScreen::ChangePassword,
         AppScreen::DecoyContacts,
         AppScreen::EmergencyShred,
         AppScreen::RecoveryHelp,
         AppScreen::RecoveryClaimReview,
-        AppScreen::Tags,
-        AppScreen::Places,
     ] {
         assert_eq!(
             screen.nav_tab_id().as_deref(),
-            Some("more"),
-            "{screen:?} must resolve to the More tab",
+            Some("settings"),
+            "{screen:?} must resolve to the Settings destination",
         );
     }
 }
@@ -173,8 +218,8 @@ fn app_engine_stamps_nav_tab_id_on_rendered_screen() {
     engine.navigate_to(AppScreen::Settings);
     assert_eq!(
         engine.current_screen().nav_tab_id.as_deref(),
-        Some("more"),
-        "Settings is a More-bucket screen — the rendered ScreenModel must say so",
+        Some("settings"),
+        "Settings is a primary destination — the rendered ScreenModel must say so",
     );
 
     engine.navigate_to(AppScreen::Contacts);

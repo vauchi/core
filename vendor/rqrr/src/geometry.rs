@@ -77,8 +77,11 @@ impl Perspective {
         // (near-zero `den` → NaN/inf/out-of-range). Clamp instead: the
         // resulting Point samples a clamped pixel (get_pixel_at_point already
         // clamps into image bounds), ECC then fails and decode() returns Err
-        // gracefully. Clamp well inside i32 so find_alignment_pattern's i32
-        // coordinate-delta product cannot overflow. VENDORED PATCH — see
+        // gracefully. The i32::MAX/4 limit keeps the DIFFERENCE of two mapped
+        // coordinates inside i32 for find_alignment_pattern; their product
+        // still needs 60 bits, which the upstream patch prepared in
+        // problems/2026-09-07-core-rqrr-patch-does-not-reach-consumers/upstream-rqrr
+        // fixes properly by widening that estimate to i64. VENDORED PATCH — see
         // _private/docs/historical/problems-done/2026-05-25-rqrr-perspective-panic-crashes-qr-scan.
         const COORD_LIMIT: f64 = (i32::MAX / 4) as f64;
         let clamp = |c: f64| -> i32 {

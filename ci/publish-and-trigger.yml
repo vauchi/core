@@ -755,9 +755,24 @@ verify:downstream-rust:
   # own CARGO_HOME / runner config). Forwarding core's VAUCHI_SCRIPTS_REF made
   # verified-fetch download a humble_check.py that mismatched the downstream's
   # pinned checksum (cli lint:humble), and leaked an unwritable CARGO_HOME into
-  # cargo-vet on read-only runners (relay security:vet). Downstream verifies
-  # core's new code via the `branch = "main"` git dependency, so no core
-  # variable needs forwarding.
+  # cargo-vet on read-only runners (relay security:vet).
+  #
+  # What each child actually verifies, because it is NOT uniform and the
+  # previous wording here claimed it was ("downstream verifies core's new
+  # code via the `branch = \"main\"` git dependency"):
+  #
+  #   tui, relay, linux-gtk   `branch = "main"` — do verify this commit.
+  #   cli, e2e                `tag = "vX", version = "=X"` — resolve their
+  #                           OWN PIN. They verify the core they were last
+  #                           bumped to, not the code that triggered them.
+  #
+  # So a green child here is not evidence that this merge is safe for the
+  # tag-pinned two. e2e sat on v0.61.0 for a month, passing on every core
+  # merge, while core reached v0.64.0. Forwarding a variable does not fix
+  # it either: a `[patch]` cannot satisfy `version = "=0.61.0"` with a
+  # 0.64.0 crate, so making these two verify this commit means moving the
+  # pin — which is the bump bot's job, not this bridge's.
+  # See problems/2026-09-07-downstream-verify-tests-the-pin.
   trigger:
     project: $DOWNSTREAM
     strategy: depend

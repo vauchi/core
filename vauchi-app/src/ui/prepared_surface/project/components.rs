@@ -104,17 +104,13 @@ impl Projection {
                         accessibility: AccessibilitySpec::label(&item.title),
                     })
                     .collect();
-                let label = if title.is_empty() {
-                    accessibility(a11y, id).label
-                } else {
-                    title.clone()
-                };
-                Ok(group(
-                    Some(BindingId::new(id)?),
-                    Some(label.clone()),
-                    children,
-                    accessibility(a11y, &label),
-                ))
+                // A panel that supplies no title wants no heading. Borrowing
+                // the spoken label printed the screen title a second time on
+                // onboarding, and borrowing the id put `decommission_info`
+                // where copy goes, in every language.
+                let heading = (!title.is_empty()).then(|| title.clone());
+                let spoken = accessibility(a11y, heading.as_deref().unwrap_or_default());
+                Ok(group(Some(BindingId::new(id)?), heading, children, spoken))
             }
             Component::List {
                 id,

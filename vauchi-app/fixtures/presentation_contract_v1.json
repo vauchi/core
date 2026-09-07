@@ -21,7 +21,7 @@
             {
               "Group": {
                 "id": "identity_check_info",
-                "label": "Welcome to Vauchi",
+                "label": null,
                 "axis": "vertical",
                 "children": [
                   {

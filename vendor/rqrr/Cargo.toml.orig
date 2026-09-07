@@ -1,8 +1,7 @@
 [package]
 name = "rqrr"
 edition = "2021"
-rust-version = "1.64.0"
-version = "0.10.1"
+version = "0.11.0"
 authors = ["WanzenBug <moritz@wanzenbug.xyz>"]
 license = "(MIT OR Apache-2.0) AND ISC"
 documentation = "https://docs.rs/rqrr/"
@@ -22,6 +21,7 @@ include = [
     "/src/**/*.rs",
     "/src/**/*.png",
 ]
+rust-version = "1.85.1"
 
 [features]
 img = ["image"]
@@ -39,5 +39,5 @@ image = { version = ">= 0.24, <= 0.25", default-features = false, features = ["p
 
 [dependencies]
 g2p = "1.0"
-lru = "0.16"
+lru = "0.18"
 image = { version = ">= 0.24, <= 0.25", optional = true, default-features = false }

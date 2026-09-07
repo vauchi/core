@@ -33,9 +33,11 @@ vauchi-core = { path = "vauchi-core", version = "0.64.0", default-features = fal
 vauchi-app = { path = "vauchi-app", version = "0.64.0", default-features = false }
 vauchi-protocol = { path = "vauchi-protocol", version = "0.64.0" }
 
-# Vendored fork of rqrr 0.10.1 — patches Perspective::map to clamp instead of
+# Vendored fork of rqrr 0.11.0 — patches Perspective::map to clamp instead of
 # abort on a near-degenerate QR perspective (panic=abort makes the upstream
-# assert uncatchable). Keeps version 0.10.1; redirects the `rqrr = "0.10"` dep
+# assert uncatchable). Upstream 0.11.0 still asserts, so the fork is still
+# needed; geometry.rs is byte-identical 0.10.1 -> 0.11.0, so the rebase was a
+# straight carry. Keeps version 0.11.0; redirects the `rqrr = "0.11"` dep
 # in vauchi-core. See _private/docs/problems/2026-05-25-rqrr-perspective-panic-crashes-qr-scan
 # and core/vendor/rqrr/src/geometry.rs (top-of-file patch marker).
 [patch.crates-io]

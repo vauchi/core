@@ -1,7 +1,7 @@
 // ============================================================================
-// VENDORED PATCH — vauchi core fork of rqrr 0.10.1.
+// VENDORED PATCH — vauchi core fork of rqrr 0.11.0.
 //
-// This file is BYTE-IDENTICAL to upstream rqrr 0.10.1 EXCEPT for
+// This file is BYTE-IDENTICAL to upstream rqrr 0.11.0 EXCEPT for
 // `Perspective::map` (and the tests guarding it). Upstream `map` asserts
 // the mapped coordinates fit in i32 and ABORTS the process on a
 // near-degenerate perspective (near-zero denominator → NaN/inf/out-of-range).
@@ -15,7 +15,7 @@
 // tests at the bottom of this module go RED.
 //
 // Source / rationale:
-//   _private/docs/problems/2026-05-25-rqrr-perspective-panic-crashes-qr-scan
+//   _private/docs/historical/problems-done/2026-05-25-rqrr-perspective-panic-crashes-qr-scan
 // ============================================================================
 
 use crate::identify::Point;
@@ -72,14 +72,14 @@ impl Perspective {
         let x = x.round();
         let y = y.round();
 
-        // Upstream rqrr 0.10.1 asserts here and aborts under panic=abort
+        // Upstream rqrr 0.11.0 asserts here and aborts under panic=abort
         // (vauchi core release profile) on a near-degenerate perspective
         // (near-zero `den` → NaN/inf/out-of-range). Clamp instead: the
         // resulting Point samples a clamped pixel (get_pixel_at_point already
         // clamps into image bounds), ECC then fails and decode() returns Err
         // gracefully. Clamp well inside i32 so find_alignment_pattern's i32
         // coordinate-delta product cannot overflow. VENDORED PATCH — see
-        // _private/docs/problems/2026-05-25-rqrr-perspective-panic-crashes-qr-scan.
+        // _private/docs/historical/problems-done/2026-05-25-rqrr-perspective-panic-crashes-qr-scan.
         const COORD_LIMIT: f64 = (i32::MAX / 4) as f64;
         let clamp = |c: f64| -> i32 {
             if c.is_nan() {

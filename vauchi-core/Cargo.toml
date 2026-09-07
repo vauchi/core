@@ -154,7 +154,7 @@ ureq = { version = "3", default-features = false, features = ["json", "rustls-no
 ohttp = { version = "0.7", default-features = false, features = ["client", "rust-hpke"], optional = true }
 
 # QR code decoding — used by production mobile scanner (rxing tryHarder pipeline)
-rqrr = "0.10"
+rqrr = "0.11"
 rxing = { version = "0.8", default-features = false, features = ["encoding_rs"] }
 
 # Image preprocessing for diagnostic scanner benchmarking (optional)

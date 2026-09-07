@@ -99,6 +99,14 @@ impl CorrectedDataStream {
 
         ret
     }
+
+    /// Read `nbits` bits, or fail if the stream cannot supply them all.
+    fn take_bits_checked(&mut self, nbits: usize) -> DeQRResult<usize> {
+        if self.bits_remaining() < nbits {
+            Err(DeQRError::DataUnderflow)?
+        }
+        Ok(self.take_bits(nbits))
+    }
 }
 
 /// Given a grid try to decode and write it to the output writer
@@ -159,22 +167,11 @@ fn decode_eci<W>(_meta: &MetaData, ds: &mut CorrectedDataStream, mut _writer: W)
 where
     W: Write,
 {
-    if ds.bits_remaining() < 8 {
-        Err(DeQRError::DataUnderflow)?
-    }
-
-    let mut _eci = ds.take_bits(8) as u32;
+    let mut _eci = ds.take_bits_checked(8)? as u32;
     if _eci & 0xc0 == 0x80 {
-        if ds.bits_remaining() < 8 {
-            Err(DeQRError::DataUnderflow)?
-        }
-        _eci = (_eci << 8) | (ds.take_bits(8) as u32)
+        _eci = (_eci << 8) | (ds.take_bits_checked(8)? as u32)
     } else if _eci & 0xe0 == 0xc0 {
-        if ds.bits_remaining() < 16 {
-            Err(DeQRError::DataUnderflow)?
-        }
-
-        _eci = (_eci << 16) | (ds.take_bits(16) as u32)
+        _eci = (_eci << 16) | (ds.take_bits_checked(16)? as u32)
     }
     Ok(())
 }
@@ -189,7 +186,7 @@ where
         _ => 12,
     };
 
-    let count = ds.take_bits(nbits);
+    let count = ds.take_bits_checked(nbits)?;
     if ds.bits_remaining() < count * 13 {
         Err(DeQRError::DataUnderflow)?
     }
@@ -221,7 +218,7 @@ where
         _ => 16,
     };
 
-    let count = ds.take_bits(nbits);
+    let count = ds.take_bits_checked(nbits)?;
     if ds.bits_remaining() < count * 8 {
         Err(DeQRError::DataUnderflow)?;
     }
@@ -242,7 +239,7 @@ where
         Version(10..=26) => 11,
         _ => 13,
     };
-    let mut count = ds.take_bits(nbits);
+    let mut count = ds.take_bits_checked(nbits)?;
     let mut buf = [0; 2];
 
     while count >= 2 {
@@ -267,17 +264,13 @@ fn alpha_tuple(
     nbits: usize,
     digits: usize,
 ) -> DeQRResult<()> {
-    if ds.bits_remaining() < nbits {
-        Err(DeQRError::DataUnderflow)
-    } else {
-        let mut tuple = ds.take_bits(nbits);
-        for i in (0..digits).rev() {
-            const ALPHA_MAP: &[u8; 46] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:\x00";
-            buf[i] = ALPHA_MAP[tuple % 45];
-            tuple /= 45;
-        }
-        Ok(())
+    let mut tuple = ds.take_bits_checked(nbits)?;
+    for i in (0..digits).rev() {
+        const ALPHA_MAP: &[u8; 46] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:\x00";
+        buf[i] = ALPHA_MAP[tuple % 45];
+        tuple /= 45;
     }
+    Ok(())
 }
 
 fn decode_numeric<W>(meta: &MetaData, ds: &mut CorrectedDataStream, mut writer: W) -> DeQRResult<()>
@@ -290,7 +283,7 @@ where
         _ => 14,
     };
 
-    let mut count = ds.take_bits(nbits);
+    let mut count = ds.take_bits_checked(nbits)?;
     let mut buf = [0; 3];
     while count >= 3 {
         numeric_tuple(&mut buf, ds, 10, 3)?;
@@ -321,16 +314,12 @@ fn numeric_tuple(
     nbits: usize,
     digits: usize,
 ) -> DeQRResult<()> {
-    if ds.bits_remaining() < nbits {
-        Err(DeQRError::DataUnderflow)
-    } else {
-        let mut tuple = ds.take_bits(nbits);
-        for i in (0..digits).rev() {
-            buf[i] = (tuple % 10) as u8 + b'0';
-            tuple /= 10;
-        }
-        Ok(())
+    let mut tuple = ds.take_bits_checked(nbits)?;
+    for i in (0..digits).rev() {
+        buf[i] = (tuple % 10) as u8 + b'0';
+        tuple /= 10;
     }
+    Ok(())
 }
 
 fn codestream_ecc(meta: &MetaData, ds: RawData) -> DeQRResult<CorrectedDataStream> {
@@ -358,8 +347,15 @@ fn codestream_ecc(meta: &MetaData, ds: RawData) -> DeQRResult<CorrectedDataStrea
         let dst = &mut out.data[dst_offset..(dst_offset + ecc.bs)];
         let num_ec = ecc.bs - ecc.dw;
         #[allow(clippy::needless_range_loop)]
-        for j in 0..ecc.dw {
+        for j in 0..sb_ecc.dw {
             dst[j] = ds.data[j * bc + i];
+        }
+        // A long block carries exactly one more data codeword than a short
+        // one. Once the short blocks have run out, interleaving skips them, so
+        // those final codewords sit in a compact run right after the common
+        // columns rather than in a column of their own.
+        if ecc.dw > sb_ecc.dw {
+            dst[sb_ecc.dw] = ds.data[sb_ecc.dw * bc + (i - sb_ecc.ns)];
         }
         for j in 0..num_ec {
             dst[ecc.dw + j] = ds.data[ecc_offset + j * bc + i];
@@ -894,5 +890,221 @@ mod tests {
                 assert_eq!(test[y][x] != 0, mask_bit(7, y, x));
             }
         }
+    }
+
+    /// Systematic Reed-Solomon encode, producing the `npar` error correction
+    /// codewords that follow `data` in a block. Uses the same generator roots
+    /// (alpha^0 .. alpha^(npar - 1)) that `block_syndromes` evaluates at.
+    fn rs_encode(data: &[u8], npar: usize) -> Vec<u8> {
+        let mut gen = vec![GF256::ONE];
+        for i in 0..npar {
+            let root = GF256::GENERATOR.pow(i);
+            gen.push(GF256::ZERO);
+            for j in (1..gen.len()).rev() {
+                let carry = gen[j - 1] * root;
+                gen[j] += carry;
+            }
+        }
+
+        let mut rem: Vec<GF256> = data.iter().map(|&b| GF256(b)).collect();
+        rem.resize(data.len() + npar, GF256::ZERO);
+        for i in 0..data.len() {
+            let coeff = rem[i];
+            if coeff == GF256::ZERO {
+                continue;
+            }
+            for (j, &g) in gen.iter().enumerate() {
+                rem[i + j] += g * coeff;
+            }
+        }
+        rem[data.len()..].iter().map(|g| g.0).collect()
+    }
+
+    /// Build the symbol at this version and error correction level, damage
+    /// one long block by exactly as many codewords as its error correction can
+    /// repair, and check that every data codeword comes back in order.
+    fn check_damaged_long_block(version: usize, ecc_level: u16) {
+        let meta = MetaData {
+            version: Version(version),
+            ecc_level,
+            mask: 0,
+        };
+        let ver = &VERSION_DATA_BASE[version];
+        let sb_ecc = &ver.ecc[ecc_level as usize];
+        let lb_count = (ver.data_bytes - sb_ecc.bs * sb_ecc.ns) / (sb_ecc.bs + 1);
+        let bc = sb_ecc.ns + lb_count;
+        let npar = sb_ecc.bs - sb_ecc.dw;
+
+        // Build every block, each data codeword distinguishable from its
+        // neighbours, and give each block its real error correction codewords.
+        let mut data = Vec::new();
+        let mut ecc = Vec::new();
+        for i in 0..bc {
+            let dw = if i < sb_ecc.ns {
+                sb_ecc.dw
+            } else {
+                sb_ecc.dw + 1
+            };
+            let block: Vec<u8> = (0..dw).map(|j| (i * 251 + j * 97 + 1) as u8).collect();
+            ecc.push(rs_encode(&block, npar));
+            data.push(block);
+        }
+
+        // Interleave per ISO/IEC 18004 section 8.6: one data codeword from
+        // every block in turn, skipping blocks that have run out - so the long
+        // blocks' final data codewords form a compact run at the end of the
+        // data codewords - then the same over the error correction codewords.
+        // Note where the first long block's codewords land as we go.
+        let mut raw = RawData {
+            data: [0; MAX_PAYLOAD_SIZE],
+            len: 0,
+        };
+        let mut target = Vec::new();
+        let mut pos = 0;
+        for j in 0..=sb_ecc.dw {
+            for (i, block) in data.iter().enumerate() {
+                if j < block.len() {
+                    if i == sb_ecc.ns {
+                        target.push(pos);
+                    }
+                    raw.data[pos] = block[j];
+                    pos += 1;
+                }
+            }
+        }
+        for j in 0..npar {
+            for (i, block) in ecc.iter().enumerate() {
+                if i == sb_ecc.ns {
+                    target.push(pos);
+                }
+                raw.data[pos] = block[j];
+                pos += 1;
+            }
+        }
+        assert_eq!(pos, ver.data_bytes);
+        raw.len = pos * 8;
+
+        // Damage that block up to - but not past - what it can repair.
+        for &p in &target[..npar / 2] {
+            raw.data[p] ^= 0xff;
+        }
+
+        let out = codestream_ecc(&meta, raw).unwrap_or_else(|e| {
+            panic!("version {version} level {ecc_level} damaged to its limit: {e:?}")
+        });
+        let expected: Vec<u8> = data.concat();
+        assert_eq!(out.bit_len, expected.len() * 8);
+        assert_eq!(
+            &out.data[..expected.len()],
+            &expected[..],
+            "version {version} level {ecc_level}"
+        );
+    }
+
+    #[test]
+    fn test_deinterleave_mixed_block_sizes() {
+        // Every version and error correction level whose blocks come in two
+        // sizes, so that the long blocks each carry one extra data codeword.
+        // Version 7-Q, for example, has 2 blocks of (32, 14) and 4 of (33, 15).
+        let mut checked = 0;
+        for version in 1..VERSION_DATA_BASE.len() {
+            for ecc_level in 0..4 {
+                let ver = &VERSION_DATA_BASE[version];
+                let sb_ecc = &ver.ecc[ecc_level as usize];
+                if (ver.data_bytes - sb_ecc.bs * sb_ecc.ns) / (sb_ecc.bs + 1) > 0 {
+                    check_damaged_long_block(version, ecc_level);
+                    checked += 1;
+                }
+            }
+        }
+        // 128 of the 160 version/level combinations have two block sizes.
+        assert_eq!(checked, 128);
+    }
+    /// The `nbits` wide big endian representation of `value`, one entry per bit.
+    fn bits_of(value: usize, nbits: usize) -> Vec<u8> {
+        (0..nbits)
+            .map(|i| ((value >> (nbits - 1 - i)) & 1) as u8)
+            .collect()
+    }
+
+    /// A corrected stream holding exactly `bits` and nothing more.
+    fn stream_of(bits: &[u8]) -> CorrectedDataStream {
+        let mut ds = CorrectedDataStream {
+            data: [0; MAX_PAYLOAD_SIZE],
+            ptr: 0,
+            bit_len: bits.len(),
+        };
+        for (i, &bit) in bits.iter().enumerate() {
+            if bit != 0 {
+                ds.data[i >> 3] |= 0x80 >> (i & 7);
+            }
+        }
+        ds
+    }
+
+    #[test]
+    fn test_truncated_count_indicator() {
+        let meta = MetaData {
+            version: Version(1),
+            ecc_level: 0,
+            mask: 0,
+        };
+
+        // A mode indicator followed by a character count indicator one bit
+        // short of complete, for each of the four data modes. At version 1 the
+        // counts are 10, 9, 8 and 8 bits wide respectively.
+        for (mode, nbits) in [(1, 10), (2, 9), (4, 8), (8, 8)] {
+            let mut bits = bits_of(mode, 4);
+            bits.extend(bits_of(0, nbits - 1));
+
+            let mut out = Vec::new();
+            assert_eq!(
+                decode_payload(&meta, stream_of(&bits), &mut out),
+                Err(DeQRError::DataUnderflow),
+                "mode {mode} accepted a truncated character count indicator"
+            );
+        }
+    }
+
+    #[test]
+    fn test_truncated_count_indicator_after_valid_segment() {
+        let meta = MetaData {
+            version: Version(1),
+            ecc_level: 0,
+            mask: 0,
+        };
+
+        // A well formed byte segment carrying "A", then a second byte mode
+        // indicator whose 8 bit count indicator is cut off after 4 bits.
+        let mut bits = bits_of(4, 4);
+        bits.extend(bits_of(1, 8));
+        bits.extend(bits_of(u32::from(b'A') as usize, 8));
+        bits.extend(bits_of(4, 4));
+        bits.extend(bits_of(0, 4));
+
+        let mut out = Vec::new();
+        assert_eq!(
+            decode_payload(&meta, stream_of(&bits), &mut out),
+            Err(DeQRError::DataUnderflow),
+            "a stream cut short mid count indicator decoded to {out:?}"
+        );
+    }
+
+    #[test]
+    fn test_count_indicator_ends_stream() {
+        let meta = MetaData {
+            version: Version(1),
+            ecc_level: 0,
+            mask: 0,
+        };
+
+        // The stream ends on the last bit of the count indicator. That is a
+        // complete - if empty - segment and must still decode.
+        let mut bits = bits_of(4, 4);
+        bits.extend(bits_of(0, 8));
+
+        let mut out = Vec::new();
+        decode_payload(&meta, stream_of(&bits), &mut out).expect("a complete count indicator");
+        assert!(out.is_empty());
     }
 }

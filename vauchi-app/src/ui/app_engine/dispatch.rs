@@ -335,6 +335,23 @@ impl AppEngine {
             return Some(ActionResult::NavigateTo(screen));
         }
 
+        // The three contact-book vocabularies (ADR-051). Each was a
+        // top-level nav destination until the nav was cut to the five
+        // primary ones; the Contacts screen is their route now, so an
+        // unhandled id here orphans the screen outright.
+        if self.screen == AppScreen::Contacts
+            && let UserAction::ActionPressed { action_id } = action
+            && let Some(target) = match action_id.as_str() {
+                "groups" => Some(AppScreen::Groups),
+                "tags" => Some(AppScreen::Tags),
+                "places" => Some(AppScreen::Places),
+                _ => None,
+            }
+        {
+            let screen = self.navigate_to(target);
+            return Some(ActionResult::NavigateTo(screen));
+        }
+
         // "merge" from ContactDuplicates → store pending pair and navigate to ContactMerge
         if self.screen == AppScreen::ContactDuplicates
             && matches!(action, UserAction::ActionPressed { action_id } if action_id == "merge")

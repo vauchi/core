@@ -50,6 +50,13 @@ const HANDLED: &[&str] = &[
     // the shell for a vCard rather than navigating, so the engine itself
     // never handles it.
     "import_contacts",
+    // The three contact-book vocabularies, likewise intercepted by
+    // `AppEngine`. They are top-level screens the navigation stopped
+    // offering, so these affordances are their only in-app route
+    // (`nav_primary_destinations_tests`).
+    "groups",
+    "tags",
+    "places",
 ];
 
 fn factory() -> ContactListEngine {

@@ -435,8 +435,14 @@ impl AppEngine {
         }
     }
 
-    /// Returns top-level navigation screens. Sub-screens (Sync,
-    /// Recovery, Groups, Privacy, Support) are reached via `navigate_to`.
+    /// Every screen reachable as a top-level destination.
+    ///
+    /// Wider than [`Self::primary_destinations`], which is what the nav
+    /// actually offers: the difference is the set demoted into Settings.
+    /// Kept as the full set because it is what
+    /// `nav_primary_destinations_tests` subtracts from to derive the
+    /// demoted screens — a screen added here without a Settings row fails
+    /// that test rather than shipping orphaned.
     pub fn available_screens(&self) -> Vec<AppScreen> {
         if !self.vauchi.has_identity() {
             return vec![AppScreen::Onboarding];
@@ -459,10 +465,36 @@ impl AppEngine {
         ]
     }
 
+    /// The destinations the navigation offers.
+    ///
+    /// Deliberately **not** [`Self::available_screens`]. Mapping the nav
+    /// over the full set rendered fourteen identical pills in which a
+    /// daily destination looked exactly like a rare and destructive one —
+    /// ten-plus of them on a phone. Five destinations: the daily pair
+    /// (Contacts, My Card) around the primary action (Exchange), then the
+    /// two the user administers rather than uses (Devices, Settings).
+    ///
+    /// Everything demoted from here keeps a Settings row as its route;
+    /// `nav_primary_destinations_tests` derives that demoted set from
+    /// these two methods and taps every one of those rows, so cutting the
+    /// nav cannot silently orphan a screen.
+    pub fn primary_destinations(&self) -> Vec<AppScreen> {
+        if !self.vauchi.has_identity() {
+            return vec![AppScreen::Onboarding];
+        }
+        vec![
+            AppScreen::Contacts,
+            AppScreen::MyInfo,
+            AppScreen::Exchange,
+            AppScreen::DeviceManagement,
+            AppScreen::Settings,
+        ]
+    }
+
     /// Returns metadata for the mobile bottom-tab bar — every screen in
-    /// [`Self::available_screens`] after identity creation, just Onboarding
-    /// before. Labels resolve via `i18n::get_string(locale, "nav.*")` with
-    /// English fallback.
+    /// [`Self::primary_destinations`] after identity creation, just
+    /// Onboarding before. Labels resolve via `i18n::get_string(locale,
+    /// "nav.*")` with English fallback.
     ///
     /// Identical to [`Self::sidebar_items`] since the More overflow tab was
     /// retired; both names are kept because both are on the binding surface.
@@ -470,14 +502,14 @@ impl AppEngine {
     /// Frontends render the returned `TabInfo` directly — no local
     /// screen-to-tab map or label lookup needed.
     pub fn tab_info(&self, locale: Locale) -> Vec<TabInfo> {
-        self.available_screens()
+        self.primary_destinations()
             .into_iter()
             .map(|screen| Self::tab_info_for(screen, locale))
             .collect()
     }
 
     /// Returns metadata for a desktop sidebar — every screen in
-    /// [`Self::available_screens`], which is the same flat list
+    /// [`Self::primary_destinations`], which is the same list
     /// [`Self::tab_info`] returns. Labels resolve via
     /// `i18n::get_string(locale, "nav.*")`.
     ///
@@ -485,7 +517,7 @@ impl AppEngine {
     /// frontends can stop maintaining their own `AppScreen`-to-label
     /// match tables (§6 pure-renderer remediation).
     pub fn sidebar_items(&self, locale: Locale) -> Vec<TabInfo> {
-        self.available_screens()
+        self.primary_destinations()
             .into_iter()
             .map(|s| Self::tab_info_for(s, locale))
             .collect()

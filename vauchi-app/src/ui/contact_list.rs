@@ -372,6 +372,30 @@ impl WorkflowEngine for ContactListEngine {
             a11y: None,
         });
 
+        // Groups, tags and places are the three vocabularies the contact
+        // book is organized by — group membership, the owner-private tag
+        // vocabulary, and the named places exchanges were recorded at
+        // (ADR-051). They were top-level nav destinations until the nav was
+        // cut to the five primary ones, and the Contacts screen is where
+        // they belong: it is the surface whose contents they organize, and
+        // it already carries the same class of secondary link
+        // (`view_archived`, `find_duplicates`). Labels reuse the
+        // destination's own locale key rather than minting a second name
+        // for the same screen.
+        for (id, label_key) in [
+            ("groups", "nav.groups"),
+            ("tags", "more.tags"),
+            ("places", "more.places"),
+        ] {
+            actions.push(ScreenAction {
+                id: id.into(),
+                label: self.t(label_key),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            });
+        }
+
         // Add exchange shortcut when empty
         if self.all_contacts.is_empty() {
             actions.insert(

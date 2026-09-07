@@ -363,9 +363,17 @@ fn nav_items_mobile_pre_identity_returns_only_onboarding() {
     assert_eq!(tab.badge_count, 0);
 }
 
+/// The binding surface carries the five primary destinations, in order.
+///
+/// It used to carry all fourteen reachable screens, which rendered as
+/// ten-plus identical pills where a daily destination looked exactly like
+/// a rare and destructive one. The demoted nine keep in-app routes off the
+/// Contacts and Settings screens; `vauchi-app`'s
+/// `nav_primary_destinations_tests` is what proves none of them was
+/// orphaned by the cut.
 // @internal
 #[test]
-fn nav_items_post_identity_returns_the_flat_destination_list() {
+fn nav_items_post_identity_returns_the_primary_destinations() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     let tabs = engine
@@ -375,20 +383,11 @@ fn nav_items_post_identity_returns_the_flat_destination_list() {
     assert_eq!(
         ids,
         vec![
-            "my_info",
             "contacts",
+            "my_info",
             "exchange",
-            "groups",
-            "settings",
-            "recovery",
             "device_management",
-            "backup",
-            "privacy",
-            "support",
-            "help",
-            "activity_log",
-            "tags",
-            "places",
+            "settings",
         ],
         "post-identity order must be stable for frontends"
     );
@@ -421,7 +420,7 @@ fn nav_items_english_labels_come_from_locale() {
     assert_eq!(by_id.get("my_info"), Some(&"My Card"));
     assert_eq!(by_id.get("contacts"), Some(&"Contacts"));
     assert_eq!(by_id.get("exchange"), Some(&"Exchange"));
-    assert_eq!(by_id.get("groups"), Some(&"Groups"));
+    assert_eq!(by_id.get("device_management"), Some(&"Devices"));
     assert_eq!(by_id.get("settings"), Some(&"Settings"));
 }
 

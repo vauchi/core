@@ -195,12 +195,13 @@ fn activating_a_navigation_destination_dismisses_the_overlay() {
         })
         .expect("activating the navigation affordance must present the overlay");
 
-    // A destination other than the current screen, so the batch cannot be
-    // confused with a no-op re-render of where we already are.
+    // A destination other than the current screen (a fresh identity with no
+    // contacts lands on My Card), so the batch cannot be confused with a
+    // no-op re-render of where we already are.
     let destination = items
         .iter()
-        .find(|item| item.interaction_id.as_str().ends_with("groups"))
-        .expect("navigation overlay must offer Groups");
+        .find(|item| item.interaction_id.as_str().ends_with("contacts"))
+        .expect("navigation overlay must offer Contacts");
 
     let commands = activate(
         &mut engine,
@@ -227,7 +228,7 @@ fn activating_a_navigation_destination_dismisses_the_overlay() {
 /// evidence for that change. It exists because an earlier version of this
 /// test only *looked* like it navigated back — `context_interaction`
 /// re-reads the bar from whatever surface is current, so it was asserting
-/// about Groups while claiming to be home.
+/// about the away screen while claiming to be home.
 // @internal
 #[test]
 fn the_menu_reopens_after_navigating_away_and_back() {
@@ -248,18 +249,18 @@ fn the_menu_reopens_after_navigating_away_and_back() {
     let mut engine = engine_with_identity();
     let (home_surface, home_nav) = context_interaction(&mut engine, "navigation");
     let opened = activate(&mut engine, &home_surface, &home_nav);
-    let groups = destination(&opened, "groups");
-    activate(&mut engine, &home_surface, &groups);
+    let contacts = destination(&opened, "contacts");
+    activate(&mut engine, &home_surface, &contacts);
 
-    // Now genuinely on Groups: its own bar, its own surface id.
-    let (groups_surface, groups_nav) = context_interaction(&mut engine, "navigation");
+    // Now genuinely on Contacts: its own bar, its own surface id.
+    let (away_surface, away_nav) = context_interaction(&mut engine, "navigation");
     assert_ne!(
-        groups_surface, home_surface,
+        away_surface, home_surface,
         "the engine must actually have moved to another surface"
     );
-    let opened_on_groups = activate(&mut engine, &groups_surface, &groups_nav);
-    let my_info = destination(&opened_on_groups, "my_info");
-    activate(&mut engine, &groups_surface, &my_info);
+    let opened_away = activate(&mut engine, &away_surface, &away_nav);
+    let my_info = destination(&opened_away, "my_info");
+    activate(&mut engine, &away_surface, &my_info);
 
     // Home again — the affordance must present, not toggle closed.
     let (home_again, nav_again) = context_interaction(&mut engine, "navigation");

@@ -237,6 +237,27 @@ impl AppEngine {
                     let screen = self.navigate_to(AppScreen::Help);
                     return Some(ActionResult::NavigateTo(screen));
                 }
+                // Destinations the navigation stopped offering when it was
+                // cut to the five primary ones. These rows are their only
+                // in-app route, so an id that falls through here does not
+                // merely fail to navigate — it orphans the screen
+                // (`nav_primary_destinations_tests`).
+                "recovery" => {
+                    let screen = self.navigate_to(AppScreen::Recovery);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
+                "privacy" => {
+                    let screen = self.navigate_to(AppScreen::Privacy);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
+                "support" => {
+                    let screen = self.navigate_to(AppScreen::Support);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
+                "activity_log" => {
+                    let screen = self.navigate_to(AppScreen::ActivityLog);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
                 "funding" => {
                     return Some(ActionResult::OpenUrl {
                         url: "https://vauchi.app/docs/about/supporters".into(),

@@ -107,6 +107,28 @@ impl SettingsEngine {
         get_string(self.locale(), key)
     }
 
+    /// A row whose only job is to reach a screen the navigation no longer
+    /// offers.
+    ///
+    /// The label reuses the destination's own locale key instead of
+    /// minting a second name for one screen — two names for Recovery drift
+    /// apart in translation. The route lives in
+    /// `intercept_settings_action`, keyed on `id`.
+    fn destination_row(&self, id: &str, label_key: &str) -> SettingsItem {
+        let label = self.t(label_key);
+        SettingsItem {
+            id: id.into(),
+            label: label.clone(),
+            kind: SettingsItemKind::Link { detail: None },
+            a11y: Some(A11y {
+                label: Some(label),
+                hint: None,
+                role: None,
+            }),
+            info_key: None,
+        }
+    }
+
     fn profile_group(&self) -> Component {
         Component::SettingsGroup {
             id: "profile".into(),
@@ -188,6 +210,8 @@ impl SettingsEngine {
                     }),
                     info_key: None,
                 },
+                self.destination_row("privacy", "nav.privacy"),
+                self.destination_row("activity_log", "nav.activity"),
             ],
         }
     }
@@ -409,6 +433,7 @@ impl SettingsEngine {
                     }),
                     info_key: None,
                 },
+                self.destination_row("recovery", "nav.recovery"),
             ],
         }
     }
@@ -573,6 +598,7 @@ impl SettingsEngine {
                     }),
                     info_key: None,
                 },
+                self.destination_row("support", "nav.support"),
                 SettingsItem {
                     id: "privacy_policy".into(),
                     label: self.t("help.privacy_policy"),

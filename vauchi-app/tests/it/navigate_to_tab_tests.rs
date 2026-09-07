@@ -118,8 +118,14 @@ fn tab_info_action_id_round_trips_through_navigate_to_tab() {
 
 /// Regression: only the typed `NavigateToTab` triggers tab routing. An
 /// `ActionPressed` whose `action_id` happens to equal a canonical screen_id
-/// (`"groups"`) must dispatch to the current screen's engine, never navigate —
+/// (`"backup"`) must dispatch to the current screen's engine, never navigate —
 /// guarding the dispatch-lane separation the interception relies on.
+///
+/// The sentinel used to be `"groups"`, which stopped being one when Groups
+/// became a real secondary action on this screen: an id a screen genuinely
+/// handles proves nothing about the tab lane. `"backup"` is a canonical
+/// screen_id that the Contacts screen offers no affordance for — pick
+/// another such id if that ever changes, rather than relaxing the assert.
 // @internal
 #[test]
 fn action_pressed_with_screen_like_id_is_not_tab_navigation() {
@@ -128,11 +134,11 @@ fn action_pressed_with_screen_like_id_is_not_tab_navigation() {
     let before = engine.current_screen().screen_id;
 
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "groups".to_string(),
+        action_id: "backup".to_string(),
     });
     if let ActionResult::NavigateTo(screen) = &result {
         assert_ne!(
-            screen.screen_id, "groups",
+            screen.screen_id, "backup",
             "ActionPressed must not be routed as tab navigation"
         );
     }

@@ -9,7 +9,7 @@
 //! gave a menu called "More" whose last entry was "More" — verified on a
 //! Pixel 3a and an iPhone SE, 2026-08-20.
 
-use vauchi_app::ui::AppEngine;
+use vauchi_app::ui::{AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 
 fn engine_with_identity() -> AppEngine {
@@ -44,26 +44,58 @@ fn navigation_destinations_do_not_include_the_overlay_itself() {
     );
 }
 
-/// Screens the More menu is the only in-app route to.
+/// Screens the More menu was the only in-app route to, each paired with
+/// the route that replaced it.
 ///
-/// Deliberately short. Most of what the More menu lists is reachable
+/// Deliberately short. Most of what the More menu listed is reachable
 /// without it and must not be promoted twice: `archived_contacts` and
 /// `contact_duplicates` hang off the Contacts screen's `view_archived`
 /// and `find_duplicates`, and `device_replacement` off `setup_new_device`.
-/// Only these two have no other route.
-const FORMERLY_MORE_ONLY: &[&str] = &["tags", "places"];
+/// Only these two had no other route.
+///
+/// The overlay *was* that route until the nav was cut to the five primary
+/// destinations; a Contacts-screen action is that route now — both are
+/// vocabularies the contact book is organized by, so that is where they
+/// belong. What this guard has always protected is that these two are
+/// reachable **at all** — a menu change orphaned them once — so it names
+/// the route it checks rather than assuming the overlay is the only route
+/// that can exist. `nav_primary_destinations_tests` runs the same check
+/// across every demoted screen, deriving the set from the code; this pair
+/// keeps its own guard because it is the pair with the incident behind it.
+const FORMERLY_MORE_ONLY: &[(&str, &str)] = &[("tags", "tags"), ("places", "places")];
+
+/// Where the app lands after the user activates the Contacts-screen
+/// action `action_id`.
+#[track_caller]
+fn contacts_action_lands_on(action_id: &str) -> AppScreen {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Contacts);
+    let offered = engine
+        .current_screen()
+        .contextual_actions
+        .iter()
+        .any(|action| action.id == action_id && action.enabled);
+    assert!(
+        offered,
+        "the contacts screen offers no enabled `{action_id}` action"
+    );
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: action_id.to_string(),
+    });
+    engine.current_app_screen().clone()
+}
 
 // @internal
 #[test]
-fn destinations_that_only_more_reached_are_offered_directly() {
-    let engine = engine_with_identity();
-    let ids = destination_ids(&engine);
-
-    for screen in FORMERLY_MORE_ONLY {
-        assert!(
-            ids.iter().any(|id| id == screen),
-            "retiring the More menu leaves {screen:?} with no in-app route; \
-             it must be offered in the navigation overlay. destinations: {ids:?}"
+fn destinations_that_only_more_reached_stay_reachable() {
+    for (screen_id, action_id) in FORMERLY_MORE_ONLY {
+        let target = AppScreen::from_screen_id(screen_id)
+            .unwrap_or_else(|| panic!("`{screen_id}` does not name a screen"));
+        assert_eq!(
+            contacts_action_lands_on(action_id),
+            target,
+            "retiring the More menu left {screen_id:?} with no in-app route; \
+             the `{action_id}` action on Contacts must reach it"
         );
     }
 }

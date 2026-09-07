@@ -93,6 +93,12 @@ variables:
   # Bumped 2026-09-05 for the lint:typos linux tag (vauchi/scripts!552);
   # before that, retired_boundary_vocabulary (vauchi/scripts!502).
   VAUCHI_SCRIPTS_REF: "abf10bebb2cbff5266c8ad5652eea3e50848286c"
+  # cargo audit runs with --deny warnings; every entry here is an
+  # advisory with no fix available to us, not one we chose to skip.
+  #   RUSTSEC-2026-0192  ttf-parser unmaintained, reached through
+  #                      ab_glyph -> owned_ttf_parser. Clears when
+  #                      ab_glyph moves off it or we drop the dep.
+  AUDIT_IGNORES: "--ignore RUSTSEC-2026-0192"
 
 # Ceiling for jobs that compile the full dependency tree. On a fresh or
 # reinstalled shell runner ALL warm state is gone at once — per-slot

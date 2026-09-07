@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_app::ui::{
-    A11y, ActionListItem, Component, DropdownOption, FormDialogEngine, FormDialogType, InputType,
-    Item, PreparedSurface, ScreenModel, Section, TextStyle, UserAction, WorkflowEngine,
+    A11y, ActionListItem, Component, DropdownOption, FormDialogEngine, FormDialogType, InfoItem,
+    InputType, Item, PreparedSurface, ScreenModel, Section, TextStyle, UserAction, WorkflowEngine,
 };
 use vauchi_core::{
     Command, Event, InputValue, PresentationInputKind, PresentationNode, PresentationTextStyle,
@@ -591,4 +591,91 @@ fn a_rejected_input_announces_the_reason_in_its_accessibility_copy() {
         "the rejection reason must outrank the usage hint while the value is rejected"
     );
     assert_eq!(accessibility.label, "Display name");
+}
+
+fn info_panel_screen(title: &str, a11y: Option<A11y>) -> ScreenModel {
+    ScreenModel::new(
+        "device.decommission",
+        "Retire this device",
+        vec![Component::InfoPanel {
+            id: "decommission_info".into(),
+            icon: None,
+            title: title.into(),
+            items: vec![InfoItem {
+                icon: None,
+                title: "Remove the device".into(),
+                detail: "Its keys stop working everywhere.".into(),
+            }],
+            a11y,
+        }],
+        vec![],
+    )
+}
+
+fn projected_group(screen: &ScreenModel) -> (Option<String>, String) {
+    let prepared =
+        PreparedSurface::from_screen(SurfaceId::new("device.decommission").unwrap(), 1, screen)
+            .expect("supported generic projection");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("surface projection must be atomic");
+    };
+    let PresentationNode::Group {
+        label,
+        accessibility,
+        ..
+    } = &surface.nodes[0]
+    else {
+        panic!("expected a Group node, got {:?}", surface.nodes[0]);
+    };
+    (label.clone(), accessibility.label.clone())
+}
+
+/// A11y copy is written to be spoken, not read: it repeats context a sighted
+/// reader already has from the screen title. Promoting it to the visible
+/// heading printed "Welcome to Vauchi" twice on the onboarding screen —
+/// observed on a Pixel 3a, a Galaxy S7 and the iOS simulator.
+// @scenario: generic_presentation_protocol.feature :: A panel without a title shows no heading
+#[test]
+fn a_spoken_panel_label_is_not_promoted_to_visible_copy() {
+    let (label, spoken) = projected_group(&info_panel_screen(
+        "",
+        Some(A11y {
+            label: Some("Retire this device".into()),
+            hint: None,
+            role: None,
+        }),
+    ));
+
+    assert_eq!(
+        label, None,
+        "an untitled panel must render no heading, not a second copy of the spoken label"
+    );
+    assert_eq!(
+        spoken, "Retire this device",
+        "the supplied label must still reach assistive tech"
+    );
+}
+
+/// The component id is a wire identifier. Falling back to it put
+/// `decommission_info` where a heading goes, in every language.
+// @scenario: generic_presentation_protocol.feature :: A panel without a title shows no heading
+#[test]
+fn a_panel_without_copy_never_shows_its_component_id() {
+    let (label, spoken) = projected_group(&info_panel_screen("", None));
+
+    assert_eq!(label, None, "no title means no heading");
+    assert!(
+        !spoken.contains("decommission_info"),
+        "the wire id must never be spoken either, got {spoken:?}"
+    );
+}
+
+/// The narrowing above must not cost a panel that does supply a title.
+// @internal
+#[test]
+fn a_titled_panel_still_renders_its_heading() {
+    let (label, spoken) = projected_group(&info_panel_screen("Before you continue", None));
+
+    assert_eq!(label.as_deref(), Some("Before you continue"));
+    assert_eq!(spoken, "Before you continue");
 }

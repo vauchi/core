@@ -618,3 +618,72 @@ fn backup_password_value_is_reflected_for_keyboard_frontends() {
         "password value must be reflected"
     );
 }
+
+// @feature: silent_failure_modes
+// @scenario: backup_recovery :: a second submit during processing cannot re-enter the flow
+/// Mashing the submit button during a long restore must not advance,
+/// restart, or consume anything.
+///
+/// This is the second half of the test strategy in problem record
+/// 2026-06-11-restore-runs-without-progress-feedback. The device symptom
+/// was a ~90 s restore behind an unchanged, still-interactive screen: the
+/// user assumed the tap missed and pressed again, and because the engine
+/// takes the staged backup bytes on first submit, the second press
+/// silently did nothing. Rejection has to come from the state machine —
+/// a debounce would still leave the flow re-enterable.
+// @internal
+#[test]
+fn backup_processing_rejects_a_second_submit() {
+    let mut engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Restore),
+        false,
+        vauchi_app::i18n::Locale::English,
+    );
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "my-secret".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeef".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "backup_processing",
+        "restore submit must land on the processing screen"
+    );
+
+    for action_id in ["continue", "restore", "back"] {
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: action_id.into(),
+        });
+        match result {
+            ActionResult::UpdateScreen(screen) => assert_eq!(
+                screen.screen_id, "backup_processing",
+                "'{action_id}' during processing must not leave the screen"
+            ),
+            other => panic!("'{action_id}' during processing must be a no-op, got {other:?}"),
+        }
+    }
+
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "backup_processing",
+        "the engine must still be processing after repeated submits"
+    );
+    assert!(
+        engine.current_screen().contextual_actions.is_empty(),
+        "processing must expose no affordances to press in the first place"
+    );
+
+    engine.processing_complete();
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "backup_complete",
+        "completion must remain the only exit"
+    );
+}

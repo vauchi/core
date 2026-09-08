@@ -580,6 +580,7 @@ impl AppEngine {
     /// Frontends should call this after receiving an event callback.
     pub fn drain_pending_notifications(&mut self) -> Vec<PendingNotification> {
         let new_entries = self.drain_events_to_log();
+        let new_entries = self.without_ignored_card_updates(new_entries);
         if new_entries.is_empty() {
             return Vec::new();
         }
@@ -895,6 +896,7 @@ impl AppEngine {
                 Some((row.event_key, entry))
             })
             .collect();
+        let entries = self.without_ignored_card_updates(entries);
 
         if entries.is_empty() {
             return Vec::new();
@@ -969,6 +971,29 @@ impl AppEngine {
     /// Returns newly inserted `(event_key, ActivityLogEntry)` pairs.
     /// Called before operations that read from the activity log (notifications)
     /// or when data mutations may have occurred (user actions).
+    /// Drops card-update entries from ignored contacts before notification
+    /// evaluation (ADR-072): the update is applied and logged, but never
+    /// surfaces as an OS notification. Safety alerts are left untouched.
+    fn without_ignored_card_updates(
+        &self,
+        entries: Vec<(String, ActivityLogEntry)>,
+    ) -> Vec<(String, ActivityLogEntry)> {
+        entries
+            .into_iter()
+            .filter(|(_, entry)| {
+                let ActivityLogEntry::CardUpdateReceived { contact_id, .. } = entry else {
+                    return true;
+                };
+                !self
+                    .vauchi
+                    .get_contact(contact_id)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|c| c.is_ignored())
+            })
+            .collect()
+    }
+
     fn drain_events_to_log(&mut self) -> Vec<(String, ActivityLogEntry)> {
         let mut events = Vec::new();
         while let Ok(event) = self.event_rx.try_recv() {

@@ -6,10 +6,14 @@
 //! ignored contact is still applied and logged, but never surfaces as
 //! an OS notification.
 
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+
 use vauchi_app::notification_types::NotificationCategory;
 use vauchi_app::ui::AppEngine;
 use vauchi_core::Identity;
 use vauchi_core::api::{Vauchi, VauchiEvent};
+use vauchi_core::clock::{Clock, FakeClock};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
@@ -17,6 +21,11 @@ use vauchi_core::crypto::SymmetricKey;
 fn vauchi_with_contact(name: &str) -> (Vauchi, String) {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Owner").unwrap();
+    let id = add_exchanged_contact(&vauchi, name);
+    (vauchi, id)
+}
+
+fn add_exchanged_contact(vauchi: &Vauchi, name: &str) -> String {
     let identity = Identity::create(name, 0);
     let contact = Contact::from_exchange(
         *identity.signing_public_key(),
@@ -26,7 +35,7 @@ fn vauchi_with_contact(name: &str) -> (Vauchi, String) {
     );
     let id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
-    (vauchi, id)
+    id
 }
 
 // @scenario: release_privacy_multidevice_certification :: Ignoring a contact removes attention but keeps continuity
@@ -72,7 +81,14 @@ fn card_update_from_an_active_contact_still_notifies() {
 // @scenario: release_privacy_multidevice_certification :: Ignoring a contact removes attention but keeps continuity
 #[test]
 fn un_ignoring_restores_notifications_without_replaying_missed_ones() {
-    let (vauchi, bob) = vauchi_with_contact("Bob");
+    // Activity-log keys carry the second of receipt; a fake clock lets the
+    // second update land on a distinct key without waiting (CC-06).
+    let clock = Arc::new(FakeClock::new(
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+    ));
+    let mut vauchi = Vauchi::in_memory_with_clock(clock.clone() as Arc<dyn Clock>).unwrap();
+    vauchi.create_identity("Owner").unwrap();
+    let bob = add_exchanged_contact(&vauchi, "Bob");
     vauchi.ignore_contact(&bob).unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine
@@ -89,6 +105,7 @@ fn un_ignoring_restores_notifications_without_replaying_missed_ones() {
         "unignore must not replay the update that arrived while ignored"
     );
 
+    clock.advance(Duration::from_secs(1));
     engine
         .vauchi()
         .events()

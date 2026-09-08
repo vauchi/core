@@ -6,14 +6,10 @@
 //! ignored contact is still applied and logged, but never surfaces as
 //! an OS notification.
 
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
-
 use vauchi_app::notification_types::NotificationCategory;
 use vauchi_app::ui::AppEngine;
 use vauchi_core::Identity;
 use vauchi_core::api::{Vauchi, VauchiEvent};
-use vauchi_core::clock::{Clock, FakeClock};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
@@ -78,9 +74,16 @@ fn card_update_from_an_active_contact_still_notifies() {
     assert_eq!(notifications[0].contact_id, bob);
 }
 
+// FakeClock is `#[cfg(any(test, feature = "testing"))]` in vauchi-core, so
+// this case only builds with `--features testing` (as `just test` does).
 // @scenario: release_privacy_multidevice_certification :: Ignoring a contact removes attention but keeps continuity
+#[cfg(feature = "testing")]
 #[test]
 fn un_ignoring_restores_notifications_without_replaying_missed_ones() {
+    use std::sync::Arc;
+    use std::time::{Duration, SystemTime};
+    use vauchi_core::clock::{Clock, FakeClock};
+
     // Activity-log keys carry the second of receipt; a fake clock lets the
     // second update land on a distinct key without waiting (CC-06).
     let clock = Arc::new(FakeClock::new(

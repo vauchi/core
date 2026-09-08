@@ -223,6 +223,7 @@
   "backup.title": "Backup & Restore",
   "backup.warning_replace": "Warning: Importing a backup will replace your current identity!",
   "backup.wizard.backup_item": "Backup",
+  "backup.wizard.choose_file": "Choose backup file",
   "backup.wizard.choose_password": "Choose a backup password",
   "backup.wizard.complete_hint": "Your backup operation completed successfully.",
   "backup.wizard.confirm_label": "Confirm your backup password",

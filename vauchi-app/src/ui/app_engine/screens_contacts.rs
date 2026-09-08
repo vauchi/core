@@ -9,12 +9,14 @@
 use super::AppEngine;
 use super::AppScreen;
 use crate::ui::archived_contacts::ArchivedContactsEngine;
-use crate::ui::component::{A11y, Field, Item, UiFieldVisibility, initials};
+use crate::ui::component::{
+    A11y, Field, Item, ListItemAction, ListItemActionKind, UiFieldVisibility, initials,
+};
 use crate::ui::contact_detail::{ContactDetailEngine, ContactNotFoundEngine, DeliverySummary};
 use crate::ui::contact_detail_rules::{ContactPlace, ContactTag};
 use crate::ui::contact_edit::{ContactEditEngine, EditableContact, EditableField};
 use crate::ui::contact_limit::ContactLimitEngine;
-use crate::ui::contact_list::ContactListEngine;
+use crate::ui::contact_list::{ContactListEngine, IndexedItem};
 use crate::ui::contact_merge::{ContactMergeEngine, MergePreview};
 use crate::ui::contact_visibility::ContactVisibilityEngine;
 use crate::ui::duplicate_detection::{DuplicateDetectionEngine, DuplicatePair};
@@ -408,4 +410,99 @@ impl AppEngine {
             other => unreachable!("non-contacts screen {other:?} routed to contacts factory"),
         }
     }
+}
+
+impl AppEngine {
+    pub(super) fn load_contact_items(
+        vauchi: &Vauchi,
+        locale: crate::i18n::Locale,
+    ) -> Vec<IndexedItem> {
+        match vauchi.list_contacts() {
+            Ok(mut contacts) => {
+                // Ignored contacts sort below active ones (ADR-072); the
+                // stable sort keeps storage's name order within each group.
+                contacts.sort_by_key(|c| c.is_ignored());
+                contacts
+                    .iter()
+                    .map(|c| {
+                        let fields: Vec<String> = c
+                            .card()
+                            .fields()
+                            .iter()
+                            .map(|f| f.value().to_string())
+                            .collect();
+                        let subtitle = fields.first().cloned();
+                        let status = if vauchi.is_contact_revoked(c.id()) {
+                            Some("Deleted their identity".into())
+                        } else if c.has_recovered() && !c.is_fingerprint_verified() {
+                            Some("Recovered — re-verify recommended".into())
+                        } else {
+                            None
+                        };
+                        let item = Item {
+                            id: c.id().to_string(),
+                            name: c.display_name().to_string(),
+                            subtitle,
+                            initials: initials(c.display_name()),
+                            status,
+                            actions: contact_row_actions(c.is_imported(), c.is_hidden(), locale),
+                            a11y: Some(A11y {
+                                label: Some(format!("Contact: {}", c.display_name())),
+                                hint: Some(crate::i18n::get_string(
+                                    locale,
+                                    "contact_detail.double_tap_to_view_hint",
+                                )),
+                                role: None,
+                            }),
+                        };
+                        IndexedItem::new(item, fields)
+                    })
+                    .collect()
+            }
+            Err(_) => vec![],
+        }
+    }
+}
+
+/// Per-row swipe actions offered on the contact list. Imported contacts
+/// get a reversible soft-delete; exchanged ones get archive. Both can
+/// be hidden/unhidden.
+fn contact_row_actions(
+    is_imported: bool,
+    is_hidden: bool,
+    locale: crate::i18n::Locale,
+) -> Vec<ListItemAction> {
+    let t = |key: &str| crate::i18n::get_string(locale, key);
+    let mut actions = Vec::new();
+    if is_hidden {
+        actions.push(ListItemAction {
+            id: "unhide".into(),
+            label: t("contacts.action_unhide"),
+            kind: ListItemActionKind::Unhide,
+            destructive: false,
+        });
+    } else {
+        actions.push(ListItemAction {
+            id: "hide".into(),
+            label: t("contacts.action_hide"),
+            kind: ListItemActionKind::Hide,
+            destructive: false,
+        });
+    }
+    if is_imported {
+        actions.push(ListItemAction {
+            id: "delete".into(),
+            label: t("action.delete"),
+            kind: ListItemActionKind::Delete,
+            destructive: false,
+        });
+    } else {
+        actions.push(ListItemAction {
+            id: "archive".into(),
+            label: t("contacts.action_archive"),
+            kind: ListItemActionKind::Archive,
+            destructive: false,
+        });
+    }
+    actions
 }

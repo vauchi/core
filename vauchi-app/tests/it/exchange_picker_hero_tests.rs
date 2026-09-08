@@ -4,9 +4,10 @@
 
 //! M2 S3 — mode picker: one hero action + "Other ways to connect"
 //! disclosure (design D2.3, user-approved 2026-07-04: hero = last-used,
-//! first-run hero = Glance; all modes stay reachable; Bump/Shake/Magic
-//! carry a visible "Unauthenticated" annotation until their BLE auth
-//! tiers land). `2026-07-03-one-tap-exchange` goal 3.
+//! first-run hero = Glance). `2026-07-03-one-tap-exchange` goal 3.
+//! RG-9 (owner decision 2026-09-08) removed Bump/Shake/Magic from the
+//! offer for the alpha — unreliable per the 2026-07-20 exchange-modes
+//! plan — superseding D2.3's "annotate, don't hide".
 
 use vauchi_app::ui::{AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
@@ -129,47 +130,49 @@ fn disclosure_lists_all_other_modes_in_order() {
             "mode:tap_hover_shake".to_string(),
             "mode:link".to_string(),
             "mode:cable".to_string(),
-            "mode:bump".to_string(),
-            "mode:shake".to_string(),
-            "mode:magic".to_string(),
             "mode:tap_tap".to_string(),
         ],
-        "approved order, hero (Hover) excluded, all modes reachable"
+        "approved order, hero (Hover) excluded, every offered mode reachable"
     );
 }
 
-// Bump/Shake/Magic run unauthenticated BLE today — their rows say so.
-// @scenario: exchange :: unauthenticated BLE modes are annotated
+// Bump/Shake/Magic are not offered for the alpha — even on a device that
+// could run all three, and even when fully expanded.
+// @scenario: exchange :: picker offers only the alpha-reliable modes
 // @internal
 #[test]
-fn unauthenticated_ble_modes_are_annotated() {
+fn unoffered_ble_modes_are_absent_from_the_expanded_picker() {
     let mut engine = engine_on_picker(None, full_caps());
     expand(&mut engine);
-    let screen = engine.current_screen();
-    let details: Vec<(String, String)> = screen
-        .components
-        .iter()
-        .filter_map(|c| match c {
-            Component::ActionList { id, items } if id == "other_modes" => Some(
-                items
-                    .iter()
-                    .map(|i| (i.id.clone(), i.detail.clone().unwrap_or_default()))
-                    .collect::<Vec<_>>(),
-            ),
-            _ => None,
-        })
-        .flatten()
-        .collect();
+    let mut ids = list_ids(&engine, "hero").expect("hero list present");
+    ids.extend(list_ids(&engine, "other_modes").expect("expanded list present"));
     for mode in ["mode:bump", "mode:shake", "mode:magic"] {
-        let (_, detail) = details
-            .iter()
-            .find(|(id, _)| id == mode)
-            .unwrap_or_else(|| panic!("{mode} present in the expanded list"));
         assert!(
-            detail.starts_with("Unauthenticated"),
-            "{mode} must carry the Unauthenticated annotation, got `{detail}`"
+            !ids.contains(&mode.to_string()),
+            "{mode} must not be offered, picker lists {ids:?}"
         );
     }
+    assert_eq!(ids.len(), 6, "hero + five others, got {ids:?}");
+}
+
+// A pre-alpha install may still store Magic as its last-used mode; the
+// hero must fall through to Glance instead of resurrecting it.
+// @scenario: exchange :: unoffered last-used mode falls back to Glance
+// @internal
+#[test]
+fn stored_unoffered_last_used_falls_back_to_glance() {
+    let engine = engine_on_picker(
+        Some(ExchangeDefaults {
+            group_ids: vec![],
+            mode: ExchangeMode::Magic,
+        }),
+        full_caps(),
+    );
+    assert_eq!(
+        list_ids(&engine, "hero").expect("hero list present"),
+        vec!["mode:glance".to_string()],
+        "stored Magic must not be the hero; Glance is"
+    );
 }
 
 // A stored mode that can't run on this device falls back to Glance.

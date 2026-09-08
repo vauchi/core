@@ -54,7 +54,7 @@ struct PickerCopy {
     disclosure_label: String,
     hero_label: String,
     hero_detail: String,
-    hover_detail: String,
+    link_detail: String,
 }
 
 fn walk_picker(locale: Locale) -> PickerCopy {
@@ -80,7 +80,9 @@ fn walk_picker(locale: Locale) -> PickerCopy {
         item_id: "show_other_modes".into(),
     });
     let expanded = engine.current_screen();
-    let hover = find_item(&expanded, "mode:hover").expect("Hover listed after disclosure");
+    // Link is runnable here (internet only), so its detail is the localized
+    // instruction rather than a core-computed availability reason.
+    let link = find_item(&expanded, "mode:link").expect("Link listed after disclosure");
 
     PickerCopy {
         screen_id,
@@ -89,7 +91,7 @@ fn walk_picker(locale: Locale) -> PickerCopy {
         disclosure_label,
         hero_label,
         hero_detail,
-        hover_detail: hover.detail.clone().unwrap_or_default(),
+        link_detail: link.detail.clone().unwrap_or_default(),
     }
 }
 
@@ -109,7 +111,7 @@ fn mode_picker_renders_the_active_locale() {
     assert_translated("picker subtitle", &de.subtitle, &en.subtitle);
     assert_translated("disclosure row", &de.disclosure_label, &en.disclosure_label);
     assert_translated("Glance hero detail", &de.hero_detail, &en.hero_detail);
-    assert_translated("Hover detail", &de.hover_detail, &en.hover_detail);
+    assert_translated("Link detail", &de.link_detail, &en.link_detail);
 
     // Exemption: "Glance" is the product name for the mode and is
     // deliberately identical in every locale, so it cannot be asserted

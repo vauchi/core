@@ -278,7 +278,7 @@ fn fallback_relay_after_ble_failure_lands_on_link_screen() {
         ActionResult::NavigateTo(screen) => screen.screen_id.clone(),
         other => panic!("fallback_relay must navigate to the Link screen, got {other:?}"),
     };
-    assert_eq!(landed, "exchange_link_waiting");
+    assert_eq!(landed, "exchange_share_url");
     assert_eq!(*engine.current_app_screen(), AppScreen::LinkExchange);
 }
 

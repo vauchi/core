@@ -95,6 +95,8 @@ pub struct ContactDetailEngine {
     is_hidden: bool,
     /// Whether this is an imported (non-crypto) contact vs. exchanged.
     is_imported: bool,
+    /// Whether this contact is ignored (ADR-072: silent, reversible).
+    is_ignored: bool,
     /// Card update delivery status for this contact (J1 MVP).
     delivery_summary: Option<DeliverySummary>,
     /// Whether the user has pressed "Delete" and the InlineConfirm is showing.
@@ -137,6 +139,16 @@ impl ContactDetailEngine {
     /// Returns the current hidden state.
     pub fn is_hidden(&self) -> bool {
         self.is_hidden
+    }
+
+    /// Toggles ignored state in-memory. Callers must persist via Vauchi.
+    pub fn toggle_ignored(&mut self) {
+        self.is_ignored = !self.is_ignored;
+    }
+
+    /// Returns the current ignored state.
+    pub fn is_ignored(&self) -> bool {
+        self.is_ignored
     }
 
     /// Returns the current proposal_trusted flag.
@@ -588,6 +600,24 @@ impl ContactDetailEngine {
             enabled: true,
             a11y: Some(A11y::labeled(toggle_hidden_label)),
         });
+        let (ignore_action_id, ignore_label) = if self.is_ignored {
+            (
+                "unignore_contact",
+                self.t("contact_detail.unignore_contact_button"),
+            )
+        } else {
+            (
+                "ignore_contact",
+                self.t("contact_detail.ignore_contact_button"),
+            )
+        };
+        actions.push(ScreenAction {
+            id: ignore_action_id.into(),
+            label: ignore_label.clone(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: Some(A11y::labeled(ignore_label)),
+        });
         let footer_label = if self.is_imported {
             self.t("contact_detail.delete_contact_button")
         } else {
@@ -628,6 +658,7 @@ impl WorkflowEngine for ContactDetailEngine {
             U::ToggleProposalTrusted => self.toggle_proposal_trusted(),
             U::ToggleRecoveryTrusted => self.toggle_recovery_trusted(),
             U::ToggleHidden => self.toggle_hidden(),
+            U::ToggleIgnored => self.toggle_ignored(),
             U::TagQuery { query, suggestions } => self.set_tag_query(query, suggestions),
             U::TagAdded(tag) => self.add_tag_row(tag),
             U::TagRemoved(tag_id) => self.remove_tag_row(&tag_id),

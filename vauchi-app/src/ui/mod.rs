@@ -209,7 +209,9 @@ pub fn affected_screens(event: &vauchi_core::api::VauchiEvent) -> Vec<&'static s
         | VauchiEvent::ContactUnblocked { .. }
         | VauchiEvent::ContactSoftDeleted { .. }
         | VauchiEvent::ContactArchived { .. }
-        | VauchiEvent::ContactUnarchived { .. } => {
+        | VauchiEvent::ContactUnarchived { .. }
+        | VauchiEvent::ContactIgnored { .. }
+        | VauchiEvent::ContactUnignored { .. } => {
             vec!["contacts", "contact_detail"]
         }
         VauchiEvent::OwnCardUpdated { .. } => vec!["my_info"],

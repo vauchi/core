@@ -802,42 +802,47 @@ impl AppEngine {
         locale: crate::i18n::Locale,
     ) -> Vec<IndexedItem> {
         match vauchi.list_contacts() {
-            Ok(contacts) => contacts
-                .iter()
-                .map(|c| {
-                    let fields: Vec<String> = c
-                        .card()
-                        .fields()
-                        .iter()
-                        .map(|f| f.value().to_string())
-                        .collect();
-                    let subtitle = fields.first().cloned();
-                    let status = if vauchi.is_contact_revoked(c.id()) {
-                        Some("Deleted their identity".into())
-                    } else if c.has_recovered() && !c.is_fingerprint_verified() {
-                        Some("Recovered — re-verify recommended".into())
-                    } else {
-                        None
-                    };
-                    let item = Item {
-                        id: c.id().to_string(),
-                        name: c.display_name().to_string(),
-                        subtitle,
-                        initials: initials(c.display_name()),
-                        status,
-                        actions: contact_row_actions(c.is_imported(), c.is_hidden(), locale),
-                        a11y: Some(A11y {
-                            label: Some(format!("Contact: {}", c.display_name())),
-                            hint: Some(crate::i18n::get_string(
-                                locale,
-                                "contact_detail.double_tap_to_view_hint",
-                            )),
-                            role: None,
-                        }),
-                    };
-                    IndexedItem::new(item, fields)
-                })
-                .collect(),
+            Ok(mut contacts) => {
+                // Ignored contacts sort below active ones (ADR-072); the
+                // stable sort keeps storage's name order within each group.
+                contacts.sort_by_key(|c| c.is_ignored());
+                contacts
+                    .iter()
+                    .map(|c| {
+                        let fields: Vec<String> = c
+                            .card()
+                            .fields()
+                            .iter()
+                            .map(|f| f.value().to_string())
+                            .collect();
+                        let subtitle = fields.first().cloned();
+                        let status = if vauchi.is_contact_revoked(c.id()) {
+                            Some("Deleted their identity".into())
+                        } else if c.has_recovered() && !c.is_fingerprint_verified() {
+                            Some("Recovered — re-verify recommended".into())
+                        } else {
+                            None
+                        };
+                        let item = Item {
+                            id: c.id().to_string(),
+                            name: c.display_name().to_string(),
+                            subtitle,
+                            initials: initials(c.display_name()),
+                            status,
+                            actions: contact_row_actions(c.is_imported(), c.is_hidden(), locale),
+                            a11y: Some(A11y {
+                                label: Some(format!("Contact: {}", c.display_name())),
+                                hint: Some(crate::i18n::get_string(
+                                    locale,
+                                    "contact_detail.double_tap_to_view_hint",
+                                )),
+                                role: None,
+                            }),
+                        };
+                        IndexedItem::new(item, fields)
+                    })
+                    .collect()
+            }
             Err(_) => vec![],
         }
     }

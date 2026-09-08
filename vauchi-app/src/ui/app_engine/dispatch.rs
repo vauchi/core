@@ -276,6 +276,9 @@ impl AppEngine {
             if let Some(result) = self.intercept_hide_toggle(&contact_id, action) {
                 return Some(result);
             }
+            if let Some(result) = self.intercept_ignore_toggle(&contact_id, action) {
+                return Some(result);
+            }
             if let Some(result) = self.intercept_contact_delete_archive(&contact_id, action) {
                 return Some(result);
             }

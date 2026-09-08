@@ -29,6 +29,7 @@ impl ContactDetailEngine {
             proposal_trusted: false,
             is_hidden: false,
             is_imported: false,
+            is_ignored: false,
             delivery_summary: None,
             pending_delete: false,
             avatar_data: None,
@@ -67,6 +68,7 @@ impl ContactDetailEngine {
             proposal_trusted: false,
             is_hidden: false,
             is_imported: false,
+            is_ignored: false,
             delivery_summary: None,
             pending_delete: false,
             avatar_data: None,
@@ -187,6 +189,12 @@ impl ContactDetailEngine {
     /// Attach imported flag (true for imported contacts, false for exchanged).
     pub fn with_imported(mut self, is_imported: bool) -> Self {
         self.is_imported = is_imported;
+        self
+    }
+
+    /// Attach ignored state (ADR-072).
+    pub fn with_ignored(mut self, is_ignored: bool) -> Self {
+        self.is_ignored = is_ignored;
         self
     }
 

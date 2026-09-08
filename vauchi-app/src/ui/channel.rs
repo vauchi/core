@@ -212,6 +212,7 @@ pub enum ContactDetailUpdate {
     ToggleProposalTrusted,
     ToggleRecoveryTrusted,
     ToggleHidden,
+    ToggleIgnored,
     TagQuery {
         query: String,
         suggestions: Vec<String>,
@@ -334,6 +335,7 @@ impl EngineUpdate {
                     "ContactDetail::ToggleRecoveryTrusted"
                 }
                 ContactDetailUpdate::ToggleHidden => "ContactDetail::ToggleHidden",
+                ContactDetailUpdate::ToggleIgnored => "ContactDetail::ToggleIgnored",
                 ContactDetailUpdate::TagQuery { .. } => "ContactDetail::TagQuery",
                 ContactDetailUpdate::TagAdded(_) => "ContactDetail::TagAdded",
                 ContactDetailUpdate::TagRemoved(_) => "ContactDetail::TagRemoved",

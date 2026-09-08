@@ -124,4 +124,31 @@ impl AppEngine {
             ))
             .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
     }
+
+    /// Intercept `ignore_contact` / `unignore_contact` on ContactDetail
+    /// (ADR-072) and persist before the engine flips its in-memory flag.
+    pub(in crate::ui::app_engine) fn intercept_ignore_toggle(
+        &mut self,
+        contact_id: &str,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        let UserAction::ActionPressed { action_id } = action else {
+            return None;
+        };
+        let persisted = match action_id.as_str() {
+            "ignore_contact" => self.vauchi.ignore_contact(contact_id),
+            "unignore_contact" => self.vauchi.unignore_contact(contact_id),
+            _ => return None,
+        };
+        if let Err(error) = persisted {
+            tracing::warn!(%error, action_id, "ignore toggle not persisted");
+            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+        }
+
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                crate::ui::ContactDetailUpdate::ToggleIgnored,
+            ))
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
 }

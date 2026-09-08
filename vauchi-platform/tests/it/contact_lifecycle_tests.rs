@@ -230,6 +230,18 @@ fn unarchive(engine: &PlatformAppEngine, id: String) -> Result<(), MobileError> 
         .map(|_| ())
 }
 
+fn ignore(engine: &PlatformAppEngine, id: String) -> Result<(), MobileError> {
+    engine
+        .dispatch_domain_command(DomainCommand::IgnoreContact { id })
+        .map(|_| ())
+}
+
+fn unignore(engine: &PlatformAppEngine, id: String) -> Result<(), MobileError> {
+    engine
+        .dispatch_domain_command(DomainCommand::UnignoreContact { id })
+        .map(|_| ())
+}
+
 // === Soft-Delete (imported contacts only) ===
 
 // @scenario: contacts_management :: Soft-delete imported contact hides from list
@@ -427,4 +439,41 @@ fn test_contact_detail_footer_action_id_unknown_returns_invalid_input() {
             other
         ),
     }
+}
+
+// === Ignore (ADR-072) ===
+
+// @scenario: release_privacy_multidevice_certification :: Ignoring a contact removes attention but keeps continuity
+#[test]
+fn test_ignore_contact_keeps_it_in_main_list() {
+    let (engine, _dir) = setup();
+    let id = add_exchanged_contact(&engine, "Judy");
+
+    ignore(&engine, id.clone()).unwrap();
+
+    let listed = list_contacts(&engine);
+    assert_eq!(listed.len(), 1, "ignore must not remove from list_contacts");
+    assert_eq!(listed[0].id, id);
+}
+
+// @scenario: release_privacy_multidevice_certification :: Ignoring a contact removes attention but keeps continuity
+#[test]
+fn test_unignore_contact_after_ignore_succeeds() {
+    let (engine, _dir) = setup();
+    let id = add_exchanged_contact(&engine, "Karl");
+
+    ignore(&engine, id.clone()).unwrap();
+    unignore(&engine, id).unwrap();
+
+    assert_eq!(list_contacts(&engine).len(), 1);
+}
+
+// @scenario: release_privacy_multidevice_certification :: Ignoring a contact removes attention but keeps continuity
+#[test]
+fn test_ignore_unknown_contact_returns_error() {
+    let (engine, _dir) = setup();
+    assert!(
+        ignore(&engine, "nonexistent".into()).is_err(),
+        "ignoring an unknown contact must surface an error"
+    );
 }

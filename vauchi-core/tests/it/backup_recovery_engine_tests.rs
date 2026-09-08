@@ -687,3 +687,127 @@ fn backup_processing_rejects_a_second_submit() {
         "completion must remain the only exit"
     );
 }
+
+// @feature: backup_recovery
+/// Restore must offer a file path, because a real backup cannot be pasted.
+///
+/// A 10k-contact export is 2,278,510 bytes and Core bounds a presentation
+/// input value at 4,096 (`MAX_EVENT_INPUT_VALUE_BYTES`), so the paste field
+/// silently never receives it — the field stays empty and Continue stays
+/// disabled with nothing explaining why (problem record
+/// 2026-09-08-full-backup-restore-cannot-be-pasted). File bytes arrive as
+/// `Event::FilePickedFromUser` and are not subject to that bound.
+// @scenario: backup_recovery :: restore offers a file pick for full backups
+#[test]
+fn restore_password_screen_offers_a_file_pick_action() {
+    let engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Restore),
+        false,
+        vauchi_app::i18n::Locale::English,
+    );
+    let screen = engine.current_screen();
+    assert!(
+        screen
+            .contextual_actions
+            .iter()
+            .any(|a| a.id == "choose_file"),
+        "restore must offer a file pick, got: {:?}",
+        screen
+            .contextual_actions
+            .iter()
+            .map(|a| &a.id)
+            .collect::<Vec<_>>()
+    );
+}
+
+// @feature: backup_recovery
+/// Creating a backup writes a file out; it never reads one in, so the
+/// pick affordance must not appear there.
+// @scenario: backup_recovery :: create mode has no file pick
+#[test]
+fn create_password_screen_has_no_file_pick_action() {
+    let engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Create),
+        false,
+        vauchi_app::i18n::Locale::English,
+    );
+    assert!(
+        !engine
+            .current_screen()
+            .contextual_actions
+            .iter()
+            .any(|a| a.id == "choose_file"),
+        "create mode must not offer a file pick"
+    );
+}
+
+// @feature: backup_recovery
+/// The pick affordance asks the shell for a file, using the purpose the
+/// device-replacement flow already uses rather than a new one.
+// @scenario: backup_recovery :: choosing a file requests an ImportBackup pick
+#[test]
+fn choose_file_requests_an_import_backup_pick() {
+    let mut engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Restore),
+        false,
+        vauchi_app::i18n::Locale::English,
+    );
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "choose_file".into(),
+    });
+    match result {
+        ActionResult::Commands { commands } => match &commands[0] {
+            vauchi_core::Command::FilePickFromUser { purpose, .. } => {
+                assert_eq!(*purpose, vauchi_core::FilePickPurpose::ImportBackup);
+            }
+            other => panic!("expected FilePickFromUser, got {other:?}"),
+        },
+        other => panic!("expected Commands, got {other:?}"),
+    }
+}
+
+// @feature: backup_recovery
+/// Picked bytes populate the restore payload without passing through the
+/// bounded text-input channel, and the flow becomes submittable once the
+/// password is entered.
+// @scenario: backup_recovery :: picked backup bytes populate the restore payload
+#[test]
+fn picked_backup_bytes_populate_the_restore_payload() {
+    let mut engine = BackupRecoveryEngine::new(
+        Some(BackupMode::Restore),
+        false,
+        vauchi_app::i18n::Locale::English,
+    );
+
+    // Far past MAX_EVENT_INPUT_VALUE_BYTES: the point is that this path
+    // has no such ceiling.
+    let payload = "a".repeat(64 * 1024);
+    assert!(engine.apply_update(EngineUpdate::BackupRecovery(
+        BackupRecoveryUpdate::PickedBackupBytes(payload.clone().into_bytes()),
+    )));
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "my-secret".into(),
+    });
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "backup_password");
+    assert!(
+        screen
+            .contextual_actions
+            .iter()
+            .any(|a| a.id == "continue" && a.enabled),
+        "continue must enable once a file and password are present"
+    );
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(next) => assert_eq!(
+            next.screen_id, "backup_processing",
+            "submitting a picked backup must show progress, not sit on an unchanged screen"
+        ),
+        other => panic!("expected NavigateTo(backup_processing), got {other:?}"),
+    }
+}

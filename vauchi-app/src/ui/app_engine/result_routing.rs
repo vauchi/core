@@ -58,9 +58,17 @@ impl AppEngine {
             }
             // StartLinkExchange carries no group preamble — the engine-owned
             // initiator on the LinkExchange screen drives the relay handshake.
-            // The commit still becomes the last-used default (M2 S1).
+            // The commit still becomes the last-used default (M2 S1); on an
+            // RG-9 fallback the picker is gone, so the groups of the failed
+            // attempt are the ones to keep.
             ActionResult::StartLinkExchange => {
-                self.persist_exchange_defaults(ExchangeMode::Link, self.current_exchange_groups());
+                if let Some(groups) = self.picker_selected_groups() {
+                    self.pending_exchange_groups = groups;
+                }
+                self.persist_exchange_defaults(
+                    ExchangeMode::Link,
+                    self.pending_exchange_groups.clone(),
+                );
                 self.enter_exchange_screen(AppScreen::LinkExchange)
             }
             // M5 B3 Slice 3: start the device-link join (responder) machine
@@ -167,12 +175,6 @@ impl AppEngine {
             self.navigate_to_internal(target)
         };
         ActionResult::NavigateTo(screen)
-    }
-
-    /// The active ExchangeEngine's selected groups (empty when the current
-    /// engine is not the exchange flow).
-    fn current_exchange_groups(&self) -> Vec<String> {
-        self.picker_selected_groups().unwrap_or_default()
     }
 
     /// The picker's selected groups; `None` when the active engine is not

@@ -41,6 +41,12 @@ fn contact_events_invalidate_contacts_and_detail() {
         VauchiEvent::ContactUnarchived {
             contact_id: "c1".into(),
         },
+        VauchiEvent::ContactIgnored {
+            contact_id: "c1".into(),
+        },
+        VauchiEvent::ContactUnignored {
+            contact_id: "c1".into(),
+        },
     ];
 
     for event in &events {

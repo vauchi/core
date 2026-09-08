@@ -33,6 +33,7 @@ const HANDLED: &[&str] = &[
     "edit",
     "verify_fingerprint",
     "toggle_hidden",
+    "ignore_contact",
     "delete_contact",
 ];
 

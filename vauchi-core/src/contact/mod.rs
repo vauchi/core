@@ -93,6 +93,10 @@ pub struct Contact {
     archived: bool,
     /// Timestamp of archival (None = not archived).
     archived_at: Option<u64>,
+    /// Whether this contact is ignored (ADR-072: local, silent, reversible).
+    ignored: bool,
+    /// Timestamp of ignoring (None = not ignored).
+    ignored_at: Option<u64>,
 }
 
 impl Contact {
@@ -135,6 +139,8 @@ impl Contact {
             deleted_at: None,
             archived: false,
             archived_at: None,
+            ignored: false,
+            ignored_at: None,
         }
     }
 
@@ -254,6 +260,8 @@ impl Contact {
             deleted_at: None,
             archived: false,
             archived_at: None,
+            ignored: false,
+            ignored_at: None,
         }
     }
 
@@ -290,6 +298,8 @@ impl Contact {
             deleted_at: None,
             archived: false,
             archived_at: None,
+            ignored: false,
+            ignored_at: None,
         }
     }
 
@@ -323,6 +333,8 @@ impl Contact {
             deleted_at: None,
             archived: false,
             archived_at: None,
+            ignored: false,
+            ignored_at: None,
         }
     }
 
@@ -864,6 +876,28 @@ impl Contact {
     pub fn unarchive(&mut self) {
         self.archived = false;
         self.archived_at = None;
+    }
+
+    /// Returns whether this contact is ignored.
+    pub fn is_ignored(&self) -> bool {
+        self.ignored
+    }
+
+    /// Returns the ignore timestamp, if set.
+    pub fn ignored_at(&self) -> Option<u64> {
+        self.ignored_at
+    }
+
+    /// Ignores this contact, recording the given timestamp.
+    pub fn ignore(&mut self, timestamp: u64) {
+        self.ignored = true;
+        self.ignored_at = Some(timestamp);
+    }
+
+    /// Un-ignores this contact, clearing the ignored flag and timestamp.
+    pub fn unignore(&mut self) {
+        self.ignored = false;
+        self.ignored_at = None;
     }
 
     /// Returns the CEK if present.

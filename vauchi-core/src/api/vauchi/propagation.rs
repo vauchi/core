@@ -912,6 +912,32 @@ impl Vauchi {
                         None => Ok(()), // Contact not found, skip
                     }
                 }
+                SyncItem::ContactIgnored {
+                    ref contact_id,
+                    timestamp,
+                    ..
+                } => match self.storage.contacts().load_contact(contact_id)? {
+                    Some(mut contact) => {
+                        contact.ignore(timestamp);
+                        self.storage
+                            .contacts()
+                            .save_contact(&contact)
+                            .map_err(|e| e.into())
+                    }
+                    None => Ok(()), // Contact not found, skip
+                },
+                SyncItem::ContactUnignored { ref contact_id, .. } => {
+                    match self.storage.contacts().load_contact(contact_id)? {
+                        Some(mut contact) => {
+                            contact.unignore();
+                            self.storage
+                                .contacts()
+                                .save_contact(&contact)
+                                .map_err(|e| e.into())
+                        }
+                        None => Ok(()), // Contact not found, skip
+                    }
+                }
             };
 
             if result.is_ok() {
@@ -1026,6 +1052,12 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
             contact_id: contact_id.clone(),
         }),
         SyncItem::ContactUnarchived { contact_id, .. } => Some(VauchiEvent::ContactUnarchived {
+            contact_id: contact_id.clone(),
+        }),
+        SyncItem::ContactIgnored { contact_id, .. } => Some(VauchiEvent::ContactIgnored {
+            contact_id: contact_id.clone(),
+        }),
+        SyncItem::ContactUnignored { contact_id, .. } => Some(VauchiEvent::ContactUnignored {
             contact_id: contact_id.clone(),
         }),
         // No mapped invalidation event (no affected_screens entry today).

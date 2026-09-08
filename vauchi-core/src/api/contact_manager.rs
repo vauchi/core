@@ -536,6 +536,32 @@ impl<'a> ContactManager<'a> {
         Ok(self.storage.contacts().list_archived_contacts()?)
     }
 
+    // === Ignore Operations (ADR-072) ===
+
+    /// Ignores a contact: no notifications, sorted below active contacts,
+    /// still listed, still exchanging updates in both directions.
+    pub fn ignore_contact(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self.get_contact_required(id)?;
+        let now = self.storage.clock().unix_seconds();
+        contact.ignore(now);
+        self.storage.contacts().save_contact(&contact)?;
+        self.events.dispatch(VauchiEvent::ContactIgnored {
+            contact_id: id.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Un-ignores a contact, restoring normal ordering and notifications.
+    pub fn unignore_contact(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self.get_contact_required(id)?;
+        contact.unignore();
+        self.storage.contacts().save_contact(&contact)?;
+        self.events.dispatch(VauchiEvent::ContactUnignored {
+            contact_id: id.to_string(),
+        });
+        Ok(())
+    }
+
     // === Helper Methods ===
 
     /// Computes which fields changed between two cards.

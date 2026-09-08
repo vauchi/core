@@ -84,7 +84,10 @@ fn unignore_contact_clears_flag_and_dispatches_contact_unignored() {
 fn ignore_unknown_contact_is_not_found() {
     let (wb, _) = vauchi_with_contact("Bob");
     let err = wb.ignore_contact("nonexistent").unwrap_err();
-    assert!(matches!(err, VauchiError::NotFound(_)), "got {err:?}");
+    assert!(
+        matches!(err, VauchiError::ContactNotFound(_)),
+        "got {err:?}"
+    );
 }
 
 // @scenario: release_privacy_multidevice_certification :: Ignoring a contact removes attention but keeps continuity

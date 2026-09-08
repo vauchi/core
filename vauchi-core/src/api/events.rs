@@ -254,6 +254,18 @@ pub enum VauchiEvent {
         /// The contact ID.
         contact_id: String,
     },
+
+    /// A contact was ignored (ADR-072).
+    ContactIgnored {
+        /// The contact ID.
+        contact_id: String,
+    },
+
+    /// A contact was un-ignored.
+    ContactUnignored {
+        /// The contact ID.
+        contact_id: String,
+    },
 }
 
 impl VauchiEvent {

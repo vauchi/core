@@ -449,6 +449,30 @@ impl Vauchi {
         manager.list_archived_contacts()
     }
 
+    /// Ignores a contact (ADR-072). Synced to own devices only; the peer
+    /// and the relay never learn of it, and updates keep flowing both ways.
+    pub fn ignore_contact(&self, id: &str) -> VauchiResult<()> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.ignore_contact(id)?;
+        self.record_sync_item(crate::sync::SyncItem::ContactIgnored {
+            contact_id: id.to_string(),
+            timestamp: self.now_timestamp(),
+        });
+        Ok(())
+    }
+
+    /// Un-ignores a contact. No catch-up is needed because nothing was
+    /// withheld while ignored.
+    pub fn unignore_contact(&self, id: &str) -> VauchiResult<()> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.unignore_contact(id)?;
+        self.record_sync_item(crate::sync::SyncItem::ContactUnignored {
+            contact_id: id.to_string(),
+            timestamp: self.now_timestamp(),
+        });
+        Ok(())
+    }
+
     // === Double Ratchet Operations ===
 
     /// Gets the Double Ratchet state for a contact.

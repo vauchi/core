@@ -762,6 +762,12 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::ContactUnarchived { contact_id, .. } => {
                 format!("archive:{}", contact_id)
             }
+            SyncItem::ContactIgnored { contact_id, .. } => {
+                format!("ignore:{}", contact_id)
+            }
+            SyncItem::ContactUnignored { contact_id, .. } => {
+                format!("ignore:{}", contact_id)
+            }
         }
     }
 

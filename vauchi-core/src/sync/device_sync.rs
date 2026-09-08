@@ -337,6 +337,22 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
+    /// A contact was ignored on another device (ADR-072).
+    ContactIgnored {
+        /// ID of the ignored contact.
+        contact_id: String,
+        /// Timestamp of ignoring.
+        timestamp: u64,
+    },
+
+    /// A contact was un-ignored on another device.
+    ContactUnignored {
+        /// ID of the un-ignored contact.
+        contact_id: String,
+        /// Timestamp of un-ignoring.
+        timestamp: u64,
+    },
+
     /// Own contact-card field with its stable identity.
     ///
     /// New linked-device writes use this form so per-contact visibility
@@ -387,6 +403,8 @@ impl SyncItem {
             SyncItem::ImportedContactRemoved { timestamp, .. } => *timestamp,
             SyncItem::ContactArchived { timestamp, .. } => *timestamp,
             SyncItem::ContactUnarchived { timestamp, .. } => *timestamp,
+            SyncItem::ContactIgnored { timestamp, .. } => *timestamp,
+            SyncItem::ContactUnignored { timestamp, .. } => *timestamp,
         }
     }
 

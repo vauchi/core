@@ -671,6 +671,46 @@ fn glance_orchestration_scanner_ignores_foreign_advertiser() {
     );
 }
 
+// @scenario: exchange :: BLE failure falls back to Link instead of cancelling
+// @internal
+#[test]
+fn fallback_to_link_keeps_the_groups_picked_for_the_failed_attempt() {
+    // The relay fallback persists the last-used defaults like every other
+    // commit; it must persist the groups the user picked for the failed
+    // BLE attempt, not an empty list read from a picker that is no longer
+    // the active engine.
+    let (mut engine, work) = engine_with_card_and_group();
+    let _ = engine.navigate_to(AppScreen::Exchange);
+    let _ = engine.navigate_to(AppScreen::BleExchange {
+        mode: vauchi_core::exchange::mode::ExchangeMode::Glance,
+    });
+    engine.pending_exchange_groups = vec![work.clone()];
+    let _ = engine.handle_hardware_event(Event::BleDisconnected {
+        device_id: "peer-1".into(),
+        direction: BleLinkDirection::Outbound,
+        reason: "lost".into(),
+    });
+    let _ = crate::ui::engine::WorkflowEngine::handle_action(
+        &mut engine,
+        crate::ui::UserAction::ActionPressed {
+            action_id: "fallback_relay".into(),
+        },
+    );
+    assert_eq!(*engine.current_app_screen(), AppScreen::LinkExchange);
+    let stored = engine
+        .vauchi
+        .storage()
+        .ux()
+        .load_exchange_defaults()
+        .expect("load")
+        .expect("fallback commit persists defaults");
+    assert_eq!(
+        stored.group_ids,
+        vec![work],
+        "relay fallback must keep the failed attempt's groups as the default"
+    );
+}
+
 // @scenario: ble_exchange :: Glance identity-spoofing advertiser is rejected at the handshake pin
 #[test]
 fn glance_orchestration_identity_spoofing_advertiser_rejected_at_handshake() {

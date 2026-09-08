@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 66] = [
+const MIGRATIONS: [Migration; 67] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -602,7 +602,22 @@ const MIGRATIONS: [Migration; 66] = [
         name: "pending_target_device",
         action: MigrationAction::Sql(MIGRATION_V66_PENDING_TARGET_DEVICE),
     },
+    Migration {
+        version: 67,
+        name: "contact_ignore",
+        action: MigrationAction::Sql(MIGRATION_V67_CONTACT_IGNORE),
+    },
 ];
+
+/// Migration v67: per-contact ignore flag (ADR-072).
+///
+/// Ignore is a local, silent, reversible de-prioritisation synced only to
+/// the user's own devices — the same column shape as archive (v37) but
+/// never a filter on `list_contacts`.
+const MIGRATION_V67_CONTACT_IGNORE: &str = "
+    ALTER TABLE contacts ADD COLUMN ignored INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE contacts ADD COLUMN ignored_at INTEGER;
+";
 
 /// Migration v66: per-device fan-out target for the F4 device-scoped contact
 /// mailbox (ADR-064 Amendment 2026-07-25).

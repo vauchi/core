@@ -46,6 +46,8 @@ pub(super) struct ContactRow {
     pub deleted_at: Option<i64>,
     pub archived: i32,
     pub archived_at: Option<i64>,
+    pub ignored: i32,
+    pub ignored_at: Option<i64>,
     pub reciprocity: Option<String>,
     pub confirmation_channel: Option<String>,
 }
@@ -199,6 +201,8 @@ impl ContactStore<'_> {
             deleted_at: contact.deleted_at().map(|t| t as i64),
             archived: contact.is_archived() as i32,
             archived_at: contact.archived_at().map(|t| t as i64),
+            ignored: contact.is_ignored() as i32,
+            ignored_at: contact.ignored_at().map(|t| t as i64),
             reciprocity,
             confirmation_channel,
         })
@@ -280,6 +284,9 @@ impl ContactStore<'_> {
             } else {
                 contact.archive(0);
             }
+        }
+        if row.ignored != 0 {
+            contact.ignore(row.ignored_at.unwrap_or(0) as u64);
         }
 
         if let Some(cek) = cek {
@@ -451,6 +458,9 @@ impl ContactStore<'_> {
             } else {
                 contact.archive(0);
             }
+        }
+        if row.ignored != 0 {
+            contact.ignore(row.ignored_at.unwrap_or(0) as u64);
         }
 
         Ok(contact)

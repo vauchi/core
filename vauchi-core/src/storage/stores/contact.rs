@@ -61,9 +61,9 @@ impl ContactStore<'_> {
               exchange_transport, has_recovered, card_updated_at,
               relay_url, trust_metrics,
               contact_kind, import_source, imported_at, original_uid,
-              deleted_at, archived, archived_at,
+              deleted_at, archived, archived_at, ignored, ignored_at,
               reciprocity, confirmation_channel)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31)
              ON CONFLICT(id) DO UPDATE SET
                public_key              = excluded.public_key,
                display_name            = excluded.display_name,
@@ -90,6 +90,8 @@ impl ContactStore<'_> {
                deleted_at              = excluded.deleted_at,
                archived                = excluded.archived,
                archived_at             = excluded.archived_at,
+               ignored                 = excluded.ignored,
+               ignored_at              = excluded.ignored_at,
                reciprocity             = excluded.reciprocity,
                confirmation_channel    = excluded.confirmation_channel",
             params![
@@ -120,6 +122,8 @@ impl ContactStore<'_> {
                 row.deleted_at,
                 row.archived,
                 row.archived_at,
+                row.ignored,
+                row.ignored_at,
                 row.reciprocity,
                 row.confirmation_channel,
             ],
@@ -136,7 +140,7 @@ impl ContactStore<'_> {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at,
+                    deleted_at, archived, archived_at, ignored, ignored_at,
                     reciprocity, confirmation_channel
              FROM contacts WHERE id = ?1",
         )?;
@@ -170,8 +174,10 @@ impl ContactStore<'_> {
                 deleted_at: row.get(24)?,
                 archived: row.get(25)?,
                 archived_at: row.get(26)?,
-                reciprocity: row.get(27)?,
-                confirmation_channel: row.get(28)?,
+                ignored: row.get(27)?,
+                ignored_at: row.get(28)?,
+                reciprocity: row.get(29)?,
+                confirmation_channel: row.get(30)?,
             })
         });
 
@@ -190,7 +196,7 @@ impl ContactStore<'_> {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at,
+                    deleted_at, archived, archived_at, ignored, ignored_at,
                     reciprocity, confirmation_channel
              FROM contacts
              WHERE deleted_at IS NULL AND archived = 0
@@ -226,8 +232,10 @@ impl ContactStore<'_> {
                 deleted_at: row.get(24)?,
                 archived: row.get(25)?,
                 archived_at: row.get(26)?,
-                reciprocity: row.get(27)?,
-                confirmation_channel: row.get(28)?,
+                ignored: row.get(27)?,
+                ignored_at: row.get(28)?,
+                reciprocity: row.get(29)?,
+                confirmation_channel: row.get(30)?,
             })
         })?;
 
@@ -289,7 +297,7 @@ impl ContactStore<'_> {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at,
+                    deleted_at, archived, archived_at, ignored, ignored_at,
                     reciprocity, confirmation_channel
              FROM contacts
              WHERE deleted_at IS NULL AND archived = 0
@@ -326,8 +334,10 @@ impl ContactStore<'_> {
                 deleted_at: row.get(24)?,
                 archived: row.get(25)?,
                 archived_at: row.get(26)?,
-                reciprocity: row.get(27)?,
-                confirmation_channel: row.get(28)?,
+                ignored: row.get(27)?,
+                ignored_at: row.get(28)?,
+                reciprocity: row.get(29)?,
+                confirmation_channel: row.get(30)?,
             })
         })?;
 
@@ -364,7 +374,7 @@ impl ContactStore<'_> {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at,
+                    deleted_at, archived, archived_at, ignored, ignored_at,
                     reciprocity, confirmation_channel
              FROM contacts
              WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
@@ -401,8 +411,10 @@ impl ContactStore<'_> {
                 deleted_at: row.get(24)?,
                 archived: row.get(25)?,
                 archived_at: row.get(26)?,
-                reciprocity: row.get(27)?,
-                confirmation_channel: row.get(28)?,
+                ignored: row.get(27)?,
+                ignored_at: row.get(28)?,
+                reciprocity: row.get(29)?,
+                confirmation_channel: row.get(30)?,
             })
         })?;
 
@@ -420,7 +432,7 @@ impl ContactStore<'_> {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at,
+                    deleted_at, archived, archived_at, ignored, ignored_at,
                     reciprocity, confirmation_channel
              FROM contacts
              WHERE display_name = '' AND deleted_at IS NULL AND archived = 0",
@@ -455,8 +467,10 @@ impl ContactStore<'_> {
                 deleted_at: row.get(24)?,
                 archived: row.get(25)?,
                 archived_at: row.get(26)?,
-                reciprocity: row.get(27)?,
-                confirmation_channel: row.get(28)?,
+                ignored: row.get(27)?,
+                ignored_at: row.get(28)?,
+                reciprocity: row.get(29)?,
+                confirmation_channel: row.get(30)?,
             })
         })?;
 
@@ -485,7 +499,7 @@ impl ContactStore<'_> {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at,
+                    deleted_at, archived, archived_at, ignored, ignored_at,
                     reciprocity, confirmation_channel
              FROM contacts
              WHERE archived = 1 AND deleted_at IS NULL
@@ -521,8 +535,10 @@ impl ContactStore<'_> {
                 deleted_at: row.get(24)?,
                 archived: row.get(25)?,
                 archived_at: row.get(26)?,
-                reciprocity: row.get(27)?,
-                confirmation_channel: row.get(28)?,
+                ignored: row.get(27)?,
+                ignored_at: row.get(28)?,
+                reciprocity: row.get(29)?,
+                confirmation_channel: row.get(30)?,
             })
         })?;
 
@@ -582,7 +598,7 @@ impl ContactStore<'_> {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at,
+                    deleted_at, archived, archived_at, ignored, ignored_at,
                     reciprocity, confirmation_channel
              FROM contacts
              WHERE reciprocity = ?1 AND deleted_at IS NULL",
@@ -617,8 +633,10 @@ impl ContactStore<'_> {
                 deleted_at: row.get(24)?,
                 archived: row.get(25)?,
                 archived_at: row.get(26)?,
-                reciprocity: row.get(27)?,
-                confirmation_channel: row.get(28)?,
+                ignored: row.get(27)?,
+                ignored_at: row.get(28)?,
+                reciprocity: row.get(29)?,
+                confirmation_channel: row.get(30)?,
             })
         })?;
 

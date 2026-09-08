@@ -946,4 +946,71 @@ mod tests {
         assert!(!engine.was_cancelled());
         assert_eq!(engine.screen_entered().len(), 2);
     }
+
+    fn failed_engine(has_camera: bool) -> BleExchangeEngine {
+        let mut engine = BleExchangeEngine::new(
+            ExchangeMode::Magic,
+            has_camera,
+            vec![],
+            SystemClock::shared(),
+            None,
+            Locale::English,
+        );
+        let _ = engine.handle_hardware_event(Event::BleDisconnected {
+            device_id: "peer-1".into(),
+            direction: vauchi_core::BleLinkDirection::Outbound,
+            reason: "lost".into(),
+        });
+        assert_eq!(engine.current_screen().screen_id, "exchange_failed");
+        engine
+    }
+
+    // @scenario: exchange :: BLE failure falls back to Glance instead of cancelling
+    // @internal
+    #[test]
+    fn fallback_qr_from_failed_hands_off_to_glance_instead_of_cancelling() {
+        let mut engine = failed_engine(true);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "fallback_qr".into(),
+        });
+        assert!(
+            matches!(
+                result,
+                ActionResult::StartBleExchange {
+                    mode: ExchangeMode::Glance
+                }
+            ),
+            "fallback_qr must hand off to Glance, got {result:?}"
+        );
+        assert!(!engine.was_cancelled(), "a fallback is not a cancel");
+    }
+
+    // @scenario: exchange :: BLE failure falls back to Link instead of cancelling
+    // @internal
+    #[test]
+    fn fallback_relay_from_failed_hands_off_to_link_instead_of_cancelling() {
+        let mut engine = failed_engine(false);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "fallback_relay".into(),
+        });
+        assert!(
+            matches!(result, ActionResult::StartLinkExchange),
+            "fallback_relay must hand off to Link, got {result:?}"
+        );
+        assert!(!engine.was_cancelled(), "a fallback is not a cancel");
+    }
+
+    // @internal
+    #[test]
+    fn unknown_action_on_failed_screen_re_renders_instead_of_cancelling() {
+        let mut engine = failed_engine(true);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "nonsense".into(),
+        });
+        match result {
+            ActionResult::UpdateScreen(screen) => assert_eq!(screen.screen_id, "exchange_failed"),
+            other => panic!("unknown action must re-render the failed screen, got {other:?}"),
+        }
+        assert!(!engine.was_cancelled());
+    }
 }

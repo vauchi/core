@@ -314,6 +314,28 @@ mod tests {
     }
 
     #[test]
+    fn recommend_never_picks_an_unoffered_ble_mode() {
+        // BLE + accelerometer + audio but no camera: only Magic / Shake /
+        // Bump could run, and none is offered for the alpha (owner decision
+        // 2026-09-08), so the recommendation falls through to Link.
+        let caps = DeviceCapabilities {
+            has_ble: true,
+            has_accelerometer: true,
+            audio: AudioCapability::Full,
+            has_internet: true,
+            ..Default::default()
+        };
+        for mode in [ExchangeMode::Magic, ExchangeMode::Shake, ExchangeMode::Bump] {
+            assert_eq!(
+                check_mode_availability(mode, &caps),
+                ModeAvailability::Available,
+                "{mode:?} must be runnable here so the test proves the exclusion"
+            );
+        }
+        assert_eq!(recommend_mode(&caps), ExchangeMode::Link);
+    }
+
+    #[test]
     fn recommend_picks_link_for_no_hardware() {
         // Internet only — no camera, no BLE, no NFC, no audio, no accelerometer
         let caps = DeviceCapabilities {

@@ -407,8 +407,23 @@ mod tests {
         }
     }
 
+    fn mode_ids(screen: &ScreenModel) -> Vec<String> {
+        screen
+            .components
+            .iter()
+            .filter_map(|c| match c {
+                Component::ActionList { items, .. } => Some(items),
+                _ => None,
+            })
+            .flatten()
+            .filter(|i| i.id.starts_with("mode:"))
+            .map(|i| i.id.clone())
+            .collect()
+    }
+
+    // @scenario: exchange :: picker offers only the alpha-reliable modes
     #[test]
-    fn screen_shows_all_nine_modes() {
+    fn expanded_picker_offers_exactly_the_alpha_modes() {
         let mut engine = ModeSelectionEngine::new(
             full_caps(),
             TransportReadiness::default(),
@@ -419,18 +434,50 @@ mod tests {
         let screen = engine.screen();
         assert_eq!(screen.screen_id, "exchange_mode_selection");
 
-        // Hero + expanded disclosure together list every mode exactly once.
-        let mode_count: usize = screen
+        // Hero + expanded disclosure together list every offered mode once.
+        let mut ids = mode_ids(&screen);
+        ids.sort();
+        assert_eq!(
+            ids,
+            [
+                "mode:cable",
+                "mode:glance",
+                "mode:hover",
+                "mode:link",
+                "mode:tap_hover_shake",
+                "mode:tap_tap",
+            ]
+        );
+        for unoffered in ["mode:bump", "mode:shake", "mode:magic"] {
+            assert!(
+                !ids.iter().any(|id| id == unoffered),
+                "{unoffered} is unreliable (2026-07-20 plan) and must not be offered"
+            );
+        }
+    }
+
+    // @internal
+    #[test]
+    fn last_used_unoffered_mode_does_not_become_the_hero() {
+        // A pre-alpha install may have Magic stored as its last-used mode;
+        // the hero must fall through to Glance rather than resurrect it.
+        let engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            Some(ExchangeMode::Magic),
+            Locale::English,
+        );
+        let screen = engine.screen();
+        let hero_first = screen
             .components
             .iter()
-            .filter_map(|c| match c {
-                Component::ActionList { items, .. } => {
-                    Some(items.iter().filter(|i| i.id.starts_with("mode:")).count())
-                }
+            .find_map(|c| match c {
+                Component::ActionList { id, items } if id == "hero" => items.first(),
                 _ => None,
             })
-            .sum();
-        assert_eq!(mode_count, 9, "All 9 modes should be listed");
+            .map(|item| item.id.as_str());
+        assert_eq!(hero_first, Some("mode:glance"));
+        assert!(mode_ids(&screen).iter().all(|id| id != "mode:magic"));
     }
 
     #[test]
@@ -552,9 +599,9 @@ mod tests {
         );
         engine.expanded = true;
         let screen = engine.screen();
-        for &mode in ExchangeMode::all() {
-            let item =
-                find_mode_item(&screen, mode.serde_name()).expect("every mode should be listed");
+        for &mode in DISCLOSURE_ORDER {
+            let item = find_mode_item(&screen, mode.serde_name())
+                .expect("every offered mode should be listed");
             let icon = item.icon.as_deref().expect("every mode carries an icon");
             assert_ne!(icon, "tag", "{:?} should have a dedicated icon", mode);
             assert!(!icon.is_empty(), "{:?} icon must be non-empty", mode);
@@ -573,8 +620,8 @@ mod tests {
         let screen = engine.screen();
 
         // BLE modes should be unavailable
-        let magic = find_mode_item(&screen, "magic").expect("Magic should be listed");
-        let reason = magic
+        let glance = find_mode_item(&screen, "glance").expect("Glance should be listed");
+        let reason = glance
             .detail
             .as_ref()
             .expect("Unavailable mode should have a detail reason");

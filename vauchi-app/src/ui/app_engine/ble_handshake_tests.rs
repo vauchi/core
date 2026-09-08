@@ -701,3 +701,35 @@ fn glance_orchestration_identity_spoofing_advertiser_rejected_at_handshake() {
         "the handshake pin rejects Mallory — she is not the scanned Alice"
     );
 }
+
+// @internal
+#[test]
+fn fallback_to_glance_keeps_the_groups_picked_for_the_failed_attempt() {
+    // The Glance attempt must share what the user chose on the picker for
+    // the Magic attempt — a fallback is the same exchange over another
+    // transport, not a fresh pick.
+    let (mut engine, work) = engine_with_card_and_group();
+    let _ = engine.navigate_to(AppScreen::Exchange);
+    let _ = engine.navigate_to(AppScreen::BleExchange {
+        mode: vauchi_core::exchange::mode::ExchangeMode::Magic,
+    });
+    engine.pending_exchange_groups = vec![work.clone()];
+    let _ = engine.handle_hardware_event(Event::BleDisconnected {
+        device_id: "peer-1".into(),
+        direction: BleLinkDirection::Outbound,
+        reason: "lost".into(),
+    });
+    let _ = crate::ui::engine::WorkflowEngine::handle_action(
+        &mut engine,
+        crate::ui::UserAction::ActionPressed {
+            action_id: "fallback_qr".into(),
+        },
+    );
+    assert!(matches!(
+        engine.current_app_screen(),
+        AppScreen::BleExchange {
+            mode: vauchi_core::exchange::mode::ExchangeMode::Glance
+        }
+    ));
+    assert_eq!(engine.pending_exchange_groups, vec![work]);
+}

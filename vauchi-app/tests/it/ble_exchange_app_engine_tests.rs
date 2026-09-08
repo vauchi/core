@@ -228,6 +228,79 @@ fn cancel_on_ble_exchange_lands_on_mode_picker() {
     );
 }
 
+/// Enter Magic and fail it with a peer disconnect, parking the engine on
+/// the BLE failed screen.
+fn failed_ble_engine() -> AppEngine {
+    let mut engine = enter_ble_mode("mode:magic");
+    let _ = engine.handle_hardware_event(Event::BleDisconnected {
+        device_id: "peer-1".into(),
+        direction: vauchi_core::BleLinkDirection::Outbound,
+        reason: "peer hung up".into(),
+    });
+    assert_eq!(engine.current_screen().screen_id, "exchange_failed");
+    engine
+}
+
+// @scenario: exchange :: BLE failure falls back to Glance instead of cancelling
+// @internal
+#[test]
+fn fallback_qr_after_ble_failure_lands_on_glance_exchange_screen() {
+    let mut engine = failed_ble_engine();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "fallback_qr".into(),
+    });
+    let landed = match &result {
+        ActionResult::NavigateTo(screen) => screen.screen_id.clone(),
+        other => panic!("fallback_qr must navigate to the Glance screen, got {other:?}"),
+    };
+    assert_eq!(landed, "exchange_ble_glance");
+    assert!(
+        matches!(
+            engine.current_app_screen(),
+            AppScreen::BleExchange {
+                mode: vauchi_core::exchange::mode::ExchangeMode::Glance
+            }
+        ),
+        "fallback_qr must re-enter the exchange as Glance, got {:?}",
+        engine.current_app_screen()
+    );
+}
+
+// @scenario: exchange :: BLE failure falls back to Link instead of cancelling
+// @internal
+#[test]
+fn fallback_relay_after_ble_failure_lands_on_link_screen() {
+    let mut engine = failed_ble_engine();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "fallback_relay".into(),
+    });
+    let landed = match &result {
+        ActionResult::NavigateTo(screen) => screen.screen_id.clone(),
+        other => panic!("fallback_relay must navigate to the Link screen, got {other:?}"),
+    };
+    assert_eq!(landed, "exchange_link_waiting");
+    assert_eq!(*engine.current_app_screen(), AppScreen::LinkExchange);
+}
+
+// @internal
+#[test]
+fn back_from_fallback_screen_returns_to_picker_not_failed_transport() {
+    let mut engine = failed_ble_engine();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "fallback_qr".into(),
+    });
+    let back = engine.navigate_back();
+    assert_eq!(
+        back.screen_id, "exchange",
+        "Back from the fallback must land on the picker, not restart the dead transport"
+    );
+    assert!(
+        !matches!(engine.current_app_screen(), AppScreen::BleExchange { .. }),
+        "still on {:?}",
+        engine.current_app_screen()
+    );
+}
+
 // @internal
 #[cfg(feature = "testing")]
 #[test]

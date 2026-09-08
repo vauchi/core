@@ -54,7 +54,7 @@ struct PickerCopy {
     disclosure_label: String,
     hero_label: String,
     hero_detail: String,
-    bump_detail: String,
+    hover_detail: String,
 }
 
 fn walk_picker(locale: Locale) -> PickerCopy {
@@ -74,13 +74,13 @@ fn walk_picker(locale: Locale) -> PickerCopy {
     let hero_label = hero.label.clone();
     let hero_detail = hero.detail.clone().expect("hero detail present");
 
-    // Expanded: an unauthenticated mode carries the localized marker.
+    // Expanded: a disclosed mode carries its localized instruction.
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "more".into(),
         item_id: "show_other_modes".into(),
     });
     let expanded = engine.current_screen();
-    let bump = find_item(&expanded, "mode:bump").expect("Bump listed after disclosure");
+    let hover = find_item(&expanded, "mode:hover").expect("Hover listed after disclosure");
 
     PickerCopy {
         screen_id,
@@ -89,7 +89,7 @@ fn walk_picker(locale: Locale) -> PickerCopy {
         disclosure_label,
         hero_label,
         hero_detail,
-        bump_detail: bump.detail.clone().unwrap_or_default(),
+        hover_detail: hover.detail.clone().unwrap_or_default(),
     }
 }
 
@@ -109,7 +109,7 @@ fn mode_picker_renders_the_active_locale() {
     assert_translated("picker subtitle", &de.subtitle, &en.subtitle);
     assert_translated("disclosure row", &de.disclosure_label, &en.disclosure_label);
     assert_translated("Glance hero detail", &de.hero_detail, &en.hero_detail);
-    assert_translated("Bump detail marker", &de.bump_detail, &en.bump_detail);
+    assert_translated("Hover detail", &de.hover_detail, &en.hover_detail);
 
     // Exemption: "Glance" is the product name for the mode and is
     // deliberately identical in every locale, so it cannot be asserted

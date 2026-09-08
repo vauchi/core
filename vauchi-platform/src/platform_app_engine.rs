@@ -771,6 +771,8 @@ impl PlatformAppEngine {
             | DomainCommand::HardDeleteImportedContact { .. }
             | DomainCommand::ArchiveContact { .. }
             | DomainCommand::UnarchiveContact { .. }
+            | DomainCommand::IgnoreContact { .. }
+            | DomainCommand::UnignoreContact { .. }
             | DomainCommand::ListArchivedContacts
             | DomainCommand::HideContact { .. }
             | DomainCommand::UnhideContact { .. }

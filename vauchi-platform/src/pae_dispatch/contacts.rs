@@ -146,6 +146,32 @@ impl PlatformAppEngine {
                 });
                 Ok(DomainCommandResult::Unit)
             }
+            DomainCommand::IgnoreContact { id } => {
+                engine
+                    .vauchi()
+                    .ignore_contact(&id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Contacts);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::UnignoreContact { id } => {
+                engine
+                    .vauchi()
+                    .unignore_contact(&id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Contacts);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
             DomainCommand::ListArchivedContacts => {
                 let storage = engine.vauchi().storage();
                 let contacts =

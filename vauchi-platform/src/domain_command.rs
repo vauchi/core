@@ -233,6 +233,14 @@ pub enum DomainCommand {
     UnarchiveContact {
         id: String,
     },
+    /// Ignore a contact (ADR-072): silent, local, reversible; stays listed.
+    IgnoreContact {
+        id: String,
+    },
+    /// Stop ignoring a contact.
+    UnignoreContact {
+        id: String,
+    },
     /// List archived contacts (enriched).
     ListArchivedContacts,
     /// Hide a contact (keeps record but excludes from default views).

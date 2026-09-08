@@ -1202,11 +1202,11 @@ impl WorkflowEngine for ExchangeEngine {
                 self.ble_fallback_available = false;
                 self.qr_fallback_available = false;
                 self.failure_detail = None;
-                // "Fall back to QR" routes to the graduated Glance
-                // (multi-stage QR), NOT the retired legacy QR sub-flow — the
-                // same fix P2.D applied to the picker path (the legacy QR is
-                // frozen on android). enter_mode_sub_flow routes Glance ->
-                // ActionResult::StartMultiStageExchange.
+                // "Fall back to QR" routes to the graduated Glance, NOT the
+                // retired legacy QR sub-flow — the same fix P2.D applied to
+                // the picker path (the legacy QR is frozen on android).
+                // enter_mode_sub_flow routes Glance -> StartBleExchange
+                // (G3: one-sided QR + BLE transfer).
                 self.config.mode = Some(ExchangeMode::Glance);
                 self.enter_mode_sub_flow()
             }

@@ -314,6 +314,7 @@ mod tests {
         assert_eq!(recommend_mode(&caps), ExchangeMode::Glance);
     }
 
+    // @scenario: exchange :: recommendation never names an unoffered mode
     #[test]
     fn recommend_never_picks_an_unoffered_ble_mode() {
         // BLE + accelerometer + audio but no camera: only Magic / Shake /

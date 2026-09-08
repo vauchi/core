@@ -94,20 +94,21 @@ pub fn check_mode_availability_with_readiness(
 
 /// Recommend the best [`ExchangeMode`] for `caps`.
 ///
-/// Modes are tried in priority order: Hover, Magic, Shake, TapHoverShake,
-/// TapTap, Bump, Glance, Broadcast, Web, Link. The first `Available` mode is
-/// returned. Link is always available when `has_internet` is true; if nothing
-/// else works, [`ExchangeMode::Link`] is returned as the ultimate fallback even
-/// if Link itself is unavailable (no internet). The UI layer is responsible for
-/// showing the mode as unavailable in that case.
+/// Modes are tried in priority order: Hover, TapHoverShake, TapTap, Glance,
+/// Link. The first `Available` mode is returned. Link is always available
+/// when `has_internet` is true; if nothing else works, [`ExchangeMode::Link`]
+/// is returned as the ultimate fallback even if Link itself is unavailable
+/// (no internet). The UI layer is responsible for showing the mode as
+/// unavailable in that case.
+///
+/// Magic, Shake and Bump are never recommended: the picker does not offer
+/// them for the alpha (owner decision 2026-09-08, RG-9; unreliable per the
+/// 2026-07-20 exchange-modes plan), and a recommendation must be selectable.
 pub fn recommend_mode(caps: &DeviceCapabilities) -> ExchangeMode {
     const PRIORITY: &[ExchangeMode] = &[
         ExchangeMode::Hover,
-        ExchangeMode::Magic,
-        ExchangeMode::Shake,
         ExchangeMode::TapHoverShake,
         ExchangeMode::TapTap,
-        ExchangeMode::Bump,
         ExchangeMode::Glance,
         ExchangeMode::Link,
     ];

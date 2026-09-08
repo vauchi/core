@@ -28,7 +28,7 @@ use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::{Command, Event};
 
 use super::ble::{
-    BleExchangeFlow, BleHardwareOutcome, BleStep, build_discovering_screen,
+    BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep, build_discovering_screen,
     build_exchanging_screen, build_verifying_screen, handle_ble_action,
 };
 
@@ -38,6 +38,10 @@ pub const ACTION_CANCEL: &str = "cancel";
 pub const ACTION_RETRY: &str = "retry";
 /// Action id for the Done button on the success screen.
 pub const ACTION_DONE: &str = "done";
+/// Failed-screen action: re-enter the exchange as Glance (QR).
+pub const ACTION_FALLBACK_QR: &str = "fallback_qr";
+/// Failed-screen action: re-enter the exchange as Link (relay).
+pub const ACTION_FALLBACK_RELAY: &str = "fallback_relay";
 
 /// How long a non-terminal BLE step (`Discovering`/`Handshaking`/
 /// `Exchanging`/`Verifying`) may persist with no progress before the
@@ -286,6 +290,20 @@ impl BleExchangeEngine {
         }
     }
 
+    /// RG-9: a fallback re-enters the exchange over another transport
+    /// through the same `ActionResult` the picker emits, so AppEngine
+    /// routes it exactly like a fresh pick (the user never lands back on
+    /// the picker). Glance is the QR mode post-G3 (one-sided QR + BLE).
+    fn fallback_to_glance() -> ActionResult {
+        ActionResult::StartBleExchange {
+            mode: ExchangeMode::Glance,
+        }
+    }
+
+    fn fallback_to_link() -> ActionResult {
+        ActionResult::StartLinkExchange
+    }
+
     fn build_failed_screen(&self, detail: Option<String>) -> ScreenModel {
         let mut actions = vec![ScreenAction {
             id: ACTION_RETRY.into(),
@@ -296,7 +314,7 @@ impl BleExchangeEngine {
         }];
         if self.has_camera {
             actions.push(ScreenAction {
-                id: "fallback_qr".into(),
+                id: ACTION_FALLBACK_QR.into(),
                 label: self.t("exchange.terminal.switch_qr"),
                 style: ActionStyle::Secondary,
                 enabled: true,
@@ -308,7 +326,7 @@ impl BleExchangeEngine {
             });
         }
         actions.push(ScreenAction {
-            id: "fallback_relay".into(),
+            id: ACTION_FALLBACK_RELAY.into(),
             label: self.t("exchange.terminal.switch_relay"),
             style: ActionStyle::Secondary,
             enabled: true,
@@ -430,13 +448,15 @@ impl WorkflowEngine for BleExchangeEngine {
                         self.cancelled = true;
                         ActionResult::Complete
                     }
-                    // `fallback_qr` / `fallback_relay` switch transport — a
-                    // router concern wired in slice 2; treated as cancel until
-                    // then so the buttons never dead-end silently.
-                    _ => {
-                        self.cancelled = true;
-                        ActionResult::Complete
+                    UserAction::ActionPressed { action_id } if action_id == ACTION_FALLBACK_QR => {
+                        Self::fallback_to_glance()
                     }
+                    UserAction::ActionPressed { action_id }
+                        if action_id == ACTION_FALLBACK_RELAY =>
+                    {
+                        Self::fallback_to_link()
+                    }
+                    _ => ActionResult::UpdateScreen(self.build_screen()),
                 };
             }
             BleScreen::Active => {}
@@ -446,16 +466,15 @@ impl WorkflowEngine for BleExchangeEngine {
             return ActionResult::UpdateScreen(self.build_screen());
         }
 
-        // Active sub-flow actions (cancel / fallback) — delegate to the flow's
-        // action handler, then map the outcome.
         match handle_ble_action(self.flow.step(), &action) {
-            Some(_) => {
-                // Cancel and FallbackToRelay both end the BLE attempt; the
-                // transport-switch (relay) is router-level (slice 2).
+            Some(BleActionOutcome::Cancel) => {
                 self.cancelled = true;
                 ActionResult::Complete
             }
-            None => ActionResult::UpdateScreen(self.build_screen()),
+            Some(BleActionOutcome::FallbackToRelay) => Self::fallback_to_link(),
+            Some(BleActionOutcome::Ignored) | None => {
+                ActionResult::UpdateScreen(self.build_screen())
+            }
         }
     }
 

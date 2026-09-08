@@ -18,11 +18,11 @@ use vauchi_core::exchange::mode_availability::{
 
 /// Engine that displays exchange mode selection.
 ///
-/// One hero action (the last-used mode when it can run here, else Glance,
-/// else the capability recommendation) with every other mode behind a
-/// single "Other ways to connect" disclosure — de-clutter only, nothing
-/// hidden (M2 S3, D2.3, user decision 2026-07-04). When the user picks a
-/// mode, returns `ModeSelectionResult::Selected`.
+/// One hero action (the last-used mode when it is offered and can run
+/// here, else Glance, else the capability recommendation) with every other
+/// offered mode behind a single "Other ways to connect" disclosure (M2 S3,
+/// D2.3, user decision 2026-07-04). When the user picks a mode, returns
+/// `ModeSelectionResult::Selected`.
 pub struct ModeSelectionEngine {
     capabilities: DeviceCapabilities,
     readiness: TransportReadiness,
@@ -39,21 +39,26 @@ pub enum ModeSelectionResult {
     Screen(Box<ScreenModel>),
 }
 
-/// Approved disclosure order (design D2.3): Glance first-class, then the
-/// remaining authenticated modes, then the unauthenticated BLE trio
-/// (annotated), NFC last (hardware-gated). The hero is filtered out so it
-/// is never listed twice.
+/// The modes offered to the user, in disclosure order (design D2.3):
+/// Glance first-class, then the remaining authenticated modes, NFC last
+/// (hardware-gated). The hero is filtered out so it is never listed twice.
+///
+/// Bump, Shake and Magic are deliberately absent: they are unreliable
+/// (2026-07-20 exchange-modes plan) and the owner removed them from the
+/// alpha offer (2026-09-08, RG-9), superseding D2.3's "annotate, don't
+/// hide". Their engines and enum variants stay.
 const DISCLOSURE_ORDER: &[ExchangeMode] = &[
     ExchangeMode::Glance,
     ExchangeMode::Hover,
     ExchangeMode::TapHoverShake,
     ExchangeMode::Link,
     ExchangeMode::Cable,
-    ExchangeMode::Bump,
-    ExchangeMode::Shake,
-    ExchangeMode::Magic,
     ExchangeMode::TapTap,
 ];
+
+fn is_offered(mode: ExchangeMode) -> bool {
+    DISCLOSURE_ORDER.contains(&mode)
+}
 
 /// Whether a mode can actually start on this device right now.
 fn runnable(
@@ -67,14 +72,15 @@ fn runnable(
     )
 }
 
-/// Hero pick (D2.3): last-used when runnable, else Glance (implemented +
-/// peer-authenticated), else the capability recommendation.
+/// Hero pick (D2.3): last-used when offered and runnable, else Glance
+/// (implemented + peer-authenticated), else the capability recommendation.
 fn pick_hero(
     last_used: Option<ExchangeMode>,
     capabilities: &DeviceCapabilities,
     readiness: &TransportReadiness,
 ) -> ExchangeMode {
     if let Some(mode) = last_used
+        && is_offered(mode)
         && runnable(mode, capabilities, readiness)
     {
         return mode;
@@ -183,7 +189,7 @@ impl ModeSelectionEngine {
         // recommended mode (always available, since `recommend_mode` only picks
         // runnable modes) gets a leading marker so the suggestion survives
         // without a dedicated badge field on the wire item.
-        let base_detail = match &availability {
+        let detail = match &availability {
             // Availability reasons are core-computed English today —
             // keying them means a reason enum on the availability type
             // (S4b-2 of 2026-07-03-core-screens-bypass-i18n).
@@ -197,27 +203,11 @@ impl ModeSelectionEngine {
             ),
             _ => self.mode_instruction(mode),
         };
-        // Bump/Shake/Magic run unauthenticated BLE today (decorative
-        // proximity, no peer verification) — say so on the row until their
-        // auth tiers land (2026-06-10 BLE records; D2.3 user decision:
-        // annotate, don't hide).
-        let detail = if matches!(
-            mode,
-            ExchangeMode::Bump | ExchangeMode::Shake | ExchangeMode::Magic
-        ) {
-            Some(get_string_with_args(
-                self.locale,
-                "exchange.picker.unauthenticated",
-                &[("detail", &base_detail)],
-            ))
-        } else {
-            Some(base_detail)
-        };
         ActionListItem {
             id: format!("mode:{}", mode.serde_name()),
             label: self.mode_name(mode),
             icon: Some(mode_icon(mode).into()),
-            detail,
+            detail: Some(detail),
             a11y: None,
             info_key: None,
         }

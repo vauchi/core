@@ -368,10 +368,13 @@ pub enum ActionResult {
     /// lifecycle is core/event-driven (no platform bridge).
     StartLinkExchange,
     /// App layer should navigate to the dedicated BLE-exchange screen
-    /// (`AppScreen::BleExchange { mode }`) for Magic/Bump/Shake. The screen
-    /// factory builds a fresh `BleExchangeEngine`; the legacy
-    /// `ExchangeStep::Ble` sub-flow is retired in slice 3. Per
-    /// `2026-05-11-ble-exchange-engine-graduation`.
+    /// (`AppScreen::BleExchange { mode }`) for the BLE family (Glance since
+    /// G3; Magic/Bump/Shake keep their engine but are not offered for the
+    /// alpha). The screen factory builds a fresh `BleExchangeEngine`; the
+    /// legacy `ExchangeStep::Ble` sub-flow is retired in slice 3. Per
+    /// `2026-05-11-ble-exchange-engine-graduation`. Also emitted by
+    /// `BleExchangeEngine` itself on the failed screen's "switch to QR"
+    /// fallback (RG-9), with `mode: Glance`.
     StartBleExchange {
         mode: ExchangeMode,
     },

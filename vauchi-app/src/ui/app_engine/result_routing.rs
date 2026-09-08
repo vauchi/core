@@ -61,7 +61,7 @@ impl AppEngine {
             // The commit still becomes the last-used default (M2 S1).
             ActionResult::StartLinkExchange => {
                 self.persist_exchange_defaults(ExchangeMode::Link, self.current_exchange_groups());
-                ActionResult::NavigateTo(self.navigate_to(AppScreen::LinkExchange))
+                self.enter_exchange_screen(AppScreen::LinkExchange)
             }
             // M5 B3 Slice 3: start the device-link join (responder) machine
             // when the user confirms the device name on the join screen.
@@ -144,21 +144,44 @@ impl AppEngine {
     /// (2026-06-04-exchange-terminal-screens), then navigate to `target`.
     fn start_exchange_to(&mut self, target: AppScreen, mode: ExchangeMode) -> ActionResult {
         tracing::info!("[Exchange] started: {}", mode.display_name());
-        self.pending_exchange_groups = self.current_exchange_groups();
+        // A transport engine's fallback (RG-9) re-enters here without a
+        // picker to read from; the groups picked for the failed attempt
+        // still apply to the fallback attempt.
+        if let Some(groups) = self.picker_selected_groups() {
+            self.pending_exchange_groups = groups;
+        }
         // M2 S1: the committed (groups, mode) pair becomes the last-used
         // default, so the next exchange skips the group gate.
         self.persist_exchange_defaults(mode, self.pending_exchange_groups.clone());
-        ActionResult::NavigateTo(self.navigate_to(target))
+        self.enter_exchange_screen(target)
+    }
+
+    /// Navigate to an exchange transport screen. From the picker this pushes
+    /// history as usual; from another transport screen (an RG-9 fallback) it
+    /// replaces it, so Back returns to the picker instead of re-entering the
+    /// transport that just failed.
+    fn enter_exchange_screen(&mut self, target: AppScreen) -> ActionResult {
+        let screen = if self.screen == AppScreen::Exchange {
+            self.navigate_to(target)
+        } else {
+            self.navigate_to_internal(target)
+        };
+        ActionResult::NavigateTo(screen)
     }
 
     /// The active ExchangeEngine's selected groups (empty when the current
     /// engine is not the exchange flow).
     fn current_exchange_groups(&self) -> Vec<String> {
+        self.picker_selected_groups().unwrap_or_default()
+    }
+
+    /// The picker's selected groups; `None` when the active engine is not
+    /// the exchange picker flow.
+    fn picker_selected_groups(&self) -> Option<Vec<String>> {
         self.engine
             .as_any()
             .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
             .map(|ex| ex.selected_groups().to_vec())
-            .unwrap_or_default()
     }
 
     /// Persist the last-used exchange defaults (M2 S1). Best-effort: a

@@ -430,8 +430,13 @@ impl AppEngine {
     pub(super) fn sync_ble_handshake_lifecycle(&mut self, old: &AppScreen, new: &AppScreen) {
         let was = matches!(old, AppScreen::BleExchange { .. });
         let is = matches!(new, AppScreen::BleExchange { .. });
-        if was && !is {
+        // A fallback from one BLE-family mode to another (RG-9) is also an
+        // exit for the failed attempt's machine — but not for the Glance
+        // display state, which `navigate_to` regenerated for the new entry.
+        if was && old != new {
             self.cancel_ble_handshake_session();
+        }
+        if was && !is {
             self.glance_display_qr = None;
             self.glance_display_nonce = None;
             self.glance_scanned = None;

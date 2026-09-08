@@ -252,7 +252,7 @@
   "backup.wizard.restore": "Restore Backup",
   "backup.wizard.restore_failed_title": "Restore Failed",
   "backup.wizard.restored_title": "Backup Restored",
-  "backup.wizard.restoring_detail": "Decrypting your backup. This may take a few seconds on older devices.",
+  "backup.wizard.restoring_detail": "Decrypting your backup. Large backups can take several minutes on older devices.",
   "backup.wizard.restoring_title": "Restoring backup…",
   "backup.wizard.status_a11y": "{title} status",
   "backup.wizard.title": "Backup & Recovery",

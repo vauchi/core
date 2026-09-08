@@ -104,6 +104,7 @@ mod contact_edit_engine_tests;
 mod contact_favorites_notes_tests;
 mod contact_field_note_storage_tests;
 mod contact_has_contacts_tests;
+mod contact_ignore_tests;
 mod contact_kind_tests;
 mod contact_limit_engine_tests;
 mod contact_limit_tests;

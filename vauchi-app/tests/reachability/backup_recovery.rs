@@ -49,6 +49,11 @@ const HANDLED: &[&str] = &[
     "restore",
     "back",
     "continue",
+    // Restore-only: asks the shell for the backup file. A real export
+    // cannot arrive through the paste field (2.2 MB against a 4 KB
+    // MAX_EVENT_INPUT_VALUE_BYTES), so this is the load-bearing path
+    // (2026-09-08-full-backup-restore-cannot-be-pasted).
+    "choose_file",
     "confirm_replace",
     "cancel_replace",
 ];

@@ -392,6 +392,22 @@ impl AppEngine {
                     }),
                 }
             }
+            AppScreen::Backup => {
+                // The restore wizard's own file path. Paste cannot carry a
+                // real backup — a 10k-contact export is ~2.2 MB against a
+                // 4 KB MAX_EVENT_INPUT_VALUE_BYTES, so the value is dropped
+                // and Continue never enables
+                // (2026-09-08-full-backup-restore-cannot-be-pasted).
+                if self
+                    .engine
+                    .apply_update(crate::ui::EngineUpdate::BackupRecovery(
+                        crate::ui::BackupRecoveryUpdate::PickedBackupBytes(bytes),
+                    ))
+                {
+                    return Some(ActionResult::NavigateTo(self.engine.current_screen()));
+                }
+                None
+            }
             AppScreen::Onboarding => {
                 // ADR-031 Phase 2B: backup-restore. The picked bytes
                 // are the encrypted backup file (hex-encoded ASCII —

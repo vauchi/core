@@ -82,9 +82,9 @@ pub use avatar_editor::AvatarEditorEngine;
 pub use backup_recovery::{BackupLevel, BackupMode, BackupRecoveryEngine};
 pub use change_password::ChangePasswordEngine;
 pub use channel::{
-    BackupFormSnapshot, ContactDetailUpdate, ContactListUpdate, DeviceLinkJoinUpdate,
-    DeviceLinkUpdate, DuressPinSetup, EngineOutput, EngineUpdate, FormInput, GdprChoice,
-    LinkExchangeUpdate, LinkResponderUpdate, MultiStageUpdate, MyInfoEntryDetailUpdate,
+    BackupFormSnapshot, BackupRecoveryUpdate, ContactDetailUpdate, ContactListUpdate,
+    DeviceLinkJoinUpdate, DeviceLinkUpdate, DuressPinSetup, EngineOutput, EngineUpdate, FormInput,
+    GdprChoice, LinkExchangeUpdate, LinkResponderUpdate, MultiStageUpdate, MyInfoEntryDetailUpdate,
     OnboardingSnapshot, OnboardingUpdate, PendingBackup, RecoveryHelpUpdate, RecoveryUpdate,
 };
 pub use component::{

@@ -9,7 +9,14 @@
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
+use vauchi_core::{Command, FilePickPurpose};
 use zeroize::Zeroize;
+
+/// Backup exports are hex-encoded ASCII; pickers vary in what they report,
+/// so accept the plain-text families rather than a single strict type.
+fn backup_mime_types() -> Vec<String> {
+    vec!["text/plain".to_string(), "*/*".to_string()]
+}
 
 /// Whether the user is creating or restoring a backup.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -270,27 +277,40 @@ impl BackupRecoveryEngine {
             }),
             info_key: None,
         });
+        let mut actions = vec![ScreenAction {
+            id: "back".into(),
+            label: self.t("action.back"),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: Some(A11y::labeled(self.t("action.back"))),
+        }];
+        // A real backup cannot arrive through the paste field: a 10k-contact
+        // export is ~2.2 MB against a 4 KB MAX_EVENT_INPUT_VALUE_BYTES, so
+        // the value is dropped and the screen dead-ends with Continue
+        // disabled (2026-09-08-full-backup-restore-cannot-be-pasted).
+        if matches!(self.mode, BackupMode::Restore) {
+            actions.push(ScreenAction {
+                id: "choose_file".into(),
+                label: self.t("backup.wizard.choose_file"),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: Some(A11y::labeled(self.t("backup.wizard.choose_file"))),
+            });
+        }
+        actions.push(ScreenAction {
+            id: "continue".into(),
+            label: self.t("action.continue"),
+            style: ActionStyle::Primary,
+            enabled: !self.password.is_empty(),
+            a11y: Some(A11y::labeled(self.t("action.continue"))),
+        });
+
         ScreenModel {
             screen_id: "backup_password".into(),
             title: self.t("backup.wizard.password_title"),
             subtitle: None,
             components,
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "back".into(),
-                    label: self.t("action.back"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.back"))),
-                },
-                ScreenAction {
-                    id: "continue".into(),
-                    label: self.t("action.continue"),
-                    style: ActionStyle::Primary,
-                    enabled: !self.password.is_empty(),
-                    a11y: Some(A11y::labeled(self.t("action.continue"))),
-                },
-            ],
+            contextual_actions: actions,
             progress: self.progress(),
             ..Default::default()
         }
@@ -512,6 +532,24 @@ impl WorkflowEngine for BackupRecoveryEngine {
         }
     }
 
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        let crate::ui::EngineUpdate::BackupRecovery(update) = update else {
+            return false;
+        };
+        match update {
+            crate::ui::BackupRecoveryUpdate::PickedBackupBytes(bytes) => {
+                // The picker hands back the exported file verbatim; the
+                // export is hex-encoded ASCII, so lossy decoding cannot
+                // corrupt a valid backup and a binary file simply fails
+                // to decrypt with a clear error rather than panicking.
+                self.restore_data = String::from_utf8_lossy(&bytes).into_owned();
+                self.mode = BackupMode::Restore;
+                self.step = BackupStep::EnterPassword;
+            }
+        }
+        true
+    }
+
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match (&self.step, action) {
             // ChooseMode
@@ -563,6 +601,16 @@ impl WorkflowEngine for BackupRecoveryEngine {
             ) if component_id == "backup_data" => {
                 self.restore_data = value;
                 ActionResult::UpdateScreen(self.current_screen())
+            }
+            (BackupStep::EnterPassword, UserAction::ActionPressed { action_id })
+                if action_id == "choose_file" =>
+            {
+                ActionResult::Commands {
+                    commands: vec![Command::FilePickFromUser {
+                        accepted_mime_types: backup_mime_types(),
+                        purpose: FilePickPurpose::ImportBackup,
+                    }],
+                }
             }
             (BackupStep::EnterPassword, UserAction::ActionPressed { action_id })
                 if action_id == "continue"

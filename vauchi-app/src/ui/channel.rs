@@ -119,6 +119,7 @@ pub enum EngineOutput {
 /// [`WorkflowEngine::apply_update`]: super::WorkflowEngine::apply_update
 pub enum EngineUpdate {
     MultiStage(MultiStageUpdate),
+    BackupRecovery(BackupRecoveryUpdate),
     DeviceLink(DeviceLinkUpdate),
     DeviceLinkJoin(DeviceLinkJoinUpdate),
     LinkResponder(LinkResponderUpdate),
@@ -246,6 +247,20 @@ pub enum RecoveryHelpUpdate {
 }
 
 /// Updates for the onboarding engine.
+/// Updates for the backup/restore wizard.
+#[derive(Debug, Clone)]
+pub enum BackupRecoveryUpdate {
+    /// Deliver a backup chosen through the file picker.
+    ///
+    /// Restore cannot take a real backup through the paste field: a
+    /// 10k-contact export is ~2.2 MB against a 4 KB
+    /// `MAX_EVENT_INPUT_VALUE_BYTES`, so the value is dropped and the
+    /// screen dead-ends with Continue disabled (problem record
+    /// 2026-09-08-full-backup-restore-cannot-be-pasted). File bytes are
+    /// not carried by that bounded channel.
+    PickedBackupBytes(Vec<u8>),
+}
+
 pub enum OnboardingUpdate {
     /// Stash picked backup bytes and transition to password entry.
     PendingBackupBytes(Vec<u8>),
@@ -271,6 +286,9 @@ impl EngineUpdate {
     /// Variant path for logging — payloads never reach logs.
     pub fn name(&self) -> &'static str {
         match self {
+            Self::BackupRecovery(u) => match u {
+                BackupRecoveryUpdate::PickedBackupBytes(_) => "BackupRecovery::PickedBackupBytes",
+            },
             Self::MultiStage(u) => match u {
                 MultiStageUpdate::State(_) => "MultiStage::State",
                 MultiStageUpdate::QrPayload(_) => "MultiStage::QrPayload",

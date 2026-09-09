@@ -46,6 +46,7 @@ use super::{AppEngine, AppScreen};
 use crate::orchestrator::ble_handshake_machine::{
     BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleOobBinding, BleRole, decide_ble_role,
 };
+use crate::ui::{EngineOutput, EngineUpdate};
 use vauchi_core::Contact;
 use vauchi_core::Event;
 use vauchi_core::contact_card::ContactCard;
@@ -385,6 +386,34 @@ impl AppEngine {
             required_oob_nonce: None,
         });
         Ok(())
+    }
+
+    /// Pin the peer from a Glance code the user typed instead of scanning
+    /// ([`EngineOutput::GlancePeerCode`]) through the same
+    /// [`Self::apply_glance_scan`] a camera decode reaches, so the manual
+    /// route cannot drift from the scan route. Runs after every action on
+    /// the Glance screen; a pin already latched short-circuits, and the
+    /// engine has verified the code, so a rejection here means it expired
+    /// between commit and pin — surfaced as the retry screen, not swallowed.
+    pub(super) fn pin_typed_glance_code(&mut self) {
+        if self.glance_scanned.is_some()
+            || !matches!(
+                self.screen,
+                AppScreen::BleExchange {
+                    mode: vauchi_core::exchange::mode::ExchangeMode::Glance
+                }
+            )
+        {
+            return;
+        }
+        let Some(EngineOutput::GlancePeerCode { data }) = self.engine.engine_output() else {
+            return;
+        };
+        if let Err(error) = self.apply_glance_scan(&data) {
+            self.engine.apply_update(EngineUpdate::BleForceFailure {
+                reason: Some(error.user_message().to_string()),
+            });
+        }
     }
 
     /// Scanner-side discovery gate for Glance: connect to a discovered device

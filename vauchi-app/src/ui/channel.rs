@@ -46,6 +46,11 @@ pub enum EngineOutput {
     /// PIN/password typed on the lock screen (redacted in `Debug`).
     /// Absent (engine returns `None`) while the entry is empty.
     Lock { pin: String },
+    /// A verified Glance peer code the user typed instead of scanning;
+    /// the AppEngine pins the peer from it as from a camera scan. Absent
+    /// until a code is accepted. `Debug` prints the length only: a code
+    /// carries key material (logging rules).
+    GlancePeerCode { data: String },
     /// Per-field show/hide toggles on the contact-visibility screen,
     /// as `(field_id, visible)` pairs.
     ContactVisibility { toggles: Vec<(String, bool)> },
@@ -504,6 +509,10 @@ impl std::fmt::Debug for EngineOutput {
                 .finish(),
             Self::Backup(s) => f.debug_tuple("Backup").field(s).finish(),
             Self::Lock { .. } => f.debug_struct("Lock").field("pin", &"<redacted>").finish(),
+            Self::GlancePeerCode { data } => f
+                .debug_struct("GlancePeerCode")
+                .field("len", &data.len())
+                .finish(),
             Self::ContactVisibility { toggles } => f
                 .debug_struct("ContactVisibility")
                 .field("toggles", toggles)

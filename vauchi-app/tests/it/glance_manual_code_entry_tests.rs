@@ -15,7 +15,7 @@ use vauchi_app::ui::{
 };
 use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
-use vauchi_core::exchange::DeviceCapabilities;
+use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::platform::BleLinkDirection;
 

@@ -571,7 +571,7 @@ fn glance_without_a_camera_renders_the_manual_code_input() {
     let engine = glance_engine(false);
     let screen = engine.current_screen();
 
-    assert_eq!(screen.screen_id, "exchange_ble_glance");
+    assert_eq!(screen.screen_id, "exchange_ble_glance_code");
     assert_eq!(
         code_input_of(&screen),
         Some((
@@ -615,7 +615,7 @@ fn glance_with_a_camera_offers_enter_code_and_switches_to_the_input() {
     let ActionResult::UpdateScreen(screen) = result else {
         panic!("enter_code must re-render the glance screen, got {result:?}");
     };
-    assert_eq!(screen.screen_id, "exchange_ble_glance");
+    assert_eq!(screen.screen_id, "exchange_ble_glance_code");
     assert_eq!(
         code_input_of(&screen).map(|(_, placeholder, _)| placeholder),
         Some(Some("Paste or type the code".to_string()))
@@ -748,7 +748,7 @@ fn retry_after_a_bad_code_returns_to_the_code_input() {
     });
 
     let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_ble_glance");
+    assert_eq!(screen.screen_id, "exchange_ble_glance_code");
     assert_eq!(
         code_input_of(&screen).map(|(_, _, value)| value),
         Some(String::new()),

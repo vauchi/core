@@ -42,6 +42,10 @@ pub const ACTION_DONE: &str = "done";
 pub const ACTION_FALLBACK_QR: &str = "fallback_qr";
 /// Failed-screen action: re-enter the exchange as Link (relay).
 pub const ACTION_FALLBACK_RELAY: &str = "fallback_relay";
+/// Glance action (camera devices): swap the scan node for the code input.
+pub const ACTION_ENTER_CODE: &str = "enter_code";
+/// Glance action: commit the typed peer code (the input's submit twin).
+pub const ACTION_CONNECT_CODE: &str = "connect_code";
 
 /// How long a non-terminal BLE step (`Discovering`/`Handshaking`/
 /// `Exchanging`/`Verifying`) may persist with no progress before the
@@ -82,6 +86,25 @@ const GLANCE_OWN_QR_COMPONENT_ID: &str = "glance_own_qr";
 /// `AppEngine::apply_glance_scan` (the Cycle D contract).
 pub const GLANCE_SCAN_COMPONENT_ID: &str = "glance_peer_scan";
 
+/// Component id of the Glance manual code input — the camera-less route for
+/// the peer's OOB code (`2026-09-09-tui-cannot-ingest-peer-exchange-payload`).
+/// The engine buffers `TextChanged` on it; `TextSubmitted` or
+/// [`ACTION_CONNECT_CODE`] commits, and an accepted code surfaces as
+/// [`EngineOutput::GlancePeerCode`] for the AppEngine to pin exactly as a
+/// camera scan.
+pub const GLANCE_CODE_INPUT_ID: &str = "glance_code_input";
+
+/// Where the Glance active screen is in the manual-code route.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum GlanceCodeEntry {
+    /// Camera scan node shown (camera devices, until `enter_code`).
+    Scanning,
+    /// Text input shown; `code` is the uncommitted buffer.
+    Typing { code: String },
+    /// A verified code was committed; waiting for BLE discovery of the peer.
+    Accepted { code: String },
+}
+
 /// Dedicated BLE exchange engine — wraps [`BleExchangeFlow`].
 pub struct BleExchangeEngine {
     mode: ExchangeMode,
@@ -110,6 +133,7 @@ pub struct BleExchangeEngine {
     /// `None` for radio modes (Magic/Bump/Shake).
     glance_qr: Option<String>,
     locale: Locale,
+    glance_code_entry: GlanceCodeEntry,
 }
 
 impl BleExchangeEngine {
@@ -140,6 +164,19 @@ impl BleExchangeEngine {
             step_entered_unix,
             glance_qr,
             locale,
+            glance_code_entry: Self::initial_glance_code_entry(has_camera),
+        }
+    }
+
+    /// Without a camera the code input is the only route, so it is shown
+    /// from the start instead of behind `enter_code`.
+    fn initial_glance_code_entry(has_camera: bool) -> GlanceCodeEntry {
+        if has_camera {
+            GlanceCodeEntry::Scanning
+        } else {
+            GlanceCodeEntry::Typing {
+                code: String::new(),
+            }
         }
     }
 
@@ -200,37 +237,130 @@ impl BleExchangeEngine {
                 a11y: None,
             });
         }
-        if self.has_camera {
-            components.push(Component::QrCode {
-                id: GLANCE_SCAN_COMPONENT_ID.into(),
-                data: String::new(),
-                frames: Vec::new(),
-                mode: QrMode::Scan,
-                label: Some(self.t("exchange.ble.glance_scan")),
-                scan_quality: None,
-                a11y: None,
-            });
+        let mut actions = Vec::with_capacity(2);
+        match &self.glance_code_entry {
+            GlanceCodeEntry::Scanning => {
+                components.push(Component::QrCode {
+                    id: GLANCE_SCAN_COMPONENT_ID.into(),
+                    data: String::new(),
+                    frames: Vec::new(),
+                    mode: QrMode::Scan,
+                    label: Some(self.t("exchange.ble.glance_scan")),
+                    scan_quality: None,
+                    a11y: None,
+                });
+                actions.push(ScreenAction {
+                    id: ACTION_ENTER_CODE.into(),
+                    label: self.t("exchange.ble.glance_enter_code"),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                });
+            }
+            GlanceCodeEntry::Typing { code } => {
+                components.push(Component::TextInput {
+                    id: GLANCE_CODE_INPUT_ID.into(),
+                    label: self.t("exchange.paste_instruction"),
+                    value: code.clone(),
+                    placeholder: Some(self.t("exchange.ble.glance_code_placeholder")),
+                    max_length: None,
+                    validation_error: None,
+                    input_type: InputType::Text,
+                    a11y: None,
+                    info_key: None,
+                });
+                actions.push(ScreenAction {
+                    id: ACTION_CONNECT_CODE.into(),
+                    label: self.t("exchange.ble.glance_connect_code"),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                });
+            }
+            GlanceCodeEntry::Accepted { .. } => {}
         }
+        actions.push(ScreenAction {
+            id: ACTION_CANCEL.into(),
+            label: self.t("action.cancel"),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: None,
+        });
+        // The code step carries its own id: the BFS reachability walker keys
+        // nodes on `screen_id`, and shells key composition on it too.
+        let screen_id = match &self.glance_code_entry {
+            GlanceCodeEntry::Typing { .. } => "exchange_ble_glance_code",
+            _ => "exchange_ble_glance",
+        };
         ScreenModel {
-            screen_id: "exchange_ble_glance".into(),
+            screen_id: screen_id.into(),
             title: self.t("exchange.mode_name.glance"),
             subtitle: Some(self.t("exchange.ble.glance_subtitle")),
             components,
-            contextual_actions: vec![ScreenAction {
-                id: "cancel".into(),
-                label: self.t("action.cancel"),
-                style: ActionStyle::Secondary,
-                enabled: true,
-                a11y: None,
-            }],
+            contextual_actions: actions,
             ..Default::default()
+        }
+    }
+
+    /// Manual-code route on the Glance active screen. `None` when the
+    /// action is not part of it (the caller falls through to the flow).
+    fn handle_glance_code_action(&mut self, action: &UserAction) -> Option<ActionResult> {
+        if self.mode != ExchangeMode::Glance {
+            return None;
+        }
+        match action {
+            UserAction::ActionPressed { action_id } if action_id == ACTION_ENTER_CODE => {
+                self.glance_code_entry = GlanceCodeEntry::Typing {
+                    code: String::new(),
+                };
+            }
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == GLANCE_CODE_INPUT_ID => {
+                self.glance_code_entry = GlanceCodeEntry::Typing {
+                    code: value.clone(),
+                };
+            }
+            UserAction::TextSubmitted { component_id } if component_id == GLANCE_CODE_INPUT_ID => {
+                self.commit_glance_code();
+            }
+            UserAction::ActionPressed { action_id } if action_id == ACTION_CONNECT_CODE => {
+                self.commit_glance_code();
+            }
+            _ => return None,
+        }
+        Some(ActionResult::UpdateScreen(self.build_screen()))
+    }
+
+    /// Verify the typed code with the same parser a camera scan goes through
+    /// (`AppEngine::apply_glance_scan`), so a malformed, forged, or expired
+    /// code fails to the retry screen instead of silently pinning nothing —
+    /// a deliberate submit deserves an answer where a stray camera frame
+    /// does not.
+    fn commit_glance_code(&mut self) {
+        let GlanceCodeEntry::Typing { code } = &self.glance_code_entry else {
+            return;
+        };
+        let now = self.clock.unix_seconds();
+        match vauchi_core::exchange::oob_bootstrap::OobBootstrapQr::verified_from_data_string(
+            code, now,
+        ) {
+            Ok(_) => {
+                self.glance_code_entry = GlanceCodeEntry::Accepted { code: code.clone() };
+                self.step_entered_unix = now;
+            }
+            Err(error) => self.force_failure(Some(error.user_message().to_string())),
         }
     }
 
     fn build_screen(&self) -> ScreenModel {
         match &self.screen {
             BleScreen::Active => match self.flow.step() {
-                BleStep::Discovering if self.mode == ExchangeMode::Glance => {
+                BleStep::Discovering
+                    if self.mode == ExchangeMode::Glance
+                        && !matches!(self.glance_code_entry, GlanceCodeEntry::Accepted { .. }) =>
+                {
                     self.build_glance_active_screen()
                 }
                 BleStep::Discovering => build_discovering_screen(self.mode, self.locale),
@@ -442,6 +572,11 @@ impl WorkflowEngine for BleExchangeEngine {
                         self.screen = BleScreen::Active;
                         self.started = false;
                         self.step_entered_unix = self.clock.unix_seconds();
+                        if self.glance_code_entry != GlanceCodeEntry::Scanning {
+                            self.glance_code_entry = GlanceCodeEntry::Typing {
+                                code: String::new(),
+                            };
+                        }
                         ActionResult::UpdateScreen(self.build_screen())
                     }
                     UserAction::ActionPressed { action_id } if action_id == ACTION_CANCEL => {
@@ -464,6 +599,10 @@ impl WorkflowEngine for BleExchangeEngine {
 
         if self.cancelled {
             return ActionResult::UpdateScreen(self.build_screen());
+        }
+
+        if let Some(result) = self.handle_glance_code_action(&action) {
+            return result;
         }
 
         match handle_ble_action(self.flow.step(), &action) {
@@ -541,6 +680,15 @@ impl WorkflowEngine for BleExchangeEngine {
 
     fn was_cancelled(&self) -> bool {
         self.cancelled
+    }
+
+    fn engine_output(&self) -> Option<EngineOutput> {
+        match &self.glance_code_entry {
+            GlanceCodeEntry::Accepted { code } => {
+                Some(EngineOutput::GlancePeerCode { data: code.clone() })
+            }
+            _ => None,
+        }
     }
 }
 

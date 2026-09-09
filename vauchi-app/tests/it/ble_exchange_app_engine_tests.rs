@@ -246,6 +246,15 @@ fn failed_ble_engine() -> AppEngine {
 #[test]
 fn fallback_qr_after_ble_failure_lands_on_glance_exchange_screen() {
     let mut engine = failed_ble_engine();
+    // `fallback_qr` is offered to camera devices only; without a camera
+    // Glance opens on its manual code step instead of the scan screen.
+    engine.set_device_capabilities(
+        vauchi_core::exchange::capability::types::DeviceCapabilities {
+            has_ble: true,
+            has_camera: true,
+            ..Default::default()
+        },
+    );
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "fallback_qr".into(),
     });

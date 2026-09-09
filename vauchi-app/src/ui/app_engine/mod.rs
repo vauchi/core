@@ -708,6 +708,7 @@ impl WorkflowEngine for AppEngine {
         }
 
         let result = self.engine.handle_action(action);
+        self.pin_typed_glance_code();
         let result = self.route_result(result);
         // Slice 32l T3.1b: feed typed DeviceLink* ActionResults into the engine-owned machine.
         #[cfg(all(feature = "network-http", feature = "storage"))]

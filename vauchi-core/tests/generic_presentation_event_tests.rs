@@ -5,7 +5,7 @@
 use serde_json::json;
 use vauchi_core::{
     Event, EventJsonError, MAX_EVENT_INPUT_VALUE_BYTES, MAX_EVENT_JSON_BYTES,
-    MAX_EVENT_JSON_NESTING_DEPTH, OverlayKind, SurfaceId, event_from_json,
+    MAX_EVENT_JSON_NESTING_DEPTH, MAX_FULL_BACKUP_BYTES, OverlayKind, SurfaceId, event_from_json,
 };
 
 fn surface(id: &str) -> SurfaceId {
@@ -168,5 +168,49 @@ fn test_event_json_rejects_oversized_input_value() {
     assert_eq!(
         event_from_json(&event).expect_err("oversized input value must be rejected"),
         EventJsonError::InputValueTooLarge
+    );
+}
+
+/// Feature: generic_presentation_protocol.feature
+/// Scenario: Invalid boundary input fails safely
+// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+#[test]
+fn test_event_json_admits_a_file_pick_of_the_full_backup_ceiling() {
+    let bytes = vec![255u8; MAX_FULL_BACKUP_BYTES];
+    let widest_byte_array = "255,".repeat(MAX_FULL_BACKUP_BYTES);
+    let event = format!(
+        r#"{{"FilePickedFromUser":{{"bytes":[{}],"filename":"backup.vauchi"}}}}"#,
+        widest_byte_array.trim_end_matches(',')
+    );
+
+    assert!(
+        event.len() <= MAX_EVENT_JSON_BYTES,
+        "the widest legitimate file pick ({} bytes of JSON) must fit the {} byte ceiling",
+        event.len(),
+        MAX_EVENT_JSON_BYTES
+    );
+    assert_eq!(
+        event_from_json(&event).expect("a full-size backup pick must be accepted"),
+        Event::FilePickedFromUser {
+            bytes,
+            filename: "backup.vauchi".to_string(),
+        }
+    );
+}
+
+/// Feature: generic_presentation_protocol.feature
+/// Scenario: Invalid boundary input fails safely
+// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+#[test]
+fn test_event_json_rejects_a_file_pick_over_the_full_backup_ceiling() {
+    let widest_byte_array = "255,".repeat(MAX_FULL_BACKUP_BYTES + 1024);
+    let event = format!(
+        r#"{{"FilePickedFromUser":{{"bytes":[{}],"filename":"backup.vauchi"}}}}"#,
+        widest_byte_array.trim_end_matches(',')
+    );
+
+    assert_eq!(
+        event_from_json(&event).expect_err("a pick over the backup ceiling must be rejected"),
+        EventJsonError::TooLarge
     );
 }

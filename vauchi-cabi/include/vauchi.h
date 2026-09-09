@@ -323,6 +323,20 @@ char *vauchi_app_initial_commands(struct VauchiApp *handle);
 char *vauchi_app_dispatch(struct VauchiApp *handle, const char *event_json);
 
 /**
+ * Return the design tokens as JSON.
+ *
+ * The shape matches `vauchi_app::theme::DesignTokens`, which is the same
+ * document `themes/tokens.json` holds and the same one iOS, macOS and
+ * Android receive over UniFFI.
+ *
+ * Returns null only if the tokens cannot be serialized, which would mean
+ * a broken build rather than a runtime condition.
+ *
+ * The caller must free the returned string with `vauchi_string_free`.
+ */
+char *vauchi_design_tokens_json(void);
+
+/**
  * Create a new QR exchange session using the app's identity.
  *
  * Uses manual confirmation for proximity verification (suitable for

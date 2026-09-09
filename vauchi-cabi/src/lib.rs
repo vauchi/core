@@ -21,6 +21,7 @@ mod app_import_warnings;
 mod app_navigation;
 mod app_presentation;
 mod config;
+mod design_tokens;
 mod exchange;
 mod i18n;
 mod logging;

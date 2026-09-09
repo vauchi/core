@@ -25,6 +25,29 @@ fn backup_mime_types() -> Vec<String> {
     vec!["application/octet-stream".into(), "text/plain".into()]
 }
 
+/// Body lists mirroring the overflow choices of the two onboarding steps
+/// that used to render empty (`2026-08-07-onboarding-steps-render-empty-
+/// bodies`). Their item ids are the same action ids the context bar
+/// dispatches, so `handle_action` folds a row tap into that one path.
+const CONTACT_INFO_CHOICES: &str = "contact_info_choices";
+const WHAT_NEXT_CHOICES: &str = "what_next_choices";
+
+fn choices_as_list<'a>(id: &str, choices: impl Iterator<Item = &'a ScreenAction>) -> Component {
+    Component::ActionList {
+        id: id.into(),
+        items: choices
+            .map(|choice| ActionListItem {
+                id: choice.id.clone(),
+                label: choice.label.clone(),
+                icon: None,
+                detail: None,
+                a11y: choice.a11y.clone(),
+                info_key: None,
+            })
+            .collect(),
+    }
+}
+
 // ── Public data types ───────────────────────────────────────────────
 
 /// Data collected during onboarding.
@@ -556,32 +579,22 @@ impl OnboardingEngine {
             });
         }
 
-        let mut actions = Vec::new();
+        let mut choices = Vec::new();
         if !self.phone_input_visible {
-            actions.push(ScreenAction {
-                id: "show_phone".into(),
-                label: self.t("onboarding.add_phone"),
-                style: ActionStyle::Secondary,
-                enabled: true,
-                a11y: Some(A11y::labeled(self.t("onboarding.add_phone"))),
-            });
+            choices.push(self.secondary_action("show_phone", "onboarding.add_phone"));
         }
         if !self.email_input_visible {
-            actions.push(ScreenAction {
-                id: "show_email".into(),
-                label: self.t("onboarding.add_email"),
-                style: ActionStyle::Secondary,
-                enabled: true,
-                a11y: Some(A11y::labeled(self.t("onboarding.add_email"))),
-            });
+            choices.push(self.secondary_action("show_email", "onboarding.add_email"));
         }
-        actions.push(ScreenAction {
-            id: "add_social".into(),
-            label: self.t("onboarding.add_social"),
-            style: ActionStyle::Secondary,
-            enabled: true,
-            a11y: Some(A11y::labeled(self.t("onboarding.add_social"))),
-        });
+        choices.push(self.secondary_action("add_social", "onboarding.add_social"));
+        let skip = self.secondary_action("skip", "onboarding.skip");
+        let list = choices_as_list(
+            CONTACT_INFO_CHOICES,
+            choices.iter().chain(std::iter::once(&skip)),
+        );
+        components.push(list);
+
+        let mut actions = choices;
         actions.push(ScreenAction {
             id: "continue".into(),
             label: self.t("action.continue"),
@@ -589,13 +602,7 @@ impl OnboardingEngine {
             enabled: true,
             a11y: Some(A11y::labeled(self.t("action.continue"))),
         });
-        actions.push(ScreenAction {
-            id: "skip".into(),
-            label: self.t("onboarding.skip"),
-            style: ActionStyle::Secondary,
-            enabled: true,
-            a11y: Some(A11y::labeled(self.t("onboarding.skip"))),
-        });
+        actions.push(skip);
 
         ScreenModel {
             screen_id: "contact_info".into(),
@@ -609,50 +616,53 @@ impl OnboardingEngine {
     }
 
     fn build_what_next(&self) -> ScreenModel {
+        let choices = [
+            self.secondary_action("exchange", "onboarding.exchange_cards"),
+            self.secondary_action("import_contacts", "onboarding.import_existing"),
+        ];
+        let list = choices_as_list(WHAT_NEXT_CHOICES, choices.iter());
+        // The final onboarding step's job is to land the user
+        // in the app — "Start using the app" is the natural
+        // exit, so it owns the primary affordance. Exchange
+        // and Import remain as optional shortcuts for users
+        // who know exactly what they want to do first.
+        //
+        // "Read about security" and "Read about backup" were
+        // peers here until 2026-05-21; they came off this
+        // screen because the docs reading list belonged in
+        // Help, not on the onboarding finish line — the
+        // 5-button flat menu hid which option actually
+        // ended onboarding. See
+        // _private/docs/problems/2026-05-21-mobile-onboarding-
+        // final-step-and-skip-fold G2/G3.
+        let mut actions = vec![ScreenAction {
+            id: "start_app".into(),
+            label: self.t("onboarding.start_app"),
+            style: ActionStyle::Primary,
+            enabled: true,
+            a11y: Some(A11y::labeled(self.t("onboarding.start_app"))),
+        }];
+        actions.extend(choices);
+
         ScreenModel {
             screen_id: "what_next".into(),
             title: self.t("onboarding.done_title"),
             subtitle: Some(self.t("onboarding.done_subtitle")),
-            components: vec![],
-            contextual_actions: vec![
-                // The final onboarding step's job is to land the user
-                // in the app — "Start using the app" is the natural
-                // exit, so it owns the primary affordance. Exchange
-                // and Import remain as optional shortcuts for users
-                // who know exactly what they want to do first.
-                //
-                // "Read about security" and "Read about backup" were
-                // peers here until 2026-05-21; they came off this
-                // screen because the docs reading list belonged in
-                // Help, not on the onboarding finish line — the
-                // 5-button flat menu hid which option actually
-                // ended onboarding. See
-                // _private/docs/problems/2026-05-21-mobile-onboarding-
-                // final-step-and-skip-fold G2/G3.
-                ScreenAction {
-                    id: "start_app".into(),
-                    label: self.t("onboarding.start_app"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.start_app"))),
-                },
-                ScreenAction {
-                    id: "exchange".into(),
-                    label: self.t("onboarding.exchange_cards"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.exchange_cards"))),
-                },
-                ScreenAction {
-                    id: "import_contacts".into(),
-                    label: self.t("onboarding.import_existing"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.import_existing"))),
-                },
-            ],
+            components: vec![list],
+            contextual_actions: actions,
             progress: self.progress(4),
             ..Default::default()
+        }
+    }
+
+    fn secondary_action(&self, id: &str, label_key: &str) -> ScreenAction {
+        let label = self.t(label_key);
+        ScreenAction {
+            id: id.into(),
+            a11y: Some(A11y::labeled(label.clone())),
+            label,
+            style: ActionStyle::Secondary,
+            enabled: true,
         }
     }
 
@@ -1054,6 +1064,15 @@ impl WorkflowEngine for OnboardingEngine {
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        let action = match action {
+            UserAction::ListItemSelected {
+                component_id,
+                item_id,
+            } if component_id == CONTACT_INFO_CHOICES || component_id == WHAT_NEXT_CHOICES => {
+                UserAction::ActionPressed { action_id: item_id }
+            }
+            other => other,
+        };
         match self.step {
             Step::IdentityCheck => self.handle_identity_check(&action),
             Step::DeviceLinkInstructions => self.handle_device_link_instructions(&action),

@@ -265,7 +265,12 @@ pub enum Command {
     ///
     /// `accepted_mime_types` is advisory — frontends may default to a
     /// coarser superset on platforms where the OS picker doesn't filter
-    /// by MIME (e.g., older Android versions). `purpose` lets the
+    /// by MIME (e.g., older Android versions). `accepted_extensions`
+    /// carries the same filter as lowercase, dot-less extensions for
+    /// pickers that filter by extension or UTType instead (WinUI,
+    /// iOS); an empty list means "any file". Both lists are derived
+    /// from `purpose` (see [`FilePickPurpose::accepted_extensions`]),
+    /// so shells never need a MIME table (ADR-066). `purpose` lets the
     /// frontend label the picker dialog without hardcoding strings;
     /// label text comes from core's locale store via `t(key)`.
     ///
@@ -281,6 +286,8 @@ pub enum Command {
     /// future key bundles, etc.).
     FilePickFromUser {
         accepted_mime_types: Vec<String>,
+        #[serde(default)]
+        accepted_extensions: Vec<String>,
         purpose: FilePickPurpose,
     },
 
@@ -529,6 +536,19 @@ pub enum FilePickPurpose {
     /// Reserved for future imports — frontends look up `label_key`
     /// in the locale store.
     Other { label_key: String },
+}
+
+impl FilePickPurpose {
+    /// Lowercase, dot-less file extensions a picker for this purpose
+    /// should accept; empty means "any file".
+    pub fn accepted_extensions(&self) -> Vec<String> {
+        let extensions: &[&str] = match self {
+            Self::ImportContacts => &["vcf", "vcard"],
+            Self::ImportBackup => &["vauchi"],
+            Self::Other { .. } => &[],
+        };
+        extensions.iter().map(|ext| (*ext).to_string()).collect()
+    }
 }
 
 impl Command {
@@ -1051,14 +1071,17 @@ mod tests {
             Command::SwitchCamera { use_front: false },
             Command::FilePickFromUser {
                 accepted_mime_types: vec!["text/vcard".into(), "text/x-vcard".into()],
+                accepted_extensions: vec![],
                 purpose: FilePickPurpose::ImportContacts,
             },
             Command::FilePickFromUser {
                 accepted_mime_types: vec!["application/octet-stream".into()],
+                accepted_extensions: vec![],
                 purpose: FilePickPurpose::ImportBackup,
             },
             Command::FilePickFromUser {
                 accepted_mime_types: vec![],
+                accepted_extensions: vec![],
                 purpose: FilePickPurpose::Other {
                     label_key: "import.key_bundle".into(),
                 },
@@ -1312,6 +1335,7 @@ mod tests {
             Command::SwitchCamera { use_front: false },
             Command::FilePickFromUser {
                 accepted_mime_types: vec![],
+                accepted_extensions: vec![],
                 purpose: FilePickPurpose::ImportContacts,
             },
         ];
@@ -1418,14 +1442,17 @@ mod tests {
     fn file_pick_from_user_command_stores_purpose_and_mime() {
         let cmd = Command::FilePickFromUser {
             accepted_mime_types: vec!["text/vcard".into(), "text/x-vcard".into()],
+            accepted_extensions: vec!["vcf".into()],
             purpose: FilePickPurpose::ImportContacts,
         };
         match cmd {
             Command::FilePickFromUser {
                 accepted_mime_types,
+                accepted_extensions,
                 purpose,
             } => {
                 assert_eq!(accepted_mime_types, vec!["text/vcard", "text/x-vcard"]);
+                assert_eq!(accepted_extensions, vec!["vcf"]);
                 assert_eq!(purpose, FilePickPurpose::ImportContacts);
             }
             other => panic!("expected FilePickFromUser, got {:?}", other),
@@ -1509,6 +1536,7 @@ mod tests {
     fn file_pick_from_user_variant_name_is_stable() {
         let cmd = Command::FilePickFromUser {
             accepted_mime_types: vec![],
+            accepted_extensions: vec![],
             purpose: FilePickPurpose::ImportBackup,
         };
         assert_eq!(cmd.variant_name(), "FilePickFromUser");

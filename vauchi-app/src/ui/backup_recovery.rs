@@ -608,6 +608,7 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 ActionResult::Commands {
                     commands: vec![Command::FilePickFromUser {
                         accepted_mime_types: backup_mime_types(),
+                        accepted_extensions: FilePickPurpose::ImportBackup.accepted_extensions(),
                         purpose: FilePickPurpose::ImportBackup,
                     }],
                 }

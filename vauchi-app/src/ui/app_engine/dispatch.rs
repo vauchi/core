@@ -325,6 +325,8 @@ impl AppEngine {
             return Some(ActionResult::Commands {
                 commands: vec![vauchi_core::Command::FilePickFromUser {
                     accepted_mime_types: vcf_mime_types(),
+                    accepted_extensions: vauchi_core::FilePickPurpose::ImportContacts
+                        .accepted_extensions(),
                     purpose: vauchi_core::FilePickPurpose::ImportContacts,
                 }],
             });

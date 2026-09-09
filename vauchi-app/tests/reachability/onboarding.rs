@@ -16,8 +16,7 @@
 use std::collections::BTreeSet;
 
 use vauchi_app::ui::testing::{assert_reachability, check_reachability, check_static_reachability};
-use vauchi_app::ui::{OnboardingEngine, UserAction, WorkflowEngine};
-use vauchi_core::types::OnboardingStep as Step;
+use vauchi_app::ui::{OnboardingEngine, WorkflowEngine};
 
 /// Action ids `handle_identity_check` consumes
 /// (`core/vauchi-app/src/ui/onboarding.rs:644`).

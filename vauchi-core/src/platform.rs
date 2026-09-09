@@ -189,12 +189,15 @@ pub enum Command {
     BleStopScanning,
 
     // Appended to preserve serde discriminant ordering.
-    /// Send an exchange payload over a direct transport (USB cable / local TCP).
+    /// Swap opaque bytes with the peer over a direct transport (USB cable /
+    /// local TCP). The wired exchange issues this command once per leg (key
+    /// payload, then encrypted card); the bytes carry no leg discriminator
+    /// and the shell must not need one (ADR-066).
     ///
     /// The frontend should:
-    /// 1. Send `payload` to the peer over the established TCP connection
-    /// 2. Receive the peer's payload from the same connection
-    /// 3. Report the peer's data via [`Event::DirectPayloadReceived`]
+    /// 1. Send `payload` to the peer over a fresh TCP connection
+    /// 2. Receive the peer's bytes from the same connection
+    /// 3. Report them via [`Event::DirectPayloadReceived`]
     ///
     /// The `is_initiator` flag determines send/recv ordering to avoid deadlock
     /// (initiator sends first, responder receives first).
@@ -319,14 +322,12 @@ pub enum Command {
     SetOrientationLock { orientation: Option<Orientation> },
 
     // Appended to preserve serde discriminant ordering.
-    /// Send our AEAD-encrypted `ContactCard` to the peer over the established
-    /// USB / direct-TCP connection (the second leg of the wired exchange, after
-    /// the key-bearing [`Command::DirectSend`] / [`Event::DirectPayloadReceived`]
-    /// round). `ciphertext` is our card encrypted under a key HKDF-derived from
-    /// the agreed `shared_key` (ADR-019 XChaCha20-Poly1305, ADR-007 domain
-    /// separation). The frontend sends it and reports the peer's encrypted card
-    /// via [`Event::DirectCardReceived`]. `is_initiator` keeps the same
-    /// send/recv ordering discriminator as `DirectSend` (avoids TCP deadlock).
+    /// Retired card-leg command. Core never emits it any more: the encrypted
+    /// card rides [`Command::DirectSend`] like the key payload. The variant
+    /// stays for one release so shells built against the split contract still
+    /// compile; remove it (and `Event::DirectCardReceived`) in the release
+    /// after every shell handles the card leg as a plain `DirectSend`.
+    #[deprecated(note = "ADR-066: core emits DirectSend for both wired legs")]
     DirectSendCard {
         ciphertext: Vec<u8>,
         is_initiator: bool,
@@ -537,6 +538,7 @@ impl Command {
             Self::ShowShareSheet { .. } => "ShowShareSheet",
             Self::BleStopScanning => "BleStopScanning",
             Self::DirectSend { .. } => "DirectSend",
+            #[allow(deprecated)]
             Self::DirectSendCard { .. } => "DirectSendCard",
             Self::ImagePickFromLibrary => "ImagePickFromLibrary",
             Self::ImageCaptureFromCamera => "ImageCaptureFromCamera",
@@ -707,11 +709,12 @@ pub enum Event {
     /// Blob retrieved from relay escrow gate (response to `RelayEscrowRetrieve`).
     RelayEscrowBlobReceived { gate_hash: Vec<u8>, blob: Vec<u8> },
 
-    /// Peer's exchange payload received over a direct transport.
+    /// The peer's bytes received over a direct transport.
     ///
-    /// Sent by the frontend after completing the TCP exchange requested
-    /// by [`Command::DirectSend`]. Contains the raw bytes of
-    /// the peer's exchange payload (QR data string format).
+    /// Sent by the frontend after completing the TCP swap requested by
+    /// [`Command::DirectSend`]. Core decides from the exchange phase whether
+    /// the bytes are the peer's key payload or its encrypted card; the shell
+    /// forwards them unchanged (ADR-066).
     DirectPayloadReceived { data: Vec<u8> },
 
     // ── Image picking (avatar editor, ADR-042) ─────────────────────
@@ -765,10 +768,11 @@ pub enum Event {
     BleMtuNegotiated { device_id: String, mtu: u32 },
 
     // Appended to preserve serde discriminant ordering.
-    /// The peer's AEAD-encrypted `ContactCard`, reported by the frontend after
-    /// the second USB / direct-TCP swap requested by [`Command::DirectSendCard`].
-    /// The session decrypts it under the HKDF-derived card key and completes the
-    /// exchange (USB is physical → proximity High, no user step).
+    /// Retired card-leg event, still accepted for one release and handled
+    /// exactly like [`Event::DirectPayloadReceived`]. Remove it together with
+    /// `Command::DirectSendCard` once every shell reports the card leg as
+    /// `DirectPayloadReceived`.
+    #[deprecated(note = "ADR-066: report the card leg as DirectPayloadReceived")]
     DirectCardReceived { ciphertext: Vec<u8> },
     /// A Core-minted interaction on a presented surface was activated.
     ActionActivated {

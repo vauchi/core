@@ -487,9 +487,11 @@ fn usb_direct_payload_on_qr_session_is_rejected() {
 // ── Real card round-trip (no hand-feeding) ──────────────────────
 //
 // `2026-06-05-usb-card-exchange-protocol`: each session learns the *peer's*
-// ContactCard ONLY via the encrypted `DirectSendCard` / `DirectCardReceived`
-// round — proving the wire actually carries the card. (The ceremony test
-// above hand-feeds both cards, so it never exercised this.)
+// ContactCard ONLY via the encrypted card leg — proving the wire actually
+// carries the card. (The ceremony test above hand-feeds both cards, so it
+// never exercised this.) These two tests drive the leg through the retired
+// `DirectCardReceived` event, pinning that legacy shells keep working for one
+// release; the opaque-payload tests below cover the current contract.
 
 fn card_with_email(identity: &Identity, email: &str) -> ContactCard {
     let mut card = ContactCard::new(identity.display_name());
@@ -528,14 +530,15 @@ fn key_agree_and_get_card_ciphertext(
         .drain_commands()
         .into_iter()
         .find_map(|c| match c {
-            Command::DirectSendCard { ciphertext, .. } => Some(ciphertext),
+            Command::DirectSend { payload, .. } => Some(payload),
             _ => None,
         })
-        .expect("PerformKeyAgreement must emit DirectSendCard for USB")
+        .expect("PerformKeyAgreement must emit the card-leg DirectSend for USB")
 }
 
 // @internal
 #[test]
+#[allow(deprecated)]
 fn usb_card_round_trip_completes_with_peer_card() {
     let alice_id = create_identity("Alice");
     let bob_id = create_identity("Bob");
@@ -607,6 +610,7 @@ fn usb_card_round_trip_completes_with_peer_card() {
 
 // @internal
 #[test]
+#[allow(deprecated)]
 fn usb_tampered_card_ciphertext_is_rejected() {
     let alice_id = create_identity("Alice");
     let bob_id = create_identity("Bob");

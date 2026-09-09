@@ -6,8 +6,8 @@
 //!
 //! Cable graduation (`2026-05-11-direct-transport-engine-graduation`). The
 //! engine owns a `new_usb` `ExchangeSession`; its exchange / verifying / success
-//! screens are driven by USB *hardware* events (DirectPayloadReceived →
-//! DirectCardReceived), not actions, so the action walker only reaches the two
+//! screens are driven by USB *hardware* events (two opaque
+//! DirectPayloadReceived legs), not actions, so the action walker only reaches the two
 //! action-rooted screens:
 //!
 //! - **Waiting** (`exchange_direct_waiting`) — the entry screen, whose only

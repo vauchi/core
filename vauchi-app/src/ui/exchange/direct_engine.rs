@@ -19,9 +19,9 @@
 //!   peer's `ExchangeQR` (→ `AwaitingKeyAgreement`), then the engine
 //!   auto-advances `PerformKeyAgreement`. For USB that derives the shared key,
 //!   sets proximity High (the cable IS the proximity proof), transitions to
-//!   `AwaitingCardExchange`, and emits `Command::DirectSendCard` (our encrypted
+//!   `AwaitingCardExchange`, and emits a second `Command::DirectSend` (our encrypted
 //!   card). No separate `ProximityCheckCompleted` — key agreement sets it.
-//! - **Phase B** — on [`Event::DirectCardReceived`]: the session decrypts the
+//! - **Phase B** — on the next [`Event::DirectPayloadReceived`]: the session decrypts the
 //!   peer's card and completes the exchange internally. The engine then runs the
 //!   shared completion machinery (reciprocity confirmer + success summary +
 //!   state sync).
@@ -490,9 +490,10 @@ impl WorkflowEngine for DirectTransportEngine {
             .unwrap_or_default();
 
         // Phase A: USB auto-advance. After DirectPayloadReceived →
-        // AwaitingKeyAgreement, drive PerformKeyAgreement (emits DirectSendCard,
-        // sets proximity High internally for USB). The peer's card arrives later
-        // as DirectCardReceived (Phase B), which completes the session.
+        // AwaitingKeyAgreement, drive PerformKeyAgreement (emits the card-leg
+        // DirectSend, sets proximity High internally for USB). The peer's card
+        // arrives later as another DirectPayloadReceived (Phase B), which
+        // completes the session.
         let needs_key_agreement = self.session.as_ref().is_some_and(|s| {
             matches!(s.state(), ExchangeState::AwaitingKeyAgreement { .. })
                 && s.transport() == ExchangeTransport::Usb
@@ -590,7 +591,7 @@ mod tests {
             .expect("a DirectSend command")
     }
 
-    /// Pull the `DirectSendCard` ciphertext out of an `ActionResult::Commands`.
+    /// Pull the card-leg `DirectSend` bytes out of an `ActionResult::Commands`.
     fn direct_send_card(result: &ActionResult) -> Vec<u8> {
         let ActionResult::Commands { commands } = result else {
             panic!("expected Commands, got {result:?}");
@@ -598,10 +599,10 @@ mod tests {
         commands
             .iter()
             .find_map(|c| match c {
-                Command::DirectSendCard { ciphertext, .. } => Some(ciphertext.clone()),
+                Command::DirectSend { payload, .. } => Some(payload.clone()),
                 _ => None,
             })
-            .expect("a DirectSendCard command")
+            .expect("a card-leg DirectSend command")
     }
 
     // @internal
@@ -745,7 +746,8 @@ mod tests {
     }
 
     /// Full real-crypto round-trip between two engines: payload leg (Phase A,
-    /// emits DirectSendCard) then card leg (Phase B, completes the session).
+    /// emits the card-leg DirectSend) then card leg (Phase B, completes the
+    /// session) — both reported by the shell as opaque DirectPayloadReceived.
     /// Each engine ends with the exchange complete and a success summary naming
     /// the *peer* — proving the USB ceremony drives a genuine exchange (C-1).
     // @internal
@@ -775,10 +777,10 @@ mod tests {
 
         // Phase B: deliver the peer's encrypted card → session completes.
         let _ = alice
-            .handle_hardware_event(Event::DirectCardReceived { ciphertext: b_card })
+            .handle_hardware_event(Event::DirectPayloadReceived { data: b_card })
             .expect("alice phase B");
         let _ = bob
-            .handle_hardware_event(Event::DirectCardReceived { ciphertext: a_card })
+            .handle_hardware_event(Event::DirectPayloadReceived { data: a_card })
             .expect("bob phase B");
 
         // After completion the engine either confirms reciprocity (Verifying)

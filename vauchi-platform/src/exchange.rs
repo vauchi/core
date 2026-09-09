@@ -121,7 +121,8 @@ pub enum MobileCommand {
         payload: Vec<u8>,
         is_initiator: bool,
     },
-    // USB/direct-transport card-exchange second leg: send our encrypted card.
+    // Retired: core now emits DirectSend for the card leg too. Kept one release
+    // so generated Swift/Kotlin stays source-compatible; drop with core's variant.
     DirectSendCard {
         ciphertext: Vec<u8>,
         is_initiator: bool,
@@ -223,6 +224,7 @@ impl From<Command> for MobileCommand {
                 payload,
                 is_initiator,
             },
+            #[allow(deprecated)]
             Command::DirectSendCard {
                 ciphertext,
                 is_initiator,
@@ -352,7 +354,8 @@ pub enum MobileEvent {
     DirectPayloadReceived {
         data: Vec<u8>,
     },
-    // USB/direct-transport card-exchange second leg: the peer's encrypted card.
+    // Retired: report the card leg as DirectPayloadReceived. Kept one release
+    // for source compatibility; drop with core's variant.
     DirectCardReceived {
         ciphertext: Vec<u8>,
     },
@@ -492,6 +495,7 @@ impl From<MobileEvent> for Event {
             MobileEvent::LinkShared => Self::LinkShared,
             MobileEvent::LinkOpened { peer_public_key } => Self::LinkOpened { peer_public_key },
             MobileEvent::DirectPayloadReceived { data } => Self::DirectPayloadReceived { data },
+            #[allow(deprecated)]
             MobileEvent::DirectCardReceived { ciphertext } => {
                 Self::DirectCardReceived { ciphertext }
             }

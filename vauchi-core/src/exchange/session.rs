@@ -959,13 +959,10 @@ impl ExchangeSession {
             }
             Event::HardwareUnavailable { transport } => self.handle_hardware_unavailable(transport),
             Event::PermissionDenied { transport } => self.handle_permission_denied(transport),
-            Event::DirectPayloadReceived { data } => {
-                let payload_str =
-                    String::from_utf8(data).map_err(|_| ExchangeError::InvalidQRFormat)?;
-                self.handle_direct_payload_received(payload_str)
-            }
+            Event::DirectPayloadReceived { data } => self.handle_direct_bytes_received(data),
+            #[allow(deprecated)]
             Event::DirectCardReceived { ciphertext } => {
-                self.handle_direct_card_received(ciphertext)
+                self.handle_direct_bytes_received(ciphertext)
             }
             Event::AudioSamplesRecorded { .. } => {
                 // Audio proximity response — trigger proximity check.
@@ -1569,7 +1566,7 @@ impl ExchangeSession {
         // the second wire leg (the peer decrypts with the same shared key). Built
         // here, before `shared_key` moves into the state below.
         let usb_card_command = if self.transport == ExchangeTransport::Usb {
-            Some(self.build_direct_send_card(&shared_key)?)
+            Some(self.build_card_leg_command(&shared_key)?)
         } else {
             None
         };
@@ -1749,21 +1746,32 @@ impl ExchangeSession {
         Ok(())
     }
 
-    fn handle_direct_payload_received(
-        &mut self,
-        their_payload: String,
-    ) -> Result<(), ExchangeError> {
+    /// The shell reports every wired swap as opaque bytes; only the session
+    /// knows which leg it is on (ADR-066), so the exchange phase decides
+    /// whether the bytes are the peer's key payload or its encrypted card.
+    fn handle_direct_bytes_received(&mut self, data: Vec<u8>) -> Result<(), ExchangeError> {
         if self.transport != ExchangeTransport::Usb {
             return Err(ExchangeError::InvalidState(
                 "DirectPayloadReceived requires Usb transport".into(),
             ));
         }
-        if !matches!(self.state, ExchangeState::AwaitingDirectPayload { .. }) {
-            return Err(ExchangeError::InvalidState(
-                "Can only receive direct payload from AwaitingDirectPayload state".into(),
-            ));
+        match self.state {
+            ExchangeState::AwaitingDirectPayload { .. } => {
+                let payload_str =
+                    String::from_utf8(data).map_err(|_| ExchangeError::InvalidQRFormat)?;
+                self.handle_direct_payload_received(payload_str)
+            }
+            ExchangeState::AwaitingCardExchange { .. } => self.handle_direct_card_received(data),
+            _ => Err(ExchangeError::InvalidState(
+                "Direct payload is only accepted while awaiting the peer's payload or card".into(),
+            )),
         }
+    }
 
+    fn handle_direct_payload_received(
+        &mut self,
+        their_payload: String,
+    ) -> Result<(), ExchangeError> {
         // Parse their payload (same format as QR data string)
         let qr = ExchangeQR::from_data_string(&their_payload)?;
 
@@ -1813,9 +1821,9 @@ impl ExchangeSession {
         crate::crypto::SymmetricKey::from_bytes(*derived)
     }
 
-    /// Build the `DirectSendCard` command — our card serialized + AEAD-encrypted
-    /// under the USB card key.
-    fn build_direct_send_card(
+    /// Build the card-leg `DirectSend` command — our card serialized +
+    /// AEAD-encrypted under the USB card key. The shell sees only bytes.
+    fn build_card_leg_command(
         &self,
         shared_key: &crate::crypto::SymmetricKey,
     ) -> Result<Command, ExchangeError> {
@@ -1824,8 +1832,8 @@ impl ExchangeSession {
             serde_json::to_vec(&self.our_card).map_err(|_| ExchangeError::SerializationFailed)?;
         let ciphertext = crate::crypto::encryption::encrypt(&card_key, &plaintext)
             .map_err(|_| ExchangeError::SerializationFailed)?;
-        Ok(Command::DirectSendCard {
-            ciphertext,
+        Ok(Command::DirectSend {
+            payload: ciphertext,
             is_initiator: self.usb_role == Some(UsbRole::Initiator),
         })
     }
@@ -1833,16 +1841,11 @@ impl ExchangeSession {
     /// Handle the peer's encrypted card (USB second leg): decrypt under the
     /// shared card key, parse, and complete the exchange.
     fn handle_direct_card_received(&mut self, ciphertext: Vec<u8>) -> Result<(), ExchangeError> {
-        if self.transport != ExchangeTransport::Usb {
-            return Err(ExchangeError::InvalidState(
-                "DirectCardReceived requires Usb transport".into(),
-            ));
-        }
         let shared_key = match &self.state {
             ExchangeState::AwaitingCardExchange { shared_key, .. } => shared_key.clone(),
             _ => {
                 return Err(ExchangeError::InvalidState(
-                    "DirectCardReceived requires AwaitingCardExchange state".into(),
+                    "The card leg requires AwaitingCardExchange state".into(),
                 ));
             }
         };

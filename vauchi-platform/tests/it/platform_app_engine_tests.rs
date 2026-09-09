@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use vauchi_platform::{
     MobileBleLinkDirection, MobileEvent, MobileLocale, MobileTabLayout, PlatformAppEngine,
-    PlatformAppEngineTestHelpers, PlatformEventListener,
+    PlatformAppEngineTestHelpers, PlatformEventListener, hardware_event_json,
 };
 
 /// Helper: create a PlatformAppEngine with a temp directory.
@@ -1049,9 +1049,9 @@ fn qr_scanned_hardware_event_routes_to_session_when_on_multi_stage_screen() {
     // internally, but it must still return a generic presentation batch and
     // never expose the retired ActionResult envelope.
     let result_json = engine
-        .handle_hardware_event(MobileEvent::QrScanned {
+        .dispatch_json(hardware_event_json(MobileEvent::QrScanned {
             data: "garbage-not-an-init-frame".into(),
-        })
+        }))
         .expect("hardware event accepted");
     let v: serde_json::Value =
         serde_json::from_str(&result_json).expect("parse hardware event envelope");
@@ -1099,11 +1099,11 @@ fn glance_scanning_a_peer_qr_connects_only_to_that_peer() {
 
     // A's BLE scan first surfaces a FOREIGN advertiser A never scanned → ignored.
     let foreign = a
-        .handle_hardware_event(MobileEvent::BleDeviceDiscovered {
+        .dispatch_json(hardware_event_json(MobileEvent::BleDeviceDiscovered {
             id: "mallory-device".into(),
             rssi: -40,
             adv_data: vec![0xAB; 32],
-        })
+        }))
         .expect("foreign discovery accepted");
     assert!(
         !foreign.contains("mallory-device"),
@@ -1112,11 +1112,11 @@ fn glance_scanning_a_peer_qr_connects_only_to_that_peer() {
 
     // Then B is discovered advertising the scanned identity → A connects to B.
     let discovery = a
-        .handle_hardware_event(MobileEvent::BleDeviceDiscovered {
+        .dispatch_json(hardware_event_json(MobileEvent::BleDeviceDiscovered {
             id: "b-device".into(),
             rssi: -40,
             adv_data: b_identity.to_vec(),
-        })
+        }))
         .expect("B discovery accepted");
     assert!(
         discovery.contains("BleConnect") && discovery.contains("b-device"),
@@ -1174,7 +1174,7 @@ fn biometric_unlock_succeeded_hardware_event_returns_authentication_command_when
     let (engine, _dir) = create_engine();
 
     let result_json = engine
-        .handle_hardware_event(MobileEvent::BiometricUnlockSucceeded)
+        .dispatch_json(hardware_event_json(MobileEvent::BiometricUnlockSucceeded))
         .expect("biometric event accepted");
     let v: serde_json::Value =
         serde_json::from_str(&result_json).expect("parse biometric result envelope");
@@ -1307,11 +1307,11 @@ fn ble_machine_terminal_event_fires_invalidation_and_flips_chrome() {
     // device is the initiator and the discovery builds the
     // AppEngine-owned handshake session.
     engine
-        .handle_hardware_event(MobileEvent::BleDeviceDiscovered {
+        .dispatch_json(hardware_event_json(MobileEvent::BleDeviceDiscovered {
             id: "AA:BB:CC:DD:EE:FF".into(),
             rssi: -40,
             adv_data: vec![0xff, 0xff, 0xff, 0xff],
-        })
+        }))
         .expect("discovery");
 
     // A malformed data chunk drives the machine to a terminal Failed
@@ -1319,12 +1319,14 @@ fn ble_machine_terminal_event_fires_invalidation_and_flips_chrome() {
     // event was invisible: the frontend kept rendering "Exchanging..."
     // forever (P5b re-test, `2026-06-06-android-ble-execution`).
     engine
-        .handle_hardware_event(MobileEvent::BleCharacteristicNotified {
-            device_id: "peer-1".into(),
-            direction: MobileBleLinkDirection::Outbound,
-            uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567897".into(),
-            data: vec![0u8; 8],
-        })
+        .dispatch_json(hardware_event_json(
+            MobileEvent::BleCharacteristicNotified {
+                device_id: "peer-1".into(),
+                direction: MobileBleLinkDirection::Outbound,
+                uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567897".into(),
+                data: vec![0u8; 8],
+            },
+        ))
         .expect("malformed chunk");
 
     assert_eq!(
@@ -1378,12 +1380,14 @@ fn poll_notifications_on_ble_discovery_fires_invalidation() {
 // @internal
 #[test]
 fn ble_discovery_via_dispatch_json_builds_the_same_session_as_the_typed_seam() {
-    // ADR-066 admits one Event input. Today the BLE handshake session is
-    // built only inside PlatformAppEngine::handle_hardware_event — an event
-    // arriving through the canonical dispatch_json envelope misses the
-    // session-building routing. Two identically-driven engines must produce
-    // the same observable outcome (a BleConnect command for the tiebreak
-    // winner) whichever envelope carries the same discovery.
+    // ADR-066 admits one Event input; the retired typed shim
+    // (`PlatformAppEngine::handle_hardware_event`) and the canonical
+    // `dispatch_json` envelope both fed the same `AppEngine::dispatch`
+    // session-building routing. This proves the `hardware_event_json`
+    // codec (the language-native wrapper real shells use to build the
+    // JSON before calling `dispatch_json`) still reaches the same
+    // observable outcome (a BleConnect command for the tiebreak winner)
+    // as a hand-authored envelope literal.
     let (typed, _dt) = create_engine();
     drive_onboarding(&typed);
     typed
@@ -1400,11 +1404,11 @@ fn ble_discovery_via_dispatch_json_builds_the_same_session_as_the_typed_seam() {
     // so each engine is the initiator and the discovery must build the
     // AppEngine-owned handshake session.
     let typed_json = typed
-        .handle_hardware_event(MobileEvent::BleDeviceDiscovered {
+        .dispatch_json(hardware_event_json(MobileEvent::BleDeviceDiscovered {
             id: "AA:BB:CC:DD:EE:FF".into(),
             rssi: -40,
             adv_data: vec![0xff, 0xff, 0xff, 0xff],
-        })
+        }))
         .expect("typed seam accepts discovery");
     assert!(
         typed_json.contains("BleConnect"),
@@ -1438,9 +1442,9 @@ fn qr_scanned_via_dispatch_json_routes_to_multi_stage_session_like_the_typed_sea
     drive_to_multi_stage(&canonical);
 
     let typed_json = typed
-        .handle_hardware_event(MobileEvent::QrScanned {
+        .dispatch_json(hardware_event_json(MobileEvent::QrScanned {
             data: "garbage-not-an-init-frame".into(),
-        })
+        }))
         .expect("typed seam accepts scan");
 
     let canonical_json = canonical

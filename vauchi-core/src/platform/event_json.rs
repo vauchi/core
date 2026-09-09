@@ -2,17 +2,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::{Event, InputValue};
+use crate::backup::MAX_FULL_BACKUP_BYTES;
 
 /// Maximum JSON payload accepted by the generic presentation dispatch path.
 ///
-/// 64 KiB holds every presentation event because the byte-bearing variants
-/// (`ImageReceived`, `FilePickedFromUser`, `AudioSamplesRecorded`, and the
-/// BLE/NFC payloads) reach Core through the typed `handle_hardware_event`
-/// seam rather than this JSON path. That seam is the `split_dispatch_api`
-/// debt ADR-066 drives to zero — when it is retired those variants move
-/// here, and this ceiling must be re-derived from the largest legitimate
-/// payload (a user-picked backup, `MAX_FULL_BACKUP_BYTES`) before it is.
-pub const MAX_EVENT_JSON_BYTES: usize = 64 * 1024;
+/// Every shell event, byte-bearing hardware events included, travels this
+/// path (ADR-066 retires the typed hardware-event seam), so the
+/// ceiling is derived from the largest legitimate payload: a user-picked
+/// full backup of [`MAX_FULL_BACKUP_BYTES`]. Serde spells each byte as up to
+/// four JSON characters (`255,`); the envelope allowance covers the variant
+/// tag, field names, and the filename.
+pub const MAX_EVENT_JSON_BYTES: usize = MAX_FULL_BACKUP_BYTES * 4 + MAX_EVENT_ENVELOPE_BYTES;
+const MAX_EVENT_ENVELOPE_BYTES: usize = 4 * 1024;
 /// Maximum object/array nesting accepted before event deserialization.
 pub const MAX_EVENT_JSON_NESTING_DEPTH: usize = 16;
 /// Maximum raw text or choice value accepted from a presented input.

@@ -292,3 +292,45 @@ fn sync_now_action_pressed_does_not_panic() {
         "engine still emits a populated screen after sync_now"
     );
 }
+
+// ---------------------------------------------------------------------------
+// sync_now must establish the OHTTP session before syncing
+// ---------------------------------------------------------------------------
+
+// A fresh process has no OHTTP key; `Vauchi::sync()` then returns
+// `NotConnected` without doing anything. The Sync chip is the only sync
+// trigger the shells have, so it must connect first — and report the
+// attempt's failure instead of leaving the chip on "Sync" as if nothing
+// had been asked. Seen on two Android phones 2026-09-09: every tap on
+// Sync after an app start was a silent no-op.
+// @scenario: sync_chrome :: Sync now connects before syncing
+#[cfg(feature = "network-http")]
+#[test]
+fn sync_now_without_a_session_attempts_to_connect_and_reports_failure() {
+    use vauchi_core::api::VauchiConfig;
+    use vauchi_core::crypto::SymmetricKey;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+        .with_storage_key(SymmetricKey::generate())
+        .with_relay_url("http://127.0.0.1:1")
+        .with_ohttp_relay_url("http://127.0.0.1:2");
+    let mut vauchi = Vauchi::new(config).expect("vauchi");
+    vauchi.create_identity("Alice").expect("identity");
+    assert!(!vauchi.has_ohttp_key(), "test premise: no session yet");
+    let mut engine = AppEngine::new(vauchi);
+    add_contact(&engine, "Bob");
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "sync_now".into(),
+    });
+
+    let screen = engine.current_screen();
+    let (label, kind, _) = find_sync_indicator(&screen.components).expect("sync indicator present");
+    assert_eq!(
+        (label, kind),
+        ("Sync failed", &IndicatorKind::Error),
+        "sync_now must try to connect (which fails against an unreachable relay) \
+         rather than silently skipping the sync"
+    );
+}

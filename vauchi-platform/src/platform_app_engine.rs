@@ -273,6 +273,14 @@ impl PlatformAppEngine {
     }
 
     /// Reduce one canonical event into the next ordered command batch.
+    ///
+    /// The one hardware-event entry (ADR-066 split_dispatch_api): the
+    /// multi-stage QR auto-route, BLE discovery session-building, the
+    /// handshake-machine gate, and the terminal-event invalidation all
+    /// live in `AppEngine::dispatch`. Native callers encode a
+    /// `vauchi_core::Event` with the `hardware_event_json` codec and feed
+    /// the result here; the retired typed hardware-event shim had no
+    /// other behavior this path doesn't already cover.
     pub fn dispatch_json(&self, event_json: String) -> Result<String, MobileError> {
         let event = event_from_json(&event_json)?;
         let (commands, fire_invalidation) = {
@@ -320,40 +328,6 @@ impl PlatformAppEngine {
             MobileTabLayout::Desktop => engine.sidebar_items(locale.into()),
         };
         Ok(items.into_iter().map(MobileTabInfo::from).collect())
-    }
-}
-
-#[uniffi::export]
-impl PlatformAppEngine {
-    /// Reduce a typed hardware event into the next generic command batch.
-    ///
-    /// This is the typed UniFFI companion to [`Self::dispatch_json`]. It keeps
-    /// native callers from hand-encoding hardware payloads while preserving the
-    /// same Event -> Command protocol used by every presentation interaction.
-    pub fn handle_hardware_event(&self, event: crate::MobileEvent) -> Result<String, MobileError> {
-        // Thin typed shim over the canonical dispatch path (ADR-066): the
-        // multi-stage QR auto-route, BLE discovery session-building, the
-        // handshake-machine gate, and the terminal-event invalidation all
-        // live in `AppEngine::dispatch`, shared with `dispatch_json`, so the
-        // two envelopes can never diverge. Retire this shim once the last
-        // native caller moves to the canonical envelope.
-        let hw_event: vauchi_core::Event = event.into();
-        let (commands, fire_invalidation) = {
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            let commands = engine
-                .dispatch(hw_event)
-                .map_err(|e| MobileError::InvalidInput {
-                    field: String::new(),
-                    detail: format!("Invalid hardware event: {e}"),
-                })?;
-            (commands, engine.take_pending_presentation_invalidation())
-        };
-        if fire_invalidation {
-            self.fire_presentation_invalidated();
-        }
-        commands_envelope_to_json(&commands)
     }
 }
 

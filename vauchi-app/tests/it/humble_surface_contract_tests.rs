@@ -53,7 +53,6 @@ use std::path::{Path, PathBuf};
 const HUMBLE_ALLOWLIST: &[&str] = &[
     "dispatch_domain_command",
     "dispatch_json",
-    "handle_hardware_event",
     "has_identity",
     "initial_commands_json",
     "new",
@@ -276,7 +275,14 @@ fn humble_allowlist_size_matches_plan() {
     // canonical reducer methods. Retiring the animated-QR getter and the
     // duplicate background lifecycle path shrinks the binding surface to 16.
     // Retiring the two direct invalidation exports then shrinks it to 14.
-    assert_eq!(HUMBLE_ALLOWLIST.len(), 14);
+    //
+    // `handle_hardware_event` retirement (ADR-066 split_dispatch_api debt,
+    // 14 -> 13): the typed hardware-event shim over `dispatch_json` had no
+    // native callers left once android !648, ios !650, and the macos MR
+    // moved to encoding hardware events as canonical Event JSON via the
+    // exported `hardware_event_json` codec. `dispatch_json` is now the
+    // sole hardware-event entry.
+    assert_eq!(HUMBLE_ALLOWLIST.len(), 13);
 }
 
 // @internal

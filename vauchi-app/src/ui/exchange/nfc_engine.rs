@@ -166,6 +166,7 @@ impl NfcExchangeEngine {
         ActionResult::Commands {
             commands: vec![Command::NfcActivate {
                 payload: Vec::new(),
+                apdus: Vec::new(),
             }],
         }
     }
@@ -394,7 +395,10 @@ impl WorkflowEngine for NfcExchangeEngine {
         // same event fall through to the flow below
         // (`2026-05-29-nfc-exchange-mode-entry-wiring`).
         if self.flow.is_none()
-            && matches!(event, Event::NfcDataReceived { .. })
+            && matches!(
+                event,
+                Event::NfcDataReceived { .. } | Event::NfcApduReceived { .. }
+            )
             && let Some(identity) = self.identity.take()
         {
             let mut flow = NfcExchangeFlow::new_responder(identity, self.display_name.clone());

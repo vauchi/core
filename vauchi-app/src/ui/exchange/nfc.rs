@@ -42,6 +42,7 @@
 
 use vauchi_core::clock::SystemClock;
 use vauchi_core::exchange::escrow::{EscrowKeys, EscrowRole};
+use vauchi_core::exchange::nfc_apdu::{self, ApduCommand, ChainReassembler, SW_SUCCESS};
 use vauchi_core::exchange::{
     NFC_PAYLOAD_SIZE, NfcCardPayload, NfcHandshakeSession, NfcHandshakeState,
 };
@@ -120,6 +121,8 @@ pub(super) struct NfcExchangeFlow {
     /// and `create_key_offer` (initiator) — both need the full
     /// `Identity` to sign their NFC payload.
     identity: Identity,
+    /// (Responder only) collects chained EXCHANGE chunks off the raw wire.
+    reassembler: ChainReassembler,
 }
 
 impl NfcExchangeFlow {
@@ -130,6 +133,7 @@ impl NfcExchangeFlow {
             session,
             is_initiator: true,
             identity,
+            reassembler: ChainReassembler::new(),
         }
     }
 
@@ -140,6 +144,7 @@ impl NfcExchangeFlow {
             session,
             is_initiator: false,
             identity,
+            reassembler: ChainReassembler::new(),
         }
     }
 
@@ -156,23 +161,32 @@ impl NfcExchangeFlow {
             return Err(NfcFlowError::WrongState);
         }
         let now = SystemClock::shared().unix_seconds();
-        let payload = if self.is_initiator {
-            self.session
+        let (payload, apdus) = if self.is_initiator {
+            let payload = self
+                .session
                 .create_key_offer(&self.identity, now)
-                .map_err(|e| NfcFlowError::Protocol(e.to_string()))?
+                .map_err(|e| NfcFlowError::Protocol(e.to_string()))?;
+            let apdus = nfc_apdu::frame_command(&payload)
+                .map_err(|e| NfcFlowError::Protocol(e.to_string()))?;
+            (payload, apdus)
         } else {
-            Vec::<u8>::new()
+            (Vec::new(), Vec::new())
         };
         self.step = NfcStep::AwaitingTap;
-        Ok(vec![Command::NfcActivate { payload }])
+        Ok(vec![Command::NfcActivate { payload, apdus }])
     }
 
-    /// Process a hardware event. Cross-transport failure events
-    /// (`HardwareError`/`HardwareUnavailable`/`PermissionDenied`
-    /// with `transport == "nfc"` and `BleDisconnected` are
-    /// short-circuited at the top — pattern mirrored from
-    /// `BleExchangeFlow::handle_event`.
+    /// Process a hardware event. Failure events (`NfcFailed`, plus
+    /// `HardwareError`/`HardwareUnavailable`/`PermissionDenied` with
+    /// `transport == "nfc"`) are short-circuited at the top — pattern
+    /// mirrored from `BleExchangeFlow::handle_event`. Raw wire bytes
+    /// (`NfcApduReceived`) are decoded here by role; the legacy
+    /// `NfcDataReceived` keeps the shape today's shells deliver
+    /// (`data || SW` from a reader, bare payload from the HCE side).
     pub(super) fn handle_event(&mut self, event: &Event) -> NfcHardwareOutcome {
+        if let Event::NfcFailed { reason } = event {
+            return self.fail_with_fallback(reason.clone());
+        }
         if let Event::HardwareError { transport, error } = event
             && transport.eq_ignore_ascii_case("nfc")
         {
@@ -189,16 +203,66 @@ impl NfcExchangeFlow {
             return self.fail_with_fallback("NFC permission denied".into());
         }
 
-        match (&self.step, event) {
-            (NfcStep::AwaitingTap, Event::NfcDataReceived { data }) => {
-                self.handle_awaiting_tap(data)
+        if matches!(self.step, NfcStep::Idle | NfcStep::Complete) {
+            return NfcHardwareOutcome::Ignored;
+        }
+        match event {
+            Event::NfcApduReceived { bytes } => self.handle_raw_apdu(bytes),
+            Event::NfcDataReceived { data } if self.is_initiator => {
+                self.handle_reader_response(data)
             }
-            (NfcStep::PayloadSent, Event::NfcDataReceived { .. }) => {
-                self.handle_payload_sent_complete()
-            }
-            (NfcStep::AckSent, Event::NfcDataReceived { data }) => self.handle_ack_sent(data),
-            (NfcStep::Complete, _) => NfcHardwareOutcome::Ignored,
+            Event::NfcDataReceived { data } => self.handle_peer_payload(data),
             _ => NfcHardwareOutcome::Ignored,
+        }
+    }
+
+    fn handle_raw_apdu(&mut self, bytes: &[u8]) -> NfcHardwareOutcome {
+        if self.is_initiator {
+            return self.handle_reader_response(bytes);
+        }
+        match nfc_apdu::decode_command(bytes) {
+            Ok(ApduCommand::Select) => Self::acknowledge(),
+            Ok(ApduCommand::Exchange { data, more }) => match self.reassembler.push(&data, more) {
+                Ok(Some(payload)) => self.handle_peer_payload(&payload),
+                Ok(None) => Self::acknowledge(),
+                Err(e) => self.fail_with_fallback(e.to_string()),
+            },
+            Ok(ApduCommand::Unknown { ins }) => {
+                self.fail_with_fallback(format!("Unsupported NFC command {ins:02X}"))
+            }
+            Err(e) => self.fail_with_fallback(e.to_string()),
+        }
+    }
+
+    fn handle_reader_response(&mut self, bytes: &[u8]) -> NfcHardwareOutcome {
+        match nfc_apdu::decode_response(bytes) {
+            Ok(data) => self.handle_peer_payload(&data),
+            Err(e) => self.fail_with_fallback(e.to_string()),
+        }
+    }
+
+    fn handle_peer_payload(&mut self, data: &[u8]) -> NfcHardwareOutcome {
+        match self.step {
+            NfcStep::AwaitingTap => self.handle_awaiting_tap(data),
+            NfcStep::PayloadSent => self.handle_payload_sent_complete(),
+            NfcStep::AckSent => self.handle_ack_sent(data),
+            NfcStep::Idle | NfcStep::Complete => NfcHardwareOutcome::Ignored,
+        }
+    }
+
+    /// The HCE side must answer every command APDU or the OS times the
+    /// tap out; SELECT and non-final chunks get a bare `90 00`.
+    fn acknowledge() -> NfcHardwareOutcome {
+        NfcHardwareOutcome::Consumed {
+            commands: vec![Self::status_command(SW_SUCCESS)],
+        }
+    }
+
+    fn status_command(sw: [u8; 2]) -> Command {
+        let response = nfc_apdu::status_response(sw);
+        Command::NfcSendApdu {
+            data: response.clone(),
+            apdus: vec![response],
         }
     }
 
@@ -217,12 +281,18 @@ impl NfcExchangeFlow {
                 ));
             }
             let (key_ack, encrypted_card) = data.split_at(NFC_PAYLOAD_SIZE);
-            match self.session.process_key_ack(key_ack, encrypted_card, now) {
-                Ok(our_encrypted_card) => {
+            let our_encrypted_card =
+                match self.session.process_key_ack(key_ack, encrypted_card, now) {
+                    Ok(card) => card,
+                    Err(e) => return self.fail_with_fallback(e.to_string()),
+                };
+            match nfc_apdu::frame_exchange(&our_encrypted_card) {
+                Ok(apdus) => {
                     self.step = NfcStep::PayloadSent;
                     NfcHardwareOutcome::StepAdvanced {
                         commands: vec![Command::NfcSendApdu {
                             data: our_encrypted_card,
+                            apdus,
                         }],
                     }
                 }
@@ -230,13 +300,21 @@ impl NfcExchangeFlow {
             }
         } else {
             // Responder: `data` is the initiator's key offer.
-            match self.session.process_key_offer(&self.identity, data, now) {
-                Ok((our_ack, our_encrypted_card)) => {
-                    let mut framed = our_ack;
-                    framed.extend(our_encrypted_card);
+            let (our_ack, our_encrypted_card) =
+                match self.session.process_key_offer(&self.identity, data, now) {
+                    Ok(reply) => reply,
+                    Err(e) => return self.fail_with_fallback(e.to_string()),
+                };
+            let mut reply = our_ack;
+            reply.extend(our_encrypted_card);
+            match nfc_apdu::frame_response(&reply) {
+                Ok(response) => {
                     self.step = NfcStep::AckSent;
                     NfcHardwareOutcome::StepAdvanced {
-                        commands: vec![Command::NfcSendApdu { data: framed }],
+                        commands: vec![Command::NfcSendApdu {
+                            data: response.clone(),
+                            apdus: vec![response],
+                        }],
                     }
                 }
                 Err(e) => self.fail_with_fallback(e.to_string()),
@@ -286,12 +364,7 @@ impl NfcExchangeFlow {
                         .remote_card
                         .to_bytes()
                         .expect("NfcCardPayload re-serialization is infallible by construction"),
-                    commands: vec![
-                        Command::NfcSendApdu {
-                            data: vec![0x90, 0x00],
-                        },
-                        Command::NfcDeactivate,
-                    ],
+                    commands: vec![Self::status_command(SW_SUCCESS), Command::NfcDeactivate],
                 }
             }
             Err(e) => self.fail_with_fallback(e.to_string()),

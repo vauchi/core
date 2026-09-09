@@ -1109,7 +1109,10 @@ impl ExchangeSession {
                     );
                     nfc.to_bytes().to_vec()
                 };
-                vec![Command::NfcActivate { payload }]
+                vec![Command::NfcActivate {
+                    apdus: super::nfc_apdu::frame_command(&payload).unwrap_or_default(),
+                    payload,
+                }]
             }
             (ExchangeState::AwaitingBleConnection, ExchangeTransport::Ble) => {
                 vec![

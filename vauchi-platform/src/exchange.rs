@@ -79,10 +79,12 @@ pub enum MobileCommand {
     // NFC
     NfcActivate {
         payload: Vec<u8>,
+        apdus: Vec<Vec<u8>>,
     },
     NfcDeactivate,
     NfcSendApdu {
         data: Vec<u8>,
+        apdus: Vec<Vec<u8>>,
     },
     // Audio (PCM samples — core encodes the FSK challenge before sending)
     AudioEmitChallenge {
@@ -171,9 +173,9 @@ impl From<Command> for MobileCommand {
                 device_id,
                 direction: direction.into(),
             },
-            Command::NfcActivate { payload } => Self::NfcActivate { payload },
+            Command::NfcActivate { payload, apdus } => Self::NfcActivate { payload, apdus },
             Command::NfcDeactivate => Self::NfcDeactivate,
-            Command::NfcSendApdu { data } => Self::NfcSendApdu { data },
+            Command::NfcSendApdu { data, apdus } => Self::NfcSendApdu { data, apdus },
             Command::AudioEmitChallenge {
                 samples,
                 sample_rate,
@@ -317,6 +319,12 @@ pub enum MobileEvent {
     NfcDataReceived {
         data: Vec<u8>,
     },
+    NfcApduReceived {
+        bytes: Vec<u8>,
+    },
+    NfcFailed {
+        reason: String,
+    },
     // Audio (raw PCM — core decodes the FSK signal internally)
     AudioSamplesRecorded {
         samples: Vec<f32>,
@@ -444,6 +452,8 @@ impl From<MobileEvent> for Event {
                 reason,
             },
             MobileEvent::NfcDataReceived { data } => Self::NfcDataReceived { data },
+            MobileEvent::NfcApduReceived { bytes } => Self::NfcApduReceived { bytes },
+            MobileEvent::NfcFailed { reason } => Self::NfcFailed { reason },
             MobileEvent::AudioSamplesRecorded {
                 samples,
                 sample_rate,

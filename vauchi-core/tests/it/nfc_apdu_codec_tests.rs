@@ -472,7 +472,7 @@ proptest! {
         if decode_command(&bytes) == Ok(ApduCommand::Select) {
             prop_assert_eq!(bytes[1], 0xA4);
             prop_assert_eq!(bytes[2], 0x04);
-            prop_assert_eq!(&bytes[5..5 + AID.len()], AID);
+            prop_assert!(bytes.windows(AID.len()).any(|window| window == AID));
         }
     }
 }

@@ -128,7 +128,18 @@ pub enum Command {
     },
 
     /// Activate the NFC interface and prepare to exchange `payload`.
-    NfcActivate { payload: Vec<u8> },
+    ///
+    /// `apdus` is the same payload already framed by core
+    /// (`exchange::nfc_apdu::frame_command`: SELECT, then the EXCHANGE
+    /// chain). A reader shell transmits each frame verbatim and reports
+    /// every response as [`Event::NfcApduReceived`]; a responder gets an
+    /// empty list because it only listens. `payload` stays for shells
+    /// that still frame on their own.
+    NfcActivate {
+        payload: Vec<u8>,
+        #[serde(default)]
+        apdus: Vec<Vec<u8>>,
+    },
     /// Deactivate the NFC interface.
     NfcDeactivate,
     /// Send a continuation APDU on the already-active NFC session.
@@ -136,7 +147,16 @@ pub enum Command {
     /// `NfcActivate`: the frontend keeps the tag connection alive and
     /// transmits `data` opaquely, then surfaces the peer's response as
     /// `Event::NfcDataReceived`.
-    NfcSendApdu { data: Vec<u8> },
+    ///
+    /// `apdus` carries the frames core already built: the EXCHANGE chain
+    /// on the reader side, the complete response APDU (`data || SW`) on
+    /// the HCE side. Shells that forward raw bytes use it and ignore
+    /// `data`.
+    NfcSendApdu {
+        data: Vec<u8>,
+        #[serde(default)]
+        apdus: Vec<Vec<u8>>,
+    },
 
     /// Emit ultrasonic PCM samples encoding a challenge.
     ///
@@ -650,8 +670,16 @@ pub enum Event {
         reason: String,
     },
 
-    /// NFC data received from a tap exchange.
+    /// NFC data received from a tap exchange (legacy shape: readers pass
+    /// `data || SW1 SW2`, the HCE responder passes the bare payload).
     NfcDataReceived { data: Vec<u8> },
+    /// Raw bytes off the NFC wire, decoded by core: a response APDU on
+    /// the reader side, a command APDU on the HCE side.
+    NfcApduReceived { bytes: Vec<u8> },
+    /// The OS NFC session failed (tag lost, session invalidated,
+    /// transceive error). `reason` is the OS description; core decides
+    /// what it means for the exchange.
+    NfcFailed { reason: String },
 
     /// Raw PCM samples from a microphone listen.
     ///

@@ -39,6 +39,20 @@ impl AppEngine {
     /// Matching is case-insensitive because shells differ on casing for the
     /// same capability — `vauchi-cabi` reports `BLE` where others report
     /// `ble`.
+    fn hardware_error_alert(&self, transport: &str, error: &str) -> ActionResult {
+        ActionResult::ShowAlert {
+            title: match self.capability_label(transport) {
+                Some(name) => crate::i18n::get_string_with_args(
+                    self.render_context.resolved_locale(),
+                    "hardware.error_title",
+                    &[("name", &name)],
+                ),
+                None => self.t("hardware.error_title_generic"),
+            },
+            message: error.to_string(),
+        }
+    }
+
     fn capability_label(&self, transport: &str) -> Option<String> {
         let token = transport.trim().to_ascii_lowercase();
         NAMEABLE_CAPABILITIES
@@ -266,17 +280,10 @@ impl AppEngine {
                 undo_action_id: None,
                 undo_label: None,
             }),
-            Event::HardwareError { transport, error } => Some(ActionResult::ShowAlert {
-                title: match self.capability_label(transport) {
-                    Some(name) => crate::i18n::get_string_with_args(
-                        self.render_context.resolved_locale(),
-                        "hardware.error_title",
-                        &[("name", &name)],
-                    ),
-                    None => self.t("hardware.error_title_generic"),
-                },
-                message: error.clone(),
-            }),
+            Event::HardwareError { transport, error } => {
+                Some(self.hardware_error_alert(transport, error))
+            }
+            Event::NfcFailed { reason } => Some(self.hardware_error_alert("nfc", reason)),
             _ => None,
         };
 

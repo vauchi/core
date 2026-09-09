@@ -492,3 +492,266 @@ fn unknown_action_on_failed_screen_re_renders_instead_of_cancelling() {
     }
     assert!(!engine.was_cancelled());
 }
+
+// ── Glance manual code entry ──────────────────────────────────────
+// `2026-09-09-tui-cannot-ingest-peer-exchange-payload`: a camera-less
+// device (TUI) and an automation harness (Maestro) need a core-owned text
+// route for the peer's Glance code.
+
+fn glance_engine(has_camera: bool) -> BleExchangeEngine {
+    BleExchangeEngine::new(
+        ExchangeMode::Glance,
+        has_camera,
+        vec![],
+        SystemClock::shared(),
+        Some("OWN-QR".to_string()),
+        Locale::English,
+    )
+}
+
+fn code_input_of(screen: &ScreenModel) -> Option<(String, Option<String>, String)> {
+    screen.components.iter().find_map(|c| match c {
+        Component::TextInput {
+            id,
+            label,
+            placeholder,
+            value,
+            ..
+        } if id == GLANCE_CODE_INPUT_ID => {
+            Some((label.clone(), placeholder.clone(), value.clone()))
+        }
+        _ => None,
+    })
+}
+
+fn has_scan_component(screen: &ScreenModel) -> bool {
+    screen.components.iter().any(|c| {
+        matches!(
+            c,
+            Component::QrCode {
+                mode: QrMode::Scan,
+                ..
+            }
+        )
+    })
+}
+
+fn action_label(screen: &ScreenModel, id: &str) -> Option<String> {
+    screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == id)
+        .map(|a| a.label.clone())
+}
+
+fn valid_glance_code() -> String {
+    let now = SystemClock::shared().unix_seconds();
+    let identity = vauchi_core::identity::Identity::create("Peer", now);
+    vauchi_core::exchange::oob_bootstrap::OobBootstrapQr::generate(
+        &identity,
+        &identity.x3dh_keypair(),
+        now,
+    )
+    .to_data_string()
+}
+
+fn submit_code(engine: &mut BleExchangeEngine, code: &str) -> ActionResult {
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: GLANCE_CODE_INPUT_ID.into(),
+        value: code.into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: ACTION_CONNECT_CODE.into(),
+    })
+}
+
+// @scenario: contact_exchange.feature :: Glance without a camera accepts the peer code as text
+#[test]
+fn glance_without_a_camera_renders_the_manual_code_input() {
+    let engine = glance_engine(false);
+    let screen = engine.current_screen();
+
+    assert_eq!(screen.screen_id, "exchange_ble_glance");
+    assert_eq!(
+        code_input_of(&screen),
+        Some((
+            "Paste the exchange data from another user".to_string(),
+            Some("Paste or type the code".to_string()),
+            String::new(),
+        )),
+        "no camera → the peer code is entered as text"
+    );
+    assert!(
+        !has_scan_component(&screen),
+        "no camera → no scan component"
+    );
+    assert_eq!(
+        action_label(&screen, ACTION_CONNECT_CODE).as_deref(),
+        Some("Connect")
+    );
+    assert_eq!(
+        action_label(&screen, ACTION_ENTER_CODE),
+        None,
+        "the input is already shown — nothing to switch to"
+    );
+}
+
+// @scenario: contact_exchange.feature :: Glance with a camera offers manual code entry
+#[test]
+fn glance_with_a_camera_offers_enter_code_and_switches_to_the_input() {
+    let mut engine = glance_engine(true);
+    let screen = engine.current_screen();
+    assert!(has_scan_component(&screen));
+    assert_eq!(code_input_of(&screen), None, "camera → scan first");
+    assert_eq!(
+        action_label(&screen, ACTION_ENTER_CODE).as_deref(),
+        Some("Enter Code Manually")
+    );
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: ACTION_ENTER_CODE.into(),
+    });
+
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("enter_code must re-render the glance screen, got {result:?}");
+    };
+    assert_eq!(screen.screen_id, "exchange_ble_glance");
+    assert_eq!(
+        code_input_of(&screen).map(|(_, placeholder, _)| placeholder),
+        Some(Some("Paste or type the code".to_string()))
+    );
+    assert!(
+        !has_scan_component(&screen),
+        "the input step replaces the camera"
+    );
+    assert_eq!(
+        action_label(&screen, ACTION_CONNECT_CODE).as_deref(),
+        Some("Connect")
+    );
+}
+
+// @internal
+#[test]
+fn typed_code_is_echoed_back_in_the_input() {
+    let mut engine = glance_engine(false);
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: GLANCE_CODE_INPUT_ID.into(),
+        value: "partial".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("typing re-renders, got {result:?}");
+    };
+    assert_eq!(
+        code_input_of(&screen).map(|(_, _, value)| value),
+        Some("partial".to_string())
+    );
+    assert_eq!(
+        engine.engine_output(),
+        None,
+        "typing alone must not hand a code to the AppEngine"
+    );
+}
+
+// @scenario: contact_exchange.feature :: Glance without a camera accepts the peer code as text
+#[test]
+fn submitting_a_peer_code_is_handled_like_a_scan() {
+    let mut engine = glance_engine(false);
+    let code = valid_glance_code();
+
+    let result = submit_code(&mut engine, &code);
+
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("an accepted code waits for discovery, got {result:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "exchange_ble_discovering",
+        "an accepted code moves on to the BLE wait, like a successful scan"
+    );
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::GlancePeerCode { data: code }),
+        "the AppEngine pins the peer from the submitted code exactly as from a scan"
+    );
+}
+
+// @internal
+#[test]
+fn text_submitted_on_the_code_input_commits_like_connect() {
+    let mut engine = glance_engine(true);
+    let code = valid_glance_code();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: ACTION_ENTER_CODE.into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: GLANCE_CODE_INPUT_ID.into(),
+        value: code.clone(),
+    });
+
+    let _ = engine.handle_action(UserAction::TextSubmitted {
+        component_id: GLANCE_CODE_INPUT_ID.into(),
+    });
+
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::GlancePeerCode { data: code })
+    );
+}
+
+// @scenario: contact_exchange.feature :: A malformed peer code fails to the retry screen
+#[test]
+fn submitting_garbage_lands_on_the_retry_screen() {
+    let mut engine = glance_engine(false);
+    let now = SystemClock::shared().unix_seconds();
+    let expected_detail =
+        vauchi_core::exchange::oob_bootstrap::OobBootstrapQr::verified_from_data_string(
+            "not a vauchi code",
+            now,
+        )
+        .expect_err("garbage must not parse")
+        .user_message()
+        .to_string();
+
+    let result = submit_code(&mut engine, "not a vauchi code");
+
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("garbage must render the failed screen, got {result:?}");
+    };
+    assert_eq!(screen.screen_id, "exchange_failed");
+    let detail = screen.components.iter().find_map(|c| match c {
+        Component::StatusIndicator { detail, .. } => Some(detail.clone()),
+        _ => None,
+    });
+    assert_eq!(detail, Some(Some(expected_detail)));
+    assert_eq!(
+        action_label(&screen, ACTION_RETRY).as_deref(),
+        Some("Retry")
+    );
+    assert_eq!(
+        engine.engine_output(),
+        None,
+        "a rejected code must not be handed to the AppEngine"
+    );
+}
+
+// @internal
+#[test]
+fn retry_after_a_bad_code_returns_to_the_code_input() {
+    let mut engine = glance_engine(true);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: ACTION_ENTER_CODE.into(),
+    });
+    let _ = submit_code(&mut engine, "");
+    assert_eq!(engine.current_screen().screen_id, "exchange_failed");
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: ACTION_RETRY.into(),
+    });
+
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "exchange_ble_glance");
+    assert_eq!(
+        code_input_of(&screen).map(|(_, _, value)| value),
+        Some(String::new()),
+        "retry keeps the user on manual entry with a cleared input"
+    );
+}

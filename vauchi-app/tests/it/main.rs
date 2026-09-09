@@ -21,6 +21,7 @@ mod app_reducer_protocol_tests;
 #[path = "../app_undo_protocol_tests.rs"]
 mod app_undo_protocol_tests;
 mod ble_handshake_app_engine_tests;
+mod glance_manual_code_entry_tests;
 mod schedule_wakeup_tests;
 // The multi-stage half needs FakeClock (gated inside the file); the
 // BLE half runs featureless.

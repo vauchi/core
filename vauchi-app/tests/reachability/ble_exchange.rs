@@ -26,8 +26,8 @@
 
 use vauchi_app::ui::testing::{assert_reachability_across_screens, check_reachability};
 use vauchi_app::ui::{
-    BLE_EXCHANGE_ACTION_CANCEL, BLE_EXCHANGE_ACTION_DONE, BLE_EXCHANGE_ACTION_RETRY,
-    BleExchangeEngine, WorkflowEngine,
+    BLE_EXCHANGE_ACTION_CANCEL, BLE_EXCHANGE_ACTION_CONNECT_CODE, BLE_EXCHANGE_ACTION_DONE,
+    BLE_EXCHANGE_ACTION_ENTER_CODE, BLE_EXCHANGE_ACTION_RETRY, BleExchangeEngine, WorkflowEngine,
 };
 use vauchi_core::Event;
 use vauchi_core::exchange::mode::ExchangeMode;
@@ -50,6 +50,37 @@ const FAILED_HANDLED: &[&str] = &[
     "fallback_relay",
     BLE_EXCHANGE_ACTION_CANCEL,
 ];
+
+/// Glance with a camera: scan node + `enter_code` (→ the text input, whose
+/// `connect_code` with an empty buffer fails to the retry screen) + `cancel`.
+/// The failed screen's `fallback_*`/`retry` close the set.
+const GLANCE_CAMERA_HANDLED: &[&str] = &[
+    BLE_EXCHANGE_ACTION_ENTER_CODE,
+    BLE_EXCHANGE_ACTION_CONNECT_CODE,
+    BLE_EXCHANGE_ACTION_RETRY,
+    "fallback_qr",
+    "fallback_relay",
+    BLE_EXCHANGE_ACTION_CANCEL,
+];
+/// Glance without a camera: the text input is the only route, so there is
+/// no `enter_code` and no `fallback_qr`.
+const GLANCE_NO_CAMERA_HANDLED: &[&str] = &[
+    BLE_EXCHANGE_ACTION_CONNECT_CODE,
+    BLE_EXCHANGE_ACTION_RETRY,
+    "fallback_relay",
+    BLE_EXCHANGE_ACTION_CANCEL,
+];
+
+fn glance_factory(has_camera: bool) -> BleExchangeEngine {
+    BleExchangeEngine::new(
+        ExchangeMode::Glance,
+        has_camera,
+        vec![],
+        vauchi_core::clock::SystemClock::shared(),
+        Some("OWN-QR".to_string()),
+        vauchi_app::i18n::Locale::English,
+    )
+}
 
 /// Discovering root — a fresh engine renders the discovering screen.
 fn discovering_factory() -> BleExchangeEngine {
@@ -208,6 +239,30 @@ fn failed_screen_is_reachable_with_retry_fallbacks_and_cancel() {
     let e = failed_factory();
     assert_eq!(e.current_screen().screen_id, "exchange_failed");
     assert_reachability_across_screens(failed_factory, FAILED_HANDLED);
+}
+
+// ── Glance — manual code entry ────────────────────────────────────
+
+// @internal
+#[test]
+fn glance_with_camera_is_reachable_through_enter_code() {
+    assert_reachability_across_screens(|| glance_factory(true), GLANCE_CAMERA_HANDLED);
+    let report = check_reachability(|| glance_factory(true), GLANCE_CAMERA_HANDLED);
+    assert!(
+        report.is_reachable(),
+        "glance (camera): unexpected orphans: {report:?}"
+    );
+}
+
+// @internal
+#[test]
+fn glance_without_camera_is_reachable_through_the_code_input() {
+    assert_reachability_across_screens(|| glance_factory(false), GLANCE_NO_CAMERA_HANDLED);
+    let report = check_reachability(|| glance_factory(false), GLANCE_NO_CAMERA_HANDLED);
+    assert!(
+        report.is_reachable(),
+        "glance (no camera): unexpected orphans: {report:?}"
+    );
 }
 
 // ── No-orphan assertions per screen ───────────────────────────────

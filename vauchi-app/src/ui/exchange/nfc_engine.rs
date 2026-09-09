@@ -612,7 +612,7 @@ mod tests {
         let result = e.handle_action(select(ROLE_SEND));
         match result {
             ActionResult::Commands { commands } => match &commands[0] {
-                Command::NfcActivate { payload } => {
+                Command::NfcActivate { payload, .. } => {
                     assert!(!payload.is_empty(), "initiator sends a non-empty key offer")
                 }
                 other => panic!("expected NfcActivate, got {other:?}"),
@@ -633,7 +633,7 @@ mod tests {
         let result = e.handle_action(select(ROLE_RECEIVE));
         match result {
             ActionResult::Commands { commands } => match &commands[0] {
-                Command::NfcActivate { payload } => {
+                Command::NfcActivate { payload, .. } => {
                     assert!(
                         payload.is_empty(),
                         "responder registers HCE with empty payload"

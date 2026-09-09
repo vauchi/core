@@ -105,3 +105,67 @@ fn hardware_event_json_qr_scan_uses_the_canonical_tag() {
         "shells must be able to feed codec output straight to dispatch_json",
     );
 }
+
+// @internal
+#[test]
+fn nfc_activate_carries_framed_apdus_through_mobile_enum() {
+    let cmd = Command::NfcActivate {
+        payload: vec![0xAA],
+        apdus: vec![vec![0x00, 0xA4], vec![0x00, 0xE0]],
+    };
+    let mobile: MobileCommand = cmd.into();
+    match mobile {
+        MobileCommand::NfcActivate { payload, apdus } => {
+            assert_eq!(payload, vec![0xAA]);
+            assert_eq!(apdus, vec![vec![0x00, 0xA4], vec![0x00, 0xE0]]);
+        }
+        other => panic!("expected NfcActivate, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn nfc_send_apdu_carries_framed_apdus_through_mobile_enum() {
+    let cmd = Command::NfcSendApdu {
+        data: vec![0x90, 0x00],
+        apdus: vec![vec![0x90, 0x00]],
+    };
+    let mobile: MobileCommand = cmd.into();
+    match mobile {
+        MobileCommand::NfcSendApdu { data, apdus } => {
+            assert_eq!(data, vec![0x90, 0x00]);
+            assert_eq!(apdus, vec![vec![0x90, 0x00]]);
+        }
+        other => panic!("expected NfcSendApdu, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn nfc_apdu_received_roundtrips_through_mobile_enum() {
+    let evt = MobileEvent::NfcApduReceived {
+        bytes: vec![0x6A, 0x82],
+    };
+    let core: Event = evt.into();
+    assert_eq!(
+        core,
+        Event::NfcApduReceived {
+            bytes: vec![0x6A, 0x82]
+        }
+    );
+}
+
+// @internal
+#[test]
+fn nfc_failed_roundtrips_through_mobile_enum() {
+    let evt = MobileEvent::NfcFailed {
+        reason: "tag lost".into(),
+    };
+    let core: Event = evt.into();
+    assert_eq!(
+        core,
+        Event::NfcFailed {
+            reason: "tag lost".into()
+        }
+    );
+}

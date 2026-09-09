@@ -422,6 +422,7 @@ pub(super) fn build_nfc_screen(step: &NfcStep, locale: crate::i18n::Locale) -> S
 mod tests {
     use super::*;
     use vauchi_core::Event;
+    use vauchi_core::exchange::nfc_apdu::{self, ApduError};
 
     fn make_identity(name: &str) -> Identity {
         Identity::create(name, 0)
@@ -451,7 +452,7 @@ mod tests {
         assert_eq!(*flow.step(), NfcStep::AwaitingTap);
         assert_eq!(commands.len(), 1);
         match &commands[0] {
-            Command::NfcActivate { payload } => {
+            Command::NfcActivate { payload, .. } => {
                 assert_eq!(
                     payload.len(),
                     NFC_PAYLOAD_SIZE,
@@ -469,7 +470,7 @@ mod tests {
         let commands = flow.activate().expect("activate");
         assert_eq!(*flow.step(), NfcStep::AwaitingTap);
         match &commands[0] {
-            Command::NfcActivate { payload } => {
+            Command::NfcActivate { payload, .. } => {
                 assert!(
                     payload.is_empty(),
                     "responder activation payload must be empty"
@@ -501,7 +502,7 @@ mod tests {
         let alice_cmds = alice.activate().expect("alice activate");
         let _ = bob.activate().expect("bob activate");
         let alice_offer = match &alice_cmds[0] {
-            Command::NfcActivate { payload } => payload.clone(),
+            Command::NfcActivate { payload, .. } => payload.clone(),
             other => panic!("expected NfcActivate, got {other:?}"),
         };
 
@@ -509,7 +510,7 @@ mod tests {
         let bob_outcome = bob.handle_event(&Event::NfcDataReceived { data: alice_offer });
         let bob_response = match bob_outcome {
             NfcHardwareOutcome::StepAdvanced { commands } => match &commands[0] {
-                Command::NfcSendApdu { data } => data.clone(),
+                Command::NfcSendApdu { data, .. } => data.clone(),
                 other => panic!("bob expected NfcSendApdu, got {other:?}"),
             },
             other => panic!("bob expected StepAdvanced, got {other:?}"),
@@ -520,7 +521,7 @@ mod tests {
         let alice_outcome = alice.handle_event(&Event::NfcDataReceived { data: bob_response });
         let alice_card = match alice_outcome {
             NfcHardwareOutcome::StepAdvanced { commands } => match &commands[0] {
-                Command::NfcSendApdu { data } => data.clone(),
+                Command::NfcSendApdu { data, .. } => data.clone(),
                 other => panic!("alice expected NfcSendApdu, got {other:?}"),
             },
             other => panic!("alice expected StepAdvanced, got {other:?}"),
@@ -545,8 +546,9 @@ mod tests {
                     "responder terminal must emit both ACK + deactivate"
                 );
                 match &commands[0] {
-                    Command::NfcSendApdu { data } => {
+                    Command::NfcSendApdu { data, apdus } => {
                         assert_eq!(data, &vec![0x90, 0x00], "terminal ACK must be 0x9000");
+                        assert_eq!(apdus, &vec![vec![0x90, 0x00]]);
                     }
                     other => panic!("bob expected NfcSendApdu(0x9000) first, got {other:?}"),
                 }
@@ -571,6 +573,207 @@ mod tests {
                 assert!(commands.iter().any(|c| matches!(c, Command::NfcDeactivate)));
             }
             other => panic!("alice expected Complete, got {other:?}"),
+        }
+        assert_eq!(*alice.step(), NfcStep::Complete);
+    }
+
+    fn activation_of(commands: &[Command]) -> (Vec<u8>, Vec<Vec<u8>>) {
+        match &commands[0] {
+            Command::NfcActivate { payload, apdus } => (payload.clone(), apdus.clone()),
+            other => panic!("expected NfcActivate, got {other:?}"),
+        }
+    }
+
+    fn send_of(outcome: NfcHardwareOutcome) -> (Vec<u8>, Vec<Vec<u8>>) {
+        match outcome {
+            NfcHardwareOutcome::StepAdvanced { commands } => match &commands[0] {
+                Command::NfcSendApdu { data, apdus } => (data.clone(), apdus.clone()),
+                other => panic!("expected NfcSendApdu, got {other:?}"),
+            },
+            other => panic!("expected StepAdvanced, got {other:?}"),
+        }
+    }
+
+    fn short_exchange_apdu(payload: &[u8]) -> Vec<u8> {
+        let mut apdu = vec![0x00, 0xE0, 0x00, 0x00, payload.len() as u8];
+        apdu.extend_from_slice(payload);
+        apdu
+    }
+
+    // @internal
+    #[test]
+    fn initiator_activate_carries_select_and_exchange_apdus() {
+        let mut flow = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        let (payload, apdus) = activation_of(&flow.activate().expect("activate"));
+        assert_eq!(
+            apdus,
+            vec![nfc_apdu::build_select(), short_exchange_apdu(&payload)]
+        );
+    }
+
+    // @internal
+    #[test]
+    fn responder_activate_carries_no_apdus() {
+        let mut flow = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+        let (payload, apdus) = activation_of(&flow.activate().expect("activate"));
+        assert!(payload.is_empty());
+        assert!(apdus.is_empty());
+    }
+
+    // @internal
+    #[test]
+    fn responder_decodes_exchange_apdu_and_replies_with_status_terminated_response() {
+        let mut alice = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        let mut bob = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+        let (_, mut apdus) = activation_of(&alice.activate().expect("alice activate"));
+        let _ = bob.activate().expect("bob activate");
+
+        let exchange_apdu = apdus.remove(1);
+        let (data, reply_apdus) = send_of(bob.handle_event(&Event::NfcApduReceived {
+            bytes: exchange_apdu,
+        }));
+
+        assert_eq!(*bob.step(), NfcStep::AckSent);
+        assert!(
+            data.len() > NFC_PAYLOAD_SIZE + 2,
+            "key ack + encrypted card + status word, got {} bytes",
+            data.len()
+        );
+        assert_eq!(&data[data.len() - 2..], &[0x90, 0x00]);
+        assert_eq!(reply_apdus, vec![data]);
+    }
+
+    // @internal
+    #[test]
+    fn initiator_decodes_raw_response_and_frames_its_card_send() {
+        let mut alice = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        let mut bob = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+        let (offer, _) = activation_of(&alice.activate().expect("alice activate"));
+        let _ = bob.activate().expect("bob activate");
+        let (bob_response, _) = send_of(bob.handle_event(&Event::NfcDataReceived { data: offer }));
+
+        let (card, apdus) = send_of(alice.handle_event(&Event::NfcApduReceived {
+            bytes: bob_response,
+        }));
+
+        assert_eq!(*alice.step(), NfcStep::PayloadSent);
+        assert_eq!(apdus, vec![short_exchange_apdu(&card)]);
+    }
+
+    // @internal
+    #[test]
+    fn initiator_fails_with_fallback_on_aid_not_found_status() {
+        let mut alice = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        let _ = alice.activate().expect("activate");
+
+        let outcome = alice.handle_event(&Event::NfcApduReceived {
+            bytes: vec![0x6A, 0x82],
+        });
+
+        match outcome {
+            NfcHardwareOutcome::FailedWithFallback {
+                reason,
+                relay_handoff,
+            } => {
+                assert_eq!(reason, ApduError::AidNotFound.to_string());
+                assert!(relay_handoff.is_none());
+            }
+            other => panic!("expected FailedWithFallback, got {other:?}"),
+        }
+        assert_eq!(*alice.step(), NfcStep::Complete);
+    }
+
+    // @internal
+    #[test]
+    fn responder_answers_select_without_advancing() {
+        let mut bob = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+        let _ = bob.activate().expect("activate");
+
+        let outcome = bob.handle_event(&Event::NfcApduReceived {
+            bytes: nfc_apdu::build_select(),
+        });
+
+        match outcome {
+            NfcHardwareOutcome::Consumed { commands } => assert_eq!(
+                commands,
+                vec![Command::NfcSendApdu {
+                    data: vec![0x90, 0x00],
+                    apdus: vec![vec![0x90, 0x00]],
+                }]
+            ),
+            other => panic!("expected Consumed, got {other:?}"),
+        }
+        assert_eq!(*bob.step(), NfcStep::AwaitingTap);
+    }
+
+    // @internal
+    #[test]
+    fn responder_reassembles_chained_exchange_apdus() {
+        let mut alice = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        let mut bob = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+        let (offer, _) = activation_of(&alice.activate().expect("alice activate"));
+        let _ = bob.activate().expect("bob activate");
+        let (head, tail) = offer.split_at(100);
+        let mut first = vec![0x10, 0xE0, 0x00, 0x00, head.len() as u8];
+        first.extend_from_slice(head);
+
+        let outcome = bob.handle_event(&Event::NfcApduReceived { bytes: first });
+
+        match outcome {
+            NfcHardwareOutcome::Consumed { commands } => assert_eq!(
+                commands,
+                vec![Command::NfcSendApdu {
+                    data: vec![0x90, 0x00],
+                    apdus: vec![vec![0x90, 0x00]],
+                }]
+            ),
+            other => panic!("expected Consumed for a non-final chunk, got {other:?}"),
+        }
+        assert_eq!(*bob.step(), NfcStep::AwaitingTap);
+
+        let _ = send_of(bob.handle_event(&Event::NfcApduReceived {
+            bytes: short_exchange_apdu(tail),
+        }));
+        assert_eq!(*bob.step(), NfcStep::AckSent);
+    }
+
+    // @internal
+    #[test]
+    fn responder_rejects_malformed_command_apdu() {
+        let mut bob = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+        let _ = bob.activate().expect("activate");
+
+        let outcome = bob.handle_event(&Event::NfcApduReceived {
+            bytes: vec![0x00, 0xE0, 0x00, 0x00, 0x05, 0x01],
+        });
+
+        match outcome {
+            NfcHardwareOutcome::FailedWithFallback { reason, .. } => {
+                assert_eq!(reason, ApduError::MalformedCommand.to_string());
+            }
+            other => panic!("expected FailedWithFallback, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn nfc_failed_event_routes_to_fail_with_fallback() {
+        let mut alice = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        let _ = alice.activate().expect("activate");
+
+        let outcome = alice.handle_event(&Event::NfcFailed {
+            reason: "tag lost".into(),
+        });
+
+        match outcome {
+            NfcHardwareOutcome::FailedWithFallback {
+                reason,
+                relay_handoff,
+            } => {
+                assert_eq!(reason, "tag lost");
+                assert!(relay_handoff.is_none());
+            }
+            other => panic!("expected FailedWithFallback, got {other:?}"),
         }
         assert_eq!(*alice.step(), NfcStep::Complete);
     }
@@ -621,7 +824,7 @@ mod tests {
         let alice_cmds = alice.activate().expect("alice activate");
         let _ = bob.activate().expect("bob activate");
         let offer = match &alice_cmds[0] {
-            Command::NfcActivate { payload } => payload.clone(),
+            Command::NfcActivate { payload, .. } => payload.clone(),
             other => panic!("expected NfcActivate, got {other:?}"),
         };
         let bob_outcome = bob.handle_event(&Event::NfcDataReceived { data: offer });
@@ -766,13 +969,13 @@ mod tests {
         let alice_cmds = alice.activate().expect("alice activate");
         let _ = bob.activate().expect("bob activate");
         let offer = match &alice_cmds[0] {
-            Command::NfcActivate { payload } => payload.clone(),
+            Command::NfcActivate { payload, .. } => payload.clone(),
             _ => unreachable!(),
         };
         let bob_outcome = bob.handle_event(&Event::NfcDataReceived { data: offer });
         let bob_response = match bob_outcome {
             NfcHardwareOutcome::StepAdvanced { commands } => match &commands[0] {
-                Command::NfcSendApdu { data } => data.clone(),
+                Command::NfcSendApdu { data, .. } => data.clone(),
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -780,7 +983,7 @@ mod tests {
         let alice_outcome = alice.handle_event(&Event::NfcDataReceived { data: bob_response });
         let alice_card = match alice_outcome {
             NfcHardwareOutcome::StepAdvanced { commands } => match &commands[0] {
-                Command::NfcSendApdu { data } => data.clone(),
+                Command::NfcSendApdu { data, .. } => data.clone(),
                 _ => unreachable!(),
             },
             _ => unreachable!(),

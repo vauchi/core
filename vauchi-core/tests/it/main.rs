@@ -325,6 +325,7 @@ mod network_relay_client_tests;
 mod network_transport_tests;
 mod nfc_active_exchange_tests;
 mod nfc_apdu_chaining_tests;
+mod nfc_apdu_codec_tests;
 mod nfc_apdu_protocol_tests;
 mod nfc_card_payload_tests;
 mod nfc_handshake_tests;

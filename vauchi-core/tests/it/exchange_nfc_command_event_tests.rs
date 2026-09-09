@@ -38,7 +38,7 @@ fn nfc_session_emits_activate_with_payload() {
     assert_eq!(cmds.len(), 1, "expected exactly one NfcActivate command");
 
     match &cmds[0] {
-        Command::NfcActivate { payload } => {
+        Command::NfcActivate { payload, .. } => {
             assert!(
                 !payload.is_empty(),
                 "NfcActivate payload should contain our NFC exchange data, got empty"
@@ -59,7 +59,7 @@ fn nfc_data_received_with_valid_payload_completes_exchange() {
     bob.emit_initial_commands();
     let bob_cmds = bob.drain_commands();
     let bob_payload = match &bob_cmds[0] {
-        Command::NfcActivate { payload } => payload.clone(),
+        Command::NfcActivate { payload, .. } => payload.clone(),
         _ => panic!("expected NfcActivate"),
     };
 
@@ -110,7 +110,7 @@ fn nfc_tap_emits_deactivate_after_processing() {
     bob.emit_initial_commands();
     let bob_cmds = bob.drain_commands();
     let bob_payload = match &bob_cmds[0] {
-        Command::NfcActivate { payload } => payload.clone(),
+        Command::NfcActivate { payload, .. } => payload.clone(),
         _ => panic!("expected NfcActivate"),
     };
 

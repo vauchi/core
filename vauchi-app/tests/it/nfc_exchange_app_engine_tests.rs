@@ -11,8 +11,9 @@
 //! uniform AppEngine surface. Mirrors `ble_exchange_app_engine_tests.rs`.
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
-use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
+use vauchi_core::exchange::nfc_apdu;
+use vauchi_core::{Command, Event};
 
 fn engine_with_identity() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -60,7 +61,7 @@ fn picking_send_through_app_engine_emits_nfc_activate() {
     });
     match result {
         ActionResult::Commands { commands } => assert!(
-            matches!(&commands[0], vauchi_core::Command::NfcActivate { payload } if !payload.is_empty()),
+            matches!(&commands[0], vauchi_core::Command::NfcActivate { payload, .. } if !payload.is_empty()),
             "Send should emit NfcActivate with a key-offer payload, got {commands:?}"
         ),
         other => panic!("expected Commands from the active NFC engine, got {other:?}"),
@@ -70,6 +71,71 @@ fn picking_send_through_app_engine_emits_nfc_activate() {
         "exchange_nfc_awaiting_tap",
         "after Send the engine awaits the tap"
     );
+}
+
+// @internal
+#[test]
+fn picking_send_emits_nfc_activate_with_framed_apdus() {
+    let mut engine = enter_taptap();
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "nfc_role".into(),
+        item_id: "nfc_role:send".into(),
+    });
+    let ActionResult::Commands { commands } = result else {
+        panic!("expected Commands from the active NFC engine, got {result:?}");
+    };
+    let Command::NfcActivate { payload, apdus } = &commands[0] else {
+        panic!("expected NfcActivate, got {commands:?}");
+    };
+    let mut exchange = vec![0x00, 0xE0, 0x00, 0x00, payload.len() as u8];
+    exchange.extend_from_slice(payload);
+    assert_eq!(apdus, &vec![nfc_apdu::build_select(), exchange]);
+}
+
+// @internal
+#[test]
+fn forwarding_raw_select_apdu_to_the_receiver_is_answered_with_success() {
+    let mut engine = enter_taptap();
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "nfc_role".into(),
+        item_id: "nfc_role:receive".into(),
+    });
+
+    let result = engine.handle_hardware_event(Event::NfcApduReceived {
+        bytes: nfc_apdu::build_select(),
+    });
+
+    assert_eq!(
+        result,
+        Some(ActionResult::Commands {
+            commands: vec![Command::NfcSendApdu {
+                data: vec![0x90, 0x00],
+                apdus: vec![vec![0x90, 0x00]],
+            }],
+        })
+    );
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_nfc_awaiting_tap",
+        "a SELECT establishes the tap but carries no handshake data"
+    );
+}
+
+// @internal
+#[test]
+fn nfc_failed_event_lands_on_the_failed_screen() {
+    let mut engine = enter_taptap();
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "nfc_role".into(),
+        item_id: "nfc_role:send".into(),
+    });
+
+    let result = engine.handle_hardware_event(Event::NfcFailed {
+        reason: "tag lost".into(),
+    });
+
+    assert!(result.is_some(), "NfcFailed must reach the live engine");
+    assert_eq!(engine.current_screen().screen_id, "exchange_failed");
 }
 
 // @internal

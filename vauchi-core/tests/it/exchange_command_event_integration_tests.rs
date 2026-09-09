@@ -123,7 +123,7 @@ fn nfc_full_round_trip_via_commands_and_events() {
         .drain_commands()
         .into_iter()
         .find_map(|c| match c {
-            Command::NfcActivate { payload } => Some(payload),
+            Command::NfcActivate { payload, .. } => Some(payload),
             _ => None,
         })
         .expect("Alice should emit NfcActivate with payload");
@@ -132,7 +132,7 @@ fn nfc_full_round_trip_via_commands_and_events() {
         .drain_commands()
         .into_iter()
         .find_map(|c| match c {
-            Command::NfcActivate { payload } => Some(payload),
+            Command::NfcActivate { payload, .. } => Some(payload),
             _ => None,
         })
         .expect("Bob should emit NfcActivate with payload");

@@ -981,6 +981,11 @@ mod tests {
             },
             Command::NfcActivate {
                 payload: vec![0xAA],
+                apdus: vec![vec![0x00, 0xA4]],
+            },
+            Command::NfcSendApdu {
+                data: vec![0x90, 0x00],
+                apdus: vec![vec![0x90, 0x00]],
             },
             Command::NfcDeactivate,
             Command::AudioEmitChallenge {
@@ -1035,6 +1040,47 @@ mod tests {
             let json = serde_json::to_string(cmd).expect("serialize");
             let decoded: Command = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(cmd, &decoded, "roundtrip failed for {:?}", cmd);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn nfc_commands_without_apdus_decode_to_no_frames() {
+        let activate: Command =
+            serde_json::from_str(r#"{"NfcActivate":{"payload":[170]}}"#).expect("legacy JSON");
+        assert_eq!(
+            activate,
+            Command::NfcActivate {
+                payload: vec![0xAA],
+                apdus: vec![],
+            }
+        );
+        let send: Command =
+            serde_json::from_str(r#"{"NfcSendApdu":{"data":[144,0]}}"#).expect("legacy JSON");
+        assert_eq!(
+            send,
+            Command::NfcSendApdu {
+                data: vec![0x90, 0x00],
+                apdus: vec![],
+            }
+        );
+    }
+
+    // @internal
+    #[test]
+    fn nfc_raw_events_round_trip_through_json() {
+        let events = [
+            Event::NfcApduReceived {
+                bytes: vec![0x90, 0x00],
+            },
+            Event::NfcFailed {
+                reason: "tag lost".into(),
+            },
+        ];
+        for evt in &events {
+            let json = serde_json::to_string(evt).expect("serialize");
+            let decoded: Event = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(&decoded, evt);
         }
     }
 
@@ -1196,7 +1242,10 @@ mod tests {
                 device_id: "".into(),
                 direction: BleLinkDirection::Outbound,
             },
-            Command::NfcActivate { payload: vec![] },
+            Command::NfcActivate {
+                payload: vec![],
+                apdus: vec![],
+            },
             Command::NfcDeactivate,
             Command::AudioEmitChallenge {
                 samples: vec![],

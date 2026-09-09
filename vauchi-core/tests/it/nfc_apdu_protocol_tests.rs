@@ -32,9 +32,11 @@ const INS_CARD_EXCHANGE: u8 = 0xE2;
 
 // @internal
 #[test]
-fn aid_is_eight_bytes_with_vauchi_marker() {
-    assert_eq!(AID.len(), 8);
-    assert_eq!(AID, &[0xF0, 0x56, 0x41, 0x55, 0x43, 0x48, 0x49, 0x01]);
+fn aid_is_the_seven_byte_aid_the_shells_register() {
+    // `F0564155434849` is what `android/.../nfc_aid_list.xml` and
+    // `ios/Vauchi/Info.plist` register with the OS — the wire truth.
+    assert_eq!(AID.len(), 7);
+    assert_eq!(AID, &[0xF0, 0x56, 0x41, 0x55, 0x43, 0x48, 0x49]);
     assert_eq!(&AID[1..7], b"VAUCHI");
 }
 

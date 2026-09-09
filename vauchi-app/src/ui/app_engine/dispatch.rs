@@ -63,6 +63,12 @@ impl AppEngine {
         {
             use std::time::{SystemTime, UNIX_EPOCH};
             use vauchi_core::api::VauchiSyncOutcome;
+            // A fresh process holds no OHTTP session and `sync()` would
+            // return `NotConnected` without touching the network.
+            if !self.vauchi.has_ohttp_key() && self.vauchi.connect().is_err() {
+                self.sync_chrome_status = SyncChromeStatus::Failed;
+                return ActionResult::UpdateScreen(self.current_screen());
+            }
             self.sync_chrome_status = match self.vauchi.sync() {
                 Ok(VauchiSyncOutcome::Ok { .. }) => SyncChromeStatus::Synced {
                     unix_ts: SystemTime::now()

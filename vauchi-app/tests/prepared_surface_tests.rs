@@ -182,7 +182,7 @@ fn prepared_choice_carries_every_frontend_decision_in_one_command() {
     assert_eq!(surface.tokens.spacing_medium, 16);
     assert_eq!(surface.tokens.spacing_large, 24);
     assert_eq!(surface.tokens.corner_radius, 12);
-    assert_eq!(surface.tokens.minimum_target_size, 44);
+    assert_eq!(surface.tokens.minimum_target_size, 48);
 
     let PresentationNode::Choice {
         binding_id,

@@ -9,7 +9,7 @@
 //! core-owned per ADR-047 Addendum 2026-07-05.
 //!
 //! Exact-value assertions (CC-03) from the bundled token defaults:
-//! motion `200/150/300`, `touch_target.minimum = 44`,
+//! motion `200/150/300`, `touch_target.minimum = 48`,
 //! `list_item_*` = `8/8/12/12`. Large-touch scale is `v*3/2` (1.5x).
 
 use vauchi_app::theme::{DesignTokens, apply_accessibility_tokens};
@@ -47,14 +47,14 @@ fn reduce_motion_zeroes_all_motion_durations_only() {
 fn large_touch_scales_touch_and_list_spacing_only() {
     let base = DesignTokens::default();
     // Guard the fixture defaults so the scaled expectations below are anchored.
-    assert_eq!(base.touch_target.minimum, 44);
+    assert_eq!(base.touch_target.minimum, 48);
     assert_eq!(base.spacing_direction.list_item_start, 8);
     assert_eq!(base.spacing_direction.list_item_end, 8);
     assert_eq!(base.spacing_direction.list_item_inline_start, 12);
     assert_eq!(base.spacing_direction.list_item_inline_end, 12);
 
     let out = apply_accessibility_tokens(base.clone(), false, true);
-    assert_eq!(out.touch_target.minimum, 66, "44 * 3 / 2");
+    assert_eq!(out.touch_target.minimum, 72, "48 * 3 / 2");
     assert_eq!(out.spacing_direction.list_item_start, 12, "8 * 3 / 2");
     assert_eq!(out.spacing_direction.list_item_end, 12);
     assert_eq!(
@@ -74,7 +74,7 @@ fn both_flags_compose() {
     assert_eq!(out.motion.enter_duration_ms, 0);
     assert_eq!(out.motion.exit_duration_ms, 0);
     assert_eq!(out.motion.emphasis_duration_ms, 0);
-    assert_eq!(out.touch_target.minimum, 66);
+    assert_eq!(out.touch_target.minimum, 72);
     assert_eq!(out.spacing_direction.list_item_inline_end, 18);
 }
 
@@ -100,10 +100,10 @@ fn current_screen_applies_reduce_motion_from_config() {
 fn current_screen_applies_large_touch_from_config() {
     let mut engine = AppEngine::new(Vauchi::in_memory().unwrap());
     let before = engine.current_screen();
-    assert_eq!(before.tokens.touch_target.minimum, 44);
+    assert_eq!(before.tokens.touch_target.minimum, 48);
 
     engine.vauchi_mut().config_mut().large_touch = true;
     let after = engine.current_screen();
-    assert_eq!(after.tokens.touch_target.minimum, 66);
+    assert_eq!(after.tokens.touch_target.minimum, 72);
     assert_eq!(after.tokens.spacing_direction.list_item_inline_start, 18);
 }

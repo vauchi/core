@@ -15,7 +15,7 @@
             "spacing_medium": 16,
             "spacing_large": 24,
             "corner_radius": 12,
-            "minimum_target_size": 44
+            "minimum_target_size": 48
           },
           "nodes": [
             {
@@ -122,7 +122,7 @@
                 "spacing_medium": 16,
                 "spacing_large": 24,
                 "corner_radius": 12,
-                "minimum_target_size": 44
+                "minimum_target_size": 48
               },
               "nodes": [
                 {
@@ -219,7 +219,7 @@
                 "spacing_medium": 16,
                 "spacing_large": 24,
                 "corner_radius": 12,
-                "minimum_target_size": 44
+                "minimum_target_size": 48
               },
               "nodes": [
                 {
@@ -306,7 +306,7 @@
         "spacing_medium": 16,
         "spacing_large": 24,
         "corner_radius": 12,
-        "minimum_target_size": 44
+        "minimum_target_size": 48
       },
       "nodes": [
         {

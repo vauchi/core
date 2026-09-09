@@ -449,7 +449,7 @@ fn test_mobile_theme_includes_design_tokens() {
     assert_eq!(mobile.tokens.spacing.lg, 24);
     assert_eq!(mobile.tokens.border_radius.md_lg, 12);
     assert_eq!(mobile.tokens.typography.body_size, 16);
-    assert_eq!(mobile.tokens.touch_target.minimum, 44);
+    assert_eq!(mobile.tokens.touch_target.minimum, 48);
     assert_eq!(mobile.tokens.motion.enter_duration_ms, 200);
 }
 

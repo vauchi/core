@@ -275,7 +275,7 @@ fn test_design_tokens_default_spacing_direction() {
 // @scenario: accessibility.feature:Touch targets are large enough
 fn test_design_tokens_default_touch_target() {
     let tokens = DesignTokens::default();
-    assert_eq!(tokens.touch_target.minimum, 44);
+    assert_eq!(tokens.touch_target.minimum, 48);
 }
 
 // @internal

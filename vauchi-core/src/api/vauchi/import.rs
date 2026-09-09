@@ -299,6 +299,9 @@ impl Vauchi {
             )
             .map_err(|e| VauchiError::Crypto(format!("link ratchet bootstrap: {e:?}")))?;
         self.save_exchange_ratchet(&contact_id, &ratchet, is_initiator)?;
+        // The initiator's first send is what gives the responder a sending
+        // chain, so both sides owe a repropagation pass (see `finish_exchange`).
+        self.mark_own_card_repropagate()?;
 
         Ok(contact_id)
     }

@@ -523,7 +523,7 @@ pub fn load_design_tokens_from_bytes(data: &[u8]) -> Result<(), ThemeError> {
 /// - `reduce_motion` zeroes every animation duration (still UI).
 /// - `large_touch` scales the touch-target minimum and list-item spacing
 ///   by 1.5x via integer `v*3/2` — deterministic so exact-value tests
-///   pin it (44→66, 8→12, 12→18). Motion-only and touch-only are
+///   pin it (48→72, 8→12, 12→18). Motion-only and touch-only are
 ///   independent; both compose.
 pub fn apply_accessibility_tokens(
     mut tokens: DesignTokens,

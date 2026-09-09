@@ -23,8 +23,8 @@ pub use contact_backup::{BackupError, export_contact_backup, import_contact_back
 pub(crate) use full_backup::guardian_backup_key_matches;
 pub use full_backup::{
     BackupSections, FullBackupEnvelope, FullBackupIdentityData, IdentitySection, LabelSection,
-    export_full_backup, export_guardian_backup, extract_master_seed, import_full_backup,
-    import_guardian_backup, restore_contacts_from_envelope,
+    MAX_FULL_BACKUP_BYTES, export_full_backup, export_guardian_backup, extract_master_seed,
+    import_full_backup, import_guardian_backup, restore_contacts_from_envelope,
 };
 #[cfg(feature = "network-rustls")]
 pub(crate) use full_backup::{decode_backup_hex_with_limit, decode_full_backup_hex};

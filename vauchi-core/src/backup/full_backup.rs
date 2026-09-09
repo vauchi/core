@@ -61,7 +61,7 @@ const GUARDIAN_BACKUP_HEADER_LENGTH: usize =
 pub(crate) const MAX_GUARDIAN_BACKUP_BYTES: usize = 32 * 1024 * 1024;
 
 /// Maximum accepted password-based full backup size (32 MiB).
-const MAX_FULL_BACKUP_BYTES: usize = 32 * 1024 * 1024;
+pub const MAX_FULL_BACKUP_BYTES: usize = 32 * 1024 * 1024;
 
 /// Maximum decompressed JSON size for any full backup (64 MiB).
 const MAX_DECOMPRESSED_BACKUP_BYTES: usize = 64 * 1024 * 1024;

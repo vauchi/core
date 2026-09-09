@@ -738,6 +738,16 @@ impl Vauchi {
                     .save_contact_override(contact_id, field_id, is_visible)
                     .map_err(VauchiError::from)
                     .and_then(|()| self.mark_own_card_repropagate()),
+                SyncItem::VisibilityOverrideRemoved {
+                    ref contact_id,
+                    ref field_id,
+                    ..
+                } => self
+                    .storage
+                    .labels()
+                    .delete_contact_override(contact_id, field_id)
+                    .map_err(VauchiError::from)
+                    .and_then(|()| self.mark_own_card_repropagate()),
                 SyncItem::GroupChanged { ref group_data, .. } => self
                     .storage
                     .labels()
@@ -998,6 +1008,11 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
             changed_fields: vec![field_label.clone()],
         }),
         SyncItem::VisibilityChanged {
+            contact_id,
+            field_id,
+            ..
+        }
+        | SyncItem::VisibilityOverrideRemoved {
             contact_id,
             field_id,
             ..

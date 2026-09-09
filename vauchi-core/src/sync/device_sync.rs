@@ -200,6 +200,21 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
+    /// Per-contact visibility override was removed, so the field falls
+    /// back to group/default visibility for that contact. Shares
+    /// `VisibilityChanged`'s conflict key so the later stamp wins whichever
+    /// arrives first (ADR-020).
+    VisibilityOverrideRemoved {
+        /// Contact ID whose override was removed.
+        contact_id: String,
+        /// Own-card field **id**; wire key `field_label` for the same
+        /// reason as `VisibilityChanged`.
+        #[serde(rename = "field_label")]
+        field_id: String,
+        /// Timestamp of removal.
+        timestamp: u64,
+    },
+
     /// Complete owner-private group state changed on a linked device.
     GroupChanged {
         group_data: GroupSyncData,
@@ -387,6 +402,7 @@ impl SyncItem {
             SyncItem::CardFieldSynced { timestamp, .. } => *timestamp,
             SyncItem::CardFieldRemoved { timestamp, .. } => *timestamp,
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,
+            SyncItem::VisibilityOverrideRemoved { timestamp, .. } => *timestamp,
             SyncItem::GroupChanged { timestamp, .. } => *timestamp,
             SyncItem::GroupDeleted { timestamp, .. } => *timestamp,
             SyncItem::TagChanged { timestamp, .. } => *timestamp,

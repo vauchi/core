@@ -229,15 +229,23 @@ impl Vauchi {
     }
 
     /// Removes a per-contact visibility override.
+    ///
+    /// Journaled like the set, otherwise a sibling device keeps the
+    /// override the owner just cleared.
     pub fn remove_contact_visibility_override(
         &self,
         contact_id: &str,
         field_id: &str,
     ) -> VauchiResult<()> {
-        Ok(self
-            .storage
+        self.storage
             .labels()
-            .delete_contact_override(contact_id, field_id)?)
+            .delete_contact_override(contact_id, field_id)?;
+        self.record_sync_item(crate::sync::SyncItem::VisibilityOverrideRemoved {
+            contact_id: contact_id.to_string(),
+            field_id: field_id.to_string(),
+            timestamp: self.now_timestamp(),
+        });
+        Ok(())
     }
 
     /// Marks an own-card field as part of the **public base** — visible to an

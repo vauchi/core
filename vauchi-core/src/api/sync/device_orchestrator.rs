@@ -721,6 +721,11 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                 contact_id,
                 field_id,
                 ..
+            }
+            | SyncItem::VisibilityOverrideRemoved {
+                contact_id,
+                field_id,
+                ..
             } => format!("visibility:{}:{}", contact_id, field_id),
             SyncItem::GroupChanged { group_data, .. } => {
                 format!("group:{}", group_data.id)

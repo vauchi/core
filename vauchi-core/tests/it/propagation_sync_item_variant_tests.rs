@@ -362,6 +362,38 @@ fn apply_sync_visibility_changed_writes_per_contact_override() {
         }])
         .unwrap();
     assert_eq!(applied, 1);
+    assert_eq!(
+        wb.get_contact_visibility_overrides(&bob_id)
+            .unwrap()
+            .get("email"),
+        Some(&false)
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_visibility_override_removed_clears_override_on_linked_device() {
+    let wb = make_vauchi();
+    let bob = make_exchanged_contact("Bob");
+    let bob_id = bob.id().to_string();
+    wb.add_contact(bob).unwrap();
+    wb.set_contact_visibility_override(&bob_id, "email", false)
+        .unwrap();
+
+    let applied = wb
+        .apply_sync_items(vec![SyncItem::VisibilityOverrideRemoved {
+            contact_id: bob_id.clone(),
+            field_id: "email".to_string(),
+            timestamp: now(),
+        }])
+        .unwrap();
+
+    assert_eq!(applied, 1);
+    let overrides = wb.get_contact_visibility_overrides(&bob_id).unwrap();
+    assert!(
+        overrides.is_empty(),
+        "a synced removal must clear the override, got {overrides:?}"
+    );
 }
 
 // ============================================================
@@ -728,6 +760,31 @@ fn apply_sync_visibility_changed_dispatches_visibility_changed_event() {
                 if *contact_id == bob_id && field == "email"
         ),
         "VisibilityChanged sync must dispatch VisibilityChanged, got {got:?}"
+    );
+}
+
+// @internal
+#[test]
+fn apply_sync_visibility_override_removed_dispatches_visibility_changed_event() {
+    let mut wb = make_vauchi();
+    let bob_id = added_contact(&mut wb, "Bob");
+    let events = capture_events(&wb);
+
+    wb.apply_sync_items(vec![SyncItem::VisibilityOverrideRemoved {
+        contact_id: bob_id.clone(),
+        field_id: "email".to_string(),
+        timestamp: now(),
+    }])
+    .unwrap();
+
+    let got = events.lock().unwrap();
+    assert!(
+        matches!(
+            got.as_slice(),
+            [VauchiEvent::VisibilityChanged { contact_id, field }]
+                if *contact_id == bob_id && field == "email"
+        ),
+        "VisibilityOverrideRemoved sync must dispatch VisibilityChanged, got {got:?}"
     );
 }
 

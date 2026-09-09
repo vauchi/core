@@ -177,6 +177,37 @@ fn contact_visibility_override_is_journaled_for_linked_devices() {
     );
 }
 
+/// Clearing an override is a state change too: without a journal entry
+/// the sibling keeps the override the owner just removed (RG-10).
+// @internal
+#[test]
+fn contact_visibility_override_removal_is_journaled_for_linked_devices() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let (registry, tablet_id) = link_tablet(&vauchi, [13u8; 32]);
+    vauchi
+        .set_contact_visibility_override("contact-bob", "field-email", true)
+        .unwrap();
+
+    vauchi
+        .remove_contact_visibility_override("contact-bob", "field-email")
+        .unwrap();
+
+    let journal = journal_for_tablet(&vauchi, registry, &tablet_id);
+    assert!(
+        matches!(
+            journal.last(),
+            Some(SyncItem::VisibilityOverrideRemoved {
+                contact_id,
+                field_id,
+                ..
+            }) if contact_id == "contact-bob" && field_id == "field-email"
+        ),
+        "remove_contact_visibility_override must journal \
+         SyncItem::VisibilityOverrideRemoved for linked devices, got {journal:?}"
+    );
+}
+
 /// Tests that groups sync across the user's own devices without entering contact data.
 ///
 /// Feature: visibility_labels.feature

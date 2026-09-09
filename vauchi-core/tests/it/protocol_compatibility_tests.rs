@@ -572,10 +572,14 @@ fn test_sync_item_enum_variant_names() {
     let card_updated = r#"{"CardUpdated":{"field_label":"x","new_value":"y","timestamp":0}}"#;
     let contact_removed = r#"{"ContactRemoved":{"contact_id":"x","timestamp":0}}"#;
     let visibility = r#"{"VisibilityChanged":{"contact_id":"x","field_label":"y","is_visible":true,"timestamp":0}}"#;
+    let override_removed =
+        r#"{"VisibilityOverrideRemoved":{"contact_id":"x","field_label":"y","timestamp":0}}"#;
 
     use vauchi_core::sync::SyncItem;
 
     serde_json::from_str::<SyncItem>(card_updated).expect("CardUpdated variant name changed");
     serde_json::from_str::<SyncItem>(contact_removed).expect("ContactRemoved variant name changed");
     serde_json::from_str::<SyncItem>(visibility).expect("VisibilityChanged variant name changed");
+    serde_json::from_str::<SyncItem>(override_removed)
+        .expect("VisibilityOverrideRemoved variant name changed");
 }

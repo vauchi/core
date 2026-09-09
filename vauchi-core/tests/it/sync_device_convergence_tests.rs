@@ -397,6 +397,73 @@ fn visibility_changes_for_distinct_fields_apply_under_reorder() {
     );
 }
 
+/// A set and a removal of the same (contact, field) override share one
+/// conflict key, so the later stamp wins whichever arrives first
+/// (ADR-020) — otherwise a reordered stale set resurrects the override.
+fn reorder_visibility_override(newer: SyncItem, older: SyncItem) -> (Vec<SyncItem>, Vec<SyncItem>) {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry = create_test_registry(&master_seed, &device_b);
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
+
+    let applied_first = orchestrator
+        .process_incoming(vec![newer], &[0x99u8; 32])
+        .unwrap();
+    let applied_second = orchestrator
+        .process_incoming(vec![older], &[0x99u8; 32])
+        .unwrap();
+    (applied_first, applied_second)
+}
+
+// @internal
+#[test]
+fn visibility_override_removal_supersedes_earlier_set_under_reorder() {
+    let set = SyncItem::VisibilityChanged {
+        contact_id: "contact-bob".to_string(),
+        field_id: "field-email".to_string(),
+        is_visible: true,
+        timestamp: 1000,
+    };
+    let removal = SyncItem::VisibilityOverrideRemoved {
+        contact_id: "contact-bob".to_string(),
+        field_id: "field-email".to_string(),
+        timestamp: 1001,
+    };
+
+    let (applied_first, applied_second) = reorder_visibility_override(removal.clone(), set);
+
+    assert_eq!(applied_first, vec![removal]);
+    assert!(
+        applied_second.is_empty(),
+        "an older set must not resurrect a removed override, got {applied_second:?}"
+    );
+}
+
+// @internal
+#[test]
+fn visibility_override_set_supersedes_earlier_removal_under_reorder() {
+    let removal = SyncItem::VisibilityOverrideRemoved {
+        contact_id: "contact-bob".to_string(),
+        field_id: "field-email".to_string(),
+        timestamp: 1000,
+    };
+    let set = SyncItem::VisibilityChanged {
+        contact_id: "contact-bob".to_string(),
+        field_id: "field-email".to_string(),
+        is_visible: true,
+        timestamp: 1001,
+    };
+
+    let (applied_first, applied_second) = reorder_visibility_override(set.clone(), removal);
+
+    assert_eq!(applied_first, vec![set]);
+    assert!(
+        applied_second.is_empty(),
+        "an older removal must not clear a re-set override, got {applied_second:?}"
+    );
+}
+
 /// Scenario: Offline changes are queued
 /// Changes made while offline should be stored for later sync
 // @scenario: device_management :: Offline changes sync when reconnected

@@ -45,6 +45,43 @@ fn tiny_png() -> Vec<u8> {
 // - @local-only: Labels sync across my own devices only
 // - @local-only: Labels are not shared with contacts
 
+/// Registers a sibling device so `record_sync_item` has someone to
+/// journal for; returns the registry and the sibling's id.
+fn link_tablet(vauchi: &Vauchi, seed: [u8; 32]) -> (DeviceRegistry, [u8; 32]) {
+    let signing = SigningKeyPair::from_seed(&seed);
+    let mut registry = DeviceRegistry::new(
+        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
+        &signing,
+    );
+    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
+    let tablet_id = *tablet.device_id();
+    registry
+        .add_device_unsigned(tablet.to_registered(&seed))
+        .unwrap();
+    vauchi
+        .storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+    (registry, tablet_id)
+}
+
+/// The sync items journaled for the sibling registered by `link_tablet`.
+fn journal_for_tablet(
+    vauchi: &Vauchi,
+    registry: DeviceRegistry,
+    tablet_id: &[u8; 32],
+) -> Vec<SyncItem> {
+    DeviceSyncOrchestrator::load(
+        vauchi.storage(),
+        vauchi.identity().unwrap().create_device_info(0),
+        registry,
+    )
+    .unwrap()
+    .pending_for_device(tablet_id)
+    .to_vec()
+}
+
 // @scenario: device_management :: Group presentation changes sync to linked devices
 // @scenario: sync_updates :: Group presentation state converges across linked devices
 #[test]
@@ -52,22 +89,7 @@ fn group_mutations_journal_complete_state_for_linked_devices() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
-    const SEED: [u8; 32] = [7u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
-    );
-    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
-    let tablet_id = *tablet.device_id();
-    registry
-        .add_device_unsigned(tablet.to_registered(&SEED))
-        .unwrap();
-    vauchi
-        .storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
+    let (registry, tablet_id) = link_tablet(&vauchi, [7u8; 32]);
 
     let created = vauchi.create_group("Work").unwrap();
     vauchi
@@ -87,14 +109,8 @@ fn group_mutations_journal_complete_state_for_linked_devices() {
         .unwrap();
     let expected = vauchi.get_group(created.id()).unwrap();
 
-    let orchestrator = DeviceSyncOrchestrator::load(
-        vauchi.storage(),
-        vauchi.identity().unwrap().create_device_info(0),
-        registry.clone(),
-    )
-    .unwrap();
-    let queued: Vec<_> = orchestrator
-        .pending_for_device(&tablet_id)
+    let journal = journal_for_tablet(&vauchi, registry.clone(), &tablet_id);
+    let queued: Vec<_> = journal
         .iter()
         .filter_map(|item| match item {
             SyncItem::GroupChanged { group_data, .. } => Some(group_data),
@@ -121,14 +137,8 @@ fn group_mutations_journal_complete_state_for_linked_devices() {
     assert_eq!(queued.modified_at, expected.modified_at());
 
     vauchi.delete_group(expected.id()).unwrap();
-    let orchestrator = DeviceSyncOrchestrator::load(
-        vauchi.storage(),
-        vauchi.identity().unwrap().create_device_info(0),
-        registry,
-    )
-    .unwrap();
     assert!(matches!(
-        orchestrator.pending_for_device(&tablet_id).last(),
+        journal_for_tablet(&vauchi, registry, &tablet_id).last(),
         Some(SyncItem::GroupDeleted { group_id, .. }) if group_id == expected.id()
     ));
 }
@@ -145,49 +155,25 @@ fn contact_visibility_override_is_journaled_for_linked_devices() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
-    const SEED: [u8; 32] = [11u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
-    );
-    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
-    let tablet_id = *tablet.device_id();
-    registry
-        .add_device_unsigned(tablet.to_registered(&SEED))
-        .unwrap();
-    vauchi
-        .storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
+    let (registry, tablet_id) = link_tablet(&vauchi, [11u8; 32]);
 
     vauchi
         .set_contact_visibility_override("contact-bob", "field-email", true)
         .unwrap();
 
-    let orchestrator = DeviceSyncOrchestrator::load(
-        vauchi.storage(),
-        vauchi.identity().unwrap().create_device_info(0),
-        registry,
-    )
-    .unwrap();
+    let journal = journal_for_tablet(&vauchi, registry, &tablet_id);
     assert!(
-        orchestrator
-            .pending_for_device(&tablet_id)
-            .iter()
-            .any(|item| matches!(
-                item,
-                SyncItem::VisibilityChanged {
-                    contact_id,
-                    field_id,
-                    is_visible: true,
-                    ..
-                } if contact_id == "contact-bob" && field_id == "field-email"
-            )),
+        journal.iter().any(|item| matches!(
+            item,
+            SyncItem::VisibilityChanged {
+                contact_id,
+                field_id,
+                is_visible: true,
+                ..
+            } if contact_id == "contact-bob" && field_id == "field-email"
+        )),
         "set_contact_visibility_override must journal SyncItem::VisibilityChanged \
-         for linked devices, got {:?}",
-        orchestrator.pending_for_device(&tablet_id)
+         for linked devices, got {journal:?}"
     );
 }
 

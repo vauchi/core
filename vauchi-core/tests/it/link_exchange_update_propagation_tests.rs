@@ -150,3 +150,96 @@ fn visible_field_added_after_link_exchange_queues_a_delta_for_the_peer() {
         "a field visible to everyone must queue a card delta for the Link contact"
     );
 }
+
+fn deliver_all(from: &Vauchi, to: &Vauchi, to_id_at_from: &str, from_id_at_to: &str) -> usize {
+    let pending = from
+        .storage()
+        .pending()
+        .get_pending_updates(to_id_at_from)
+        .expect("pending queue readable");
+    for update in &pending {
+        vauchi_core::api::process_single_card_update(
+            to.identity().expect("identity"),
+            to.storage(),
+            from_id_at_to,
+            &update.payload,
+        )
+        .unwrap_or_else(|e| panic!("delivery failed: {e:?}"));
+        from.storage()
+            .pending()
+            .delete_pending_update(&update.id)
+            .expect("dequeue delivered update");
+    }
+    pending.len()
+}
+
+fn peer_card_value(v: &Vauchi, contact_id: &str, label: &str) -> Option<String> {
+    v.get_contact(contact_id)
+        .expect("get ok")
+        .expect("contact exists")
+        .card()
+        .fields()
+        .iter()
+        .find(|f| f.label() == label)
+        .map(|f| f.value().to_string())
+}
+
+// @scenario: link_exchange :: Edits from both sides of a Link exchange converge
+#[test]
+fn edits_from_both_sides_of_a_link_exchange_reach_the_peer() {
+    let (initiator, responder, responder_id, initiator_id) = linked_pair();
+
+    // Initiator's first sync primes the responder's sending chain.
+    initiator.run_owed_repropagation().expect("initiator pass");
+    assert_eq!(
+        deliver_all(&initiator, &responder, &responder_id, &initiator_id),
+        1
+    );
+    // The responder's deferred pass now goes through.
+    responder.run_owed_repropagation().expect("responder pass");
+    assert_eq!(
+        deliver_all(&responder, &initiator, &initiator_id, &responder_id),
+        1,
+        "once primed, the responder's owed pass must queue its card"
+    );
+
+    // Responder edits a field visible to everyone.
+    responder
+        .add_own_field(ContactField::new(
+            FieldType::Email,
+            "Work",
+            "bob@example.com",
+            0,
+        ))
+        .expect("add field");
+    let field_id = own_field_id(&responder, "Work");
+    responder
+        .set_field_shown(&field_id, true)
+        .expect("visible to all");
+    responder.run_owed_repropagation().expect("responder pass");
+    assert!(deliver_all(&responder, &initiator, &initiator_id, &responder_id) >= 1);
+    assert_eq!(
+        peer_card_value(&initiator, &responder_id, "Work").as_deref(),
+        Some("bob@example.com")
+    );
+
+    // Initiator edits too; the responder must see it.
+    initiator
+        .add_own_field(ContactField::new(
+            FieldType::Email,
+            "Work",
+            "alice@example.com",
+            0,
+        ))
+        .expect("add field");
+    let field_id = own_field_id(&initiator, "Work");
+    initiator
+        .set_field_shown(&field_id, true)
+        .expect("visible to all");
+    initiator.run_owed_repropagation().expect("initiator pass");
+    assert!(deliver_all(&initiator, &responder, &responder_id, &initiator_id) >= 1);
+    assert_eq!(
+        peer_card_value(&responder, &initiator_id, "Work").as_deref(),
+        Some("alice@example.com")
+    );
+}

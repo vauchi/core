@@ -21,8 +21,14 @@ use std::sync::Arc;
 
 use tempfile::TempDir;
 
+use vauchi_app::i18n::Locale;
+use vauchi_core::AhaMoment;
+use vauchi_core::AhaMomentType;
 use vauchi_core::api::VauchiSyncOutcome;
-use vauchi_platform::{DomainCommand, MobileSyncResult, PlatformAppEngine};
+use vauchi_platform::{
+    DomainCommand, MobileAnimationToken, MobileHapticPattern, MobileSoundToken, MobileSyncResult,
+    PlatformAppEngine,
+};
 
 fn fresh_engine() -> (Arc<PlatformAppEngine>, TempDir) {
     let dir = TempDir::new().unwrap();
@@ -60,7 +66,7 @@ fn sync_without_identity_surfaces_identity_error() {
 fn too_soon_maps_to_benign_no_change_result() {
     // The throttle decision (design §4): a C1/C2 deferral is NOT an
     // error — it is an up-to-date / no-change result.
-    let result = MobileSyncResult::try_from(VauchiSyncOutcome::TooSoon)
+    let result = MobileSyncResult::from_outcome(VauchiSyncOutcome::TooSoon, Locale::English)
         .expect("TooSoon must map to a result, not an error");
 
     assert!(!result.has_changes, "TooSoon must report no changes");
@@ -90,9 +96,11 @@ fn ok_outcome_maps_received_and_sent_counts() {
         acknowledged: 0,
         errors: vec![],
         version_policy: None,
+        aha_moments: vec![],
     };
 
-    let result = MobileSyncResult::try_from(outcome).expect("Ok outcome must map to a result");
+    let result = MobileSyncResult::from_outcome(outcome, Locale::English)
+        .expect("Ok outcome must map to a result");
 
     assert_eq!(result.cards_updated, 3, "received maps to cards_updated");
     assert_eq!(result.updates_sent, 2, "sent maps to updates_sent");
@@ -124,9 +132,11 @@ fn ok_outcome_with_zero_counts_has_no_changes() {
         acknowledged: 0,
         errors: vec![],
         version_policy: None,
+        aha_moments: vec![],
     };
 
-    let result = MobileSyncResult::try_from(outcome).expect("Ok outcome must map to a result");
+    let result = MobileSyncResult::from_outcome(outcome, Locale::English)
+        .expect("Ok outcome must map to a result");
 
     assert!(
         !result.has_changes,
@@ -138,7 +148,7 @@ fn ok_outcome_with_zero_counts_has_no_changes() {
 // @internal
 #[test]
 fn not_connected_outcome_maps_to_error() {
-    let err = MobileSyncResult::try_from(VauchiSyncOutcome::NotConnected)
+    let err = MobileSyncResult::from_outcome(VauchiSyncOutcome::NotConnected, Locale::English)
         .expect_err("NotConnected must map to an error, not a silent zero result");
     let detail = format!("{err:?}").to_lowercase();
     assert!(
@@ -150,11 +160,152 @@ fn not_connected_outcome_maps_to_error() {
 // @internal
 #[test]
 fn no_identity_outcome_maps_to_error() {
-    let err = MobileSyncResult::try_from(VauchiSyncOutcome::NoIdentity)
+    let err = MobileSyncResult::from_outcome(VauchiSyncOutcome::NoIdentity, Locale::English)
         .expect_err("NoIdentity must map to an error, not a silent zero result");
     let detail = format!("{err:?}").to_lowercase();
     assert!(
         detail.contains("identity"),
         "NoIdentity error must mention identity; got: {detail}"
+    );
+}
+
+fn ok_outcome(received: usize, sent: usize, errors: Vec<String>) -> VauchiSyncOutcome {
+    VauchiSyncOutcome::Ok {
+        received,
+        fetched: received,
+        rejected: 0,
+        unresolved: 0,
+        reject_reasons: String::new(),
+        sent,
+        acknowledged: 0,
+        errors,
+        version_policy: None,
+        aha_moments: vec![],
+    }
+}
+
+fn ok_outcome_with_moments(received: usize, aha_moments: Vec<AhaMoment>) -> VauchiSyncOutcome {
+    VauchiSyncOutcome::Ok {
+        received,
+        fetched: received,
+        rejected: 0,
+        unresolved: 0,
+        reject_reasons: String::new(),
+        sent: 0,
+        acknowledged: 0,
+        errors: vec![],
+        version_policy: None,
+        aha_moments,
+    }
+}
+
+// ── Prepared presentation (RG-11: shells stop assembling sync copy) ──
+
+// @internal
+#[test]
+fn summary_reports_no_changes_for_too_soon() {
+    let result = MobileSyncResult::from_outcome(VauchiSyncOutcome::TooSoon, Locale::English)
+        .expect("TooSoon maps to a result");
+
+    assert_eq!(result.summary, "No changes");
+    assert!(
+        !result.should_refresh_presentation,
+        "a throttled sync moved nothing, so the shell has nothing to redraw"
+    );
+    assert!(result.celebrate.is_none());
+}
+
+// @internal
+#[test]
+fn summary_reports_no_changes_for_empty_ok() {
+    let result = MobileSyncResult::from_outcome(ok_outcome(0, 0, vec![]), Locale::English)
+        .expect("Ok maps to a result");
+
+    assert_eq!(result.summary, "No changes");
+    assert!(!result.should_refresh_presentation);
+}
+
+// @internal
+#[test]
+fn summary_counts_cards_and_updates_when_changes_moved() {
+    let result = MobileSyncResult::from_outcome(ok_outcome(3, 2, vec![]), Locale::English)
+        .expect("Ok maps to a result");
+
+    assert_eq!(result.summary, "Synced: 3 cards updated, 2 sent");
+    assert!(
+        result.should_refresh_presentation,
+        "received or sent changes mean the shell must reload what it shows"
+    );
+}
+
+// @internal
+#[test]
+fn summary_reports_failure_when_nothing_moved_and_errors_remain() {
+    let result = MobileSyncResult::from_outcome(
+        ok_outcome(0, 0, vec!["send: relay 502".to_string()]),
+        Locale::English,
+    )
+    .expect("Ok maps to a result");
+
+    assert_eq!(result.summary, "Sync failed");
+    assert!(!result.should_refresh_presentation);
+}
+
+// @internal
+#[test]
+fn partial_success_with_errors_still_reports_the_moved_counts() {
+    let result = MobileSyncResult::from_outcome(
+        ok_outcome(1, 0, vec!["send: relay 502".to_string()]),
+        Locale::English,
+    )
+    .expect("Ok maps to a result");
+
+    assert_eq!(result.summary, "Synced: 1 cards updated, 0 sent");
+    assert!(result.should_refresh_presentation);
+}
+
+// @internal
+#[test]
+fn first_update_moment_yields_celebration_with_localized_message() {
+    let outcome =
+        ok_outcome_with_moments(1, vec![AhaMoment::new(AhaMomentType::FirstUpdateReceived)]);
+
+    let result =
+        MobileSyncResult::from_outcome(outcome, Locale::English).expect("Ok maps to a result");
+
+    let celebration = result
+        .celebrate
+        .expect("the first received update is core's aha moment, surfaced on the result");
+    assert_eq!(celebration.title, "You received an update!");
+    assert_eq!(
+        celebration.message,
+        "This is the magic - they updated, you see it instantly."
+    );
+    assert_eq!(celebration.haptic, MobileHapticPattern::Success);
+    assert_eq!(celebration.sound, MobileSoundToken::None);
+    assert_eq!(celebration.animation, MobileAnimationToken::None);
+}
+
+// @internal
+#[test]
+fn celebration_fires_only_for_the_first_update_moment() {
+    let other_moment = ok_outcome_with_moments(
+        1,
+        vec![AhaMoment::new(AhaMomentType::FirstOutboundDelivered)],
+    );
+    let later_sync = ok_outcome(4, 1, vec![]);
+
+    let first =
+        MobileSyncResult::from_outcome(other_moment, Locale::English).expect("Ok maps to a result");
+    let second =
+        MobileSyncResult::from_outcome(later_sync, Locale::English).expect("Ok maps to a result");
+
+    assert!(
+        first.celebrate.is_none(),
+        "only the first-update moment celebrates on the sync result"
+    );
+    assert!(
+        second.celebrate.is_none(),
+        "a later sync that received updates carries no moment, so no repeat celebration"
     );
 }

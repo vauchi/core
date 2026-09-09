@@ -1516,6 +1516,65 @@ mod tests {
 
     // @internal
     #[test]
+    fn import_contacts_purpose_accepts_vcf_and_vcard_extensions() {
+        assert_eq!(
+            FilePickPurpose::ImportContacts.accepted_extensions(),
+            vec!["vcf".to_string(), "vcard".to_string()]
+        );
+    }
+
+    // @internal
+    #[test]
+    fn import_backup_purpose_accepts_vauchi_extension() {
+        assert_eq!(
+            FilePickPurpose::ImportBackup.accepted_extensions(),
+            vec!["vauchi".to_string()]
+        );
+    }
+
+    // @internal
+    #[test]
+    fn other_purpose_accepts_any_extension() {
+        let purpose = FilePickPurpose::Other {
+            label_key: "import.key_bundle".into(),
+        };
+        assert_eq!(purpose.accepted_extensions(), Vec::<String>::new());
+    }
+
+    // @internal
+    #[test]
+    fn file_pick_from_user_json_spells_accepted_extensions() {
+        let cmd = Command::FilePickFromUser {
+            accepted_mime_types: vec!["text/vcard".into()],
+            accepted_extensions: vec!["vcf".into(), "vcard".into()],
+            purpose: FilePickPurpose::ImportContacts,
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert_eq!(
+            json,
+            r#"{"FilePickFromUser":{"accepted_mime_types":["text/vcard"],"accepted_extensions":["vcf","vcard"],"purpose":"ImportContacts"}}"#
+        );
+        let restored: Command = serde_json::from_str(&json).unwrap();
+        assert_eq!(cmd, restored);
+    }
+
+    // @internal
+    #[test]
+    fn file_pick_from_user_json_without_accepted_extensions_decodes_to_empty_list() {
+        let legacy_json = r#"{"FilePickFromUser":{"accepted_mime_types":["text/vcard"],"purpose":"ImportContacts"}}"#;
+        let decoded: Command = serde_json::from_str(legacy_json).unwrap();
+        assert_eq!(
+            decoded,
+            Command::FilePickFromUser {
+                accepted_mime_types: vec!["text/vcard".into()],
+                accepted_extensions: vec![],
+                purpose: FilePickPurpose::ImportContacts,
+            }
+        );
+    }
+
+    // @internal
+    #[test]
     fn set_screen_brightness_with_some_level_round_trips() {
         let cmd = Command::SetScreenBrightness { level: Some(0.65) };
         let json = serde_json::to_string(&cmd).unwrap();

@@ -54,9 +54,11 @@ fn import_contacts_action_emits_file_pick_command() {
             match &commands[0] {
                 Command::FilePickFromUser {
                     accepted_mime_types,
+                    accepted_extensions,
                     purpose,
                 } => {
                     assert_eq!(*purpose, FilePickPurpose::ImportContacts);
+                    assert_eq!(*accepted_extensions, vec!["vcf", "vcard"]);
                     assert!(
                         accepted_mime_types.iter().any(|m| m == "text/vcard"),
                         "expected text/vcard in accepted MIME types, got {:?}",
@@ -258,8 +260,13 @@ fn restore_backup_emits_file_pick_for_backup() {
         ActionResult::Commands { commands } => {
             assert_eq!(commands.len(), 1);
             match &commands[0] {
-                Command::FilePickFromUser { purpose, .. } => {
+                Command::FilePickFromUser {
+                    accepted_extensions,
+                    purpose,
+                    ..
+                } => {
                     assert_eq!(*purpose, FilePickPurpose::ImportBackup);
+                    assert_eq!(*accepted_extensions, vec!["vauchi"]);
                 }
                 other => panic!("expected FilePickFromUser, got {other:?}"),
             }

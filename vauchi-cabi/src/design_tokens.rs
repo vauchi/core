@@ -87,11 +87,28 @@ mod tests {
             "touch_target",
             "motion",
             "focus",
+            "avatar",
         ] {
             assert!(
                 json.contains(&format!("\"{category}\"")),
                 "the tokens payload has no `{category}`, so a C shell still has to invent it"
             );
         }
+    }
+
+    /// RG-11: Windows keeps its own `#4682B4` behind avatar initials only
+    /// because nothing across the C ABI carried the colour; the payload
+    /// now names it, so the shell can read rather than invent it.
+    // @internal
+    #[test]
+    fn the_payload_carries_the_avatar_fallback_background() {
+        let ptr = vauchi_design_tokens_json();
+        // SAFETY: The C ABI returned a valid string owned by this test.
+        let json = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_owned();
+        // SAFETY: The pointer is owned by the C ABI and freed exactly once.
+        unsafe { crate::vauchi_string_free(ptr) };
+
+        let decoded: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded["avatar"]["fallback_bg"], "#4682B4");
     }
 }

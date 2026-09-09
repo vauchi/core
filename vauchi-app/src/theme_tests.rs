@@ -315,6 +315,30 @@ fn test_design_tokens_default_focus() {
     assert_eq!(tokens.focus.ring_offset, 2);
 }
 
+/// RG-11: the background behind avatar initials when a contact carries
+/// no `bg_color` used to live only in the Windows shell as `#4682B4`;
+/// the token is the value every shell converges on.
+// @internal
+#[test]
+fn test_design_tokens_default_avatar() {
+    let tokens = DesignTokens::default();
+    assert_eq!(tokens.avatar.fallback_bg, "#4682B4");
+}
+
+/// A shell parses the fallback straight into a platform colour, so the
+/// token has to stay a six-digit `#rrggbb` — no alpha, no shorthand.
+// @internal
+#[test]
+fn avatar_fallback_bg_is_a_six_digit_hex_colour() {
+    let hex = DesignTokens::default().avatar.fallback_bg;
+    let digits = hex.strip_prefix('#').expect("leading #");
+    assert_eq!(digits.len(), 6, "{hex} is not #rrggbb");
+    assert!(
+        digits.chars().all(|c| c.is_ascii_hexdigit()),
+        "{hex} has a non-hex digit"
+    );
+}
+
 // @internal
 #[test]
 fn test_design_tokens_serde_roundtrip() {

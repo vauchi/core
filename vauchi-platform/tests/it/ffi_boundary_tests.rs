@@ -471,6 +471,7 @@ fn test_mobile_design_tokens_matches_core_defaults() {
         mobile.motion.emphasis_duration_ms,
         core_tokens.motion.emphasis_duration_ms
     );
+    assert_eq!(mobile.avatar.fallback_bg, core_tokens.avatar.fallback_bg);
 }
 
 // === QR Bitmap Generation ===

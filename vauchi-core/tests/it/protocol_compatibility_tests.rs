@@ -583,3 +583,75 @@ fn test_sync_item_enum_variant_names() {
     serde_json::from_str::<SyncItem>(override_removed)
         .expect("VisibilityOverrideRemoved variant name changed");
 }
+
+// =============================================================================
+// DIRECT-SEND TRANSPORT WIRE SPELLING (ADR-066)
+// =============================================================================
+
+/// The single opaque direct-transport command. Both wired legs (key payload
+/// and encrypted card) ride this spelling; no leg discriminator exists.
+const DIRECT_SEND_COMMAND_V1: &str =
+    r#"{"DirectSend":{"payload":[86,88,67,72],"is_initiator":true}}"#;
+
+/// The single opaque direct-transport event the shell reports after a swap.
+const DIRECT_PAYLOAD_RECEIVED_EVENT_V1: &str =
+    r#"{"DirectPayloadReceived":{"data":[86,88,67,72]}}"#;
+
+/// Retired card-leg event; still decoded for one release so shells built
+/// against the pre-unification contract keep working.
+const LEGACY_DIRECT_CARD_RECEIVED_EVENT_V1: &str =
+    r#"{"DirectCardReceived":{"ciphertext":[1,2,3]}}"#;
+
+// @internal
+#[test]
+fn test_direct_send_command_wire_spelling_v1() {
+    use vauchi_core::Command;
+
+    let cmd: Command = serde_json::from_str(DIRECT_SEND_COMMAND_V1).expect("decode DirectSend");
+    assert_eq!(
+        cmd,
+        Command::DirectSend {
+            payload: b"VXCH".to_vec(),
+            is_initiator: true,
+        }
+    );
+
+    let reserialized: serde_json::Value = serde_json::to_value(&cmd).unwrap();
+    let golden: serde_json::Value = serde_json::from_str(DIRECT_SEND_COMMAND_V1).unwrap();
+    assert_eq!(reserialized, golden);
+}
+
+// @internal
+#[test]
+fn test_direct_payload_received_event_wire_spelling_v1() {
+    use vauchi_core::Event;
+
+    let evt: Event = serde_json::from_str(DIRECT_PAYLOAD_RECEIVED_EVENT_V1)
+        .expect("decode DirectPayloadReceived");
+    assert_eq!(
+        evt,
+        Event::DirectPayloadReceived {
+            data: b"VXCH".to_vec(),
+        }
+    );
+
+    let reserialized: serde_json::Value = serde_json::to_value(&evt).unwrap();
+    let golden: serde_json::Value = serde_json::from_str(DIRECT_PAYLOAD_RECEIVED_EVENT_V1).unwrap();
+    assert_eq!(reserialized, golden);
+}
+
+// @internal
+#[test]
+#[allow(deprecated)]
+fn test_legacy_direct_card_received_event_still_decodes_v1() {
+    use vauchi_core::Event;
+
+    let evt: Event = serde_json::from_str(LEGACY_DIRECT_CARD_RECEIVED_EVENT_V1)
+        .expect("legacy DirectCardReceived still decodes for one release");
+    assert_eq!(
+        evt,
+        Event::DirectCardReceived {
+            ciphertext: vec![1, 2, 3],
+        }
+    );
+}

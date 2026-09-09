@@ -645,3 +645,194 @@ fn usb_tampered_card_ciphertext_is_rejected() {
         "a rejected card must not complete the exchange"
     );
 }
+
+// ── One opaque direct-send command, core decides the leg ───────
+//
+// ADR-066: the shell forwards bytes over TCP and reports bytes back. It
+// must never learn whether a swap carried the key payload or the encrypted
+// card — core knows the exchange phase and decides.
+
+fn usb_pair() -> (ExchangeSession, ExchangeSession) {
+    let alice_id = create_identity("Alice");
+    let bob_id = create_identity("Bob");
+    let alice_card = card_with_email(&alice_id, "alice@example.com");
+    let bob_card = card_with_email(&bob_id, "bob@example.com");
+    let alice = ExchangeSession::new_usb(
+        alice_id,
+        alice_card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
+    );
+    let bob = ExchangeSession::new_usb(
+        bob_id,
+        bob_card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Responder,
+        vauchi_core::clock::SystemClock::shared(),
+    );
+    (alice, bob)
+}
+
+/// Receive the peer's key payload + perform key agreement, then return the
+/// bytes of the single opaque `DirectSend` command core emits for the card leg.
+fn key_agree_and_get_card_leg_bytes(
+    session: &mut ExchangeSession,
+    peer_payload: Vec<u8>,
+) -> Vec<u8> {
+    session
+        .apply_hardware_event(Event::DirectPayloadReceived { data: peer_payload })
+        .expect("process peer payload");
+    session
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .expect("key agreement");
+    let commands = session.drain_commands();
+    assert_eq!(
+        commands.len(),
+        1,
+        "the card leg is exactly one transport command, got {commands:?}"
+    );
+    match &commands[0] {
+        Command::DirectSend { payload, .. } => payload.clone(),
+        other => panic!("expected DirectSend, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn usb_card_leg_emits_one_opaque_direct_send_without_a_card_leg_flag() {
+    let (mut alice, mut bob) = usb_pair();
+    let bob_payload = direct_send_payload(&mut bob);
+    let _ = direct_send_payload(&mut alice);
+
+    alice
+        .apply_hardware_event(Event::DirectPayloadReceived { data: bob_payload })
+        .expect("process peer payload");
+    alice
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .expect("key agreement");
+    let commands = alice.drain_commands();
+
+    assert_eq!(commands.len(), 1, "one command, got {commands:?}");
+    let json = serde_json::to_value(&commands[0]).expect("serialize");
+    let body = json
+        .get("DirectSend")
+        .expect("card leg rides the same DirectSend command as the key leg");
+    let mut keys: Vec<&str> = body
+        .as_object()
+        .expect("object body")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        vec!["is_initiator", "payload"],
+        "no card-leg discriminator may reach the shell"
+    );
+    assert_eq!(body["is_initiator"], serde_json::Value::Bool(true));
+    assert!(
+        !body["payload"].as_array().expect("bytes").is_empty(),
+        "the card leg carries the encrypted card"
+    );
+}
+
+// @internal
+#[test]
+fn direct_payload_received_during_card_leg_is_treated_as_the_card() {
+    let (mut alice, mut bob) = usb_pair();
+    let alice_payload = direct_send_payload(&mut alice);
+    let bob_payload = direct_send_payload(&mut bob);
+    let alice_card_bytes = key_agree_and_get_card_leg_bytes(&mut alice, bob_payload);
+    let bob_card_bytes = key_agree_and_get_card_leg_bytes(&mut bob, alice_payload);
+
+    alice
+        .apply_hardware_event(Event::DirectPayloadReceived {
+            data: bob_card_bytes,
+        })
+        .expect("alice decrypts bob's card from the opaque payload");
+    bob.apply_hardware_event(Event::DirectPayloadReceived {
+        data: alice_card_bytes,
+    })
+    .expect("bob decrypts alice's card from the opaque payload");
+
+    assert!(alice.is_complete(), "alice completed");
+    assert!(bob.is_complete(), "bob completed");
+    let alice_contact = alice.extract_contact().expect("alice contact");
+    let bob_contact = bob.extract_contact().expect("bob contact");
+    assert_eq!(alice_contact.card().display_name(), "Bob");
+    assert_eq!(bob_contact.card().display_name(), "Alice");
+    assert!(
+        alice_contact
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.value() == "bob@example.com"),
+        "the card leg carried Bob's full card"
+    );
+}
+
+// @internal
+#[test]
+fn direct_payload_received_before_card_leg_is_treated_as_the_payload() {
+    let (mut alice, mut bob) = usb_pair();
+    let bob_payload = direct_send_payload(&mut bob);
+    let _ = direct_send_payload(&mut alice);
+
+    alice
+        .apply_hardware_event(Event::DirectPayloadReceived { data: bob_payload })
+        .expect("key payload accepted");
+
+    assert!(
+        matches!(alice.state(), ExchangeState::AwaitingKeyAgreement { .. }),
+        "the key leg parses the peer payload, got {:?}",
+        alice.state()
+    );
+    assert!(!alice.is_complete());
+}
+
+// @internal
+#[test]
+fn direct_payload_received_after_card_leg_is_rejected() {
+    let (mut alice, mut bob) = usb_pair();
+    let alice_payload = direct_send_payload(&mut alice);
+    let bob_payload = direct_send_payload(&mut bob);
+    let _ = key_agree_and_get_card_leg_bytes(&mut alice, bob_payload);
+    let bob_card_bytes = key_agree_and_get_card_leg_bytes(&mut bob, alice_payload);
+    alice
+        .apply_hardware_event(Event::DirectPayloadReceived {
+            data: bob_card_bytes.clone(),
+        })
+        .expect("card leg completes");
+    assert!(alice.is_complete());
+
+    let replay = alice.apply_hardware_event(Event::DirectPayloadReceived {
+        data: bob_card_bytes,
+    });
+
+    assert!(
+        matches!(replay, Err(ExchangeError::InvalidState(_))),
+        "a completed session accepts no further direct payload, got {replay:?}"
+    );
+}
+
+// @internal
+#[test]
+fn tampered_card_leg_payload_is_rejected() {
+    let (mut alice, mut bob) = usb_pair();
+    let alice_payload = direct_send_payload(&mut alice);
+    let bob_payload = direct_send_payload(&mut bob);
+    let _ = key_agree_and_get_card_leg_bytes(&mut alice, bob_payload);
+    let mut bob_card_bytes = key_agree_and_get_card_leg_bytes(&mut bob, alice_payload);
+    *bob_card_bytes.last_mut().expect("non-empty ciphertext") ^= 0xFF;
+
+    let result = alice.apply_hardware_event(Event::DirectPayloadReceived {
+        data: bob_card_bytes,
+    });
+
+    assert!(
+        matches!(result, Err(ExchangeError::UsbDecryptionFailed)),
+        "tampered card bytes must fail AEAD, got {result:?}"
+    );
+    assert!(!alice.is_complete());
+}

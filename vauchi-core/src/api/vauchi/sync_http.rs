@@ -1067,7 +1067,14 @@ fn classify_inbound_blob(
 }
 
 fn http_origin(url: &str) -> Option<Origin> {
-    let parsed = Url::parse(url).ok()?;
+    let mut parsed = Url::parse(url).ok()?;
+    // Relay URLs are commonly written with the WebSocket scheme; the origin
+    // they name is the same host over HTTP(S).
+    match parsed.scheme() {
+        "ws" => parsed.set_scheme("http").ok()?,
+        "wss" => parsed.set_scheme("https").ok()?,
+        _ => {}
+    }
     if !matches!(parsed.scheme(), "http" | "https")
         || parsed.host().is_none()
         || !parsed.username().is_empty()

@@ -1102,6 +1102,38 @@ fn merge_pins(target: &mut Vec<PinnedCertificate>, source: &[PinnedCertificate])
 mod tests {
     use super::*;
 
+    // The CLI's default relay is `wss://relay.vauchi.app`; the OHTTP outer
+    // hop is derived as `https://ohttp.vauchi.app`. The distinct-origin
+    // check must compare the two as HTTP origins instead of rejecting the
+    // WebSocket scheme, otherwise every default CLI sync fails closed.
+    // @scenario: sync_privacy :: production relay reachable over its WebSocket URL
+    #[test]
+    fn websocket_relay_url_shares_the_origin_of_its_http_form() {
+        assert_eq!(
+            http_origin("wss://relay.vauchi.app"),
+            http_origin("https://relay.vauchi.app"),
+        );
+        assert_eq!(
+            http_origin("ws://relay.local:8080"),
+            http_origin("http://relay.local:8080"),
+        );
+        assert!(http_origin("ftp://relay.vauchi.app").is_none());
+    }
+
+    // @scenario: sync_privacy :: production relay reachable over its WebSocket URL
+    #[test]
+    fn production_websocket_relay_routes_through_the_derived_ohttp_hop() {
+        use crate::api::VauchiConfig;
+        let dir = tempfile::tempdir().expect("tempdir must succeed");
+        let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+            .with_relay_url("wss://relay.vauchi.app");
+        let vauchi = Vauchi::new(config).expect("Vauchi::new must succeed");
+        assert_eq!(
+            vauchi.distinct_ohttp_route().as_deref(),
+            Some("https://ohttp.vauchi.app"),
+        );
+    }
+
     // @scenario: sync_privacy :: sync adapter never inherits direct fallback
     //
     // Step 4: the sync receive adapter is built through the hardened

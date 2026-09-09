@@ -28,7 +28,8 @@ impl PlatformAppEngine {
                 let outcome = vauchi.sync().map_err(|e| MobileError::Other {
                     detail: e.to_string(),
                 })?;
-                let result = crate::types::MobileSyncResult::try_from(outcome)?;
+                let locale = engine.render_context().resolved_locale();
+                let result = crate::types::MobileSyncResult::from_outcome(outcome, locale)?;
                 Ok(DomainCommandResult::SyncResult { result })
             }
             DomainCommand::PendingUpdateCount => {

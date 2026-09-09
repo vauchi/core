@@ -169,7 +169,7 @@ impl Vauchi {
             errors.push(format!("{ctx}: {msg}"));
         }
 
-        self.trigger_sync_aha_moments(received, send_result.sent);
+        let aha_moments = self.trigger_sync_aha_moments(received, send_result.sent);
 
         Ok(VauchiSyncOutcome::Ok {
             received,
@@ -181,6 +181,7 @@ impl Vauchi {
             acknowledged: send_result.acknowledged,
             errors,
             version_policy,
+            aha_moments,
         })
     }
 
@@ -596,7 +597,12 @@ impl Vauchi {
     /// Counts, not storage state, decide: a cycle that moved nothing is not
     /// a first delivery. Non-fatal for the same reason as the first-contact
     /// moment — the sync already succeeded.
-    fn trigger_sync_aha_moments(&self, received: usize, sent: usize) {
+    fn trigger_sync_aha_moments(
+        &self,
+        received: usize,
+        sent: usize,
+    ) -> Vec<crate::aha_moments::AhaMoment> {
+        let mut triggered = Vec::new();
         let candidates = [
             (
                 received > 0,
@@ -612,16 +618,20 @@ impl Vauchi {
                 continue;
             }
             let Ok(mut tracker) = self.storage.ux().load_or_create_aha_tracker() else {
-                return;
+                return triggered;
             };
             let Some(moment) = tracker.try_trigger(moment_type) else {
                 continue;
             };
             if self.storage.ux().save_aha_tracker(&tracker).is_ok() {
                 self.events
-                    .dispatch(crate::api::events::VauchiEvent::AhaMomentTriggered { moment });
+                    .dispatch(crate::api::events::VauchiEvent::AhaMomentTriggered {
+                        moment: moment.clone(),
+                    });
+                triggered.push(moment);
             }
         }
+        triggered
     }
 
     /// Moves the adapter into a `RelayClient` which is wrapped by a

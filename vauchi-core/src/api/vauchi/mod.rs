@@ -132,6 +132,11 @@ pub enum VauchiSyncOutcome {
         errors: Vec<String>,
         /// Version policy from relay response headers (if any).
         version_policy: Option<crate::version::VersionPolicy>,
+        /// Milestones this cycle triggered (first update received, first
+        /// outbound delivered). Carried on the outcome, not only as an
+        /// event, so a frontend can celebrate exactly the sync that
+        /// caused the moment without owning a tracker (ADR-069).
+        aha_moments: Vec<crate::aha_moments::AhaMoment>,
     },
     /// Called too soon (C1 post-exchange or C2 jitter).
     TooSoon,

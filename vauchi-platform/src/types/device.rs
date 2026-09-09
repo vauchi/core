@@ -110,65 +110,13 @@ pub struct MobileSyncResult {
     /// (e.g. `decrypt:2,signature:1`) — names the failing receive step.
     /// 2026-06-28-sync-delivery-sent-not-received.
     pub reject_reasons: String,
-}
-
-/// Maps a core sync outcome to the mobile result shape.
-///
-/// Throttle decision (engine-resident-sync-orchestration design §4):
-/// `TooSoon` is a benign no-change result, *not* an error — a
-/// user-initiated sync inside the C1/C2 privacy window reports
-/// "up to date" rather than failing. `NotConnected` / `NoIdentity`
-/// stay errors so the caller distinguishes them from a successful
-/// empty sync. The `Ok` field mapping mirrors the retired
-/// `VauchiPlatform::sync()` exactly (`received → cards_updated`,
-/// `sent → updates_sent`; `contacts_added` / `updated_contact_names`
-/// have no source in the outcome).
-impl TryFrom<vauchi_core::api::VauchiSyncOutcome> for MobileSyncResult {
-    type Error = crate::error::MobileError;
-
-    fn try_from(outcome: vauchi_core::api::VauchiSyncOutcome) -> Result<Self, Self::Error> {
-        use vauchi_core::api::VauchiSyncOutcome;
-        match outcome {
-            VauchiSyncOutcome::Ok {
-                received,
-                fetched,
-                rejected,
-                unresolved,
-                reject_reasons,
-                sent,
-                ..
-            } => Ok(MobileSyncResult {
-                contacts_added: 0,
-                cards_updated: received as u32,
-                updates_sent: sent as u32,
-                total: (received + sent) as u32,
-                has_changes: received > 0 || sent > 0,
-                updated_contact_names: vec![],
-                blobs_fetched: fetched as u32,
-                rejected: rejected as u32,
-                unresolved: unresolved as u32,
-                reject_reasons,
-            }),
-            VauchiSyncOutcome::TooSoon => Ok(MobileSyncResult {
-                contacts_added: 0,
-                cards_updated: 0,
-                updates_sent: 0,
-                total: 0,
-                has_changes: false,
-                updated_contact_names: vec![],
-                blobs_fetched: 0,
-                rejected: 0,
-                unresolved: 0,
-                reject_reasons: String::new(),
-            }),
-            VauchiSyncOutcome::NotConnected => Err(crate::error::MobileError::Other {
-                detail: "Not connected".into(),
-            }),
-            VauchiSyncOutcome::NoIdentity => Err(crate::error::MobileError::Other {
-                detail: "No identity".into(),
-            }),
-        }
-    }
+    /// Localized one-line outcome copy, ready to toast as-is.
+    pub summary: String,
+    /// Whether the shell must reload what it currently shows (contact
+    /// list, badges, widgets) because this cycle changed it.
+    pub should_refresh_presentation: bool,
+    /// Present when this cycle triggered core's first-update milestone.
+    pub celebrate: Option<crate::MobileCelebration>,
 }
 
 /// Incoming device link request received via relay.

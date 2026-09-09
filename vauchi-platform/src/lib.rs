@@ -38,6 +38,7 @@ mod platform_app_engine;
 mod platform_app_engine_internals;
 mod platform_app_engine_test_helpers;
 mod policies;
+mod sync_presentation;
 mod types;
 mod validation;
 
@@ -81,6 +82,9 @@ pub use platform_app_engine_test_helpers::PlatformAppEngineTestHelpers;
 pub use policies::{
     MobileClipboardPolicy, mobile_clipboard_policy, mobile_generate_storage_key,
     mobile_storage_key_byte_length,
+};
+pub use sync_presentation::{
+    MobileAnimationToken, MobileCelebration, MobileHapticPattern, MobileSoundToken,
 };
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileAvatarTokens,
@@ -505,6 +509,9 @@ mod tests {
             rejected: 0,
             unresolved: 0,
             reject_reasons: String::new(),
+            summary: String::new(),
+            should_refresh_presentation: false,
+            celebrate: None,
         };
         assert_eq!(empty.total, 0);
         assert!(!empty.has_changes);
@@ -520,6 +527,9 @@ mod tests {
             rejected: 0,
             unresolved: 0,
             reject_reasons: String::new(),
+            summary: String::new(),
+            should_refresh_presentation: false,
+            celebrate: None,
         };
         assert_eq!(with_changes.total, 6);
         assert!(with_changes.has_changes);
@@ -535,6 +545,9 @@ mod tests {
             rejected: 0,
             unresolved: 0,
             reject_reasons: String::new(),
+            summary: String::new(),
+            should_refresh_presentation: false,
+            celebrate: None,
         };
         assert_eq!(partial.total, 1);
         assert!(partial.has_changes);

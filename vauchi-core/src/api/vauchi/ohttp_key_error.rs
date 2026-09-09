@@ -162,6 +162,7 @@ mod tests {
             acknowledged: 0,
             errors,
             version_policy: None,
+            aha_moments: vec![],
         }
     }
 

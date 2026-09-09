@@ -109,7 +109,7 @@ pub use device_link::{
 pub use direct_transport::{ProximityLevel, UsbRole};
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;
-pub use nfc_active::apdu as nfc_apdu;
+pub mod nfc_apdu;
 pub use nfc_active::{ExchangeNfc, NFC_PAYLOAD_SIZE};
 pub use nfc_apdu_chaining::{
     MAX_APDU_DATA, extract_data, is_chained, reassemble_chain, split_into_chain,

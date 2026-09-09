@@ -42,10 +42,10 @@ pub use social::{
     MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 pub use ux::{
-    MobileAhaMoment, MobileAhaMomentType, MobileBorderRadiusTokens, MobileDemoContact,
-    MobileDemoContactState, MobileDesignTokens, MobileLocale, MobileLocaleInfo, MobileMotionTokens,
-    MobileOnboardingProgress, MobileOnboardingStep, MobileSpacingDirectionTokens,
-    MobileSpacingTokens, MobileTabInfo, MobileTabLayout, MobileTheme, MobileThemeColors,
-    MobileThemeMode, MobileTouchTargetTokens, MobileTypographyTokens, mobile_get_string,
-    mobile_get_string_with_args,
+    MobileAhaMoment, MobileAhaMomentType, MobileAvatarTokens, MobileBorderRadiusTokens,
+    MobileDemoContact, MobileDemoContactState, MobileDesignTokens, MobileLocale, MobileLocaleInfo,
+    MobileMotionTokens, MobileOnboardingProgress, MobileOnboardingStep,
+    MobileSpacingDirectionTokens, MobileSpacingTokens, MobileTabInfo, MobileTabLayout, MobileTheme,
+    MobileThemeColors, MobileThemeMode, MobileTouchTargetTokens, MobileTypographyTokens,
+    mobile_get_string, mobile_get_string_with_args,
 };

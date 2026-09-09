@@ -30,7 +30,7 @@ use std::path::Path;
 /// required (non-defaulted) fields, so an empty `{}` cannot parse — the
 /// fallback must be a complete, valid token document. Keep in sync with
 /// `themes/tokens.json` (the contract checker validates the real one).
-const FROZEN_TOKENS_JSON: &str = r#"{
+const FROZEN_TOKENS_JSON: &str = r##"{
   "_spdx": "SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>; SPDX-License-Identifier: GPL-3.0-or-later",
   "version": "2.0.0",
   "spacing": { "xs": 4, "sm": 8, "sm_md": 12, "md": 16, "lg": 24, "xl": 32 },
@@ -41,8 +41,9 @@ const FROZEN_TOKENS_JSON: &str = r#"{
   "font_family": { "display": "Bricolage Grotesque", "body": "Hanken Grotesk", "mono": "JetBrains Mono" },
   "font_weight": { "regular": 400, "medium": 500, "semibold": 600, "bold": 700, "extrabold": 800 },
   "focus": { "ring_width": 3, "ring_offset": 2 },
-  "motion": { "enter_duration_ms": 200, "exit_duration_ms": 150, "emphasis_duration_ms": 300 }
-}"#;
+  "motion": { "enter_duration_ms": 200, "exit_duration_ms": 150, "emphasis_duration_ms": 300 },
+  "avatar": { "fallback_bg": "#4682B4" }
+}"##;
 
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();

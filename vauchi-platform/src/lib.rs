@@ -83,12 +83,12 @@ pub use policies::{
     mobile_storage_key_byte_length,
 };
 pub use types::{
-    MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBiometricUnlockOutcome,
-    MobileBorderRadiusTokens, MobileBroadcastResult, MobileConsentRecord, MobileConsentStatus,
-    MobileConsentType, MobileContact, MobileContactCard, MobileContactField,
-    MobileContactTrustLevel, MobileDecoyContact, MobileDeletionInfo, MobileDeletionState,
-    MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
-    MobileDemoContactState, MobileDesignTokens, MobileDeviceDeliveryRecord,
+    MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileAvatarTokens,
+    MobileBiometricUnlockOutcome, MobileBorderRadiusTokens, MobileBroadcastResult,
+    MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileContact, MobileContactCard,
+    MobileContactField, MobileContactTrustLevel, MobileDecoyContact, MobileDeletionInfo,
+    MobileDeletionState, MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary,
+    MobileDemoContact, MobileDemoContactState, MobileDesignTokens, MobileDeviceDeliveryRecord,
     MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceJoinResult,
     MobileDeviceLinkConfirmation, MobileDeviceLinkData, MobileDeviceLinkInfo,
     MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings, MobileEmergencyConfig,

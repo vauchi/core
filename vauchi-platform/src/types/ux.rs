@@ -448,6 +448,12 @@ pub struct MobileMotionTokens {
     pub emphasis_duration_ms: u16,
 }
 
+/// Design tokens: avatar rendering constants (`fallback_bg` is `#rrggbb`).
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileAvatarTokens {
+    pub fallback_bg: String,
+}
+
 /// Complete design tokens for cross-platform rendering consistency.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileDesignTokens {
@@ -457,6 +463,7 @@ pub struct MobileDesignTokens {
     pub border_radius: MobileBorderRadiusTokens,
     pub touch_target: MobileTouchTargetTokens,
     pub motion: MobileMotionTokens,
+    pub avatar: MobileAvatarTokens,
 }
 
 impl From<&vauchi_app::theme::DesignTokens> for MobileDesignTokens {
@@ -498,6 +505,9 @@ impl From<&vauchi_app::theme::DesignTokens> for MobileDesignTokens {
                 enter_duration_ms: t.motion.enter_duration_ms,
                 exit_duration_ms: t.motion.exit_duration_ms,
                 emphasis_duration_ms: t.motion.emphasis_duration_ms,
+            },
+            avatar: MobileAvatarTokens {
+                fallback_bg: t.avatar.fallback_bg.clone(),
             },
         }
     }

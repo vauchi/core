@@ -7,7 +7,8 @@ use vauchi_app::ui::{
     TabInfo, UserAction,
 };
 use vauchi_core::{
-    ActionSpec, ActionTone, Command, Event, InteractionId, OverlayKind, StandardShortcut, SurfaceId,
+    ActionSpec, ActionTone, Command, Event, InteractionId, NavigationItem, NavigationSpec,
+    OverlayKind, StandardShortcut, SurfaceId,
 };
 
 fn screen_action(id: &str, label: &str, style: ActionStyle) -> ScreenAction {
@@ -38,26 +39,29 @@ fn action(
     }
 }
 
+fn navigation_item(
+    id: &str,
+    label: &str,
+    icon_token: &str,
+    selected: bool,
+    badge_count: u32,
+) -> NavigationItem {
+    NavigationItem {
+        interaction_id: InteractionId::new(id).expect("valid interaction id"),
+        label: label.to_owned(),
+        accessibility_label: label.to_owned(),
+        icon_token: Some(icon_token.to_owned()),
+        selected,
+        badge_count,
+    }
+}
+
 fn surface() -> SurfaceId {
     SurfaceId::new("contacts").expect("valid surface id")
 }
 
-fn contextual_surface() -> ContextualSurface {
-    let mut screen = ScreenModel::new(
-        "contacts",
-        "Contacts",
-        vec![],
-        vec![
-            screen_action("save", "Save", ActionStyle::Primary),
-            screen_action("share", "Share", ActionStyle::Secondary),
-            screen_action("delete", "Delete", ActionStyle::Destructive),
-        ],
-    );
-    screen.nav_actions = vec![
-        screen_action("go_back", "Back", ActionStyle::Secondary),
-        screen_action("open_settings", "Settings", ActionStyle::Secondary),
-    ];
-    let navigation = vec![
+fn navigation_destinations() -> Vec<TabInfo> {
+    vec![
         TabInfo {
             id: "contacts".into(),
             action_id: "contacts".into(),
@@ -72,10 +76,49 @@ fn contextual_surface() -> ContextualSurface {
             icon: "folder".into(),
             badge_count: 2,
         },
+    ]
+}
+
+fn contextual_surface_selecting(selected_tab: Option<&str>) -> ContextualSurface {
+    let mut screen = ScreenModel::new(
+        "contacts",
+        "Contacts",
+        vec![],
+        vec![
+            screen_action("save", "Save", ActionStyle::Primary),
+            screen_action("share", "Share", ActionStyle::Secondary),
+            screen_action("delete", "Delete", ActionStyle::Destructive),
+        ],
+    );
+    screen.nav_actions = vec![
+        screen_action("go_back", "Back", ActionStyle::Secondary),
+        screen_action("open_settings", "Settings", ActionStyle::Secondary),
     ];
 
-    ContextualSurface::compose(surface(), &screen, &navigation, "Navigate", "More actions")
-        .expect("valid contextual surface")
+    ContextualSurface::compose(
+        surface(),
+        &screen,
+        &navigation_destinations(),
+        selected_tab,
+        "Navigate",
+        "More actions",
+    )
+    .expect("valid contextual surface")
+}
+
+fn contextual_surface() -> ContextualSurface {
+    contextual_surface_selecting(Some("contacts"))
+}
+
+fn set_navigation(surface: &ContextualSurface) -> NavigationSpec {
+    surface
+        .initial_commands()
+        .into_iter()
+        .find_map(|command| match command {
+            Command::SetNavigation { navigation, .. } => Some(navigation),
+            _ => None,
+        })
+        .expect("initial commands must publish SetNavigation")
 }
 
 /// Feature: generic_presentation_protocol.feature
@@ -128,11 +171,35 @@ fn test_screen_actions_are_partitioned_into_four_core_owned_roles() {
     );
     assert_eq!(
         surface.initial_commands(),
-        vec![Command::SetContextBar {
-            surface_id: self::surface(),
-            revision: 0,
-            bar: Box::new(bar.clone()),
-        }]
+        vec![
+            Command::SetContextBar {
+                surface_id: self::surface(),
+                revision: 0,
+                bar: Box::new(bar.clone()),
+            },
+            Command::SetNavigation {
+                surface_id: self::surface(),
+                revision: 0,
+                navigation: NavigationSpec {
+                    items: vec![
+                        navigation_item(
+                            "presentation.navigation.contacts",
+                            "Contacts",
+                            "person.2",
+                            true,
+                            0,
+                        ),
+                        navigation_item(
+                            "presentation.navigation.groups",
+                            "Groups",
+                            "folder",
+                            false,
+                            2,
+                        ),
+                    ],
+                },
+            },
+        ]
     );
 
     let secondary = surface
@@ -232,7 +299,7 @@ fn revisioned_context_rejects_an_activation_from_an_old_render() {
         vec![screen_action("save", "Save", ActionStyle::Primary)],
     );
     let current =
-        ContextualSurface::compose_revisioned(surface(), 7, &screen, &[], "Navigate", "More")
+        ContextualSurface::compose_revisioned(surface(), 7, &screen, &[], None, "Navigate", "More")
             .expect("revisioned context");
     let current_primary = current
         .context_bar()
@@ -268,8 +335,9 @@ fn test_serious_screen_action_projects_as_serious_tone() {
             screen_action("delete", "Delete", ActionStyle::Destructive),
         ],
     );
-    let surface = ContextualSurface::compose(surface(), &screen, &[], "Navigate", "More actions")
-        .expect("valid contextual surface");
+    let surface =
+        ContextualSurface::compose(surface(), &screen, &[], None, "Navigate", "More actions")
+            .expect("valid contextual surface");
 
     let secondary = surface
         .handle_event(Event::ActionActivated {
@@ -295,4 +363,81 @@ fn test_serious_screen_action_projects_as_serious_tone() {
             ("delete", ActionTone::Destructive),
         ]
     );
+}
+
+/// `SetNavigation` is new reusable presentation mechanics (ADR-066
+/// Amendment 2026-07-18 D4) with no Gherkin scenario yet.
+// @internal
+#[test]
+fn navigation_items_mirror_the_overlay_items_with_matching_ids() {
+    let surface = contextual_surface();
+
+    let overlay_items = {
+        let route = surface
+            .handle_event(Event::ActionActivated {
+                surface_id: self::surface(),
+                interaction_id: InteractionId::new("presentation.navigation").unwrap(),
+            })
+            .expect("navigation launcher");
+        let ContextualSurfaceRoute::Commands(commands) = route else {
+            panic!("navigation launcher must emit overlay commands");
+        };
+        let Command::PresentOverlay { overlay, .. } = &commands[0] else {
+            panic!("navigation launcher must present an overlay");
+        };
+        overlay.items.clone()
+    };
+
+    let navigation = set_navigation(&surface);
+
+    assert_eq!(navigation.items.len(), overlay_items.len());
+    for (nav_item, overlay_item) in navigation.items.iter().zip(overlay_items.iter()) {
+        assert_eq!(
+            nav_item.interaction_id, overlay_item.interaction_id,
+            "a bar tap must route exactly like the matching overlay item"
+        );
+        assert_eq!(nav_item.label, overlay_item.label);
+        assert_eq!(
+            nav_item.accessibility_label,
+            overlay_item.accessibility_label
+        );
+        assert_eq!(nav_item.icon_token, overlay_item.icon_token);
+    }
+}
+
+// @internal
+#[test]
+fn navigation_selected_flag_marks_only_the_current_destination() {
+    let surface = contextual_surface_selecting(Some("groups"));
+
+    assert_eq!(
+        set_navigation(&surface)
+            .items
+            .iter()
+            .map(|item| (item.interaction_id.as_str(), item.selected))
+            .collect::<Vec<_>>(),
+        vec![
+            ("presentation.navigation.contacts", false),
+            ("presentation.navigation.groups", true),
+        ]
+    );
+}
+
+/// A locked app publishes no destinations at all
+/// (`2026-08-12-android-app-password-bypass`): the persistent bar must
+/// hide rather than render an affordance leading nowhere.
+// @internal
+#[test]
+fn navigation_is_empty_when_the_app_offers_no_destinations() {
+    let screen = ScreenModel::new(
+        "lock",
+        "Lock",
+        vec![],
+        vec![screen_action("unlock", "Unlock", ActionStyle::Primary)],
+    );
+    let surface =
+        ContextualSurface::compose(surface(), &screen, &[], None, "Navigate", "More actions")
+            .expect("valid contextual surface");
+
+    assert!(set_navigation(&surface).items.is_empty());
 }

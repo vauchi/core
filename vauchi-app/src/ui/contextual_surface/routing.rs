@@ -11,12 +11,29 @@ impl ContextualSurface {
         &self.bar
     }
 
-    pub fn initial_commands(&self) -> Vec<Command> {
-        vec![Command::SetContextBar {
+    /// The persistent navigation command for this surface — a shell that
+    /// renders a bottom bar or sidebar needs it whenever the context bar is
+    /// (re)installed, not only when `initial_commands` runs the whole
+    /// batch. `AppEngine::surface_commands` calls this directly because it
+    /// sources `SetContextBar` from `ContextualActionCoordinator` (which
+    /// owns Undo substitution), not from `initial_commands` below.
+    pub fn navigation_command(&self) -> Command {
+        Command::SetNavigation {
             surface_id: self.surface_id.clone(),
             revision: self.revision,
-            bar: Box::new(self.bar.clone()),
-        }]
+            navigation: self.navigation_spec.clone(),
+        }
+    }
+
+    pub fn initial_commands(&self) -> Vec<Command> {
+        vec![
+            Command::SetContextBar {
+                surface_id: self.surface_id.clone(),
+                revision: self.revision,
+                bar: Box::new(self.bar.clone()),
+            },
+            self.navigation_command(),
+        ]
     }
 
     pub fn handle_event(

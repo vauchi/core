@@ -7,7 +7,7 @@ use vauchi_core::{
     SurfaceId,
 };
 
-use super::{AppEngine, AppScreen};
+use super::{AppEngine, AppScreen, TabLayout};
 use crate::ui::{
     ActionResult, ContextualSurface, ContextualSurfaceError, ContextualSurfaceRoute,
     PreparedSurface, PreparedSurfaceError, PresentationCoordinatorError, UserAction,
@@ -261,11 +261,17 @@ impl AppEngine {
         } else {
             self.sidebar_items(locale)
         };
+        // The persistent navigation reflects the app's overall current
+        // destination, not the individual surface being composed: a
+        // companion (detail) pane shares the same selection as the
+        // primary pane, since there is one active destination at a time.
+        let selected_tab = self.current_tab_id(TabLayout::Desktop);
         ContextualSurface::compose_revisioned(
             surface_id,
             self.surface_revision,
             screen,
             &destinations,
+            selected_tab,
             &self.t("nav.more"),
             &self.t("action_list.title"),
         )
@@ -303,10 +309,15 @@ impl AppEngine {
         for (_, prepared, _) in &visible {
             commands.push(prepared.command());
         }
-        for (surface_id, _, _) in &visible {
+        for (surface_id, _, contextual) in &visible {
             if let Some(coordinator) = self.contextual_actions.get(surface_id) {
                 commands.extend(coordinator.initial_commands());
             }
+            // `SetNavigation` immediately follows `SetContextBar` for the
+            // same surface: it comes from `contextual` directly rather than
+            // the coordinator above, which only tracks the four contextual
+            // roles for Undo substitution, not the persistent nav.
+            commands.push(contextual.navigation_command());
         }
         if let Some(profile) = self.presentation_coordinator.current_profile_command() {
             commands.push(profile);

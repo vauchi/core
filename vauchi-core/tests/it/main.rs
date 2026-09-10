@@ -57,6 +57,7 @@ mod app_engine_info_requested_tests;
 mod app_engine_navigation_tests;
 mod app_engine_offline_overlay_tests;
 mod app_engine_onboarding_tests;
+mod app_engine_persistent_navigation_tests;
 mod app_engine_preview_as_tests;
 mod app_engine_serde_exchange_tests;
 mod app_engine_settings_lock_tests;

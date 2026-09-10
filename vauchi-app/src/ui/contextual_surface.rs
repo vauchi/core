@@ -5,8 +5,8 @@
 use std::collections::HashMap;
 
 use vauchi_core::{
-    ActionSpec, ActionTone, Command, ContextBar, InteractionId, OverlayKind, OverlaySpec,
-    PresentationIdError, StandardShortcut, SurfaceId,
+    ActionSpec, ActionTone, Command, ContextBar, InteractionId, NavigationItem, NavigationSpec,
+    OverlayKind, OverlaySpec, PresentationIdError, StandardShortcut, SurfaceId,
 };
 
 use super::{ActionStyle, ScreenAction, ScreenModel, TabInfo, UserAction};
@@ -53,6 +53,7 @@ pub struct ContextualSurface {
     secondary_interaction_id: Option<InteractionId>,
     navigation_overlay: OverlaySpec,
     secondary_overlay: OverlaySpec,
+    navigation_spec: NavigationSpec,
     routes: HashMap<InteractionId, UserAction>,
 }
 
@@ -61,6 +62,7 @@ impl ContextualSurface {
         surface_id: SurfaceId,
         screen: &ScreenModel,
         navigation: &[TabInfo],
+        selected_tab: Option<&str>,
         navigation_label: &str,
         secondary_label: &str,
     ) -> Result<Self, ContextualSurfaceError> {
@@ -69,6 +71,7 @@ impl ContextualSurface {
             None,
             screen,
             navigation,
+            selected_tab,
             navigation_label,
             secondary_label,
         )
@@ -79,6 +82,7 @@ impl ContextualSurface {
         revision: u64,
         screen: &ScreenModel,
         navigation: &[TabInfo],
+        selected_tab: Option<&str>,
         navigation_label: &str,
         secondary_label: &str,
     ) -> Result<Self, ContextualSurfaceError> {
@@ -87,6 +91,7 @@ impl ContextualSurface {
             Some(revision),
             screen,
             navigation,
+            selected_tab,
             navigation_label,
             secondary_label,
         )
@@ -97,6 +102,7 @@ impl ContextualSurface {
         revision: Option<u64>,
         screen: &ScreenModel,
         navigation: &[TabInfo],
+        selected_tab: Option<&str>,
         navigation_label: &str,
         secondary_label: &str,
     ) -> Result<Self, ContextualSurfaceError> {
@@ -170,6 +176,7 @@ impl ContextualSurface {
         }
 
         let mut navigation_items = Vec::with_capacity(navigation.len());
+        let mut navigation_spec_items = Vec::with_capacity(navigation.len());
         for item in navigation {
             let interaction_id = scoped_interaction(
                 revision,
@@ -182,13 +189,21 @@ impl ContextualSurface {
                 },
             );
             navigation_items.push(ActionSpec {
-                interaction_id,
+                interaction_id: interaction_id.clone(),
                 label: item.label.clone(),
                 accessibility_label: item.label.clone(),
                 icon_token: Some(item.icon.clone()),
                 enabled: true,
                 tone: ActionTone::Standard,
                 shortcut: None,
+            });
+            navigation_spec_items.push(NavigationItem {
+                interaction_id,
+                label: item.label.clone(),
+                accessibility_label: item.label.clone(),
+                icon_token: Some(item.icon.clone()),
+                selected: selected_tab == Some(item.id.as_str()),
+                badge_count: item.badge_count,
             });
         }
 
@@ -229,6 +244,9 @@ impl ContextualSurface {
                 kind: OverlayKind::ActionMenu,
                 title: Some(secondary_label.to_owned()),
                 items: secondary_items,
+            },
+            navigation_spec: NavigationSpec {
+                items: navigation_spec_items,
             },
             routes,
         })

@@ -169,6 +169,7 @@ fn contextual_surface(
         revision,
         screen,
         &demo_navigation(),
+        None,
         "Navigate",
         "More actions",
     )

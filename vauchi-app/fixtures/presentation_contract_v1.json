@@ -97,6 +97,24 @@
           }
         }
       }
+    },
+    {
+      "SetNavigation": {
+        "surface_id": "onboarding",
+        "revision": 1,
+        "navigation": {
+          "items": [
+            {
+              "interaction_id": "surface.1.context.presentation.navigation.onboarding",
+              "label": "Welcome",
+              "accessibility_label": "Welcome",
+              "icon_token": "person.badge.plus",
+              "selected": true,
+              "badge_count": 0
+            }
+          ]
+        }
+      }
     }
   ],
   "steps": [
@@ -189,6 +207,24 @@
                 "shortcut": "activate_primary"
               },
               "secondary": null
+            }
+          }
+        },
+        {
+          "SetNavigation": {
+            "surface_id": "onboarding",
+            "revision": 2,
+            "navigation": {
+              "items": [
+                {
+                  "interaction_id": "surface.2.context.presentation.navigation.onboarding",
+                  "label": "Welcome",
+                  "accessibility_label": "Welcome",
+                  "icon_token": "person.badge.plus",
+                  "selected": true,
+                  "badge_count": 0
+                }
+              ]
             }
           }
         }
@@ -286,6 +322,24 @@
                 "shortcut": "activate_primary"
               },
               "secondary": null
+            }
+          }
+        },
+        {
+          "SetNavigation": {
+            "surface_id": "onboarding",
+            "revision": 2,
+            "navigation": {
+              "items": [
+                {
+                  "interaction_id": "surface.2.context.presentation.navigation.onboarding",
+                  "label": "Welcome",
+                  "accessibility_label": "Welcome",
+                  "icon_token": "person.badge.plus",
+                  "selected": true,
+                  "badge_count": 0
+                }
+              ]
             }
           }
         }

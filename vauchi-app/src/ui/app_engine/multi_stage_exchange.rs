@@ -156,11 +156,16 @@ impl AppEngine {
         // for ~1000× its window and deadlocked the exchange
         // (2026-06-03-multistage-qr-exchange-stalls-init-on-device).
         let now = self.vauchi.clock().unix_millis();
-        let event = match self.multi_stage_session.as_mut() {
-            Some(holder) => holder.machine.advance(now),
+        let (event, stalled) = match self.multi_stage_session.as_mut() {
+            Some(holder) => {
+                let event = holder.machine.advance(now);
+                (event, holder.machine.is_frame_stalled())
+            }
             None => return false,
         };
-        self.apply_multi_stage_event(event)
+        let stalled_changed = self.apply_multi_stage_stalled(stalled);
+        let event_changed = self.apply_multi_stage_event(event);
+        stalled_changed || event_changed
     }
 
     /// Translate a frontend-emitted [`vauchi_core::Event`] into a
@@ -334,7 +339,14 @@ impl AppEngine {
         let event = self.forward_multi_stage_hardware_event(&vauchi_core::Event::QrScanned {
             data: qr.to_string(),
         });
-        self.apply_multi_stage_event(event)
+        let stalled = self
+            .multi_stage_session
+            .as_ref()
+            .map(|h| h.machine.is_frame_stalled())
+            .unwrap_or(false);
+        let stalled_changed = self.apply_multi_stage_stalled(stalled);
+        let event_changed = self.apply_multi_stage_event(event);
+        stalled_changed || event_changed
     }
 
     /// Drain any commands the machine emitted that aren't routed
@@ -696,6 +708,19 @@ impl AppEngine {
         self.engine
             .apply_update(crate::ui::EngineUpdate::MultiStage(
                 crate::ui::MultiStageUpdate::AccelProximity(state),
+            ))
+    }
+
+    /// Bridge: push `MultiStageMachine::is_frame_stalled()` onto the
+    /// active `MultiStageExchangeEngine`'s `Stalled` presentation. Called
+    /// alongside every `apply_multi_stage_event` dispatch (`advance_multi_
+    /// stage_session` / `apply_multi_stage_peer_scan`) so the flag always
+    /// reflects the same tick's phase (`_private/docs/backlog/
+    /// 2026-09-10-exchange-stall-and-ble-fallback-states/README.md`).
+    pub fn apply_multi_stage_stalled(&mut self, stalled: bool) -> bool {
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::MultiStage(
+                crate::ui::MultiStageUpdate::Stalled(stalled),
             ))
     }
 

@@ -54,6 +54,9 @@ use crate::ui::*;
 mod camera_gate;
 use camera_gate::CameraGate;
 
+#[path = "multi_stage_exchange_terminal_screens.rs"]
+mod terminal_screens;
+
 pub(crate) use crate::ui::multi_stage_status::own_qr_label;
 
 // ── Action IDs ─────────────────────────────────────────────────────
@@ -69,6 +72,10 @@ pub const SWITCH_CAMERA_ACTION_ID: &str = "switch_camera";
 /// User tapped the "grant permission" affordance after camera permission
 /// was denied. Frontend re-prompts the OS permission dialog.
 pub const GRANT_CAMERA_PERMISSION_ACTION_ID: &str = "grant_camera_permission";
+/// User tapped "Switch to encrypted relay" on the `Stalled` presentation —
+/// abandons the in-person attempt and restarts over Link (matches the
+/// BLE/generic exchange engines' `fallback_relay` action id).
+pub const SWITCH_RELAY_ACTION_ID: &str = "fallback_relay";
 
 // ── Component IDs ──────────────────────────────────────────────────
 
@@ -153,6 +160,12 @@ pub struct MultiStageExchangeEngine {
     /// state machine for non-Hover sessions even before the Phase
     /// 1.E mode-dispatcher flips to per-mode constructors).
     is_hover_mode: bool,
+    /// Peer-frame `Stalled` presentation, pushed by the AppEngine bridge
+    /// from `MultiStageMachine::is_frame_stalled` on every poll tick.
+    /// `false` for Glance too — the machine only ever reports `true` from
+    /// a peer-engaged phase (`_private/docs/backlog/
+    /// 2026-09-10-exchange-stall-and-ble-fallback-states/README.md`).
+    stalled: bool,
     locale: Locale,
 }
 
@@ -176,6 +189,7 @@ impl MultiStageExchangeEngine {
             audio_proximity: AudioProximityState::Pending,
             accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: false,
+            stalled: false,
             locale: Locale::English,
         }
     }
@@ -216,6 +230,7 @@ impl MultiStageExchangeEngine {
             audio_proximity: AudioProximityState::Pending,
             accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: true,
+            stalled: false,
             locale: Locale::English,
         }
     }
@@ -240,6 +255,7 @@ impl MultiStageExchangeEngine {
             audio_proximity: AudioProximityState::Pending,
             accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: true,
+            stalled: false,
             locale: Locale::English,
         }
     }
@@ -363,6 +379,17 @@ impl MultiStageExchangeEngine {
         self.accel_proximity
     }
 
+    /// Drive the engine's peer-frame `Stalled` presentation. No-op after
+    /// cancel, mirroring the other bridge setters. The AppEngine pushes
+    /// this alongside every `set_state` call from `MultiStageMachine::
+    /// is_frame_stalled`, so it always reflects the same tick's phase.
+    pub fn set_stalled(&mut self, stalled: bool) {
+        if self.cancelled {
+            return;
+        }
+        self.stalled = stalled;
+    }
+
     // ── Internal helpers ───────────────────────────────────────────
 
     fn build_screen(&self) -> ScreenModel {
@@ -438,6 +465,14 @@ impl MultiStageExchangeEngine {
         // signals fail (see `audio_failed_takes_precedence_over_accel_failed`).
         if matches!(self.accel_proximity, AccelerometerProximityState::Failed) {
             return self.build_accel_failed_screen(title);
+        }
+        // Stalled takes precedence over the plain active chrome the same
+        // way the proximity-failure checks above do: it's a *this attempt
+        // needs a decision* signal. Never true alongside Finalized/Failed —
+        // `MultiStageMachine::frame_stall_applies` excludes every terminal
+        // and success-pending phase, so this cannot shadow those screens.
+        if self.stalled {
+            return self.build_stalled_screen(title);
         }
         match &self.state {
             ProtocolState::Failed(reason) => self.build_failed_screen(title, reason),
@@ -665,123 +700,6 @@ impl MultiStageExchangeEngine {
             }],
         )
     }
-
-    fn build_failed_screen(&self, title: String, reason: &str) -> ScreenModel {
-        ScreenModel::new(
-            SCREEN_ID,
-            title,
-            vec![Component::StatusIndicator {
-                id: COMPONENT_ID_STATUS.into(),
-                icon: Some("xmark.circle".into()),
-                title: self.t("exchange.terminal.failed_status"),
-                detail: Some(reason.to_string()),
-                status: Status::Failed,
-                status_label: self.t(Status::Failed.label_key()),
-                a11y: None,
-            }],
-            vec![
-                ScreenAction {
-                    id: RETRY_ACTION_ID.into(),
-                    label: self.t("action.retry"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.retry"))),
-                },
-                ScreenAction {
-                    id: CANCEL_ACTION_ID.into(),
-                    label: self.t("action.cancel"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
-                },
-            ],
-        )
-    }
-
-    /// TapHoverShake mirror of [`Self::build_audio_failed_screen`].
-    /// Distinct chrome from both generic protocol-Failed and
-    /// audio-Failed: "Couldn't confirm the shake" tells the user the
-    /// accelerometer cross-correlation didn't pass — an actionable
-    /// physical-setup hint (shake both phones together). Reached only
-    /// when `accel_proximity == Failed` and `audio_proximity != Failed`.
-    fn build_accel_failed_screen(&self, title: String) -> ScreenModel {
-        ScreenModel::new(
-            SCREEN_ID,
-            title,
-            vec![Component::StatusIndicator {
-                id: COMPONENT_ID_STATUS.into(),
-                icon: Some("move.3d".into()),
-                title: self.t("multi_stage.shake_not_confirmed_title"),
-                detail: Some(self.t("multi_stage.shake_not_confirmed_detail")),
-                status: Status::Failed,
-                status_label: self.t(Status::Failed.label_key()),
-                a11y: None,
-            }],
-            vec![
-                ScreenAction {
-                    id: RETRY_ACTION_ID.into(),
-                    label: self.t("action.retry"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.retry"))),
-                },
-                ScreenAction {
-                    id: CANCEL_ACTION_ID.into(),
-                    label: self.t("action.cancel"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
-                },
-            ],
-        )
-    }
-
-    /// G1.3 of the Hover graduation problem record. Distinct chrome
-    /// from generic protocol-Failed: "Couldn't confirm devices are
-    /// close" tells the user the audio-proximity handshake timed out,
-    /// which is a *physical-setup* problem — they should move the
-    /// devices closer and retry rather than wonder what "Exchange
-    /// Failed" means.
-    ///
-    /// Retry semantics differ between protocol-Failed and audio-Failed:
-    /// the audio-failed retry should restart only the audio verifier
-    /// (no QR-cycle restart). That's a session-side concern (Phase
-    /// 1.C.3 under Option B), so the action surface remains the same
-    /// as the generic Failed screen for now — the handler in
-    /// `handle_action` distinguishes by inspecting
-    /// `self.audio_proximity` at retry time and emits the appropriate
-    /// command set when the session-side work lands.
-    fn build_audio_failed_screen(&self, title: String) -> ScreenModel {
-        ScreenModel::new(
-            SCREEN_ID,
-            title,
-            vec![Component::StatusIndicator {
-                id: COMPONENT_ID_STATUS.into(),
-                icon: Some("dot.radiowaves.left.and.right".into()),
-                title: self.t("multi_stage.proximity_not_confirmed_title"),
-                detail: Some(self.t("multi_stage.proximity_not_confirmed_detail")),
-                status: Status::Failed,
-                status_label: self.t(Status::Failed.label_key()),
-                a11y: None,
-            }],
-            vec![
-                ScreenAction {
-                    id: RETRY_ACTION_ID.into(),
-                    label: self.t("action.retry"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.retry"))),
-                },
-                ScreenAction {
-                    id: CANCEL_ACTION_ID.into(),
-                    label: self.t("action.cancel"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
-                },
-            ],
-        )
-    }
 }
 
 impl WorkflowEngine for MultiStageExchangeEngine {
@@ -812,6 +730,7 @@ impl WorkflowEngine for MultiStageExchangeEngine {
             MultiStageUpdate::SessionEnded => self.set_session_ended(),
             MultiStageUpdate::AudioProximity(state) => self.set_audio_proximity(state),
             MultiStageUpdate::AccelProximity(state) => self.set_accel_proximity(state),
+            MultiStageUpdate::Stalled(stalled) => self.set_stalled(stalled),
         }
         true
     }
@@ -853,6 +772,14 @@ impl WorkflowEngine for MultiStageExchangeEngine {
                 // fresh one spawns on the next mode pick.
                 self.cancelled = true;
                 ActionResult::Complete
+            }
+            SWITCH_RELAY_ACTION_ID => {
+                // Only reachable from the Stalled presentation. Abandons the
+                // in-person attempt and restarts over the encrypted relay —
+                // the same escape the BLE/generic exchange engines already
+                // offer from their Failed screens.
+                self.cancelled = true;
+                ActionResult::StartLinkExchange
             }
             SWITCH_CAMERA_ACTION_ID => {
                 self.use_front_camera = !self.use_front_camera;

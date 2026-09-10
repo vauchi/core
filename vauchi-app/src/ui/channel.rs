@@ -158,6 +158,11 @@ pub enum MultiStageUpdate {
     SessionEnded,
     AudioProximity(AudioProximityState),
     AccelProximity(AccelerometerProximityState),
+    /// Peer-frame stall presentation, derived from
+    /// `MultiStageMachine::is_frame_stalled` on every poll tick / scanned
+    /// frame — see `_private/docs/backlog/
+    /// 2026-09-10-exchange-stall-and-ble-fallback-states/README.md`.
+    Stalled(bool),
 }
 
 /// Cycle-thread bridge updates for the device-linking engine.
@@ -303,6 +308,7 @@ impl EngineUpdate {
                 MultiStageUpdate::SessionEnded => "MultiStage::SessionEnded",
                 MultiStageUpdate::AudioProximity(_) => "MultiStage::AudioProximity",
                 MultiStageUpdate::AccelProximity(_) => "MultiStage::AccelProximity",
+                MultiStageUpdate::Stalled(_) => "MultiStage::Stalled",
             },
             Self::DeviceLink(u) => match u {
                 DeviceLinkUpdate::QrPending => "DeviceLink::QrPending",

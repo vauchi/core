@@ -64,11 +64,13 @@
 
 use vauchi_core::Command;
 use vauchi_core::Event;
-use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{
     AccelerometerProximityState, AudioConfig, AudioProximityState, MultiStageSession,
     ProtocolState, QrPayload, audio_modem,
 };
+
+#[path = "multi_stage_machine_peer_name.rs"]
+mod peer_name;
 
 /// Audio-listen window default (ms). Mirrors the cycle-thread's
 /// `MobileMultiStageSession::AUDIO_LISTEN_TIMEOUT_MS`. Kept private
@@ -101,6 +103,19 @@ pub const MULTI_STAGE_STEP_TIMEOUT_MS: u64 = 120_000;
 /// over reset-on-scan-activity because a foreign scanner could otherwise
 /// keep the session alive indefinitely.
 pub const MULTI_STAGE_DISCOVERY_TIMEOUT_MS: u64 = 300_000;
+
+/// Design proposal (not a device measurement — `_private/docs/backlog/
+/// 2026-09-10-exchange-stall-and-ble-fallback-states/README.md`): how long
+/// a peer-engaged phase (`Discovered` onward) may go without decoding a new
+/// peer QR frame before the screen surfaces a `Stalled` presentation. A
+/// dead or misaligned session looked identical to a live one — the "hover
+/// transfer stalls" and "BLE never shows completion" reports both describe
+/// a session with no observable state between healthy and the 120 s hard
+/// failure. Far below [`MULTI_STAGE_STEP_TIMEOUT_MS`] so the soft warning
+/// (with its Retry / Switch-to-relay escape) lands well before the hard
+/// timeout, and is cleared the moment a new frame decodes — it never
+/// affects whether the exchange itself can still complete.
+pub const MULTI_STAGE_FRAME_STALL_MS: u64 = 8_000;
 
 /// Observable phase of the multi-stage machine. 1:1 with
 /// [`ProtocolState`] (renamed for engine-side ergonomics — the
@@ -236,6 +251,17 @@ pub struct MultiStageMachine {
     /// it so steady progress refreshes the budget and only a stalled
     /// wait state trips it.
     phase_entered_ms: u64,
+    /// `now` (ms) when a peer QR frame was last decoded
+    /// ([`Event::QrScanned`]). Set on construction and re-stamped on every
+    /// `QrScanned` regardless of whether it advances the phase — a repeat
+    /// decode of the peer's still-current frame is still evidence the
+    /// camera is seeing something. [`Self::is_frame_stalled`] is derived
+    /// from it.
+    last_peer_frame_ms: u64,
+    /// Cached result of the last [`Self::refresh_stall_state`] call.
+    /// Read by [`Self::is_frame_stalled`]; the AppEngine bridge pushes it
+    /// onto the screen's Stalled presentation.
+    frame_stalled: bool,
 }
 
 impl MultiStageMachine {
@@ -251,6 +277,8 @@ impl MultiStageMachine {
             current_frame_duration: 0,
             cancelled: false,
             phase_entered_ms: now,
+            last_peer_frame_ms: now,
+            frame_stalled: false,
         }
     }
 
@@ -268,6 +296,8 @@ impl MultiStageMachine {
             current_frame_duration: 0,
             cancelled: false,
             phase_entered_ms: now,
+            last_peer_frame_ms: now,
+            frame_stalled: false,
         }
     }
 
@@ -287,6 +317,8 @@ impl MultiStageMachine {
             current_frame_duration: 0,
             cancelled: false,
             phase_entered_ms: now,
+            last_peer_frame_ms: now,
+            frame_stalled: false,
         }
     }
 
@@ -338,6 +370,7 @@ impl MultiStageMachine {
         let prior_phase = self.phase.clone();
         let event = self.advance_frame(now);
         self.note_phase_progress(&prior_phase, now);
+        self.refresh_stall_state(now);
         event
     }
 
@@ -365,6 +398,8 @@ impl MultiStageMachine {
         self.phase = MultiStagePhase::Failed {
             reason: reason.clone(),
         };
+        // The hard failure supersedes the soft Stalled presentation.
+        self.frame_stalled = false;
         MultiStageEvent::Failed { reason }
     }
 
@@ -375,6 +410,42 @@ impl MultiStageMachine {
         if self.phase != *prior {
             self.phase_entered_ms = now;
         }
+    }
+
+    /// Phases where the peer is expected to keep sending frames — the
+    /// window [`Self::is_frame_stalled`] watches. `Advertising` is
+    /// excluded: it is peerless and already covered by the longer,
+    /// human-paced [`MULTI_STAGE_DISCOVERY_TIMEOUT_MS`]. `Finalized` is
+    /// success-pending (mirrors [`Self::step_timed_out`]'s carve-out) and
+    /// every other variant is a terminal phase already excluded by the
+    /// `is_terminal` guard on `advance` / `handle_hardware_event`.
+    fn frame_stall_applies(&self) -> bool {
+        matches!(
+            self.phase,
+            MultiStagePhase::Discovered
+                | MultiStagePhase::Transferring { .. }
+                | MultiStagePhase::Verifying
+                | MultiStagePhase::Confirming
+        )
+    }
+
+    /// Re-derive [`Self::is_frame_stalled`] from `now` and the phase we
+    /// just landed in. Called at the end of both `advance` and
+    /// `handle_hardware_event` so the flag tracks every source of `now`
+    /// the machine sees, not just its own display-frame ticks.
+    fn refresh_stall_state(&mut self, now: u64) {
+        self.frame_stalled = self.frame_stall_applies()
+            && now.saturating_sub(self.last_peer_frame_ms) >= MULTI_STAGE_FRAME_STALL_MS;
+    }
+
+    /// Whether the screen should show the `Stalled` presentation — a
+    /// peer-engaged phase has gone [`MULTI_STAGE_FRAME_STALL_MS`] without
+    /// decoding a new peer QR frame. Purely advisory: the underlying
+    /// [`MULTI_STAGE_STEP_TIMEOUT_MS`] deadline keeps running underneath
+    /// and still fails the exchange if the peer never returns; decoding a
+    /// frame clears this on the next `advance` / `handle_hardware_event`.
+    pub fn is_frame_stalled(&self) -> bool {
+        self.frame_stalled
     }
 
     /// One display-frame step. No deadline/progress bookkeeping — the
@@ -486,6 +557,11 @@ impl MultiStageMachine {
                 _ => MultiStageEvent::None,
             },
             Event::QrScanned { data } => {
+                // A frame decoded — clears any Stalled presentation
+                // regardless of whether it moves the protocol forward
+                // (a repeat of the peer's still-current frame is still
+                // evidence the camera is seeing something).
+                self.last_peer_frame_ms = now;
                 // Feed the scanned QR into the protocol's
                 // deserializer. The inner state machine may
                 // transition (Advertising → Discovered, Discovered →
@@ -506,6 +582,7 @@ impl MultiStageMachine {
                     // before this early return, so it does not depend on the
                     // "never coincides with a transition" invariant above.
                     self.note_phase_progress(&prior_phase, now);
+                    self.refresh_stall_state(now);
                     return MultiStageEvent::AccelProximityChanged(accel_after);
                 }
                 phase_transition_event(&qr_prior_phase, &self.phase)
@@ -533,6 +610,7 @@ impl MultiStageMachine {
             _ => MultiStageEvent::None,
         };
         self.note_phase_progress(&prior_phase, now);
+        self.refresh_stall_state(now);
         result
     }
 
@@ -544,6 +622,7 @@ impl MultiStageMachine {
         }
         self.cancelled = true;
         self.phase = MultiStagePhase::Cancelled;
+        self.frame_stalled = false;
         // Wipe sensitive protocol state, mirroring the cycle thread's
         // `MultiStageSession::cancel` discipline.
         self.inner.cancel();
@@ -774,7 +853,7 @@ impl MultiStageMachine {
         // protocol state; the name lives in the just-received
         // payload, which only the session has.
         if matches!(new_phase, MultiStagePhase::Finalized { .. }) {
-            let peer_name = extract_peer_name(&self.inner);
+            let peer_name = peer_name::extract_peer_name(&self.inner);
             new_phase = MultiStagePhase::Finalized { peer_name };
         }
         // Preserve `Failed { reason }` already set by a hardware
@@ -786,40 +865,6 @@ impl MultiStageMachine {
             return;
         }
         self.phase = new_phase;
-    }
-}
-
-/// Decode the peer's display name from the just-received
-/// exchange payload. Called only on the `Finalized` transition;
-/// returns an empty string when the payload is absent (race —
-/// Finalized observed before reassembly completes) or malformed
-/// (deserialize failure — surfaces as the empty success-chrome
-/// name, never panics).
-///
-/// Wire format mirrors `serialize_exchange_payload`
-/// (`vauchi-app/src/ui/app_engine/multi_stage_exchange.rs`):
-/// `[version: 1][public_key: 32][card_json: rest]`. Drops the
-/// public key after the version check — the contact's signing
-/// key lives in storage via the persistence path, not on the
-/// success screen.
-fn extract_peer_name(session: &MultiStageSession) -> String {
-    let Some(data) = session.get_received_data() else {
-        return String::new();
-    };
-    decode_peer_name_from_payload(&data)
-}
-
-/// Pure-byte counterpart of [`extract_peer_name`] split out so the
-/// payload-shape edges (short input, wrong version, malformed
-/// `card_json`) can be unit-tested without spinning up a full
-/// `MultiStageSession` peer exchange.
-fn decode_peer_name_from_payload(data: &[u8]) -> String {
-    if data.len() < 34 || data[0] != EXCHANGE_PAYLOAD_VERSION {
-        return String::new();
-    }
-    match serde_json::from_slice::<ContactCard>(&data[33..]) {
-        Ok(card) => card.display_name().to_string(),
-        Err(_) => String::new(),
     }
 }
 
@@ -937,60 +982,4 @@ pub fn event_to_commands(event: &MultiStageEvent) -> Vec<Command> {
 #[doc(hidden)]
 pub fn protocol_state_for_test(machine: &MultiStageMachine) -> ProtocolState {
     machine.inner.get_state()
-}
-// INLINE_TEST_REQUIRED: decode_peer_name_from_payload is a private
-// helper; its edges (short input, wrong version, malformed card_json)
-// only exercise here.
-#[cfg(test)]
-mod peer_name_tests {
-    use super::{EXCHANGE_PAYLOAD_VERSION, decode_peer_name_from_payload};
-    use vauchi_core::contact_card::ContactCard;
-
-    fn build_payload(card: &ContactCard) -> Vec<u8> {
-        let json = serde_json::to_vec(card).expect("serialize card");
-        let mut out = Vec::with_capacity(1 + 32 + json.len());
-        out.push(EXCHANGE_PAYLOAD_VERSION);
-        out.extend_from_slice(&[0xAB; 32]);
-        out.extend_from_slice(&json);
-        out
-    }
-
-    // @internal
-    #[test]
-    fn well_formed_payload_returns_card_display_name() {
-        let card = ContactCard::new("Alice");
-        let payload = build_payload(&card);
-        assert_eq!(decode_peer_name_from_payload(&payload), "Alice");
-    }
-
-    // @internal
-    #[test]
-    fn empty_payload_returns_empty_string() {
-        assert_eq!(decode_peer_name_from_payload(&[]), "");
-    }
-
-    // @internal
-    #[test]
-    fn payload_shorter_than_header_returns_empty_string() {
-        let short = vec![EXCHANGE_PAYLOAD_VERSION; 20];
-        assert_eq!(decode_peer_name_from_payload(&short), "");
-    }
-
-    // @internal
-    #[test]
-    fn unknown_version_byte_returns_empty_string() {
-        let card = ContactCard::new("Bob");
-        let mut payload = build_payload(&card);
-        payload[0] = 0xFF;
-        assert_eq!(decode_peer_name_from_payload(&payload), "");
-    }
-
-    // @internal
-    #[test]
-    fn malformed_card_json_returns_empty_string() {
-        let mut payload = vec![EXCHANGE_PAYLOAD_VERSION];
-        payload.extend_from_slice(&[0xAB; 32]);
-        payload.extend_from_slice(b"{not-valid-json");
-        assert_eq!(decode_peer_name_from_payload(&payload), "");
-    }
 }

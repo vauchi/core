@@ -112,6 +112,12 @@ fn glance_without_camera_shows_qr_but_no_scan() {
 }
 
 // @internal
+// A peer-engaged step (post-Discovering) that goes silent for the full
+// step budget still fails to retry/cancel. `Discovering` itself no longer
+// reaches this path — it now surfaces `NothingFound` at the shorter
+// `BLE_DISCOVERY_TIMEOUT_SECS` (see the `nothing_found_*` tests below) — so
+// this test discovers a peer first to land in a step the 15 s bound
+// doesn't gate.
 #[test]
 fn stalled_step_past_timeout_ticks_to_failed() {
     let mut engine = BleExchangeEngine::new(
@@ -122,14 +128,12 @@ fn stalled_step_past_timeout_ticks_to_failed() {
         None,
         Locale::English,
     );
-    // `entered` read just after construction is >= the engine's stamped
+    let _ = discover(&mut engine);
+    assert_eq!(engine.current_screen().screen_id, "exchange_ble_exchanging");
+    // `entered` read just after discovery is >= the engine's re-stamped
     // step-entry second, so `+ budget + 1` is unambiguously past the
     // deadline (CC-06 — explicit now, no FakeClock, no sleep).
     let entered = SystemClock::shared().unix_seconds();
-    assert_eq!(
-        engine.current_screen().screen_id,
-        "exchange_ble_discovering"
-    );
 
     engine.tick(entered + BLE_STEP_TIMEOUT_SECS + 1);
 
@@ -137,6 +141,122 @@ fn stalled_step_past_timeout_ticks_to_failed() {
         engine.current_screen().screen_id,
         "exchange_failed",
         "a stalled BLE step past its budget must fail to retry/cancel"
+    );
+}
+
+// @internal
+#[test]
+fn nothing_found_after_discovery_budget_with_no_peer() {
+    let mut engine = BleExchangeEngine::new(
+        ExchangeMode::Magic,
+        true,
+        vec![],
+        SystemClock::shared(),
+        None,
+        Locale::English,
+    );
+    let entered = SystemClock::shared().unix_seconds();
+
+    engine.tick(entered + BLE_DISCOVERY_TIMEOUT_SECS + 1);
+
+    let screen = engine.current_screen();
+    assert_eq!(
+        screen.screen_id, "exchange_ble_nothing_found",
+        "no peer discovered past the discovery budget must offer nothing-found chrome instead of scanning forever"
+    );
+    let ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
+    assert!(
+        ids.contains(&ACTION_RETRY),
+        "nothing-found must offer Retry, got {ids:?}"
+    );
+    assert!(
+        ids.contains(&ACTION_FALLBACK_QR),
+        "nothing-found (camera device) must offer Switch to QR, got {ids:?}"
+    );
+}
+
+// @internal
+#[test]
+fn not_nothing_found_before_the_discovery_budget() {
+    let mut engine = BleExchangeEngine::new(
+        ExchangeMode::Magic,
+        true,
+        vec![],
+        SystemClock::shared(),
+        None,
+        Locale::English,
+    );
+    let entered = SystemClock::shared().unix_seconds();
+
+    engine.tick(entered + BLE_DISCOVERY_TIMEOUT_SECS - 1);
+
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_ble_discovering",
+        "must not offer nothing-found before the discovery budget elapses"
+    );
+}
+
+// @internal
+#[test]
+fn discovering_a_peer_before_the_budget_prevents_nothing_found() {
+    let mut engine = BleExchangeEngine::new(
+        ExchangeMode::Magic,
+        true,
+        vec![],
+        SystemClock::shared(),
+        None,
+        Locale::English,
+    );
+    let entered = SystemClock::shared().unix_seconds();
+    let _ = discover(&mut engine);
+
+    engine.tick(entered + BLE_DISCOVERY_TIMEOUT_SECS + 1);
+
+    assert_ne!(
+        engine.current_screen().screen_id,
+        "exchange_ble_nothing_found",
+        "a peer discovered before the budget must not be overridden by nothing-found"
+    );
+}
+
+// @internal
+#[test]
+fn nothing_found_retry_restarts_scanning() {
+    let mut engine = BleExchangeEngine::new(
+        ExchangeMode::Magic,
+        true,
+        vec![],
+        SystemClock::shared(),
+        None,
+        Locale::English,
+    );
+    let entered = SystemClock::shared().unix_seconds();
+    engine.tick(entered + BLE_DISCOVERY_TIMEOUT_SECS + 1);
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_ble_nothing_found"
+    );
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: ACTION_RETRY.into(),
+    });
+
+    assert!(matches!(result, ActionResult::UpdateScreen(_)));
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_ble_discovering",
+        "retry from nothing-found must restart scanning"
+    );
+    let cmds = engine.screen_entered();
+    assert_eq!(
+        cmds.len(),
+        2,
+        "retry must re-emit the advertise/scan start commands, got {cmds:?}"
     );
 }
 
@@ -331,6 +451,34 @@ fn disconnect_transitions_to_failed_with_all_fallbacks() {
     assert!(ids.contains(&"fallback_qr")); // has_camera == true
     assert!(ids.contains(&"fallback_relay"));
     assert!(ids.contains(&"cancel"));
+}
+
+// @internal
+#[test]
+fn failed_screen_states_nothing_was_saved() {
+    let mut engine = BleExchangeEngine::new(
+        ExchangeMode::Shake,
+        true,
+        vec![],
+        SystemClock::shared(),
+        None,
+        Locale::English,
+    );
+    let _ = engine.handle_hardware_event(Event::BleDisconnected {
+        device_id: "peer-1".into(),
+        direction: vauchi_core::BleLinkDirection::Outbound,
+        reason: "lost".into(),
+    });
+    let screen = engine.current_screen();
+    let nothing_saved = get_string(Locale::English, "exchange.terminal.failed_nothing_saved");
+    assert!(
+        screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::Text { content, .. } if *content == nothing_saved)),
+        "the BLE Failed screen must state that nothing was saved, components={:?}",
+        screen.components
+    );
 }
 
 // @internal

@@ -114,6 +114,11 @@ struct State {
     received: Vec<ReceivedRequest>,
     /// Default response when no queue entry matches.
     default: Option<CannedResponse>,
+    /// When `Some`, `/v2/escrow` is served from a real gate store instead
+    /// of the canned queues, so two clients converge over one relay
+    /// (ADR-049 two-party Link). Maps `gate_hash → [(slot_hash, blob)]`,
+    /// at most `MAX_SLOTS_PER_GATE` slots per gate.
+    escrow: Option<std::collections::HashMap<String, Vec<(String, String)>>>,
 }
 
 pub struct MockRelay {
@@ -165,6 +170,13 @@ impl MockRelay {
         self.state.lock().unwrap().default = Some(response);
     }
 
+    /// Serve `/v2/escrow` from a real gate store rather than canned
+    /// responses, so an initiator's `Put` becomes a responder's `Get`
+    /// over the same relay. Enables a genuine two-party Link handshake.
+    pub fn enable_escrow_store(&self) {
+        self.state.lock().unwrap().escrow = Some(std::collections::HashMap::new());
+    }
+
     /// Snapshot of every received request in arrival order.
     pub fn received(&self) -> Vec<ReceivedRequest> {
         self.state.lock().unwrap().received.clone()
@@ -211,6 +223,68 @@ fn run_listener(listener: TcpListener, state: Arc<Mutex<State>>, shutdown: Arc<A
             Err(_) => break,
         }
     }
+}
+
+/// Serve one `/v2/escrow` request from the stateful gate store. The client
+/// sends `EscrowMessage` with the serde tag renamed `action → escrow_action`
+/// (see `http_transport::escrow`); the reply is a bare `EscrowResponse`.
+fn serve_escrow(
+    store: &mut std::collections::HashMap<String, Vec<(String, String)>>,
+    body: &[u8],
+) -> CannedResponse {
+    use vauchi_protocol::escrow::{EscrowResponse, MAX_SLOTS_PER_GATE};
+
+    let value: serde_json::Value = match serde_json::from_slice(body) {
+        Ok(value) => value,
+        Err(_) => return CannedResponse::ok_json(br#"{"status":"NotFound"}"#.to_vec()),
+    };
+    let action = value
+        .get("escrow_action")
+        .and_then(|a| a.as_str())
+        .unwrap_or("");
+    let gate = value
+        .get("gate_hash")
+        .and_then(|g| g.as_str())
+        .unwrap_or("")
+        .to_string();
+    let slot = value
+        .get("slot_hash")
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let response = match action {
+        "Put" => {
+            let blob = value
+                .get("blob")
+                .and_then(|b| b.as_str())
+                .unwrap_or("")
+                .to_string();
+            let slots = store.entry(gate).or_default();
+            if slots.iter().any(|(s, _)| s == &slot) {
+                EscrowResponse::AlreadyExists
+            } else if slots.len() >= usize::from(MAX_SLOTS_PER_GATE) {
+                EscrowResponse::GateFull
+            } else {
+                slots.push((slot, blob));
+                EscrowResponse::Stored
+            }
+        }
+        "Get" => match store.get(&gate).and_then(|slots| {
+            slots
+                .iter()
+                .find(|(s, _)| s == &slot)
+                .map(|(_, blob)| blob.clone())
+        }) {
+            Some(blob) => EscrowResponse::Blob { blob },
+            None => EscrowResponse::NotFound,
+        },
+        "Count" => EscrowResponse::Count {
+            count: store.get(&gate).map_or(0, |slots| slots.len() as u8),
+        },
+        _ => EscrowResponse::NotFound,
+    };
+    CannedResponse::ok_json(serde_json::to_vec(&response).expect("EscrowResponse serializes"))
 }
 
 fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<State>>) -> std::io::Result<()> {
@@ -260,10 +334,14 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<State>>) -> std::io
             body: body.clone(),
         });
 
-        let queue_response = s.queues.get_mut(&path).and_then(|q| q.pop_front());
-        queue_response
-            .or_else(|| s.default.clone())
-            .unwrap_or_else(|| CannedResponse::status(500))
+        if path == "/v2/escrow" && s.escrow.is_some() {
+            serve_escrow(s.escrow.as_mut().unwrap(), &body)
+        } else {
+            let queue_response = s.queues.get_mut(&path).and_then(|q| q.pop_front());
+            queue_response
+                .or_else(|| s.default.clone())
+                .unwrap_or_else(|| CannedResponse::status(500))
+        }
     };
 
     write_response(&mut stream, &response)?;

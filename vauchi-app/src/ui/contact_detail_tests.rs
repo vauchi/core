@@ -561,3 +561,17 @@ fn test_contact_info_panel_shows_status_by_icon_and_hides_raw_key_material() {
         );
     }
 }
+
+// @internal
+#[test]
+fn test_verify_fingerprint_is_serious_not_destructive() {
+    let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+        .with_trust("Standard".into(), false);
+    let screen = engine.current_screen();
+    let verify = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "verify_fingerprint")
+        .expect("unverified contact offers verify_fingerprint");
+    assert_eq!(verify.style, ActionStyle::Serious);
+}

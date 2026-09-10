@@ -254,3 +254,18 @@ fn test_native_lifecycle_events_preserve_raw_shell_facts() {
         json!("AppBackgrounded")
     );
 }
+
+/// Feature: generic_presentation_protocol.feature
+/// Scenario: Consequential actions carry a tone that is neither standard nor destructive
+// @scenario: generic_presentation_protocol.feature :: Contextual controls expose four stable roles
+#[test]
+fn test_serious_tone_serializes_as_serious_and_round_trips() {
+    let mut spec = action("verify", "Verify Fingerprint", "checkmark.shield", None);
+    spec.tone = ActionTone::Serious;
+
+    let value = serde_json::to_value(&spec).expect("serializes");
+    assert_eq!(value["tone"], json!("serious"));
+
+    let decoded: ActionSpec = serde_json::from_value(value).expect("round-trips");
+    assert_eq!(decoded.tone, ActionTone::Serious);
+}

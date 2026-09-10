@@ -252,3 +252,47 @@ fn revisioned_context_rejects_an_activation_from_an_old_render() {
             .is_err()
     );
 }
+
+/// Feature: generic_presentation_protocol.feature
+/// Scenario: Core supplies the four contextual roles
+// @scenario: generic_presentation_protocol.feature :: Contextual controls expose four stable roles
+#[test]
+fn test_serious_screen_action_projects_as_serious_tone() {
+    let screen = ScreenModel::new(
+        "contact_detail",
+        "Amira",
+        vec![],
+        vec![
+            screen_action("archive", "Archive", ActionStyle::Secondary),
+            screen_action("verify", "Verify Fingerprint", ActionStyle::Serious),
+            screen_action("delete", "Delete", ActionStyle::Destructive),
+        ],
+    );
+    let surface = ContextualSurface::compose(surface(), &screen, &[], "Navigate", "More actions")
+        .expect("valid contextual surface");
+
+    let secondary = surface
+        .handle_event(Event::ActionActivated {
+            surface_id: self::surface(),
+            interaction_id: InteractionId::new("presentation.secondary").unwrap(),
+        })
+        .expect("secondary launcher");
+    let ContextualSurfaceRoute::Commands(commands) = secondary else {
+        panic!("secondary launcher must emit overlay commands");
+    };
+    let Command::PresentOverlay { overlay, .. } = &commands[0] else {
+        panic!("secondary launcher must present an overlay");
+    };
+    assert_eq!(
+        overlay
+            .items
+            .iter()
+            .map(|item| (item.interaction_id.as_str(), item.tone))
+            .collect::<Vec<_>>(),
+        vec![
+            ("archive", ActionTone::Standard),
+            ("verify", ActionTone::Serious),
+            ("delete", ActionTone::Destructive),
+        ]
+    );
+}

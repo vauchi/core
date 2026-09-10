@@ -593,6 +593,25 @@ mod tests {
         assert_eq!(e.current_screen().screen_id, "privacy_settings");
     }
 
+    // @internal
+    #[test]
+    fn scheduling_deletion_is_serious_and_only_executing_it_is_destructive() {
+        let e = engine();
+        let screen = e.current_screen();
+        let delete = screen
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "delete")
+            .expect("delete action present");
+        assert_eq!(delete.style, ActionStyle::Serious);
+        let shred = screen
+            .contextual_actions
+            .iter()
+            .find(|a| a.id == "panic_shred")
+            .expect("panic shred present");
+        assert_eq!(shred.style, ActionStyle::Destructive);
+    }
+
     #[test]
     fn delete_navigates_to_summary() {
         let mut e = engine();

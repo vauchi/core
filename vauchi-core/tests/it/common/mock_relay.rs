@@ -270,14 +270,24 @@ fn serve_escrow(
                 EscrowResponse::Stored
             }
         }
-        "Get" => match store.get(&gate).and_then(|slots| {
-            slots
-                .iter()
-                .find(|(s, _)| s == &slot)
-                .map(|(_, blob)| blob.clone())
-        }) {
-            Some(blob) => EscrowResponse::Blob { blob },
+        // Mirror `relay/src/escrow.rs::get`: a gate only releases once both
+        // slots are filled, the requester is authenticated by naming its own
+        // slot, and the blob returned is the *other* slot's — never the
+        // caller's own deposit. Returning the named slot (the earlier bug
+        // here) let each party read back only its own deposit, so the
+        // initiator/responder never exchanged epk or card and never converged.
+        "Get" => match store.get(&gate) {
             None => EscrowResponse::NotFound,
+            Some(slots) if slots.len() < usize::from(MAX_SLOTS_PER_GATE) => {
+                EscrowResponse::NotReady {
+                    count: slots.len() as u8,
+                }
+            }
+            Some(slots) if !slots.iter().any(|(s, _)| s == &slot) => EscrowResponse::NotFound,
+            Some(slots) => match slots.iter().find(|(s, _)| s != &slot) {
+                Some((_, blob)) => EscrowResponse::Blob { blob: blob.clone() },
+                None => EscrowResponse::NotFound,
+            },
         },
         "Count" => EscrowResponse::Count {
             count: store.get(&gate).map_or(0, |slots| slots.len() as u8),

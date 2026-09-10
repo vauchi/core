@@ -12,15 +12,16 @@
 //! sequentially
 //! (`problems/2026-09-09-tui-cannot-ingest-peer-exchange-payload`).
 //!
-//! Status: the stateful escrow fixture is real and reused here; the test is
-//! `#[ignore]`d because it reproduces an open finding rather than a passing
-//! contract. With a genuine shared relay (not canned per-side responses),
-//! the initiator and responder deposit and poll *different* handshake gates
-//! — Alice's presence gate `H(alice_nonce || "handshake")` and Bob's own —
-//! so neither ever sees the peer's presence, and only the DH-derived card
-//! gate is shared. Alice reaches `exchange_link_retrieving`, Bob stays on
-//! `link_responder_waiting`, and neither completes. See
-//! `problems/2026-09-10-link-two-party-escrow-rendezvous-gap`.
+//! Both parties share the handshake gate: it is `H(initiator_nonce ||
+//! "handshake")`, derived by the initiator from its own nonce and by the
+//! responder from the same nonce carried in the share URL (see
+//! `link_mode::derive_handshake_slot`, called from both `initiator_generate`
+//! and `responder_respond`). The DH-derived card gate is likewise shared.
+//! Convergence only requires the relay to release a slot's blob to the *other*
+//! party — which `relay/src/escrow.rs::get` does, and which the stateful
+//! `MockRelay` now mirrors. An earlier fixture bug returned the *requester's
+//! own* slot, so each side read back only its own deposit and neither
+//! exchanged epk or card; that is fixed, and this test now passes.
 
 use vauchi_app::ui::{AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::api::VauchiConfig;
@@ -67,9 +68,6 @@ fn contact_count(engine: &AppEngine) -> usize {
 
 // @scenario: link_exchange :: Two parties converge over one relay escrow
 #[test]
-#[ignore = "reproduces the two-party escrow rendezvous gap: initiator and \
-            responder poll different handshake gates over a genuine shared \
-            relay (problems/2026-09-10-link-two-party-escrow-rendezvous-gap)"]
 fn initiator_and_responder_converge_over_a_shared_escrow_store() {
     let mock = MockRelay::start();
     mock.enable_escrow_store();

@@ -527,3 +527,37 @@ fn test_footer_action_id_matches_build_screen_emission() {
         );
     }
 }
+
+// @internal
+#[test]
+fn test_contact_info_panel_shows_status_by_icon_and_hides_raw_key_material() {
+    let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+        .with_trust("High".into(), false)
+        .with_fingerprint("ab12 cd34 ef56".into())
+        .with_reciprocity("Both cards exchanged".into());
+    let screen = engine.current_screen();
+    let Some(Component::InfoPanel { items, .. }) = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::InfoPanel { id, .. } if id == "contact_info"))
+    else {
+        panic!("contact_info panel must exist");
+    };
+
+    let titles: Vec<&str> = items.iter().map(|i| i.title.as_str()).collect();
+    assert!(
+        !titles.contains(&"Initials"),
+        "the avatar already shows the initials; the panel must not repeat them"
+    );
+    assert!(
+        !items.iter().any(|i| i.detail.contains("ab12")),
+        "the raw fingerprint belongs to Verify Fingerprint, not the header"
+    );
+    for item in items {
+        assert!(
+            item.icon.is_some(),
+            "status row {:?} must carry an icon so it reads without the label",
+            item.title
+        );
+    }
+}

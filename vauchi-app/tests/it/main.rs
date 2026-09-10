@@ -101,6 +101,7 @@ mod last_pins_i18n_tests;
 mod legacy_projection_matrix_tests;
 mod link_exchange_i18n_tests;
 mod link_exchange_tests;
+mod link_paste_app_engine_tests;
 mod local_client_tests;
 mod local_listener_tests;
 mod local_rendezvous_tests;

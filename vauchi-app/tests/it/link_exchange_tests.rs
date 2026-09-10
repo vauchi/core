@@ -45,7 +45,10 @@ fn initial_state_renders_share_url_screen_with_share_and_cancel() {
     let engine = engine();
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_share_url");
-    assert_eq!(action_ids(&engine), vec!["share", "cancel"]);
+    assert_eq!(
+        action_ids(&engine),
+        vec!["share", "open_peer_link", "cancel"]
+    );
     // The URL must reach the renderer for the share screen.
     let has_url = screen
         .components
@@ -186,4 +189,50 @@ fn handle_hardware_event_returns_none() {
     let mut engine = engine();
     let out = engine.handle_hardware_event(vauchi_core::Event::LinkShared);
     assert!(out.is_none(), "renderer ignores hardware events");
+}
+
+// ---------------------------------------------------------------------------
+// Camera-less devices open the peer's link by pasting it
+// ---------------------------------------------------------------------------
+
+const PEER_LINK_INPUT: &str = "peer_link_input";
+
+// @scenario: link_exchange :: The share screen accepts a pasted peer link
+#[test]
+fn share_screen_offers_a_peer_link_input_and_an_open_action() {
+    let engine = engine();
+    let screen = engine.current_screen();
+    let input = screen.components.iter().find_map(|c| match c {
+        Component::TextInput { id, value, .. } if id == PEER_LINK_INPUT => Some(value.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        input.as_deref(),
+        Some(""),
+        "the share screen carries an empty peer-link input"
+    );
+    assert!(
+        action_ids(&engine).contains(&"open_peer_link".to_string()),
+        "the share screen offers open_peer_link, got {:?}",
+        action_ids(&engine)
+    );
+}
+
+// @scenario: link_exchange :: Typed peer link is kept across re-renders
+#[test]
+fn typed_peer_link_is_rendered_back_into_the_input() {
+    let mut engine = engine();
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: PEER_LINK_INPUT.into(),
+        value: "vauchi://exchange?pk=abc&n=def".into(),
+    });
+    let value = engine
+        .current_screen()
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::TextInput { id, value, .. } if id == PEER_LINK_INPUT => Some(value.clone()),
+            _ => None,
+        });
+    assert_eq!(value.as_deref(), Some("vauchi://exchange?pk=abc&n=def"));
 }

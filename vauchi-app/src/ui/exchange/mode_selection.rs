@@ -447,6 +447,35 @@ mod tests {
     }
 
     // @internal
+    // A camera-less device (the TUI) cannot bootstrap Glance, so Link —
+    // which only needs the internet — leads the picker (owner decision
+    // 2026-09-10 for the RG-1 TUI exchange journey).
+    // @scenario: exchange :: Camera-less devices are offered Link first
+    #[test]
+    fn camera_less_device_gets_link_as_the_hero() {
+        let caps = DeviceCapabilities {
+            has_camera: false,
+            has_ble: false,
+            has_nfc: false,
+            audio: vauchi_core::types::AudioCapability::None,
+            has_accelerometer: false,
+            has_internet: true,
+            ..Default::default()
+        };
+        let engine =
+            ModeSelectionEngine::new(caps, TransportReadiness::default(), None, Locale::English);
+        let screen = engine.screen();
+        let hero_first = screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::ActionList { id, items } if id == "hero" => items.first(),
+                _ => None,
+            })
+            .map(|item| item.id.as_str());
+        assert_eq!(hero_first, Some("mode:link"));
+    }
+
     #[test]
     fn last_used_unoffered_mode_does_not_become_the_hero() {
         // A pre-alpha install may have Magic stored as its last-used mode;

@@ -156,6 +156,7 @@ pub use groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 pub use help::{HelpEngine, HelpItem};
 pub use link_exchange::{
     ACTION_CANCEL as LINK_EXCHANGE_ACTION_CANCEL, ACTION_DONE as LINK_EXCHANGE_ACTION_DONE,
+    ACTION_OPEN_PEER_LINK as LINK_EXCHANGE_ACTION_OPEN_PEER_LINK,
     ACTION_RETRY as LINK_EXCHANGE_ACTION_RETRY, ACTION_SHARE as LINK_EXCHANGE_ACTION_SHARE,
     LinkExchangeEngine,
 };

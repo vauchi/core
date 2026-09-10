@@ -45,6 +45,48 @@ use vauchi_core::exchange::link_mode;
 const INITIATOR_POLL_DEADLINE_SECS: u64 = 300;
 
 impl AppEngine {
+    /// A link pasted on the share screen is routed exactly like an opened
+    /// deep link, so a camera-less device (the TUI) can answer a peer's
+    /// Link exchange. Reads the typed value from the rendered screen.
+    pub(super) fn intercept_open_peer_link(
+        &mut self,
+        action: &crate::ui::UserAction,
+    ) -> Option<ActionResult> {
+        use crate::ui::UserAction;
+        use crate::ui::link_exchange::{ACTION_OPEN_PEER_LINK, PEER_LINK_INPUT_ID};
+
+        if !matches!(self.current_app_screen(), AppScreen::LinkExchange) {
+            return None;
+        }
+        let requested = match action {
+            UserAction::ActionPressed { action_id } => action_id == ACTION_OPEN_PEER_LINK,
+            UserAction::TextSubmitted { component_id } => component_id == PEER_LINK_INPUT_ID,
+            _ => false,
+        };
+        if !requested {
+            return None;
+        }
+        let uri = self
+            .engine
+            .current_screen()
+            .components
+            .iter()
+            .find_map(|c| match c {
+                crate::ui::Component::TextInput { id, value, .. } if id == PEER_LINK_INPUT_ID => {
+                    Some(value.trim().to_string())
+                }
+                _ => None,
+            })
+            .unwrap_or_default();
+        if uri.is_empty() {
+            return None;
+        }
+        Some(crate::ui::WorkflowEngine::handle_action(
+            self,
+            UserAction::LinkOpened { uri },
+        ))
+    }
+
     /// Build / drop the engine-owned initiator machine as navigation
     /// enters or leaves `AppScreen::LinkExchange`. Called from
     /// `navigate_to_internal` after the screen-presentation lifecycle

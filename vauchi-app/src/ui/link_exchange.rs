@@ -31,6 +31,11 @@ use vauchi_core::Event;
 pub const ACTION_SHARE: &str = "share";
 /// Action id for the Cancel button (share-url / waiting / failed screens).
 pub const ACTION_CANCEL: &str = "cancel";
+/// Opens the link the user pasted into [`PEER_LINK_INPUT_ID`]; the app
+/// engine routes it like an opened deep link (camera-less devices).
+pub const ACTION_OPEN_PEER_LINK: &str = "open_peer_link";
+/// Text input on the share screen holding the peer's `vauchi://` link.
+pub const PEER_LINK_INPUT_ID: &str = "peer_link_input";
 /// Action id for the Done button on the success screen.
 pub const ACTION_DONE: &str = "done";
 /// Action id for the Retry button on the failed screen.
@@ -69,6 +74,8 @@ pub struct LinkExchangeEngine {
     /// lifecycle builds the `LinkInitiatorSession` and calls
     /// `set_share_url`.
     share_url: String,
+    /// The peer's link as typed so far; re-rendered into the input.
+    peer_link: String,
     cancelled: bool,
     /// Rich success-screen content (received card + visibility + groups),
     /// attached by the link-initiator lifecycle once the peer's card is
@@ -93,6 +100,7 @@ impl LinkExchangeEngine {
         Self {
             state: InitiatorScreen::ShareUrl,
             share_url: String::new(),
+            peer_link: String::new(),
             cancelled: false,
             success_summary: None,
             locale: Locale::English,
@@ -185,21 +193,34 @@ impl LinkExchangeEngine {
             screen_id: "exchange_share_url".into(),
             title: self.t("link_exchange.share_link_title"),
             subtitle: Some(self.t("link_exchange.share_link_subtitle")),
-            components: vec![Component::Text {
-                id: "link_url".into(),
-                content: self.share_url.clone(),
-                style: TextStyle::Body,
-                // The URL carries a public key. Rendering it is necessary
-                // — the user has to share it — but reciting 43 characters
-                // of base64 to everyone in earshot is not, and
-                // `logging-rules.md` already forbids the same material
-                // reaching a log.
-                a11y: Some(A11y {
-                    label: Some(self.t("link_exchange.share_link_a11y")),
-                    hint: Some(self.t("link_exchange.share_link_a11y_hint")),
-                    role: None,
-                }),
-            }],
+            components: vec![
+                Component::Text {
+                    id: "link_url".into(),
+                    content: self.share_url.clone(),
+                    style: TextStyle::Body,
+                    // The URL carries a public key. Rendering it is necessary
+                    // — the user has to share it — but reciting 43 characters
+                    // of base64 to everyone in earshot is not, and
+                    // `logging-rules.md` already forbids the same material
+                    // reaching a log.
+                    a11y: Some(A11y {
+                        label: Some(self.t("link_exchange.share_link_a11y")),
+                        hint: Some(self.t("link_exchange.share_link_a11y_hint")),
+                        role: None,
+                    }),
+                },
+                Component::TextInput {
+                    id: PEER_LINK_INPUT_ID.into(),
+                    label: self.t("link_exchange.peer_link_label"),
+                    value: self.peer_link.clone(),
+                    placeholder: Some(self.t("link_exchange.peer_link_placeholder")),
+                    max_length: None,
+                    validation_error: None,
+                    input_type: InputType::Text,
+                    a11y: None,
+                    info_key: None,
+                },
+            ],
             contextual_actions: vec![
                 ScreenAction {
                     id: ACTION_SHARE.into(),
@@ -207,6 +228,13 @@ impl LinkExchangeEngine {
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: Some(A11y::labeled(self.t("action.share"))),
+                },
+                ScreenAction {
+                    id: ACTION_OPEN_PEER_LINK.into(),
+                    label: self.t("link_exchange.open_peer_link"),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("link_exchange.open_peer_link"))),
                 },
                 ScreenAction {
                     id: ACTION_CANCEL.into(),
@@ -426,6 +454,23 @@ impl WorkflowEngine for LinkExchangeEngine {
         }
 
         match (&self.state, action) {
+            (
+                InitiatorScreen::ShareUrl,
+                UserAction::TextChanged {
+                    component_id,
+                    value,
+                },
+            ) if component_id == PEER_LINK_INPUT_ID => {
+                self.peer_link = value;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            // The app engine intercepts this and routes the typed link as
+            // `LinkOpened`; the engine itself only re-renders the input.
+            (InitiatorScreen::ShareUrl, UserAction::ActionPressed { action_id })
+                if action_id == ACTION_OPEN_PEER_LINK =>
+            {
+                ActionResult::UpdateScreen(self.build_screen())
+            }
             (InitiatorScreen::ShareUrl, UserAction::ActionPressed { action_id })
                 if action_id == ACTION_SHARE =>
             {

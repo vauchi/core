@@ -28,13 +28,17 @@
 
 use vauchi_app::ui::testing::{assert_reachability_across_screens, check_reachability};
 use vauchi_app::ui::{
-    LINK_EXCHANGE_ACTION_CANCEL, LINK_EXCHANGE_ACTION_DONE, LINK_EXCHANGE_ACTION_RETRY,
-    LINK_EXCHANGE_ACTION_SHARE, LinkExchangeEngine, WorkflowEngine,
+    LINK_EXCHANGE_ACTION_CANCEL, LINK_EXCHANGE_ACTION_DONE, LINK_EXCHANGE_ACTION_OPEN_PEER_LINK,
+    LINK_EXCHANGE_ACTION_RETRY, LINK_EXCHANGE_ACTION_SHARE, LinkExchangeEngine, WorkflowEngine,
 };
 
 /// Share-url root: pressing `share` navigates to the waiting screen
 /// (whose only affordance, `cancel`, is shared with this screen).
-const SHARE_URL_HANDLED: &[&str] = &[LINK_EXCHANGE_ACTION_SHARE, LINK_EXCHANGE_ACTION_CANCEL];
+const SHARE_URL_HANDLED: &[&str] = &[
+    LINK_EXCHANGE_ACTION_SHARE,
+    LINK_EXCHANGE_ACTION_OPEN_PEER_LINK,
+    LINK_EXCHANGE_ACTION_CANCEL,
+];
 /// Retrieving screen has no top-level actions.
 const RETRIEVING_HANDLED: &[&str] = &[];
 /// Success screen exposes only `done`.

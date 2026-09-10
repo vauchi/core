@@ -641,6 +641,12 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
+        // A peer link pasted on the Link share screen (camera-less devices).
+        // See `link_exchange::intercept_open_peer_link`.
+        if let Some(result) = self.intercept_open_peer_link(&action) {
+            return result;
+        }
+
         // Mode-picker grant affordance (`grant:<mode>:<requirement>`): re-learn
         // a denied OS permission and re-render the picker. See
         // `screens_exchange::intercept_grant_permission`.

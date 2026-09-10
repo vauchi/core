@@ -130,7 +130,7 @@ impl MobileSyncResult {
                     celebrate,
                 })
             }
-            VauchiSyncOutcome::TooSoon => Ok(MobileSyncResult {
+            VauchiSyncOutcome::TooSoon { .. } => Ok(MobileSyncResult {
                 contacts_added: 0,
                 cards_updated: 0,
                 updates_sent: 0,

@@ -76,6 +76,46 @@ pub enum SyncChromeStatus {
     /// `Component::Indicator` with kind `Error` and a `sync_now`
     /// tap to retry.
     Failed,
+    /// Core declined the last request because a sync ran less than the
+    /// throttle window ago; `retry_after_secs` is the remaining wait.
+    Throttled {
+        /// Seconds until the next sync may run.
+        retry_after_secs: u64,
+    },
+}
+
+impl SyncChromeStatus {
+    /// The status the chip shows after `Vauchi::sync()` answered
+    /// `outcome`. A success stamps `now_unix`; a throttle carries its
+    /// wait; anything else keeps `previous`.
+    pub fn after_outcome(
+        outcome: &vauchi_core::api::VauchiSyncOutcome,
+        previous: SyncChromeStatus,
+        now_unix: u64,
+    ) -> SyncChromeStatus {
+        use vauchi_core::api::VauchiSyncOutcome;
+        match outcome {
+            VauchiSyncOutcome::Ok { .. } => SyncChromeStatus::Synced { unix_ts: now_unix },
+            VauchiSyncOutcome::TooSoon { retry_after_secs } => SyncChromeStatus::Throttled {
+                retry_after_secs: *retry_after_secs,
+            },
+            _ => previous,
+        }
+    }
+
+    /// Label and kind of the chrome chip for this status.
+    pub fn chip(&self) -> (String, crate::ui::component::IndicatorKind) {
+        use crate::ui::component::IndicatorKind;
+        match self {
+            SyncChromeStatus::Idle => ("Sync".to_string(), IndicatorKind::Neutral),
+            SyncChromeStatus::Synced { .. } => ("Synced".to_string(), IndicatorKind::Active),
+            SyncChromeStatus::Failed => ("Sync failed".to_string(), IndicatorKind::Error),
+            SyncChromeStatus::Throttled { retry_after_secs } => (
+                format!("Sync in {retry_after_secs} s"),
+                IndicatorKind::Neutral,
+            ),
+        }
+    }
 }
 
 impl AppEngine {
@@ -360,20 +400,7 @@ impl AppEngine {
         if already_present {
             return screen;
         }
-        let (label, kind) = match self.sync_chrome_status {
-            SyncChromeStatus::Idle => (
-                "Sync".to_string(),
-                crate::ui::component::IndicatorKind::Neutral,
-            ),
-            SyncChromeStatus::Synced { .. } => (
-                "Synced".to_string(),
-                crate::ui::component::IndicatorKind::Active,
-            ),
-            SyncChromeStatus::Failed => (
-                "Sync failed".to_string(),
-                crate::ui::component::IndicatorKind::Error,
-            ),
-        };
+        let (label, kind) = self.sync_chrome_status.chip();
         screen.components.insert(
             0,
             Component::Indicator {

@@ -66,8 +66,13 @@ fn sync_without_identity_surfaces_identity_error() {
 fn too_soon_maps_to_benign_no_change_result() {
     // The throttle decision (design §4): a C1/C2 deferral is NOT an
     // error — it is an up-to-date / no-change result.
-    let result = MobileSyncResult::from_outcome(VauchiSyncOutcome::TooSoon, Locale::English)
-        .expect("TooSoon must map to a result, not an error");
+    let result = MobileSyncResult::from_outcome(
+        VauchiSyncOutcome::TooSoon {
+            retry_after_secs: 30,
+        },
+        Locale::English,
+    )
+    .expect("TooSoon must map to a result, not an error");
 
     assert!(!result.has_changes, "TooSoon must report no changes");
     assert_eq!(result.total, 0, "TooSoon must report zero total operations");
@@ -204,8 +209,13 @@ fn ok_outcome_with_moments(received: usize, aha_moments: Vec<AhaMoment>) -> Vauc
 // @internal
 #[test]
 fn summary_reports_no_changes_for_too_soon() {
-    let result = MobileSyncResult::from_outcome(VauchiSyncOutcome::TooSoon, Locale::English)
-        .expect("TooSoon maps to a result");
+    let result = MobileSyncResult::from_outcome(
+        VauchiSyncOutcome::TooSoon {
+            retry_after_secs: 30,
+        },
+        Locale::English,
+    )
+    .expect("TooSoon maps to a result");
 
     assert_eq!(result.summary, "No changes");
     assert!(

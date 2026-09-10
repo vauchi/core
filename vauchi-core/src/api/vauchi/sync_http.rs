@@ -72,11 +72,14 @@ impl Vauchi {
         }
 
         // C1 / C2 timing gate
-        if self
-            .next_sync_allowed
-            .is_some_and(|deadline| self.monotonic.now() < deadline)
-        {
-            return Ok(VauchiSyncOutcome::TooSoon);
+        if let Some(deadline) = self.next_sync_allowed {
+            let now = self.monotonic.now();
+            if now < deadline {
+                let remaining = deadline.saturating_duration_since(now);
+                return Ok(VauchiSyncOutcome::TooSoon {
+                    retry_after_secs: remaining.as_secs().max(1),
+                });
+            }
         }
 
         // 2. Attempt sync, with one retry on a stale OHTTP key. A stale-key

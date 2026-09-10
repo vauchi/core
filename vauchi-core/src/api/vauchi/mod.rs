@@ -138,8 +138,9 @@ pub enum VauchiSyncOutcome {
         /// caused the moment without owning a tracker (ADR-069).
         aha_moments: Vec<crate::aha_moments::AhaMoment>,
     },
-    /// Called too soon (C1 post-exchange or C2 jitter).
-    TooSoon,
+    /// Called too soon (C1 post-exchange or C2 jitter). Carries the
+    /// remaining wait so a frontend can say when the next sync may run.
+    TooSoon { retry_after_secs: u64 },
     /// Not connected — call connect() first.
     NotConnected,
     /// Identity not created yet.

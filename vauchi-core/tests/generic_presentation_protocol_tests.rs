@@ -5,7 +5,8 @@
 use serde_json::json;
 use vauchi_core::{
     ActionSpec, ActionTone, Command, ContextBar, Event, InputMode, InteractionId, MotionPreference,
-    OverlayKind, OverlaySpec, PresentationIdError, StandardShortcut, SurfaceId,
+    NavigationItem, NavigationSpec, OverlayKind, OverlaySpec, PresentationIdError,
+    StandardShortcut, SurfaceId,
 };
 
 fn action(
@@ -138,6 +139,75 @@ fn test_presentation_ids_reject_invalid_values_on_creation_and_decode() {
         decoded.expect_err("decoder must validate").to_string(),
         "presentation identifier must not be empty"
     );
+}
+
+/// No Gherkin scenario yet: `SetNavigation` (persistent navigation surface)
+/// is new reusable presentation mechanics under ADR-066 Amendment
+/// 2026-07-18 D4; add a `generic_presentation_protocol.feature` scenario in
+/// the `features` repo when that surface is designed there.
+// @internal
+#[test]
+fn test_set_navigation_round_trips_with_selection_and_badge_state() {
+    let surface_id = SurfaceId::new("main").expect("valid surface id");
+    let command = Command::SetNavigation {
+        surface_id: surface_id.clone(),
+        revision: 3,
+        navigation: NavigationSpec {
+            items: vec![
+                NavigationItem {
+                    interaction_id: InteractionId::new("presentation.navigation.contacts")
+                        .expect("valid interaction id"),
+                    label: "Contacts".to_owned(),
+                    accessibility_label: "Contacts".to_owned(),
+                    icon_token: Some("navigation.contacts".to_owned()),
+                    selected: true,
+                    badge_count: 0,
+                },
+                NavigationItem {
+                    interaction_id: InteractionId::new("presentation.navigation.my_info")
+                        .expect("valid interaction id"),
+                    label: "My Card".to_owned(),
+                    accessibility_label: "My Card".to_owned(),
+                    icon_token: Some("navigation.my_info".to_owned()),
+                    selected: false,
+                    badge_count: 2,
+                },
+            ],
+        },
+    };
+
+    let encoded = serde_json::to_value(&command).expect("serialize navigation");
+    assert_eq!(
+        encoded,
+        json!({
+            "SetNavigation": {
+                "surface_id": "main",
+                "revision": 3,
+                "navigation": {
+                    "items": [
+                        {
+                            "interaction_id": "presentation.navigation.contacts",
+                            "label": "Contacts",
+                            "accessibility_label": "Contacts",
+                            "icon_token": "navigation.contacts",
+                            "selected": true,
+                            "badge_count": 0
+                        },
+                        {
+                            "interaction_id": "presentation.navigation.my_info",
+                            "label": "My Card",
+                            "accessibility_label": "My Card",
+                            "icon_token": "navigation.my_info",
+                            "selected": false,
+                            "badge_count": 2
+                        }
+                    ]
+                }
+            }
+        })
+    );
+    let decoded: Command = serde_json::from_value(encoded).expect("decode navigation");
+    assert_eq!(decoded, command);
 }
 
 /// Feature: generic_presentation_protocol.feature

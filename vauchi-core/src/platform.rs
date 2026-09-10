@@ -37,12 +37,12 @@ pub use event_json::{
 };
 pub use presentation::{
     AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, BindingId, ChoiceOption, ContextBar,
-    ExportFileSpec, InputMode, InputValue, InteractionId, MotionPreference, NotificationSpec,
-    NotificationUrgency, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis,
-    PresentationIdError, PresentationImageShape, PresentationInputKind, PresentationNode,
-    PresentationPaging, PresentationProfile, PresentationQrPurpose, PresentationRow,
-    PresentationTextStyle, PresentationTokens, PresentationTone, StandardShortcut, SurfaceId,
-    SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass,
+    ExportFileSpec, InputMode, InputValue, InteractionId, MotionPreference, NavigationItem,
+    NavigationSpec, NotificationSpec, NotificationUrgency, OverlayKind, OverlaySpec, PaneLayout,
+    PresentationAxis, PresentationIdError, PresentationImageShape, PresentationInputKind,
+    PresentationNode, PresentationPaging, PresentationProfile, PresentationQrPurpose,
+    PresentationRow, PresentationTextStyle, PresentationTokens, PresentationTone, StandardShortcut,
+    SurfaceId, SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass,
 };
 
 /// A command from core to the frontend requesting a hardware action.
@@ -387,6 +387,19 @@ pub enum Command {
         revision: u64,
         bar: Box<ContextBar>,
     },
+    /// Atomically replace the persistent navigation surface (bottom bar on
+    /// phone, sidebar on desktop) for a surface, including which
+    /// destination is currently selected. Emitted alongside
+    /// [`Command::SetContextBar`] so shells that render a persistent bar
+    /// need not open the navigation overlay to discover destinations; a
+    /// shell that ignores this command keeps working off the overlay.
+    /// Empty `navigation.items` (e.g. a locked app) means the bar has
+    /// nothing to show.
+    SetNavigation {
+        surface_id: SurfaceId,
+        revision: u64,
+        navigation: NavigationSpec,
+    },
     /// Present navigation or secondary actions for a surface.
     PresentOverlay {
         surface_id: SurfaceId,
@@ -591,6 +604,7 @@ impl Command {
             Self::LocationRequest { .. } => "LocationRequest",
             Self::Celebrate { .. } => "Celebrate",
             Self::SetContextBar { .. } => "SetContextBar",
+            Self::SetNavigation { .. } => "SetNavigation",
             Self::PresentOverlay { .. } => "PresentOverlay",
             Self::DismissOverlay { .. } => "DismissOverlay",
             Self::SetPresentationProfile { .. } => "SetPresentationProfile",

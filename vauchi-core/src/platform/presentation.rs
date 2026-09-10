@@ -192,3 +192,27 @@ pub struct PresentationProfile {
     pub detail_surface: Option<SurfaceId>,
     pub active_surface: SurfaceId,
 }
+
+/// One destination in the persistent navigation surface (bottom bar on
+/// phone, sidebar on desktop). Reuses the same opaque `interaction_id` an
+/// equivalent overlay item would use, so a tap routes identically whether
+/// the shell renders it persistently or inside `PresentOverlay`.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NavigationItem {
+    pub interaction_id: InteractionId,
+    pub label: String,
+    pub accessibility_label: String,
+    pub icon_token: Option<String>,
+    pub selected: bool,
+    pub badge_count: u32,
+}
+
+/// The complete set of persistent navigation destinations for a surface.
+/// Empty when the surface offers no destinations (e.g. a locked app), so a
+/// shell hides the bar rather than rendering it with nothing in it.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NavigationSpec {
+    pub items: Vec<NavigationItem>,
+}

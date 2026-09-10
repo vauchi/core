@@ -105,6 +105,11 @@ pub struct ActionSpec {
 pub enum ActionTone {
     #[default]
     Standard,
+    /// Consequential but reversible or protective (verify a fingerprint,
+    /// schedule a deletion, start recovery): shells draw it with the
+    /// warning colour as an outline, never as the filled primary and
+    /// never in the destructive style.
+    Serious,
     Destructive,
 }
 

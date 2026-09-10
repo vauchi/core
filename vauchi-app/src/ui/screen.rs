@@ -597,5 +597,7 @@ pub struct TabInfo {
 pub enum ActionStyle {
     Primary,
     Secondary,
+    /// Consequential but not destructive; projects to `ActionTone::Serious`.
+    Serious,
     Destructive,
 }

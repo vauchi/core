@@ -574,7 +574,7 @@ impl ContactDetailEngine {
             actions.push(ScreenAction {
                 id: "verify_fingerprint".into(),
                 label: verify_label.clone(),
-                style: ActionStyle::Secondary,
+                style: ActionStyle::Serious,
                 enabled: true,
                 a11y: Some(A11y::labeled(verify_label)),
             });

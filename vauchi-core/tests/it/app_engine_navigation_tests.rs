@@ -617,13 +617,13 @@ fn navigate_to_privacy_shows_privacy_settings() {
     let screen = engine.navigate_to(AppScreen::Privacy);
     assert_eq!(screen.screen_id, "privacy_settings");
     assert_eq!(screen.title, "Privacy & Data");
-    // GDPR delete action must be Destructive style
+    // Scheduling a deletion is serious; only executing it is destructive.
     assert!(
         screen
             .contextual_actions
             .iter()
-            .any(|a| a.id == "delete" && a.style == ActionStyle::Destructive),
-        "Privacy screen must have destructive delete action"
+            .any(|a| a.id == "delete" && a.style == ActionStyle::Serious),
+        "Privacy screen must offer a serious schedule-deletion action"
     );
 }
 

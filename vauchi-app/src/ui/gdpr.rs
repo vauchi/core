@@ -211,7 +211,7 @@ impl GdprEngine {
                     actions.push(ScreenAction {
                         id: "delete".into(),
                         label: self.t("privacy.delete_identity"),
-                        style: ActionStyle::Destructive,
+                        style: ActionStyle::Serious,
                         enabled: true,
                         a11y: Some(A11y::labeled(self.t("privacy.delete_identity"))),
                     });

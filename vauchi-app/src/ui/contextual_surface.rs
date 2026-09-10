@@ -279,10 +279,10 @@ fn scoped_interaction(
 }
 
 fn tone_for(action: &ScreenAction) -> ActionTone {
-    if matches!(action.style, ActionStyle::Destructive) {
-        ActionTone::Destructive
-    } else {
-        ActionTone::Standard
+    match action.style {
+        ActionStyle::Destructive => ActionTone::Destructive,
+        ActionStyle::Serious => ActionTone::Serious,
+        ActionStyle::Primary | ActionStyle::Secondary => ActionTone::Standard,
     }
 }
 

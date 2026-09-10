@@ -69,13 +69,29 @@ pub const BLE_STEP_TIMEOUT_SECS: u64 = 60;
 /// tick (`_private/docs/designs/2026-07-22-role-tiebreak-and-glare-design.md`).
 pub const BLE_FALLBACK_CONNECT_SECS: u64 = 4;
 
+/// Design proposal (not a device measurement — `_private/docs/backlog/
+/// 2026-09-10-exchange-stall-and-ble-fallback-states/README.md`): how long
+/// the `Discovering` step (no peer id known yet) may run before the engine
+/// offers a `NothingFound` chrome instead of scanning forever. Well under
+/// [`BLE_STEP_TIMEOUT_SECS`] so this friendlier, retry/switch-to-QR offer
+/// lands before the generic hard failure would.
+pub const BLE_DISCOVERY_TIMEOUT_SECS: u64 = 15;
+
 /// Presentation state of the BLE engine. The active sub-flow screen is derived
-/// from the wrapped flow's `BleStep`; `Success`/`Failed` are terminal.
+/// from the wrapped flow's `BleStep`; `Success`/`Failed`/`NothingFound` are
+/// terminal (hardware events stop being processed — see `handle_hardware_event`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum BleScreen {
     Active,
     Success,
-    Failed { reason: Option<String> },
+    Failed {
+        reason: Option<String>,
+    },
+    /// [`BLE_DISCOVERY_TIMEOUT_SECS`] elapsed with `BleStep::Discovering`
+    /// still current — no peer was ever seen. Distinct from `Failed`: no
+    /// hardware error occurred, so the chrome offers Retry / Switch to QR
+    /// rather than the generic failure copy.
+    NothingFound,
 }
 
 /// Component id of this device's Glance own-QR (display mode).
@@ -375,6 +391,7 @@ impl BleExchangeEngine {
             },
             BleScreen::Success => self.build_success_screen(),
             BleScreen::Failed { reason } => self.build_failed_screen(reason.clone()),
+            BleScreen::NothingFound => self.build_nothing_found_screen(),
         }
     }
 
@@ -477,16 +494,81 @@ impl BleExchangeEngine {
             screen_id: "exchange_failed".into(),
             title: self.t("exchange.terminal.failed"),
             subtitle: None,
-            components: vec![Component::StatusIndicator {
-                id: "failed_status".into(),
-                icon: None,
-                title: self.t("exchange.terminal.failed_status"),
-                detail,
-                status: Status::Failed,
-                status_label: self.t(Status::Failed.label_key()),
+            components: vec![
+                Component::StatusIndicator {
+                    id: "failed_status".into(),
+                    icon: None,
+                    title: self.t("exchange.terminal.failed_status"),
+                    detail,
+                    status: Status::Failed,
+                    status_label: self.t(Status::Failed.label_key()),
+                    a11y: Some(A11y {
+                        label: Some(self.t("exchange.terminal.failed_status")),
+                        hint: Some(self.t("exchange.terminal.failed_hint")),
+                        role: None,
+                    }),
+                },
+                // States plainly that the failed attempt saved nothing — a
+                // dead session must not be mistaken for one that partly
+                // succeeded (`2026-08-07-ble-exchange-ui-never-shows-completion`
+                // is the inverse defect: a live session that looked dead).
+                Component::Text {
+                    a11y: None,
+                    id: "failed_nothing_saved".into(),
+                    content: self.t("exchange.terminal.failed_nothing_saved"),
+                    style: TextStyle::Caption,
+                },
+            ],
+            contextual_actions: actions,
+            ..Default::default()
+        }
+    }
+
+    /// [`BLE_DISCOVERY_TIMEOUT_SECS`] elapsed with nothing found: offers
+    /// Retry and Switch to QR (has_camera-gated, matching the Failed
+    /// screen's convention) instead of scanning forever.
+    fn build_nothing_found_screen(&self) -> ScreenModel {
+        let mut actions = vec![ScreenAction {
+            id: ACTION_RETRY.into(),
+            label: self.t("action.retry"),
+            style: ActionStyle::Primary,
+            enabled: true,
+            a11y: None,
+        }];
+        if self.has_camera {
+            actions.push(ScreenAction {
+                id: ACTION_FALLBACK_QR.into(),
+                label: self.t("exchange.terminal.switch_qr"),
+                style: ActionStyle::Secondary,
+                enabled: true,
                 a11y: Some(A11y {
-                    label: Some(self.t("exchange.terminal.failed_status")),
-                    hint: Some(self.t("exchange.terminal.failed_hint")),
+                    label: None,
+                    hint: Some(self.t("exchange.terminal.switch_qr_hint")),
+                    role: None,
+                }),
+            });
+        }
+        actions.push(ScreenAction {
+            id: ACTION_CANCEL.into(),
+            label: self.t("action.cancel"),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: None,
+        });
+        ScreenModel {
+            screen_id: "exchange_ble_nothing_found".into(),
+            title: self.t("exchange.terminal.nothing_found"),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "nothing_found_status".into(),
+                icon: None,
+                title: self.t("exchange.terminal.nothing_found_status"),
+                detail: Some(self.t("exchange.terminal.nothing_found_hint")),
+                status: Status::Warning,
+                status_label: self.t(Status::Warning.label_key()),
+                a11y: Some(A11y {
+                    label: Some(self.t("exchange.terminal.nothing_found_status")),
+                    hint: Some(self.t("exchange.terminal.nothing_found_hint")),
                     role: None,
                 }),
             }],
@@ -594,6 +676,31 @@ impl WorkflowEngine for BleExchangeEngine {
                     _ => ActionResult::UpdateScreen(self.build_screen()),
                 };
             }
+            BleScreen::NothingFound => {
+                return match action {
+                    UserAction::ActionPressed { action_id } if action_id == ACTION_RETRY => {
+                        // Same fresh-attempt reset as the Failed retry branch.
+                        self.flow = BleExchangeFlow::new(self.mode, self.own_token.clone());
+                        self.screen = BleScreen::Active;
+                        self.started = false;
+                        self.step_entered_unix = self.clock.unix_seconds();
+                        if self.glance_code_entry != GlanceCodeEntry::Scanning {
+                            self.glance_code_entry = GlanceCodeEntry::Typing {
+                                code: String::new(),
+                            };
+                        }
+                        ActionResult::UpdateScreen(self.build_screen())
+                    }
+                    UserAction::ActionPressed { action_id } if action_id == ACTION_CANCEL => {
+                        self.cancelled = true;
+                        ActionResult::Complete
+                    }
+                    UserAction::ActionPressed { action_id } if action_id == ACTION_FALLBACK_QR => {
+                        Self::fallback_to_glance()
+                    }
+                    _ => ActionResult::UpdateScreen(self.build_screen()),
+                };
+            }
             BleScreen::Active => {}
         }
 
@@ -646,6 +753,15 @@ impl WorkflowEngine for BleExchangeEngine {
             return Vec::new();
         }
         let elapsed = now.saturating_sub(self.step_entered_unix);
+        // Nothing-found (before the F0/stall checks below, which only ever
+        // apply once a peer id is known — `handle_discovering` advances the
+        // step off `Discovering` the instant any `BleDeviceDiscovered`
+        // arrives, so this is unambiguously "no peer seen at all").
+        if matches!(self.flow.step(), BleStep::Discovering) && elapsed >= BLE_DISCOVERY_TIMEOUT_SECS
+        {
+            self.screen = BleScreen::NothingFound;
+            return Vec::new();
+        }
         // F0 backoff (before the stall check): a radio responder that hasn't
         // been connected to within the fallback window dials out itself, so
         // asymmetric BLE discovery (the initiator never discovered us) self-

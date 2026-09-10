@@ -16,8 +16,8 @@
 //! so these tests drive time directly — no clock, no sleeps.
 
 use vauchi_app::orchestrator::multi_stage_machine::{
-    MULTI_STAGE_DISCOVERY_TIMEOUT_MS, MULTI_STAGE_STEP_TIMEOUT_MS, MultiStageEvent,
-    MultiStageMachine, MultiStagePhase,
+    MULTI_STAGE_DISCOVERY_TIMEOUT_MS, MULTI_STAGE_FRAME_STALL_MS, MULTI_STAGE_STEP_TIMEOUT_MS,
+    MultiStageEvent, MultiStageMachine, MultiStagePhase,
 };
 use vauchi_core::Event;
 
@@ -176,5 +176,87 @@ fn timed_out_machine_is_terminal_and_absorbing() {
         matches!(machine.phase(), MultiStagePhase::Failed { .. }),
         "Failed is absorbing, got {:?}",
         machine.phase()
+    );
+}
+
+// Peer-frame stall presentation (`_private/docs/backlog/
+// 2026-09-10-exchange-stall-and-ble-fallback-states/README.md`): a bounded
+// window without a *decoded peer frame* — distinct from the phase-change
+// deadline above — surfaces an intermediate `Stalled` screen instead of
+// leaving a dead session looking identical to a live one.
+
+/// Drive both parties one cross-fed exchange step: bob's next QR frame (if
+/// any) is decoded by alice. Mirrors the inner loop of
+/// [`peer_engaged_machine`] but keeps both machines alive so a test can
+/// keep feeding frames past the point that helper returns at.
+fn exchange_step(alice: &mut MultiStageMachine, bob: &mut MultiStageMachine, now: u64) {
+    let _ = alice.advance(now);
+    if let MultiStageEvent::QrFrameReady(p) = bob.advance(now) {
+        let _ = alice.handle_hardware_event(&Event::QrScanned { data: p.data }, now);
+    }
+}
+
+// @internal
+#[test]
+fn frame_stall_after_bound_with_no_decoded_frame() {
+    let (mut alice, now) = peer_engaged_machine();
+    assert!(
+        !alice.is_frame_stalled(),
+        "precondition: freshly peer-engaged must not already be stalled"
+    );
+
+    // No further `handle_hardware_event` call — nothing decodes a frame.
+    let _ = alice.advance(now + MULTI_STAGE_FRAME_STALL_MS + 1);
+
+    assert!(
+        alice.is_frame_stalled(),
+        "a peer-engaged phase past the frame-stall bound with no decode \
+         must report stalled"
+    );
+}
+
+// @internal
+#[test]
+fn frame_not_stalled_while_frames_keep_arriving() {
+    let mut alice = MultiStageMachine::new_glance(local_card(), NOW);
+    let mut bob = MultiStageMachine::new_glance(b"name:Bob\nemail:bob@example.com".to_vec(), NOW);
+
+    let mut now = NOW;
+    // Drive well past the stall bound in small steps, cross-feeding every
+    // tick — steady decoded frames must never trip the stall flag.
+    while now < NOW + MULTI_STAGE_FRAME_STALL_MS + 4_000 {
+        now += 500;
+        exchange_step(&mut alice, &mut bob, now);
+        assert!(
+            !alice.is_frame_stalled(),
+            "steady frame decoding must not stall, at now={now}, phase={:?}",
+            alice.phase()
+        );
+    }
+}
+
+// @internal
+#[test]
+fn frame_stall_clears_on_next_decoded_frame() {
+    let (mut alice, engaged_at) = peer_engaged_machine();
+    let stalled_at = engaged_at + MULTI_STAGE_FRAME_STALL_MS + 1;
+    let _ = alice.advance(stalled_at);
+    assert!(
+        alice.is_frame_stalled(),
+        "precondition: machine must be stalled before the clearing decode"
+    );
+
+    // A malformed/no-op scan still counts as "a frame decoded" — the
+    // contract is about camera activity, not protocol progress.
+    let _ = alice.handle_hardware_event(
+        &Event::QrScanned {
+            data: String::new(),
+        },
+        stalled_at + 1,
+    );
+
+    assert!(
+        !alice.is_frame_stalled(),
+        "decoding a new frame must clear the Stalled presentation"
     );
 }

@@ -862,3 +862,102 @@ fn screen_exited_emits_brightness_idle_timer_and_orientation_unlock() {
         "screen_exited must restore brightness, idle timer, and orientation defaults"
     );
 }
+
+// Peer-frame Stalled presentation (`_private/docs/backlog/
+// 2026-09-10-exchange-stall-and-ble-fallback-states/README.md`): pushed by
+// the AppEngine bridge via `set_stalled`, independent of `ProtocolState`.
+
+// @internal
+#[test]
+fn active_screen_without_stall_offers_neither_retry_nor_switch_relay() {
+    let engine = engine_with_state(ProtocolState::Discovered);
+    let screen = engine.current_screen();
+    let ids = action_ids(&screen);
+    assert!(
+        !ids.contains(&RETRY_ACTION_ID),
+        "a non-stalled active screen must not offer Retry, got {ids:?}"
+    );
+    assert!(
+        !ids.contains(&SWITCH_RELAY_ACTION_ID),
+        "a non-stalled active screen must not offer Switch to relay, got {ids:?}"
+    );
+    assert!(
+        first_status_indicator(&screen).is_none(),
+        "the plain active screen carries no status banner"
+    );
+}
+
+// @internal
+#[test]
+fn stalled_screen_offers_retry_and_switch_relay() {
+    let mut engine = engine_with_state(ProtocolState::Discovered);
+    engine.set_stalled(true);
+    let screen = engine.current_screen();
+    let ids = action_ids(&screen);
+    assert!(
+        ids.contains(&RETRY_ACTION_ID),
+        "the Stalled screen must offer Retry, got {ids:?}"
+    );
+    assert!(
+        ids.contains(&SWITCH_RELAY_ACTION_ID),
+        "the Stalled screen must offer Switch to relay, got {ids:?}"
+    );
+}
+
+// @internal
+#[test]
+fn stalled_status_banner_keeps_the_transfer_progress_visible() {
+    let mut engine = engine_with_state(ProtocolState::Transferring {
+        chunks_sent: 1,
+        chunks_total: 3,
+        chunks_received: 2,
+        peer_chunks_total: 3,
+    });
+    engine.set_stalled(true);
+    let screen = engine.current_screen();
+    let status =
+        first_status_indicator(&screen).expect("the Stalled screen must show a status banner");
+    let Component::StatusIndicator { title, detail, .. } = status else {
+        unreachable!("first_status_indicator only returns StatusIndicator components")
+    };
+    assert_eq!(*title, engine.t("exchange.stalled_title"));
+    assert_eq!(
+        detail.as_deref(),
+        Some("Sending 1/3 · Receiving 2/3"),
+        "the banner detail must keep the frame current/total progress visible"
+    );
+}
+
+// @internal
+#[test]
+fn clearing_stall_returns_to_the_plain_active_chrome() {
+    let mut engine = engine_with_state(ProtocolState::Discovered);
+    engine.set_stalled(true);
+    assert!(
+        first_status_indicator(&engine.current_screen()).is_some(),
+        "precondition: the Stalled banner must be showing"
+    );
+
+    engine.set_stalled(false);
+
+    assert!(
+        first_status_indicator(&engine.current_screen()).is_none(),
+        "clearing the stall must drop the Stalled banner"
+    );
+}
+
+// @internal
+#[test]
+fn failed_screen_states_nothing_was_saved() {
+    let engine = engine_with_state(ProtocolState::Failed("boom".into()));
+    let screen = engine.current_screen();
+    let nothing_saved = engine.t("exchange.terminal.failed_nothing_saved");
+    assert!(
+        screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::Text { content, .. } if *content == nothing_saved)),
+        "the Failed screen must state that nothing was saved, components={:?}",
+        screen.components
+    );
+}

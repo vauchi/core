@@ -334,3 +334,48 @@ fn sync_now_without_a_session_attempts_to_connect_and_reports_failure() {
          rather than silently skipping the sync"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Throttled syncs tell the user when the next one may run
+// ---------------------------------------------------------------------------
+
+// Core throttles syncs (60 s jitter, 30 s–5 min after an exchange) and
+// answers `TooSoon` with the remaining wait. The chip must show that
+// wait instead of pretending nothing was asked
+// (backlog 2026-09-09-manual-sync-within-throttle-gives-no-feedback).
+// @scenario: sync_chrome :: Throttled sync shows the remaining wait
+#[test]
+fn throttled_sync_outcome_puts_the_remaining_wait_on_the_chip() {
+    use vauchi_app::ui::SyncChromeStatus;
+    use vauchi_core::api::VauchiSyncOutcome;
+
+    let status = SyncChromeStatus::after_outcome(
+        &VauchiSyncOutcome::TooSoon {
+            retry_after_secs: 42,
+        },
+        SyncChromeStatus::Idle,
+        1_000,
+    );
+    assert_eq!(
+        status,
+        SyncChromeStatus::Throttled {
+            retry_after_secs: 42
+        }
+    );
+    let (label, kind) = status.chip();
+    assert_eq!(
+        (label.as_str(), kind),
+        ("Sync in 42 s", IndicatorKind::Neutral)
+    );
+
+    // A successful sync stamps the completion time; other outcomes keep
+    // the previous status.
+    assert!(matches!(
+        SyncChromeStatus::after_outcome(
+            &VauchiSyncOutcome::NotConnected,
+            SyncChromeStatus::Failed,
+            1_000
+        ),
+        SyncChromeStatus::Failed
+    ));
+}

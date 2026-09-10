@@ -113,9 +113,15 @@ fn test_sync_too_soon_returns_too_soon() {
     vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
     vauchi.set_next_sync_allowed(Instant::now() + Duration::from_secs(3600));
     let result = vauchi.sync().unwrap();
+    // The throttle answer carries how long the caller has to wait, so a
+    // Sync chip can say "next sync in 59 min" instead of doing nothing
+    // silently (backlog 2026-09-09-manual-sync-within-throttle-gives-no-feedback).
+    let VauchiSyncOutcome::TooSoon { retry_after_secs } = result else {
+        panic!("expected TooSoon, got: {result:?}");
+    };
     assert!(
-        matches!(result, VauchiSyncOutcome::TooSoon),
-        "expected TooSoon, got: {result:?}"
+        (3590..=3600).contains(&retry_after_secs),
+        "retry_after_secs must be the remaining throttle window, got {retry_after_secs}"
     );
 }
 
@@ -154,7 +160,7 @@ fn test_set_post_exchange_delay_blocks_sync() {
     // With a valid OHTTP key and a future deadline, TooSoon must be returned.
     let result = vauchi.sync().unwrap();
     assert!(
-        matches!(result, VauchiSyncOutcome::TooSoon),
+        matches!(result, VauchiSyncOutcome::TooSoon { .. }),
         "expected TooSoon after set_post_exchange_delay, got: {result:?}"
     );
 }
@@ -184,7 +190,7 @@ fn test_post_exchange_delay_gate_driven_by_monotonic_clock() {
     // (bounded by post_exchange_delay_max_ms, well under one hour).
     vauchi.set_post_exchange_delay();
     assert!(
-        matches!(vauchi.sync().unwrap(), VauchiSyncOutcome::TooSoon),
+        matches!(vauchi.sync().unwrap(), VauchiSyncOutcome::TooSoon { .. }),
         "fresh post-exchange delay must gate sync as TooSoon"
     );
 
@@ -196,7 +202,7 @@ fn test_post_exchange_delay_gate_driven_by_monotonic_clock() {
     // injected clock, not wall-clock, controls the gate.
     let after = vauchi.sync();
     assert!(
-        !matches!(after, Ok(VauchiSyncOutcome::TooSoon)),
+        !matches!(after, Ok(VauchiSyncOutcome::TooSoon { .. })),
         "advancing the injected monotonic clock must release the C1 gate, got: {after:?}"
     );
 }
@@ -568,7 +574,7 @@ fn test_sync_gate_ordering() {
         vauchi.set_next_sync_allowed(Instant::now() + Duration::from_secs(3600));
         let result = vauchi.sync().unwrap();
         assert!(
-            matches!(result, VauchiSyncOutcome::TooSoon),
+            matches!(result, VauchiSyncOutcome::TooSoon { .. }),
             "timing gate must fire after identity+connection gates pass, got: {result:?}"
         );
     }

@@ -368,15 +368,13 @@ impl ContactDetailEngine {
     }
 
     fn contact_info_panel(&self) -> Component {
-        // Build contact_info items — always show initials, add trust level if set
-        let mut contact_info_items = vec![InfoItem {
-            icon: None,
-            title: self.t("contact_detail.initials_label"),
-            detail: self.contact.initials.clone(),
-        }];
+        // Status rows only: the avatar already shows the initials and the
+        // raw fingerprint is shown by Verify Fingerprint, where it is
+        // compared rather than read.
+        let mut contact_info_items = Vec::new();
         if !self.trust_level.is_empty() {
             contact_info_items.push(InfoItem {
-                icon: None,
+                icon: Some("checkmark.shield".into()),
                 title: self.t("contact_detail.trust_label"),
                 detail: self.trust_level.clone(),
             });
@@ -395,16 +393,9 @@ impl ContactDetailEngine {
                 detail: self.t("generic.yes"),
             });
         }
-        if !self.fingerprint.is_empty() {
-            contact_info_items.push(InfoItem {
-                icon: None,
-                title: self.t("contact_detail.fingerprint_label"),
-                detail: self.fingerprint.clone(),
-            });
-        }
         if !self.reciprocity_status.is_empty() {
             contact_info_items.push(InfoItem {
-                icon: None,
+                icon: Some("arrow.left.arrow.right".into()),
                 title: self.t("contact_detail.exchange_status_label"),
                 detail: self.reciprocity_status.clone(),
             });

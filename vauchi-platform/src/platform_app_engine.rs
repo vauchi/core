@@ -35,7 +35,7 @@ use vauchi_core::crypto::SymmetricKey;
 use crate::error::MobileError;
 use crate::platform_app_engine_internals::self_heal_post_auth;
 
-use crate::json_helpers::{commands_envelope_to_json, event_from_json, wakeup_envelope_to_json};
+use crate::json_helpers::{commands_envelope_to_json, wakeup_envelope_to_json};
 
 // ── PlatformEventListener ──────────────────────────────────────────
 
@@ -282,7 +282,21 @@ impl PlatformAppEngine {
     /// the result here; the retired typed hardware-event shim had no
     /// other behavior this path doesn't already cover.
     pub fn dispatch_json(&self, event_json: String) -> Result<String, MobileError> {
-        let event = event_from_json(&event_json)?;
+        let event = match vauchi_core::event_from_json(&event_json) {
+            Ok(event) => event,
+            Err(error) => {
+                let engine = self.engine.lock().map_err(|e| MobileError::Other {
+                    detail: format!("Lock failed: {e}"),
+                })?;
+                return match engine.reject_event_json(&error) {
+                    Some(commands) => commands_envelope_to_json(&commands),
+                    None => Err(MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: error.to_string(),
+                    }),
+                };
+            }
+        };
         let (commands, fire_invalidation) = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),

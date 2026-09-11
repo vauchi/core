@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_core::{
-    AccessibilitySpec, ActionSpec, ActionTone, Command, Event, InteractionId, StandardShortcut,
-    SurfaceId,
+    AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, Command, Event, EventJsonError,
+    InteractionId, MAX_EVENT_INPUT_VALUE_BYTES, StandardShortcut, SurfaceId,
 };
 
 use super::{AppEngine, AppScreen, TabLayout};
@@ -115,6 +115,28 @@ impl AppEngine {
     }
 
     /// Reduce one raw shell event into the next ordered command batch.
+    /// Presentation for an event the boundary decoder refused.
+    ///
+    /// An input value over `MAX_EVENT_INPUT_VALUE_BYTES` is the one refusal a
+    /// user can cause (pasting a whole backup into a text field); it comes
+    /// back as a prepared alert so no shell is left on a dead screen. Every
+    /// other refusal is a shell defect and stays an error.
+    pub fn reject_event_json(&self, error: &EventJsonError) -> Option<Vec<Command>> {
+        match error {
+            EventJsonError::InputValueTooLarge => Some(vec![Command::PresentAlert {
+                alert: AlertSpec {
+                    title: self.t("error.title"),
+                    message: crate::i18n::get_string_with_args(
+                        self.render_context.resolved_locale(),
+                        "validation.too_long",
+                        &[("max", &MAX_EVENT_INPUT_VALUE_BYTES.to_string())],
+                    ),
+                },
+            }]),
+            EventJsonError::TooLarge | EventJsonError::TooDeep | EventJsonError::Malformed => None,
+        }
+    }
+
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
         self.clear_open_overlay(&event);
 

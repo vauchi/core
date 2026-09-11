@@ -70,15 +70,25 @@ pub unsafe extern "C" fn vauchi_app_dispatch(
                 Ok(json) => json,
                 Err(_) => return to_c_string(r#"{"error":"event JSON is malformed"}"#),
             };
+            let app = &*handle;
             let event = match vauchi_core::event_from_json(json) {
                 Ok(event) => event,
                 Err(error) => {
-                    return to_c_string(
-                        &serde_json::json!({ "error": error.to_string() }).to_string(),
-                    );
+                    let rejection = app
+                        .engine
+                        .lock()
+                        .ok()
+                        .and_then(|engine| engine.reject_event_json(&error));
+                    return match rejection {
+                        Some(commands) => {
+                            to_c_string(&serde_json::json!({ "commands": commands }).to_string())
+                        }
+                        None => to_c_string(
+                            &serde_json::json!({ "error": error.to_string() }).to_string(),
+                        ),
+                    };
                 }
             };
-            let app = &*handle;
             match app.engine.lock() {
                 Ok(mut engine) => match engine.dispatch(event) {
                     Ok(commands) => {
@@ -144,6 +154,42 @@ mod tests {
                 vauchi_core::MAX_EVENT_JSON_BYTES
             )
         );
+
+        // SAFETY: Both pointers are owned by the C ABI and freed exactly once.
+        unsafe {
+            crate::vauchi_string_free(response_ptr);
+            crate::vauchi_app_destroy(app);
+        }
+    }
+
+    // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+    #[test]
+    fn c_abi_explains_an_oversized_input_value_with_an_alert() {
+        // SAFETY: The default constructor has no pointer inputs and returns an owned handle.
+        let app = unsafe { crate::vauchi_app_create() };
+        assert!(!app.is_null());
+        let event = CString::new(
+            serde_json::json!({
+                "ValueChanged": {
+                    "surface_id": "surface",
+                    "binding_id": "binding",
+                    "value": { "text": "a".repeat(vauchi_core::MAX_EVENT_INPUT_VALUE_BYTES + 1) },
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        // SAFETY: The handle and NUL-terminated event string are owned by this test.
+        let response_ptr = unsafe { vauchi_app_dispatch(app, event.as_ptr()) };
+        assert!(!response_ptr.is_null());
+        // SAFETY: The C ABI returned a valid string owned by this test.
+        let response = unsafe { CStr::from_ptr(response_ptr) }.to_str().unwrap();
+        let response: serde_json::Value = serde_json::from_str(response).unwrap();
+        let message = response["commands"][0]["PresentAlert"]["alert"]["message"]
+            .as_str()
+            .unwrap_or_else(|| panic!("expected a PresentAlert batch, got {response}"));
+        assert!(message.contains(&vauchi_core::MAX_EVENT_INPUT_VALUE_BYTES.to_string()));
 
         // SAFETY: Both pointers are owned by the C ABI and freed exactly once.
         unsafe {

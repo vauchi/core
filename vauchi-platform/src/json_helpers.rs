@@ -9,7 +9,7 @@
 
 use serde::Serialize;
 use vauchi_app::ui::AppScreen;
-use vauchi_core::{Command, Event};
+use vauchi_core::Command;
 
 use crate::error::MobileError;
 use crate::types::notification::MobilePendingNotification;
@@ -48,14 +48,6 @@ struct CommandsEnvelope<'a> {
 pub(crate) fn commands_envelope_to_json(commands: &[Command]) -> Result<String, MobileError> {
     serde_json::to_string(&CommandsEnvelope { commands }).map_err(|e| MobileError::Other {
         detail: format!("Failed to serialize CommandsEnvelope: {e}"),
-    })
-}
-
-/// Deserialize a generic platform event without a hand-maintained FFI mirror.
-pub(crate) fn event_from_json(json: &str) -> Result<Event, MobileError> {
-    vauchi_core::event_from_json(json).map_err(|error| MobileError::InvalidInput {
-        field: String::new(),
-        detail: error.to_string(),
     })
 }
 

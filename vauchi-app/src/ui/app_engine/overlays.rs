@@ -16,6 +16,9 @@ use crate::ui::screen::{ActionStyle, ScreenAction, ScreenLayout, ScreenModel};
 
 /// Shared action ID for the update link button/banner.
 pub(super) const ACTION_OPEN_UPDATE_LINK: &str = "open_update_link";
+/// Destination the update banner opens on every shell; must be an `https://`
+/// URL because no shell registers a `vauchi://` handler.
+pub(super) const UPDATE_LINK_URL: &str = "https://vauchi.app/";
 /// Reserved global-chrome action id: the native top-bar gear forwards
 /// this instead of constructing the "Settings" screen name. Resolved
 /// to `NavigateTo(Settings)` before per-screen dispatch (CoreScreenIdMap

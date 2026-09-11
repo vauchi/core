@@ -15,7 +15,7 @@
 use super::SyncChromeStatus;
 use super::{
     ACTION_DISMISS_DEMO_CONTACT, ACTION_GO_BACK, ACTION_OPEN_SETTINGS, ACTION_OPEN_UPDATE_LINK,
-    ACTION_SYNC_NOW, AppEngine, AppScreen,
+    ACTION_SYNC_NOW, AppEngine, AppScreen, UPDATE_LINK_URL,
 };
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::engine::WorkflowEngine;
@@ -114,7 +114,7 @@ impl AppEngine {
                 self.update_dismissed = true;
             }
             return Some(ActionResult::OpenUrl {
-                url: "vauchi://update".into(),
+                url: UPDATE_LINK_URL.into(),
             });
         }
 

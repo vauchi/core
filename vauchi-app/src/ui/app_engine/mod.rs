@@ -52,7 +52,7 @@ mod screens_exchange;
 pub use app_screen::AppScreen;
 use overlays::{
     ACTION_DISMISS_DEMO_CONTACT, ACTION_GO_BACK, ACTION_OPEN_SETTINGS, ACTION_OPEN_UPDATE_LINK,
-    ACTION_SYNC_NOW,
+    ACTION_SYNC_NOW, UPDATE_LINK_URL,
 };
 pub use {
     navigation::TabLayout, overlays::SyncChromeStatus, presentation_protocol::AppPresentationError,

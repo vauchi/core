@@ -781,7 +781,11 @@ impl AppEngine {
     /// `PlatformAppEngine` can expose it via UniFFI. The frontend bootstraps
     /// the loop by calling this once at launch.
     pub fn on_wakeup(&mut self) -> Vec<PendingNotification> {
+        let before = self.current_screen();
         let notifications = self.poll_notifications();
+        if self.current_screen() != before {
+            self.re_present_after_heartbeat();
+        }
         self.pending_commands.push_back(self.compute_next_wakeup());
         notifications
     }
@@ -816,12 +820,45 @@ impl AppEngine {
                 earliest_millis: Some(self.multi_stage_frame_ms().unwrap_or(300)),
             };
         }
+        // A Link rendezvous is several dependent relay round trips (presence
+        // deposit, peer epk, card deposit, peer card), each waiting on one
+        // side's heartbeat. At the idle cadence two terminals converged in
+        // ~90 s; the escrow phase is meant to poll about once a second.
+        if self.link_session_active() {
+            return vauchi_core::Command::ScheduleWakeup {
+                earliest_secs: 1,
+                deadline_secs: 1,
+                min_interval_secs: 1,
+                earliest_millis: None,
+            };
+        }
         vauchi_core::Command::ScheduleWakeup {
             earliest_secs: 30,
             deadline_secs: 90,
             min_interval_secs: 30,
             earliest_millis: None,
         }
+    }
+
+    /// A Link-mode rendezvous (initiator on the share screen or responder on
+    /// the deep-link screen) is still waiting on the relay. Terminal machines
+    /// are dropped by their advance, so "held" means "live".
+    pub fn link_session_active(&self) -> bool {
+        use vauchi_core::exchange::link_initiator::LinkInitiatorState;
+        use vauchi_core::exchange::link_responder::LinkResponderState;
+        let initiator_live = self.link_initiator.as_ref().is_some_and(|machine| {
+            matches!(
+                machine.current_state(),
+                LinkInitiatorState::Polling | LinkInitiatorState::Retrieving
+            )
+        });
+        let responder_live = self.link_responder.as_ref().is_some_and(|machine| {
+            matches!(
+                machine.current_state(),
+                LinkResponderState::Polling | LinkResponderState::Retrieving
+            )
+        });
+        initiator_live || responder_live
     }
 
     /// Convert `ValidationError` into `UpdateScreen` with the error injected

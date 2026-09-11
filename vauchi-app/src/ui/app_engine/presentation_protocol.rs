@@ -299,6 +299,27 @@ impl AppEngine {
         )
     }
 
+    /// A heartbeat replaced what is on screen (a Link session completed or
+    /// timed out, a Hover frame moved on): hand the shell the new surface
+    /// the way a reduced event would, ahead of whatever the advance already
+    /// queued (a celebration must land on the completion screen, not the
+    /// waiting one). Shells render only what core hands them.
+    pub(super) fn re_present_after_heartbeat(&mut self) {
+        let Some(next_revision) = self.surface_revision.checked_add(1) else {
+            return;
+        };
+        self.surface_revision = next_revision;
+        let screen = self.current_screen();
+        match self.surface_commands(&screen) {
+            Ok(commands) => {
+                let queued: Vec<Command> = self.pending_commands.drain(..).collect();
+                self.extend_pending_commands(commands);
+                self.extend_pending_commands(queued);
+            }
+            Err(error) => tracing::warn!(?error, "heartbeat re-present failed"),
+        }
+    }
+
     fn surface_commands(
         &mut self,
         screen: &crate::ui::ScreenModel,

@@ -172,6 +172,17 @@ impl AppEngine {
                 machine.drain_pending_commands(),
             )
         };
+        self.present_link_initiator_state(state, new_commands)
+    }
+
+    /// Reconcile the renderer with the machine's state: terminal states
+    /// render their outcome and drop the machine; live states hand back
+    /// the follow-up relay commands, if any.
+    fn present_link_initiator_state(
+        &mut self,
+        state: LinkInitiatorState,
+        new_commands: Vec<vauchi_core::Command>,
+    ) -> Option<ActionResult> {
         match state {
             LinkInitiatorState::Finalized { card_bytes } => {
                 let completed = match self.link_initiator_x3dh.as_ref() {
@@ -293,9 +304,21 @@ impl AppEngine {
             advanced |= self.run_and_feed_initiator_command(&check);
         }
 
-        // 3. Enforce the polling deadline (Failed(PollingTimedOut)).
-        if let Some(machine) = self.link_initiator.as_mut() {
+        // 3. Enforce the polling deadline (Failed(PollingTimedOut)) and show
+        //    it: the deadline is the one transition no relay event announces.
+        let timed_out = self.link_initiator.as_mut().is_some_and(|machine| {
             machine.tick(now);
+            matches!(machine.current_state(), LinkInitiatorState::Failed(_))
+        });
+        if timed_out {
+            let state = self
+                .link_initiator
+                .as_ref()
+                .map(|m| m.current_state().clone());
+            if let Some(state) = state {
+                self.present_link_initiator_state(state, Vec::new());
+                advanced = true;
+            }
         }
         advanced
     }

@@ -200,3 +200,150 @@ fn the_sub_second_wakeup_survives_json() {
         "a live exchange must ask for its frame dwell, got {millis}ms"
     );
 }
+
+/// A live Link session is a relay rendezvous of several dependent round
+/// trips (presence deposit → peer epk → card deposit → peer card), and each
+/// leg waits for a heartbeat on one side or the other. At the idle 30 s
+/// cadence two terminals needed ~90 s to converge — past every 60 s wait in
+/// `integration_tui_to_tui_link_exchange` — while the escrow phase is
+/// designed to poll about once a second.
+// @internal
+#[test]
+fn a_live_link_session_schedules_a_far_shorter_wakeup_than_the_idle_heartbeat() {
+    let mut initiating = engine_with_identity();
+    let entry = initiating.navigate_to(vauchi_app::ui::AppScreen::LinkExchange);
+    assert_eq!(
+        entry.screen_id, "exchange_share_url",
+        "precondition: on the Link share screen"
+    );
+    assert!(
+        initiating.link_session_active(),
+        "precondition: the initiator machine is live"
+    );
+    let _ = initiating.on_wakeup();
+    let initiator_secs = first_wakeup_earliest_secs(&mut initiating);
+    assert!(
+        initiator_secs <= 1,
+        "a live Link initiator must be driven at least once a second, got {initiator_secs}s"
+    );
+
+    let (initiation, _presence) = vauchi_core::exchange::link_mode::initiator_generate();
+    let payload = vauchi_core::exchange::link_mode::parse_exchange_deep_link(&initiation.url)
+        .expect("a generated link parses");
+    let mut responding = engine_with_identity();
+    responding.navigate_to(vauchi_app::ui::AppScreen::DeepLinkResponder { payload });
+    assert!(
+        responding.link_session_active(),
+        "precondition: the responder machine is live"
+    );
+    let _ = responding.on_wakeup();
+    let responder_secs = first_wakeup_earliest_secs(&mut responding);
+    assert!(
+        responder_secs <= 1,
+        "a live Link responder must be driven at least once a second, got {responder_secs}s"
+    );
+
+    let mut idle = engine_with_identity();
+    let _ = idle.on_wakeup();
+    assert_eq!(
+        first_wakeup_earliest_secs(&mut idle),
+        30,
+        "the idle heartbeat is unchanged"
+    );
+}
+
+// `FakeClock` is `#[cfg(any(test, feature = "testing"))]`; the no-feature
+// compile check excludes the clock-driven tests below with it.
+#[cfg(feature = "testing")]
+mod link_heartbeat {
+    use super::*;
+    use vauchi_app::ui::WorkflowEngine;
+
+    fn engine_on_link_share_screen_with_clock()
+    -> (std::sync::Arc<vauchi_core::clock::FakeClock>, AppEngine) {
+        let clock = std::sync::Arc::new(vauchi_core::clock::FakeClock::new(
+            std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_000),
+        ));
+        let mut vauchi = Vauchi::in_memory_with_clock(clock.clone()).unwrap();
+        vauchi.create_identity("Alice").unwrap();
+        let mut engine = AppEngine::new(vauchi);
+        let entry = engine.navigate_to(vauchi_app::ui::AppScreen::LinkExchange);
+        assert_eq!(
+            entry.screen_id, "exchange_share_url",
+            "precondition: on the Link share screen"
+        );
+        (clock, engine)
+    }
+
+    /// The polling deadline is the one Link transition no relay event
+    /// announces: `tick` fails the machine, but nothing rendered that, so a
+    /// share screen whose session had silently died kept inviting the peer.
+    // @internal
+    #[test]
+    fn a_link_session_past_its_deadline_shows_the_failure_on_the_next_heartbeat() {
+        let (clock, mut engine) = engine_on_link_share_screen_with_clock();
+        let before = engine.current_screen();
+
+        clock.advance(std::time::Duration::from_secs(301));
+        let _ = engine.on_wakeup();
+
+        assert!(
+            !engine.link_session_active(),
+            "the session is over once its deadline passed"
+        );
+        assert_ne!(
+            before,
+            engine.current_screen(),
+            "the heartbeat must render the timed-out session"
+        );
+    }
+
+    /// A heartbeat can replace what is on screen — a Link responder's waiting
+    /// screen becomes the completion summary when the relay hands over the
+    /// peer's card; a timed-out session becomes its failure. Shells render only
+    /// what core hands them, so a wakeup that changed the screen must
+    /// re-present it; otherwise the terminal keeps showing "Waiting..." after
+    /// the contact was saved (`integration_tui_to_tui_link_exchange`,
+    /// 2026-09-11).
+    // @internal
+    #[test]
+    fn a_wakeup_that_changes_the_screen_re_presents_it() {
+        let (clock, mut engine) = engine_on_link_share_screen_with_clock();
+        let _ = engine.on_wakeup();
+        let _ = engine.drain_pending_commands();
+
+        let before = engine.current_screen();
+        clock.advance(std::time::Duration::from_secs(301));
+        let _ = engine.on_wakeup();
+        assert_ne!(
+            before,
+            engine.current_screen(),
+            "precondition: the heartbeat changed the screen"
+        );
+
+        let cmds = engine.drain_pending_commands();
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, Command::ReplaceSurface { .. })),
+            "a wakeup that changed the screen must re-present it, got {cmds:?}"
+        );
+    }
+}
+
+/// The converse: an idle heartbeat that changed nothing must not flood the
+/// shell with a surface replacement every tick.
+// @internal
+#[test]
+fn an_idle_wakeup_does_not_re_present_the_screen() {
+    let mut engine = engine_with_identity();
+    let _ = engine.on_wakeup();
+    let _ = engine.drain_pending_commands();
+    let _ = engine.on_wakeup();
+    let cmds = engine.drain_pending_commands();
+    assert!(
+        !cmds
+            .iter()
+            .any(|c| matches!(c, Command::ReplaceSurface { .. })),
+        "an idle heartbeat must not re-present, got {cmds:?}"
+    );
+}

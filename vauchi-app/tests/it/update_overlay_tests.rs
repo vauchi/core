@@ -76,7 +76,7 @@ fn dismissing_update_available_hides_banner() {
         action_id: "open_update_link".into(),
     });
     assert!(
-        matches!(result, ActionResult::OpenUrl { ref url } if url == "vauchi://update"),
+        matches!(result, ActionResult::OpenUrl { ref url } if url == "https://vauchi.app/"),
         "open_update_link should return OpenUrl"
     );
 
@@ -182,7 +182,7 @@ fn open_update_link_returns_open_url() {
 
     match result {
         ActionResult::OpenUrl { url } => {
-            assert_eq!(url, "vauchi://update");
+            assert_eq!(url, "https://vauchi.app/");
         }
         other => panic!("expected OpenUrl, got {other:?}"),
     }

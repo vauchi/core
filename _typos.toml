@@ -12,6 +12,7 @@ extend-exclude = [
     "**/cert_pinning.rs",    # base64-encoded certificates produce false positives
     "*.lock",
     "**/*_i18n_tests.rs",    # exact non-English string assertions (M3, CC-03) — German is not a typo
+    "**/screen_catalog_v1.json", # rendered German entries + random key material
 ]
 
 [default.extend-words]

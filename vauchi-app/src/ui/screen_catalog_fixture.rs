@@ -15,6 +15,11 @@
 //! Keys and ids are random per run, so the bytes are not byte-stable; the
 //! `#[ignore]` `regenerate_shared_fixture` test rewrites the file on demand.
 //!
+//! A sub-screen batch (`contact_detail`, `settings_advanced`, ...) also
+//! replaces its parent surface: the engine emits the responsive companion
+//! pane, and a shell that renders one pane at a time ignores it. The
+//! entry's own surface is the one whose id equals the screen id.
+//!
 //! Screens that are not in the catalog, and why:
 //! - `DeepLinkConsent` / `DeepLinkResponder` / `DeviceLinkJoin` need a
 //!   parsed peer payload or invitation URL that only a real peer emits.

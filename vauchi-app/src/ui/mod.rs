@@ -119,6 +119,7 @@ pub use delivery::{DeliveryItem, DeliveryStatusEngine};
 pub use demo_presentation::DemoPresentationEngine;
 
 mod presentation_contract_fixture;
+mod screen_catalog_fixture;
 pub use device_link_join::{
     CANCEL_ACTION_ID as DEVICE_LINK_CANCEL_ACTION_ID, DeviceLinkJoinEngine,
     JOIN_ACTION_ID as DEVICE_LINK_JOIN_ACTION_ID,
@@ -182,6 +183,9 @@ pub use render_context::RenderContext;
 pub use screen::{
     ActionStyle, CURRENT_SCHEMA_VERSION, NativeWrapperHint, Progress, ScreenAction, ScreenLayout,
     ScreenModel, ScreenPresentationKind, TabInfo,
+};
+pub use screen_catalog_fixture::{
+    ScreenCatalogEntry, ScreenCatalogFixture, screen_catalog_fixture_json,
 };
 pub use settings::{SettingsConfig, SettingsEngine};
 pub use support::SupportEngine;

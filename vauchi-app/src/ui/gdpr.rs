@@ -321,6 +321,7 @@ impl GdprEngine {
                 items: vec![
                     SettingsItem {
                         id: "data_processing".into(),
+                        subtitle: None,
                         label: self.t("privacy.consent_data_processing"),
                         kind: SettingsItemKind::Toggle {
                             enabled: self.consent.data_processing,
@@ -330,6 +331,7 @@ impl GdprEngine {
                     },
                     SettingsItem {
                         id: "contact_sharing".into(),
+                        subtitle: None,
                         label: self.t("privacy.consent_contact_sharing"),
                         kind: SettingsItemKind::Toggle {
                             enabled: self.consent.contact_sharing,
@@ -339,6 +341,7 @@ impl GdprEngine {
                     },
                     SettingsItem {
                         id: "recovery_vouching".into(),
+                        subtitle: None,
                         label: self.t("privacy.consent_recovery_vouching"),
                         kind: SettingsItemKind::Toggle {
                             enabled: self.consent.recovery_vouching,

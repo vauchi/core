@@ -53,7 +53,9 @@ impl AppScreen {
             // Without this the Advanced sub-screen reduced to itself and
             // fell through to `None`, so the sidebar cleared its selection
             // on entry. `parent_screen_id` has always said `settings`.
-            Self::SettingsAdvanced => Self::Settings,
+            Self::SettingsAdvanced | Self::SettingsAppearance | Self::SettingsAccessibility => {
+                Self::Settings
+            }
             Self::RecoveryHelp | Self::RecoveryClaimReview => Self::Recovery,
             Self::DeviceLinking | Self::DeviceReplacement => Self::DeviceManagement,
             Self::FormDialog { .. } => return None,

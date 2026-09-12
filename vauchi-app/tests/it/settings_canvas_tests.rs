@@ -21,6 +21,7 @@ fn config() -> SettingsConfig {
         display_name: "Sample User".into(),
         device_count: 1,
         last_backup_display: "Never".into(),
+        show_help_icons: true,
         ..Default::default()
     }
 }

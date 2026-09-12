@@ -53,18 +53,14 @@ impl AppEngine {
 
     /// Persist settings toggle changes to Vauchi config (fixes HIGH-4).
     pub(in crate::ui::app_engine) fn persist_settings_toggle(&mut self, action: &UserAction) {
-        if self.screen != AppScreen::Settings {
+        if !self.screen.is_settings_surface() {
             return;
         }
         if let UserAction::SettingsToggled {
             component_id,
             item_id,
         } = action
-            && matches!(
-                component_id.as_str(),
-                // M6 S1b merged privacy+notifications into one group id.
-                "privacy_notifications" | "accessibility"
-            )
+            && matches!(component_id.as_str(), "privacy" | "accessibility")
         {
             let config = self.vauchi.config_mut();
             match item_id.as_str() {
@@ -109,7 +105,7 @@ impl AppEngine {
             component_id,
             item_id,
         } = action
-            && component_id == "security_backup"
+            && component_id == "backup"
             && item_id == "backup_reminders"
             && let Ok(mut state) = self.vauchi.load_backup_reminder_state()
         {
@@ -162,10 +158,7 @@ impl AppEngine {
         &mut self,
         action: &UserAction,
     ) -> Option<ActionResult> {
-        if !matches!(
-            self.screen,
-            AppScreen::Settings | AppScreen::SettingsAdvanced
-        ) {
+        if !self.screen.is_settings_surface() {
             return None;
         }
         if let UserAction::ListItemSelected { item_id, .. } = action {
@@ -276,6 +269,14 @@ impl AppEngine {
                 // (network, delivery status, emergency wipe).
                 "advanced" => {
                     let screen = self.navigate_to(AppScreen::SettingsAdvanced);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
+                "appearance" => {
+                    let screen = self.navigate_to(AppScreen::SettingsAppearance);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
+                "accessibility" => {
+                    let screen = self.navigate_to(AppScreen::SettingsAccessibility);
                     return Some(ActionResult::NavigateTo(screen));
                 }
                 _ => {}

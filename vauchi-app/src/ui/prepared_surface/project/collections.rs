@@ -130,7 +130,7 @@ impl Projection {
             };
             rows.push(PresentationRow {
                 title: item.label.clone(),
-                subtitle: None,
+                subtitle: item.subtitle.clone(),
                 detail,
                 icon_token: None,
                 image_data: None,

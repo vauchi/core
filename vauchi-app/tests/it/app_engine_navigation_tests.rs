@@ -473,7 +473,7 @@ fn settings_screen_version_row_has_non_empty_value() {
     use vauchi_app::ui::{Component, SettingsItemKind};
 
     let mut engine = engine_with_identity();
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAdvanced);
     let screen = engine.current_screen();
 
     let version_item = screen
@@ -483,7 +483,7 @@ fn settings_screen_version_row_has_non_empty_value() {
             Component::SettingsGroup { items, .. } => items.iter().find(|i| i.id == "version"),
             _ => None,
         })
-        .expect("Settings screen must contain a `version` SettingsItem");
+        .expect("Advanced settings screen must contain a `version` SettingsItem");
 
     match &version_item.kind {
         SettingsItemKind::Value { value } => {

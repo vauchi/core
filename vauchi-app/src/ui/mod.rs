@@ -187,7 +187,7 @@ pub use screen::{
 pub use screen_catalog_fixture::{
     ScreenCatalogEntry, ScreenCatalogFixture, screen_catalog_fixture_json,
 };
-pub use settings::{SettingsConfig, SettingsEngine};
+pub use settings::{SettingsConfig, SettingsEngine, SettingsMode};
 pub use support::SupportEngine;
 pub use tag_promotion::{PromotionField, TagPromotionEngine};
 pub use tags_list::{TagSummary, TagsEngine};

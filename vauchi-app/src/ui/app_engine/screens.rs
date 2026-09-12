@@ -35,7 +35,7 @@ use crate::ui::recovery_claim_review::{
     ClaimContext, Confidence, RecoveryClaimReviewEngine, ReviewMode,
 };
 use crate::ui::recovery_status::RecoveryEngine;
-use crate::ui::settings::{SettingsConfig, SettingsEngine};
+use crate::ui::settings::{SettingsConfig, SettingsEngine, SettingsMode};
 use crate::ui::support::SupportEngine;
 use crate::ui::tag_promotion::{PromotionField, TagPromotionEngine};
 use crate::ui::tags_list::{TagSummary, TagsEngine};
@@ -174,7 +174,10 @@ impl AppEngine {
             | AppScreen::VerifyFingerprint { .. } => {
                 Self::create_contacts_engine(vauchi, screen, render_context)
             }
-            AppScreen::Settings | AppScreen::SettingsAdvanced => {
+            AppScreen::Settings
+            | AppScreen::SettingsAdvanced
+            | AppScreen::SettingsAppearance
+            | AppScreen::SettingsAccessibility => {
                 let card = vauchi.own_card().ok().flatten();
                 let display_name = card
                     .map(|c| c.display_name().to_string())
@@ -262,11 +265,13 @@ impl AppEngine {
                             .unwrap_or_else(|| "Never".to_string())
                     },
                 };
-                if matches!(screen, AppScreen::SettingsAdvanced) {
-                    Box::new(SettingsEngine::new_advanced(config))
-                } else {
-                    Box::new(SettingsEngine::new(config))
-                }
+                let mode = match screen {
+                    AppScreen::SettingsAdvanced => SettingsMode::Advanced,
+                    AppScreen::SettingsAppearance => SettingsMode::Appearance,
+                    AppScreen::SettingsAccessibility => SettingsMode::Accessibility,
+                    _ => SettingsMode::Main,
+                };
+                Box::new(SettingsEngine::with_mode(config, mode))
             }
             AppScreen::Exchange
             | AppScreen::DeepLinkConsent { .. }

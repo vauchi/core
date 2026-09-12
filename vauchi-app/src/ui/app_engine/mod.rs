@@ -332,7 +332,11 @@ impl AppEngine {
     pub fn set_render_context(&mut self, ctx: crate::ui::RenderContext) {
         self.render_context = ctx;
         self.engine_cache.remove(&AppScreen::Settings);
-        if matches!(self.screen, AppScreen::Settings) {
+        self.engine_cache.remove(&AppScreen::SettingsAppearance);
+        if matches!(
+            self.screen,
+            AppScreen::Settings | AppScreen::SettingsAppearance
+        ) {
             let screen = self.screen.clone();
             self.engine = Self::create_engine(
                 &self.vauchi,

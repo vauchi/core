@@ -66,18 +66,24 @@ fn default_true() -> bool {
     true
 }
 
-/// Settings screen engine.
-/// Which Settings surface this engine renders (M6 D6.1). The main list
-/// carries the everyday groups + an "Advanced…" link; the advanced
-/// sub-screen carries the rare/technical groups + emergency wipe, kept
-/// behind deliberate navigation (danger far from the thumb-reachable
-/// bottom).
-#[derive(Clone, Copy, PartialEq, Eq)]
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/// Which Settings surface this engine renders. The main list is the
+/// design canvas's three sections; the sub-screens carry the theme and
+/// language pickers, the accessibility toggles, and the rare/technical
+/// rows plus the emergency wipe, kept behind deliberate navigation
+/// (M6 D6.1 — danger far from the thumb-reachable bottom).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingsMode {
     Main,
     Advanced,
+    Appearance,
+    Accessibility,
 }
 
+/// Settings screen engine.
 pub struct SettingsEngine {
     config: SettingsConfig,
     mode: SettingsMode,
@@ -86,17 +92,25 @@ pub struct SettingsEngine {
 
 impl SettingsEngine {
     pub fn new(config: SettingsConfig) -> Self {
-        Self {
-            config,
-            mode: SettingsMode::Main,
-            pending_wipe: false,
-        }
+        Self::with_mode(config, SettingsMode::Main)
     }
 
     pub fn new_advanced(config: SettingsConfig) -> Self {
+        Self::with_mode(config, SettingsMode::Advanced)
+    }
+
+    pub fn new_appearance(config: SettingsConfig) -> Self {
+        Self::with_mode(config, SettingsMode::Appearance)
+    }
+
+    pub fn new_accessibility(config: SettingsConfig) -> Self {
+        Self::with_mode(config, SettingsMode::Accessibility)
+    }
+
+    pub fn with_mode(config: SettingsConfig, mode: SettingsMode) -> Self {
         Self {
             config,
-            mode: SettingsMode::Advanced,
+            mode,
             pending_wipe: false,
         }
     }
@@ -109,24 +123,10 @@ impl SettingsEngine {
         get_string(self.locale(), key)
     }
 
-    /// The everyday-6 main list + the Advanced link. Network, delivery,
-    /// and the emergency wipe live on the advanced sub-screen instead
-    /// (M6 D6.1 — danger far from the thumb-reachable bottom).
-    fn main_screen(&self) -> ScreenModel {
-        let components = vec![
-            self.profile_group(),
-            self.privacy_notifications_group(),
-            self.appearance_group(),
-            self.theme_dropdown(),
-            self.language_dropdown(),
-            self.accessibility_group(),
-            self.security_backup_group(),
-            self.help_about_group(),
-            self.advanced_link(),
-        ];
+    fn screen(&self, screen_id: &str, title_key: &str, components: Vec<Component>) -> ScreenModel {
         ScreenModel {
-            screen_id: "settings".into(),
-            title: self.t("settings.title"),
+            screen_id: screen_id.into(),
+            title: self.t(title_key),
             subtitle: None,
             components,
             contextual_actions: vec![],
@@ -135,13 +135,49 @@ impl SettingsEngine {
         }
     }
 
-    /// The advanced sub-screen: rare/technical groups + the emergency
-    /// wipe, reached only by deliberate navigation. Back is the generic
+    /// The design canvas: My identity / Privacy / App.
+    fn main_screen(&self) -> ScreenModel {
+        self.screen(
+            "settings",
+            "settings.title",
+            vec![
+                self.identity_group(),
+                self.privacy_group(),
+                self.app_group(),
+            ],
+        )
+    }
+
+    fn appearance_screen(&self) -> ScreenModel {
+        self.screen(
+            "settings_appearance",
+            "settings.appearance_language",
+            vec![
+                self.theme_dropdown(),
+                self.language_dropdown(),
+                self.appearance_group(),
+            ],
+        )
+    }
+
+    fn accessibility_screen(&self) -> ScreenModel {
+        self.screen(
+            "settings_accessibility",
+            "settings.accessibility",
+            vec![self.accessibility_group()],
+        )
+    }
+
+    /// Everything the canvas does not show, plus the emergency wipe,
+    /// reached only by deliberate navigation. Back is the generic
     /// nav-stack pop (parent stamped by the overlay layer).
     fn advanced_screen(&self) -> ScreenModel {
         let mut components = vec![
+            self.security_group(),
+            self.backup_group(),
             self.network_group(),
             self.delivery_group(),
+            self.about_group(),
             self.danger_group(),
         ];
 
@@ -162,15 +198,40 @@ impl SettingsEngine {
             });
         }
 
-        ScreenModel {
-            screen_id: "settings_advanced".into(),
-            title: self.t("settings.advanced_title"),
-            subtitle: None,
-            components,
-            contextual_actions: vec![],
-            progress: None,
-            ..Default::default()
+        self.screen("settings_advanced", "settings.advanced_title", components)
+    }
+
+    fn flip_toggle(&mut self, component_id: &str, item_id: &str) {
+        let config = &mut self.config;
+        match (component_id, item_id) {
+            ("privacy", "delivery_receipts") => {
+                config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
+            }
+            ("privacy", "suppress_presence") => {
+                config.suppress_presence = !config.suppress_presence;
+            }
+            ("privacy", "new_field_default") => {
+                config.new_field_default_visible = !config.new_field_default_visible;
+            }
+            ("privacy", "contact_added") => {
+                config.contact_added_notifications = !config.contact_added_notifications;
+            }
+            ("privacy", "card_update") => {
+                config.card_update_notifications = !config.card_update_notifications;
+            }
+            ("accessibility", "reduce_motion") => config.reduce_motion = !config.reduce_motion,
+            ("accessibility", "large_touch") => config.large_touch = !config.large_touch,
+            ("appearance", "show_help_icons") => config.show_help_icons = !config.show_help_icons,
+            ("about", "debug_mode") => config.debug_mode = !config.debug_mode,
+            _ => {}
         }
+    }
+
+    fn cycle_backup_reminders(&mut self) {
+        let current = vauchi_core::types::ReminderFrequency::from_label(
+            &self.config.backup_reminder_frequency,
+        );
+        self.config.backup_reminder_frequency = current.next().label().to_string();
     }
 }
 
@@ -179,6 +240,8 @@ impl WorkflowEngine for SettingsEngine {
         match self.mode {
             SettingsMode::Main => self.main_screen(),
             SettingsMode::Advanced => self.advanced_screen(),
+            SettingsMode::Appearance => self.appearance_screen(),
+            SettingsMode::Accessibility => self.accessibility_screen(),
         }
     }
 
@@ -187,65 +250,15 @@ impl WorkflowEngine for SettingsEngine {
             UserAction::SettingsToggled {
                 ref component_id,
                 ref item_id,
-            } if component_id == "privacy_notifications" && item_id == "delivery_receipts" => {
-                self.config.delivery_receipts_enabled = !self.config.delivery_receipts_enabled;
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-            UserAction::SettingsToggled {
-                ref component_id,
-                ref item_id,
-            } if component_id == "privacy_notifications" && item_id == "suppress_presence" => {
-                self.config.suppress_presence = !self.config.suppress_presence;
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-            UserAction::SettingsToggled {
-                ref component_id,
-                ref item_id,
-            } if component_id == "privacy_notifications" && item_id == "contact_added" => {
-                self.config.contact_added_notifications = !self.config.contact_added_notifications;
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-            UserAction::SettingsToggled {
-                ref component_id,
-                ref item_id,
-            } if component_id == "privacy_notifications" && item_id == "card_update" => {
-                self.config.card_update_notifications = !self.config.card_update_notifications;
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-            UserAction::SettingsToggled {
-                ref component_id,
-                ref item_id,
-            } if component_id == "accessibility" => {
-                match item_id.as_str() {
-                    "reduce_motion" => self.config.reduce_motion = !self.config.reduce_motion,
-                    "large_touch" => self.config.large_touch = !self.config.large_touch,
-                    _ => {}
-                }
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-            UserAction::SettingsToggled {
-                ref component_id,
-                ref item_id,
-            } if component_id == "appearance" && item_id == "show_help_icons" => {
-                self.config.show_help_icons = !self.config.show_help_icons;
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-            UserAction::SettingsToggled {
-                ref component_id,
-                ref item_id,
-            } if component_id == "help_about" && item_id == "debug_mode" => {
-                self.config.debug_mode = !self.config.debug_mode;
+            } => {
+                self.flip_toggle(component_id, item_id);
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected {
                 ref component_id,
                 ref item_id,
-            } if component_id == "security_backup" && item_id == "backup_reminders" => {
-                let current = vauchi_core::types::ReminderFrequency::from_label(
-                    &self.config.backup_reminder_frequency,
-                );
-                let next = current.next();
-                self.config.backup_reminder_frequency = next.label().to_string();
+            } if component_id == "backup" && item_id == "backup_reminders" => {
+                self.cycle_backup_reminders();
                 ActionResult::UpdateScreen(self.current_screen())
             }
             // Theme + Language Dropdown selections — persistence happens
@@ -253,8 +266,8 @@ impl WorkflowEngine for SettingsEngine {
             // writes the new value into the engine's RenderContext.
             // Engine mirrors the new id locally so the screen reflects
             // the pick on the very next render; the fresh config built
-            // on re-entry to AppScreen::Settings re-derives the id from
-            // the engine's RenderContext (ADR-047).
+            // on re-entry re-derives the id from the engine's
+            // RenderContext (ADR-047).
             UserAction::ListItemSelected {
                 ref component_id,
                 ref item_id,
@@ -272,7 +285,7 @@ impl WorkflowEngine for SettingsEngine {
             UserAction::ListItemSelected {
                 ref component_id,
                 ref item_id,
-            } if component_id == "help_about" && item_id == "what_is_vauchi" => {
+            } if component_id == "about" && item_id == "what_is_vauchi" => {
                 let title = self.t("about.what_is_vauchi.title");
                 let body = self.t("about.what_is_vauchi.body");
                 ActionResult::ShowInfoOverlay { title, body }

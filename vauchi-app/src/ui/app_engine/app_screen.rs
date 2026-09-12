@@ -28,6 +28,12 @@ pub enum AppScreen {
     /// Settings → Advanced sub-screen (M6 D6.1): network, delivery
     /// status, and emergency wipe, behind deliberate navigation.
     SettingsAdvanced,
+    /// Settings → Appearance & Language sub-screen: theme, language
+    /// and help-icon choices.
+    SettingsAppearance,
+    /// Settings → Accessibility sub-screen: motion and touch-target
+    /// toggles.
+    SettingsAccessibility,
     Help,
     Backup,
     Lock,
@@ -186,6 +192,8 @@ impl AppScreen {
             Self::Exchange => "exchange",
             Self::Settings => "settings",
             Self::SettingsAdvanced => "settings_advanced",
+            Self::SettingsAppearance => "settings_appearance",
+            Self::SettingsAccessibility => "settings_accessibility",
             Self::Help => "help",
             Self::Backup => "backup",
             Self::Lock => "lock",
@@ -231,6 +239,19 @@ impl AppScreen {
     ///
     /// Only handles simple (non-parameterized) screens. Parameterized screens
     /// like `ContactDetail` require additional data and return `None`.
+    /// The Settings screen and its sub-screens: the surfaces whose
+    /// rows route through `intercept_settings_action` and whose
+    /// toggles persist through `persist_settings_toggle`.
+    pub fn is_settings_surface(&self) -> bool {
+        matches!(
+            self,
+            Self::Settings
+                | Self::SettingsAdvanced
+                | Self::SettingsAppearance
+                | Self::SettingsAccessibility
+        )
+    }
+
     pub fn from_screen_id(id: &str) -> Option<Self> {
         Some(match id {
             "onboarding" => Self::Onboarding,
@@ -238,6 +259,9 @@ impl AppScreen {
             "contacts" => Self::Contacts,
             "exchange" => Self::Exchange,
             "settings" => Self::Settings,
+            "settings_advanced" => Self::SettingsAdvanced,
+            "settings_appearance" => Self::SettingsAppearance,
+            "settings_accessibility" => Self::SettingsAccessibility,
             "help" => Self::Help,
             "backup" => Self::Backup,
             "lock" => Self::Lock,
@@ -291,7 +315,9 @@ impl AppScreen {
             Self::TagPromotion { .. } => Some("tags"),
             Self::RecoveryHelp | Self::RecoveryClaimReview => Some("recovery"),
             Self::DeviceLinking | Self::DeviceReplacement => Some("device_management"),
-            Self::SettingsAdvanced => Some("settings"),
+            Self::SettingsAdvanced | Self::SettingsAppearance | Self::SettingsAccessibility => {
+                Some("settings")
+            }
             _ => None,
         }
     }
@@ -357,6 +383,8 @@ impl AppScreen {
             }
             Self::Settings
             | Self::SettingsAdvanced
+            | Self::SettingsAppearance
+            | Self::SettingsAccessibility
             | Self::Help
             | Self::Backup
             | Self::DuressPin

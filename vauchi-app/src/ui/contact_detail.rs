@@ -300,6 +300,7 @@ impl ContactDetailEngine {
             label: self.t("contact_detail.trust_permissions_label"),
             items: vec![SettingsItem {
                 id: "proposal_trusted".into(),
+                subtitle: None,
                 label: self.t("contact_detail.can_propose_contacts_label"),
                 kind: SettingsItemKind::Toggle {
                     enabled: self.proposal_trusted,
@@ -319,6 +320,7 @@ impl ContactDetailEngine {
             label: self.t("contact_detail.recovery_label"),
             items: vec![SettingsItem {
                 id: "recovery_trusted".into(),
+                subtitle: None,
                 label: self.t("contact_detail.trust_for_recovery_label"),
                 kind: SettingsItemKind::Toggle {
                     enabled: self.is_recovery_trusted,

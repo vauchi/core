@@ -477,6 +477,10 @@ pub struct InfoItem {
 pub struct SettingsItem {
     pub id: String,
     pub label: String,
+    /// One-line description under the label. Serde-defaulted so
+    /// pre-field payloads still decode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subtitle: Option<String>,
     pub kind: SettingsItemKind,
     #[serde(default)]
     pub a11y: Option<A11y>,

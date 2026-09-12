@@ -608,7 +608,7 @@
     },
     {
       "code_id": "lock",
-      "title": "Enter Password",
+      "title": "Vauchi is Locked",
       "locale": "en",
       "commands": [
         {
@@ -616,9 +616,9 @@
             "surface": {
               "surface_id": "lock",
               "revision": 1,
-              "title": "Enter Password",
-              "subtitle": null,
-              "accessibility_label": "Enter Password",
+              "title": "Vauchi is Locked",
+              "subtitle": "Enter your password to unlock",
+              "accessibility_label": "Vauchi is Locked",
               "layout": "scroll",
               "tokens": {
                 "spacing_small": 8,
@@ -628,6 +628,34 @@
                 "minimum_target_size": 48
               },
               "nodes": [
+                {
+                  "Group": {
+                    "id": "lock_glyph",
+                    "label": null,
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Status": {
+                          "id": null,
+                          "title": "Locked",
+                          "detail": null,
+                          "icon_token": "lock",
+                          "badge": null,
+                          "tone": "neutral",
+                          "activation": null,
+                          "accessibility": {
+                            "label": "Locked",
+                            "description": null
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Locked",
+                      "description": null
+                    }
+                  }
+                },
                 {
                   "Input": {
                     "binding_id": "surface.1.pin",

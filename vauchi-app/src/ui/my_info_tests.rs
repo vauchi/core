@@ -10,6 +10,7 @@
 // is module-private and cannot be tested from external tests/.
 use super::*;
 
+// @internal
 #[test]
 fn test_my_info_has_preview_as_action_in_entry_view() {
     let engine = MyInfoEngine::new(MyInfoProgress::default());
@@ -26,6 +27,7 @@ fn test_my_info_has_preview_as_action_in_entry_view() {
     assert_eq!(action.unwrap().label, "Preview as...");
 }
 
+// @internal
 #[test]
 fn test_my_info_has_preview_as_action_in_group_view() {
     let engine = MyInfoEngine::new(MyInfoProgress::default())
@@ -42,6 +44,7 @@ fn test_my_info_has_preview_as_action_in_group_view() {
     );
 }
 
+// @internal
 #[test]
 fn test_my_info_preview_mode_has_no_preview_as_picker_action() {
     let engine =
@@ -60,6 +63,7 @@ fn test_my_info_preview_mode_has_no_preview_as_picker_action() {
     );
 }
 
+// @internal
 #[test]
 fn test_preview_as_picker_returns_show_contact_picker() {
     let mut engine = MyInfoEngine::new(MyInfoProgress::default());

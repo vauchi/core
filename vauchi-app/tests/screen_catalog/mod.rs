@@ -197,6 +197,8 @@ fn record_seeded(world: SeededWorld, locale: &'static str, screens: &mut Vec<Scr
         AppScreen::Exchange,
         AppScreen::Settings,
         AppScreen::SettingsAdvanced,
+        AppScreen::SettingsAppearance,
+        AppScreen::SettingsAccessibility,
         AppScreen::Help,
         AppScreen::Backup,
         AppScreen::DeviceLinking,

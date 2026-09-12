@@ -12,7 +12,7 @@ use screen_catalog::{
 use vauchi_app::ui::{ScreenCatalogEntry, ScreenCatalogFixture};
 use vauchi_core::Command;
 
-const REQUIRED_CODE_IDS: [&str; 51] = [
+const REQUIRED_CODE_IDS: [&str; 53] = [
     "onboarding",
     "my_info-empty",
     "my_info",
@@ -26,6 +26,8 @@ const REQUIRED_CODE_IDS: [&str; 51] = [
     "exchange-no_groups",
     "settings",
     "settings_advanced",
+    "settings_appearance",
+    "settings_accessibility",
     "help",
     "backup",
     "lock",

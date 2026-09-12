@@ -163,12 +163,13 @@ fn screen_catalog_checked_in_catalog_covers_every_reachable_screen() {
         code_ids.len()
     );
     for locale_screen in ["onboarding", "contacts", "settings"] {
+        let german_code_id = format!("{locale_screen}-de");
         assert!(
             catalog
                 .screens
                 .iter()
-                .any(|entry| entry.code_id == locale_screen && entry.locale == "de"),
-            "{locale_screen} needs a German entry"
+                .any(|entry| entry.code_id == german_code_id && entry.locale == "de"),
+            "{locale_screen} needs a German entry under code_id {german_code_id}"
         );
     }
 }
@@ -177,11 +178,13 @@ fn screen_catalog_checked_in_catalog_covers_every_reachable_screen() {
 #[test]
 fn screen_catalog_every_catalog_entry_replaces_one_surface_then_installs_its_navigation() {
     let catalog = checked_in_catalog();
+    // Shells write `<code_id>.png`, so a code_id repeated across locales
+    // would make the second render overwrite the first.
     let mut seen = BTreeSet::new();
     for entry in &catalog.screens {
         assert!(
-            seen.insert((entry.code_id.clone(), entry.locale.clone())),
-            "{}/{} listed twice",
+            seen.insert(entry.code_id.clone()),
+            "code_id {} listed twice (locale {})",
             entry.code_id,
             entry.locale
         );

@@ -33,18 +33,19 @@ fn my_info_shows_own_fields_via_app_engine() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "my_info");
 
-    // MyInfo should show own fields in an ActionList (entry view)
-    let has_entries = screen.components.iter().any(|c| {
-        matches!(c, Component::ActionList { id, ..
-        } if id == "own_entries")
-    });
-    assert!(has_entries, "MyInfo should show own entries ActionList");
-
-    let has_contact_list = screen
+    // MyInfo shows own fields as the `own_entries` List (entry view):
+    // value as title, label as subtitle, visibility as the row detail.
+    let has_entries = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::List { .. }));
-    assert!(!has_contact_list, "MyInfo should not show a ContactList");
+        .any(|c| matches!(c, Component::List { id, .. } if id == "own_entries"));
+    assert!(has_entries, "MyInfo should show the own_entries List");
+
+    let has_other_list = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::List { id, .. } if id != "own_entries"));
+    assert!(!has_other_list, "MyInfo should not show a contact list");
 }
 
 // @internal

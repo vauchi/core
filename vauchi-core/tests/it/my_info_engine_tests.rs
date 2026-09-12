@@ -36,29 +36,22 @@ fn my_info_screen_id() {
 
 // @internal
 #[test]
-fn my_info_shows_own_fields_in_action_list() {
+fn my_info_shows_own_fields_as_the_own_entries_list() {
     let engine = MyInfoEngine::new(MyInfoProgress::default())
         .with_own_card("Demo User".into(), sample_own_fields());
 
     let screen = engine.current_screen();
-    let list = screen.components.iter().find(|c| {
-        matches!(c, Component::ActionList { id, ..
-        } if id == "own_entries")
+    let items = screen.components.iter().find_map(|c| match c {
+        Component::List { id, items, .. } if id == "own_entries" => Some(items.clone()),
+        _ => None,
     });
-    assert!(list.is_some(), "MyInfo should show own entries ActionList");
+    let items = items.expect("MyInfo should show the own_entries List");
 
-    if let Some(Component::ActionList { items, .. }) = list {
-        assert_eq!(items.len(), 2);
-        assert!(items[0].label.contains("+41 79 123 45 67"));
-        assert!(items[0].detail.as_deref().unwrap_or("").contains("Family"));
-        assert!(
-            items[0]
-                .detail
-                .as_deref()
-                .unwrap_or("")
-                .contains("3 contacts")
-        );
-    }
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0].name, "+41 79 123 45 67");
+    assert_eq!(items[0].subtitle.as_deref(), Some("Mobile"));
+    assert_eq!(items[0].status.as_deref(), Some("Family"));
+    assert_eq!(items[1].status.as_deref(), Some("Everyone"));
 }
 
 // @internal
@@ -76,10 +69,13 @@ fn my_info_title_is_display_name() {
 fn my_info_has_add_entry_and_toggle_view_actions() {
     let engine = MyInfoEngine::new(MyInfoProgress::default());
     let screen = engine.current_screen();
-    assert_eq!(screen.contextual_actions.len(), 3);
-    assert_eq!(screen.contextual_actions[0].id, "add_field");
-    assert_eq!(screen.contextual_actions[1].id, "toggle_view");
-    assert_eq!(screen.contextual_actions[2].id, "preview-as-picker");
+    // Canvas order: Group View, Preview as, then the primary Add Entry.
+    let ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
+    assert_eq!(ids, vec!["toggle_view", "preview-as-picker", "add_field"]);
 }
 
 // @internal
@@ -311,7 +307,11 @@ fn my_info_hides_exchange_prompt_when_has_contacts() {
         "Should not have go_exchange action"
     );
 
-    // add_field should be primary
-    assert_eq!(screen.contextual_actions[0].id, "add_field");
-    assert_eq!(screen.contextual_actions[0].style, ActionStyle::Primary);
+    // add_field stays the primary action
+    let add_field = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "add_field")
+        .expect("add_field action");
+    assert_eq!(add_field.style, ActionStyle::Primary);
 }

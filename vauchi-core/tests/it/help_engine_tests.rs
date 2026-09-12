@@ -9,6 +9,7 @@ fn sample_items() -> Vec<HelpItem> {
         HelpItem {
             id: "q1".into(),
             question: "How do I add a contact?".into(),
+            subtitle: None,
             answer: Some("Meet in person and use Exchange.".into()),
             answer_url: Some("https://vauchi.app/docs/users/faq#contacts--exchange".into()),
             category: "Getting Started".into(),
@@ -16,6 +17,7 @@ fn sample_items() -> Vec<HelpItem> {
         HelpItem {
             id: "q2".into(),
             question: "What is end-to-end encryption?".into(),
+            subtitle: None,
             answer: None,
             answer_url: Some("https://vauchi.app/docs/users/faq#privacy--security".into()),
             category: "Security".into(),
@@ -23,11 +25,33 @@ fn sample_items() -> Vec<HelpItem> {
         HelpItem {
             id: "q3".into(),
             question: "How do I create a backup?".into(),
+            subtitle: None,
             answer: None,
             answer_url: None,
             category: "Getting Started".into(),
         },
     ]
+}
+
+/// `(section id, section label, item ids)` of the help list, in order.
+fn sections(screen: &ScreenModel) -> Vec<(String, String, Vec<String>)> {
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::SectionedActionList { id, sections } if id == "help" => Some(sections),
+            _ => None,
+        })
+        .expect("help renders its items as one sectioned list")
+        .iter()
+        .map(|s| {
+            (
+                s.id.clone(),
+                s.label.clone(),
+                s.items.iter().map(|i| i.id.clone()).collect(),
+            )
+        })
+        .collect()
 }
 
 // @scenario: help_faq :: View FAQ categories
@@ -56,27 +80,24 @@ fn help_groups_by_category() {
     let engine = HelpEngine::new(sample_items());
     let screen = engine.current_screen();
 
-    // 1 TextInput + 2 ActionList categories = 3 components
-    assert_eq!(screen.components.len(), 3);
-
-    match &screen.components[1] {
-        Component::ActionList { id, items, .. } => {
-            assert_eq!(id, "Getting Started");
-            assert_eq!(items.len(), 2);
-            assert_eq!(items[0].id, "q1");
-            assert_eq!(items[1].id, "q3");
-        }
-        other => panic!("Expected ActionList, got {:?}", other),
-    }
-
-    match &screen.components[2] {
-        Component::ActionList { id, items, .. } => {
-            assert_eq!(id, "Security");
-            assert_eq!(items.len(), 1);
-            assert_eq!(items[0].id, "q2");
-        }
-        other => panic!("Expected ActionList, got {:?}", other),
-    }
+    // 1 TextInput + 1 sectioned list = 2 components
+    assert_eq!(screen.components.len(), 2);
+    // A category the catalog does not name renders its id as the header.
+    assert_eq!(
+        sections(&screen),
+        vec![
+            (
+                "Getting Started".to_string(),
+                "Getting Started".to_string(),
+                vec!["q1".to_string(), "q3".to_string()]
+            ),
+            (
+                "Security".to_string(),
+                "Security".to_string(),
+                vec!["q2".to_string()]
+            ),
+        ]
+    );
 }
 
 // @scenario: help_faq :: View a specific FAQ
@@ -85,7 +106,7 @@ fn help_groups_by_category() {
 fn help_faq_selected_shows_overlay() {
     let mut engine = HelpEngine::new(sample_items());
     let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "Getting Started".into(),
+        component_id: "help.Getting Started".into(),
         item_id: "q1".into(),
     });
 
@@ -104,7 +125,7 @@ fn help_faq_selected_shows_overlay() {
 fn help_select_item_without_answer_falls_back_to_url() {
     let mut engine = HelpEngine::new(sample_items());
     let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "Security".into(),
+        component_id: "help.Security".into(),
         item_id: "q2".into(),
     });
 
@@ -121,7 +142,7 @@ fn help_select_item_without_answer_falls_back_to_url() {
 fn help_select_item_without_url_returns_update() {
     let mut engine = HelpEngine::new(sample_items());
     let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "Getting Started".into(),
+        component_id: "help.Getting Started".into(),
         item_id: "q3".into(),
     });
 
@@ -133,7 +154,7 @@ fn help_select_item_without_url_returns_update() {
     }
 }
 
-// @scenario: help_faq :: Search filters FAQs
+// @scenario: help_faq :: Search FAQs by keyword
 // @internal
 #[test]
 fn help_engine_search_filters_faqs() {
@@ -150,24 +171,20 @@ fn help_engine_search_filters_faqs() {
         other => panic!("Expected UpdateScreen, got {:?}", other),
     };
 
-    // TextInput + 1 ActionList (Security only)
-    assert_eq!(screen.components.len(), 2);
-
     match &screen.components[0] {
         Component::TextInput { value, .. } => {
             assert_eq!(value, "encryption");
         }
         other => panic!("Expected TextInput, got {:?}", other),
     }
-
-    match &screen.components[1] {
-        Component::ActionList { id, items, .. } => {
-            assert_eq!(id, "Security");
-            assert_eq!(items.len(), 1);
-            assert_eq!(items[0].id, "q2");
-        }
-        other => panic!("Expected ActionList, got {:?}", other),
-    }
+    assert_eq!(
+        sections(&screen),
+        vec![(
+            "Security".to_string(),
+            "Security".to_string(),
+            vec!["q2".to_string()]
+        )]
+    );
 }
 
 // @internal
@@ -182,19 +199,17 @@ fn help_engine_search_matches_answer_text() {
     });
     let screen = engine.current_screen();
 
-    // TextInput + 1 ActionList (Getting Started only, q1 matches)
-    assert_eq!(screen.components.len(), 2);
-
-    match &screen.components[1] {
-        Component::ActionList { id, items, .. } => {
-            assert_eq!(id, "Getting Started");
-            assert_eq!(items.len(), 1);
-            assert_eq!(items[0].id, "q1");
-        }
-        other => panic!("Expected ActionList, got {:?}", other),
-    }
+    assert_eq!(
+        sections(&screen),
+        vec![(
+            "Getting Started".to_string(),
+            "Getting Started".to_string(),
+            vec!["q1".to_string()]
+        )]
+    );
 }
 
+// @scenario: help_faq :: Search is case-insensitive
 // @internal
 #[test]
 fn help_engine_search_is_case_insensitive() {
@@ -206,16 +221,33 @@ fn help_engine_search_is_case_insensitive() {
     });
     let screen = engine.current_screen();
 
-    // TextInput + 1 ActionList (Getting Started, q3 matches)
-    assert_eq!(screen.components.len(), 2);
+    assert_eq!(
+        sections(&screen),
+        vec![(
+            "Getting Started".to_string(),
+            "Getting Started".to_string(),
+            vec!["q3".to_string()]
+        )]
+    );
+}
 
-    match &screen.components[1] {
-        Component::ActionList { items, .. } => {
-            assert_eq!(items.len(), 1);
-            assert_eq!(items[0].id, "q3");
-        }
-        other => panic!("Expected ActionList, got {:?}", other),
-    }
+// @scenario: help_faq :: Search with no results
+// @internal
+#[test]
+fn help_search_with_no_match_leaves_only_the_search_field() {
+    let mut engine = HelpEngine::new(sample_items());
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "help_search".into(),
+        value: "zebra".into(),
+    });
+    let screen = engine.current_screen();
+
+    assert_eq!(screen.components.len(), 1, "{:?}", screen.components);
+    assert!(matches!(
+        &screen.components[0],
+        Component::TextInput { id, .. } if id == "help_search"
+    ));
 }
 
 // @scenario: help_faq :: All categories have at least one FAQ
@@ -226,7 +258,7 @@ fn help_empty_items_shows_empty() {
     let screen = engine.current_screen();
 
     assert_eq!(screen.screen_id, "help");
-    // Only the search TextInput, no ActionLists
+    // Only the search TextInput; an empty sectioned list is not emitted.
     assert_eq!(screen.components.len(), 1);
     assert!(screen.contextual_actions.is_empty());
 }

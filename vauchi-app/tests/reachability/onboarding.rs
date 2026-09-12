@@ -18,9 +18,13 @@ use std::collections::BTreeSet;
 use vauchi_app::ui::testing::{assert_reachability, check_reachability, check_static_reachability};
 use vauchi_app::ui::{OnboardingEngine, WorkflowEngine};
 
-/// Action ids `handle_identity_check` consumes
-/// (`core/vauchi-app/src/ui/onboarding.rs:644`).
-const IDENTITY_CHECK_HANDLED: &[&str] = &["create_new", "link_device", "load_backup"];
+/// Action ids `handle_identity_check` consumes through a
+/// `ScreenAction`. `link_device` and `load_backup` are also handled
+/// there, but they arrive as "I already have an identity" body rows —
+/// `ListItemSelected` pass-throughs the static harness leaves out of
+/// both sides; `tests/it/onboarding_welcome_entry_points_tests.rs`
+/// covers their paths.
+const IDENTITY_CHECK_HANDLED: &[&str] = &["create_new"];
 
 /// Union of action ids reachable from `OnboardingEngine`'s
 /// rendered screens. Most are consumed by one of the
@@ -30,10 +34,9 @@ const IDENTITY_CHECK_HANDLED: &[&str] = &["create_new", "link_device", "load_bac
 /// "handled" from the user's perspective and belong in this set
 /// so the Layer 1 reachability diff doesn't false-positive.
 const ONBOARDING_ALL_HANDLED: &[&str] = &[
-    // identity_check
+    // identity_check — `link_device` / `load_backup` are body rows
+    // (`ListItemSelected` pass-throughs), see IDENTITY_CHECK_HANDLED.
     "create_new",
-    "link_device",
-    "load_backup",
     // device_link_instructions
     "scan_qr",
     "back",

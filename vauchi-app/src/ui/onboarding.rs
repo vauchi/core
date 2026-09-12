@@ -32,6 +32,25 @@ fn backup_mime_types() -> Vec<String> {
 const CONTACT_INFO_CHOICES: &str = "contact_info_choices";
 const WHAT_NEXT_CHOICES: &str = "what_next_choices";
 
+/// Welcome-screen rows for bringing an existing identity along. They
+/// used to be secondary contextual actions, which the context bar folds
+/// into its "Actions" launcher, so the surface's initial batch showed no
+/// way in (ADR-066: shells render only what Core batches).
+const HAVE_IDENTITY_CHOICES: &str = "have_identity_choices";
+const HAVE_IDENTITY_SECTION: &str = "have_identity";
+
+/// The prepared-surface projection dispatches a sectioned list's rows as
+/// `{list}.{section}` while the screen walker dispatches them as `{list}`,
+/// so a welcome row is recognised under both spellings.
+fn is_choice_list(component_id: &str) -> bool {
+    component_id == CONTACT_INFO_CHOICES
+        || component_id == WHAT_NEXT_CHOICES
+        || component_id
+            .strip_prefix(HAVE_IDENTITY_CHOICES)
+            .and_then(|rest| rest.strip_prefix('.').or(Some("")))
+            .is_some_and(|section| section.is_empty() || section == HAVE_IDENTITY_SECTION)
+}
+
 fn choices_as_list<'a>(id: &str, choices: impl Iterator<Item = &'a ScreenAction>) -> Component {
     Component::ActionList {
         id: id.into(),
@@ -221,53 +240,82 @@ impl OnboardingEngine {
             screen_id: "identity_check".into(),
             title: self.t("onboarding.welcome_title"),
             subtitle: Some(self.t("onboarding.welcome_subtitle")),
-            components: vec![Component::InfoPanel {
-                id: "identity_check_info".into(),
-                icon: None,
-                title: "".into(),
-                items: vec![
-                    InfoItem {
-                        icon: Some("lock".into()),
-                        title: self.t("onboarding.welcome_private_title"),
-                        detail: self.t("onboarding.welcome_private_desc"),
-                    },
-                    InfoItem {
-                        icon: Some("devices".into()),
-                        title: self.t("onboarding.welcome_multidevice_title"),
-                        detail: self.t("onboarding.welcome_multidevice_desc"),
-                    },
-                ],
-                a11y: Some(A11y {
-                    label: Some(self.t("onboarding.welcome_title")),
-                    hint: None,
-                    role: Some(AccessibilityRole::Heading),
-                }),
-            }],
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "create_new".into(),
-                    label: self.t("onboarding.create_identity"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.create_identity"))),
+            components: vec![
+                Component::InfoPanel {
+                    id: "identity_check_info".into(),
+                    icon: None,
+                    title: "".into(),
+                    items: vec![
+                        InfoItem {
+                            icon: Some("lock".into()),
+                            title: self.t("onboarding.welcome_private_title"),
+                            detail: self.t("onboarding.welcome_private_desc"),
+                        },
+                        InfoItem {
+                            icon: Some("devices".into()),
+                            title: self.t("onboarding.welcome_multidevice_title"),
+                            detail: self.t("onboarding.welcome_multidevice_desc"),
+                        },
+                    ],
+                    a11y: Some(A11y {
+                        label: Some(self.t("onboarding.welcome_title")),
+                        hint: None,
+                        role: Some(AccessibilityRole::Heading),
+                    }),
                 },
-                ScreenAction {
-                    id: "link_device".into(),
-                    label: self.t("onboarding.restore_link_title"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.restore_link_title"))),
-                },
-                ScreenAction {
-                    id: "load_backup".into(),
-                    label: self.t("onboarding.restore_backup_title"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("onboarding.restore_backup_title"))),
-                },
+                self.have_identity_choices(),
             ],
+            contextual_actions: vec![ScreenAction {
+                id: "create_new".into(),
+                label: self.t("onboarding.create_identity"),
+                style: ActionStyle::Primary,
+                enabled: true,
+                a11y: Some(A11y::labeled(self.t("onboarding.create_identity"))),
+            }],
             progress: None,
             ..Default::default()
+        }
+    }
+
+    fn have_identity_choices(&self) -> Component {
+        Component::SectionedActionList {
+            id: HAVE_IDENTITY_CHOICES.into(),
+            sections: vec![Section {
+                id: HAVE_IDENTITY_SECTION.into(),
+                label: self.t("onboarding.have_identity"),
+                items: vec![
+                    self.entry_point(
+                        "link_device",
+                        "devices",
+                        "onboarding.link_device_instructions_title",
+                        "onboarding.link_device_instructions_subtitle",
+                    ),
+                    self.entry_point(
+                        "load_backup",
+                        "lock",
+                        "onboarding.restore_backup_title",
+                        "onboarding.backup_password_subtitle",
+                    ),
+                ],
+            }],
+        }
+    }
+
+    fn entry_point(
+        &self,
+        id: &str,
+        icon: &str,
+        label_key: &str,
+        detail_key: &str,
+    ) -> ActionListItem {
+        let label = self.t(label_key);
+        ActionListItem {
+            id: id.into(),
+            a11y: Some(A11y::labeled(label.clone())),
+            label,
+            icon: Some(icon.into()),
+            detail: Some(self.t(detail_key)),
+            info_key: None,
         }
     }
 
@@ -1069,9 +1117,7 @@ impl WorkflowEngine for OnboardingEngine {
             UserAction::ListItemSelected {
                 component_id,
                 item_id,
-            } if component_id == CONTACT_INFO_CHOICES || component_id == WHAT_NEXT_CHOICES => {
-                UserAction::ActionPressed { action_id: item_id }
-            }
+            } if is_choice_list(&component_id) => UserAction::ActionPressed { action_id: item_id },
             other => other,
         };
         match self.step {

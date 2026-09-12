@@ -17,14 +17,17 @@ use vauchi_app::ui::{
     UserAction, WorkflowEngine,
 };
 
+/// The sharing summary (surface subtitle) plus every caption: the pending
+/// count lives in the summary, the last-sync time in a caption.
 fn caption_texts(screen: &vauchi_app::ui::ScreenModel) -> Vec<String> {
     screen
-        .components
+        .subtitle
         .iter()
-        .filter_map(|c| match c {
+        .cloned()
+        .chain(screen.components.iter().filter_map(|c| match c {
             Component::Text { content, .. } => Some(content.clone()),
             _ => None,
-        })
+        }))
         .collect()
 }
 
@@ -99,8 +102,8 @@ fn last_pins_english_copy_unchanged() {
         .with_now_seconds(1_030);
     let texts = caption_texts(&engine.current_screen());
     assert!(
-        texts.iter().any(|t| t == "3 pending updates"),
-        "English pending caption unchanged; got {texts:?}"
+        texts.iter().any(|t| t.contains("3 pending updates")),
+        "English pending copy unchanged; got {texts:?}"
     );
 
     assert_eq!(about_overlay_title(""), "What is Vauchi?");

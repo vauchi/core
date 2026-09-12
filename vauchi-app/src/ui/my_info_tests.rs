@@ -83,36 +83,6 @@ fn caption_content(screen: &ScreenModel, id: &str) -> Option<String> {
 
 // @internal
 #[test]
-fn test_my_info_emits_pending_updates_caption() {
-    let engine = MyInfoEngine::new(MyInfoProgress::default()).with_pending_updates(3);
-    let screen = engine.current_screen();
-    assert_eq!(
-        caption_content(&screen, "pending_updates_caption").as_deref(),
-        Some("3 pending updates"),
-    );
-}
-
-// @internal
-#[test]
-fn test_my_info_pending_updates_caption_uses_singular_for_one() {
-    let engine = MyInfoEngine::new(MyInfoProgress::default()).with_pending_updates(1);
-    let screen = engine.current_screen();
-    assert_eq!(
-        caption_content(&screen, "pending_updates_caption").as_deref(),
-        Some("1 pending update"),
-    );
-}
-
-// @internal
-#[test]
-fn test_my_info_omits_pending_updates_caption_when_zero() {
-    let engine = MyInfoEngine::new(MyInfoProgress::default()).with_pending_updates(0);
-    let screen = engine.current_screen();
-    assert!(caption_content(&screen, "pending_updates_caption").is_none());
-}
-
-// @internal
-#[test]
 fn test_my_info_emits_last_sync_caption() {
     // 5 minutes ago — format_relative_time renders "5 minutes ago"
     let now = 1_700_000_000u64;
@@ -132,34 +102,9 @@ fn test_my_info_omits_last_sync_caption_when_none() {
     let engine = MyInfoEngine::new(MyInfoProgress::default()).with_now_seconds(1_700_000_000);
     let screen = engine.current_screen();
     assert!(caption_content(&screen, "last_sync_caption").is_none());
-}
-
-// @internal
-#[test]
-fn test_my_info_emits_both_captions_in_order_pending_then_sync() {
-    let now = 1_700_000_000u64;
-    let engine = MyInfoEngine::new(MyInfoProgress::default())
-        .with_pending_updates(2)
-        .with_last_sync_seconds(Some(now - 120))
-        .with_now_seconds(now);
-    let screen = engine.current_screen();
-    let positions: Vec<usize> = screen
-        .components
-        .iter()
-        .enumerate()
-        .filter_map(|(i, c)| match c {
-            Component::Text { id, .. }
-                if id == "pending_updates_caption" || id == "last_sync_caption" =>
-            {
-                Some(i)
-            }
-            _ => None,
-        })
-        .collect();
-    assert_eq!(positions.len(), 2, "expected both captions in the screen");
     assert!(
-        positions[0] < positions[1],
-        "pending_updates_caption must appear before last_sync_caption"
+        screen.subtitle.is_none(),
+        "the sharing summary is owner-only and must not leak into the preview"
     );
 }
 
@@ -180,4 +125,182 @@ fn test_my_info_preview_mode_omits_sync_status_captions() {
         "PreviewAs renders the card as the contact sees it — owner-only sync status must not leak"
     );
     assert!(caption_content(&screen, "last_sync_caption").is_none());
+}
+
+fn own_field(id: &str, value: &str, label: &str, groups: &[&str], shown: bool) -> OwnFieldInfo {
+    OwnFieldInfo {
+        field_id: id.into(),
+        field_type: "Phone".into(),
+        label: label.into(),
+        value: value.into(),
+        visible_groups: groups.iter().map(|g| (*g).to_string()).collect(),
+        contact_count: 0,
+        shown,
+    }
+}
+
+fn own_entries(screen: &ScreenModel) -> Vec<Item> {
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::List { id, items, .. } if id == "own_entries" => Some(items.clone()),
+            _ => None,
+        })
+        .expect("My Card renders its entries as the own_entries List")
+}
+
+fn card_with(fields: Vec<OwnFieldInfo>) -> MyInfoEngine {
+    MyInfoEngine::new(MyInfoProgress::default()).with_own_card("Tessa Urech".into(), fields)
+}
+
+// @internal
+#[test]
+fn entries_render_the_value_as_title_and_the_label_as_subtitle() {
+    let screen = card_with(vec![own_field(
+        "f1",
+        "+41 79 000 00 00",
+        "Mobile",
+        &[],
+        true,
+    )])
+    .current_screen();
+    let items = own_entries(&screen);
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].id, "f1");
+    assert_eq!(items[0].name, "+41 79 000 00 00");
+    assert_eq!(items[0].subtitle.as_deref(), Some("Mobile"));
+}
+
+// @internal
+#[test]
+fn entry_shown_to_every_contact_carries_the_everyone_chip() {
+    let screen = card_with(vec![own_field(
+        "f1",
+        "tessa@example.org",
+        "Email",
+        &[],
+        true,
+    )])
+    .current_screen();
+    assert_eq!(own_entries(&screen)[0].status.as_deref(), Some("Everyone"));
+}
+
+// @internal
+#[test]
+fn entry_granted_by_groups_carries_the_group_names_chip() {
+    let screen = card_with(vec![own_field(
+        "f1",
+        "+41 44 000 00 00",
+        "Work",
+        &["Family", "Cycling club"],
+        false,
+    )])
+    .current_screen();
+    assert_eq!(
+        own_entries(&screen)[0].status.as_deref(),
+        Some("Family, Cycling club")
+    );
+}
+
+// @internal
+#[test]
+fn entry_hidden_from_every_contact_carries_the_hidden_chip() {
+    let screen =
+        card_with(vec![own_field("f1", "1815-12-10", "Birthday", &[], false)]).current_screen();
+    assert_eq!(own_entries(&screen)[0].status.as_deref(), Some("Hidden"));
+}
+
+// @internal
+#[test]
+fn entry_without_a_label_falls_back_to_its_field_type() {
+    let screen =
+        card_with(vec![own_field("f1", "+41 79 000 00 00", "", &[], true)]).current_screen();
+    assert_eq!(own_entries(&screen)[0].subtitle.as_deref(), Some("Phone"));
+}
+
+// @internal
+#[test]
+fn selecting_an_entry_opens_its_detail() {
+    let mut engine = card_with(vec![own_field(
+        "f1",
+        "+41 79 000 00 00",
+        "Mobile",
+        &[],
+        true,
+    )]);
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "own_entries".into(),
+        item_id: "f1".into(),
+    });
+    assert_eq!(
+        result,
+        ActionResult::OpenEntryDetail {
+            field_id: "f1".into()
+        }
+    );
+}
+
+// @internal
+#[test]
+fn sharing_summary_joins_contact_count_and_pending_updates() {
+    let screen = MyInfoEngine::new(MyInfoProgress::default())
+        .with_contact_count(7)
+        .with_pending_updates(1)
+        .current_screen();
+    assert_eq!(
+        screen.subtitle.as_deref(),
+        Some("Shared with 7 contacts · 1 pending update")
+    );
+}
+
+// @internal
+#[test]
+fn sharing_summary_uses_the_singular_for_one_contact() {
+    let screen = MyInfoEngine::new(MyInfoProgress::default())
+        .with_contact_count(1)
+        .current_screen();
+    assert_eq!(screen.subtitle.as_deref(), Some("Shared with 1 contact"));
+}
+
+// @internal
+#[test]
+fn sharing_summary_omits_pending_updates_when_none_are_queued() {
+    let screen = MyInfoEngine::new(MyInfoProgress::default())
+        .with_contact_count(3)
+        .with_pending_updates(0)
+        .current_screen();
+    assert_eq!(screen.subtitle.as_deref(), Some("Shared with 3 contacts"));
+    assert!(caption_content(&screen, "pending_updates_caption").is_none());
+}
+
+// @internal
+#[test]
+fn pending_updates_live_in_the_sharing_summary_not_a_caption() {
+    let screen = MyInfoEngine::new(MyInfoProgress::default())
+        .with_pending_updates(3)
+        .current_screen();
+    assert!(caption_content(&screen, "pending_updates_caption").is_none());
+    assert_eq!(
+        screen.subtitle.as_deref(),
+        Some("Shared with 0 contacts · 3 pending updates")
+    );
+}
+
+// @internal
+#[test]
+fn entry_view_offers_group_view_and_preview_before_add_entry() {
+    let screen = MyInfoEngine::new(MyInfoProgress::default()).current_screen();
+    let ids: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect();
+    assert_eq!(ids, ["toggle_view", "preview-as-picker", "add_field"]);
+    let labels: Vec<&str> = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.label.as_str())
+        .collect();
+    assert_eq!(labels, ["Group View", "Preview as...", "Add Entry"]);
 }

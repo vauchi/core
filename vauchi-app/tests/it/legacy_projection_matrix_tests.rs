@@ -85,6 +85,7 @@ fn sample_help_items() -> Vec<HelpItem> {
             question: "How do I exchange contacts?".into(),
             answer: Some("Meet in person and use the Exchange screen.".into()),
             answer_url: Some("https://vauchi.app/docs/users/faq#contacts--exchange".into()),
+            subtitle: None,
             category: "Getting Started".into(),
         },
         HelpItem {
@@ -92,6 +93,7 @@ fn sample_help_items() -> Vec<HelpItem> {
             question: "What is a duress PIN?".into(),
             answer: Some("A secondary PIN that triggers data protection.".into()),
             answer_url: Some("https://vauchi.app/docs/users/faq#privacy--security".into()),
+            subtitle: None,
             category: "Security".into(),
         },
     ]

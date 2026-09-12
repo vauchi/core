@@ -131,7 +131,7 @@ fn help_screen_dispatches_faq_selection_after_navigation() {
 
     // Select a FAQ item (the default items include "create-backup" with an inline answer)
     let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "Getting Started".into(),
+        component_id: "help".into(),
         item_id: "create-backup".into(),
     });
 

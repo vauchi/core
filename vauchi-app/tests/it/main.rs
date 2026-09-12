@@ -93,6 +93,7 @@ mod fingerprint_verify_engine_tests;
 mod form_dialog_i18n_tests;
 mod gdpr_i18n_tests;
 mod group_delete_tests;
+mod help_canvas_tests;
 mod help_engine_wiring_tests;
 mod humble_surface_contract_tests;
 mod i18n_support;
@@ -149,6 +150,7 @@ mod render_context_tests;
 #[path = "../responsive_presentation_tests.rs"]
 mod responsive_presentation_tests;
 mod result_routing_wiring_tests;
+mod settings_canvas_tests;
 mod settings_link_routing_tests;
 mod settings_parity_tests;
 mod settings_profile_i18n_tests;

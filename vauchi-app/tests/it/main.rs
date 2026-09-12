@@ -142,6 +142,7 @@ mod notification_proptest;
 mod onboarding_custom_group_tests;
 mod onboarding_i18n_tests;
 mod onboarding_step_choices_tests;
+mod onboarding_welcome_entry_points_tests;
 mod reciprocity_confirmer_tests;
 mod recovery_claim_review_i18n_tests;
 mod recovery_help_i18n_tests;

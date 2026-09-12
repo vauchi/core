@@ -16,7 +16,7 @@
 #![allow(dead_code)]
 
 use vauchi_app::i18n::load_locale_from_bytes;
-use vauchi_app::ui::ScreenModel;
+use vauchi_app::ui::{Component, ScreenModel};
 
 /// Loads the real German locale, exactly as CI does — the
 /// `.clone-locales` template places the checkout as a sibling of core,
@@ -35,6 +35,22 @@ pub fn action_label(screen: &ScreenModel, id: &str) -> String {
         .unwrap_or_else(|| panic!("action {id} present"))
         .label
         .clone()
+}
+
+/// Label of a body row (`SectionedActionList` item) by its item id.
+pub fn row_label(screen: &ScreenModel, item_id: &str) -> String {
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::SectionedActionList { sections, .. } => sections
+                .iter()
+                .flat_map(|section| section.items.iter())
+                .find(|item| item.id == item_id)
+                .map(|item| item.label.clone()),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("row {item_id} present"))
 }
 
 /// Asserts a rendered string is genuinely translated.

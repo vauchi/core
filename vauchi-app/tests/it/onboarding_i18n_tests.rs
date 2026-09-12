@@ -8,7 +8,7 @@
 //! Asserts that the screens resolved a translation, not what the
 //! translation says — see `i18n_support::assert_translated`.
 
-use super::i18n_support::{action_label, assert_translated, load_german};
+use super::i18n_support::{action_label, assert_translated, load_german, row_label};
 use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{ActionResult, Component, OnboardingEngine, UserAction, WorkflowEngine};
 
@@ -101,11 +101,8 @@ fn onboarding_english_copy_unchanged() {
     let welcome = engine.current_screen();
     assert_eq!(welcome.title, "Welcome to Vauchi");
     assert_eq!(action_label(&welcome, "create_new"), "Create new identity");
-    assert_eq!(
-        action_label(&welcome, "link_device"),
-        "Link from another device"
-    );
-    assert_eq!(action_label(&welcome, "load_backup"), "Restore from backup");
+    assert_eq!(row_label(&welcome, "link_device"), "Link this device");
+    assert_eq!(row_label(&welcome, "load_backup"), "Restore from backup");
 
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),

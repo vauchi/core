@@ -291,3 +291,53 @@ fn screen_catalog_exchange_picker_offers_qr_nfc_and_bluetooth_from_a_phone_capab
         );
     }
 }
+
+fn my_info_visibility_by_label(entry: &ScreenCatalogEntry) -> BTreeMap<String, String> {
+    replaced_surface(&entry.commands, "my_info")
+        .nodes
+        .iter()
+        .filter_map(|node| match node {
+            PresentationNode::List { rows, .. } => Some(rows),
+            _ => None,
+        })
+        .flatten()
+        .map(|row| {
+            (
+                row.subtitle
+                    .clone()
+                    .expect("own entry row carries its label"),
+                row.detail
+                    .clone()
+                    .expect("own entry row carries a visibility chip"),
+            )
+        })
+        .collect()
+}
+
+// The catalog is what the design canvas is compared against, so the seeded
+// owner must have granted visibility the way a real user does: most entries
+// to everyone, the address to one group, the birthday to two — not the
+// privacy-first "Hidden" every fresh entry starts with.
+// @scenario: my_info :: entry rows show who can see each entry
+#[test]
+fn screen_catalog_my_info_rows_carry_a_realistic_visibility_mix() {
+    let catalog = checked_in_catalog();
+    let entry = catalog
+        .screens
+        .iter()
+        .find(|entry| entry.code_id == "my_info")
+        .expect("my_info recorded");
+    let visibility = my_info_visibility_by_label(entry);
+
+    let expected: BTreeMap<String, String> = [
+        ("mobile", "Everyone"),
+        ("work", "Everyone"),
+        ("homepage", "Everyone"),
+        ("home", "Family"),
+        ("birthday", "Cycling club, Family"),
+    ]
+    .into_iter()
+    .map(|(label, chip)| (label.to_owned(), chip.to_owned()))
+    .collect();
+    assert_eq!(visibility, expected);
+}

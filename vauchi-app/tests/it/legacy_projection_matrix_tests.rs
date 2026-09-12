@@ -265,6 +265,7 @@ fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
                     value: "+41 79 000 00 00".into(),
                     visible_groups: vec![],
                     contact_count: 0,
+                    shown: true,
                 }],
             )
             .current_screen(),

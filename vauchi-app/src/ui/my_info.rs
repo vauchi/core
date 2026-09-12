@@ -28,6 +28,9 @@ pub struct OwnFieldInfo {
     pub visible_groups: Vec<String>,
     /// Number of contacts who can see this field (derived from group membership).
     pub contact_count: usize,
+    /// Visible to every contact when no group grants it (per
+    /// `ContactCard::is_field_shown`); a group-granted field ignores this.
+    pub shown: bool,
 }
 
 /// View mode for the MyInfo screen.
@@ -62,6 +65,9 @@ pub struct MyInfoEngine {
     preview_data: Option<SharedInfoView>,
     /// Show a first-exchange prompt (user has no contacts yet).
     show_exchange_prompt: bool,
+    /// Contacts holding this card (per `Vauchi::contact_count`), summarised
+    /// in the surface subtitle.
+    contact_count: usize,
     /// Avatar image bytes (WebP) for the ImageCircle component.
     avatar_data: Option<Vec<u8>>,
     /// Outbound updates queued for the next sync (per
@@ -85,6 +91,7 @@ impl MyInfoEngine {
             view_mode: MyInfoViewMode::EntryView,
             preview_data: None,
             show_exchange_prompt: false,
+            contact_count: 0,
             avatar_data: None,
             pending_updates: 0,
             last_sync_seconds: None,
@@ -129,6 +136,12 @@ impl MyInfoEngine {
         self
     }
 
+    /// Set the number of contacts holding this card.
+    pub fn with_contact_count(mut self, count: usize) -> Self {
+        self.contact_count = count;
+        self
+    }
+
     /// Set the avatar image data for the ImageCircle component.
     pub fn with_avatar_data(mut self, data: Option<Vec<u8>>) -> Self {
         self.avatar_data = data;
@@ -159,25 +172,62 @@ impl MyInfoEngine {
         self
     }
 
-    fn sync_status_components(&self) -> Vec<Component> {
-        let mut out = Vec::new();
-        if self.pending_updates > 0 {
-            let label = if self.pending_updates == 1 {
-                get_string(self.locale, "sync.pending_updates_one")
-            } else {
+    /// "Shared with N contacts · M pending updates" — the header line under
+    /// the display name; the pending part only while updates are queued.
+    fn sharing_summary(&self) -> String {
+        let contacts = if self.contact_count == 1 {
+            self.t("my_info.shared_summary_one")
+        } else {
+            get_string_with_args(
+                self.locale,
+                "my_info.shared_summary",
+                &[("count", &self.contact_count.to_string())],
+            )
+        };
+        match self.pending_updates {
+            0 => contacts,
+            1 => format!("{contacts} · {}", self.t("sync.pending_updates_one")),
+            n => format!(
+                "{contacts} · {}",
                 get_string_with_args(
                     self.locale,
                     "sync.pending_updates",
-                    &[("count", &self.pending_updates.to_string())],
+                    &[("count", &n.to_string())]
                 )
-            };
-            out.push(Component::Text {
-                a11y: None,
-                id: "pending_updates_caption".into(),
-                content: label,
-                style: TextStyle::Caption,
-            });
+            ),
         }
+    }
+
+    /// The trailing chip: the granting group names, else Everyone / Hidden.
+    fn visibility_chip(&self, field: &OwnFieldInfo) -> String {
+        if !field.visible_groups.is_empty() {
+            field.visible_groups.join(", ")
+        } else if field.shown {
+            self.t("my_info.visibility_everyone")
+        } else {
+            self.t("fields.hidden")
+        }
+    }
+
+    fn entry_item(&self, field: &OwnFieldInfo) -> Item {
+        let label = if field.label.is_empty() {
+            field.field_type.clone()
+        } else {
+            field.label.clone()
+        };
+        Item {
+            id: field.field_id.clone(),
+            name: field.value.clone(),
+            initials: crate::ui::component::initials(&label),
+            subtitle: Some(label),
+            status: Some(self.visibility_chip(field)),
+            actions: Vec::new(),
+            a11y: None,
+        }
+    }
+
+    fn sync_status_components(&self) -> Vec<Component> {
+        let mut out = Vec::new();
         if let Some(then) = self.last_sync_seconds {
             let relative = format_relative_time(self.now_seconds, then, self.locale);
             out.push(Component::Text {
@@ -207,41 +257,13 @@ impl MyInfoEngine {
             return components;
         }
 
-        // Build selectable entry list using ActionList
-        let items: Vec<ActionListItem> = self
-            .own_fields
-            .iter()
-            .map(|f| {
-                let groups_str = if f.visible_groups.is_empty() {
-                    String::new()
-                } else {
-                    format!("[{}]", f.visible_groups.join(", "))
-                };
-                let contacts_str = if f.contact_count > 0 {
-                    format!("{} contacts", f.contact_count)
-                } else {
-                    String::new()
-                };
-                let detail = match (groups_str.is_empty(), contacts_str.is_empty()) {
-                    (true, true) => None,
-                    (false, true) => Some(groups_str),
-                    (true, false) => Some(contacts_str),
-                    (false, false) => Some(format!("{groups_str} {contacts_str}")),
-                };
-                ActionListItem {
-                    id: f.field_id.clone(),
-                    label: format!("{} ({})", f.value, f.label),
-                    icon: Some(f.field_type.clone()),
-                    detail,
-                    a11y: None,
-                    info_key: None,
-                }
-            })
-            .collect();
-
-        components.push(Component::ActionList {
+        components.push(Component::List {
             id: "own_entries".into(),
-            items,
+            items: self.own_fields.iter().map(|f| self.entry_item(f)).collect(),
+            searchable: false,
+            total_count: 0,
+            offset: 0,
+            window: 0,
         });
 
         components
@@ -378,8 +400,8 @@ impl MyInfoEngine {
 
     fn build_actions(&self) -> Vec<ScreenAction> {
         let view_label = match &self.view_mode {
-            MyInfoViewMode::EntryView => "Group View",
-            MyInfoViewMode::GroupView { .. } => "Entry View",
+            MyInfoViewMode::EntryView => self.t("my_info.group_view_button"),
+            MyInfoViewMode::GroupView { .. } => self.t("my_info.entry_view_button"),
             MyInfoViewMode::PreviewAs { .. } => unreachable!("handled above"),
         };
 
@@ -397,28 +419,12 @@ impl MyInfoEngine {
             });
         }
 
+        // Canvas order: the two view switches above the entries, Add Entry
+        // as the closing action.
         actions.extend([
             ScreenAction {
-                id: "add_field".into(),
-                label: if at_field_limit {
-                    format!(
-                        "Field limit reached ({})",
-                        vauchi_core::contact_card::MAX_FIELDS
-                    )
-                } else {
-                    "Add Entry".into()
-                },
-                style: if self.show_exchange_prompt {
-                    ActionStyle::Secondary
-                } else {
-                    ActionStyle::Primary
-                },
-                enabled: !at_field_limit,
-                a11y: None,
-            },
-            ScreenAction {
                 id: "toggle_view".into(),
-                label: view_label.into(),
+                label: view_label,
                 style: ActionStyle::Secondary,
                 enabled: true,
                 a11y: None,
@@ -428,6 +434,25 @@ impl MyInfoEngine {
                 label: self.t("my_info.preview_as_button"),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
+            },
+            ScreenAction {
+                id: "add_field".into(),
+                label: if at_field_limit {
+                    get_string_with_args(
+                        self.locale,
+                        "my_info.field_limit_reached",
+                        &[("count", &vauchi_core::contact_card::MAX_FIELDS.to_string())],
+                    )
+                } else {
+                    self.t("my_info.add_entry_button")
+                },
+                style: if self.show_exchange_prompt {
+                    ActionStyle::Secondary
+                } else {
+                    ActionStyle::Primary
+                },
+                enabled: !at_field_limit,
                 a11y: None,
             },
         ]);
@@ -507,7 +532,7 @@ impl WorkflowEngine for MyInfoEngine {
         ScreenModel {
             screen_id: "my_info".into(),
             title: self.display_name.clone(),
-            subtitle: None,
+            subtitle: Some(self.sharing_summary()),
             components,
             contextual_actions: actions,
             progress: None,

@@ -119,6 +119,7 @@ impl AppEngine {
                                     value: f.value().to_string(),
                                     visible_groups,
                                     contact_count: visible_contact_ids.len(),
+                                    shown: card.is_field_shown(f.id()),
                                 }
                             })
                             .collect();
@@ -144,7 +145,7 @@ impl AppEngine {
                     })
                     .collect();
 
-                let has_contacts = vauchi.contact_count().unwrap_or(0) > 0;
+                let contact_count = vauchi.contact_count().unwrap_or(0);
                 let pending_updates = vauchi.pending_update_count().unwrap_or(0);
                 let last_sync_seconds = vauchi.last_sync_time();
                 let now_seconds = vauchi.clock().unix_seconds();
@@ -153,7 +154,8 @@ impl AppEngine {
                         .with_locale(render_context.resolved_locale())
                         .with_own_card(display_name, own_fields)
                         .with_groups(group_tabs)
-                        .with_exchange_prompt(!has_contacts)
+                        .with_contact_count(contact_count)
+                        .with_exchange_prompt(contact_count == 0)
                         .with_avatar_data(avatar_data)
                         .with_pending_updates(pending_updates)
                         .with_last_sync_seconds(last_sync_seconds)

@@ -102,10 +102,6 @@ fn test_my_info_omits_last_sync_caption_when_none() {
     let engine = MyInfoEngine::new(MyInfoProgress::default()).with_now_seconds(1_700_000_000);
     let screen = engine.current_screen();
     assert!(caption_content(&screen, "last_sync_caption").is_none());
-    assert!(
-        screen.subtitle.is_none(),
-        "the sharing summary is owner-only and must not leak into the preview"
-    );
 }
 
 // @internal
@@ -125,6 +121,10 @@ fn test_my_info_preview_mode_omits_sync_status_captions() {
         "PreviewAs renders the card as the contact sees it — owner-only sync status must not leak"
     );
     assert!(caption_content(&screen, "last_sync_caption").is_none());
+    assert!(
+        screen.subtitle.is_none(),
+        "the sharing summary is owner-only and must not leak into the preview"
+    );
 }
 
 fn own_field(id: &str, value: &str, label: &str, groups: &[&str], shown: bool) -> OwnFieldInfo {

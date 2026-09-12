@@ -81,7 +81,7 @@ fn test_default_shows_their_info() {
     let has_toggle = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::ToggleList { id, .. } if id == "view_mode"));
+        .any(|c| matches!(c, Component::Dropdown { id, .. } if id == "view_mode"));
     assert!(!has_toggle, "Should not show toggle without shared info");
 }
 
@@ -99,7 +99,7 @@ fn test_with_shared_info_shows_toggle() {
     let has_toggle = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::ToggleList { id, .. } if id == "view_mode"));
+        .any(|c| matches!(c, Component::Dropdown { id, .. } if id == "view_mode"));
     assert!(
         has_toggle,
         "Should show toggle when shared info is available"
@@ -117,7 +117,7 @@ fn test_toggle_to_my_info_shows_shared_name() {
     );
 
     // Switch to MyInfoForThem
-    let result = engine.handle_action(UserAction::ItemToggled {
+    let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "view_mode".into(),
         item_id: "my_info_for_them".into(),
     });
@@ -148,7 +148,7 @@ fn test_toggle_to_my_info_shows_my_fields() {
         String::new(),
     );
 
-    let _ = engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "view_mode".into(),
         item_id: "my_info_for_them".into(),
     });
@@ -177,11 +177,11 @@ fn test_toggle_back_to_their_info() {
     );
 
     // Switch to MyInfoForThem then back
-    let _ = engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "view_mode".into(),
         item_id: "my_info_for_them".into(),
     });
-    let _ = engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "view_mode".into(),
         item_id: "their_info".into(),
     });
@@ -189,6 +189,45 @@ fn test_toggle_back_to_their_info() {
     assert_eq!(engine.view_mode(), &ContactViewMode::TheirInfo);
     let screen = engine.current_screen();
     assert_eq!(screen.title, "Alice");
+}
+
+// @internal
+#[test]
+fn test_perspective_choice_selects_current_mode() {
+    // One exclusive Choice per perspective pair (ADR-066): the shell draws
+    // a segmented control from the options and Core owns the selection.
+    let mut engine = ContactDetailEngine::with_shared_info(
+        sample_contact(),
+        sample_fields(),
+        sample_shared_info(),
+        String::new(),
+    );
+    let perspective = |engine: &ContactDetailEngine| {
+        engine
+            .current_screen()
+            .components
+            .into_iter()
+            .find(|c| matches!(c, Component::Dropdown { id, .. } if id == "view_mode"))
+            .expect("perspective choice present")
+    };
+    let Component::Dropdown {
+        selected, options, ..
+    } = perspective(&engine)
+    else {
+        unreachable!()
+    };
+    assert_eq!(selected.as_deref(), Some("their_info"));
+    let ids: Vec<&str> = options.iter().map(|o| o.id.as_str()).collect();
+    assert_eq!(ids, vec!["their_info", "my_info_for_them"]);
+
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "view_mode".into(),
+        item_id: "my_info_for_them".into(),
+    });
+    let Component::Dropdown { selected, .. } = perspective(&engine) else {
+        unreachable!()
+    };
+    assert_eq!(selected.as_deref(), Some("my_info_for_them"));
 }
 
 // @internal

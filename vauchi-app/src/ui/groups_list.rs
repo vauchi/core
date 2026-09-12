@@ -345,7 +345,7 @@ mod tests {
         let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
         assert_eq!(engine.mode(), &GroupsMode::Members);
 
-        let result = engine.handle_action(UserAction::ItemToggled {
+        let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "mode_toggle".into(),
             item_id: "visibility".into(),
         });
@@ -357,7 +357,7 @@ mod tests {
     fn test_mode_toggle_switches_to_members() {
         let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Visibility);
 
-        let _ = engine.handle_action(UserAction::ItemToggled {
+        let _ = engine.handle_action(UserAction::ListItemSelected {
             component_id: "mode_toggle".into(),
             item_id: "members".into(),
         });
@@ -369,16 +369,20 @@ mod tests {
         let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
         let screen = engine.current_screen();
 
-        let toggle = screen
+        // One exclusive Choice for the Members/Visibility pair (ADR-066):
+        // the shell draws a segmented control, Core owns the selection.
+        let Some(Component::Dropdown {
+            selected, options, ..
+        }) = screen
             .components
             .iter()
-            .find(|c| matches!(c, Component::ToggleList { id, .. } if id == "mode_toggle"))
-            .expect("should have mode toggle");
-        if let Component::ToggleList { items, .. } = toggle {
-            assert_eq!(items.len(), 2);
-            assert!(items[0].selected); // Members selected
-            assert!(!items[1].selected); // Visibility not selected
-        }
+            .find(|c| matches!(c, Component::Dropdown { id, .. } if id == "mode_toggle"))
+        else {
+            panic!("should have mode choice");
+        };
+        assert_eq!(selected.as_deref(), Some("members"));
+        let ids: Vec<&str> = options.iter().map(|o| o.id.as_str()).collect();
+        assert_eq!(ids, vec!["members", "visibility"]);
     }
 
     #[test]

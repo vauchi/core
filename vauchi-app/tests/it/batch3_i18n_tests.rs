@@ -35,7 +35,7 @@ fn sample_groups() -> Vec<GroupInfo> {
     }]
 }
 
-/// The groups-list view-mode toggle label.
+/// The groups-list view-mode choice label.
 fn groups_view_mode_label(locale: Locale) -> String {
     GroupsEngine::new(sample_groups(), GroupsMode::Members)
         .with_locale(locale)
@@ -43,10 +43,10 @@ fn groups_view_mode_label(locale: Locale) -> String {
         .components
         .iter()
         .find_map(|c| match c {
-            vauchi_app::ui::Component::ToggleList { label, .. } => Some(label.clone()),
+            vauchi_app::ui::Component::Dropdown { label, .. } => Some(label.clone()),
             _ => None,
         })
-        .expect("groups list renders a ToggleList")
+        .expect("groups list renders a view-mode choice")
 }
 
 /// Every screen title in this batch, for one locale.

@@ -10,12 +10,33 @@ pub mod seed;
 use vauchi_app::ui::{
     AppEngine, AppScreen, FormDialogType, RenderContext, ScreenCatalogEntry, ScreenCatalogFixture,
 };
+use vauchi_core::exchange::capability::types::{BiometricType, DeviceCapabilities, Platform};
 use vauchi_core::exchange::mode::ExchangeMode;
-use vauchi_core::{Command, PresentationNode, Vauchi};
+use vauchi_core::types::AudioCapability;
+use vauchi_core::{Command, Event, PresentationNode, SurfaceId, Vauchi};
 
 use seed::SeededWorld;
 
 pub const LOCK_PASSWORD: &str = "correct horse battery staple";
+
+/// What a phone shell declares at boot (the iOS `DeviceCapabilitiesPusher`
+/// set): every in-person transport present, no USB data port.
+pub fn phone_capabilities() -> DeviceCapabilities {
+    DeviceCapabilities {
+        has_nfc: true,
+        has_ble: true,
+        has_camera: true,
+        audio: AudioCapability::Full,
+        has_biometrics: true,
+        biometric_type: Some(BiometricType::FaceId),
+        has_secure_enclave: true,
+        platform: Platform::Ios,
+        has_accelerometer: true,
+        has_internet: true,
+        has_usb_port: false,
+        device_name: Some("iPhone".to_owned()),
+    }
+}
 
 /// Loads the bundled English strings plus the real German locale from the
 /// `locales` checkout that sits next to core (CI: `.clone-locales`).
@@ -110,6 +131,10 @@ impl<'a> Recorder<'a> {
         screens: &'a mut Vec<ScreenCatalogEntry>,
     ) -> Recorder<'a> {
         let mut engine = AppEngine::new(vauchi);
+        // A shell pushes its hardware set right after boot (the TUI's
+        // `set_device_capabilities` call, the iOS capabilities pusher);
+        // without it every hardware-gated exchange mode reads as absent.
+        engine.set_device_capabilities(phone_capabilities());
         engine.set_render_context(RenderContext {
             locale: Some(locale.to_owned()),
             theme_id: None,
@@ -161,6 +186,34 @@ impl<'a> Recorder<'a> {
     fn record_variant(&mut self, screen: AppScreen, code_id: &str) {
         self.engine.navigate_to(screen);
         self.record_current(code_id);
+    }
+
+    /// Activate the row carrying `icon_token` on `surface_id` the way a
+    /// shell relays a tap: through the surface's minted interaction id.
+    fn activate_row(&mut self, surface_id: &str, icon_token: &str) {
+        let commands = self
+            .engine
+            .initial_commands()
+            .unwrap_or_else(|error| panic!("{surface_id}: initial commands: {error:?}"));
+        let interaction_id = replaced_surface(&commands, surface_id)
+            .nodes
+            .iter()
+            .filter_map(|node| match node {
+                PresentationNode::List { rows, .. } => Some(rows),
+                _ => None,
+            })
+            .flatten()
+            .find(|row| row.icon_token.as_deref() == Some(icon_token))
+            .and_then(|row| row.activation.as_ref())
+            .unwrap_or_else(|| panic!("{surface_id} has an activatable {icon_token} row"))
+            .interaction_id
+            .clone();
+        self.engine
+            .dispatch(Event::ActionActivated {
+                surface_id: SurfaceId::new(surface_id).expect("surface id"),
+                interaction_id,
+            })
+            .unwrap_or_else(|error| panic!("{surface_id}: activate {icon_token}: {error:?}"));
     }
 }
 
@@ -303,7 +356,11 @@ fn record_empty(locale: &'static str, screens: &mut Vec<ScreenCatalogEntry>) {
     let mut recorder = Recorder::new(seed::identity_only(), locale, screens);
     recorder.record_current("my_info-empty");
     recorder.record_variant(AppScreen::Contacts, "contacts-empty");
-    recorder.record_variant(AppScreen::Exchange, "exchange-no_groups");
+    // The picker collapses every mode but the hero behind "Other ways to
+    // connect"; the catalog shows the full offer, as the design canvas does.
+    recorder.engine.navigate_to(AppScreen::Exchange);
+    recorder.activate_row("exchange", "more");
+    recorder.record_current("exchange-no_groups");
 }
 
 fn record_onboarding(locale: &'static str, screens: &mut Vec<ScreenCatalogEntry>) {

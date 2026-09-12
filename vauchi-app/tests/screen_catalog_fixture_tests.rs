@@ -238,12 +238,12 @@ fn picker_rows(entry: &ScreenCatalogEntry) -> Vec<&PresentationRow> {
         .collect()
 }
 
-// @scenario: exchange :: picker offers only the alpha-reliable modes
 // The catalog is what shells and the design canvas are compared against,
 // so the picker must be recorded from a phone's capability set: Glance
 // (QR) leads as the recommended hero and the NFC- and BLE-gated modes are
 // offered as runnable, not "Requires camera, BLE" the way a camera-less
 // engine renders them.
+// @scenario: exchange :: picker offers only the alpha-reliable modes
 #[test]
 fn screen_catalog_exchange_picker_offers_qr_nfc_and_bluetooth_from_a_phone_capability_set() {
     let catalog = checked_in_catalog();

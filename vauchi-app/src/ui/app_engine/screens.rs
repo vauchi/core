@@ -290,8 +290,10 @@ impl AppEngine {
                 render_context.resolved_locale(),
             ),
             AppScreen::Help => Box::new(
-                HelpEngine::new(help_catalog::default_help_items())
-                    .with_locale(render_context.resolved_locale()),
+                HelpEngine::new(help_catalog::default_help_items(
+                    render_context.resolved_locale(),
+                ))
+                .with_locale(render_context.resolved_locale()),
             ),
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(
                 None,

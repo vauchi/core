@@ -2,10 +2,19 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Help & FAQ engine — single screen listing help items grouped by category.
+//! Help & FAQ engine — single screen: a search field over the help
+//! items, grouped into labelled sections (the design canvas's FAQ
+//! HIGHLIGHTS, the remaining questions, and MORE).
 
 use crate::i18n::{Locale, get_string};
 use crate::ui::*;
+
+/// Section ids the catalog files items under. A section whose id is
+/// none of these renders its id verbatim as the header, so ad-hoc
+/// catalogs (tests, content updates) still group.
+pub const SECTION_HIGHLIGHTS: &str = "highlights";
+pub const SECTION_FAQ: &str = "faq";
+pub const SECTION_MORE: &str = "more";
 
 /// A single help/FAQ item.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -13,14 +22,19 @@ use crate::ui::*;
 pub struct HelpItem {
     pub id: String,
     pub question: String,
+    /// One-line description under the question (a MORE row's "what
+    /// happens when you tap"). Serde-defaulted so older catalogs decode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subtitle: Option<String>,
     /// Inline answer text (preferred for TUI / offline use).
     pub answer: Option<String>,
     /// External URL (used by mobile/desktop if no inline answer, or as "Learn more" link).
     pub answer_url: Option<String>,
+    /// Section id; see [`SECTION_HIGHLIGHTS`] and friends.
     pub category: String,
 }
 
-/// Help & FAQ engine — displays help items grouped by category.
+/// Help & FAQ engine — displays help items grouped by section.
 #[derive(Clone, Debug)]
 pub struct HelpEngine {
     items: Vec<HelpItem>,
@@ -62,8 +76,8 @@ impl HelpEngine {
             .collect()
     }
 
-    /// Returns the unique categories from filtered items in first-appearance order.
-    fn categories(&self, filtered: &[&HelpItem]) -> Vec<String> {
+    /// Returns the unique sections from filtered items in first-appearance order.
+    fn sections(&self, filtered: &[&HelpItem]) -> Vec<String> {
         let mut seen = Vec::new();
         for item in filtered {
             if !seen.contains(&item.category) {
@@ -72,43 +86,62 @@ impl HelpEngine {
         }
         seen
     }
+
+    fn section_label(&self, section: &str) -> String {
+        match section {
+            SECTION_HIGHLIGHTS => get_string(self.locale, "help.faq_highlights"),
+            SECTION_FAQ => get_string(self.locale, "help.more_questions"),
+            SECTION_MORE => get_string(self.locale, "help.more"),
+            other => other.to_string(),
+        }
+    }
+
+    fn section(&self, id: &str, filtered: &[&HelpItem]) -> Section {
+        let items = filtered
+            .iter()
+            .filter(|item| item.category == id)
+            .map(|item| ActionListItem {
+                id: item.id.clone(),
+                label: item.question.clone(),
+                icon: None,
+                detail: item.subtitle.clone(),
+                a11y: None,
+                info_key: None,
+            })
+            .collect();
+        Section {
+            id: id.into(),
+            label: self.section_label(id),
+            items,
+        }
+    }
 }
 
 impl WorkflowEngine for HelpEngine {
     fn current_screen(&self) -> ScreenModel {
         let filtered = self.filtered_items();
 
-        let mut components: Vec<Component> = vec![Component::TextInput {
-            id: "help_search".into(),
-            label: get_string(self.locale, "help.search_button"),
-            value: self.search_query.clone(),
-            placeholder: Some(get_string(self.locale, "help.search_placeholder")),
-            max_length: None,
-            validation_error: None,
-            input_type: InputType::Text,
-            a11y: None,
-            info_key: None,
-        }];
-
-        for category in self.categories(&filtered) {
-            let items = filtered
-                .iter()
-                .filter(|item| item.category == category)
-                .map(|item| ActionListItem {
-                    id: item.id.clone(),
-                    label: item.question.clone(),
-                    icon: None,
-                    detail: None,
-                    a11y: None,
-                    info_key: None,
-                })
-                .collect();
-
-            components.push(Component::ActionList {
-                id: category,
-                items,
-            });
-        }
+        let components: Vec<Component> = vec![
+            Component::TextInput {
+                id: "help_search".into(),
+                label: get_string(self.locale, "help.search_button"),
+                value: self.search_query.clone(),
+                placeholder: Some(get_string(self.locale, "help.search_placeholder")),
+                max_length: None,
+                validation_error: None,
+                input_type: InputType::Text,
+                a11y: None,
+                info_key: None,
+            },
+            Component::SectionedActionList {
+                id: "help".into(),
+                sections: self
+                    .sections(&filtered)
+                    .iter()
+                    .map(|id| self.section(id, &filtered))
+                    .collect(),
+            },
+        ];
 
         ScreenModel {
             screen_id: "help".into(),

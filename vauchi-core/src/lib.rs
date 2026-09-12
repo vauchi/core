@@ -24,6 +24,9 @@
 // See `_private/docs/problems/2026-05-21-silent-failures-in-security-paths/`.
 #![warn(clippy::let_underscore_must_use)]
 
+/// The Core crate version, as shown on the Help screen's About row.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub mod clock;
 pub mod monotonic;
 pub mod rng;

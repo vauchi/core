@@ -53,7 +53,7 @@ fn starts_at_identity_check() {
 
 // @internal
 #[test]
-fn identity_check_has_info_panel_and_three_actions() {
+fn identity_check_has_info_panel_one_primary_action_and_the_have_identity_rows() {
     let engine = OnboardingEngine::new();
     let screen = engine.current_screen();
 
@@ -64,22 +64,31 @@ fn identity_check_has_info_panel_and_three_actions() {
             .any(|c| matches!(c, Component::InfoPanel { .. })),
         "IdentityCheck should have an InfoPanel"
     );
-    assert_eq!(screen.contextual_actions.len(), 3);
+    assert_eq!(screen.contextual_actions.len(), 1);
     assert_eq!(screen.contextual_actions[0].id, "create_new");
     assert!(matches!(
         screen.contextual_actions[0].style,
         ActionStyle::Primary
     ));
-    assert_eq!(screen.contextual_actions[1].id, "link_device");
-    assert!(matches!(
-        screen.contextual_actions[1].style,
-        ActionStyle::Secondary
-    ));
-    assert_eq!(screen.contextual_actions[2].id, "load_backup");
-    assert!(matches!(
-        screen.contextual_actions[2].style,
-        ActionStyle::Secondary
-    ));
+    // Link and restore are rows of the "I already have an identity"
+    // list, not secondary actions: secondaries fold into the context
+    // bar's overflow and would hide both entry points.
+    let rows: Vec<&str> = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::SectionedActionList { id, sections } if id == "have_identity_choices" => {
+                Some(
+                    sections
+                        .iter()
+                        .flat_map(|s| s.items.iter().map(|r| r.id.as_str()))
+                        .collect(),
+                )
+            }
+            _ => None,
+        })
+        .expect("welcome lists the have-identity choices");
+    assert_eq!(rows, vec!["link_device", "load_backup"]);
 }
 
 // @internal

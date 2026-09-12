@@ -4,14 +4,13 @@
 
 //! Cross-platform parity contract for the Settings screen.
 //!
-//! G7 of `2026-05-02-ios-humble-ui-deep-retirement`. Both iOS and
-//! Android render the same `ScreenModel` JSON for `AppScreen::Settings`,
-//! so platform-level parity is enforced as
-//! long as core's emitted shape stays stable. These tests pin that
-//! shape: a single canonical group/action list, in a fixed order,
-//! matching what every Humble UI renderer must walk.
+//! G7 of `2026-05-02-ios-humble-ui-deep-retirement`. Every shell renders
+//! the same prepared Settings batch, so platform-level parity is
+//! enforced as long as core's emitted shape stays stable. These tests
+//! pin that shape: a canonical group list, in a fixed order, matching
+//! what every renderer walks.
 //!
-//! Why pin order: the Settings screen is a long scrollable surface;
+//! Why pin order: the Settings screen is a scrollable surface;
 //! re-ordering would change which groups appear above the fold on
 //! every device. The 2026-05-08 device-test campaign (F-MED-3)
 //! reported "Appearance unreachable on iOS" — root cause was a
@@ -25,28 +24,18 @@ use vauchi_app::ui::{
 };
 use vauchi_core::api::Vauchi;
 
-/// The canonical SettingsGroup ids emitted by `SettingsEngine`,
-/// in the order they appear on every Humble UI renderer.
+/// The canonical SettingsGroup ids emitted by `SettingsEngine`, in the
+/// order they appear on every renderer: the three design-canvas
+/// sections. Everything the canvas does not show lives on the
+/// Advanced, Appearance & Language and Accessibility sub-screens.
 ///
-/// Editing this list is a cross-platform shape change — bump the
-/// list intentionally and update both iOS + Android snapshot
-/// expectations in the same MR.
-// M6 D6.1: the everyday-6 main list + the "Advanced…" nav row. Network,
-// delivery, and danger moved to the advanced sub-screen
-// (EXPECTED_ADVANCED_GROUP_IDS). Frontends render SettingsGroups
-// generically (by iterating components, not keyed on group id), so this
-// reorg is pure-core — no per-frontend renderer change.
-const EXPECTED_SETTINGS_GROUP_IDS: &[&str] = &[
-    "profile",
-    "privacy_notifications",
-    "appearance",
-    "accessibility",
-    "security_backup",
-    "help_about",
-    "advanced_nav",
-];
+/// Editing this list is a cross-platform shape change — bump the list
+/// intentionally and regenerate the screen catalog fixture in the same MR.
+const EXPECTED_SETTINGS_GROUP_IDS: &[&str] = &["identity", "privacy", "app"];
 
-const EXPECTED_ADVANCED_GROUP_IDS: &[&str] = &["network", "delivery", "danger"];
+const EXPECTED_ADVANCED_GROUP_IDS: &[&str] = &[
+    "security", "backup", "network", "delivery", "about", "danger",
+];
 
 fn sample_settings_config() -> SettingsConfig {
     SettingsConfig {
@@ -82,6 +71,18 @@ fn sample_settings_config() -> SettingsConfig {
     }
 }
 
+fn group_ids(engine: &SettingsEngine) -> Vec<String> {
+    engine
+        .current_screen()
+        .components
+        .iter()
+        .filter_map(|c| match c {
+            Component::SettingsGroup { id, .. } => Some(id.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
 // @internal
 #[test]
 fn settings_screen_emits_full_group_set_in_stable_order() {
@@ -90,21 +91,12 @@ fn settings_screen_emits_full_group_set_in_stable_order() {
 
     assert_eq!(screen.screen_id, "settings");
     assert_eq!(screen.title, "Settings");
-
-    let actual_group_ids: Vec<&str> = screen
-        .components
-        .iter()
-        .filter_map(|c| match c {
-            Component::SettingsGroup { id, .. } => Some(id.as_str()),
-            _ => None,
-        })
-        .collect();
-
     assert_eq!(
-        actual_group_ids, EXPECTED_SETTINGS_GROUP_IDS,
+        group_ids(&engine),
+        EXPECTED_SETTINGS_GROUP_IDS,
         "SettingsEngine emitted SettingsGroup ids do not match the cross-platform contract. \
-         Editing the canonical list is intentional only when paired with iOS + Android \
-         renderer updates in the same MR."
+         Editing the canonical list is intentional only when paired with a regenerated \
+         screen catalog fixture in the same MR."
     );
 }
 
@@ -112,12 +104,11 @@ fn settings_screen_emits_full_group_set_in_stable_order() {
 #[test]
 fn relay_url_renders_as_link_so_renderers_emit_list_item_selected() {
     // Device regression 2026-06-10: `Value` rows are display-only in
-    // every Humble UI renderer, so the relay-URL editor was unreachable
-    // on mobile even after the persistence fix. The row must be a
-    // `Link` (tappable → `ListItemSelected("relay_url")` → intercept
-    // opens `FormDialogType::EditRelayUrl`), carrying the current URL
-    // as its detail text.
-    // M6 D6.1: network lives on the Advanced sub-screen now.
+    // every renderer, so the relay-URL editor was unreachable on mobile
+    // even after the persistence fix. The row must be a `Link`
+    // (tappable → `ListItemSelected("relay_url")` → intercept opens
+    // `FormDialogType::EditRelayUrl`), carrying the current URL as its
+    // detail text. Network lives on the Advanced sub-screen.
     let engine = SettingsEngine::new_advanced(sample_settings_config());
     let screen = engine.current_screen();
 
@@ -130,13 +121,13 @@ fn relay_url_renders_as_link_so_renderers_emit_list_item_selected() {
         })
         .expect("advanced settings screen must emit a network group");
 
-    let relay_item = network_items
+    let item = network_items
         .iter()
         .find(|i| i.id == "relay_url")
         .expect("network group must contain the relay_url item");
 
     assert_eq!(
-        relay_item.kind,
+        item.kind,
         SettingsItemKind::Link {
             detail: Some("https://relay.test".into())
         },
@@ -146,8 +137,8 @@ fn relay_url_renders_as_link_so_renderers_emit_list_item_selected() {
 
 // @internal
 #[test]
-fn settings_screen_emits_theme_and_language_dropdowns() {
-    let engine = SettingsEngine::new(sample_settings_config());
+fn appearance_screen_emits_theme_and_language_dropdowns() {
+    let engine = SettingsEngine::new_appearance(sample_settings_config());
     let screen = engine.current_screen();
 
     let dropdown_ids: Vec<&str> = screen
@@ -162,54 +153,31 @@ fn settings_screen_emits_theme_and_language_dropdowns() {
     assert_eq!(
         dropdown_ids,
         vec!["theme", "language"],
-        "Settings screen must surface Theme + Language as inline Dropdowns. \
-         Both iOS and Android render `Component::Dropdown` exhaustively, so \
-         dropping either here makes ADR-038 theme/language picks unreachable \
-         on every Humble UI frontend."
+        "The Appearance & Language screen must surface Theme + Language as inline \
+         Dropdowns; dropping either makes ADR-038 theme/language picks unreachable."
     );
+    assert_eq!(group_ids(&engine), vec!["appearance"]);
 }
 
 // @internal
 #[test]
-fn settings_screen_appearance_and_danger_groups_present() {
-    // Appearance stays on the main screen; danger + emergency_wipe moved
-    // to the Advanced sub-screen (M6 D6.1). Both must still exist so the
-    // F-MED-3 cross-platform divergence can't recur — just on the right
-    // surface now.
-    let main_json =
-        serde_json::to_string(&SettingsEngine::new(sample_settings_config()).current_screen())
-            .expect("main settings screen must serialize");
-    assert!(
-        main_json.contains("\"appearance\""),
-        "main Settings JSON missing `appearance`"
-    );
-
-    let advanced_json = serde_json::to_string(
-        &SettingsEngine::new_advanced(sample_settings_config()).current_screen(),
-    )
-    .expect("advanced settings screen must serialize");
+fn advanced_screen_emits_its_group_set_with_danger_last() {
+    let advanced = SettingsEngine::new_advanced(sample_settings_config());
+    let advanced_json = serde_json::to_string(&advanced.current_screen())
+        .expect("advanced settings screen must serialize");
     for required in ["\"danger\"", "\"emergency_wipe\""] {
         assert!(
             advanced_json.contains(required),
             "advanced Settings JSON missing `{required}`"
         );
     }
-
-    // The advanced sub-screen carries exactly the rare/technical groups.
-    let advanced_group_ids: Vec<String> = SettingsEngine::new_advanced(sample_settings_config())
-        .current_screen()
-        .components
-        .iter()
-        .filter_map(|c| match c {
-            Component::SettingsGroup { id, .. } => Some(id.clone()),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(advanced_group_ids, EXPECTED_ADVANCED_GROUP_IDS);
+    assert_eq!(group_ids(&advanced), EXPECTED_ADVANCED_GROUP_IDS);
+    assert_eq!(
+        group_ids(&SettingsEngine::new_accessibility(sample_settings_config())),
+        vec!["accessibility"]
+    );
 }
 
-// M6 D6.1: the "Advanced…" row on the main screen navigates to the
-// advanced sub-screen (network + delivery + emergency wipe).
 // @internal
 #[test]
 fn settings_advanced_link_navigates_to_advanced_subscreen() {
@@ -219,7 +187,7 @@ fn settings_advanced_link_navigates_to_advanced_subscreen() {
     let _ = engine.navigate_to(AppScreen::Settings);
 
     let result = engine.handle_action(vauchi_app::ui::UserAction::ListItemSelected {
-        component_id: "advanced_nav".into(),
+        component_id: "app".into(),
         item_id: "advanced".into(),
     });
     match result {
@@ -233,33 +201,11 @@ fn settings_advanced_link_navigates_to_advanced_subscreen() {
 
 // @internal
 #[test]
-fn settings_screen_about_version_renders_non_empty_semver() {
-    // Regression for 2026-05-10 device-test campaign F-005:
-    // `61b01b2b` (chore: bump core 0.50.0 → 0.51.0) landed at
-    // 10:05 on 2026-05-08, and `5645efa2` (fix: render Settings
-    // "Version" row with binding semver) landed 5h46m later at
-    // 15:51. The published vauchi-platform 0.51.0 binding therefore
-    // does not contain the fix, and every clean install of the
-    // shipped app renders an empty Version row — re-verified
-    // 2026-05-10 on Pixel 3a + Samsung S7 + iPhone SE clean
-    // installs.
-    //
-    // The fix is now on core/main; this test guards against any
-    // future refactor of `app_engine/screens.rs:238` silently
-    // re-emptying `SettingsConfig.version`. We don't use
-    // `sample_settings_config()` (which seeds a fake "0.0.0-test")
-    // — the production construction site sets `env!("CARGO_PKG_VERSION")`
-    // and we assert the rendered screen reflects that.
-    // Drive the **production construction site** at
-    // `app_engine/screens.rs:238`, not a synthetic SettingsConfig.
-    // A test that builds its own SettingsConfig with a populated
-    // `version` field would silently pass even if `screens.rs:238`
-    // regressed back to `version: String::new()` — exactly the
-    // regression shape we want to prevent.
+fn settings_advanced_about_version_renders_non_empty_semver() {
     let mut vauchi = Vauchi::in_memory().expect("Vauchi::in_memory must succeed");
     vauchi.create_identity("Alice").expect("create_identity");
     let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAdvanced);
     let screen = engine.current_screen();
     let json = serde_json::to_string(&screen).expect("settings screen must serialize");
 
@@ -271,8 +217,8 @@ fn settings_screen_about_version_renders_non_empty_semver() {
     );
     assert!(
         json.contains(pkg_version),
-        "AppEngine-rendered Settings screen must include the binding semver \
-         `{pkg_version}`. If this fails, `app_engine/screens.rs:238` \
+        "AppEngine-rendered Advanced settings screen must include the binding semver \
+         `{pkg_version}`. If this fails, `app_engine/screens.rs` \
          `version: env!(\"CARGO_PKG_VERSION\").into()` was either dropped \
          (regressing to the F-005 empty-Version-row state) or the SettingsEngine \
          no longer renders the value. Fix at the construction site, not here. \
@@ -283,27 +229,22 @@ fn settings_screen_about_version_renders_non_empty_semver() {
 // @internal
 #[test]
 fn display_name_renders_as_link_so_renderers_emit_list_item_selected() {
-    // Orphan handler (2026-04-06-display-name-rename-fails, reopened): the rename
-    // handler (`intercept.rs`, `ListItemSelected{display_name}` → `EditName`
-    // dialog) is unreachable while the row is a display-only `Value` — every
-    // Humble UI renderer makes `Value` non-tappable. The row must be a `Link`
-    // carrying the current name as detail, so the renderer emits the action.
     let engine = SettingsEngine::new(sample_settings_config());
     let screen = engine.current_screen();
 
-    let profile_items = screen
+    let identity_items = screen
         .components
         .iter()
         .find_map(|c| match c {
-            Component::SettingsGroup { id, items, .. } if id == "profile" => Some(items),
+            Component::SettingsGroup { id, items, .. } if id == "identity" => Some(items),
             _ => None,
         })
-        .expect("settings screen must emit a profile group");
+        .expect("settings screen must emit an identity group");
 
-    let item = profile_items
+    let item = identity_items
         .iter()
         .find(|i| i.id == "display_name")
-        .expect("profile group must contain the display_name item");
+        .expect("identity group must contain the display_name item");
 
     assert_eq!(
         item.kind,
@@ -317,21 +258,17 @@ fn display_name_renders_as_link_so_renderers_emit_list_item_selected() {
 // @internal
 #[test]
 fn backup_reminders_renders_as_link_so_renderers_emit_list_item_selected() {
-    // Same orphan class: the backup-reminder-frequency cycle handler
-    // (`settings.rs`, `ListItemSelected{backup_reminders}`) is unreachable while
-    // the row is a `Value`. It must be a tappable `Link`.
-    let engine = SettingsEngine::new(sample_settings_config());
+    let engine = SettingsEngine::new_advanced(sample_settings_config());
     let screen = engine.current_screen();
 
-    // M6 S1b: backup items live in the merged security_backup group.
     let backup_items = screen
         .components
         .iter()
         .find_map(|c| match c {
-            Component::SettingsGroup { id, items, .. } if id == "security_backup" => Some(items),
+            Component::SettingsGroup { id, items, .. } if id == "backup" => Some(items),
             _ => None,
         })
-        .expect("settings screen must emit a security_backup group");
+        .expect("advanced settings screen must emit a backup group");
 
     let item = backup_items
         .iter()

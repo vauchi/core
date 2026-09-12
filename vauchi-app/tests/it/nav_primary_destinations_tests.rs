@@ -45,6 +45,8 @@ enum Route {
     ContactsAction(&'static str),
     /// A row on the Settings screen.
     SettingsRow(&'static str),
+    /// A row on the Advanced settings sub-screen.
+    AdvancedSettingsRow(&'static str),
 }
 
 /// Every screen `available_screens` reaches that the nav no longer offers,
@@ -61,7 +63,7 @@ const DEMOTED_SCREEN_ROUTES: &[(&str, Route)] = &[
     ("recovery", Route::SettingsRow("recovery")),
     ("backup", Route::SettingsRow("backup_export")),
     ("privacy", Route::SettingsRow("privacy")),
-    ("support", Route::SettingsRow("support")),
+    ("support", Route::AdvancedSettingsRow("support")),
     ("help", Route::SettingsRow("help_center")),
     ("activity_log", Route::SettingsRow("activity_log")),
 ];
@@ -86,6 +88,11 @@ fn follow(route: Route) -> (ActionResult, AppScreen) {
     let (mut engine, action) = match route {
         Route::SettingsRow(item_id) => {
             let mut engine = engine_on(AppScreen::Settings);
+            let action = settings_row_action(&mut engine, item_id);
+            (engine, action)
+        }
+        Route::AdvancedSettingsRow(item_id) => {
+            let mut engine = engine_on(AppScreen::SettingsAdvanced);
             let action = settings_row_action(&mut engine, item_id);
             (engine, action)
         }

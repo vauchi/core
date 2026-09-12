@@ -111,23 +111,17 @@ fn main_settings_rows_reduce_to_list_item_selected() {
     assert_rows_reduce_to_list_item_selected(
         &engine,
         &[
-            ("profile", "display_name"),
-            ("profile", "edit_profile"),
-            ("security_backup", "change_password"),
-            ("security_backup", "devices"),
-            ("security_backup", "duress_pin"),
-            ("security_backup", "decoy_contacts"),
-            ("security_backup", "backup_export"),
-            ("security_backup", "backup_import"),
-            ("security_backup", "setup_new_device"),
-            ("security_backup", "last_backup"),
-            ("security_backup", "backup_reminders"),
-            ("help_about", "help_center"),
-            ("help_about", "funding"),
-            ("help_about", "privacy_policy"),
-            ("help_about", "what_is_vauchi"),
-            ("help_about", "version"),
-            ("advanced_nav", "advanced"),
+            ("identity", "display_name"),
+            ("identity", "edit_profile"),
+            ("identity", "devices"),
+            ("identity", "backup_export"),
+            ("identity", "recovery"),
+            ("privacy", "privacy"),
+            ("privacy", "activity_log"),
+            ("app", "appearance"),
+            ("app", "accessibility"),
+            ("app", "help_center"),
+            ("app", "advanced"),
         ],
     );
 }
@@ -139,9 +133,18 @@ fn advanced_settings_rows_reduce_to_list_item_selected() {
     assert_rows_reduce_to_list_item_selected(
         &engine,
         &[
+            ("security", "change_password"),
+            ("security", "duress_pin"),
+            ("security", "decoy_contacts"),
+            ("security", "setup_new_device"),
+            ("backup", "backup_reminders"),
             ("network", "relay_url"),
             ("delivery", "pending_updates"),
             ("delivery", "failed_deliveries"),
+            ("about", "what_is_vauchi"),
+            ("about", "funding"),
+            ("about", "support"),
+            ("about", "version"),
             ("danger", "emergency_wipe"),
         ],
     );
@@ -174,7 +177,7 @@ fn tapping_edit_profile_navigates_to_my_info() {
 // @internal
 #[test]
 fn tapping_change_password_navigates_to_change_password() {
-    let mut engine = engine_on(AppScreen::Settings);
+    let mut engine = engine_on(AppScreen::SettingsAdvanced);
     let result = tap_row(&mut engine, "change_password");
     assert!(
         matches!(result, ActionResult::NavigateTo(_)),
@@ -198,7 +201,7 @@ fn tapping_backup_export_navigates_to_backup_screen() {
 // @internal
 #[test]
 fn tapping_funding_opens_supporters_url() {
-    let mut engine = engine_on(AppScreen::Settings);
+    let mut engine = engine_on(AppScreen::SettingsAdvanced);
     let result = tap_row(&mut engine, "funding");
     assert!(
         matches!(
@@ -280,7 +283,7 @@ fn advanced_tapping_emergency_wipe_shows_inline_confirm() {
 // @internal
 #[test]
 fn tapping_what_is_vauchi_shows_info_overlay() {
-    let mut engine = engine_on(AppScreen::Settings);
+    let mut engine = engine_on(AppScreen::SettingsAdvanced);
     let result = tap_row(&mut engine, "what_is_vauchi");
     assert!(
         matches!(
@@ -297,7 +300,7 @@ fn tapping_what_is_vauchi_shows_info_overlay() {
 // @internal
 #[test]
 fn tapping_backup_reminders_cycles_frequency() {
-    let mut engine = engine_on(AppScreen::Settings);
+    let mut engine = engine_on(AppScreen::SettingsAdvanced);
     let _ = tap_row(&mut engine, "backup_reminders");
     let screen = engine.current_screen();
     let detail = screen
@@ -325,9 +328,9 @@ fn tapping_backup_reminders_cycles_frequency() {
 // @internal
 #[test]
 fn tapping_version_value_row_stays_on_settings() {
-    let mut engine = engine_on(AppScreen::Settings);
+    let mut engine = engine_on(AppScreen::SettingsAdvanced);
     let _ = tap_row(&mut engine, "version");
-    assert_eq!(*engine.current_app_screen(), AppScreen::Settings);
+    assert_eq!(*engine.current_app_screen(), AppScreen::SettingsAdvanced);
 }
 
 /// Legacy (ScreenModel) renderers emit `ListItemSelected` directly; the

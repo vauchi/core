@@ -45,7 +45,7 @@ fn about_overlay_title(language_id: &str) -> String {
     };
     let mut engine = SettingsEngine::new(config);
     let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "help_about".into(),
+        component_id: "about".into(),
         item_id: "what_is_vauchi".into(),
     });
     let ActionResult::ShowInfoOverlay { title, .. } = result else {

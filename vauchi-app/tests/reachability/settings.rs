@@ -56,3 +56,27 @@ fn settings_screen_is_reachable() {
     assert_eq!(engine.current_screen().screen_id, "settings");
     assert_reachability(&engine, &[]);
 }
+
+// @internal
+#[test]
+fn settings_advanced_screen_is_reachable() {
+    let engine = SettingsEngine::new_advanced(config());
+    assert_eq!(engine.current_screen().screen_id, "settings_advanced");
+    assert_reachability(&engine, &[]);
+}
+
+// @internal
+#[test]
+fn settings_appearance_screen_is_reachable() {
+    let engine = SettingsEngine::new_appearance(config());
+    assert_eq!(engine.current_screen().screen_id, "settings_appearance");
+    assert_reachability(&engine, &[]);
+}
+
+// @internal
+#[test]
+fn settings_accessibility_screen_is_reachable() {
+    let engine = SettingsEngine::new_accessibility(config());
+    assert_eq!(engine.current_screen().screen_id, "settings_accessibility");
+    assert_reachability(&engine, &[]);
+}

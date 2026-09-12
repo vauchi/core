@@ -31,7 +31,7 @@ fn settings_copy(language_id: &str) -> (String, String, String, String) {
     let engine = SettingsEngine::new(config(language_id));
     let screen = engine.current_screen();
 
-    let Component::SettingsGroup { label, items, .. } = find_group(&screen.components, "profile")
+    let Component::SettingsGroup { label, items, .. } = find_group(&screen.components, "identity")
     else {
         unreachable!()
     };
@@ -39,14 +39,13 @@ fn settings_copy(language_id: &str) -> (String, String, String, String) {
     let edit_profile = items[1].label.clone();
 
     // M6 S1b: privacy merged with notifications.
-    let Component::SettingsGroup { label, .. } =
-        find_group(&screen.components, "privacy_notifications")
-    else {
+    let Component::SettingsGroup { label, .. } = find_group(&screen.components, "privacy") else {
         unreachable!()
     };
     let privacy_label = label.clone();
 
-    let theme = screen
+    let appearance = SettingsEngine::new_appearance(config(language_id)).current_screen();
+    let theme = appearance
         .components
         .iter()
         .find(|c| matches!(c, Component::Dropdown { id, .. } if id == "theme"))
@@ -90,10 +89,10 @@ fn settings_profile_groups_english_copy_unchanged() {
     let engine = SettingsEngine::new(config(""));
     let screen = engine.current_screen();
 
-    let Component::SettingsGroup { label, items, .. } = find_group(&screen.components, "profile")
+    let Component::SettingsGroup { label, items, .. } = find_group(&screen.components, "identity")
     else {
         unreachable!()
     };
-    assert_eq!(label, "Profile");
-    assert_eq!(items[1].label, "Edit Profile");
+    assert_eq!(label, "My identity");
+    assert_eq!(items[1].label, "My Contact Info");
 }

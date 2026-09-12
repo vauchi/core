@@ -24,7 +24,7 @@ fn engine_with_identity() -> AppEngine {
 }
 
 fn dropdown_selected(engine: &mut AppEngine, dropdown_id: &str) -> Option<String> {
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAppearance);
     let screen = engine.current_screen();
     screen
         .components
@@ -112,7 +112,7 @@ fn theme_dropdown_selection_updates_render_context() {
     // retired; the frontend owns persistence (UserDefaults /
     // SharedPreferences) and pushes back via setRenderContextJson.
     let mut engine = engine_with_identity();
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAppearance);
     assert_eq!(engine.render_context().theme_id, None);
 
     let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -132,7 +132,7 @@ fn theme_dropdown_selection_updates_render_context() {
 #[test]
 fn language_dropdown_selection_updates_render_context() {
     let mut engine = engine_with_identity();
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAppearance);
     assert_eq!(engine.render_context().locale, None);
 
     let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -154,7 +154,7 @@ fn follow_system_selection_clears_render_context_field() {
         locale: Some("de".to_string()),
         theme_id: Some("cyber".to_string()),
     });
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAppearance);
 
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "theme".to_string(),

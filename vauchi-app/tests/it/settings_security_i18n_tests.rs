@@ -33,8 +33,7 @@ fn security_copy(language_id: &str) -> (String, String, String, String) {
     let screen = engine.current_screen();
 
     // M6 S1b: security merged with backup.
-    let Component::SettingsGroup { label, items, .. } =
-        find_group(&screen.components, "security_backup")
+    let Component::SettingsGroup { label, items, .. } = find_group(&screen.components, "identity")
     else {
         unreachable!()
     };
@@ -95,12 +94,11 @@ fn settings_security_groups_english_copy_unchanged() {
     let screen = engine.current_screen();
     assert_eq!(screen.title, "Settings");
 
-    let Component::SettingsGroup { label, items, .. } =
-        find_group(&screen.components, "security_backup")
+    let Component::SettingsGroup { label, items, .. } = find_group(&screen.components, "identity")
     else {
         unreachable!()
     };
-    assert_eq!(label, "Security & Backup");
+    assert_eq!(label, "My identity");
     let devices_item = items.iter().find(|i| i.id == "devices").unwrap();
     assert_eq!(
         devices_item.kind,

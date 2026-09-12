@@ -96,7 +96,7 @@ impl Projection {
                     .map(|item| PresentationNode::Status {
                         id: None,
                         title: item.title.clone(),
-                        detail: Some(item.detail.clone()),
+                        detail: (!item.detail.is_empty()).then(|| item.detail.clone()),
                         icon_token: item.icon.clone(),
                         badge: None,
                         tone: PresentationTone::Neutral,

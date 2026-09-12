@@ -441,6 +441,11 @@ pub enum Command {
     SetAuthenticationRequirement {
         requirement: AuthenticationRequirement,
     },
+    /// Run the platform biometric prompt (LAContext, BiometricPrompt) for
+    /// the lock screen's biometric unlock action. Success arrives as
+    /// [`Event::BiometricUnlockSucceeded`]; a shell without the hardware
+    /// answers [`Event::HardwareUnavailable`].
+    RequestBiometricUnlock,
 }
 
 /// Authentication state the native startup shell must present.
@@ -617,6 +622,7 @@ impl Command {
             Self::ResetApplication => "ResetApplication",
             Self::PostNotification { .. } => "PostNotification",
             Self::SetAuthenticationRequirement { .. } => "SetAuthenticationRequirement",
+            Self::RequestBiometricUnlock => "RequestBiometricUnlock",
         }
     }
 }

@@ -297,8 +297,14 @@ impl AppEngine {
     }
 
     pub fn set_device_capabilities(&mut self, caps: DeviceCapabilities) {
+        // The live engine takes the update in place (only the lock screen
+        // consumes it today); a rebuild would drop its failed-attempt count.
+        let _ = self
+            .engine
+            .apply_update(crate::ui::EngineUpdate::DeviceCapabilities(caps.clone()));
         self.device_capabilities = caps;
         self.engine_cache.remove(&AppScreen::Exchange);
+        self.engine_cache.remove(&AppScreen::Lock);
     }
 
     /// The transport-readiness ledger (presence × permission) — consult

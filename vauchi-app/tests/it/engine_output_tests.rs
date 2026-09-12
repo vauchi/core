@@ -113,7 +113,12 @@ fn lock_screen_accepts_long_alphanumeric_password() {
     // The rendered entry surface must be a masked password TextInput,
     // NOT a fixed-length PinInput (which caps + forces a numeric keypad).
     let screen = engine.current_screen();
-    match screen.components.first().expect("an input component") {
+    let input = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::TextInput { id, .. } if id == "pin"))
+        .expect("an input component with id 'pin'");
+    match input {
         Component::TextInput { input_type, .. } => assert_eq!(
             *input_type,
             InputType::Password,

@@ -295,6 +295,7 @@ impl AppEngine {
             )),
             AppScreen::Lock => Box::new(
                 LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)
+                    .with_device_capabilities(device_capabilities)
                     .with_locale(render_context.resolved_locale()),
             ),
             AppScreen::DeviceLinking => Box::new(

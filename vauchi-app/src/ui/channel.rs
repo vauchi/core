@@ -147,6 +147,10 @@ pub enum EngineUpdate {
     /// Tags/Places management screens: commit the armed row delete.
     ConfirmPendingDelete,
     MyInfoEntryDetail(MyInfoEntryDetailUpdate),
+    /// The shell reported (or re-reported) its hardware. Pushed into the
+    /// live engine so a screen gated on a capability re-prepares without a
+    /// rebuild that would drop its state (the lock screen's attempt count).
+    DeviceCapabilities(vauchi_core::exchange::capability::types::DeviceCapabilities),
 }
 
 /// Cycle-thread bridge updates for the multi-stage exchange engine.
@@ -375,6 +379,7 @@ impl EngineUpdate {
                 OnboardingUpdate::PushField(_) => "Onboarding::PushField",
             },
             Self::ConfirmPendingDelete => "ConfirmPendingDelete",
+            Self::DeviceCapabilities(_) => "DeviceCapabilities",
             Self::MyInfoEntryDetail(u) => match u {
                 MyInfoEntryDetailUpdate::GroupVisibility { .. } => {
                     "MyInfoEntryDetail::GroupVisibility"

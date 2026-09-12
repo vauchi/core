@@ -648,17 +648,14 @@ fn lock_screen_tracks_failed_attempts() {
     );
 
     let screen = engine.current_screen();
-    let has_validation_error = screen.components.iter().any(|c| {
+    let shows_remaining_attempts = screen.components.iter().any(|c| {
         matches!(
             c,
-            vauchi_app::ui::Component::TextInput {
-                validation_error: Some(_),
-                ..
-            }
+            vauchi_app::ui::Component::StatusIndicator { id, .. } if id == "attempts"
         )
     });
     assert!(
-        has_validation_error,
+        shows_remaining_attempts,
         "lock screen should show remaining attempts after failures"
     );
 }

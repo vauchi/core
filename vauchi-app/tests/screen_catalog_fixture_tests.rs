@@ -10,7 +10,7 @@ use screen_catalog::{
     replaced_surface_ids,
 };
 use vauchi_app::ui::{ScreenCatalogEntry, ScreenCatalogFixture};
-use vauchi_core::Command;
+use vauchi_core::{Command, PresentationNode, PresentationRow};
 
 const REQUIRED_CODE_IDS: [&str; 53] = [
     "onboarding",
@@ -224,4 +224,70 @@ fn screen_catalog_regenerate_shared_fixture() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/screen_catalog_v1.json");
     std::fs::write(path, format!("{json}\n")).expect("write screen catalog fixture");
+}
+
+fn picker_rows(entry: &ScreenCatalogEntry) -> Vec<&PresentationRow> {
+    replaced_surface(&entry.commands, "exchange")
+        .nodes
+        .iter()
+        .filter_map(|node| match node {
+            PresentationNode::List { rows, .. } => Some(rows),
+            _ => None,
+        })
+        .flatten()
+        .collect()
+}
+
+// @scenario: exchange :: picker offers only the alpha-reliable modes
+// The catalog is what shells and the design canvas are compared against,
+// so the picker must be recorded from a phone's capability set: Glance
+// (QR) leads as the recommended hero and the NFC- and BLE-gated modes are
+// offered as runnable, not "Requires camera, BLE" the way a camera-less
+// engine renders them.
+#[test]
+fn screen_catalog_exchange_picker_offers_qr_nfc_and_bluetooth_from_a_phone_capability_set() {
+    let catalog = checked_in_catalog();
+    let entry = catalog
+        .screens
+        .iter()
+        .find(|entry| entry.code_id == "exchange-no_groups")
+        .expect("exchange-no_groups recorded");
+    let rows = picker_rows(entry);
+
+    let hero = rows.first().expect("picker leads with a hero row");
+    assert_eq!(hero.icon_token.as_deref(), Some("qrcode"), "QR leads");
+    assert!(
+        hero.subtitle
+            .as_deref()
+            .is_some_and(|subtitle| subtitle.starts_with("Recommended")),
+        "QR hero is marked recommended, got {:?}",
+        hero.subtitle
+    );
+
+    let icons: BTreeSet<&str> = rows
+        .iter()
+        .filter_map(|row| row.icon_token.as_deref())
+        .collect();
+    for offered in ["qrcode", "nfc", "gesture"] {
+        assert!(
+            icons.contains(offered),
+            "picker offers {offered}, got {icons:?}"
+        );
+    }
+    // A phone has a camera, BLE, NFC, audio and an accelerometer; only the
+    // USB-gated Cable row may still read as unavailable.
+    for row in rows
+        .iter()
+        .filter(|row| row.icon_token.as_deref() != Some("cable"))
+    {
+        assert!(
+            !row.subtitle
+                .as_deref()
+                .unwrap_or_default()
+                .starts_with("Requires"),
+            "{} is gated on hardware a phone has: {:?}",
+            row.title,
+            row.subtitle
+        );
+    }
 }

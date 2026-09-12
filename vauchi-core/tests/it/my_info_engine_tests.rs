@@ -13,6 +13,7 @@ fn sample_own_fields() -> Vec<OwnFieldInfo> {
             value: "+41 79 123 45 67".into(),
             visible_groups: vec!["Family".into()],
             contact_count: 3,
+            shown: false,
         },
         OwnFieldInfo {
             field_id: "f2".into(),
@@ -21,6 +22,7 @@ fn sample_own_fields() -> Vec<OwnFieldInfo> {
             value: "demo@vauchi.app".into(),
             visible_groups: vec![],
             contact_count: 0,
+            shown: true,
         },
     ]
 }

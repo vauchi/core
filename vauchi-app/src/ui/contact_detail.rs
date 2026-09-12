@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Contact detail engine — view a single contact with a toggle between
-//! "their info I can see" and "my info they can see".
+//! Contact detail engine — view a single contact with a perspective
+//! choice between "their info I can see" and "my info they can see".
 
 use std::collections::HashMap;
 
@@ -169,9 +169,9 @@ impl ContactDetailEngine {
     fn build_screen(&self) -> ScreenModel {
         let mut components = Vec::new();
 
-        // Mode toggle — only shown when shared info is available
+        // Perspective choice — only shown when shared info is available
         if self.shared_info.is_some() {
-            components.push(self.perspective_toggle());
+            components.push(self.perspective_choice());
         }
 
         match self.view_mode {
@@ -204,58 +204,28 @@ impl ContactDetailEngine {
         }
     }
 
-    fn perspective_toggle(&self) -> Component {
-        let their_info_selected = self.view_mode == ContactViewMode::TheirInfo;
-        let my_info_selected = self.view_mode == ContactViewMode::MyInfoForThem;
-        let toggle_hint = self.t("onboarding.a11y_toggle_hint");
-        let their_info_label = self.t("contact_detail.their_info_label");
-        let my_info_for_them_label = self.t("contact_detail.my_info_for_them_label");
-        Component::ToggleList {
+    fn perspective_choice(&self) -> Component {
+        let selected = match self.view_mode {
+            ContactViewMode::TheirInfo => "their_info",
+            ContactViewMode::MyInfoForThem => "my_info_for_them",
+        };
+        Component::Dropdown {
             id: "view_mode".into(),
             label: self.t("contact_detail.perspective_label"),
-            items: vec![
-                ToggleItem {
+            selected: Some(selected.into()),
+            options: vec![
+                DropdownOption {
                     id: "their_info".into(),
-                    label: their_info_label.clone(),
-                    selected: their_info_selected,
-                    subtitle: Some(self.t("contact_detail.their_info_subtitle")),
-                    a11y: Some(A11y {
-                        label: Some(format!(
-                            "{their_info_label}, {}",
-                            if their_info_selected {
-                                self.t("onboarding.a11y_selected")
-                            } else {
-                                self.t("onboarding.a11y_not_selected")
-                            }
-                        )),
-                        hint: Some(toggle_hint.clone()),
-                        role: Some(AccessibilityRole::Toggle),
-                    }),
-                    info_key: None,
+                    label: self.t("contact_detail.their_info_label"),
                 },
-                ToggleItem {
+                DropdownOption {
                     id: "my_info_for_them".into(),
-                    label: my_info_for_them_label.clone(),
-                    selected: my_info_selected,
-                    subtitle: Some(self.t("contact_detail.my_info_for_them_subtitle")),
-                    a11y: Some(A11y {
-                        label: Some(format!(
-                            "{my_info_for_them_label}, {}",
-                            if my_info_selected {
-                                self.t("onboarding.a11y_selected")
-                            } else {
-                                self.t("onboarding.a11y_not_selected")
-                            }
-                        )),
-                        hint: Some(toggle_hint),
-                        role: Some(AccessibilityRole::Toggle),
-                    }),
-                    info_key: None,
+                    label: self.t("contact_detail.my_info_for_them_label"),
                 },
             ],
             a11y: Some(A11y {
                 label: Some(self.t("contact_detail.perspective_options_a11y")),
-                hint: Some(self.t("contact_detail.select_items_hint")),
+                hint: None,
                 role: None,
             }),
         }
@@ -666,8 +636,8 @@ impl WorkflowEngine for ContactDetailEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
-            // View mode toggle
-            UserAction::ItemToggled {
+            // Perspective choice (one exclusive Choice node, ADR-066)
+            UserAction::ListItemSelected {
                 component_id,
                 item_id,
             } if component_id == "view_mode" => {

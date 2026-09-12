@@ -111,8 +111,8 @@ impl GroupsEngine {
             });
         }
 
-        // Mode toggle (radio-style: only one selected at a time)
-        components.push(self.mode_toggle());
+        // Mode choice (one exclusive Choice node, ADR-066)
+        components.push(self.mode_choice());
 
         // Group list with mode-dependent detail text
         let items: Vec<ActionListItem> = self
@@ -181,60 +181,28 @@ impl GroupsEngine {
         }
     }
 
-    fn mode_toggle(&self) -> Component {
-        let members_selected = self.mode == GroupsMode::Members;
-        let visibility_selected = self.mode == GroupsMode::Visibility;
-        let selected_suffix = self.t("onboarding.a11y_selected");
-        let not_selected_suffix = self.t("onboarding.a11y_not_selected");
-        let toggle_hint = self.t("onboarding.a11y_toggle_hint");
-        Component::ToggleList {
+    fn mode_choice(&self) -> Component {
+        let selected = match self.mode {
+            GroupsMode::Members => "members",
+            GroupsMode::Visibility => "visibility",
+        };
+        Component::Dropdown {
             id: "mode_toggle".into(),
             label: self.t("groups_list.view_mode_label"),
-            items: vec![
-                ToggleItem {
+            selected: Some(selected.into()),
+            options: vec![
+                DropdownOption {
                     id: "members".into(),
                     label: self.t("group_detail.members_label"),
-                    selected: members_selected,
-                    subtitle: Some(self.t("groups_list.members_subtitle")),
-                    a11y: Some(A11y {
-                        label: Some(format!(
-                            "{}, {}",
-                            self.t("group_detail.members_label"),
-                            if members_selected {
-                                &selected_suffix
-                            } else {
-                                &not_selected_suffix
-                            }
-                        )),
-                        hint: Some(toggle_hint.clone()),
-                        role: Some(AccessibilityRole::Toggle),
-                    }),
-                    info_key: None,
                 },
-                ToggleItem {
+                DropdownOption {
                     id: "visibility".into(),
                     label: self.t("groups_list.visibility_mode_label"),
-                    selected: visibility_selected,
-                    subtitle: Some(self.t("groups_list.visibility_subtitle")),
-                    a11y: Some(A11y {
-                        label: Some(format!(
-                            "{}, {}",
-                            self.t("groups_list.visibility_mode_label"),
-                            if visibility_selected {
-                                &selected_suffix
-                            } else {
-                                &not_selected_suffix
-                            }
-                        )),
-                        hint: Some(toggle_hint),
-                        role: Some(AccessibilityRole::Toggle),
-                    }),
-                    info_key: None,
                 },
             ],
             a11y: Some(A11y {
                 label: Some(self.t("groups_list.view_mode_options_a11y")),
-                hint: Some(self.t("contact_detail.select_items_hint")),
+                hint: None,
                 role: None,
             }),
         }
@@ -248,8 +216,8 @@ impl WorkflowEngine for GroupsEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
-            // Mode toggle: switch between Members and Visibility
-            UserAction::ItemToggled {
+            // Mode choice: switch between Members and Visibility
+            UserAction::ListItemSelected {
                 component_id,
                 item_id,
             } if component_id == "mode_toggle" => {

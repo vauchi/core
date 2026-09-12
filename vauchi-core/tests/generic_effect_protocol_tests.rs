@@ -33,6 +33,7 @@ fn generic_shell_effects_round_trip_without_domain_results() {
         },
         Command::PerformNativeBack,
         Command::ResetApplication,
+        Command::RequestBiometricUnlock,
     ];
 
     let encoded = serde_json::to_vec(&commands).expect("serialize generic effects");

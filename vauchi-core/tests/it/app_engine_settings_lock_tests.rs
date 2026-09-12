@@ -12,6 +12,7 @@ use vauchi_core::api::Vauchi;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::exchange::capability::types::{BiometricType, DeviceCapabilities};
 
 // ── settings toggle persistence tests (HIGH-4) ──────────────────────
 
@@ -688,4 +689,33 @@ fn lock_screen_correct_pin_after_failed_attempt_unlocks() {
         "correct PIN after failed attempt should navigate to home"
     );
     assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
+}
+
+// @internal
+#[test]
+fn lock_screen_gains_biometric_unlock_once_the_shell_reports_the_capability() {
+    let mut engine = engine_with_password("123456");
+    assert_eq!(engine.current_app_screen(), &AppScreen::Lock);
+    assert!(
+        !engine
+            .current_screen()
+            .contextual_actions
+            .iter()
+            .any(|a| a.id == "unlock_biometric"),
+        "no biometric offer before the shell reports the hardware"
+    );
+
+    engine.set_device_capabilities(DeviceCapabilities {
+        has_biometrics: true,
+        biometric_type: Some(BiometricType::FaceId),
+        ..Default::default()
+    });
+
+    let screen = engine.current_screen();
+    let action = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "unlock_biometric")
+        .expect("the capability event must re-prepare the lock screen");
+    assert_eq!(action.label, "Unlock with Face ID");
 }

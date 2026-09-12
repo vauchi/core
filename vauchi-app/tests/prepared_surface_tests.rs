@@ -656,6 +656,46 @@ fn a_spoken_panel_label_is_not_promoted_to_visible_copy() {
     );
 }
 
+/// A glyph row supplies a spoken title and no prose. Projecting the empty
+/// detail as `Some("")` made every shell paint a blank second line under
+/// the lock screen's lock glyph.
+// @internal
+#[test]
+fn an_item_without_detail_projects_no_detail_line() {
+    let screen = ScreenModel::new(
+        "lock_screen",
+        "Vauchi is Locked",
+        vec![Component::InfoPanel {
+            id: "lock_glyph".into(),
+            icon: Some("lock".into()),
+            title: "".into(),
+            items: vec![InfoItem {
+                icon: Some("lock".into()),
+                title: "Locked".into(),
+                detail: "".into(),
+            }],
+            a11y: None,
+        }],
+        vec![],
+    );
+    let prepared = PreparedSurface::from_screen(SurfaceId::new("lock_screen").unwrap(), 1, &screen)
+        .expect("supported generic projection");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("surface projection must be atomic");
+    };
+    let PresentationNode::Group { children, .. } = &surface.nodes[0] else {
+        panic!("expected a Group node, got {:?}", surface.nodes[0]);
+    };
+    let PresentationNode::Status {
+        detail, icon_token, ..
+    } = &children[0]
+    else {
+        panic!("expected a Status row, got {:?}", children[0]);
+    };
+    assert_eq!(icon_token.as_deref(), Some("lock"));
+    assert_eq!(detail, &None, "an empty detail is no detail");
+}
+
 /// The component id is a wire identifier. Falling back to it put
 /// `decommission_info` where a heading goes, in every language.
 // @scenario: generic_presentation_protocol.feature :: A panel without a title shows no heading

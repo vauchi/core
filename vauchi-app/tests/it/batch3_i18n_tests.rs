@@ -216,7 +216,7 @@ fn batch3_english_copy_unchanged() {
     );
     assert_eq!(
         LockScreenEngine::new(5).current_screen().title,
-        "Enter Password"
+        "Vauchi is Locked"
     );
     assert_eq!(
         DuplicateDetectionEngine::new(vec![]).current_screen().title,

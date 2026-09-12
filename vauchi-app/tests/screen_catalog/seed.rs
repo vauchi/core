@@ -101,7 +101,17 @@ fn exchanged_contact(name: &str, phone: &str, website: &str) -> Contact {
     )
 }
 
-fn seed_own_card(vauchi: &Vauchi) -> String {
+/// Own-card field ids the seed grants visibility on once the groups exist.
+struct OwnFieldIds {
+    mobile: String,
+    home: String,
+    birthday: String,
+}
+
+/// Adds the own-card entries and shows the contact-facing ones to everyone.
+/// The address and birthday stay off the public base; the groups grant
+/// them once they exist (see `grant_group_visibility`).
+fn seed_own_card(vauchi: &Vauchi) -> OwnFieldIds {
     for entry in [
         field(FieldType::Phone, "mobile", "+44 20 7946 0958"),
         field(FieldType::Email, "work", "ada@analytical.example.org"),
@@ -122,13 +132,29 @@ fn seed_own_card(vauchi: &Vauchi) -> String {
             .map(|entry| entry.id().to_owned())
             .expect("seeded own field")
     };
-    vauchi
-        .set_own_field_private(&field_id("home"))
-        .expect("private address");
-    vauchi
-        .set_own_field_private(&field_id("birthday"))
-        .expect("private birthday");
-    field_id("mobile")
+    for label in ["mobile", "work", "homepage"] {
+        vauchi
+            .set_own_field_public(&field_id(label))
+            .expect("public own field");
+    }
+    OwnFieldIds {
+        mobile: field_id("mobile"),
+        home: field_id("home"),
+        birthday: field_id("birthday"),
+    }
+}
+
+/// Home address to Family only; birthday to Family and Cycling club.
+fn grant_group_visibility(vauchi: &Vauchi, own: &OwnFieldIds, family: &str, cycling: &str) {
+    for (group_id, field_id) in [
+        (family, &own.home),
+        (family, &own.birthday),
+        (cycling, &own.birthday),
+    ] {
+        vauchi
+            .set_group_field_visibility(group_id, field_id, true)
+            .expect("group grant");
+    }
 }
 
 /// Identity plus own-card entries only — the "filled my info, empty
@@ -141,7 +167,7 @@ pub fn identity_only() -> Vauchi {
 
 pub fn seeded_world() -> SeededWorld {
     let vauchi = identity_only();
-    let own_phone_field_id = seed_own_card(&vauchi);
+    let own_fields = seed_own_card(&vauchi);
 
     let contacts: Vec<SeededContact> = CONTACTS
         .iter()
@@ -175,6 +201,7 @@ pub fn seeded_world() -> SeededWorld {
             .add_contact_to_group(cycling.id(), &contacts[index].id)
             .expect("cycling member");
     }
+    grant_group_visibility(&vauchi, &own_fields, family.id(), cycling.id());
 
     vauchi
         .verify_contact_fingerprint(&contacts[0].id)
@@ -187,6 +214,6 @@ pub fn seeded_world() -> SeededWorld {
         vauchi,
         contacts,
         family_group_id: family.id().to_owned(),
-        own_phone_field_id,
+        own_phone_field_id: own_fields.mobile,
     }
 }

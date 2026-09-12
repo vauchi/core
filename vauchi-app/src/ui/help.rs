@@ -121,27 +121,29 @@ impl WorkflowEngine for HelpEngine {
     fn current_screen(&self) -> ScreenModel {
         let filtered = self.filtered_items();
 
-        let components: Vec<Component> = vec![
-            Component::TextInput {
-                id: "help_search".into(),
-                label: get_string(self.locale, "help.search_button"),
-                value: self.search_query.clone(),
-                placeholder: Some(get_string(self.locale, "help.search_placeholder")),
-                max_length: None,
-                validation_error: None,
-                input_type: InputType::Text,
-                a11y: None,
-                info_key: None,
-            },
-            Component::SectionedActionList {
+        let mut components: Vec<Component> = vec![Component::TextInput {
+            id: "help_search".into(),
+            label: get_string(self.locale, "help.search_button"),
+            value: self.search_query.clone(),
+            placeholder: Some(get_string(self.locale, "help.search_placeholder")),
+            max_length: None,
+            validation_error: None,
+            input_type: InputType::Text,
+            a11y: None,
+            info_key: None,
+        }];
+
+        let sections: Vec<Section> = self
+            .sections(&filtered)
+            .iter()
+            .map(|id| self.section(id, &filtered))
+            .collect();
+        if !sections.is_empty() {
+            components.push(Component::SectionedActionList {
                 id: "help".into(),
-                sections: self
-                    .sections(&filtered)
-                    .iter()
-                    .map(|id| self.section(id, &filtered))
-                    .collect(),
-            },
-        ];
+                sections,
+            });
+        }
 
         ScreenModel {
             screen_id: "help".into(),

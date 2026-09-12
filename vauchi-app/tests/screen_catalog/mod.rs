@@ -125,13 +125,24 @@ impl<'a> Recorder<'a> {
         }
     }
 
+    /// Shells write `<code_id>.png`, so a non-English capture of a screen
+    /// carries its locale in the code_id (`contacts-de`) rather than
+    /// sharing the English stem.
+    fn unique_code_id(&self, code_id: &str) -> String {
+        if self.locale == "en" {
+            code_id.to_owned()
+        } else {
+            format!("{code_id}-{}", self.locale)
+        }
+    }
+
     fn record_current(&mut self, code_id: &str) {
         let commands = self
             .engine
             .initial_commands()
             .unwrap_or_else(|error| panic!("{code_id}: initial commands: {error:?}"));
         let entry = ScreenCatalogEntry {
-            code_id: code_id.to_owned(),
+            code_id: self.unique_code_id(code_id),
             title: String::new(),
             locale: self.locale.to_owned(),
             commands,

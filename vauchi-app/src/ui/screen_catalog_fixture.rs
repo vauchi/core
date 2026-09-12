@@ -45,7 +45,9 @@ pub struct ScreenCatalogFixture {
 pub struct ScreenCatalogEntry {
     /// The screen's [`super::AppScreen::screen_id`], suffixed with
     /// `-<variant>` when the same screen is captured in several states
-    /// (for example `contacts-empty` next to `contacts`).
+    /// (for example `contacts-empty` next to `contacts`) and with
+    /// `-<locale>` for non-English captures (`contacts-de`). Unique across
+    /// the catalog: shells use it as the PNG file stem.
     pub code_id: String,
     /// The rendered surface title, duplicated here for quick lookup.
     pub title: String,

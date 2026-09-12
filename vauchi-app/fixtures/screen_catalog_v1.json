@@ -65,6 +65,81 @@
                       "description": null
                     }
                   }
+                },
+                {
+                  "Group": {
+                    "id": "have_identity_choices",
+                    "label": null,
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "List": {
+                          "id": "have_identity_choices.have_identity",
+                          "label": "I already have an identity",
+                          "rows": [
+                            {
+                              "title": "Link this device",
+                              "subtitle": "Use your other signed-in device to invite this one.",
+                              "detail": null,
+                              "icon_token": "devices",
+                              "image_data": null,
+                              "fallback_text": null,
+                              "selected": false,
+                              "enabled": true,
+                              "activation": {
+                                "interaction_id": "surface.1.interaction.0",
+                                "label": "Link this device",
+                                "accessibility_label": "Link this device",
+                                "icon_token": null,
+                                "enabled": true,
+                                "shortcut": null
+                              },
+                              "secondary_actions": [],
+                              "controls": [],
+                              "accessibility": {
+                                "label": "Link this device",
+                                "description": null
+                              }
+                            },
+                            {
+                              "title": "Restore from backup",
+                              "subtitle": "The password you set when you exported the backup.",
+                              "detail": null,
+                              "icon_token": "lock",
+                              "image_data": null,
+                              "fallback_text": null,
+                              "selected": false,
+                              "enabled": true,
+                              "activation": {
+                                "interaction_id": "surface.1.interaction.1",
+                                "label": "Restore from backup",
+                                "accessibility_label": "Restore from backup",
+                                "icon_token": null,
+                                "enabled": true,
+                                "shortcut": null
+                              },
+                              "secondary_actions": [],
+                              "controls": [],
+                              "accessibility": {
+                                "label": "Restore from backup",
+                                "description": null
+                              }
+                            }
+                          ],
+                          "searchable": false,
+                          "paging": null,
+                          "accessibility": {
+                            "label": "I already have an identity",
+                            "description": null
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    }
+                  }
                 }
               ]
             }
@@ -92,14 +167,7 @@
                 "enabled": true,
                 "shortcut": "activate_primary"
               },
-              "secondary": {
-                "interaction_id": "surface.1.context.presentation.secondary",
-                "label": "Actions",
-                "accessibility_label": "Actions",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": null
-              }
+              "secondary": null
             }
           }
         },
@@ -20015,6 +20083,81 @@
                       "description": null
                     }
                   }
+                },
+                {
+                  "Group": {
+                    "id": "have_identity_choices",
+                    "label": null,
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "List": {
+                          "id": "have_identity_choices.have_identity",
+                          "label": "Ich habe bereits eine Identität",
+                          "rows": [
+                            {
+                              "title": "Dieses Gerät verknüpfen",
+                              "subtitle": "Nutze dein anderes angemeldetes Gerät, um dieses einzuladen.",
+                              "detail": null,
+                              "icon_token": "devices",
+                              "image_data": null,
+                              "fallback_text": null,
+                              "selected": false,
+                              "enabled": true,
+                              "activation": {
+                                "interaction_id": "surface.1.interaction.0",
+                                "label": "Dieses Gerät verknüpfen",
+                                "accessibility_label": "Dieses Gerät verknüpfen",
+                                "icon_token": null,
+                                "enabled": true,
+                                "shortcut": null
+                              },
+                              "secondary_actions": [],
+                              "controls": [],
+                              "accessibility": {
+                                "label": "Dieses Gerät verknüpfen",
+                                "description": null
+                              }
+                            },
+                            {
+                              "title": "Aus Sicherung wiederherstellen",
+                              "subtitle": "Das Passwort, das du beim Exportieren der Sicherung festgelegt hast.",
+                              "detail": null,
+                              "icon_token": "lock",
+                              "image_data": null,
+                              "fallback_text": null,
+                              "selected": false,
+                              "enabled": true,
+                              "activation": {
+                                "interaction_id": "surface.1.interaction.1",
+                                "label": "Aus Sicherung wiederherstellen",
+                                "accessibility_label": "Aus Sicherung wiederherstellen",
+                                "icon_token": null,
+                                "enabled": true,
+                                "shortcut": null
+                              },
+                              "secondary_actions": [],
+                              "controls": [],
+                              "accessibility": {
+                                "label": "Aus Sicherung wiederherstellen",
+                                "description": null
+                              }
+                            }
+                          ],
+                          "searchable": false,
+                          "paging": null,
+                          "accessibility": {
+                            "label": "Ich habe bereits eine Identität",
+                            "description": null
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    }
+                  }
                 }
               ]
             }
@@ -20042,14 +20185,7 @@
                 "enabled": true,
                 "shortcut": "activate_primary"
               },
-              "secondary": {
-                "interaction_id": "surface.1.context.presentation.secondary",
-                "label": "Actions",
-                "accessibility_label": "Actions",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": null
-              }
+              "secondary": null
             }
           }
         },

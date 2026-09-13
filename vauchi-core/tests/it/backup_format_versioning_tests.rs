@@ -8,6 +8,7 @@
 //! Tests version detection, migration, and corruption detection for identity backups.
 
 use vauchi_core::Identity;
+use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::identity::{IdentityBackup, IdentityError};
 
 /// Backup format version byte for v2 (Argon2id + XChaCha20).
@@ -455,5 +456,78 @@ fn test_backup_import_creates_identical_signing_keys() {
         clone_a.public_id(),
         identity.public_id(),
         "Clones have the same identity as the original"
+    );
+}
+
+// =============================================================================
+// =============================================================================
+
+/// Tests that an exported identity backup keeps its key material encrypted.
+///
+/// The master seed is the whole secret: every keypair derives from it, so a
+/// backup that carried it in the clear would hand an attacker the identity
+/// while still looking like a valid encrypted file.
+///
+/// Feature: backup_format_versioning.feature
+/// Scenario: Identity backup carries no plaintext key material
+// @scenario: backup_format_versioning :: Identity backup carries no plaintext key material
+#[test]
+fn v2_backup_encrypts_the_seed_and_leaks_no_key_material() {
+    let identity = Identity::create("Seed Keeper", 0);
+    let password = "SecureP@ssw0rd!2024";
+    let seed = *identity.master_seed();
+
+    let backup = identity.export_backup(password).unwrap();
+    let bytes = backup.as_bytes();
+    assert_eq!(bytes[0], BACKUP_VERSION_V2, "backup should be v2");
+
+    // Positive control: the same scan finds the seed when it *is* present,
+    // so a clean result below means "absent", not "scan broken".
+    let planted: Vec<u8> = bytes.iter().copied().chain(seed).collect();
+    assert!(
+        planted.windows(seed.len()).any(|w| w == seed),
+        "the scan must be able to find a seed that is present"
+    );
+
+    // "no plaintext key material should appear in the backup file"
+    assert!(
+        !bytes.windows(seed.len()).any(|w| w == seed),
+        "master seed appears verbatim in the backup file"
+    );
+
+    // "the backup should contain the encrypted master seed"
+    let restored = Identity::import_backup(&backup, password, 0).unwrap();
+    assert_eq!(
+        restored.master_seed(),
+        &seed,
+        "the encrypted seed must round-trip byte-for-byte"
+    );
+
+    // "all keypairs should be re-derivable from the seed"
+    assert_eq!(
+        restored.signing_public_key(),
+        identity.signing_public_key(),
+        "signing keypair must re-derive from the seed"
+    );
+    assert_eq!(
+        restored.exchange_public_key(),
+        identity.exchange_public_key(),
+        "exchange keypair must re-derive from the seed"
+    );
+    assert_eq!(
+        SigningKeyPair::from_seed(&seed).public_key().as_bytes(),
+        identity.signing_public_key(),
+        "the seed alone must reproduce the signing keypair"
+    );
+
+    // The restored private half really works — not just matching public bytes.
+    let message = b"restored identities must be able to sign";
+    let signature = restored.sign(message);
+    assert!(
+        identity
+            .signing_keypair()
+            .public_key()
+            .verify(message, &signature),
+        "a signature from the restored identity must verify against the original key"
     );
 }

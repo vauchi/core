@@ -249,7 +249,7 @@ fn appearance_sub_screen_carries_theme_language_and_help_icons() {
     );
 }
 
-// @scenario: accessibility :: Accessibility toggles live on their own sub-screen
+// @scenario: accessibility :: In-app accessibility settings
 #[test]
 fn accessibility_sub_screen_carries_the_motion_and_touch_toggles() {
     let screen = SettingsEngine::new_accessibility(config()).current_screen();
@@ -365,7 +365,7 @@ fn appearance_and_accessibility_rows_open_their_sub_screens() {
     }
 }
 
-// @scenario: accessibility :: Accessibility toggles live on their own sub-screen
+// @scenario: accessibility :: In-app accessibility settings
 #[test]
 fn accessibility_toggle_on_its_sub_screen_persists_to_config() {
     let mut engine = engine_with_identity();

@@ -150,7 +150,7 @@ fn make_contact_with_avatar(name: &str) -> Contact {
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 /// Round-trip with identity only (no contacts, no own card, no labels).
-// @scenario: backup_format_versioning :: Restore v2 backup with correct password
+// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
 #[test]
 fn v3_roundtrip_identity_only() {
     let id_data = test_identity_data();
@@ -219,7 +219,7 @@ fn v3_backup_size_with_avatars_under_target() {
 }
 
 /// Round-trip with mixed contacts (exchanged + imported).
-// @scenario: backup_format_versioning :: Restore v2 backup with correct password
+// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
 #[test]
 fn v3_roundtrip_with_contacts() {
     let id_data = test_identity_data();
@@ -257,7 +257,7 @@ fn v3_roundtrip_with_contacts() {
 }
 
 /// Own card survives the round-trip.
-// @scenario: backup_format_versioning :: Restore v2 backup with correct password
+// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
 #[test]
 fn v3_roundtrip_with_own_card() {
     let id_data = test_identity_data();
@@ -279,7 +279,7 @@ fn v3_roundtrip_with_own_card() {
 }
 
 /// Labels survive the round-trip.
-// @scenario: backup_format_versioning :: Restore v2 backup with correct password
+// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
 #[test]
 fn v3_roundtrip_with_labels() {
     let id_data = test_identity_data();

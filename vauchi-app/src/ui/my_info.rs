@@ -33,6 +33,12 @@ pub struct OwnFieldInfo {
     pub shown: bool,
 }
 
+const VIEW_MODE_SWITCH: &str = "view_mode";
+const VIEW_ENTRIES: &str = "entries";
+const VIEW_GROUPS: &str = "groups";
+const PREVIEW_AS_ROW: &str = "preview_as";
+const PREVIEW_AS_PICKER: &str = "preview-as-picker";
+
 /// View mode for the MyInfo screen.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -399,12 +405,6 @@ impl MyInfoEngine {
     }
 
     fn build_actions(&self) -> Vec<ScreenAction> {
-        let view_label = match &self.view_mode {
-            MyInfoViewMode::EntryView => self.t("my_info.group_view_button"),
-            MyInfoViewMode::GroupView { .. } => self.t("my_info.entry_view_button"),
-            MyInfoViewMode::PreviewAs { .. } => unreachable!("handled above"),
-        };
-
         let at_field_limit = self.own_fields.len() >= vauchi_core::contact_card::MAX_FIELDS;
         let mut actions = Vec::new();
 
@@ -419,44 +419,61 @@ impl MyInfoEngine {
             });
         }
 
-        // Canvas order: the two view switches above the entries, Add Entry
-        // as the closing action.
-        actions.extend([
-            ScreenAction {
-                id: "toggle_view".into(),
-                label: view_label,
-                style: ActionStyle::Secondary,
-                enabled: true,
-                a11y: None,
+        actions.push(ScreenAction {
+            id: "add_field".into(),
+            label: if at_field_limit {
+                get_string_with_args(
+                    self.locale,
+                    "my_info.field_limit_reached",
+                    &[("count", &vauchi_core::contact_card::MAX_FIELDS.to_string())],
+                )
+            } else {
+                self.t("my_info.add_entry_button")
             },
-            ScreenAction {
-                id: "preview-as-picker".into(),
-                label: self.t("my_info.preview_as_button"),
-                style: ActionStyle::Secondary,
-                enabled: true,
-                a11y: None,
+            style: if self.show_exchange_prompt {
+                ActionStyle::Secondary
+            } else {
+                ActionStyle::Primary
             },
-            ScreenAction {
-                id: "add_field".into(),
-                label: if at_field_limit {
-                    get_string_with_args(
-                        self.locale,
-                        "my_info.field_limit_reached",
-                        &[("count", &vauchi_core::contact_card::MAX_FIELDS.to_string())],
-                    )
-                } else {
-                    self.t("my_info.add_entry_button")
-                },
-                style: if self.show_exchange_prompt {
-                    ActionStyle::Secondary
-                } else {
-                    ActionStyle::Primary
-                },
-                enabled: !at_field_limit,
-                a11y: None,
-            },
-        ]);
+            enabled: !at_field_limit,
+            a11y: None,
+        });
         actions
+    }
+
+    fn build_view_switches(&self) -> [Component; 2] {
+        let selected = match self.view_mode {
+            MyInfoViewMode::GroupView { .. } => VIEW_GROUPS,
+            _ => VIEW_ENTRIES,
+        };
+        let option = |id: &str, key: &str| DropdownOption {
+            id: id.into(),
+            label: self.t(key),
+        };
+        let preview_label = self.t("my_info.preview_as_button");
+        [
+            Component::Dropdown {
+                id: VIEW_MODE_SWITCH.into(),
+                label: self.t("my_info.view_mode_label"),
+                selected: Some(selected.into()),
+                options: vec![
+                    option(VIEW_ENTRIES, "my_info.entry_view_button"),
+                    option(VIEW_GROUPS, "my_info.group_view_button"),
+                ],
+                a11y: None,
+            },
+            Component::ActionList {
+                id: PREVIEW_AS_ROW.into(),
+                items: vec![ActionListItem {
+                    id: PREVIEW_AS_PICKER.into(),
+                    label: preview_label,
+                    icon: None,
+                    detail: None,
+                    a11y: None,
+                    info_key: None,
+                }],
+            },
+        ]
     }
 }
 
@@ -519,6 +536,8 @@ impl WorkflowEngine for MyInfoEngine {
             });
         }
 
+        components.extend(self.build_view_switches());
+
         components.extend(match &self.view_mode {
             MyInfoViewMode::EntryView => self.build_entry_view(),
             MyInfoViewMode::GroupView { selected_tab } => self.build_group_view(*selected_tab),
@@ -546,26 +565,26 @@ impl WorkflowEngine for MyInfoEngine {
                 // Signal to AppEngine to navigate to AddField form
                 ActionResult::NavigateTo(self.current_screen())
             }
-            UserAction::ActionPressed { action_id } if action_id == "preview-as-picker" => {
-                // Signal to AppEngine to navigate to the Contacts screen (contact picker)
-                ActionResult::ShowContactPicker
-            }
-            UserAction::ActionPressed { action_id } if action_id == "toggle_view" => {
-                self.view_mode = match &self.view_mode {
-                    MyInfoViewMode::EntryView => MyInfoViewMode::GroupView { selected_tab: 0 },
-                    MyInfoViewMode::GroupView { .. } => MyInfoViewMode::EntryView,
-                    // toggle_view is not available in preview mode — ignore
-                    MyInfoViewMode::PreviewAs { .. } => {
-                        return ActionResult::UpdateScreen(self.current_screen());
-                    }
-                };
-                ActionResult::UpdateScreen(self.current_screen())
-            }
             UserAction::ListItemSelected {
                 component_id,
                 item_id,
             } => {
                 match component_id.as_str() {
+                    PREVIEW_AS_ROW if item_id == PREVIEW_AS_PICKER => {
+                        ActionResult::ShowContactPicker
+                    }
+                    VIEW_MODE_SWITCH => {
+                        match item_id.as_str() {
+                            VIEW_ENTRIES => self.view_mode = MyInfoViewMode::EntryView,
+                            VIEW_GROUPS
+                                if !matches!(self.view_mode, MyInfoViewMode::GroupView { .. }) =>
+                            {
+                                self.view_mode = MyInfoViewMode::GroupView { selected_tab: 0 }
+                            }
+                            _ => {}
+                        }
+                        ActionResult::UpdateScreen(self.current_screen())
+                    }
                     "own_entries" | "group_entries" => {
                         // Entry selected → navigate to entry detail
                         ActionResult::OpenEntryDetail { field_id: item_id }

@@ -66,16 +66,15 @@ fn my_info_title_is_display_name() {
 
 // @internal
 #[test]
-fn my_info_has_add_entry_and_toggle_view_actions() {
+fn my_info_offers_add_entry_as_its_only_context_action() {
     let engine = MyInfoEngine::new(MyInfoProgress::default());
     let screen = engine.current_screen();
-    // Canvas order: Group View, Preview as, then the primary Add Entry.
     let ids: Vec<&str> = screen
         .contextual_actions
         .iter()
         .map(|a| a.id.as_str())
         .collect();
-    assert_eq!(ids, vec!["toggle_view", "preview-as-picker", "add_field"]);
+    assert_eq!(ids, vec!["add_field"]);
 }
 
 // @internal
@@ -105,32 +104,32 @@ fn my_info_empty_fields_shows_hint() {
     assert!(has_hint, "MyInfo without entries should show hint text");
 }
 
+fn selected_view(screen: &ScreenModel) -> Option<String> {
+    screen.components.iter().find_map(|c| match c {
+        Component::Dropdown { id, selected, .. } if id == "view_mode" => selected.clone(),
+        _ => None,
+    })
+}
+
 // @internal
 #[test]
-fn my_info_toggle_view_switches_mode() {
+fn my_info_view_switch_changes_mode() {
     let mut engine = MyInfoEngine::new(MyInfoProgress::default())
         .with_own_card("Demo".into(), sample_own_fields());
-
-    let screen = engine.current_screen();
-    assert!(
-        screen
-            .contextual_actions
-            .iter()
-            .any(|a| a.id == "toggle_view" && a.label == "Group View")
+    assert_eq!(
+        selected_view(&engine.current_screen()).as_deref(),
+        Some("entries")
     );
 
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "toggle_view".into(),
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "view_mode".into(),
+        item_id: "groups".into(),
     });
-    assert!(matches!(result, ActionResult::UpdateScreen(_)));
 
-    let screen = engine.current_screen();
-    assert!(
-        screen
-            .contextual_actions
-            .iter()
-            .any(|a| a.id == "toggle_view" && a.label == "Entry View")
-    );
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("switching views re-renders MyCard, got {result:?}");
+    };
+    assert_eq!(selected_view(&screen).as_deref(), Some("groups"));
 }
 
 // @internal

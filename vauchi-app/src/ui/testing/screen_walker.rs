@@ -201,6 +201,7 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
         | Component::QrCode { .. }
         | Component::Divider
         | Component::ImageCircle { .. }
+        | Component::Image { .. }
         | Component::Slider { .. } => {}
     }
 }

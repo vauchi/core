@@ -296,6 +296,19 @@ impl Projection {
                 })
             }
             Component::Divider => Ok(PresentationNode::Divider),
+            Component::Image {
+                id,
+                image_data,
+                label,
+            } => Ok(PresentationNode::Image {
+                id: Some(BindingId::new(id)?),
+                data: Some(image_data.clone()),
+                fallback_text: Some(label.clone()),
+                shape: PresentationImageShape::Natural,
+                brightness: 0.0,
+                activation: None,
+                accessibility: AccessibilitySpec::label(label),
+            }),
             other => self.remaining_component(other),
         }
     }

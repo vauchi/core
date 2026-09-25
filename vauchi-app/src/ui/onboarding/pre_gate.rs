@@ -15,6 +15,8 @@ fn backup_mime_types() -> Vec<String> {
     vec!["application/octet-stream".into(), "text/plain".into()]
 }
 
+const VAUCHI_MARK_PNG: &[u8] = include_bytes!("../../../assets/vauchi-mark.png");
+
 impl OnboardingEngine {
     pub(super) fn build_identity_check(&self) -> ScreenModel {
         ScreenModel {
@@ -22,6 +24,11 @@ impl OnboardingEngine {
             title: self.t("onboarding.welcome_title"),
             subtitle: Some(self.t("onboarding.welcome_subtitle")),
             components: vec![
+                Component::Image {
+                    id: "vauchi_mark".into(),
+                    image_data: VAUCHI_MARK_PNG.to_vec(),
+                    label: self.t("app.name"),
+                },
                 Component::InfoPanel {
                     id: "identity_check_info".into(),
                     icon: None,

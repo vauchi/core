@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+mod fixture_json;
 mod screen_catalog;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -223,7 +224,11 @@ fn screen_catalog_regenerate_shared_fixture() {
     let json = serde_json::to_string_pretty(&build_catalog()).expect("serialize catalog");
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/screen_catalog_v1.json");
-    std::fs::write(path, format!("{json}\n")).expect("write screen catalog fixture");
+    std::fs::write(
+        path,
+        format!("{}\n", fixture_json::collapse_number_arrays(&json)),
+    )
+    .expect("write screen catalog fixture");
 }
 
 fn picker_rows(entry: &ScreenCatalogEntry) -> Vec<&PresentationRow> {

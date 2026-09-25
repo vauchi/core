@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+mod fixture_json;
+
 use serde::{Deserialize, Serialize};
 use vauchi_app::ui::AppEngine;
 use vauchi_core::{
@@ -205,5 +207,9 @@ fn regenerate_shared_fixture() {
     let json = serde_json::to_string_pretty(&current_fixture()).expect("serialize fixture");
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("fixtures/presentation_contract_v1.json");
-    std::fs::write(path, format!("{json}\n")).expect("write presentation fixture");
+    std::fs::write(
+        path,
+        format!("{}\n", fixture_json::collapse_number_arrays(&json)),
+    )
+    .expect("write presentation fixture");
 }

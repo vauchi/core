@@ -251,6 +251,13 @@ pub enum Component {
         info_key: Option<String>,
     },
     Divider,
+    /// A picture drawn at its own proportions, never cropped to an avatar
+    /// circle. `label` is spoken and stands in wherever pixels cannot.
+    Image {
+        id: String,
+        image_data: Vec<u8>,
+        label: String,
+    },
     /// Informational banner with an optional action button (e.g. preview mode indicator).
     Banner {
         text: String,

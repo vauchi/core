@@ -66,14 +66,6 @@ criteria = "safe-to-deploy"
 version = "1.5.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.aws-lc-rs]]
-version = "1.18.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.aws-lc-sys]]
-version = "0.45.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.blake2]]
 version = "0.10.6"
 criteria = "safe-to-deploy"

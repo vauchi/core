@@ -17,7 +17,9 @@ fn preview_as_row(screen: &ScreenModel) -> Option<&ActionListItem> {
     })
 }
 
-fn view_switch(screen: &ScreenModel) -> Option<(Option<&str>, Vec<(&str, &str)>)> {
+type ViewSwitch<'a> = (Option<&'a str>, Vec<(&'a str, &'a str)>);
+
+fn view_switch(screen: &ScreenModel) -> Option<ViewSwitch<'_>> {
     screen.components.iter().find_map(|c| match c {
         Component::Dropdown {
             id,

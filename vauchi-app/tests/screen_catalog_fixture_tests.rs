@@ -302,7 +302,7 @@ fn my_info_visibility_by_label(entry: &ScreenCatalogEntry) -> BTreeMap<String, S
         .nodes
         .iter()
         .filter_map(|node| match node {
-            PresentationNode::List { rows, .. } => Some(rows),
+            PresentationNode::List { id, rows, .. } if id.as_str() == "own_entries" => Some(rows),
             _ => None,
         })
         .flatten()

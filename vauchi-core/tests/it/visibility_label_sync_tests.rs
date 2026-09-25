@@ -19,6 +19,8 @@ use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
 use vauchi_core::sync::{GroupSyncData, SyncItem};
 
+use crate::common::two_recipient::add_recipient;
+
 // =============================================================================
 // =============================================================================
 
@@ -204,6 +206,38 @@ fn contact_visibility_override_removal_is_journaled_for_linked_devices() {
             }) if contact_id == "contact-bob" && field_id == "field-email"
         ),
         "remove_contact_visibility_override must journal \
+         SyncItem::VisibilityOverrideRemoved for linked devices, got {journal:?}"
+    );
+}
+
+/// The clear that `vauchi contacts clear-override` reaches goes through
+/// `remove_contact_visibility_override_and_repropagate`, which must journal
+/// the removal as well: the six-device E2E caught A1 and A3 keeping an
+/// override A2 cleared (RG-10).
+// @internal
+#[test]
+fn contact_override_removal_with_repropagation_is_journaled_for_linked_devices() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let alice_pk = *vauchi.identity().unwrap().signing_public_key();
+    let bob = add_recipient(&vauchi, &alice_pk, "Bob");
+    let (registry, tablet_id) = link_tablet(&vauchi, [17u8; 32]);
+    vauchi
+        .set_contact_visibility_override(&bob.id_at_sharer, "field-email", true)
+        .unwrap();
+
+    vauchi
+        .remove_contact_visibility_override_and_repropagate(&bob.id_at_sharer, "field-email")
+        .unwrap();
+
+    let journal = journal_for_tablet(&vauchi, registry, &tablet_id);
+    assert!(
+        journal.iter().any(|item| matches!(
+            item,
+            SyncItem::VisibilityOverrideRemoved { contact_id, field_id, .. }
+                if *contact_id == bob.id_at_sharer && field_id == "field-email"
+        )),
+        "remove_contact_visibility_override_and_repropagate must journal \
          SyncItem::VisibilityOverrideRemoved for linked devices, got {journal:?}"
     );
 }

@@ -251,3 +251,51 @@ fn welcome_leads_with_the_spoken_vauchi_mark() {
         "the mark is decoration, not a control"
     );
 }
+
+fn image_size(screen: &ScreenModel) -> Option<u16> {
+    let prepared = PreparedSurface::from_screen(SurfaceId::new("onboarding").unwrap(), 1, screen)
+        .expect("screen projects to a generic surface");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("surface projection must be atomic");
+    };
+    surface
+        .nodes
+        .iter()
+        .find_map(|node| match node {
+            PresentationNode::Image { size, .. } => Some(*size),
+            _ => None,
+        })
+        .expect("screen carries an image")
+}
+
+/// The welcome artboard draws the mark at 88 x 88 on a 390-wide phone.
+/// Without a size, Android and iOS stretched it across the screen and the
+/// web drew it at 48 px (themes `image.hero_size`).
+// @internal
+#[test]
+fn welcome_mark_is_sized_as_the_artboard_draws_it() {
+    assert_eq!(image_size(&welcome()), Some(88));
+}
+
+/// Avatars keep sizing themselves from the touch-target floor, so they
+/// carry no size of their own.
+// @internal
+#[test]
+fn an_avatar_carries_no_image_size() {
+    let avatar = ScreenModel::new(
+        "onboarding",
+        "Avatar",
+        vec![Component::ImageCircle {
+            id: "avatar".into(),
+            image_data: None,
+            initials: "TU".into(),
+            bg_color: None,
+            brightness: 0.0,
+            editable: false,
+            edit_action_id: None,
+            a11y: None,
+        }],
+        vec![],
+    );
+    assert_eq!(image_size(&avatar), None);
+}

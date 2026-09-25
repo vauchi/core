@@ -16,7 +16,7 @@ use vauchi_app::ui::{
     ActionResult, ActionStyle, Component, OnboardingEngine, PreparedSurface, ScreenModel, Section,
     UserAction, WorkflowEngine,
 };
-use vauchi_core::{Command, FilePickPurpose, PresentationNode, SurfaceId};
+use vauchi_core::{Command, FilePickPurpose, PresentationImageShape, PresentationNode, SurfaceId};
 
 const HAVE_IDENTITY_CHOICES: &str = "have_identity_choices";
 
@@ -206,5 +206,48 @@ fn choosing_restore_from_backup_asks_for_the_backup_file() {
             .iter()
             .any(|c| matches!(c, Command::FilePickFromUser { purpose, .. } if *purpose == FilePickPurpose::ImportBackup)),
         "restore starts with picking the backup file; the password entry follows the pick"
+    );
+}
+
+/// The artboard opens onboarding on the Vauchi mark; with the title now
+/// a plain "Welcome", the mark is where the product name appears, so it
+/// must also be spoken.
+// @internal
+#[test]
+fn welcome_leads_with_the_spoken_vauchi_mark() {
+    let prepared =
+        PreparedSurface::from_screen(SurfaceId::new("onboarding").unwrap(), 1, &welcome())
+            .expect("welcome projects to a generic surface");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("surface projection must be atomic");
+    };
+
+    let PresentationNode::Image {
+        data,
+        shape,
+        accessibility,
+        activation,
+        ..
+    } = &surface.nodes[0]
+    else {
+        panic!(
+            "welcome must lead with the mark, got {:?}",
+            surface.nodes[0]
+        );
+    };
+    assert_eq!(
+        *shape,
+        PresentationImageShape::Natural,
+        "a mark is not an avatar crop"
+    );
+    let png = data.as_deref().expect("the mark ships its own pixels");
+    assert!(
+        png.starts_with(b"\x89PNG\r\n\x1a\n"),
+        "the mark is a PNG every shell decodes"
+    );
+    assert_eq!(accessibility.label, "Vauchi");
+    assert!(
+        activation.is_none(),
+        "the mark is decoration, not a control"
     );
 }

@@ -29,9 +29,14 @@ fn walk_onboarding(locale: Locale) -> OnboardingCopy {
     let welcome_title = welcome.title.clone();
     let welcome_subtitle = welcome.subtitle.clone().expect("welcome subtitle present");
     let create_action = action_label(&welcome, "create_new");
-    let Component::InfoPanel { items, .. } = &welcome.components[0] else {
-        panic!("welcome leads with the value-props InfoPanel");
-    };
+    let items = welcome
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::InfoPanel { items, .. } => Some(items),
+            _ => None,
+        })
+        .expect("welcome carries the value-props InfoPanel");
     let first_value_prop = items[0].title.clone();
 
     let _ = engine.handle_action(UserAction::ActionPressed {
@@ -99,7 +104,11 @@ fn onboarding_english_copy_unchanged() {
     let mut engine = OnboardingEngine::new();
 
     let welcome = engine.current_screen();
-    assert_eq!(welcome.title, "Welcome to Vauchi");
+    assert_eq!(welcome.title, "Welcome");
+    assert_eq!(
+        welcome.subtitle.as_deref(),
+        Some("Your contact card, shared in person and kept up to date.")
+    );
     assert_eq!(action_label(&welcome, "create_new"), "Create new identity");
     assert_eq!(row_label(&welcome, "link_device"), "Link this device");
     assert_eq!(row_label(&welcome, "load_backup"), "Restore from backup");

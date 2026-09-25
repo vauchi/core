@@ -42,7 +42,8 @@ const FROZEN_TOKENS_JSON: &str = r##"{
   "font_weight": { "regular": 400, "medium": 500, "semibold": 600, "bold": 700, "extrabold": 800 },
   "focus": { "ring_width": 3, "ring_offset": 2 },
   "motion": { "enter_duration_ms": 200, "exit_duration_ms": 150, "emphasis_duration_ms": 300 },
-  "avatar": { "fallback_bg": "#4682B4" }
+  "avatar": { "fallback_bg": "#4682B4" },
+  "image": { "hero_size": 88 }
 }"##;
 
 fn main() {

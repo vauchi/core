@@ -237,6 +237,7 @@ impl Projection {
             data: image_data.clone(),
             fallback_text: Some(initials.to_owned()),
             shape: PresentationImageShape::Circle,
+            size: None,
             brightness: 0.0,
             activation: None,
             accessibility: accessibility(a11y, name),

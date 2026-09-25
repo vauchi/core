@@ -28,6 +28,7 @@ impl OnboardingEngine {
                     id: "vauchi_mark".into(),
                     image_data: VAUCHI_MARK_PNG.to_vec(),
                     label: self.t("app.name"),
+                    size: Some(crate::theme::DesignTokens::default().image.hero_size),
                 },
                 Component::InfoPanel {
                     id: "identity_check_info".into(),

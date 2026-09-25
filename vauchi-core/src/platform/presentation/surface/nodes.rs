@@ -171,6 +171,13 @@ pub enum PresentationNode {
         data: Option<Vec<u8>>,
         fallback_text: Option<String>,
         shape: PresentationImageShape,
+        /// Square, in logical units, the picture is fitted into with its
+        /// aspect kept and never wider than the space it is given. `None`
+        /// leaves the shell's own sizing (avatars size from the touch
+        /// target). Absent on the wire when `None`, so shells that predate
+        /// it keep decoding.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        size: Option<u16>,
         brightness: f32,
         activation: Option<ActionSpec>,
         accessibility: AccessibilitySpec,

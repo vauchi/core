@@ -257,6 +257,7 @@ pub enum Component {
         id: String,
         image_data: Vec<u8>,
         label: String,
+        size: Option<u16>,
     },
     /// Informational banner with an optional action button (e.g. preview mode indicator).
     Banner {

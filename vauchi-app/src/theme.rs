@@ -141,6 +141,8 @@ pub struct DesignTokens {
     pub focus: FocusTokens,
     #[serde(default)]
     pub avatar: AvatarTokens,
+    #[serde(default)]
+    pub image: ImageTokens,
 }
 
 /// Spacing scale for margins, padding, and gaps.
@@ -374,6 +376,21 @@ impl Default for AvatarTokens {
         Self {
             fallback_bg: "#4682B4".to_string(),
         }
+    }
+}
+
+/// Image sizing in logical units. `hero_size` is the square a screen's
+/// leading picture is fitted into: the onboarding welcome artboard draws
+/// the Vauchi mark at 88.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImageTokens {
+    pub hero_size: u16,
+}
+
+impl Default for ImageTokens {
+    fn default() -> Self {
+        Self { hero_size: 88 }
     }
 }
 

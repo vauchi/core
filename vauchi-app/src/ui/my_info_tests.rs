@@ -10,65 +10,146 @@
 // is module-private and cannot be tested from external tests/.
 use super::*;
 
+fn preview_as_row(screen: &ScreenModel) -> Option<&ActionListItem> {
+    screen.components.iter().find_map(|c| match c {
+        Component::ActionList { id, items } if id == "preview_as" => items.first(),
+        _ => None,
+    })
+}
+
+fn view_switch(screen: &ScreenModel) -> Option<(Option<&str>, Vec<(&str, &str)>)> {
+    screen.components.iter().find_map(|c| match c {
+        Component::Dropdown {
+            id,
+            selected,
+            options,
+            ..
+        } if id == "view_mode" => Some((
+            selected.as_deref(),
+            options
+                .iter()
+                .map(|o| (o.id.as_str(), o.label.as_str()))
+                .collect(),
+        )),
+        _ => None,
+    })
+}
+
+// The MyCard artboard draws Group View and Preview as beside the header;
+// as secondary context actions every shell folded them into the Actions
+// sheet (problems/2026-09-13-device-walk-diverges-from-canvas, plan 2).
 // @internal
 #[test]
-fn test_my_info_has_preview_as_action_in_entry_view() {
-    let engine = MyInfoEngine::new(MyInfoProgress::default());
-    let screen = engine.current_screen();
+fn view_switches_sit_in_the_card_body_not_the_actions_sheet() {
+    for engine in [
+        MyInfoEngine::new(MyInfoProgress::default()),
+        MyInfoEngine::new(MyInfoProgress::default())
+            .with_view_mode(MyInfoViewMode::GroupView { selected_tab: 0 }),
+    ] {
+        let screen = engine.current_screen();
 
-    let action = screen
-        .contextual_actions
-        .iter()
-        .find(|a| a.id == "preview-as-picker");
-    assert!(
-        action.is_some(),
-        "MyInfo (EntryView) should have 'preview-as-picker' action"
-    );
-    assert_eq!(action.unwrap().label, "Preview as...");
+        let ids: Vec<&str> = screen
+            .contextual_actions
+            .iter()
+            .map(|a| a.id.as_str())
+            .collect();
+        assert_eq!(ids, ["add_field"]);
+        let preview = preview_as_row(&screen).expect("Preview as is a body row");
+        assert_eq!(
+            (preview.id.as_str(), preview.label.as_str()),
+            ("preview-as-picker", "Preview as...")
+        );
+    }
 }
 
 // @internal
 #[test]
-fn test_my_info_has_preview_as_action_in_group_view() {
-    let engine = MyInfoEngine::new(MyInfoProgress::default())
-        .with_view_mode(MyInfoViewMode::GroupView { selected_tab: 0 });
-    let screen = engine.current_screen();
+fn the_view_switch_offers_entry_and_group_view_with_the_current_one_selected() {
+    let entry = MyInfoEngine::new(MyInfoProgress::default()).current_screen();
+    assert_eq!(
+        view_switch(&entry),
+        Some((
+            Some("entries"),
+            vec![("entries", "Entry View"), ("groups", "Group View")]
+        ))
+    );
 
-    let action = screen
-        .contextual_actions
-        .iter()
-        .find(|a| a.id == "preview-as-picker");
-    assert!(
-        action.is_some(),
-        "MyInfo (GroupView) should have 'preview-as-picker' action"
+    let group = MyInfoEngine::new(MyInfoProgress::default())
+        .with_view_mode(MyInfoViewMode::GroupView { selected_tab: 0 })
+        .current_screen();
+    assert_eq!(
+        view_switch(&group).map(|(selected, _)| selected),
+        Some(Some("groups"))
     );
 }
 
 // @internal
 #[test]
-fn test_my_info_preview_mode_has_no_preview_as_picker_action() {
-    let engine =
-        MyInfoEngine::new(MyInfoProgress::default()).with_view_mode(MyInfoViewMode::PreviewAs {
-            contact_name: "Alice".into(),
-        });
-    let screen = engine.current_screen();
-
-    let action = screen
-        .contextual_actions
-        .iter()
-        .find(|a| a.id == "preview-as-picker");
-    assert!(
-        action.is_none(),
-        "MyInfo in PreviewAs mode should NOT have 'preview-as-picker' action"
-    );
-}
-
-// @internal
-#[test]
-fn test_preview_as_picker_returns_show_contact_picker() {
+fn choosing_a_view_switches_between_entries_and_groups() {
     let mut engine = MyInfoEngine::new(MyInfoProgress::default());
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "preview-as-picker".into(),
+    let choose = |engine: &mut MyInfoEngine, item_id: &str| {
+        engine.handle_action(UserAction::ListItemSelected {
+            component_id: "view_mode".into(),
+            item_id: item_id.into(),
+        })
+    };
+
+    let ActionResult::UpdateScreen(groups) = choose(&mut engine, "groups") else {
+        panic!("choosing a view re-renders MyCard");
+    };
+    assert_eq!(
+        view_switch(&groups).map(|(selected, _)| selected),
+        Some(Some("groups"))
+    );
+    assert_eq!(
+        engine.view_mode,
+        MyInfoViewMode::GroupView { selected_tab: 0 }
+    );
+
+    let ActionResult::UpdateScreen(entries) = choose(&mut engine, "entries") else {
+        panic!("choosing a view re-renders MyCard");
+    };
+    assert_eq!(
+        view_switch(&entries).map(|(selected, _)| selected),
+        Some(Some("entries"))
+    );
+    assert_eq!(engine.view_mode, MyInfoViewMode::EntryView);
+}
+
+// @internal
+#[test]
+fn an_unknown_view_leaves_the_card_as_it_was() {
+    let mut engine = MyInfoEngine::new(MyInfoProgress::default())
+        .with_view_mode(MyInfoViewMode::GroupView { selected_tab: 0 });
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "view_mode".into(),
+        item_id: "timeline".into(),
+    });
+    assert_eq!(
+        engine.view_mode,
+        MyInfoViewMode::GroupView { selected_tab: 0 }
+    );
+}
+
+// @internal
+#[test]
+fn preview_mode_offers_no_view_switches() {
+    let screen = MyInfoEngine::new(MyInfoProgress::default())
+        .with_view_mode(MyInfoViewMode::PreviewAs {
+            contact_name: "Alice".into(),
+        })
+        .current_screen();
+    assert!(preview_as_row(&screen).is_none());
+    assert!(view_switch(&screen).is_none());
+}
+
+// @internal
+#[test]
+fn choosing_preview_as_opens_the_contact_picker() {
+    let mut engine = MyInfoEngine::new(MyInfoProgress::default());
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "preview_as".into(),
+        item_id: "preview-as-picker".into(),
     });
     assert_eq!(result, ActionResult::ShowContactPicker);
 }
@@ -289,22 +370,4 @@ fn pending_updates_live_in_the_sharing_summary_not_a_caption() {
         screen.subtitle.as_deref(),
         Some("Shared with 0 contacts · 3 pending updates")
     );
-}
-
-// @internal
-#[test]
-fn entry_view_offers_group_view_and_preview_before_add_entry() {
-    let screen = MyInfoEngine::new(MyInfoProgress::default()).current_screen();
-    let ids: Vec<&str> = screen
-        .contextual_actions
-        .iter()
-        .map(|a| a.id.as_str())
-        .collect();
-    assert_eq!(ids, ["toggle_view", "preview-as-picker", "add_field"]);
-    let labels: Vec<&str> = screen
-        .contextual_actions
-        .iter()
-        .map(|a| a.label.as_str())
-        .collect();
-    assert_eq!(labels, ["Group View", "Preview as...", "Add Entry"]);
 }

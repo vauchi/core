@@ -21,5 +21,5 @@ fn my_info_screen_is_reachable() {
         total_steps: 3,
     });
     assert_eq!(engine.current_screen().screen_id, "my_info");
-    assert_reachability(&engine, &["add_field", "preview-as-picker", "toggle_view"]);
+    assert_reachability(&engine, &["add_field"]);
 }

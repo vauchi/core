@@ -1497,6 +1497,7 @@
   "my_info.preview_as_button": "Preview as...",
   "my_info.shared_summary": "Shared with {count} contacts",
   "my_info.shared_summary_one": "Shared with 1 contact",
+  "my_info.view_mode_label": "View",
   "my_info.visibility_everyone": "Everyone",
   "my_info_entry_detail.delete_field_a11y": "Delete {label}",
   "my_info_entry_detail.delete_field_hint": "Removes this entry from your contact card. Contacts who already have it keep their copy until their next sync.",

@@ -278,6 +278,66 @@
                   }
                 },
                 {
+                  "Choice": {
+                    "binding_id": "surface.1.binding.0",
+                    "label": "View",
+                    "selected": "entries",
+                    "options": [
+                      {
+                        "id": "entries",
+                        "label": "Entry View"
+                      },
+                      {
+                        "id": "groups",
+                        "label": "Group View"
+                      }
+                    ],
+                    "enabled": true,
+                    "accessibility": {
+                      "label": "View",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "preview_as",
+                    "label": null,
+                    "rows": [
+                      {
+                        "title": "Preview as...",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "Preview as...",
+                          "accessibility_label": "Preview as...",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Preview as...",
+                          "description": null
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    }
+                  }
+                },
+                {
                   "Text": {
                     "id": "empty_hint",
                     "content": "No entries yet. Add your first entry to share with contacts.\n\nYou can add phone numbers, email addresses, websites, social profiles, and more. Tap \"Add Entry\" to get started.",
@@ -958,6 +1018,66 @@
                   }
                 },
                 {
+                  "Choice": {
+                    "binding_id": "surface.1.binding.0",
+                    "label": "View",
+                    "selected": "entries",
+                    "options": [
+                      {
+                        "id": "entries",
+                        "label": "Entry View"
+                      },
+                      {
+                        "id": "groups",
+                        "label": "Group View"
+                      }
+                    ],
+                    "enabled": true,
+                    "accessibility": {
+                      "label": "View",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "preview_as",
+                    "label": null,
+                    "rows": [
+                      {
+                        "title": "Preview as...",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.2",
+                          "label": "Preview as...",
+                          "accessibility_label": "Preview as...",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Preview as...",
+                          "description": null
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    }
+                  }
+                },
+                {
                   "List": {
                     "id": "own_entries",
                     "label": null,
@@ -972,7 +1092,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.2",
+                          "interaction_id": "surface.1.interaction.3",
                           "label": "+44 20 7946 0958",
                           "accessibility_label": "+44 20 7946 0958",
                           "icon_token": null,
@@ -996,7 +1116,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.3",
+                          "interaction_id": "surface.1.interaction.4",
                           "label": "ada@analytical.example.org",
                           "accessibility_label": "ada@analytical.example.org",
                           "icon_token": null,
@@ -1020,7 +1140,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.4",
+                          "interaction_id": "surface.1.interaction.5",
                           "label": "https://ada.example.org",
                           "accessibility_label": "https://ada.example.org",
                           "icon_token": null,
@@ -1044,7 +1164,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.5",
+                          "interaction_id": "surface.1.interaction.6",
                           "label": "12 St James's Square, London",
                           "accessibility_label": "12 St James's Square, London",
                           "icon_token": null,
@@ -1068,7 +1188,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.6",
+                          "interaction_id": "surface.1.interaction.7",
                           "label": "1815-12-10",
                           "accessibility_label": "1815-12-10",
                           "icon_token": null,
@@ -2077,7 +2197,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_fecfedd1a0b77366",
+                    "id": "field_693630495d51f1d9",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2108,13 +2228,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:fecfedd1a0b77366",
+                    "id": "field_note:693630495d51f1d9",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:fecfedd1a0b77366",
+                          "id": "field_note:693630495d51f1d9",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2154,7 +2274,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_e9b4af80c93c51fc",
+                    "id": "field_8584cbd693888c2f",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2185,13 +2305,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:e9b4af80c93c51fc",
+                    "id": "field_note:8584cbd693888c2f",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:e9b4af80c93c51fc",
+                          "id": "field_note:8584cbd693888c2f",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2231,7 +2351,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_c0d67d5372cf69b6",
+                    "id": "field_fa21e0405a46a7ef",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2262,13 +2382,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:c0d67d5372cf69b6",
+                    "id": "field_note:fa21e0405a46a7ef",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:c0d67d5372cf69b6",
+                          "id": "field_note:fa21e0405a46a7ef",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4330,10 +4450,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "1E15 C418 28A9 FA2A 7C00 F00F A4DE 701E 62BD CEBD 2135 F38E C5E9 F0E7 5895 B319",
+                    "content": "1549 6338 EA1F F871 ABA5 B94B 876B 4F66 06A1 A6E9 5A6B D6A5 B56E 5E39 BD90 B7DD",
                     "style": "body",
                     "accessibility": {
-                      "label": "1E15 C418 28A9 FA2A 7C00 F00F A4DE 701E 62BD CEBD 2135 F38E C5E9 F0E7 5895 B319",
+                      "label": "1549 6338 EA1F F871 ABA5 B94B 876B 4F66 06A1 A6E9 5A6B D6A5 B56E 5E39 BD90 B7DD",
                       "description": null
                     }
                   }
@@ -4352,10 +4472,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "39FE 0272 0C6D F88D F189 335E 2AC0 0E3C 3407 8075 4818 B0F2 E88C 8CBD B4B2 72FA",
+                    "content": "7156 9D90 79E5 064E 8555 EA51 5CFA 51F1 17F2 E9F4 F24A 8411 2AED A9DE 55C7 DAFF",
                     "style": "body",
                     "accessibility": {
-                      "label": "39FE 0272 0C6D F88D F189 335E 2AC0 0E3C 3407 8075 4818 B0F2 E88C 8CBD B4B2 72FA",
+                      "label": "7156 9D90 79E5 064E 8555 EA51 5CFA 51F1 17F2 E9F4 F24A 8411 2AED A9DE 55C7 DAFF",
                       "description": null
                     }
                   }
@@ -12319,6 +12439,66 @@
                   }
                 },
                 {
+                  "Choice": {
+                    "binding_id": "surface.1.binding.0",
+                    "label": "View",
+                    "selected": "entries",
+                    "options": [
+                      {
+                        "id": "entries",
+                        "label": "Entry View"
+                      },
+                      {
+                        "id": "groups",
+                        "label": "Group View"
+                      }
+                    ],
+                    "enabled": true,
+                    "accessibility": {
+                      "label": "View",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "preview_as",
+                    "label": null,
+                    "rows": [
+                      {
+                        "title": "Preview as...",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "Preview as...",
+                          "accessibility_label": "Preview as...",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Preview as...",
+                          "description": null
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    }
+                  }
+                },
+                {
                   "List": {
                     "id": "own_entries",
                     "label": null,
@@ -12333,7 +12513,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.1",
+                          "interaction_id": "surface.1.interaction.2",
                           "label": "+44 20 7946 0958",
                           "accessibility_label": "+44 20 7946 0958",
                           "icon_token": null,
@@ -12357,7 +12537,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.2",
+                          "interaction_id": "surface.1.interaction.3",
                           "label": "ada@analytical.example.org",
                           "accessibility_label": "ada@analytical.example.org",
                           "icon_token": null,
@@ -12381,7 +12561,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.3",
+                          "interaction_id": "surface.1.interaction.4",
                           "label": "https://ada.example.org",
                           "accessibility_label": "https://ada.example.org",
                           "icon_token": null,
@@ -12405,7 +12585,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.4",
+                          "interaction_id": "surface.1.interaction.5",
                           "label": "12 St James's Square, London",
                           "accessibility_label": "12 St James's Square, London",
                           "icon_token": null,
@@ -12429,7 +12609,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.5",
+                          "interaction_id": "surface.1.interaction.6",
                           "label": "1815-12-10",
                           "accessibility_label": "1815-12-10",
                           "icon_token": null,
@@ -12607,14 +12787,7 @@
                 "enabled": true,
                 "shortcut": "activate_primary"
               },
-              "secondary": {
-                "interaction_id": "surface.1.context.presentation.secondary",
-                "label": "Actions",
-                "accessibility_label": "Actions",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": null
-              }
+              "secondary": null
             }
           }
         },
@@ -16355,7 +16528,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=OsmziNgmGQunOy5BGdMgt8sPmricYwwAA8Ndeg4iUC4&n=IYceslUFcO3sbBzwT19EdgR2RmCxwvgIohxogsoDfL8",
+                    "content": "vauchi://exchange?pk=rRhP-H6XLF_n4f3XR6z20rSN660qfuvhyrOLeG6sOQM&n=yxQYLOVN5B6nLh3LjQMUdh5PQvddCG6tEmz2xhip68I",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -16814,7 +16987,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,77,53,47,103,74,121,68,71,51,52,106,102,71,74,77,49,52,113,119,65,52,56,78,65,101,65,100,85,103,89,115,80,76,111,106,73,121,57,116,76,74,121,43,108,74,98,79,68,106,50,80,103,89,49,115,111,73,67,117,76,109,55,81,119,113,97,79,52,99,57,112,54,72,111,57,86,111,50,110,87,56,75,117,78,107,52,110,75,48,114,109,119,107,70,75,104,51,57,117,90,122,73,107,73,87,81,86,84,69,65,110,50,113,99,66,107,52,43,108,75,85,97,48,119,53,70,87,69,119,49,78,102,85,108,43,108,108,104,57,78,97,97,48,48,47,103,65,52,112,104,65,65,65,65,65,71,113,50,79,70,99,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,65,67,68,105,100,72,114,90,107,99,85,102,48,74,89,74,48,68,85,115,90,116,119,119,114,83,90,115,107,75,102,50,50,110,78,83,52,115,89,104,66,120,56,49,117,77,88,43,54,106,85,70,120,108,68,74,120,78,116,66,83,90,110,77,50,114,85,75,83,50,53,81,87,101,103,54,115,76,49,121,110,89,122,83,65,77],
+            "payload": [86,48,74,70,87,65,78,120,86,112,50,81,101,101,85,71,84,111,86,86,54,108,70,99,43,108,72,120,70,47,76,112,57,80,74,75,104,66,69,113,55,97,110,101,86,99,102,97,47,120,99,73,54,99,105,115,98,49,121,78,68,73,104,106,69,108,117,119,101,101,54,75,84,99,49,65,102,56,65,84,119,115,80,84,122,110,106,107,121,107,85,97,110,53,74,113,75,112,52,43,68,78,48,115,110,48,108,76,52,119,70,105,112,72,100,121,72,86,72,105,107,90,77,116,57,73,115,101,88,66,115,43,107,98,100,43,53,88,114,71,51,120,73,53,67,51,102,75,117,47,118,120,102,51,68,103,65,65,65,65,65,71,113,50,79,82,73,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,122,67,99,116,43,117,43,118,117,68,67,77,47,51,87,104,119,77,108,110,57,99,85,49,87,120,70,102,111,67,119,97,108,105,83,54,69,65,102,119,84,100,69,111,107,86,86,99,54,97,122,88,75,109,90,76,78,79,109,105,54,114,72,99,105,97,81,115,87,90,105,97,77,90,87,104,80,79,84,79,122,57,98,81,73],
             "is_initiator": true
           }
         }
@@ -16846,7 +17019,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI2Z%54H2JIM0K5KA40WLI6D$VJ7P0I7QBTJ%$AJ:QDKN J6XEBNKS$N4:-MX4LX4N$PEIOC/*B7N00 27G7NRV2A1LLB71DE4M8$AHCA 0JFB9Z80WE188H3YF11Vauchi User00"
+                      "INI2OX75UUESAN6U.Y3SNNHY1HEO67UUHKC*QJAR0MQG948VK%E197A:RNKR27.CUJN/R8-UTY.G/9I-GOLI7.-FSOHN:4ZNRS:SI7EOTMDFO$*3LOL*51/VI3C011Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": "Show this",
@@ -17435,7 +17608,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [57,254,2,114,12,109,248,141,241,137,51,94,42,192,14,60,52,7,128,117,72,24,176,242,232,140,140,189,180,178,114,250]
+            "payload": [113,86,157,144,121,229,6,78,133,85,234,81,92,250,81,241,23,242,233,244,242,74,132,17,42,237,169,222,85,199,218,255]
           }
         },
         {
@@ -17590,7 +17763,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [57,254,2,114,12,109,248,141,241,137,51,94,42,192,14,60,52,7,128,117,72,24,176,242,232,140,140,189,180,178,114,250]
+            "payload": [113,86,157,144,121,229,6,78,133,85,234,81,92,250,81,241,23,242,233,244,242,74,132,17,42,237,169,222,85,199,218,255]
           }
         },
         {
@@ -17745,7 +17918,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [57,254,2,114,12,109,248,141,241,137,51,94,42,192,14,60,52,7,128,117,72,24,176,242,232,140,140,189,180,178,114,250]
+            "payload": [113,86,157,144,121,229,6,78,133,85,234,81,92,250,81,241,23,242,233,244,242,74,132,17,42,237,169,222,85,199,218,255]
           }
         },
         {
@@ -20036,6 +20209,66 @@
                   }
                 },
                 {
+                  "Choice": {
+                    "binding_id": "surface.1.binding.0",
+                    "label": "Ansicht",
+                    "selected": "entries",
+                    "options": [
+                      {
+                        "id": "entries",
+                        "label": "Eintragsansicht"
+                      },
+                      {
+                        "id": "groups",
+                        "label": "Gruppenansicht"
+                      }
+                    ],
+                    "enabled": true,
+                    "accessibility": {
+                      "label": "Ansicht",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "preview_as",
+                    "label": null,
+                    "rows": [
+                      {
+                        "title": "Preview as...",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.2",
+                          "label": "Preview as...",
+                          "accessibility_label": "Preview as...",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Preview as...",
+                          "description": null
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    }
+                  }
+                },
+                {
                   "List": {
                     "id": "own_entries",
                     "label": null,
@@ -20050,7 +20283,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.2",
+                          "interaction_id": "surface.1.interaction.3",
                           "label": "+44 20 7946 0958",
                           "accessibility_label": "+44 20 7946 0958",
                           "icon_token": null,
@@ -20074,7 +20307,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.3",
+                          "interaction_id": "surface.1.interaction.4",
                           "label": "ada@analytical.example.org",
                           "accessibility_label": "ada@analytical.example.org",
                           "icon_token": null,
@@ -20098,7 +20331,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.4",
+                          "interaction_id": "surface.1.interaction.5",
                           "label": "https://ada.example.org",
                           "accessibility_label": "https://ada.example.org",
                           "icon_token": null,
@@ -20122,7 +20355,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.5",
+                          "interaction_id": "surface.1.interaction.6",
                           "label": "12 St James's Square, London",
                           "accessibility_label": "12 St James's Square, London",
                           "icon_token": null,
@@ -20146,7 +20379,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.6",
+                          "interaction_id": "surface.1.interaction.7",
                           "label": "1815-12-10",
                           "accessibility_label": "1815-12-10",
                           "icon_token": null,

@@ -533,9 +533,7 @@ impl Vauchi {
         contact_id: &str,
         field_id: &str,
     ) -> VauchiResult<()> {
-        self.storage
-            .labels()
-            .delete_contact_override(contact_id, field_id)?;
+        self.remove_contact_visibility_override(contact_id, field_id)?;
         self.repropagate_to_contact(contact_id)
     }
 

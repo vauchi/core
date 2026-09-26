@@ -12,6 +12,7 @@ use crate::i18n::{Locale, get_string, get_string_with_args};
 
 const SCHEMA: &str = "vauchi.contacts.v1";
 const SURFACE_ID: &str = "invocation.contacts_list";
+const ARCHIVED_SURFACE_ID: &str = "invocation.contacts_list_archived";
 const SHORT_ID_LEN: usize = 8;
 
 /// `vauchi.contacts.v1` — the shape the CLI's `--raw` printed before this
@@ -86,7 +87,35 @@ pub(super) fn run(
         InvocationOutput::Document => document(&contacts),
         InvocationOutput::Text => {
             let total = vauchi.contact_count()?;
-            surface(&contacts, total, paginated.then_some(offset), locale)
+            active_surface(&contacts, total, paginated.then_some(offset), locale)
+        }
+    }])
+}
+
+pub(super) fn run_archived(
+    vauchi: &Vauchi,
+    output: InvocationOutput,
+    locale: Locale,
+) -> VauchiResult<Vec<Command>> {
+    let archived = vauchi.list_archived_contacts()?;
+    Ok(vec![match output {
+        InvocationOutput::Document => document(&archived),
+        InvocationOutput::Text => {
+            let title = get_string_with_args(
+                locale,
+                "cli.contacts.archived.header",
+                &[("count", &archived.len().to_string())],
+            );
+            if archived.is_empty() {
+                let empty = get_string(locale, "archived_contacts.empty");
+                one_shot_surface(
+                    ARCHIVED_SURFACE_ID,
+                    title,
+                    vec![text(empty, PresentationTextStyle::Body)],
+                )
+            } else {
+                list_surface(ARCHIVED_SURFACE_ID, title, rows(&archived, locale))
+            }
         }
     }])
 }
@@ -103,7 +132,7 @@ fn document(contacts: &[Contact]) -> Command {
     }
 }
 
-fn surface(
+fn active_surface(
     contacts: &[Contact],
     total: usize,
     page_offset: Option<usize>,
@@ -139,11 +168,15 @@ fn surface(
             &[("count", &total.to_string())],
         ),
     };
+    list_surface(SURFACE_ID, title, rows(contacts, locale))
+}
+
+fn rows(contacts: &[Contact], locale: Locale) -> Vec<PresentationRow> {
     let verified = get_string(locale, "contacts.verified");
     let not_verified = get_string(locale, "contacts.not_verified");
     let recovery_trusted = get_string(locale, "contact_detail.recovery_trusted_label");
 
-    let rows = contacts
+    contacts
         .iter()
         .map(|contact| {
             let verification = if contact.is_fingerprint_verified() {
@@ -171,10 +204,12 @@ fn surface(
                 accessibility: accessibility(&format!("{}, {status}", contact.display_name())),
             }
         })
-        .collect();
+        .collect()
+}
 
+fn list_surface(surface_id: &str, title: String, rows: Vec<PresentationRow>) -> Command {
     one_shot_surface(
-        SURFACE_ID,
+        surface_id,
         title.clone(),
         vec![PresentationNode::List {
             id: BindingId::new("contacts").expect("static binding id is valid"),

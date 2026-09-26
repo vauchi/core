@@ -25,6 +25,8 @@ mod contacts_list;
 pub enum Invocation {
     /// List contacts; `limit == 0` means all.
     ContactsList { offset: usize, limit: usize },
+    /// List archived contacts.
+    ArchivedContactsList,
 }
 
 /// What the shell asked to receive.
@@ -48,6 +50,7 @@ pub fn invoke(
         Invocation::ContactsList { offset, limit } => {
             contacts_list::run(vauchi, *offset, *limit, output, locale)
         }
+        Invocation::ArchivedContactsList => contacts_list::run_archived(vauchi, output, locale),
     };
     match result {
         Ok(mut commands) => {

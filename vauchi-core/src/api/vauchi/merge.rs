@@ -22,6 +22,9 @@ impl Vauchi {
     /// Returns duplicate pairs ordered by similarity (highest first),
     /// excluding pairs the user has previously dismissed.
     pub fn find_duplicates(&self) -> VauchiResult<Vec<DuplicatePair>> {
+        if self.auth_mode == super::AuthMode::Duress {
+            return Ok(find_duplicates(&self.decoy_contacts_as_contacts()?));
+        }
         let contacts = self.storage.contacts().list_contacts()?;
         let all_duplicates = find_duplicates(&contacts);
 

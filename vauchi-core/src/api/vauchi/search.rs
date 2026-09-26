@@ -45,6 +45,11 @@ impl Vauchi {
         query: &str,
         facets: &SearchFacets,
     ) -> VauchiResult<Vec<Contact>> {
+        // Decoys carry no tags, notes, or places, so name search is the
+        // whole decoy facet space (ADR-032).
+        if self.auth_mode == super::AuthMode::Duress {
+            return self.search_contacts(query);
+        }
         let q = query.trim().to_lowercase();
 
         // Hoist the tag vocabulary once (avoids re-loading per contact).

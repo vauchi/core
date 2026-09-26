@@ -18,7 +18,7 @@ impl Vauchi {
     // === Contact Operations ===
 
     /// Converts decoy contact tuples into `Contact` objects (display-only).
-    fn decoy_contacts_as_contacts(&self) -> VauchiResult<Vec<Contact>> {
+    pub(super) fn decoy_contacts_as_contacts(&self) -> VauchiResult<Vec<Contact>> {
         let decoys = self.storage.decoy().load_decoy_contacts()?;
         Ok(decoys
             .into_iter()
@@ -445,6 +445,9 @@ impl Vauchi {
 
     /// Lists all archived contacts.
     pub fn list_archived_contacts(&self) -> VauchiResult<Vec<Contact>> {
+        if self.auth_mode == super::AuthMode::Duress {
+            return Ok(Vec::new());
+        }
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.list_archived_contacts()
     }

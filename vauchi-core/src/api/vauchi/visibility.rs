@@ -151,6 +151,9 @@ impl Vauchi {
     /// `Contact` objects. Contacts that no longer exist in storage are
     /// silently skipped.
     pub fn get_group_members(&self, label_id: &str) -> VauchiResult<Vec<crate::contact::Contact>> {
+        if self.auth_mode == super::AuthMode::Duress {
+            return Ok(Vec::new());
+        }
         let label = self.storage.labels().load_group(label_id)?;
         let mut members = Vec::new();
         for contact_id in label.contacts() {

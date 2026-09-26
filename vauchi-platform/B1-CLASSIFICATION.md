@@ -4,6 +4,13 @@
 
 # B1 — `VauchiPlatform` → `PlatformAppEngine` Classification
 
+> **Historical — superseded.** This records a 2026-04 phase of the
+> `VauchiPlatform → PlatformAppEngine` collapse, which is complete. Its
+> `UserAction` / `ActionResult` / `ScreenModel` flows and
+> `handle_action_json` no longer exist: the shell boundary is now one
+> generic `Event` in and prepared `Command`s out. Kept as evidence, not
+> guidance.
+
 | Field         | Value |
 |---------------|-------|
 | Phase         | B1 (Paper exercise — no code changes) |

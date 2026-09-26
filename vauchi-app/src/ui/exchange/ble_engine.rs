@@ -46,6 +46,8 @@ pub const ACTION_FALLBACK_RELAY: &str = "fallback_relay";
 pub const ACTION_ENTER_CODE: &str = "enter_code";
 /// Glance action: commit the typed peer code (the input's submit twin).
 pub const ACTION_CONNECT_CODE: &str = "connect_code";
+/// Glance action (camera devices): toggle the scanner between rear and front.
+pub const ACTION_SWITCH_CAMERA: &str = "switch_camera";
 
 /// How long a non-terminal BLE step (`Discovering`/`Handshaking`/
 /// `Exchanging`/`Verifying`) may persist with no progress before the

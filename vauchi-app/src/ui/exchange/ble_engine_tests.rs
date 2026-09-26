@@ -903,3 +903,87 @@ fn retry_after_a_bad_code_returns_to_the_code_input() {
         "retry keeps the user on manual entry with a cleared input"
     );
 }
+
+fn press(engine: &mut BleExchangeEngine, action_id: &str) -> ActionResult {
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: action_id.into(),
+    })
+}
+
+fn switch_camera_commands(result: ActionResult) -> Vec<bool> {
+    let ActionResult::Commands { commands } = result else {
+        panic!("switch_camera must emit commands, got {result:?}");
+    };
+    commands
+        .iter()
+        .map(|c| match c {
+            Command::SwitchCamera { use_front } => *use_front,
+            other => panic!("only SwitchCamera expected, got {other:?}"),
+        })
+        .collect()
+}
+
+// @scenario: contact_exchange.feature :: Glance scans with the rear camera and can switch to the front camera
+#[test]
+fn glance_scanner_switches_between_rear_and_front_camera() {
+    let mut engine = glance_engine(true);
+    assert_eq!(
+        action_label(&engine.current_screen(), ACTION_SWITCH_CAMERA).as_deref(),
+        Some("Use Front Camera"),
+        "the rear camera is the default, so the offer is the front one"
+    );
+
+    let to_front = press(&mut engine, ACTION_SWITCH_CAMERA);
+
+    assert_eq!(switch_camera_commands(to_front), vec![true]);
+    assert_eq!(
+        action_label(&engine.current_screen(), ACTION_SWITCH_CAMERA).as_deref(),
+        Some("Use Rear Camera")
+    );
+
+    let back_to_rear = press(&mut engine, ACTION_SWITCH_CAMERA);
+
+    assert_eq!(switch_camera_commands(back_to_rear), vec![false]);
+    assert_eq!(
+        action_label(&engine.current_screen(), ACTION_SWITCH_CAMERA).as_deref(),
+        Some("Use Front Camera")
+    );
+}
+
+// @scenario: contact_exchange.feature :: Glance keeps the chosen camera when retrying
+#[test]
+fn glance_retry_reselects_the_camera_the_user_chose() {
+    let mut engine = glance_engine(true);
+    let _ = engine.screen_entered();
+    let _ = press(&mut engine, ACTION_SWITCH_CAMERA);
+    engine.force_failure(None);
+
+    let _ = press(&mut engine, ACTION_RETRY);
+    let commands = engine.screen_entered();
+
+    assert!(
+        matches!(
+            commands.first(),
+            Some(Command::SwitchCamera { use_front: true })
+        ),
+        "retry must re-enter on the front camera the user picked, got {commands:?}"
+    );
+}
+
+// @internal
+#[test]
+fn glance_offers_no_camera_switch_without_a_camera_or_while_typing() {
+    let without_camera = glance_engine(false);
+    assert_eq!(
+        action_label(&without_camera.current_screen(), ACTION_SWITCH_CAMERA),
+        None
+    );
+
+    let mut typing = glance_engine(true);
+    let _ = press(&mut typing, ACTION_ENTER_CODE);
+    assert_eq!(
+        action_label(&typing.current_screen(), ACTION_SWITCH_CAMERA),
+        None,
+        "the code input replaces the camera, so there is nothing to switch"
+    );
+}

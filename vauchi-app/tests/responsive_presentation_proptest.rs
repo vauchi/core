@@ -45,6 +45,8 @@ fn width() -> impl Strategy<Value = u32> {
         Just(839),
         Just(840),
         Just(u32::MAX),
+        500u32..640,
+        740u32..880,
         0u32..2000,
         any::<u32>(),
     ]

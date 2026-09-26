@@ -904,45 +904,79 @@ fn stalled_screen_offers_retry_and_switch_relay() {
     );
 }
 
+fn transferring_engine() -> MultiStageExchangeEngine {
+    engine_with_qr(
+        ProtocolState::Transferring {
+            chunks_sent: 1,
+            chunks_total: 3,
+            chunks_received: 2,
+            peer_chunks_total: 3,
+        },
+        "DATA-FRAME",
+    )
+}
+
+fn component_kinds(screen: &ScreenModel) -> Vec<std::mem::Discriminant<Component>> {
+    screen
+        .components
+        .iter()
+        .map(std::mem::discriminant)
+        .collect()
+}
+
+fn own_qr_caption(screen: &ScreenModel) -> Option<&str> {
+    screen.components.iter().find_map(|c| match c {
+        Component::QrCode { id, label, .. } if id == COMPONENT_ID_OWN_QR => label.as_deref(),
+        _ => None,
+    })
+}
+
+// A banner inserted above the QR pushed the scanner off the fixed layout on
+// a phone-sized viewport, where it was disposed and never came back — so the
+// stall could not clear (vauchi/private#9, runs E3/E6/E8).
 // @internal
 #[test]
-fn stalled_status_banner_keeps_the_transfer_progress_visible() {
-    let mut engine = engine_with_state(ProtocolState::Transferring {
-        chunks_sent: 1,
-        chunks_total: 3,
-        chunks_received: 2,
-        peer_chunks_total: 3,
-    });
+fn stalling_keeps_the_active_layout_unchanged() {
+    let mut engine = transferring_engine();
+    let active = engine.current_screen();
+
     engine.set_stalled(true);
-    let screen = engine.current_screen();
-    let status =
-        first_status_indicator(&screen).expect("the Stalled screen must show a status banner");
-    let Component::StatusIndicator { title, detail, .. } = status else {
-        unreachable!("first_status_indicator only returns StatusIndicator components")
-    };
-    assert_eq!(*title, engine.t("exchange.stalled_title"));
+    let stalled = engine.current_screen();
+
     assert_eq!(
-        detail.as_deref(),
-        Some("Sending 1/3 · Receiving 2/3"),
-        "the banner detail must keep the frame current/total progress visible"
+        component_kinds(&stalled),
+        component_kinds(&active),
+        "the Stalled screen must not add, drop or reorder components"
+    );
+    assert!(
+        first_status_indicator(&stalled).is_none(),
+        "no banner above the QR"
     );
 }
 
 // @internal
 #[test]
-fn clearing_stall_returns_to_the_plain_active_chrome() {
-    let mut engine = engine_with_state(ProtocolState::Discovered);
+fn stalled_warning_rides_in_the_own_qr_caption_with_the_progress() {
+    let mut engine = transferring_engine();
     engine.set_stalled(true);
-    assert!(
-        first_status_indicator(&engine.current_screen()).is_some(),
-        "precondition: the Stalled banner must be showing"
+
+    assert_eq!(
+        own_qr_caption(&engine.current_screen()),
+        Some("Taking longer than expected · Sending 1/3 · Receiving 2/3")
     );
+}
+
+// @internal
+#[test]
+fn clearing_stall_restores_the_plain_progress_caption() {
+    let mut engine = transferring_engine();
+    engine.set_stalled(true);
 
     engine.set_stalled(false);
 
-    assert!(
-        first_status_indicator(&engine.current_screen()).is_none(),
-        "clearing the stall must drop the Stalled banner"
+    assert_eq!(
+        own_qr_caption(&engine.current_screen()),
+        Some("Sending 1/3 · Receiving 2/3")
     );
 }
 

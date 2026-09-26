@@ -225,3 +225,54 @@ fn text_surface_without_contacts_points_at_exchange() {
         ]
     );
 }
+
+// ADR-032: a duress unlock must list only the decoys — the invocation reads
+// through the same auth-mode-aware API, never around it.
+// @scenario: duress_mode :: Duress credential shows decoy contacts
+#[test]
+fn duress_unlock_lists_only_decoys_in_both_outputs() {
+    let (mut vauchi, _) = vauchi_with(&["Bob"]);
+    vauchi
+        .setup_app_password("real-password")
+        .expect("app password");
+    vauchi
+        .setup_duress_password("432198")
+        .expect("duress password");
+    vauchi
+        .add_decoy_contact("decoy-1", "Safe Name", &ContactCard::new("Safe Name"))
+        .expect("decoy");
+    vauchi.authenticate("432198").expect("duress unlock");
+
+    let doc = document(&invoke(
+        &vauchi,
+        &list(0, 0),
+        InvocationOutput::Document,
+        Locale::English,
+    ));
+    let names: Vec<&str> = doc
+        .as_array()
+        .expect("array")
+        .iter()
+        .map(|entry| entry["display_name"].as_str().expect("name"))
+        .collect();
+    assert_eq!(names, ["Safe Name"]);
+
+    let commands = invoke(
+        &vauchi,
+        &list(0, 0),
+        InvocationOutput::Text,
+        Locale::English,
+    );
+    let text = surface(&commands);
+    assert_eq!(text.title, "Contacts (1):");
+    let rows = match text.nodes.as_slice() {
+        [PresentationNode::List { rows, .. }] => rows,
+        other => panic!("expected one list, got {other:?}"),
+    };
+    assert_eq!(
+        rows.iter()
+            .map(|row| row.title.as_str())
+            .collect::<Vec<_>>(),
+        ["Safe Name"]
+    );
+}

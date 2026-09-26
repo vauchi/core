@@ -48,6 +48,7 @@ pub mod group_detail;
 mod groups_list;
 mod help;
 pub mod info_content;
+#[cfg(feature = "network-rustls")]
 pub mod invocation;
 pub mod link_exchange;
 mod link_responder;

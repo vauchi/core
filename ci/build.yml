@@ -29,7 +29,13 @@
 release:verify: # vci02-ok: tag verification must replace the SSH-oriented runner setup
   extends: [.linux-runner, .release-or-rc]
   stage: build
-  needs: []
+  # release:ratchet-zero (lint stage) runs the exact-zero boundary gate
+  # (ADR-066); everything below release:verify is DAG-ordered off it, so
+  # this need is the single choke point that blocks a release carrying
+  # boundary debt. Its rules were widened in .gitlab-ci.yml to the same
+  # tag set as .release-or-rc, so it always exists in this job's pipelines
+  # — no `optional: true` needed.
+  needs: [release:ratchet-zero]
   interruptible: false
   variables:
     GIT_STRATEGY: clone

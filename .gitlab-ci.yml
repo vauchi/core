@@ -59,6 +59,9 @@ include:
       - '/ci-templates/image-lint.yml'
       - '/ci-templates/badges.yml'
       - '/ci-templates/github-mirror.yml'
+      - '/ci-templates/verified-fetch.yml'
+      - '/ci-templates/tool-install.yml'
+      - '/ci-templates/cross-cutting-lint.yml'
   # Local include — nightly-only mutation + fuzz + slow tests extracted
   # 2026-04-22 under T2.3 split (2026-04-22-ci-pipeline-health-audit
   # Phase 2). Pure Phase 0 tidy — no behaviour change.
@@ -371,6 +374,21 @@ lint:cross-cutting-blocking:
           # and hand-edited drift stayed green until it turned main red.
           - "vauchi-app/locales/**"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Exact-zero release gate (ADR-066, vauchi/private#11). Unlike
+# lint:cross-cutting-blocking above (an MR ratchet — existing debt may
+# stay while it shrinks), this runs `--require-zero`: every boundary
+# counter, live and stored, must be zero before a release tag ships.
+# release:verify needs this job (see ci/build.yml), so a failure here
+# blocks every downstream build/package/publish job transitively.
+# rules: widened from the template default (stable tags only) to match
+# release:verify's `.release-or-rc` so RC tags are gated too — an RC
+# that ships boundary debt just becomes the eventual release.
+release:ratchet-zero:
+  extends: .release-ratchet-zero
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
 
 lint:format:
   extends: [.linux-runner-nocache, .lint-format, .validation-rust, .timeout-quick]

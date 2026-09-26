@@ -281,3 +281,76 @@ fn duress_unlock_lists_only_decoys_in_both_outputs() {
         ["Safe Name"]
     );
 }
+
+fn archive(vauchi: &Vauchi, id: &str) {
+    vauchi.archive_contact(id).expect("archive");
+}
+
+// @internal
+#[test]
+fn archived_document_lists_only_archived_contacts_in_the_v1_shape() {
+    let (vauchi, ids) = vauchi_with(&["Bob", "Carol"]);
+    archive(&vauchi, &ids[1]);
+
+    let doc = document(&invoke(
+        &vauchi,
+        &Invocation::ArchivedContactsList,
+        InvocationOutput::Document,
+        Locale::English,
+    ));
+
+    let entries = doc.as_array().expect("array");
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0]["id"], ids[1]);
+    assert_eq!(entries[0]["display_name"], "Carol");
+    assert_eq!(entries[0]["card"]["fields"], json!([]));
+}
+
+// @internal
+#[test]
+fn archived_text_surface_uses_the_archived_header() {
+    let (vauchi, ids) = vauchi_with(&["Bob", "Carol"]);
+    archive(&vauchi, &ids[0]);
+
+    let commands = invoke(
+        &vauchi,
+        &Invocation::ArchivedContactsList,
+        InvocationOutput::Text,
+        Locale::English,
+    );
+    let surface = surface(&commands);
+
+    assert_eq!(surface.title, "Archived contacts (1):");
+    let rows = match surface.nodes.as_slice() {
+        [PresentationNode::List { rows, .. }] => rows,
+        other => panic!("expected one list, got {other:?}"),
+    };
+    assert_eq!(
+        rows.iter()
+            .map(|row| row.title.as_str())
+            .collect::<Vec<_>>(),
+        ["Bob"]
+    );
+}
+
+// @internal
+#[test]
+fn archived_text_surface_without_archive_says_so() {
+    let (vauchi, _) = vauchi_with(&["Bob"]);
+
+    let commands = invoke(
+        &vauchi,
+        &Invocation::ArchivedContactsList,
+        InvocationOutput::Text,
+        Locale::English,
+    );
+    let surface = surface(&commands);
+
+    assert_eq!(surface.title, "Archived contacts (0):");
+    match surface.nodes.as_slice() {
+        [PresentationNode::Text { content, .. }] => {
+            assert_eq!(content, "No archived contacts.");
+        }
+        other => panic!("expected the empty-archive text, got {other:?}"),
+    }
+}

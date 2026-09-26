@@ -37,12 +37,13 @@ pub use event_json::{
 };
 pub use presentation::{
     AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, BindingId, ChoiceOption, ContextBar,
-    ExportFileSpec, InputMode, InputValue, InteractionId, MotionPreference, NavigationItem,
-    NavigationSpec, NotificationSpec, NotificationUrgency, OverlayKind, OverlaySpec, PaneLayout,
-    PresentationAxis, PresentationIdError, PresentationImageShape, PresentationInputKind,
-    PresentationNode, PresentationPaging, PresentationProfile, PresentationQrPurpose,
-    PresentationRow, PresentationTextStyle, PresentationTokens, PresentationTone, StandardShortcut,
-    SurfaceId, SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass,
+    DocumentSpec, ExportFileSpec, InputMode, InputValue, InteractionId, InvocationOutcome,
+    MotionPreference, NavigationItem, NavigationSpec, NotificationSpec, NotificationUrgency,
+    OverlayKind, OverlaySpec, PaneLayout, PresentationAxis, PresentationIdError,
+    PresentationImageShape, PresentationInputKind, PresentationNode, PresentationPaging,
+    PresentationProfile, PresentationQrPurpose, PresentationRow, PresentationTextStyle,
+    PresentationTokens, PresentationTone, StandardShortcut, SurfaceId, SurfaceLayout, SurfaceSpec,
+    ToastSpec, WindowClass,
 };
 
 /// A command from core to the frontend requesting a hardware action.
@@ -431,6 +432,11 @@ pub enum Command {
     OpenExternalUrl { url: String },
     /// Offer prepared bytes through the platform save/share mechanism.
     ExportFile { file: ExportFileSpec },
+    /// Write a Core-prepared machine-readable document to the shell's
+    /// primary output, unread.
+    EmitDocument { document: DocumentSpec },
+    /// End a one-shot invocation with a generic outcome.
+    FinishInvocation { outcome: InvocationOutcome },
     /// Perform the platform's default back behavior.
     PerformNativeBack,
     /// Reset platform-owned application state after Core wiped its data.
@@ -618,6 +624,8 @@ impl Command {
             Self::ShowToast { .. } => "ShowToast",
             Self::OpenExternalUrl { .. } => "OpenExternalUrl",
             Self::ExportFile { .. } => "ExportFile",
+            Self::EmitDocument { .. } => "EmitDocument",
+            Self::FinishInvocation { .. } => "FinishInvocation",
             Self::PerformNativeBack => "PerformNativeBack",
             Self::ResetApplication => "ResetApplication",
             Self::PostNotification { .. } => "PostNotification",

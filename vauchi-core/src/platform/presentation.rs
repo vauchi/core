@@ -67,7 +67,10 @@ presentation_identifier!(BindingId);
 mod effects;
 mod surface;
 
-pub use effects::{AlertSpec, ExportFileSpec, NotificationSpec, NotificationUrgency, ToastSpec};
+pub use effects::{
+    AlertSpec, DocumentSpec, ExportFileSpec, InvocationOutcome, NotificationSpec,
+    NotificationUrgency, ToastSpec,
+};
 pub use surface::{
     AccessibilitySpec, ChoiceOption, InputValue, PresentationAxis, PresentationImageShape,
     PresentationInputKind, PresentationNode, PresentationPaging, PresentationQrPurpose,

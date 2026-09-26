@@ -208,6 +208,11 @@ fn text_surface_without_contacts_points_at_exchange() {
         InvocationOutput::Text,
         Locale::English,
     );
+    assert_eq!(
+        surface(&commands).title,
+        "Contacts (0):",
+        "the hint is body copy; repeating it as the title prints it twice"
+    );
     let texts: Vec<&str> = surface(&commands)
         .nodes
         .iter()

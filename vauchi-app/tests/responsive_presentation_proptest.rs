@@ -82,6 +82,16 @@ fn probe(
     })
 }
 
+const COLLAPSE_BAND: u32 = 32;
+
+fn rank(class: WindowClass) -> u8 {
+    match class {
+        WindowClass::Compact => 0,
+        WindowClass::Medium => 1,
+        _ => 2,
+    }
+}
+
 fn expected_class(width: u32) -> WindowClass {
     match width {
         0..=599 => WindowClass::Compact,
@@ -221,8 +231,61 @@ proptest! {
             prop_assert_eq!(&during.active_surface, &before.active_surface);
         }
 
+        // The window class may legitimately differ on return: collapse is
+        // damped, so it depends on the path taken. Surfaces may not.
         let after = probe(&mut coordinator, Some(start)).expect("width reported");
-        prop_assert_eq!(after, before);
+        prop_assert_eq!(after.primary_surface, before.primary_surface);
+        prop_assert_eq!(after.detail_surface, before.detail_surface);
+        prop_assert_eq!(after.active_surface, before.active_surface);
+    }
+
+    /// Feature: generic_presentation_protocol.feature
+    /// Scenario: Class boundaries are damped on collapse
+    // @scenario: generic_presentation_protocol.feature :: Class boundaries are damped on collapse
+    #[test]
+    fn test_damping_only_delays_collapse_by_at_most_the_band(
+        history in prop::collection::vec(width(), 0..20),
+        w in width(),
+    ) {
+        let mut coordinator = PresentationCoordinator::new(surface(0));
+        for earlier in &history {
+            coordinator.handle_event(environment(*earlier)).expect("valid environment");
+        }
+
+        let class = only_profile(
+            coordinator.handle_event(environment(w)).expect("valid environment"),
+        )
+        .window_class;
+
+        prop_assert!(
+            rank(class) >= rank(expected_class(w)),
+            "{class:?} at {w} lags expansion (history {history:?})"
+        );
+        prop_assert!(
+            rank(class) <= rank(expected_class(w.saturating_add(COLLAPSE_BAND))),
+            "{class:?} at {w} outlasts the {COLLAPSE_BAND}-unit band (history {history:?})"
+        );
+    }
+
+    /// Feature: generic_presentation_protocol.feature
+    /// Scenario: Class boundaries are damped on collapse
+    // @scenario: generic_presentation_protocol.feature :: Class boundaries are damped on collapse
+    #[test]
+    fn test_shrinking_less_than_the_band_keeps_the_class(
+        w in width(),
+        shrink in 0..COLLAPSE_BAND,
+    ) {
+        let mut coordinator = PresentationCoordinator::new(surface(0));
+        coordinator.handle_event(environment(w)).expect("valid environment");
+
+        let class = only_profile(
+            coordinator
+                .handle_event(environment(w.saturating_sub(shrink)))
+                .expect("valid environment"),
+        )
+        .window_class;
+
+        prop_assert_eq!(class, expected_class(w));
     }
 
     /// Feature: generic_presentation_protocol.feature

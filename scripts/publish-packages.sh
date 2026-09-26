@@ -47,26 +47,33 @@ NC='\033[0m'
 # Note: pre-release versions (dev/rc) are allowed — CI rules control which tags
 # reach this job. Dev tags need publishing for test bindings.
 
-echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
-echo -e "${YELLOW}║     Publish Packages v$VERSION            ${NC}"
-echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}"
+printf '%b\n' "${YELLOW}╔════════════════════════════════════════╗${NC}"
+printf '%b\n' "${YELLOW}║     Publish Packages v$VERSION            ${NC}"
+printf '%b\n' "${YELLOW}╚════════════════════════════════════════╝${NC}"
 echo ""
 
 # Validate environment
 if [[ -z "$TOKEN" ]]; then
-    echo -e "${RED}Error: No authentication token found${NC}"
+    printf '%b\n' "${RED}Error: No authentication token found${NC}"
     echo "Set CI_JOB_TOKEN (in CI) or GITLAB_TOKEN (local) environment variable"
     exit 1
 fi
 
 if [[ -z "$PROJECT_ID" ]]; then
     # Try to get project ID from API
-    echo -e "${YELLOW}Fetching project ID...${NC}"
-    PROJECT_ID=$(curl -s --header "PRIVATE-TOKEN: $TOKEN" \
-        "$GITLAB_URL/api/v4/projects/vauchi%2Fcore" | jq -r '.id')
+    printf '%b\n' "${YELLOW}Fetching project ID...${NC}"
+    PROJECT_BODY=$(mktemp)
+    PROJECT_STATUS=$(curl --silent --show-error -o "$PROJECT_BODY" -w '%{http_code}' \
+        --header "PRIVATE-TOKEN: $TOKEN" \
+        "$GITLAB_URL/api/v4/projects/vauchi%2Fcore") || PROJECT_STATUS="000"
+    PROJECT_ID=""
+    if [[ "$PROJECT_STATUS" == "200" ]]; then
+        PROJECT_ID=$(jq -r '.id // empty' "$PROJECT_BODY")
+    fi
+    rm -f "$PROJECT_BODY"
 
-    if [[ "$PROJECT_ID" == "null" || -z "$PROJECT_ID" ]]; then
-        echo -e "${RED}Error: Could not determine project ID${NC}"
+    if [[ -z "$PROJECT_ID" ]]; then
+        printf '%b\n' "${RED}Error: Could not determine project ID (GitLab API returned HTTP ${PROJECT_STATUS})${NC}"
         echo "Set CI_PROJECT_ID or GITLAB_PROJECT_ID environment variable"
         exit 1
     fi
@@ -89,14 +96,15 @@ PACKAGE_URL="$GITLAB_URL/api/v4/projects/$PROJECT_ID/packages/generic/$PACKAGE_N
 
 upload_file() {
     local file="$1"
-    local filename=$(basename "$file")
+    local filename
+    filename=$(basename "$file")
 
     if [[ ! -f "$file" ]]; then
-        echo -e "${YELLOW}Skipping $filename (not found)${NC}"
+        printf '%b\n' "${YELLOW}Skipping $filename (not found)${NC}"
         return 0
     fi
 
-    echo -e "${YELLOW}Uploading $filename...${NC}"
+    printf '%b\n' "${YELLOW}Uploading $filename...${NC}"
 
     local response
     response=$(curl -s -w "\n%{http_code}" \
@@ -104,14 +112,15 @@ upload_file() {
         --upload-file "$file" \
         "$PACKAGE_URL/$filename")
 
-    local http_code=$(echo "$response" | tail -n1)
-    local body=$(echo "$response" | head -n -1)
+    local http_code body
+    http_code=$(echo "$response" | tail -n1)
+    body=$(echo "$response" | sed '$d')
 
     if [[ "$http_code" == "201" || "$http_code" == "200" ]]; then
-        echo -e "${GREEN}  ✓ Uploaded: $filename${NC}"
+        printf '%b\n' "${GREEN}  ✓ Uploaded: $filename${NC}"
         return 0
     elif [[ "$http_code" == "409" ]]; then
-        echo -e "${YELLOW}  ⚠ Already exists: $filename${NC}"
+        printf '%b\n' "${YELLOW}  ⚠ Already exists: $filename${NC}"
         return 0
     elif [[ "$http_code" == "400" && "$body" == *"Duplicate package is not allowed"* ]]; then
         # GitLab returns 400 (not 409) when the *generic-package*
@@ -123,10 +132,10 @@ upload_file() {
         # Request" we still want to fail loudly on. Recurrence note:
         # this is what skipped `update:swift-bindings` for core
         # v0.49.0 — see _private/docs/problems/2026-04-28-platform-swift-v0.28.1-tag-mismatch/.
-        echo -e "${YELLOW}  ⚠ Already exists (400 dup): $filename${NC}"
+        printf '%b\n' "${YELLOW}  ⚠ Already exists (400 dup): $filename${NC}"
         return 0
     else
-        echo -e "${RED}  ✗ Failed ($http_code): $filename${NC}"
+        printf '%b\n' "${RED}  ✗ Failed ($http_code): $filename${NC}"
         echo "  Response: $body"
         return 1
     fi
@@ -136,7 +145,7 @@ upload_file() {
 UPLOAD_SUCCESS=true
 
 # Upload iOS artifacts
-echo -e "${YELLOW}=== iOS Artifacts ===${NC}"
+printf '%b\n' "${YELLOW}=== iOS Artifacts ===${NC}"
 upload_file "$DIST_DIR/VauchiPlatformFFI.xcframework.zip" || UPLOAD_SUCCESS=false
 upload_file "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256" || UPLOAD_SUCCESS=false
 upload_file "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256.bundle" || UPLOAD_SUCCESS=false
@@ -144,14 +153,14 @@ upload_file "$DIST_DIR/VauchiPlatform-$VERSION.zip" || UPLOAD_SUCCESS=false
 
 # Upload Android artifacts
 echo ""
-echo -e "${YELLOW}=== Android Artifacts ===${NC}"
+printf '%b\n' "${YELLOW}=== Android Artifacts ===${NC}"
 upload_file "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip" || UPLOAD_SUCCESS=false
 upload_file "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256" || UPLOAD_SUCCESS=false
 upload_file "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256.bundle" || UPLOAD_SUCCESS=false
 
 # Upload SBOM artifacts (T0-2)
 echo ""
-echo -e "${YELLOW}=== SBOM Artifacts ===${NC}"
+printf '%b\n' "${YELLOW}=== SBOM Artifacts ===${NC}"
 for sbom in "$DIST_DIR"/*.sbom.json; do
     [ -f "$sbom" ] || continue
     upload_file "$sbom" || UPLOAD_SUCCESS=false
@@ -162,7 +171,7 @@ done
 # Upload SLSA provenance (G3)
 if [ -f "$DIST_DIR/provenance.intoto.jsonl" ]; then
     echo ""
-    echo -e "${YELLOW}=== SLSA Provenance ===${NC}"
+    printf '%b\n' "${YELLOW}=== SLSA Provenance ===${NC}"
     upload_file "$DIST_DIR/provenance.intoto.jsonl" || UPLOAD_SUCCESS=false
     upload_file "$DIST_DIR/provenance.intoto.jsonl.bundle" || UPLOAD_SUCCESS=false
 fi
@@ -170,9 +179,9 @@ fi
 echo ""
 
 if $UPLOAD_SUCCESS; then
-    echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║         Publish Complete               ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
+    printf '%b\n' "${GREEN}╔════════════════════════════════════════╗${NC}"
+    printf '%b\n' "${GREEN}║         Publish Complete               ║${NC}"
+    printf '%b\n' "${GREEN}╚════════════════════════════════════════╝${NC}"
     echo ""
     echo "Package URL:"
     echo "  $GITLAB_URL/vauchi/core/-/packages"
@@ -184,8 +193,8 @@ if $UPLOAD_SUCCESS; then
     echo "  Android:"
     echo "    $PACKAGE_URL/vauchi-platform-kotlin-$VERSION.zip"
 else
-    echo -e "${RED}╔════════════════════════════════════════╗${NC}"
-    echo -e "${RED}║         Publish Failed                 ║${NC}"
-    echo -e "${RED}╚════════════════════════════════════════╝${NC}"
+    printf '%b\n' "${RED}╔════════════════════════════════════════╗${NC}"
+    printf '%b\n' "${RED}║         Publish Failed                 ║${NC}"
+    printf '%b\n' "${RED}╚════════════════════════════════════════╝${NC}"
     exit 1
 fi

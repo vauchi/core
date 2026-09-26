@@ -246,3 +246,119 @@ fn test_all_apis_normal_mode_still_return_real() {
         "count must include real contacts in normal mode"
     );
 }
+
+// =============================================================================
+// #386: contact reads beyond the C-01 set must not reveal real state under
+// duress. Decoy mode must read as an almost unused app (ADR-032 addenda), so
+// real archived / hidden / blocked contacts, label members, and duplicate
+// pairs are all absent, and search covers decoys only.
+// =============================================================================
+
+/// Duress setup where `prepare` shapes real state before the duress unlock.
+fn setup_duress_after(
+    prepare: impl FnOnce(&vauchi_core::Vauchi, &str),
+) -> (vauchi_core::Vauchi, String /* bob_real_id */) {
+    let (mut alice_wb, _bob_wb, _secret, bob_id, _alice_id) = setup_alice_bob_exchange();
+    prepare(&alice_wb, &bob_id);
+    alice_wb
+        .setup_app_password("normal-pin")
+        .expect("setup app password");
+    alice_wb
+        .setup_duress_password("112233")
+        .expect("setup duress");
+    alice_wb
+        .add_decoy_contact("decoy-dana", "Decoy Dana", &ContactCard::new("Decoy Dana"))
+        .expect("add decoy");
+    assert_eq!(
+        alice_wb.authenticate("112233").expect("auth"),
+        AuthMode::Duress
+    );
+    (alice_wb, bob_id)
+}
+
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
+#[test]
+fn test_list_archived_contacts_duress_hides_real_archive() {
+    let (wb, _) = setup_duress_after(|wb, bob| wb.archive_contact(bob).expect("archive"));
+
+    assert_eq!(wb.list_archived_contacts().expect("list").len(), 0);
+}
+
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
+#[test]
+fn test_list_hidden_contacts_duress_hides_real_hidden() {
+    let (wb, _) = setup_duress_after(|wb, bob| wb.hide_contact(bob).expect("hide"));
+
+    assert_eq!(wb.list_hidden_contacts().expect("list").len(), 0);
+}
+
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
+#[test]
+fn test_list_blocked_contacts_duress_hides_real_blocked() {
+    let (wb, _) = setup_duress_after(|wb, bob| wb.block_contact(bob).expect("block"));
+
+    assert_eq!(wb.list_blocked_contacts().expect("list").len(), 0);
+}
+
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
+#[test]
+fn test_group_members_duress_hides_real_members() {
+    let label = std::cell::RefCell::new(String::new());
+    let (wb, _) = setup_duress_after(|wb, bob| {
+        let group = wb.create_group("Family").expect("group");
+        wb.add_contact_to_group(group.id(), bob).expect("member");
+        *label.borrow_mut() = group.id().to_string();
+    });
+
+    let members = wb.get_group_members(&label.borrow()).unwrap_or_default();
+    assert_eq!(members.len(), 0, "real label members leaked: {members:?}");
+}
+
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
+#[test]
+fn test_find_duplicates_duress_hides_real_pairs() {
+    let (wb, _) = setup_duress_after(|wb, bob| {
+        let name = wb
+            .get_contact(bob)
+            .expect("get")
+            .expect("bob")
+            .display_name()
+            .to_string();
+        let twin = vauchi_core::Contact::from_exchange(
+            [42u8; 32],
+            ContactCard::new(&name),
+            vauchi_core::SymmetricKey::generate(),
+            0,
+        );
+        wb.add_contact(twin).expect("twin");
+        assert!(
+            !wb.find_duplicates().expect("dupes").is_empty(),
+            "precondition: the real twins are detected as duplicates"
+        );
+    });
+
+    assert_eq!(wb.find_duplicates().expect("dupes").len(), 0);
+}
+
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
+#[test]
+fn test_search_contacts_faceted_duress_covers_decoys_only() {
+    let (wb, bob_id) = setup_duress_after(|_, _| {});
+    let facets = vauchi_core::api::SearchFacets::default();
+
+    let real = wb.search_contacts_faceted("", &facets).expect("search all");
+    assert!(
+        real.iter().all(|contact| contact.id() != bob_id),
+        "faceted search leaked the real contact"
+    );
+    let decoys = wb
+        .search_contacts_faceted("Decoy", &facets)
+        .expect("search decoy");
+    assert_eq!(
+        decoys
+            .iter()
+            .map(|contact| contact.display_name())
+            .collect::<Vec<_>>(),
+        ["Decoy Dana"]
+    );
+}

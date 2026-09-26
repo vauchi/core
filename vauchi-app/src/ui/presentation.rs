@@ -95,7 +95,7 @@ impl PresentationCoordinator {
             Event::PresentationEnvironmentChanged {
                 available_width, ..
             } => {
-                self.window_class = Some(classify_width(available_width));
+                self.window_class = Some(classify_width(self.window_class, available_width));
             }
             Event::SurfaceActivated { surface_id } => {
                 if !self.surface_is_visible(&surface_id)? {
@@ -142,12 +142,43 @@ impl PresentationCoordinator {
     }
 }
 
-fn classify_width(available_width: u32) -> WindowClass {
+/// Collapse lags expansion by this many logical units, so a window resting
+/// near a threshold (scrollbar toggling, edge drag) does not flip layouts
+/// (ADR-066 class-boundary hysteresis).
+const COLLAPSE_BAND: u32 = 32;
+
+fn classify_width(previous: Option<WindowClass>, available_width: u32) -> WindowClass {
+    let plain = threshold_class(available_width);
+    let Some(previous) = previous else {
+        return plain;
+    };
+    let damped = threshold_class(available_width.saturating_add(COLLAPSE_BAND));
+    let held = if rank(previous) < rank(damped) {
+        previous
+    } else {
+        damped
+    };
+    if rank(held) > rank(plain) {
+        held
+    } else {
+        plain
+    }
+}
+
+fn threshold_class(available_width: u32) -> WindowClass {
     if available_width < 600 {
         WindowClass::Compact
     } else if available_width < 840 {
         WindowClass::Medium
     } else {
         WindowClass::Expanded
+    }
+}
+
+fn rank(class: WindowClass) -> u8 {
+    match class {
+        WindowClass::Compact => 0,
+        WindowClass::Medium => 1,
+        _ => 2,
     }
 }

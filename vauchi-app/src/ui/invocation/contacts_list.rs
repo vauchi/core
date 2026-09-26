@@ -112,7 +112,7 @@ fn surface(
     if total == 0 {
         let hint = get_string(locale, "cli.contacts.list.no_contacts");
         let command = get_string(locale, "cli.contacts.list.exchange_command");
-        let title = hint.clone();
+        let title = get_string_with_args(locale, "cli.contacts.list.header", &[("count", "0")]);
         return one_shot_surface(
             SURFACE_ID,
             title,

@@ -66,32 +66,35 @@ impl MultiStageExchangeEngine {
 
     /// Peer-frame stall presentation (`_private/docs/backlog/
     /// 2026-09-10-exchange-stall-and-ble-fallback-states/README.md`).
-    /// Reuses `build_active_screen`'s own-QR and peer-scan components so
-    /// scanning keeps running: a newly decoded frame is exactly what
-    /// clears the stall, so the camera cannot be dropped from the screen
-    /// the way a terminal chrome would drop it. Only the banner and the
-    /// bottom action row are Stalled-specific.
+    /// Exactly `build_active_screen`'s layout, so scanning keeps running: a
+    /// newly decoded frame is what clears the stall. The warning rides in
+    /// the own-QR caption rather than a banner above it — a banner pushed
+    /// the scanner off the fixed layout on phone-sized viewports, where it
+    /// was disposed and the stall could never clear (vauchi/private#9).
+    /// Only the caption and the bottom action row are Stalled-specific.
     pub(super) fn build_stalled_screen(&self, title: String) -> ScreenModel {
         let mut screen = self.build_active_screen(title);
-        screen.components.insert(
-            0,
-            Component::StatusIndicator {
-                id: "stalled_status".into(),
-                icon: Some("clock.arrow.circlepath".into()),
-                title: self.t("exchange.stalled_title"),
+        let stalled_title = self.t("exchange.stalled_title");
+        for component in &mut screen.components {
+            if let Component::QrCode {
+                id, label, a11y, ..
+            } = component
+                && id == COMPONENT_ID_OWN_QR
+            {
                 // Keeps the frame current/total progress visible via the
                 // existing transferring-progress strings rather than
                 // duplicating that formatting in a new locale key.
-                detail: Some(own_qr_label(&self.state, self.locale)),
-                status: Status::Warning,
-                status_label: self.t(Status::Warning.label_key()),
-                a11y: Some(A11y {
-                    label: Some(self.t("exchange.stalled_title")),
+                *label = Some(format!(
+                    "{stalled_title} · {}",
+                    own_qr_label(&self.state, self.locale)
+                ));
+                *a11y = Some(A11y {
+                    label: Some(stalled_title.clone()),
                     hint: Some(self.t("exchange.stalled_detail")),
                     role: None,
-                }),
-            },
-        );
+                });
+            }
+        }
         screen.contextual_actions = vec![
             ScreenAction {
                 id: RETRY_ACTION_ID.into(),

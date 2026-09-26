@@ -27,7 +27,8 @@
 use vauchi_app::ui::testing::{assert_reachability_across_screens, check_reachability};
 use vauchi_app::ui::{
     BLE_EXCHANGE_ACTION_CANCEL, BLE_EXCHANGE_ACTION_CONNECT_CODE, BLE_EXCHANGE_ACTION_DONE,
-    BLE_EXCHANGE_ACTION_ENTER_CODE, BLE_EXCHANGE_ACTION_RETRY, BleExchangeEngine, WorkflowEngine,
+    BLE_EXCHANGE_ACTION_ENTER_CODE, BLE_EXCHANGE_ACTION_RETRY, BLE_EXCHANGE_ACTION_SWITCH_CAMERA,
+    BleExchangeEngine, WorkflowEngine,
 };
 use vauchi_core::Event;
 use vauchi_core::exchange::mode::ExchangeMode;
@@ -51,10 +52,11 @@ const FAILED_HANDLED: &[&str] = &[
     BLE_EXCHANGE_ACTION_CANCEL,
 ];
 
-/// Glance with a camera: scan node + `enter_code` (→ the text input, whose
-/// `connect_code` with an empty buffer fails to the retry screen) + `cancel`.
-/// The failed screen's `fallback_*`/`retry` close the set.
+/// Glance with a camera: scan node + `switch_camera` + `enter_code` (→ the
+/// text input, whose `connect_code` with an empty buffer fails to the retry
+/// screen) + `cancel`. The failed screen's `fallback_*`/`retry` close the set.
 const GLANCE_CAMERA_HANDLED: &[&str] = &[
+    BLE_EXCHANGE_ACTION_SWITCH_CAMERA,
     BLE_EXCHANGE_ACTION_ENTER_CODE,
     BLE_EXCHANGE_ACTION_CONNECT_CODE,
     BLE_EXCHANGE_ACTION_RETRY,

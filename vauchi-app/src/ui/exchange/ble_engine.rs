@@ -152,6 +152,9 @@ pub struct BleExchangeEngine {
     glance_qr: Option<String>,
     locale: Locale,
     glance_code_entry: GlanceCodeEntry,
+    /// Glance scans with the rear camera unless the user switched; kept
+    /// across Retry so a re-entry does not undo the choice.
+    use_front_camera: bool,
 }
 
 impl BleExchangeEngine {
@@ -183,6 +186,7 @@ impl BleExchangeEngine {
             glance_qr,
             locale,
             glance_code_entry: Self::initial_glance_code_entry(has_camera),
+            use_front_camera: false,
         }
     }
 
@@ -268,6 +272,17 @@ impl BleExchangeEngine {
                     a11y: None,
                 });
                 actions.push(ScreenAction {
+                    id: ACTION_SWITCH_CAMERA.into(),
+                    label: self.t(if self.use_front_camera {
+                        "multi_stage.use_rear_camera_button"
+                    } else {
+                        "multi_stage.use_front_camera_button"
+                    }),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                });
+                actions.push(ScreenAction {
                     id: ACTION_ENTER_CODE.into(),
                     label: self.t("exchange.ble.glance_enter_code"),
                     style: ActionStyle::Secondary,
@@ -327,6 +342,17 @@ impl BleExchangeEngine {
             return None;
         }
         match action {
+            UserAction::ActionPressed { action_id }
+                if action_id == ACTION_SWITCH_CAMERA
+                    && matches!(self.glance_code_entry, GlanceCodeEntry::Scanning) =>
+            {
+                self.use_front_camera = !self.use_front_camera;
+                return Some(ActionResult::Commands {
+                    commands: vec![Command::SwitchCamera {
+                        use_front: self.use_front_camera,
+                    }],
+                });
+            }
             UserAction::ActionPressed { action_id } if action_id == ACTION_ENTER_CODE => {
                 self.glance_code_entry = GlanceCodeEntry::Typing {
                     code: String::new(),
@@ -630,7 +656,9 @@ impl WorkflowEngine for BleExchangeEngine {
 
         let mut commands = Vec::with_capacity(3);
         if self.mode == ExchangeMode::Glance {
-            commands.push(Command::SwitchCamera { use_front: false });
+            commands.push(Command::SwitchCamera {
+                use_front: self.use_front_camera,
+            });
         }
         commands.extend(self.start_commands());
         commands

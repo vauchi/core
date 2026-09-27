@@ -84,13 +84,14 @@ impl AppEngine {
                 // with an optional label override; unknown
                 // aliases fall back to `FieldType::Custom`
                 // (mirrors the entry-detail pattern at
-                // routing.rs:511-520). Errors are swallowed
-                // per the existing groups-loop convention —
-                // partial-fields failure is recoverable: the
-                // user can add missing fields manually from
-                // MyInfo. Crash-resume semantics covered in
-                // slice 32c S3.
+                // routing.rs:511-520). A failed save does not
+                // abort completion — the user can re-add the
+                // detail from MyInfo — but it is counted and
+                // reported, because a silently dropped detail
+                // reads as saved
+                // (2026-08-07-onboarding-contact-info-silently-dropped).
                 let now = self.vauchi.clock().unix_seconds();
+                let mut unsaved_fields = 0_usize;
                 for setup in &onboarding_fields {
                     let (field_type, alias_label) = FieldType::from_alias(&setup.field_type)
                         .unwrap_or((FieldType::Custom, None));
@@ -101,11 +102,22 @@ impl AppEngine {
                         &setup.value,
                         now,
                     );
-                    // best-effort: partial-fields failure is
-                    // recoverable; user can add missing fields
-                    // manually from MyInfo
-                    #[allow(clippy::let_underscore_must_use)]
-                    let _ = self.vauchi.add_own_field(field);
+                    if self.vauchi.add_own_field(field).is_err() {
+                        unsaved_fields += 1;
+                    }
+                }
+                if unsaved_fields > 0 {
+                    self.pending_commands
+                        .push_back(vauchi_core::Command::PresentAlert {
+                            alert: vauchi_core::AlertSpec {
+                                title: self.t("onboarding.fields_not_saved_title"),
+                                message: crate::i18n::get_string_with_args(
+                                    self.render_context.resolved_locale(),
+                                    "onboarding.fields_not_saved_message",
+                                    &[("count", &unsaved_fields.to_string())],
+                                ),
+                            },
+                        });
                 }
                 let target = AppScreen::MyInfo;
                 let screen = self.navigate_to_internal(target);

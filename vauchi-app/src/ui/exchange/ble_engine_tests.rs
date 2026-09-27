@@ -341,13 +341,13 @@ fn glance_screen_entered_selects_rear_camera_before_ble_bootstrap() {
 
     let commands = engine.screen_entered();
 
-    assert_eq!(commands.len(), 3);
+    assert_eq!(commands.len(), 4);
     assert!(matches!(
-        commands[0],
+        commands[1],
         Command::SwitchCamera { use_front: false }
     ));
-    assert!(matches!(commands[1], Command::BleStartAdvertising { .. }));
-    assert!(matches!(commands[2], Command::BleStartScanning { .. }));
+    assert!(matches!(commands[2], Command::BleStartAdvertising { .. }));
+    assert!(matches!(commands[3], Command::BleStartScanning { .. }));
     assert!(
         engine.screen_entered().is_empty(),
         "Glance must not restart camera or BLE hardware on re-render"
@@ -370,7 +370,7 @@ fn glance_screen_entered_sets_the_exchange_brightness_first() {
 
     assert_eq!(
         commands.first(),
-        Some(&Command::SetScreenBrightness { level: Some(0.65) })
+        Some(&Command::SetScreenBrightness { level: Some(0.35) })
     );
 }
 
@@ -1017,10 +1017,7 @@ fn glance_retry_reselects_the_camera_the_user_chose() {
     let commands = engine.screen_entered();
 
     assert!(
-        matches!(
-            commands.first(),
-            Some(Command::SwitchCamera { use_front: true })
-        ),
+        commands.contains(&Command::SwitchCamera { use_front: true }),
         "retry must re-enter on the front camera the user picked, got {commands:?}"
     );
 }

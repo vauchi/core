@@ -648,6 +648,13 @@ impl BleExchangeEngine {
     }
 }
 
+/// Lower than Hover's 0.65 because Glance's single QR is denser (v11): a
+/// front camera auto-exposes for the dark phone around the screen, so a
+/// bright QR blooms and its modules smear. Pixel 3a reading an iPhone SE:
+/// 0/3 at max, 0/3 at 0.65, 3/3 at 0.35 with a 320 pt QR
+/// (`2026-09-26-exchange-baseline` GXP-5, GXP-9, GXP-13).
+const GLANCE_QR_BRIGHTNESS: f32 = 0.35;
+
 impl WorkflowEngine for BleExchangeEngine {
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
@@ -661,14 +668,25 @@ impl WorkflowEngine for BleExchangeEngine {
         }
         self.started = true;
 
-        let mut commands = Vec::with_capacity(3);
+        let mut commands = Vec::with_capacity(4);
         if self.mode == ExchangeMode::Glance {
+            commands.push(Command::SetScreenBrightness {
+                level: Some(GLANCE_QR_BRIGHTNESS),
+            });
             commands.push(Command::SwitchCamera {
                 use_front: self.use_front_camera,
             });
         }
         commands.extend(self.start_commands());
         commands
+    }
+
+    fn screen_exited(&mut self) -> Vec<Command> {
+        if self.mode == ExchangeMode::Glance {
+            vec![Command::SetScreenBrightness { level: None }]
+        } else {
+            Vec::new()
+        }
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {

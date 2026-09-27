@@ -671,6 +671,46 @@ fn glance_orchestration_scanner_ignores_foreign_advertiser() {
     );
 }
 
+// Phones advertise only the first two token bytes (a 16-bit service UUID,
+// `BleUuids.ADV_TOKEN_BYTES` / `BleUuids.swift`), so a discovery carries a
+// 2-byte adv_data. Matching it against the full 32-byte pin never succeeded
+// on a device: the scanner decoded the peer's QR and then timed out with
+// "Nothing found" (vauchi/private#9, run GL-5a). The handshake still pins
+// the full identity, exchange key and nonce, so a prefix twin cannot finish.
+// @internal
+#[test]
+fn glance_scanner_connects_on_the_advertised_two_byte_prefix() {
+    let mut alice = fresh_engine("Alice");
+    let mut bob = fresh_engine("Bob");
+    let alice_qr = alice.begin_glance_display().expect("alice QR");
+    bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
+
+    bob.handle_glance_discovery("alice-device", &signing_key(&alice)[..2]);
+
+    assert!(bob.ble_handshake_session_active());
+    assert!(
+        bob.drain_pending_commands()
+            .iter()
+            .any(|c| matches!(c, vauchi_core::Command::BleConnect { device_id } if device_id == "alice-device")),
+        "the scanner must connect to the advertiser carrying the scanned prefix"
+    );
+}
+
+// @scenario: ble_exchange :: Glance scanner ignores an advertiser it did not scan (F1 dissolves)
+#[test]
+fn glance_scanner_ignores_a_different_two_byte_prefix() {
+    let mut alice = fresh_engine("Alice");
+    let mut bob = fresh_engine("Bob");
+    let alice_qr = alice.begin_glance_display().expect("alice QR");
+    bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
+    let alice_id = signing_key(&alice);
+
+    bob.handle_glance_discovery("other-device", &[alice_id[0] ^ 0xFF, alice_id[1]]);
+
+    assert!(!bob.ble_handshake_session_active());
+    assert!(bob.drain_pending_commands().is_empty());
+}
+
 // @scenario: exchange :: BLE failure falls back to Link instead of cancelling
 // @internal
 #[test]

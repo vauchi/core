@@ -88,6 +88,8 @@ pub mod http_adapter;
 pub mod http_transport;
 #[cfg(feature = "network-http")]
 pub mod ohttp_client;
+#[cfg(feature = "network-http")]
+pub mod ohttp_probe;
 pub mod pinning;
 pub use crate::relay_url;
 pub mod revocation;

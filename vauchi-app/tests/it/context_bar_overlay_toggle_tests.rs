@@ -277,3 +277,53 @@ fn the_menu_reopens_after_navigating_away_and_back() {
         "the menu must open again after a round trip; got {reopened:#?}"
     );
 }
+
+fn presented_overlay(commands: &[Command]) -> Option<(usize, vauchi_core::OverlaySpec)> {
+    commands.iter().enumerate().find_map(|(index, c)| match c {
+        Command::PresentOverlay { overlay, .. } => Some((index, overlay.clone())),
+        _ => None,
+    })
+}
+
+// The wakeup tick invalidates the presentation while a menu is open. The
+// rebuild re-applies the surface, which drops any overlay on the shell, so
+// it must re-present the menu Core still records as open — otherwise the
+// menu vanishes within a second and the next tap only closes a menu nobody
+// can see (vauchi/private#9, runs GL-4f/GL-4g).
+// @internal
+#[test]
+fn invalidation_rebuild_keeps_the_open_overlay_on_screen() {
+    let mut engine = engine_with_identity();
+    let (surface_id, interaction_id) = context_interaction(&mut engine, "secondary");
+    let (_, opened) = presented_overlay(&activate(&mut engine, &surface_id, &interaction_id))
+        .expect("first activation presents the overlay");
+
+    let rebuilt = engine
+        .dispatch(Event::PresentationInvalidated)
+        .expect("invalidation rebuild");
+
+    let (overlay_at, overlay) = presented_overlay(&rebuilt).unwrap_or_else(|| {
+        panic!("the rebuild must re-present the open overlay; got {rebuilt:#?}")
+    });
+    assert_eq!(overlay, opened);
+    let surface_at = rebuilt
+        .iter()
+        .position(|c| matches!(c, Command::ReplaceSurface { .. }))
+        .expect("the rebuild replaces the surface");
+    assert!(
+        overlay_at > surface_at,
+        "the overlay must follow the surface it sits on, or the shell drops it again"
+    );
+}
+
+// @internal
+#[test]
+fn rebuild_without_an_open_overlay_presents_none() {
+    let mut engine = engine_with_identity();
+
+    let rebuilt = engine
+        .dispatch(Event::PresentationInvalidated)
+        .expect("invalidation rebuild");
+
+    assert_eq!(overlay_commands(&rebuilt), (0, 0));
+}

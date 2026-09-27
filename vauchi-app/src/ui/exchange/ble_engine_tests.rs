@@ -987,3 +987,26 @@ fn glance_offers_no_camera_switch_without_a_camera_or_while_typing() {
         "the code input replaces the camera, so there is nothing to switch"
     );
 }
+
+// A scrolling Glance screen put the full-width QR under the bottom action
+// bar on the iPhone SE: its bottom-left finder pattern was hidden and no peer
+// could decode it (vauchi/private#9, run GXP-3). Hover already sizes its QR to
+// the viewport with the fixed layout.
+// @internal
+#[test]
+fn glance_scan_screen_fits_the_viewport() {
+    assert_eq!(
+        glance_engine(true).current_screen().layout,
+        ScreenLayout::Fixed
+    );
+}
+
+// The manual code step carries a text input and the keyboard, so it scrolls.
+// @internal
+#[test]
+fn glance_code_entry_still_scrolls() {
+    assert_eq!(
+        glance_engine(false).current_screen().layout,
+        ScreenLayout::Scroll
+    );
+}

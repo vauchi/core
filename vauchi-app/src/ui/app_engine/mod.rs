@@ -58,6 +58,7 @@ pub use {
     navigation::TabLayout, overlays::SyncChromeStatus, presentation_protocol::AppPresentationError,
 };
 
+use ble_handshake::GlanceDial;
 use std::collections::HashMap;
 use std::sync::mpsc;
 
@@ -230,6 +231,9 @@ pub struct AppEngine {
     /// report each advertiser once per scan session, so the scanned peer's
     /// only discovery usually precedes the scan (vauchi/private#9).
     glance_pre_scan_discoveries: Vec<(String, Vec<u8>)>,
+    /// The scanner's pinned connect to the scanned peer and how many times it
+    /// has been redialled after failing before any link existed.
+    glance_dial: Option<GlanceDial>,
     /// The base64 OOB QR this device displays for Glance, generated ONCE on
     /// screen entry (never per-render — regenerating rotates the nonce and
     /// breaks the pin) and injected into the `BleExchangeEngine`'s screen.
@@ -511,6 +515,7 @@ impl AppEngine {
             glance_display_nonce: None,
             glance_scanned: None,
             glance_pre_scan_discoveries: Vec::new(),
+            glance_dial: None,
             glance_display_qr: None,
             presentation_coordinator,
             retained_detail_screen: None,

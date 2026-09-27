@@ -891,10 +891,11 @@ fn screen_id(engine: &AppEngine) -> String {
 fn glance_scanner_redials_when_its_dial_fails_before_a_link() {
     let mut alice = fresh_engine("Alice");
     let mut bob = glance_scanner_dialing(&mut alice);
+    let dialing_screen = screen_id(&bob);
 
     dial_fails_before_a_link(&mut bob);
 
-    assert_eq!(screen_id(&bob), "exchange_ble_glance");
+    assert_eq!(screen_id(&bob), dialing_screen);
     assert!(
         connects_to(&mut bob, "alice-device"),
         "redial to the scanned peer"
@@ -914,5 +915,5 @@ fn glance_scanner_gives_up_after_its_redials_are_spent() {
     dial_fails_before_a_link(&mut bob);
 
     assert!(!connects_to(&mut bob, "alice-device"));
-    assert_ne!(screen_id(&bob), "exchange_ble_glance");
+    assert_eq!(screen_id(&bob), "exchange_failed");
 }

@@ -252,6 +252,11 @@ impl AppEngine {
         {
             return None;
         }
+        if let Event::BleDisconnected { device_id, .. } = &event
+            && self.redial_glance_after_failed_dial(device_id)
+        {
+            return None;
+        }
 
         // ADR-031: For error events, build a user-friendly UI response
         // before delegating to the engine (which may transition to Failed).

@@ -61,6 +61,16 @@ const MIN_ADVERTISED_PREFIX_BYTES: usize = 2;
 /// any nearby device, so the memory is bounded and keeps the newest.
 const MAX_PRE_SCAN_DISCOVERIES: usize = 8;
 
+/// An Android central's dial to an iPhone can end in GATT status 133 before
+/// any link exists, typically transiently (vauchi/private#9, GXP-8c). Only
+/// the Glance scanner dials, so without a redial nobody reconnects.
+pub(super) const MAX_GLANCE_REDIALS: u8 = 2;
+
+pub(super) struct GlanceDial {
+    device_id: String,
+    redials: u8,
+}
+
 /// Wraps the machine on `AppEngine`. Same shape as
 /// `multi_stage_exchange::MultiStageHolder`.
 pub(crate) struct BleHandshakeHolder {
@@ -488,9 +498,40 @@ impl AppEngine {
             card,
             Some(binding),
         );
+        self.glance_dial = Some(GlanceDial {
+            device_id: device_id.to_string(),
+            redials: 0,
+        });
         self.extend_pending_commands(vec![vauchi_core::Command::BleConnect {
             device_id: device_id.to_string(),
         }]);
+    }
+
+    /// Redial the Glance scanner's pinned peer when its dial ended before any
+    /// link existed, within [`MAX_GLANCE_REDIALS`]. Returns `true` when the
+    /// disconnect was consumed by a redial. A lost *established* link is not
+    /// redialled: that stays a failure.
+    pub(crate) fn redial_glance_after_failed_dial(&mut self, device_id: &str) -> bool {
+        let before_any_link = self
+            .ble_handshake_session
+            .as_ref()
+            .is_some_and(|h| !h.machine.is_terminal() && h.machine.active_link().is_none());
+        let Some(dial) = self.glance_dial.as_mut() else {
+            return false;
+        };
+        if !before_any_link || dial.device_id != device_id || dial.redials >= MAX_GLANCE_REDIALS {
+            return false;
+        }
+        dial.redials += 1;
+        tracing::info!(
+            "[Glance] dial ended before a link — redial {}/{}",
+            dial.redials,
+            MAX_GLANCE_REDIALS
+        );
+        self.extend_pending_commands(vec![vauchi_core::Command::BleConnect {
+            device_id: device_id.to_string(),
+        }]);
+        true
     }
 
     /// Tear down BLE-exchange state on leaving the screen. The handshake
@@ -513,6 +554,7 @@ impl AppEngine {
             self.glance_display_nonce = None;
             self.glance_scanned = None;
             self.glance_pre_scan_discoveries.clear();
+            self.glance_dial = None;
         }
     }
 

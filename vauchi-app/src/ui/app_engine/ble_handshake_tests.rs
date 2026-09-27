@@ -696,6 +696,49 @@ fn glance_scanner_connects_on_the_advertised_two_byte_prefix() {
     );
 }
 
+fn connects_to(engine: &mut AppEngine, device: &str) -> bool {
+    engine
+        .drain_pending_commands()
+        .iter()
+        .any(|c| matches!(c, vauchi_core::Command::BleConnect { device_id } if device_id == device))
+}
+
+// A phone reports each advertiser once per scan session, and on a desk both
+// phones advertise before anyone scans — so the scanned peer's only
+// discovery arrives before the scan (vauchi/private#9, run GL-6b).
+// @internal
+#[test]
+fn glance_scanner_connects_to_a_peer_discovered_before_the_scan() {
+    let mut alice = fresh_engine("Alice");
+    let mut bob = fresh_engine("Bob");
+    let alice_qr = alice.begin_glance_display().expect("alice QR");
+    bob.handle_glance_discovery("alice-device", &signing_key(&alice)[..2]);
+    assert!(!connects_to(&mut bob, "alice-device"), "not scanned yet");
+
+    bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
+
+    assert!(connects_to(&mut bob, "alice-device"));
+}
+
+// Adverts come from any nearby device; the remembered set is bounded and
+// keeps the newest, so a flood cannot grow it or push out the peer seen last.
+// @internal
+#[test]
+fn a_flood_of_pre_scan_advertisers_keeps_the_newest_peer() {
+    let mut alice = fresh_engine("Alice");
+    let mut bob = fresh_engine("Bob");
+    let alice_qr = alice.begin_glance_display().expect("alice QR");
+    let alice_id = signing_key(&alice);
+    for i in 0..100u8 {
+        bob.handle_glance_discovery(&format!("stranger-{i}"), &[alice_id[0] ^ 0xFF, i]);
+    }
+    bob.handle_glance_discovery("alice-device", &alice_id[..2]);
+
+    bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
+
+    assert!(connects_to(&mut bob, "alice-device"));
+}
+
 // @scenario: ble_exchange :: Glance scanner ignores an advertiser it did not scan (F1 dissolves)
 #[test]
 fn glance_scanner_ignores_a_different_two_byte_prefix() {

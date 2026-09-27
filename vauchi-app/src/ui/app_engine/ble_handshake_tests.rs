@@ -856,3 +856,63 @@ fn fallback_to_glance_keeps_the_groups_picked_for_the_failed_attempt() {
     ));
     assert_eq!(engine.pending_exchange_groups, vec![work]);
 }
+
+fn glance_scanner_dialing(alice: &mut AppEngine) -> AppEngine {
+    let mut bob = fresh_engine("Bob");
+    let alice_qr = alice.begin_glance_display().expect("alice QR");
+    let _ = bob.navigate_to(AppScreen::Exchange);
+    let _ = bob.navigate_to(AppScreen::BleExchange {
+        mode: vauchi_core::exchange::mode::ExchangeMode::Glance,
+    });
+    bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
+    bob.handle_glance_discovery("alice-device", &signing_key(alice)[..2]);
+    assert!(connects_to(&mut bob, "alice-device"), "first dial");
+    bob
+}
+
+fn dial_fails_before_a_link(engine: &mut AppEngine) {
+    let _ = engine.handle_hardware_event(Event::BleDisconnected {
+        device_id: "alice-device".into(),
+        direction: BleLinkDirection::Outbound,
+        reason: "status=133".into(),
+    });
+}
+
+fn screen_id(engine: &AppEngine) -> String {
+    crate::ui::engine::WorkflowEngine::current_screen(engine).screen_id
+}
+
+// An Android central's first dial to an iPhone can end in GATT status 133
+// before any link exists; the Glance exchange then failed on the spot, since
+// only the scanner dials and the displayer never retries (vauchi/private#9,
+// run GXP-8c).
+// @scenario: contact_exchange.feature :: Glance redials a connection that never established
+#[test]
+fn glance_scanner_redials_when_its_dial_fails_before_a_link() {
+    let mut alice = fresh_engine("Alice");
+    let mut bob = glance_scanner_dialing(&mut alice);
+
+    dial_fails_before_a_link(&mut bob);
+
+    assert_eq!(screen_id(&bob), "exchange_ble_glance");
+    assert!(
+        connects_to(&mut bob, "alice-device"),
+        "redial to the scanned peer"
+    );
+}
+
+// @scenario: contact_exchange.feature :: Glance redials a connection that never established
+#[test]
+fn glance_scanner_gives_up_after_its_redials_are_spent() {
+    let mut alice = fresh_engine("Alice");
+    let mut bob = glance_scanner_dialing(&mut alice);
+    for _ in 0..2 {
+        dial_fails_before_a_link(&mut bob);
+        assert!(connects_to(&mut bob, "alice-device"));
+    }
+
+    dial_fails_before_a_link(&mut bob);
+
+    assert!(!connects_to(&mut bob, "alice-device"));
+    assert_ne!(screen_id(&bob), "exchange_ble_glance");
+}

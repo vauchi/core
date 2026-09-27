@@ -368,6 +368,17 @@ impl BleExchangeFlow {
     }
 
     fn handle_discovering(&mut self, event: &Event) -> BleHardwareOutcome {
+        // Glance keeps its QR + scanner up until a link exists: a discovered
+        // advertiser is not necessarily the scanned peer, and leaving
+        // Discovering would drop the screen the scan needs. The link comes from
+        // the AppEngine's pinned connect (`handle_glance_discovery`) or from
+        // the scanning peer connecting to us.
+        if self.mode == ExchangeMode::Glance {
+            return match event {
+                Event::BleConnected { .. } => self.handle_handshaking(event),
+                _ => BleHardwareOutcome::Ignored,
+            };
+        }
         if let Event::BleDeviceDiscovered { id, adv_data, .. } = event {
             self.connected_device = Some(id.clone());
             self.step = BleStep::Handshaking;

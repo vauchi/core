@@ -1556,6 +1556,8 @@
   "onboarding.error_display_name_required": "Please enter a display name",
   "onboarding.error_name_required": "Please enter your name.",
   "onboarding.exchange_cards": "Exchange cards",
+  "onboarding.fields_not_saved_message": "{count} of the details you entered couldn't be saved. Add them again from My Info.",
+  "onboarding.fields_not_saved_title": "Some details weren't saved",
   "onboarding.groups_add": "Add group",
   "onboarding.groups_custom_a11y": "Custom group name input",
   "onboarding.groups_custom_a11y_hint": "Enter a name for a custom contact group",

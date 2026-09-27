@@ -225,6 +225,11 @@ pub struct AppEngine {
     /// its presence latches this device into the scanner role.
     glance_display_nonce: Option<[u8; 16]>,
     glance_scanned: Option<crate::orchestrator::ble_handshake_machine::BleOobBinding>,
+    /// Advertisers discovered before this device scanned a Glance QR, as
+    /// (device id, advertised token prefix), newest last and bounded. Phones
+    /// report each advertiser once per scan session, so the scanned peer's
+    /// only discovery usually precedes the scan (vauchi/private#9).
+    glance_pre_scan_discoveries: Vec<(String, Vec<u8>)>,
     /// The base64 OOB QR this device displays for Glance, generated ONCE on
     /// screen entry (never per-render — regenerating rotates the nonce and
     /// breaks the pin) and injected into the `BleExchangeEngine`'s screen.
@@ -505,6 +510,7 @@ impl AppEngine {
             pending_ble_terminal_invalidation: false,
             glance_display_nonce: None,
             glance_scanned: None,
+            glance_pre_scan_discoveries: Vec::new(),
             glance_display_qr: None,
             presentation_coordinator,
             retained_detail_screen: None,

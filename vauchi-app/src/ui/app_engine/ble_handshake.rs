@@ -57,6 +57,10 @@ use vauchi_core::exchange::{BleCardPayload, BleExchangeResult};
 /// 16-bit service-UUID token. Anything shorter would match nearly everyone.
 const MIN_ADVERTISED_PREFIX_BYTES: usize = 2;
 
+/// How many pre-scan Glance advertisers are remembered. Adverts come from
+/// any nearby device, so the memory is bounded and keeps the newest.
+const MAX_PRE_SCAN_DISCOVERIES: usize = 8;
+
 /// Wraps the machine on `AppEngine`. Same shape as
 /// `multi_stage_exchange::MultiStageHolder`.
 pub(crate) struct BleHandshakeHolder {
@@ -389,6 +393,11 @@ impl AppEngine {
             oob_nonce_echo: Some(qr.oob_nonce()),
             required_oob_nonce: None,
         });
+        // The scanned peer was most likely discovered before the scan and will
+        // not be reported again; re-check what we saw through the same gate.
+        for (device_id, adv_data) in std::mem::take(&mut self.glance_pre_scan_discoveries) {
+            self.handle_glance_discovery(&device_id, &adv_data);
+        }
         Ok(())
     }
 
@@ -425,6 +434,16 @@ impl AppEngine {
     /// the initiator session with the scanned pins and drains a
     /// `Command::BleConnect`. A no-op for a non-scanner or a non-matching
     /// advertiser — asymmetric discovery, no tiebreak, no latch race.
+    fn remember_pre_scan_discovery(&mut self, device_id: &str, adv_data: &[u8]) {
+        self.glance_pre_scan_discoveries
+            .retain(|(known, _)| known != device_id);
+        if self.glance_pre_scan_discoveries.len() == MAX_PRE_SCAN_DISCOVERIES {
+            self.glance_pre_scan_discoveries.remove(0);
+        }
+        self.glance_pre_scan_discoveries
+            .push((device_id.to_string(), adv_data.to_vec()));
+    }
+
     pub fn handle_glance_discovery(&mut self, device_id: &str, adv_data: &[u8]) {
         // Dev instrumentation (vauchi/private#9 GL-6): lengths and decisions
         // only — no identity bytes.
@@ -433,6 +452,7 @@ impl AppEngine {
                 "[Glance] discovery adv_len={} — not scanned yet",
                 adv_data.len()
             );
+            self.remember_pre_scan_discovery(device_id, adv_data);
             return; // not the scanner — this device waits to be connected to
         };
         let Some(expected) = binding.expected_peer else {
@@ -492,6 +512,7 @@ impl AppEngine {
             self.glance_display_qr = None;
             self.glance_display_nonce = None;
             self.glance_scanned = None;
+            self.glance_pre_scan_discoveries.clear();
         }
     }
 

@@ -127,39 +127,72 @@ mod tests {
         unsafe { crate::vauchi_string_free(fixture_ptr) };
     }
 
-    /// Feature: generic_presentation_protocol.feature
-    /// Scenario: Invalid boundary input fails safely
-    // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
-    #[test]
-    fn c_abi_rejects_oversized_event_json() {
+    /// Dispatch one event through a fresh app handle and return the raw reply.
+    fn dispatch_to_json(event_json: &str) -> String {
         // SAFETY: The default constructor has no pointer inputs and returns an owned handle.
         let app = unsafe { crate::vauchi_app_create() };
         assert!(!app.is_null());
-        let event = CString::new(format!(
-            "\"PresentationInvalidated\"{padding}",
-            padding = " ".repeat(vauchi_core::MAX_EVENT_JSON_BYTES)
-        ))
-        .unwrap();
-
+        let event = CString::new(event_json).unwrap();
         // SAFETY: The handle and NUL-terminated event string are owned by this test.
         let response_ptr = unsafe { vauchi_app_dispatch(app, event.as_ptr()) };
         assert!(!response_ptr.is_null());
         // SAFETY: The C ABI returned a valid string owned by this test.
-        let response = unsafe { CStr::from_ptr(response_ptr) }.to_str().unwrap();
-        let response: serde_json::Value = serde_json::from_str(response).unwrap();
-        assert_eq!(
-            response["error"],
-            format!(
-                "event JSON exceeds {} bytes",
-                vauchi_core::MAX_EVENT_JSON_BYTES
-            )
-        );
-
+        let response = unsafe { CStr::from_ptr(response_ptr) }
+            .to_str()
+            .unwrap()
+            .to_owned();
         // SAFETY: Both pointers are owned by the C ABI and freed exactly once.
         unsafe {
             crate::vauchi_string_free(response_ptr);
             crate::vauchi_app_destroy(app);
         }
+        response
+    }
+
+    /// A rejection answers with Core-prepared copy, never its own text
+    /// (ADR-045 Am1, DC-05).
+    fn assert_prepared_rejection_alert(response: &str, rejection_text: &str) {
+        let batch: serde_json::Value = serde_json::from_str(response).unwrap();
+        let alert = &batch["commands"][0]["PresentAlert"]["alert"];
+        assert_eq!(alert["title"], "Error", "prepared title, got {batch}");
+        assert_eq!(
+            alert["message"], "Something went wrong",
+            "prepared message, got {batch}"
+        );
+        assert!(
+            !response.contains(rejection_text),
+            "the rejection's own text must not reach the shell, got {batch}"
+        );
+    }
+
+    /// Feature: generic_presentation_protocol.feature
+    /// Scenario: Invalid boundary input fails safely
+    // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+    #[test]
+    fn c_abi_explains_oversized_event_json_with_a_prepared_alert() {
+        let response = dispatch_to_json(&format!(
+            "\"PresentationInvalidated\"{padding}",
+            padding = " ".repeat(vauchi_core::MAX_EVENT_JSON_BYTES)
+        ));
+
+        assert_prepared_rejection_alert(&response, "exceeds");
+    }
+
+    // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+    #[test]
+    fn c_abi_explains_an_event_for_an_inactive_surface_with_a_prepared_alert() {
+        let response = dispatch_to_json(
+            &serde_json::json!({
+                "ValueChanged": {
+                    "surface_id": "surface",
+                    "binding_id": "binding",
+                    "value": { "text": "short" },
+                }
+            })
+            .to_string(),
+        );
+
+        assert_prepared_rejection_alert(&response, "surface is not active");
     }
 
     // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely

@@ -53,6 +53,10 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::X3DHKeyPair;
 use vauchi_core::exchange::{BleCardPayload, BleExchangeResult};
 
+/// Shortest advertised token prefix a Glance scanner accepts: the phones'
+/// 16-bit service-UUID token. Anything shorter would match nearly everyone.
+const MIN_ADVERTISED_PREFIX_BYTES: usize = 2;
+
 /// Wraps the machine on `AppEngine`. Same shape as
 /// `multi_stage_exchange::MultiStageHolder`.
 pub(crate) struct BleHandshakeHolder {
@@ -428,7 +432,10 @@ impl AppEngine {
         let Some(expected) = binding.expected_peer else {
             return;
         };
-        if adv_data != &expected[..] {
+        // Phones advertise only a 2-byte prefix of the token (a 16-bit service
+        // UUID), so match on the prefix; the handshake still pins the full
+        // identity, exchange key and OOB nonce, so a prefix twin cannot finish.
+        if adv_data.len() < MIN_ADVERTISED_PREFIX_BYTES || !expected.starts_with(adv_data) {
             return; // an advertiser we did not scan — ignore it
         }
         if self.ble_handshake_session_active() {

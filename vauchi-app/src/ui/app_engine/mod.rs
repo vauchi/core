@@ -244,7 +244,8 @@ pub struct AppEngine {
     /// to make the context-bar buttons toggle: activating the affordance
     /// that opened an overlay closes it instead of re-presenting it. Cleared
     /// when the shell reports its own dismissal via `Event::OverlayDismissed`.
-    open_overlay: Option<(vauchi_core::SurfaceId, vauchi_core::OverlayKind)>,
+    /// Holds the full spec so a rebuild can re-present it (see `initial_commands`).
+    open_overlay: Option<(vauchi_core::SurfaceId, vauchi_core::OverlaySpec)>,
     /// Set when the reducer was constructed at a single-purpose entry point
     /// rather than booted as a full app (ADR-069).
     entry_flow: Option<EntryFlow>,

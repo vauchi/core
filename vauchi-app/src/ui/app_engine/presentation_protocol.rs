@@ -51,8 +51,10 @@ impl AppEngine {
                     revision,
                     overlay,
                 } => {
-                    let requested = (surface_id.clone(), overlay.kind);
-                    if self.open_overlay.as_ref() == Some(&requested) {
+                    let already_open = self.open_overlay.as_ref().is_some_and(|(open_id, open)| {
+                        *open_id == surface_id && open.kind == overlay.kind
+                    });
+                    if already_open {
                         self.open_overlay = None;
                         Command::DismissOverlay {
                             surface_id,
@@ -60,7 +62,7 @@ impl AppEngine {
                             kind: overlay.kind,
                         }
                     } else {
-                        self.open_overlay = Some(requested);
+                        self.open_overlay = Some((surface_id.clone(), overlay.clone()));
                         Command::PresentOverlay {
                             surface_id,
                             revision,
@@ -85,13 +87,13 @@ impl AppEngine {
     ///
     /// Returns the command batch to prepend, empty when nothing is open.
     fn dismiss_open_overlay(&mut self) -> Vec<Command> {
-        let Some((surface_id, kind)) = self.open_overlay.take() else {
+        let Some((surface_id, overlay)) = self.open_overlay.take() else {
             return Vec::new();
         };
         vec![Command::DismissOverlay {
             surface_id,
             revision: self.surface_revision,
-            kind,
+            kind: overlay.kind,
         }]
     }
 
@@ -100,7 +102,10 @@ impl AppEngine {
     /// closed against state that no longer matches the screen.
     fn clear_open_overlay(&mut self, event: &Event) {
         if let Event::OverlayDismissed { surface_id, kind } = event
-            && self.open_overlay.as_ref() == Some(&(surface_id.clone(), *kind))
+            && self
+                .open_overlay
+                .as_ref()
+                .is_some_and(|(open_id, open)| open_id == surface_id && open.kind == *kind)
         {
             self.open_overlay = None;
         }
@@ -110,8 +115,27 @@ impl AppEngine {
     pub fn initial_commands(&mut self) -> Result<Vec<Command>, AppPresentationError> {
         let screen = self.current_screen();
         let mut commands = self.surface_commands(&screen)?;
+        commands.extend(self.reopened_overlay(&commands));
         commands.extend(self.drain_pending_commands());
         Ok(commands)
+    }
+
+    /// The overlay Core still records as open, re-presented on top of a
+    /// rebuilt surface. A rebuild re-applies the surface, and the shell drops
+    /// any overlay with it; without this, an invalidation closed open menus
+    /// while Core kept believing them open (vauchi/private#9).
+    fn reopened_overlay(&self, commands: &[Command]) -> Option<Command> {
+        let (open_id, overlay) = self.open_overlay.as_ref()?;
+        commands.iter().find_map(|command| match command {
+            Command::ReplaceSurface { surface } if surface.surface_id == *open_id => {
+                Some(Command::PresentOverlay {
+                    surface_id: open_id.clone(),
+                    revision: surface.revision,
+                    overlay: overlay.clone(),
+                })
+            }
+            _ => None,
+        })
     }
 
     /// Reduce one raw shell event into the next ordered command batch.

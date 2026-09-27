@@ -36,6 +36,10 @@ mod link_responder;
 mod multi_stage_exchange;
 mod navigation;
 mod notifications;
+// INLINE_TEST_REQUIRED: pushes a field that fails to save into the private
+// `engine` field — the ContactInfo step rejects such values before completion.
+#[cfg(test)]
+mod onboarding_shortfall_tests;
 mod overlays;
 mod presentation_protocol;
 // INLINE_TEST_REQUIRED: injects a legacy ExchangeEngine into the private

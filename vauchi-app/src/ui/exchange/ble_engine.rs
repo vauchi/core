@@ -325,12 +325,19 @@ impl BleExchangeEngine {
             GlanceCodeEntry::Typing { .. } => "exchange_ble_glance_code",
             _ => "exchange_ble_glance",
         };
+        // The QR must stay whole on small screens, so the scan step is sized
+        // to the viewport like Hover's; the code step scrolls for the keyboard.
+        let layout = match &self.glance_code_entry {
+            GlanceCodeEntry::Typing { .. } => ScreenLayout::Scroll,
+            _ => ScreenLayout::Fixed,
+        };
         ScreenModel {
             screen_id: screen_id.into(),
             title: self.t("exchange.mode_name.glance"),
             subtitle: Some(self.t("exchange.ble.glance_subtitle")),
             components,
             contextual_actions: actions,
+            layout,
             ..Default::default()
         }
     }

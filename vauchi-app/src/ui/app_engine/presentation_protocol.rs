@@ -418,8 +418,16 @@ impl AppEngine {
                 }
             )
         {
-            #[allow(clippy::let_underscore_must_use)]
-            let _ = self.apply_glance_scan(value);
+            // Dev instrumentation (vauchi/private#9 GL-6): the variant name
+            // only — never the scanned payload.
+            match self.apply_glance_scan(value) {
+                Ok(()) => tracing::info!("[Glance] scan applied"),
+                Err(error) => {
+                    let debug = format!("{error:?}");
+                    let kind = debug.split('(').next().unwrap_or("?");
+                    tracing::info!("[Glance] scan rejected: {kind}");
+                }
+            }
         }
         // Hover / TapHoverShake / Glance-on-the-multi-stage-screen: the
         // capture node's text carries the frame the camera just decoded.

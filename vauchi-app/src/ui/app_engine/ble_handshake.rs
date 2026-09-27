@@ -426,21 +426,37 @@ impl AppEngine {
     /// `Command::BleConnect`. A no-op for a non-scanner or a non-matching
     /// advertiser — asymmetric discovery, no tiebreak, no latch race.
     pub fn handle_glance_discovery(&mut self, device_id: &str, adv_data: &[u8]) {
+        // Dev instrumentation (vauchi/private#9 GL-6): lengths and decisions
+        // only — no identity bytes.
         let Some(binding) = self.glance_scanned else {
+            tracing::info!(
+                "[Glance] discovery adv_len={} — not scanned yet",
+                adv_data.len()
+            );
             return; // not the scanner — this device waits to be connected to
         };
         let Some(expected) = binding.expected_peer else {
+            tracing::info!("[Glance] discovery — scan binding has no pinned peer");
             return;
         };
         // Phones advertise only a 2-byte prefix of the token (a 16-bit service
         // UUID), so match on the prefix; the handshake still pins the full
         // identity, exchange key and OOB nonce, so a prefix twin cannot finish.
         if adv_data.len() < MIN_ADVERTISED_PREFIX_BYTES || !expected.starts_with(adv_data) {
+            tracing::info!(
+                "[Glance] discovery adv_len={} — not the scanned peer",
+                adv_data.len()
+            );
             return; // an advertiser we did not scan — ignore it
         }
         if self.ble_handshake_session_active() {
+            tracing::info!("[Glance] discovery — session already active");
             return;
         }
+        tracing::info!(
+            "[Glance] discovery adv_len={} — scanned peer, connecting",
+            adv_data.len()
+        );
         let Some((identity_key, x3dh, card)) = self.build_ble_session_inputs() else {
             tracing::warn!("BLE: cannot start Glance scanner handshake — no identity / card");
             return;

@@ -119,6 +119,17 @@ struct State {
     /// (ADR-049 two-party Link). Maps `gate_hash → [(slot_hash, blob)]`,
     /// at most `MAX_SLOTS_PER_GATE` slots per gate.
     escrow: Option<std::collections::HashMap<String, Vec<(String, String)>>>,
+    /// When `Some`, `/v2/ohttp-key` and `/v2/ohttp` are served by a real
+    /// OHTTP gateway, so a client's encapsulated round trip can succeed.
+    gateway: Option<MockGateway>,
+}
+
+/// A real OHTTP gateway (RFC 9458) answering `fetch` with no blobs.
+struct MockGateway {
+    server: ohttp::Server,
+    encoded_config: Vec<u8>,
+    /// Inner actions decapsulated so far, in arrival order.
+    actions: Vec<String>,
 }
 
 pub struct MockRelay {
@@ -175,6 +186,40 @@ impl MockRelay {
     /// over the same relay. Enables a genuine two-party Link handshake.
     pub fn enable_escrow_store(&self) {
         self.state.lock().unwrap().escrow = Some(std::collections::HashMap::new());
+    }
+
+    /// Serve `/v2/ohttp-key` and `/v2/ohttp` from a real OHTTP gateway.
+    /// Queued responses for those paths still win, so a test can inject a
+    /// gateway failure on one request.
+    pub fn enable_ohttp_gateway(&self) {
+        use ohttp::{KeyConfig, SymmetricSuite, hpke};
+        let config = KeyConfig::new(
+            1,
+            hpke::Kem::X25519Sha256,
+            vec![SymmetricSuite::new(
+                hpke::Kdf::HkdfSha256,
+                hpke::Aead::ChaCha20Poly1305,
+            )],
+        )
+        .expect("KeyConfig::new");
+        let encoded_config = config.encode().expect("encode key config");
+        let server = ohttp::Server::new(config).expect("ohttp::Server::new");
+        self.state.lock().unwrap().gateway = Some(MockGateway {
+            server,
+            encoded_config,
+            actions: Vec::new(),
+        });
+    }
+
+    /// Inner actions the gateway has decapsulated, in arrival order.
+    pub fn ohttp_actions(&self) -> Vec<String> {
+        self.state
+            .lock()
+            .unwrap()
+            .gateway
+            .as_ref()
+            .map(|gateway| gateway.actions.clone())
+            .unwrap_or_default()
     }
 
     /// Snapshot of every received request in arrival order.
@@ -297,6 +342,32 @@ fn serve_escrow(
     CannedResponse::ok_json(serde_json::to_vec(&response).expect("EscrowResponse serializes"))
 }
 
+/// Decapsulate one OHTTP request, answer its padded JSON action the way the
+/// relay does (`relay/src/http_api.rs`), and encapsulate the padded reply.
+fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
+    let Ok((padded_request, server_response)) = gateway.server.decapsulate(body) else {
+        return CannedResponse::status(400);
+    };
+    let action = vauchi_core::crypto::padding::unpad(&padded_request)
+        .and_then(|request| serde_json::from_slice::<serde_json::Value>(&request).ok())
+        .and_then(|request| request.get("action")?.as_str().map(str::to_string))
+        .unwrap_or_default();
+    let reply = match action.as_str() {
+        "fetch" => serde_json::json!({ "status": "ok", "blobs": [] }),
+        _ => serde_json::json!({ "status": "error", "error": "unsupported by the mock gateway" }),
+    };
+    gateway.actions.push(action);
+    let padded_reply =
+        vauchi_core::crypto::padding::pad(&serde_json::to_vec(&reply).expect("reply serializes"));
+    CannedResponse {
+        status: 200,
+        headers: vec![("Content-Type".into(), "message/ohttp-res".into())],
+        body: server_response
+            .encapsulate(&padded_reply)
+            .expect("encapsulate reply"),
+    }
+}
+
 fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<State>>) -> std::io::Result<()> {
     stream.set_read_timeout(Some(Duration::from_millis(2000)))?;
     stream.set_write_timeout(Some(Duration::from_millis(2000)))?;
@@ -346,10 +417,19 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<State>>) -> std::io
 
         if path == "/v2/escrow" && s.escrow.is_some() {
             serve_escrow(s.escrow.as_mut().unwrap(), &body)
+        } else if let Some(queued) = s.queues.get_mut(&path).and_then(|q| q.pop_front()) {
+            queued
+        } else if let (Some(gateway), "/v2/ohttp-key") = (s.gateway.as_ref(), path.as_str()) {
+            CannedResponse {
+                status: 200,
+                headers: vec![("Content-Type".into(), "application/ohttp-keys".into())],
+                body: gateway.encoded_config.clone(),
+            }
+        } else if let (Some(gateway), "/v2/ohttp") = (s.gateway.as_mut(), path.as_str()) {
+            serve_ohttp(gateway, &body)
         } else {
-            let queue_response = s.queues.get_mut(&path).and_then(|q| q.pop_front());
-            queue_response
-                .or_else(|| s.default.clone())
+            s.default
+                .clone()
                 .unwrap_or_else(|| CannedResponse::status(500))
         }
     };

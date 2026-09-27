@@ -603,16 +603,40 @@ mod tests {
             rssi: -42,
             adv_data: vec![0x09], // peer token > ours → we would win the tiebreak
         });
-        assert_eq!(*flow.step(), BleStep::Handshaking);
-        match outcome {
-            BleHardwareOutcome::StepAdvanced { commands } => {
-                assert!(
-                    commands.is_empty(),
-                    "Glance must not tiebreak-connect (scan-driven connect owns it), got {commands:?}"
-                );
-            }
-            other => panic!("Expected StepAdvanced, got {other:?}"),
-        }
+        assert!(
+            matches!(outcome, BleHardwareOutcome::Ignored),
+            "Glance must not tiebreak-connect (scan-driven connect owns it), got {outcome:?}"
+        );
+    }
+
+    // A discovered advertiser is not the scanned peer: moving on would drop the
+    // QR + scanner screen before any scan, and the pinned connect could never
+    // happen (vauchi/private#9, run GL-1).
+    // @internal
+    #[test]
+    fn glance_discovery_keeps_the_qr_screen_up() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Glance, vec![0x01]);
+
+        flow.handle_event(&Event::BleDeviceDiscovered {
+            id: "nearby-vauchi".into(),
+            rssi: -40,
+            adv_data: vec![0x09],
+        });
+
+        assert_eq!(*flow.step(), BleStep::Discovering);
+    }
+
+    // @internal
+    #[test]
+    fn glance_connection_moves_on_to_exchanging() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Glance, vec![0x01]);
+
+        flow.handle_event(&Event::BleConnected {
+            device_id: "scanned-peer".into(),
+            direction: BleLinkDirection::Outbound,
+        });
+
+        assert_eq!(*flow.step(), BleStep::Exchanging);
     }
 
     // @internal

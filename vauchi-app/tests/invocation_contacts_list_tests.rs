@@ -354,3 +354,35 @@ fn archived_text_surface_without_archive_says_so() {
         other => panic!("expected the empty-archive text, got {other:?}"),
     }
 }
+
+// ADR-032, #386: decoys have no archive, so a duress unlock must not reveal
+// the real archived contacts through the archived invocation either.
+// @scenario: duress_mode :: Duress credential shows decoy contacts
+#[test]
+fn duress_unlock_shows_no_real_archive() {
+    let (mut vauchi, ids) = vauchi_with(&["Bob"]);
+    archive(&vauchi, &ids[0]);
+    vauchi
+        .setup_app_password("real-password")
+        .expect("app password");
+    vauchi
+        .setup_duress_password("432198")
+        .expect("duress password");
+    vauchi.authenticate("432198").expect("duress unlock");
+
+    let doc = document(&invoke(
+        &vauchi,
+        &Invocation::ArchivedContactsList,
+        InvocationOutput::Document,
+        Locale::English,
+    ));
+    assert_eq!(doc, json!([]));
+
+    let commands = invoke(
+        &vauchi,
+        &Invocation::ArchivedContactsList,
+        InvocationOutput::Text,
+        Locale::English,
+    );
+    assert_eq!(surface(&commands).title, "Archived contacts (0):");
+}

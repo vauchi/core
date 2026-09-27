@@ -640,18 +640,6 @@ fn on_wakeup_returns_envelope_with_schedule_wakeup_command() {
 }
 
 // ============================================================================
-// Error handling
-// ============================================================================
-
-// @internal
-#[test]
-fn dispatch_invalid_json_returns_error() {
-    let (engine, _dir) = create_engine();
-    let result = engine.dispatch_json("not valid json".into());
-    assert!(result.is_err(), "should return error for invalid JSON");
-}
-
-// ============================================================================
 // Canonical presentation invalidation
 // ============================================================================
 
@@ -1210,9 +1198,18 @@ fn value_changed_with_unknown_binding_fails_closed_on_multi_stage() {
         })
         .to_string(),
     );
+    let batch: serde_json::Value =
+        serde_json::from_str(&result.expect("a rejection is answered with commands"))
+            .expect("parse command batch");
+    let commands = batch["commands"].as_array().expect("commands array");
+    assert_eq!(
+        commands.len(),
+        1,
+        "unknown binding must fail closed — no routing, no surface update, got: {batch}"
+    );
     assert!(
-        result.is_err(),
-        "unknown binding must fail closed, got: {result:?}"
+        commands[0].get("PresentAlert").is_some(),
+        "the only reply is the prepared rejection alert, got: {batch}"
     );
 }
 

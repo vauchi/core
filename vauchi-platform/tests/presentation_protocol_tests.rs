@@ -116,18 +116,16 @@ fn test_platform_binding_rejects_oversized_event_json() {
         padding = " ".repeat(MAX_EVENT_JSON_BYTES)
     );
 
-    let error = engine
+    let envelope = engine
         .dispatch_json(event)
-        .expect_err("oversized event JSON must be rejected");
+        .expect("oversized event JSON is rejected with prepared presentation");
 
-    match error {
-        vauchi_platform::MobileError::InvalidInput { field, detail } => {
-            assert_eq!(field, "");
-            assert_eq!(
-                detail,
-                format!("event JSON exceeds {MAX_EVENT_JSON_BYTES} bytes")
-            );
-        }
-        other => panic!("expected InvalidInput, got {other:?}"),
-    }
+    let batch: serde_json::Value = serde_json::from_str(&envelope).expect("parse command batch");
+    let alert = &batch["commands"][0]["PresentAlert"]["alert"];
+    assert_eq!(alert["title"], "Error", "got {batch}");
+    assert_eq!(alert["message"], "Something went wrong", "got {batch}");
+    assert!(
+        !envelope.contains("exceeds"),
+        "the decoder's own text must not reach the shell, got {batch}"
+    );
 }

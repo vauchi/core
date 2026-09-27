@@ -288,13 +288,7 @@ impl PlatformAppEngine {
                 let engine = self.engine.lock().map_err(|e| MobileError::Other {
                     detail: format!("Lock failed: {e}"),
                 })?;
-                return match engine.reject_event_json(&error) {
-                    Some(commands) => commands_envelope_to_json(&commands),
-                    None => Err(MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: error.to_string(),
-                    }),
-                };
+                return commands_envelope_to_json(&engine.reject_event_json(&error));
             }
         };
         let (commands, fire_invalidation) = {
@@ -304,10 +298,7 @@ impl PlatformAppEngine {
             self_heal_post_auth(&mut engine);
             let commands = engine
                 .dispatch(event)
-                .map_err(|e| MobileError::InvalidInput {
-                    field: String::new(),
-                    detail: format!("Invalid event: {e}"),
-                })?;
+                .unwrap_or_else(|rejection| engine.reject_dispatch(&rejection));
             (commands, engine.take_pending_presentation_invalidation())
         };
         if fire_invalidation {

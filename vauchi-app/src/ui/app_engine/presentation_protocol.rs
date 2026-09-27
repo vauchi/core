@@ -32,6 +32,21 @@ pub enum AppPresentationError {
     Authentication(String),
 }
 
+impl AppPresentationError {
+    /// The variant alone, safe to log where the `Display` text is not.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::RevisionExhausted => "revision_exhausted",
+            Self::UnresolvedActionResult { .. } => "unresolved_action_result",
+            Self::Contextual(_) => "contextual",
+            Self::Responsive(_) => "responsive",
+            Self::Prepared(_) => "prepared",
+            Self::ContextualAction(_) => "contextual_action",
+            Self::Authentication(_) => "authentication",
+        }
+    }
+}
+
 impl AppEngine {
     /// Turn a re-request for the already-open overlay into a dismissal.
     ///
@@ -138,29 +153,48 @@ impl AppEngine {
         })
     }
 
-    /// Reduce one raw shell event into the next ordered command batch.
     /// Presentation for an event the boundary decoder refused.
     ///
-    /// An input value over `MAX_EVENT_INPUT_VALUE_BYTES` is the one refusal a
-    /// user can cause (pasting a whole backup into a text field); it comes
-    /// back as a prepared alert so no shell is left on a dead screen. Every
-    /// other refusal is a shell defect and stays an error.
-    pub fn reject_event_json(&self, error: &EventJsonError) -> Option<Vec<Command>> {
-        match error {
-            EventJsonError::InputValueTooLarge => Some(vec![Command::PresentAlert {
-                alert: AlertSpec {
-                    title: self.t("error.title"),
-                    message: crate::i18n::get_string_with_args(
-                        self.render_context.resolved_locale(),
-                        "validation.too_long",
-                        &[("max", &MAX_EVENT_INPUT_VALUE_BYTES.to_string())],
-                    ),
-                },
-            }]),
-            EventJsonError::TooLarge | EventJsonError::TooDeep | EventJsonError::Malformed => None,
-        }
+    /// Core owns error→consequence translation (ADR-045 Am1), so every
+    /// refusal comes back as a prepared alert and no shell composes copy
+    /// from an error value. An over-bound input value is the one refusal a
+    /// user can cause (pasting a whole backup into a text field), so it
+    /// names the bound; the rest are shell defects and get generic copy.
+    pub fn reject_event_json(&self, error: &EventJsonError) -> Vec<Command> {
+        let message = match error {
+            EventJsonError::InputValueTooLarge => crate::i18n::get_string_with_args(
+                self.render_context.resolved_locale(),
+                "validation.too_long",
+                &[("max", &MAX_EVENT_INPUT_VALUE_BYTES.to_string())],
+            ),
+            EventJsonError::TooLarge | EventJsonError::TooDeep | EventJsonError::Malformed => {
+                tracing::warn!(kind = ?error, "event refused at the boundary decoder");
+                self.t("error.generic")
+            }
+        };
+        self.rejection_alert(message)
     }
 
+    /// Presentation for an event `dispatch` rejected.
+    ///
+    /// Only the variant is logged: some variants carry text derived from
+    /// the event, which may hold user input (logging rules: error types,
+    /// never content).
+    pub fn reject_dispatch(&self, error: &AppPresentationError) -> Vec<Command> {
+        tracing::warn!(kind = error.kind(), "event rejected by dispatch");
+        self.rejection_alert(self.t("error.generic"))
+    }
+
+    fn rejection_alert(&self, message: String) -> Vec<Command> {
+        vec![Command::PresentAlert {
+            alert: AlertSpec {
+                title: self.t("error.title"),
+                message,
+            },
+        }]
+    }
+
+    /// Reduce one raw shell event into the next ordered command batch.
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
         self.clear_open_overlay(&event);
 

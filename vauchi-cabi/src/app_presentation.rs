@@ -66,40 +66,21 @@ pub unsafe extern "C" fn vauchi_app_dispatch(
             if event_json.is_null() {
                 return to_c_string(r#"{"error":"null event JSON"}"#);
             }
-            let json = match CStr::from_ptr(event_json).to_str() {
-                Ok(json) => json,
-                Err(_) => return to_c_string(r#"{"error":"event JSON is malformed"}"#),
-            };
             let app = &*handle;
-            let event = match vauchi_core::event_from_json(json) {
-                Ok(event) => event,
-                Err(error) => {
-                    let rejection = app
-                        .engine
-                        .lock()
-                        .ok()
-                        .and_then(|engine| engine.reject_event_json(&error));
-                    return match rejection {
-                        Some(commands) => {
-                            to_c_string(&serde_json::json!({ "commands": commands }).to_string())
-                        }
-                        None => to_c_string(
-                            &serde_json::json!({ "error": error.to_string() }).to_string(),
-                        ),
-                    };
-                }
+            let Ok(mut engine) = app.engine.lock() else {
+                return to_c_string(r#"{"error":"lock poisoned"}"#);
             };
-            match app.engine.lock() {
-                Ok(mut engine) => match engine.dispatch(event) {
-                    Ok(commands) => {
-                        to_c_string(&serde_json::json!({ "commands": commands }).to_string())
-                    }
-                    Err(error) => {
-                        to_c_string(&serde_json::json!({ "error": error.to_string() }).to_string())
-                    }
-                },
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
-            }
+            let decoded = CStr::from_ptr(event_json)
+                .to_str()
+                .map_err(|_| vauchi_core::EventJsonError::Malformed)
+                .and_then(vauchi_core::event_from_json);
+            let commands = match decoded {
+                Ok(event) => engine
+                    .dispatch(event)
+                    .unwrap_or_else(|rejection| engine.reject_dispatch(&rejection)),
+                Err(error) => engine.reject_event_json(&error),
+            };
+            to_c_string(&serde_json::json!({ "commands": commands }).to_string())
         }))
         .unwrap_or(std::ptr::null_mut())
     }

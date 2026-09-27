@@ -354,6 +354,61 @@ fn glance_screen_entered_selects_rear_camera_before_ble_bootstrap() {
     );
 }
 
+// @scenario: contact_exchange.feature :: Glance shows its QR at a camera-readable brightness
+#[test]
+fn glance_screen_entered_sets_the_exchange_brightness_first() {
+    let mut engine = BleExchangeEngine::new(
+        ExchangeMode::Glance,
+        true,
+        vec![],
+        SystemClock::shared(),
+        Some("QR-PAYLOAD".to_string()),
+        Locale::English,
+    );
+
+    let commands = engine.screen_entered();
+
+    assert_eq!(
+        commands.first(),
+        Some(&Command::SetScreenBrightness { level: Some(0.65) })
+    );
+}
+
+// @scenario: contact_exchange.feature :: Glance shows its QR at a camera-readable brightness
+#[test]
+fn glance_screen_exited_restores_the_platform_brightness() {
+    let mut engine = BleExchangeEngine::new(
+        ExchangeMode::Glance,
+        true,
+        vec![],
+        SystemClock::shared(),
+        Some("QR-PAYLOAD".to_string()),
+        Locale::English,
+    );
+    engine.screen_entered();
+
+    assert_eq!(
+        engine.screen_exited(),
+        vec![Command::SetScreenBrightness { level: None }]
+    );
+}
+
+// @internal
+#[test]
+fn qr_less_ble_modes_leave_brightness_alone_on_exit() {
+    let mut engine = BleExchangeEngine::new(
+        ExchangeMode::Bump,
+        true,
+        vec![],
+        SystemClock::shared(),
+        None,
+        Locale::English,
+    );
+    engine.screen_entered();
+
+    assert_eq!(engine.screen_exited(), Vec::<Command>::new());
+}
+
 // @internal
 #[test]
 fn discovery_event_emits_connect_command_and_advances() {

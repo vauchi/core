@@ -159,6 +159,7 @@ mod settings_render_context_tests;
 mod settings_row_control_label_tests;
 mod settings_security_i18n_tests;
 mod shred_i18n_tests;
+mod stale_binding_event_tests;
 mod status_indicator_label_tests;
 mod sync_chrome_overlay_tests;
 mod update_overlay_tests;

@@ -173,6 +173,15 @@ impl PreparedSurface {
         }
     }
 
+    /// Whether `binding` was minted for an earlier revision of this surface:
+    /// a shell reporting against the surface it last rendered, overtaken by
+    /// a newer one. Ids with no revision, or one at or past this surface's,
+    /// are not stale; they are unknown.
+    pub fn is_stale_binding(&self, binding: &BindingId) -> bool {
+        Projection::minted_revision(binding.as_str())
+            .is_some_and(|minted| minted < self.surface.revision)
+    }
+
     fn ensure_surface(&self, surface_id: &SurfaceId) -> Result<(), PreparedSurfaceError> {
         if surface_id == &self.surface.surface_id {
             Ok(())

@@ -138,6 +138,12 @@ impl Projection {
         Ok(id)
     }
 
+    /// The revision a Core-minted id was projected at, read back from the
+    /// `surface.{revision}.` prefix every id above carries.
+    pub(super) fn minted_revision(id: &str) -> Option<u64> {
+        id.strip_prefix("surface.")?.split('.').next()?.parse().ok()
+    }
+
     pub(super) fn qualified_id(&self, id: &str) -> Result<BindingId, PreparedSurfaceError> {
         Ok(BindingId::new(format!("surface.{}.{}", self.revision, id))?)
     }

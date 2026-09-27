@@ -227,10 +227,24 @@ impl AppEngine {
         }
 
         let route = match &event {
-            Event::ValueChanged { .. }
-            | Event::InputSubmitted { .. }
-            | Event::InputFocusEnded { .. } => {
-                ContextualSurfaceRoute::UserAction(prepared.reduce(event)?)
+            Event::ValueChanged { binding_id, .. }
+            | Event::InputSubmitted { binding_id, .. }
+            | Event::InputFocusEnded { binding_id, .. } => {
+                let binding_id = binding_id.clone();
+                match prepared.reduce(event) {
+                    Ok(action) => ContextualSurfaceRoute::UserAction(action),
+                    Err(PreparedSurfaceError::UnknownBinding)
+                        if prepared.is_stale_binding(&binding_id) =>
+                    {
+                        tracing::info!(
+                            "[Presentation] dropped a value for stale binding {} (surface at revision {})",
+                            binding_id.as_str(),
+                            self.surface_revision
+                        );
+                        return Ok(Vec::new());
+                    }
+                    Err(error) => return Err(error.into()),
+                }
             }
             Event::ActionActivated { .. } => match prepared.reduce(event.clone()) {
                 Ok(action) => ContextualSurfaceRoute::UserAction(action),

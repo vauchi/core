@@ -12,6 +12,7 @@ mod ble_handshake;
 mod completion;
 mod completion_contact;
 mod completion_forms;
+mod glance;
 // INLINE_TEST_REQUIRED: injects a completed DeviceReplacementEngine into the
 // private `engine`/`screen` fields to drive the decommission-at-Complete hook.
 #[cfg(test)]
@@ -58,7 +59,7 @@ pub use {
     navigation::TabLayout, overlays::SyncChromeStatus, presentation_protocol::AppPresentationError,
 };
 
-use ble_handshake::GlanceDial;
+use glance::GlanceDial;
 use std::collections::HashMap;
 use std::sync::mpsc;
 

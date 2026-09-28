@@ -4,10 +4,12 @@
 
 //! Reachability test for `MyInfoEntryDetailEngine`.
 //!
-//! Single-screen own-field detail (`my_info_entry_detail`) with
-//! `edit` / `delete` actions; the `group_visibility` toggles are
-//! `ItemToggled` pass-throughs. Both actions are consumed by
-//! `MyInfoEntryDetailEngine::handle_action`
+//! Single-screen own-field detail (`my_info_entry_detail`) with an
+//! `edit` action; Delete is a body row (`entry_actions` / `delete`, a
+//! `ListItemSelected`) that swaps in a confirmation with
+//! `confirm_delete_entry` / `cancel_delete_entry` (#427). The
+//! `group_visibility` toggles are `ItemToggled` pass-throughs. All are
+//! consumed by `MyInfoEntryDetailEngine::handle_action`
 //! (`core/vauchi-app/src/ui/my_info_entry_detail.rs`).
 //!
 //! The footer `back` action was dropped in the Goal 3 back-chrome
@@ -17,12 +19,12 @@
 //! it.
 
 use vauchi_app::ui::testing::assert_reachability;
-use vauchi_app::ui::{MyInfoEntryDetailEngine, WorkflowEngine};
+use vauchi_app::ui::{MyInfoEntryDetailEngine, UserAction, WorkflowEngine};
 
 // @internal
 #[test]
 fn my_info_entry_detail_screen_is_reachable() {
-    let engine = MyInfoEntryDetailEngine::new(
+    let mut engine = MyInfoEntryDetailEngine::new(
         "f1".into(),
         "email".into(),
         "Email".into(),
@@ -32,5 +34,14 @@ fn my_info_entry_detail_screen_is_reachable() {
         Vec::new(),
     );
     assert_eq!(engine.current_screen().screen_id, "my_info_entry_detail");
-    assert_reachability(&engine, &["edit", "delete"]);
+    assert_reachability(&engine, &["edit"]);
+
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_actions".into(),
+        item_id: "delete".into(),
+    });
+    assert_reachability(
+        &engine,
+        &["edit", "confirm_delete_entry", "cancel_delete_entry"],
+    );
 }

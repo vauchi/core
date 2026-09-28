@@ -44,6 +44,8 @@ pub struct MyInfoEntryDetailEngine {
     /// group-assigned entries are governed by the group toggles alone
     /// (field-centric model, 2026-07-05-ungrouped-contacts-default-open).
     pub shown: bool,
+    /// Delete was chosen and the confirmation is showing.
+    pending_delete: bool,
     locale: Locale,
 }
 
@@ -66,6 +68,7 @@ impl MyInfoEntryDetailEngine {
             groups,
             visible_contacts,
             shown: false,
+            pending_delete: false,
             locale: Locale::English,
         }
     }
@@ -94,6 +97,56 @@ impl MyInfoEntryDetailEngine {
     pub fn with_locale(mut self, locale: Locale) -> Self {
         self.locale = locale;
         self
+    }
+
+    /// Delete sits in the body, beside the entry it removes, so it is
+    /// found without opening the Actions menu (#427).
+    fn delete_row(&self) -> Component {
+        Component::SettingsGroup {
+            id: "entry_actions".into(),
+            label: String::new(),
+            items: vec![SettingsItem {
+                id: "delete".into(),
+                label: self.t("action.delete"),
+                subtitle: None,
+                kind: SettingsItemKind::Destructive {
+                    label: String::new(),
+                },
+                // "Delete" alone is ambiguous to a screen reader on a
+                // detail screen; name the entry it removes.
+                a11y: Some(A11y {
+                    label: Some(get_string_with_args(
+                        self.locale,
+                        "my_info_entry_detail.delete_field_a11y",
+                        &[("label", &self.label)],
+                    )),
+                    hint: Some(self.t("my_info_entry_detail.delete_field_hint")),
+                    role: None,
+                }),
+                info_key: None,
+            }],
+        }
+    }
+
+    fn delete_confirm(&self) -> Component {
+        Component::InlineConfirm {
+            id: "delete_entry".into(),
+            warning: get_string_with_args(
+                self.locale,
+                "my_info_entry_detail.delete_confirm_warning",
+                &[("label", &self.label)],
+            ),
+            confirm_text: self.t("action.delete"),
+            cancel_text: self.t("action.cancel"),
+            confirm_action_id: "confirm_delete_entry".into(),
+            cancel_action_id: "cancel_delete_entry".into(),
+            destructive: true,
+            a11y: Some(A11y {
+                label: Some(self.t("my_info_entry_detail.confirm_deletion_a11y")),
+                hint: Some(self.t("my_info_entry_detail.confirm_deletion_hint")),
+                role: Some(AccessibilityRole::Alert),
+            }),
+        }
     }
 
     fn t(&self, key: &str) -> String {
@@ -236,40 +289,24 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
             });
         }
 
+        components.push(if self.pending_delete {
+            self.delete_confirm()
+        } else {
+            self.delete_row()
+        });
+
         ScreenModel {
             screen_id: "my_info_entry_detail".into(),
             title: self.label.clone(),
             subtitle: Some(self.field_type.clone()),
             components,
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "edit".into(),
-                    label: self.t("action.edit"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: None,
-                },
-                ScreenAction {
-                    id: "delete".into(),
-                    label: self.t("action.delete"),
-                    style: ActionStyle::Destructive,
-                    enabled: true,
-                    // Make the button's target explicit to screen
-                    // readers — "Delete" alone, on a detail screen for
-                    // a specific field, is ambiguous. Announce the
-                    // field label so VoiceOver says "Delete email,
-                    // button" (etc.) rather than just "Delete".
-                    a11y: Some(A11y {
-                        label: Some(get_string_with_args(
-                            self.locale,
-                            "my_info_entry_detail.delete_field_a11y",
-                            &[("label", &self.label)],
-                        )),
-                        hint: Some(self.t("my_info_entry_detail.delete_field_hint")),
-                        role: None,
-                    }),
-                },
-            ],
+            contextual_actions: vec![ScreenAction {
+                id: "edit".into(),
+                label: self.t("action.edit"),
+                style: ActionStyle::Primary,
+                enabled: true,
+                a11y: None,
+            }],
             progress: None,
             ..Default::default()
         }
@@ -277,6 +314,13 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
+            UserAction::ListItemSelected {
+                component_id,
+                item_id,
+            } if component_id == "entry_actions" && item_id == "delete" => {
+                self.pending_delete = true;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
             UserAction::ItemToggled {
                 component_id,
                 item_id,
@@ -295,7 +339,11 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
             }
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
                 "edit" => ActionResult::NavigateTo(self.current_screen()),
-                "delete" => ActionResult::Complete,
+                "cancel_delete_entry" => {
+                    self.pending_delete = false;
+                    ActionResult::UpdateScreen(self.current_screen())
+                }
+                "confirm_delete_entry" => ActionResult::Complete,
                 _ => ActionResult::UpdateScreen(self.current_screen()),
             },
             _ => ActionResult::UpdateScreen(self.current_screen()),

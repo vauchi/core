@@ -146,8 +146,13 @@ fn entry_detail_delete_returns_show_toast_with_undo() {
         field_id: field_id.clone(),
     });
 
+    // Delete asks first (#427); the Undo toast follows the confirmation.
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_actions".into(),
+        item_id: "delete".into(),
+    });
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "delete".into(),
+        action_id: "confirm_delete_entry".into(),
     });
     match result {
         ActionResult::ShowToast {
@@ -187,8 +192,13 @@ fn entry_detail_delete_undo_restores_field() {
         field_id: field_id.clone(),
     });
 
+    // Delete asks first (#427); the Undo toast follows the confirmation.
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_actions".into(),
+        item_id: "delete".into(),
+    });
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "delete".into(),
+        action_id: "confirm_delete_entry".into(),
     });
     let undo_id = match result {
         ActionResult::ShowToast { undo_action_id, .. } => undo_action_id.unwrap(),

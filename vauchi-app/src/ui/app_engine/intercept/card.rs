@@ -155,7 +155,7 @@ impl AppEngine {
                     return Some(ActionResult::NavigateTo(screen));
                 }
             }
-            UserAction::ActionPressed { action_id } if action_id == "delete" => {
+            UserAction::ActionPressed { action_id } if action_id == "confirm_delete_entry" => {
                 // Field delete is user-visible; surface failures as ShowAlert
                 // so the user doesn't see "Field deleted" when the row is
                 // still in storage.
@@ -163,16 +163,12 @@ impl AppEngine {
                     // Find and clone the field before removing
                     if let Some(field) = card.fields().iter().find(|f| f.id() == field_id).cloned()
                     {
-                        if let Err(e) = card.remove_field(field_id) {
+                        if card.remove_field(field_id).is_err()
+                            || self.vauchi.update_own_card(&card).is_err()
+                        {
                             return Some(ActionResult::ShowAlert {
                                 title: self.t("contacts.delete_failed_title"),
-                                message: format!("{e}"),
-                            });
-                        }
-                        if let Err(e) = self.vauchi.update_own_card(&card) {
-                            return Some(ActionResult::ShowAlert {
-                                title: self.t("contacts.delete_failed_title"),
-                                message: format!("{e}"),
+                                message: self.t("error.generic"),
                             });
                         }
                         self.pending_field_undo = Some((field_id.to_string(), field));

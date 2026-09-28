@@ -2197,7 +2197,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_5f43961129b6e2bb",
+                    "id": "field_da21b8c4e3034c16",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2228,13 +2228,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:5f43961129b6e2bb",
+                    "id": "field_note:da21b8c4e3034c16",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:5f43961129b6e2bb",
+                          "id": "field_note:da21b8c4e3034c16",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2274,7 +2274,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_104dde95708cfc58",
+                    "id": "field_6ebaa85818e03cf5",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2305,13 +2305,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:104dde95708cfc58",
+                    "id": "field_note:6ebaa85818e03cf5",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:104dde95708cfc58",
+                          "id": "field_note:6ebaa85818e03cf5",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2351,7 +2351,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_282ab57d119bd16a",
+                    "id": "field_156bdd759fe8170f",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2382,13 +2382,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:282ab57d119bd16a",
+                    "id": "field_note:156bdd759fe8170f",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:282ab57d119bd16a",
+                          "id": "field_note:156bdd759fe8170f",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4450,10 +4450,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "5374 7624 B26B 6549 BD7F 41F9 1708 D22B 3875 6519 FBD3 31A9 C1AC 9291 9C21 E834",
+                    "content": "A853 B6D0 6FA0 902B 34AA 3F9C FBC9 2943 D808 51FD FD12 EF9D ECA9 5E84 A110 14DB",
                     "style": "body",
                     "accessibility": {
-                      "label": "5374 7624 B26B 6549 BD7F 41F9 1708 D22B 3875 6519 FBD3 31A9 C1AC 9291 9C21 E834",
+                      "label": "A853 B6D0 6FA0 902B 34AA 3F9C FBC9 2943 D808 51FD FD12 EF9D ECA9 5E84 A110 14DB",
                       "description": null
                     }
                   }
@@ -4472,10 +4472,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "483F B940 BBB4 6589 2BFC F9C1 296E 9429 8ABB 2B97 3F28 E50E F584 801C A67D 1BA0",
+                    "content": "07CD 6D33 A394 3383 F466 314A 740D 75DD CD46 5C4E 91B9 1704 BCD6 C540 63DE 15AF",
                     "style": "body",
                     "accessibility": {
-                      "label": "483F B940 BBB4 6589 2BFC F9C1 296E 9429 8ABB 2B97 3F28 E50E F584 801C A67D 1BA0",
+                      "label": "07CD 6D33 A394 3383 F466 314A 740D 75DD CD46 5C4E 91B9 1704 BCD6 C540 63DE 15AF",
                       "description": null
                     }
                   }
@@ -12918,6 +12918,45 @@
                       "description": null
                     }
                   }
+                },
+                {
+                  "List": {
+                    "id": "entry_actions",
+                    "label": null,
+                    "rows": [
+                      {
+                        "title": "Delete",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.7",
+                          "label": "Delete",
+                          "accessibility_label": "Delete mobile",
+                          "icon_token": null,
+                          "enabled": true,
+                          "tone": "destructive",
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Delete mobile",
+                          "description": "Removes this entry from your contact card. Contacts who already have it keep their copy until their next sync."
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    }
+                  }
                 }
               ]
             }
@@ -13028,14 +13067,7 @@
                 "enabled": true,
                 "shortcut": "activate_primary"
               },
-              "secondary": {
-                "interaction_id": "surface.1.context.presentation.secondary",
-                "label": "Actions",
-                "accessibility_label": "Actions",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": null
-              }
+              "secondary": null
             }
           }
         },
@@ -16686,7 +16718,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=9TxO2zmRTt7POhIcAasy0NK4RNiPtvEO2eV94-ZR6HU&n=O5U1R_GDJyJABEfFjqP6aLh-G9-TDJlBd0T4Da0eVA0",
+                    "content": "vauchi://exchange?pk=8WdwcJbhU2M8PEmoFqvgZguczKpxCuVbNAurAz5AOHs&n=bygaGqfihq6BUD3JdE4im0bbkgflhdEZNwlcGYlSjWM",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17145,7 +17177,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,78,73,80,55,108,65,117,55,82,108,105,83,118,56,43,99,69,112,98,112,81,112,105,114,115,114,108,122,56,111,53,81,55,49,104,73,65,99,112,110,48,98,111,65,122,43,109,70,110,72,67,106,116,86,79,50,117,116,86,43,49,99,97,55,108,79,78,116,80,73,88,78,121,71,111,75,114,111,50,99,120,78,49,109,99,73,74,107,56,67,78,110,99,77,117,98,118,100,97,65,79,111,89,48,90,50,109,52,54,82,120,107,47,76,118,89,110,108,87,56,43,101,73,71,55,82,49,122,55,81,50,84,86,116,99,102,69,65,101,108,56,105,104,55,50,72,113,74,122,73,65,65,65,65,65,71,113,54,120,107,85,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,112,88,82,71,116,117,98,112,117,104,74,115,72,73,74,109,106,49,105,54,65,85,75,48,98,54,81,55,56,89,83,109,83,83,120,47,122,82,88,84,117,109,111,66,103,85,107,104,110,84,72,122,105,79,111,72,55,47,47,117,90,103,107,103,52,69,71,100,56,99,50,79,74,55,48,111,119,81,114,98,49,108,98,99,73],
+            "payload": [86,48,74,70,87,65,77,72,122,87,48,122,111,53,81,122,103,47,82,109,77,85,112,48,68,88,88,100,122,85,90,99,84,112,71,53,70,119,83,56,49,115,86,65,89,57,52,86,114,121,55,117,89,78,100,111,81,51,120,70,47,104,86,108,106,90,81,54,103,104,110,68,114,121,97,98,115,110,75,90,73,116,56,57,73,99,107,107,108,57,90,97,81,87,70,104,119,117,50,97,116,48,50,119,100,83,104,87,108,104,53,57,72,102,65,74,73,122,115,102,121,54,111,89,110,88,69,55,78,122,122,52,84,87,68,88,79,105,52,106,105,84,107,49,85,73,88,114,48,87,65,66,67,101,103,48,65,65,65,65,65,71,113,54,48,97,119,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,68,102,114,85,83,118,73,77,55,116,121,74,108,115,117,83,90,118,54,71,98,86,85,113,81,98,90,54,119,76,70,79,84,77,52,118,116,82,51,107,98,54,68,76,114,100,74,77,75,82,68,97,116,111,66,119,76,87,49,103,86,57,68,90,113,87,117,43,87,56,101,108,105,55,49,114,76,88,43,106,77,65,109,72,103,80],
             "is_initiator": true
           }
         }
@@ -17177,7 +17209,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI2M/D5%UND5W5D0MF/ZQZ4OGA3B5053B9QCO2RL.LI7LWV8GFJS2K*BQOW1B6H4I7G.J4RETPEXK2WXGK694*VYW9YT0A/FJGVUYH/S1WTC-6RW KW+4SLK3V411Vauchi User00"
+                      "INI23UNUV13WM T1Z.0ZUL16F$SQR42E0MN/K6PF7KFLP2I/6K0NY0O$NG%-MJ+UXHA1/2I/9D$R-64/H04MR1L4/CWXJ1%*D3H7OGV4CGH CNT0ZRK82ICTDWOU11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": "Show this",
@@ -17766,7 +17798,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [72,63,185,64,187,180,101,137,43,252,249,193,41,110,148,41,138,187,43,151,63,40,229,14,245,132,128,28,166,125,27,160]
+            "payload": [7,205,109,51,163,148,51,131,244,102,49,74,116,13,117,221,205,70,92,78,145,185,23,4,188,214,197,64,99,222,21,175]
           }
         },
         {
@@ -17921,7 +17953,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [72,63,185,64,187,180,101,137,43,252,249,193,41,110,148,41,138,187,43,151,63,40,229,14,245,132,128,28,166,125,27,160]
+            "payload": [7,205,109,51,163,148,51,131,244,102,49,74,116,13,117,221,205,70,92,78,145,185,23,4,188,214,197,64,99,222,21,175]
           }
         },
         {
@@ -18076,7 +18108,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [72,63,185,64,187,180,101,137,43,252,249,193,41,110,148,41,138,187,43,151,63,40,229,14,245,132,128,28,166,125,27,160]
+            "payload": [7,205,109,51,163,148,51,131,244,102,49,74,116,13,117,221,205,70,92,78,145,185,23,4,188,214,197,64,99,222,21,175]
           }
         },
         {

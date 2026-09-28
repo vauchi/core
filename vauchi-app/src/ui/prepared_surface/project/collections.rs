@@ -123,7 +123,7 @@ impl Projection {
                     Vec::new(),
                 ),
                 SettingsItemKind::Destructive { label } => (
-                    Some(label.clone()),
+                    (!label.is_empty()).then(|| label.clone()),
                     Some(self.settings_action(id, item)?),
                     Vec::new(),
                 ),
@@ -145,7 +145,7 @@ impl Projection {
         }
         Ok(PresentationNode::List {
             id: vauchi_core::BindingId::new(id)?,
-            label: Some(label.to_owned()),
+            label: (!label.is_empty()).then(|| label.to_owned()),
             rows,
             searchable: false,
             paging: None,

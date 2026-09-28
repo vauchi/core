@@ -1447,6 +1447,7 @@
   "lock_screen.unlock_button": "Unlock",
   "lock_screen.unlock_face_button": "Unlock with Face ID",
   "lock_screen.unlock_fingerprint_button": "Unlock with fingerprint",
+  "lock_screen.wrong_password": "Wrong password.",
   "menu.exchange_card": "Exchange Contact Card",
   "menu.file": "File",
   "menu.import_contacts": "Import Contacts...",

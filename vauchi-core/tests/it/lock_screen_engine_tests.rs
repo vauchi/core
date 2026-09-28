@@ -167,31 +167,24 @@ fn lock_screen_empty_submit_shows_validation() {
 
 // @internal
 #[test]
-fn lock_screen_failed_attempt_shows_remaining() {
+fn lock_screen_failed_attempt_reports_on_the_field() {
+    // Owner decision 2026-09-28 (#429): the failure and the attempts left
+    // are the password field's error, so they are identified in text and
+    // read with the field (WCAG 3.3.1).
     let mut engine = LockScreenEngine::new(3);
-    assert!(!engine.record_failed_attempt(), "1 attempt is not lockout");
-
-    let screen = engine.current_screen();
-    let (message, status) =
-        attempts_status(&screen).expect("a failed attempt must surface a remaining-attempts line");
-    assert!(
-        message.contains('2'),
-        "should show 2 remaining, got: {message}"
-    );
-    assert!(
-        message.contains("remaining"),
-        "should mention 'remaining', got: {message}"
-    );
-    assert_eq!(
-        status,
-        Status::Warning,
-        "remaining attempts is a warning, not a failure"
-    );
-    let (_, _, validation_error) = lock_input(&screen);
-    assert_eq!(
-        validation_error, &None,
-        "the attempts line is screen status, not a complaint about the field's value"
-    );
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "auth_failed".into(),
+    });
+    match result {
+        ActionResult::ValidationError {
+            component_id,
+            message,
+        } => {
+            assert_eq!(component_id, "pin");
+            assert_eq!(message, "Wrong password. 2 attempts remaining");
+        }
+        other => panic!("expected a field error, got {other:?}"),
+    }
 }
 
 // @internal
@@ -283,48 +276,34 @@ fn lock_screen_title_and_subtitle_match_the_canvas() {
 
 // @internal
 #[test]
-fn lock_screen_opens_with_a_labelled_lock_glyph() {
+fn lock_screen_opens_on_the_password_field_without_a_locked_chip() {
+    // The Locked chip repeated the title to screen readers (#429); the
+    // title says the app is locked and the subtitle what to do.
     let screen = LockScreenEngine::new(3).current_screen();
-    let Component::InfoPanel {
-        id,
-        title,
-        items,
-        a11y,
-        ..
-    } = &screen.components[0]
-    else {
-        panic!(
-            "the lock glyph must be the first node, got {:?}",
-            screen.components[0]
-        );
-    };
-    assert_eq!(id, "lock_glyph");
-    assert_eq!(title, "", "the glyph is decorative: no panel heading");
-    assert_eq!(items.len(), 1);
-    assert_eq!(items[0].icon.as_deref(), Some("lock"));
-    assert_eq!(items[0].title, "Locked");
-    assert_eq!(items[0].detail, "", "no prose beside the glyph");
-    let a11y = a11y.as_ref().expect("the glyph carries its spoken label");
-    assert_eq!(a11y.label.as_deref(), Some("Locked"));
-    assert_eq!(a11y.role, Some(AccessibilityRole::Image));
+    assert!(
+        matches!(&screen.components[0], Component::TextInput { id, .. } if id == "pin"),
+        "the password field comes first, got {:?}",
+        screen.components[0]
+    );
+    assert!(
+        !screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::InfoPanel { .. }))
+    );
 }
 
 // @internal
 #[test]
-fn lock_screen_hides_the_attempts_line_until_an_attempt_fails() {
+fn lock_screen_never_shows_a_separate_attempts_line() {
     let mut engine = LockScreenEngine::new(3);
     assert_eq!(attempts_status(&engine.current_screen()), None);
 
     engine.record_failed_attempt();
     assert_eq!(
         attempts_status(&engine.current_screen()),
-        Some(("2 attempts remaining", Status::Warning))
-    );
-
-    engine.record_failed_attempt();
-    assert_eq!(
-        attempts_status(&engine.current_screen()),
-        Some(("1 attempt remaining", Status::Warning))
+        None,
+        "the attempts left belong to the field's error (#429)"
     );
 }
 

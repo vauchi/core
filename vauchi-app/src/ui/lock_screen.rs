@@ -83,25 +83,6 @@ impl LockScreenEngine {
         }
     }
 
-    fn lock_glyph(&self) -> Component {
-        let spoken = get_string(self.locale, "lock_screen.lock_glyph_a11y");
-        Component::InfoPanel {
-            id: "lock_glyph".into(),
-            icon: Some("lock".into()),
-            title: String::new(),
-            items: vec![InfoItem {
-                icon: Some("lock".into()),
-                title: spoken.clone(),
-                detail: String::new(),
-            }],
-            a11y: Some(A11y {
-                label: Some(spoken),
-                hint: None,
-                role: Some(AccessibilityRole::Image),
-            }),
-        }
-    }
-
     fn password_input(&self) -> Component {
         // A masked free-text field, not a fixed-length PinInput: the app
         // password can be up to 128 chars and alphanumeric, and the duress
@@ -125,19 +106,6 @@ impl LockScreenEngine {
             }),
             info_key: None,
         }
-    }
-
-    fn attempts_status(&self) -> Option<Component> {
-        let remaining = self.remaining_attempts_message()?;
-        Some(Component::StatusIndicator {
-            id: "attempts".into(),
-            icon: Some("warning".into()),
-            title: remaining,
-            detail: None,
-            status: Status::Warning,
-            status_label: get_string(self.locale, Status::Warning.label_key()),
-            a11y: None,
-        })
     }
 
     fn biometric_label_key(&self) -> &'static str {
@@ -171,8 +139,7 @@ impl LockScreenEngine {
 
 impl WorkflowEngine for LockScreenEngine {
     fn current_screen(&self) -> ScreenModel {
-        let mut components = vec![self.lock_glyph(), self.password_input()];
-        components.extend(self.attempts_status());
+        let components = vec![self.password_input()];
 
         ScreenModel {
             screen_id: "lock_screen".into(),
@@ -247,7 +214,17 @@ impl WorkflowEngine for LockScreenEngine {
                 self.record_failed_attempt();
                 self.entered_pin.zeroize();
                 self.entered_pin.clear();
-                ActionResult::UpdateScreen(self.current_screen())
+                // Said on the field itself, so the failure is identified in
+                // text and read with the field (WCAG 3.3.1, #429).
+                let wrong = get_string(self.locale, "lock_screen.wrong_password");
+                let message = match self.remaining_attempts_message() {
+                    Some(remaining) => format!("{wrong} {remaining}"),
+                    None => wrong,
+                };
+                ActionResult::ValidationError {
+                    component_id: "pin".into(),
+                    message,
+                }
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }

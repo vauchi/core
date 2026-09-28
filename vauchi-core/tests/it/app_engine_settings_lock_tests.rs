@@ -631,14 +631,12 @@ fn lock_screen_empty_pin_does_not_unlock() {
 fn lock_screen_tracks_failed_attempts() {
     let mut engine = engine_with_password("123456");
 
+    let mut last = None;
     for _ in 0..2 {
         enter_pin(&mut engine, "000000");
-        // Intermediate step: trigger failed attempt — attempt count asserted below
-        let _ = engine.handle_action(UserAction::ActionPressed {
+        last = Some(engine.handle_action(UserAction::ActionPressed {
             action_id: "unlock".into(),
-        });
-        // Clear PIN for next attempt — navigate back to lock to get fresh engine
-        // We need to clear the entered PIN for the next attempt.
+        }));
     }
 
     assert_eq!(
@@ -647,17 +645,22 @@ fn lock_screen_tracks_failed_attempts() {
         "should remain locked after failed attempts"
     );
 
-    let screen = engine.current_screen();
-    let shows_remaining_attempts = screen.components.iter().any(|c| {
-        matches!(
-            c,
-            vauchi_app::ui::Component::StatusIndicator { id, .. } if id == "attempts"
-        )
+    // The failure and the attempts left are reported on the password field
+    // itself (#429), not in a separate status line.
+    let Some(ActionResult::UpdateScreen(screen)) = last else {
+        panic!("expected the lock screen to re-render, got {last:?}");
+    };
+    let error = screen.components.iter().find_map(|c| match c {
+        vauchi_app::ui::Component::TextInput {
+            id,
+            validation_error,
+            ..
+        } if id == "pin" => validation_error.clone(),
+        _ => None,
     });
-    assert!(
-        shows_remaining_attempts,
-        "lock screen should show remaining attempts after failures"
-    );
+    let error = error.expect("the password field carries the failure");
+    assert!(error.starts_with("Wrong password."), "{error}");
+    assert!(error.contains("attempt"), "{error}");
 }
 
 // @internal

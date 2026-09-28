@@ -73,6 +73,7 @@ mod duress_backup_i18n_tests;
 mod duress_pin_wiring_tests;
 mod engine_output_tests;
 mod engine_update_tests;
+mod entry_detail_delete_tests;
 mod entry_detail_viewers_tests;
 mod exchange_ble_chrome_i18n_tests;
 mod exchange_ble_invariants_proptest;

@@ -2197,7 +2197,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_4e16180c84861707",
+                    "id": "field_dc8ca2b9b616b4d4",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2228,13 +2228,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:4e16180c84861707",
+                    "id": "field_note:dc8ca2b9b616b4d4",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:4e16180c84861707",
+                          "id": "field_note:dc8ca2b9b616b4d4",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2274,7 +2274,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_7b2c77d73b13cece",
+                    "id": "field_35c2b544896c0698",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2305,13 +2305,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:7b2c77d73b13cece",
+                    "id": "field_note:35c2b544896c0698",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:7b2c77d73b13cece",
+                          "id": "field_note:35c2b544896c0698",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2351,7 +2351,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_aefd387b92dc7fd6",
+                    "id": "field_597616e7696fafcb",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2382,13 +2382,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:aefd387b92dc7fd6",
+                    "id": "field_note:597616e7696fafcb",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:aefd387b92dc7fd6",
+                          "id": "field_note:597616e7696fafcb",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -3831,51 +3831,199 @@
                   }
                 },
                 {
-                  "Group": {
+                  "Text": {
+                    "id": "visibility_groups_note",
+                    "content": "Grace Hopper is in Cycling club. A switch you change here applies to Grace Hopper only and takes precedence over group rules.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "Grace Hopper is in Cycling club. A switch you change here applies to Grace Hopper only and takes precedence over group rules.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
                     "id": "field_toggles",
                     "label": "Field Visibility",
-                    "axis": "vertical",
-                    "children": [
+                    "rows": [
                       {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
+                        "title": "mobile",
+                        "subtitle": "Visible to all contacts",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.0",
+                              "label": "",
+                              "value": true,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "mobile",
+                                "description": "Visible to all contacts"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
                           "label": "mobile",
-                          "value": true,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "mobile",
-                            "description": null
-                          }
+                          "description": "Visible to all contacts"
                         }
                       },
                       {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
+                        "title": "work",
+                        "subtitle": "Visible to all contacts",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.1",
+                              "label": "",
+                              "value": true,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "work",
+                                "description": "Visible to all contacts"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
                           "label": "work",
-                          "value": true,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "work",
-                            "description": null
-                          }
+                          "description": "Visible to all contacts"
                         }
                       },
                       {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "homepage",
-                          "value": true,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "homepage",
-                            "description": null
+                        "title": "homepage",
+                        "subtitle": "Visible to all contacts",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.2",
+                              "label": "",
+                              "value": true,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "homepage",
+                                "description": "Visible to all contacts"
+                              }
+                            }
                           }
+                        ],
+                        "accessibility": {
+                          "label": "homepage",
+                          "description": "Visible to all contacts"
+                        }
+                      },
+                      {
+                        "title": "home",
+                        "subtitle": "Hidden: only Family can see it",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.3",
+                              "label": "",
+                              "value": false,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "home",
+                                "description": "Hidden: only Family can see it"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
+                          "label": "home",
+                          "description": "Hidden: only Family can see it"
+                        }
+                      },
+                      {
+                        "title": "birthday",
+                        "subtitle": "Visible via Cycling club",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.4",
+                              "label": "",
+                              "value": true,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "birthday",
+                                "description": "Visible via Cycling club"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
+                          "label": "birthday",
+                          "description": "Visible via Cycling club"
                         }
                       }
                     ],
+                    "searchable": false,
+                    "paging": null,
                     "accessibility": {
                       "label": "Field Visibility options",
                       "description": "Select items to include"
+                    }
+                  }
+                },
+                {
+                  "Status": {
+                    "id": null,
+                    "title": "What changes here reaches Grace Hopper on the next sync.",
+                    "detail": null,
+                    "icon_token": null,
+                    "badge": null,
+                    "tone": "accent",
+                    "activation": {
+                      "interaction_id": "surface.1.interaction.1",
+                      "label": "Help",
+                      "accessibility_label": "What changes here reaches Grace Hopper on the next sync.",
+                      "icon_token": null,
+                      "enabled": true,
+                      "shortcut": null
+                    },
+                    "accessibility": {
+                      "label": "What changes here reaches Grace Hopper on the next sync.",
+                      "description": null
                     }
                   }
                 }
@@ -4450,10 +4598,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "9D89 D5FB D77A D99D 09CA CBAB 77BF E6B4 E3C9 EBF4 395A 5594 5F98 5F4A 6A36 D053",
+                    "content": "54B8 10BA 6BB2 F32C 0731 19FE 2BE0 91CC 20E0 2F91 36F2 63DB BEBE BECF 8293 ECA8",
                     "style": "body",
                     "accessibility": {
-                      "label": "9D89 D5FB D77A D99D 09CA CBAB 77BF E6B4 E3C9 EBF4 395A 5594 5F98 5F4A 6A36 D053",
+                      "label": "54B8 10BA 6BB2 F32C 0731 19FE 2BE0 91CC 20E0 2F91 36F2 63DB BEBE BECF 8293 ECA8",
                       "description": null
                     }
                   }
@@ -4472,10 +4620,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "4B45 DCC1 28D9 0953 CD15 3345 C3A3 DC42 0A4D 13A0 956A B183 C824 5CD4 FCB3 AF1F",
+                    "content": "09AF 5811 766C 709D F0A1 C4DF 263D D7FA 22E4 AC4F 1C45 7CC9 D423 C117 EB0C ADEE",
                     "style": "body",
                     "accessibility": {
-                      "label": "4B45 DCC1 28D9 0953 CD15 3345 C3A3 DC42 0A4D 13A0 956A B183 C824 5CD4 FCB3 AF1F",
+                      "label": "09AF 5811 766C 709D F0A1 C4DF 263D D7FA 22E4 AC4F 1C45 7CC9 D423 C117 EB0C ADEE",
                       "description": null
                     }
                   }
@@ -11390,72 +11538,163 @@
                   }
                 },
                 {
-                  "Group": {
+                  "List": {
                     "id": "field_visibility",
                     "label": "Field Visibility",
-                    "axis": "vertical",
-                    "children": [
+                    "rows": [
                       {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "mobile",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Visibility for mobile",
-                            "description": "Hidden from this group"
+                        "title": "mobile",
+                        "subtitle": "+44 20 7946 0958",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.0",
+                              "label": "",
+                              "value": false,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Visibility for mobile",
+                                "description": "Hidden from this group"
+                              }
+                            }
                           }
+                        ],
+                        "accessibility": {
+                          "label": "Visibility for mobile",
+                          "description": "Hidden from this group"
                         }
                       },
                       {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
-                          "label": "work",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Visibility for work",
-                            "description": "Hidden from this group"
+                        "title": "work",
+                        "subtitle": "ada@analytical.example.org",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.1",
+                              "label": "",
+                              "value": false,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Visibility for work",
+                                "description": "Hidden from this group"
+                              }
+                            }
                           }
+                        ],
+                        "accessibility": {
+                          "label": "Visibility for work",
+                          "description": "Hidden from this group"
                         }
                       },
                       {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "homepage",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Visibility for homepage",
-                            "description": "Hidden from this group"
+                        "title": "homepage",
+                        "subtitle": "https://ada.example.org",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.2",
+                              "label": "",
+                              "value": false,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Visibility for homepage",
+                                "description": "Hidden from this group"
+                              }
+                            }
                           }
+                        ],
+                        "accessibility": {
+                          "label": "Visibility for homepage",
+                          "description": "Hidden from this group"
                         }
                       },
                       {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.3",
-                          "label": "home",
-                          "value": true,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Visibility for home",
-                            "description": "Visible to this group"
+                        "title": "home",
+                        "subtitle": "12 St James's Square, London",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.3",
+                              "label": "",
+                              "value": true,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Visibility for home",
+                                "description": "Visible to this group"
+                              }
+                            }
                           }
+                        ],
+                        "accessibility": {
+                          "label": "Visibility for home",
+                          "description": "Visible to this group"
                         }
                       },
                       {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.4",
-                          "label": "birthday",
-                          "value": true,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Visibility for birthday",
-                            "description": "Visible to this group"
+                        "title": "birthday",
+                        "subtitle": "1815-12-10",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.4",
+                              "label": "",
+                              "value": true,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Visibility for birthday",
+                                "description": "Visible to this group"
+                              }
+                            }
                           }
+                        ],
+                        "accessibility": {
+                          "label": "Visibility for birthday",
+                          "description": "Visible to this group"
                         }
                       }
                     ],
+                    "searchable": false,
+                    "paging": null,
                     "accessibility": {
                       "label": "Field Visibility toggles",
                       "description": "Toggle which of your fields contacts in this group can see."
@@ -16718,7 +16957,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=Agd-iJmNJT0rRM_rlkVBNHjIuC0u3UvqkjvXcPY282k&n=slqyaSWO2CzAam2Dt3i_-J9xKUzrHUdh0lNuYGhwHOo",
+                    "content": "vauchi://exchange?pk=NHZAGKqCFY7ZkmkgFqTIh5HZUD0BVhQ_1ekV02Pkzn8&n=pvnTVA5NeO9Ts__pTXQPcdocbRFbF67Ma5svAoHKsHA",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17177,7 +17416,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,78,76,82,100,122,66,75,78,107,74,85,56,48,86,77,48,88,68,111,57,120,67,67,107,48,84,111,74,86,113,115,89,80,73,74,70,122,85,47,76,79,118,72,43,118,121,103,85,119,109,67,119,50,72,113,66,115,105,55,66,118,111,106,107,109,99,110,90,120,114,52,99,98,105,67,69,110,68,51,51,50,113,75,67,90,75,111,120,113,105,66,81,121,71,49,74,87,47,57,117,89,102,49,71,53,78,56,78,67,111,87,82,70,99,55,48,57,88,73,117,108,65,106,117,82,72,100,56,73,117,117,67,106,50,80,74,115,52,103,66,113,75,116,86,89,98,113,72,57,109,65,65,65,65,65,71,113,54,51,109,69,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,68,116,49,84,48,79,47,90,56,50,72,120,97,111,82,67,108,51,87,70,99,108,116,70,52,73,85,74,89,50,77,76,87,66,84,99,105,122,56,80,97,66,73,43,73,108,83,52,121,107,100,76,83,48,116,112,89,51,48,89,50,74,56,122,72,50,121,108,104,121,68,75,53,80,49,117,111,100,104,57,83,86,101,84,85,80],
+            "payload": [86,48,74,70,87,65,77,74,114,49,103,82,100,109,120,119,110,102,67,104,120,78,56,109,80,100,102,54,73,117,83,115,84,120,120,70,102,77,110,85,73,56,69,88,54,119,121,116,55,108,89,70,119,65,54,72,56,80,81,103,79,122,49,86,112,114,119,117,115,102,83,79,90,100,121,68,103,101,69,73,87,69,111,121,54,116,43,119,72,115,69,83,114,122,57,79,117,71,106,118,99,82,86,101,80,109,89,113,98,107,56,90,99,50,47,100,48,85,47,105,56,87,52,71,76,108,69,102,50,111,85,53,104,118,79,81,122,106,56,56,53,57,53,71,98,85,97,79,117,106,68,111,75,101,77,57,65,65,65,65,65,71,113,54,47,97,85,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,87,97,107,78,72,83,102,104,102,69,106,75,89,104,80,47,107,99,102,56,47,105,51,50,69,52,81,52,66,106,86,121,77,120,121,43,50,109,111,117,117,68,70,90,47,84,49,79,83,53,66,51,75,55,66,74,69,86,80,68,76,117,104,86,80,66,48,56,54,90,111,115,57,76,117,48,80,106,49,54,111,116,89,111,80],
             "is_initiator": true
           }
         }
@@ -17209,7 +17448,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI217PHEWUVNLU1H823FUI81OYQS$HW+5L/NO2P9394YP50PJDWS*0Z-3APNB.S$49HVI+DOMNKH1RD2KH I-1TR5SR295+SEATH:V7+SN803U079A6FE:EQ59K11Vauchi User00"
+                      "INI23N9$IR3.P/DET$SG*R.QQH:MWS89JH+W1SJMVO9MYV4DEW8H:LBYKJFQ3.8T/77$O97BIZEH+U2EYC%ZH7LD%GI8P2WRS.RJ3FSS93INJW-A*XO761U-STDI11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17848,7 +18087,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [75,69,220,193,40,217,9,83,205,21,51,69,195,163,220,66,10,77,19,160,149,106,177,131,200,36,92,212,252,179,175,31]
+            "payload": [9,175,88,17,118,108,112,157,240,161,196,223,38,61,215,250,34,228,172,79,28,69,124,201,212,35,193,23,235,12,173,238]
           }
         },
         {
@@ -18003,7 +18242,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [75,69,220,193,40,217,9,83,205,21,51,69,195,163,220,66,10,77,19,160,149,106,177,131,200,36,92,212,252,179,175,31]
+            "payload": [9,175,88,17,118,108,112,157,240,161,196,223,38,61,215,250,34,228,172,79,28,69,124,201,212,35,193,23,235,12,173,238]
           }
         },
         {
@@ -18158,7 +18397,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [75,69,220,193,40,217,9,83,205,21,51,69,195,163,220,66,10,77,19,160,149,106,177,131,200,36,92,212,252,179,175,31]
+            "payload": [9,175,88,17,118,108,112,157,240,161,196,223,38,61,215,250,34,228,172,79,28,69,124,201,212,35,193,23,235,12,173,238]
           }
         },
         {

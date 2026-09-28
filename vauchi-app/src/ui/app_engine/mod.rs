@@ -12,6 +12,7 @@ mod ble_handshake;
 mod completion;
 mod completion_contact;
 mod completion_forms;
+mod contact_visibility_view;
 mod glance;
 // INLINE_TEST_REQUIRED: injects a completed DeviceReplacementEngine into the
 // private `engine`/`screen` fields to drive the decommission-at-Complete hook.

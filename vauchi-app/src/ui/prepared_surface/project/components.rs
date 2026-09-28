@@ -62,6 +62,14 @@ impl Projection {
                 label,
                 items,
                 a11y,
+            } if items.iter().any(|item| item.subtitle.is_some()) => {
+                self.toggle_rows(id, label, items, a11y)
+            }
+            Component::ToggleList {
+                id,
+                label,
+                items,
+                a11y,
             } => {
                 let mut children = Vec::with_capacity(items.len());
                 for item in items {

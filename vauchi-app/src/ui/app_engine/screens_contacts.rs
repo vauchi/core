@@ -258,33 +258,19 @@ impl AppEngine {
                 ),
             },
             AppScreen::ContactVisibility { contact_id } => {
-                let (name, fields) = match vauchi.get_contact(contact_id) {
-                    Ok(Some(contact)) => {
-                        let name = contact.display_name().to_string();
-                        let items = contact
-                            .card()
-                            .fields()
-                            .iter()
-                            .map(|f| crate::ui::component::ToggleItem {
-                                id: f.id().to_string(),
-                                label: f.label().to_string(),
-                                selected: true,
-                                subtitle: None,
-                                a11y: None,
-                                info_key: None,
-                            })
-                            .collect();
-                        (name, items)
-                    }
-                    _ => (
-                        format!("Contact {}", &contact_id[..8.min(contact_id.len())]),
-                        vec![],
+                let locale = render_context.resolved_locale();
+                match super::contact_visibility_view::contact_visibility_view(
+                    vauchi, contact_id, locale,
+                ) {
+                    Some(view) => Box::new(
+                        ContactVisibilityEngine::new(view.name, view.items)
+                            .with_groups(view.groups)
+                            .with_locale(locale),
                     ),
-                };
-                Box::new(
-                    ContactVisibilityEngine::new(name, fields)
-                        .with_locale(render_context.resolved_locale()),
-                )
+                    None => {
+                        Box::new(ContactNotFoundEngine::new(contact_id.clone()).with_locale(locale))
+                    }
+                }
             }
             AppScreen::ContactEdit { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {

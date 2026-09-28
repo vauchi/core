@@ -320,6 +320,11 @@ impl AppEngine {
             }
         }
         let screen = self.navigate_back();
+        // Leaving caches this screen; its saved switches change each entry's
+        // reason, so drop it or it would reopen with the old reasons.
+        self.engine_cache.remove(&AppScreen::ContactVisibility {
+            contact_id: contact_id.to_string(),
+        });
         ActionResult::NavigateTo(screen)
     }
 

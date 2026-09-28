@@ -82,6 +82,61 @@ impl Projection {
         })
     }
 
+    /// A toggle list whose items explain themselves (a subtitle, such as
+    /// why a contact sees an entry) projects to rows with a toggle control,
+    /// the shape settings rows already use, so every shell draws the
+    /// explanation — a bare `Toggle` node carries only its label (#428).
+    pub(super) fn toggle_rows(
+        &mut self,
+        id: &str,
+        label: &str,
+        items: &[crate::ui::ToggleItem],
+        a11y: &Option<crate::ui::A11y>,
+    ) -> Result<PresentationNode, PreparedSurfaceError> {
+        let mut rows = Vec::with_capacity(items.len());
+        for item in items {
+            let binding_id = self.binding(ValueRoute::ToggleItem {
+                component_id: id.to_owned(),
+                item_id: item.id.clone(),
+            })?;
+            let mut spoken = accessibility(&item.a11y, &item.label);
+            if spoken.description.is_none() {
+                spoken.description = item.subtitle.clone();
+            }
+            rows.push(PresentationRow {
+                title: item.label.clone(),
+                subtitle: item.subtitle.clone(),
+                detail: None,
+                icon_token: None,
+                image_data: None,
+                fallback_text: None,
+                selected: false,
+                enabled: true,
+                activation: None,
+                secondary_actions: Vec::new(),
+                // The row title already names the entry; the control's
+                // visible label stays empty, as for settings toggles.
+                controls: vec![PresentationNode::Toggle {
+                    binding_id,
+                    label: String::new(),
+                    value: item.selected,
+                    enabled: true,
+                    accessibility: spoken.clone(),
+                }],
+                accessibility: spoken,
+            });
+        }
+        Ok(PresentationNode::List {
+            id: vauchi_core::BindingId::new(id)?,
+            label: (!label.is_empty()).then(|| label.to_owned()),
+            rows,
+            style: PresentationListStyle::Rows,
+            searchable: false,
+            paging: None,
+            accessibility: accessibility(a11y, label),
+        })
+    }
+
     pub(super) fn settings_group(
         &mut self,
         id: &str,

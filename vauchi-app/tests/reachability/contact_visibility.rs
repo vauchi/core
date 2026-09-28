@@ -7,14 +7,15 @@
 //! Single-screen engine (`contact_visibility`): a `ToggleList` of
 //! per-field visibility switches plus a `save` action. The toggles
 //! are `ItemToggled` pass-throughs (not part of the reachability
-//! affordance set); the only `ActionPressed` id is `save`, consumed
-//! by `ContactVisibilityEngine::handle_action`
+//! affordance set); the `ActionPressed` ids are `save` and the
+//! next-sync banner's `visibility_help` (#428), consumed by
+//! `ContactVisibilityEngine::handle_action`
 //! (`core/vauchi-app/src/ui/contact_visibility.rs`).
 
 use vauchi_app::ui::testing::assert_reachability;
 use vauchi_app::ui::{ContactVisibilityEngine, WorkflowEngine};
 
-const HANDLED: &[&str] = &["save"];
+const HANDLED: &[&str] = &["save", "visibility_help"];
 
 fn engine() -> ContactVisibilityEngine {
     // Empty field set: the `save` affordance renders regardless of how

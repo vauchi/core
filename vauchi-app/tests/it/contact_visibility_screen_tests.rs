@@ -95,6 +95,10 @@ fn world() -> World {
 
 fn open(vauchi: Vauchi, contact_id: &str) -> AppEngine {
     let mut engine = AppEngine::new(vauchi);
+    // The real route: contact detail, then its visibility screen.
+    let _ = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: contact_id.to_string(),
+    });
     let _ = engine.navigate_to(AppScreen::ContactVisibility {
         contact_id: contact_id.to_string(),
     });
@@ -273,5 +277,50 @@ fn hiding_an_entry_from_one_contact_takes_effect_and_says_so() {
     assert_eq!(
         toggle(&items, &mobile).subtitle.as_deref(),
         Some("Set for Grace: hidden")
+    );
+}
+
+// @internal
+#[test]
+fn the_reason_reaches_the_shells_as_visible_and_spoken_text() {
+    use vauchi_app::ui::PreparedSurface;
+    use vauchi_core::{Command, PresentationNode, SurfaceId};
+
+    let w = world();
+    let engine = open(w.vauchi, &w.grace);
+    let screen = engine.current_screen();
+    let prepared =
+        PreparedSurface::from_screen(SurfaceId::new("contact.visibility").unwrap(), 1, &screen)
+            .expect("projection");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("expected ReplaceSurface");
+    };
+    let rows = surface
+        .nodes
+        .iter()
+        .find_map(|n| match n {
+            PresentationNode::List { rows, .. } if rows.iter().any(|r| r.title == "mobile") => {
+                Some(rows.clone())
+            }
+            _ => None,
+        })
+        .expect("the entries project as rows");
+    let row = rows
+        .iter()
+        .find(|r| r.title == "mobile")
+        .expect("mobile row");
+
+    assert_eq!(row.subtitle.as_deref(), Some("Visible via Family"));
+    assert_eq!(
+        row.accessibility.description.as_deref(),
+        Some("Visible via Family")
+    );
+    assert!(
+        matches!(
+            row.controls.as_slice(),
+            [PresentationNode::Toggle { value: true, .. }]
+        ),
+        "{:?}",
+        row.controls
     );
 }

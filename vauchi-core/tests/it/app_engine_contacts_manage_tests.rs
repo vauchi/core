@@ -178,11 +178,12 @@ fn editing_contact_display_name_persists_through_completion() {
 fn navigate_to_contact_visibility_shows_toggles() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
+    let card = ContactCard::new("Bob");
+    let contact = Contact::from_exchange([4u8; 32], card, SymmetricKey::generate(), 0);
+    let bob_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
     let mut engine = AppEngine::new(vauchi);
-    // No real contact exists, so engine shows empty field list
-    let screen = engine.navigate_to(AppScreen::ContactVisibility {
-        contact_id: "fake-id".into(),
-    });
+    let screen = engine.navigate_to(AppScreen::ContactVisibility { contact_id: bob_id });
     assert_eq!(screen.screen_id, "contact_visibility");
     assert!(
         screen.contextual_actions.iter().any(|a| a.id == "save"),
@@ -199,14 +200,15 @@ fn contact_visibility_toggle_updates_field() {
     engine.navigate_to(AppScreen::ContactVisibility {
         contact_id: "fake-id".into(),
     });
-    // Toggle a nonexistent field — should not panic, just return screen
+    // An unknown contact shows the not-found screen (#428), and a stray
+    // toggle there must not panic.
     let result = engine.handle_action(UserAction::ItemToggled {
         component_id: "field_toggles".into(),
         item_id: "nonexistent".into(),
     });
     match result {
         ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "contact_visibility");
+            assert_eq!(screen.screen_id, "contact_not_found");
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
     }

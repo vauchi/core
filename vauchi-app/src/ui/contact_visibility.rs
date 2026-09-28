@@ -12,6 +12,8 @@ use crate::ui::*;
 pub struct ContactVisibilityEngine {
     contact_name: String,
     fields: Vec<ToggleItem>,
+    /// Groups the contact is in, for the precedence note.
+    groups: Vec<String>,
     locale: Locale,
 }
 
@@ -20,8 +22,16 @@ impl ContactVisibilityEngine {
         Self {
             contact_name,
             fields,
+            groups: Vec::new(),
             locale: Locale::English,
         }
+    }
+
+    /// The groups the contact is in; a note then says that a switch changed
+    /// here takes precedence over them (owner decision 2026-09-28, #428).
+    pub fn with_groups(mut self, groups: Vec<String>) -> Self {
+        self.groups = groups;
+        self
     }
 
     /// Set the render locale (defaults to English) — threaded from the
@@ -35,6 +45,51 @@ impl ContactVisibilityEngine {
         get_string(self.locale, key)
     }
 
+    fn components(&self) -> Vec<Component> {
+        let mut components = vec![Component::Text {
+            a11y: None,
+            id: "visibility_info".into(),
+            content: self.t("contact_visibility.info"),
+            style: TextStyle::Body,
+        }];
+        if !self.groups.is_empty() {
+            components.push(Component::Text {
+                a11y: None,
+                id: "visibility_groups_note".into(),
+                content: get_string_with_args(
+                    self.locale,
+                    "contact_visibility.groups_note",
+                    &[
+                        ("name", &self.contact_name),
+                        ("groups", &self.groups.join(", ")),
+                    ],
+                ),
+                style: TextStyle::Body,
+            });
+        }
+        components.push(Component::ToggleList {
+            id: "field_toggles".into(),
+            label: self.t("group_detail.field_visibility_label"),
+            items: self.fields.clone(),
+            a11y: Some(A11y {
+                label: Some(self.t("contact_visibility.field_visibility_options_a11y")),
+                hint: Some(self.t("contact_detail.select_items_hint")),
+                role: None,
+            }),
+        });
+        components.push(Component::Banner {
+            text: get_string_with_args(
+                self.locale,
+                "contact_visibility.sync_note",
+                &[("name", &self.contact_name)],
+            ),
+            action_label: self.t("nav.help"),
+            action_id: "visibility_help".into(),
+            a11y: None,
+        });
+        components
+    }
+
     fn build_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "contact_visibility".into(),
@@ -44,24 +99,7 @@ impl ContactVisibilityEngine {
                 &[("name", &self.contact_name)],
             ),
             subtitle: None,
-            components: vec![
-                Component::Text {
-                    a11y: None,
-                    id: "visibility_info".into(),
-                    content: self.t("contact_visibility.info"),
-                    style: TextStyle::Body,
-                },
-                Component::ToggleList {
-                    id: "field_toggles".into(),
-                    label: self.t("group_detail.field_visibility_label"),
-                    items: self.fields.clone(),
-                    a11y: Some(A11y {
-                        label: Some(self.t("contact_visibility.field_visibility_options_a11y")),
-                        hint: Some(self.t("contact_detail.select_items_hint")),
-                        role: None,
-                    }),
-                },
-            ],
+            components: self.components(),
             contextual_actions: vec![ScreenAction {
                 id: "save".into(),
                 label: self.t("action.save"),
@@ -93,6 +131,12 @@ impl WorkflowEngine for ContactVisibilityEngine {
             }
             UserAction::ActionPressed { action_id } if action_id == "save" => {
                 ActionResult::Complete
+            }
+            UserAction::ActionPressed { action_id } if action_id == "visibility_help" => {
+                ActionResult::ShowInfoOverlay {
+                    title: self.t("contact_visibility.help_title"),
+                    body: self.t("contact_visibility.help_body"),
+                }
             }
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }

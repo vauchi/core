@@ -379,6 +379,17 @@ impl RelayConfig {
         ohttp_endpoint(&self.server_url, self.ohttp_relay_url.as_deref())
     }
 
+    /// Bundled pins for [`Self::ohttp_endpoint`]: the OHTTP host's own key
+    /// when it is a distinct host (ADR-037), otherwise the relay's — the
+    /// choice sync makes when it bootstraps the OHTTP key.
+    pub fn ohttp_endpoint_pins(&self) -> Vec<PinnedCertificate> {
+        if self.ohttp_endpoint() == self.server_url {
+            self.pinned_certs.clone()
+        } else {
+            self.ohttp_pinned_certs.clone()
+        }
+    }
+
     /// Converts to TransportConfig for the network layer.
     pub fn to_transport_config(&self) -> TransportConfig {
         TransportConfig {

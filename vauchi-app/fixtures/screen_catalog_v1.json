@@ -2197,7 +2197,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_da21b8c4e3034c16",
+                    "id": "field_13f5f95ff1a30e34",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2228,13 +2228,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:da21b8c4e3034c16",
+                    "id": "field_note:13f5f95ff1a30e34",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:da21b8c4e3034c16",
+                          "id": "field_note:13f5f95ff1a30e34",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2274,7 +2274,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_6ebaa85818e03cf5",
+                    "id": "field_8baf67b22e1a3d4c",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2305,13 +2305,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:6ebaa85818e03cf5",
+                    "id": "field_note:8baf67b22e1a3d4c",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:6ebaa85818e03cf5",
+                          "id": "field_note:8baf67b22e1a3d4c",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2351,7 +2351,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_156bdd759fe8170f",
+                    "id": "field_455a2518a1dee385",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2382,13 +2382,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:156bdd759fe8170f",
+                    "id": "field_note:455a2518a1dee385",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:156bdd759fe8170f",
+                          "id": "field_note:455a2518a1dee385",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4450,10 +4450,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "A853 B6D0 6FA0 902B 34AA 3F9C FBC9 2943 D808 51FD FD12 EF9D ECA9 5E84 A110 14DB",
+                    "content": "B434 DB53 FC60 AB6A CBB5 E90E A0C3 B22E E1C0 70CD E2EF 748F A69A 8754 2F47 B43B",
                     "style": "body",
                     "accessibility": {
-                      "label": "A853 B6D0 6FA0 902B 34AA 3F9C FBC9 2943 D808 51FD FD12 EF9D ECA9 5E84 A110 14DB",
+                      "label": "B434 DB53 FC60 AB6A CBB5 E90E A0C3 B22E E1C0 70CD E2EF 748F A69A 8754 2F47 B43B",
                       "description": null
                     }
                   }
@@ -4472,10 +4472,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "07CD 6D33 A394 3383 F466 314A 740D 75DD CD46 5C4E 91B9 1704 BCD6 C540 63DE 15AF",
+                    "content": "92BE EAF0 605D 40F4 BEE2 C0D7 0EEC DBC9 8BAA EB2A 895C 8E85 632B 2F9B AD55 2D33",
                     "style": "body",
                     "accessibility": {
-                      "label": "07CD 6D33 A394 3383 F466 314A 740D 75DD CD46 5C4E 91B9 1704 BCD6 C540 63DE 15AF",
+                      "label": "92BE EAF0 605D 40F4 BEE2 C0D7 0EEC DBC9 8BAA EB2A 895C 8E85 632B 2F9B AD55 2D33",
                       "description": null
                     }
                   }
@@ -16718,7 +16718,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=8WdwcJbhU2M8PEmoFqvgZguczKpxCuVbNAurAz5AOHs&n=bygaGqfihq6BUD3JdE4im0bbkgflhdEZNwlcGYlSjWM",
+                    "content": "vauchi://exchange?pk=V7mpLIv4s7k4zKwLPWykE96X_0oXsNWwJ1AINk_cAh8&n=qBgRtuL2-nMnW5qCzGZyxnvbapAFwxNXriJ-xvwYtLU",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17177,7 +17177,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,77,72,122,87,48,122,111,53,81,122,103,47,82,109,77,85,112,48,68,88,88,100,122,85,90,99,84,112,71,53,70,119,83,56,49,115,86,65,89,57,52,86,114,121,55,117,89,78,100,111,81,51,120,70,47,104,86,108,106,90,81,54,103,104,110,68,114,121,97,98,115,110,75,90,73,116,56,57,73,99,107,107,108,57,90,97,81,87,70,104,119,117,50,97,116,48,50,119,100,83,104,87,108,104,53,57,72,102,65,74,73,122,115,102,121,54,111,89,110,88,69,55,78,122,122,52,84,87,68,88,79,105,52,106,105,84,107,49,85,73,88,114,48,87,65,66,67,101,103,48,65,65,65,65,65,71,113,54,48,97,119,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,68,102,114,85,83,118,73,77,55,116,121,74,108,115,117,83,90,118,54,71,98,86,85,113,81,98,90,54,119,76,70,79,84,77,52,118,116,82,51,107,98,54,68,76,114,100,74,77,75,82,68,97,116,111,66,119,76,87,49,103,86,57,68,90,113,87,117,43,87,56,101,108,105,55,49,114,76,88,43,106,77,65,109,72,103,80],
+            "payload": [86,48,74,70,87,65,79,83,118,117,114,119,89,70,49,65,57,76,55,105,119,78,99,79,55,78,118,74,105,54,114,114,75,111,108,99,106,111,86,106,75,121,43,98,114,86,85,116,77,50,113,87,57,87,97,73,68,84,98,99,50,57,109,87,43,50,90,82,84,67,101,73,88,104,116,106,108,85,120,110,104,106,69,55,83,47,108,54,82,104,69,88,122,75,80,65,78,108,120,101,72,79,81,72,87,97,71,115,86,50,47,67,104,84,80,68,70,108,47,111,43,56,50,52,80,71,111,80,56,79,99,104,118,76,57,51,65,72,50,77,65,78,108,100,86,51,51,75,76,107,79,98,85,77,84,55,65,65,65,65,65,71,113,54,51,105,85,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,68,104,110,68,98,77,71,47,98,90,118,102,85,100,102,109,118,76,107,57,56,76,81,104,116,70,107,119,108,69,85,106,84,77,116,117,97,81,100,90,98,75,120,69,49,54,121,55,76,66,102,51,115,74,51,100,81,43,99,71,77,85,56,119,113,106,69,73,106,99,77,108,73,113,47,99,103,103,115,80,85,88,86,71,119,66],
             "is_initiator": true
           }
         }
@@ -17209,12 +17209,12 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI23UNUV13WM T1Z.0ZUL16F$SQR42E0MN/K6PF7KFLP2I/6K0NY0O$NG%-MJ+UXHA1/2I/9D$R-64/H04MR1L4/CWXJ1%*D3H7OGV4CGH CNT0ZRK82ICTDWOU11Vauchi User00"
+                      "INI2$SE26OHY2*JV5RFHGTV KL9KXE757ALZDYKBO.M+5BJ$5 JM$SAT-EDM2TGKV:8:MI+I0.+AASPX7EDPBX:LM3EOO0JRK3$9XP98FOU5AI39PKQW-GC87./U11Vauchi User00"
                     ],
                     "purpose": "display",
-                    "label": "Show this",
+                    "label": null,
                     "accessibility": {
-                      "label": "Show this",
+                      "label": "own_qr",
                       "description": null
                     }
                   }
@@ -17240,63 +17240,87 @@
                         }
                       },
                       {
-                        "List": {
-                          "id": "exchange_actions",
+                        "Group": {
+                          "id": "exchange_side_column",
                           "label": null,
-                          "rows": [
+                          "axis": "vertical",
+                          "children": [
                             {
-                              "title": "Use Front Camera",
-                              "subtitle": null,
-                              "detail": null,
-                              "icon_token": null,
-                              "image_data": null,
-                              "fallback_text": null,
-                              "selected": false,
-                              "enabled": true,
-                              "activation": {
-                                "interaction_id": "surface.1.interaction.0",
-                                "label": "Use Front Camera",
-                                "accessibility_label": "Use Front Camera",
-                                "icon_token": null,
-                                "enabled": true,
-                                "shortcut": null
-                              },
-                              "secondary_actions": [],
-                              "controls": [],
-                              "accessibility": {
-                                "label": "Use Front Camera",
-                                "description": null
+                              "Text": {
+                                "id": "exchange_status",
+                                "content": "Show this",
+                                "style": "body",
+                                "accessibility": {
+                                  "label": "Show this",
+                                  "description": null
+                                }
                               }
                             },
                             {
-                              "title": "Cancel",
-                              "subtitle": null,
-                              "detail": null,
-                              "icon_token": null,
-                              "image_data": null,
-                              "fallback_text": null,
-                              "selected": false,
-                              "enabled": true,
-                              "activation": {
-                                "interaction_id": "surface.1.interaction.1",
-                                "label": "Cancel",
-                                "accessibility_label": "Cancel",
-                                "icon_token": null,
-                                "enabled": true,
-                                "shortcut": null
-                              },
-                              "secondary_actions": [],
-                              "controls": [],
-                              "accessibility": {
-                                "label": "Cancel",
-                                "description": null
+                              "List": {
+                                "id": "exchange_actions",
+                                "label": null,
+                                "rows": [
+                                  {
+                                    "title": "Use Front Camera",
+                                    "subtitle": null,
+                                    "detail": null,
+                                    "icon_token": null,
+                                    "image_data": null,
+                                    "fallback_text": null,
+                                    "selected": false,
+                                    "enabled": true,
+                                    "activation": {
+                                      "interaction_id": "surface.1.interaction.0",
+                                      "label": "Use Front Camera",
+                                      "accessibility_label": "Use Front Camera",
+                                      "icon_token": null,
+                                      "enabled": true,
+                                      "shortcut": null
+                                    },
+                                    "secondary_actions": [],
+                                    "controls": [],
+                                    "accessibility": {
+                                      "label": "Use Front Camera",
+                                      "description": null
+                                    }
+                                  },
+                                  {
+                                    "title": "Cancel",
+                                    "subtitle": null,
+                                    "detail": null,
+                                    "icon_token": null,
+                                    "image_data": null,
+                                    "fallback_text": null,
+                                    "selected": false,
+                                    "enabled": true,
+                                    "activation": {
+                                      "interaction_id": "surface.1.interaction.1",
+                                      "label": "Cancel",
+                                      "accessibility_label": "Cancel",
+                                      "icon_token": null,
+                                      "enabled": true,
+                                      "shortcut": null
+                                    },
+                                    "secondary_actions": [],
+                                    "controls": [],
+                                    "accessibility": {
+                                      "label": "Cancel",
+                                      "description": null
+                                    }
+                                  }
+                                ],
+                                "searchable": false,
+                                "paging": null,
+                                "accessibility": {
+                                  "label": "",
+                                  "description": null
+                                }
                               }
                             }
                           ],
-                          "searchable": false,
-                          "paging": null,
                           "accessibility": {
-                            "label": "",
+                            "label": "exchange_side_column",
                             "description": null
                           }
                         }
@@ -17453,63 +17477,87 @@
                         }
                       },
                       {
-                        "List": {
-                          "id": "exchange_actions",
+                        "Group": {
+                          "id": "exchange_side_column",
                           "label": null,
-                          "rows": [
+                          "axis": "vertical",
+                          "children": [
                             {
-                              "title": "Use Rear Camera",
-                              "subtitle": null,
-                              "detail": null,
-                              "icon_token": null,
-                              "image_data": null,
-                              "fallback_text": null,
-                              "selected": false,
-                              "enabled": true,
-                              "activation": {
-                                "interaction_id": "surface.1.interaction.0",
-                                "label": "Use Rear Camera",
-                                "accessibility_label": "Use Rear Camera",
-                                "icon_token": null,
-                                "enabled": true,
-                                "shortcut": null
-                              },
-                              "secondary_actions": [],
-                              "controls": [],
-                              "accessibility": {
-                                "label": "Use Rear Camera",
-                                "description": null
+                              "Text": {
+                                "id": "exchange_status",
+                                "content": "Show this",
+                                "style": "body",
+                                "accessibility": {
+                                  "label": "Show this",
+                                  "description": null
+                                }
                               }
                             },
                             {
-                              "title": "Cancel",
-                              "subtitle": null,
-                              "detail": null,
-                              "icon_token": null,
-                              "image_data": null,
-                              "fallback_text": null,
-                              "selected": false,
-                              "enabled": true,
-                              "activation": {
-                                "interaction_id": "surface.1.interaction.1",
-                                "label": "Cancel",
-                                "accessibility_label": "Cancel",
-                                "icon_token": null,
-                                "enabled": true,
-                                "shortcut": null
-                              },
-                              "secondary_actions": [],
-                              "controls": [],
-                              "accessibility": {
-                                "label": "Cancel",
-                                "description": null
+                              "List": {
+                                "id": "exchange_actions",
+                                "label": null,
+                                "rows": [
+                                  {
+                                    "title": "Use Rear Camera",
+                                    "subtitle": null,
+                                    "detail": null,
+                                    "icon_token": null,
+                                    "image_data": null,
+                                    "fallback_text": null,
+                                    "selected": false,
+                                    "enabled": true,
+                                    "activation": {
+                                      "interaction_id": "surface.1.interaction.0",
+                                      "label": "Use Rear Camera",
+                                      "accessibility_label": "Use Rear Camera",
+                                      "icon_token": null,
+                                      "enabled": true,
+                                      "shortcut": null
+                                    },
+                                    "secondary_actions": [],
+                                    "controls": [],
+                                    "accessibility": {
+                                      "label": "Use Rear Camera",
+                                      "description": null
+                                    }
+                                  },
+                                  {
+                                    "title": "Cancel",
+                                    "subtitle": null,
+                                    "detail": null,
+                                    "icon_token": null,
+                                    "image_data": null,
+                                    "fallback_text": null,
+                                    "selected": false,
+                                    "enabled": true,
+                                    "activation": {
+                                      "interaction_id": "surface.1.interaction.1",
+                                      "label": "Cancel",
+                                      "accessibility_label": "Cancel",
+                                      "icon_token": null,
+                                      "enabled": true,
+                                      "shortcut": null
+                                    },
+                                    "secondary_actions": [],
+                                    "controls": [],
+                                    "accessibility": {
+                                      "label": "Cancel",
+                                      "description": null
+                                    }
+                                  }
+                                ],
+                                "searchable": false,
+                                "paging": null,
+                                "accessibility": {
+                                  "label": "",
+                                  "description": null
+                                }
                               }
                             }
                           ],
-                          "searchable": false,
-                          "paging": null,
                           "accessibility": {
-                            "label": "",
+                            "label": "exchange_side_column",
                             "description": null
                           }
                         }
@@ -17798,7 +17846,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [7,205,109,51,163,148,51,131,244,102,49,74,116,13,117,221,205,70,92,78,145,185,23,4,188,214,197,64,99,222,21,175]
+            "payload": [146,190,234,240,96,93,64,244,190,226,192,215,14,236,219,201,139,170,235,42,137,92,142,133,99,43,47,155,173,85,45,51]
           }
         },
         {
@@ -17953,7 +18001,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [7,205,109,51,163,148,51,131,244,102,49,74,116,13,117,221,205,70,92,78,145,185,23,4,188,214,197,64,99,222,21,175]
+            "payload": [146,190,234,240,96,93,64,244,190,226,192,215,14,236,219,201,139,170,235,42,137,92,142,133,99,43,47,155,173,85,45,51]
           }
         },
         {
@@ -18108,7 +18156,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [7,205,109,51,163,148,51,131,244,102,49,74,116,13,117,221,205,70,92,78,145,185,23,4,188,214,197,64,99,222,21,175]
+            "payload": [146,190,234,240,96,93,64,244,190,226,192,215,14,236,219,201,139,170,235,42,137,92,142,133,99,43,47,155,173,85,45,51]
           }
         },
         {

@@ -24,6 +24,7 @@ mod device_link_initiator;
 mod device_link_responder;
 mod dispatch;
 mod entry_points;
+mod entry_viewers;
 mod help_catalog;
 // INLINE_TEST_REQUIRED: drives the `pub(super)` create_engine factory and the
 // `pub(crate)` DirectTransportEngine::outgoing_card seam — crate-internal.

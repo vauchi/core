@@ -10,7 +10,6 @@ use super::super::AppEngine;
 use super::super::AppScreen;
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::form_dialog::FormDialogType;
-use crate::ui::my_info_entry_detail::EntryContactInfo;
 
 impl AppEngine {
     /// Intercept "edit_avatar" action on MyInfo to navigate to AvatarEditor.
@@ -112,30 +111,8 @@ impl AppEngine {
                 let _ = self
                     .vauchi
                     .set_group_field_visibility(&group_id, field_id, new_visible);
-                // Rebuild visible contacts
-                let all_groups = self.vauchi.list_groups().unwrap_or_default();
-                let mut visible_contacts = Vec::new();
-                let mut seen = std::collections::HashSet::new();
-                for g in &all_groups {
-                    if g.is_field_visible(field_id) {
-                        for cid in g.contacts() {
-                            if seen.insert(cid.to_string()) {
-                                let name = self
-                                    .vauchi
-                                    .get_contact(cid)
-                                    .ok()
-                                    .flatten()
-                                    .map(|c| c.display_name().to_string())
-                                    .unwrap_or_else(|| "Unknown".into());
-                                visible_contacts.push(EntryContactInfo {
-                                    contact_id: cid.to_string(),
-                                    name,
-                                    via_group: g.name().to_string(),
-                                });
-                            }
-                        }
-                    }
-                }
+                let visible_contacts =
+                    super::super::entry_viewers::entry_viewers(&self.vauchi, field_id);
                 if self
                     .engine
                     .apply_update(crate::ui::EngineUpdate::MyInfoEntryDetail(

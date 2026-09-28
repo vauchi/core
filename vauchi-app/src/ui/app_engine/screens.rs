@@ -28,7 +28,7 @@ use crate::ui::groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 use crate::ui::help::HelpEngine;
 use crate::ui::lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
 use crate::ui::my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, OwnFieldInfo};
-use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
+use crate::ui::my_info_entry_detail::MyInfoEntryDetailEngine;
 use crate::ui::onboarding::OnboardingEngine;
 use crate::ui::places_list::{PlaceSummary, PlacesEngine};
 use crate::ui::recovery_claim_review::{
@@ -765,28 +765,7 @@ impl AppEngine {
             })
             .collect();
 
-        // Build contact list from groups that can see this field
-        let mut visible_contacts = Vec::new();
-        let mut seen_contacts = std::collections::HashSet::new();
-        for g in &all_groups {
-            if g.is_field_visible(field_id) {
-                for cid in g.contacts() {
-                    if seen_contacts.insert(cid.to_string()) {
-                        let name = vauchi
-                            .get_contact(cid)
-                            .ok()
-                            .flatten()
-                            .map(|c| c.display_name().to_string())
-                            .unwrap_or_else(|| "Unknown".into());
-                        visible_contacts.push(EntryContactInfo {
-                            contact_id: cid.to_string(),
-                            name,
-                            via_group: g.name().to_string(),
-                        });
-                    }
-                }
-            }
-        }
+        let visible_contacts = super::entry_viewers::entry_viewers(vauchi, field_id);
 
         let shown = card.as_ref().is_some_and(|c| c.is_field_shown(field_id));
         Box::new(

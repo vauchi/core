@@ -632,6 +632,24 @@ mod tests {
         );
     }
 
+    // @internal
+    #[test]
+    fn relay_config_exposes_the_ohttp_endpoint_sync_uses() {
+        assert_eq!(
+            RelayConfig::default().ohttp_endpoint(),
+            "https://ohttp.vauchi.app",
+            "production derives the distinct IP-stripping hop"
+        );
+        assert_eq!(
+            RelayConfig::unpinned("https://relay.self.example".into()).ohttp_endpoint(),
+            "https://relay.self.example",
+            "a self-hosted relay serves OHTTP itself"
+        );
+        let mut explicit = RelayConfig::unpinned("https://relay.self.example".into());
+        explicit.ohttp_relay_url = Some("https://ohttp.self.example".into());
+        assert_eq!(explicit.ohttp_endpoint(), "https://ohttp.self.example");
+    }
+
     // @scenario: pinning :: production default pins the OHTTP host distinctly
     #[test]
     fn default_relay_config_pins_ohttp_host_with_distinct_key() {

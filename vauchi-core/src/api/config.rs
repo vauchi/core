@@ -372,6 +372,13 @@ impl RelayConfig {
         }
     }
 
+    /// The OHTTP endpoint this configuration sends to — the base URL for
+    /// `POST /v2/ohttp` and the `GET /v2/ohttp-key` bootstrap, resolved the
+    /// same way sync resolves it (see [`ohttp_endpoint`]).
+    pub fn ohttp_endpoint(&self) -> String {
+        ohttp_endpoint(&self.server_url, self.ohttp_relay_url.as_deref())
+    }
+
     /// Converts to TransportConfig for the network layer.
     pub fn to_transport_config(&self) -> TransportConfig {
         TransportConfig {

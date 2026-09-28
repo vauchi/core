@@ -520,7 +520,10 @@ impl MultiStageExchangeEngine {
                 // Animated-QR frame carrier (ADR-044 Am2a C2a); see module doc.
                 frames: vec![data.clone()],
                 mode: QrMode::Display,
-                label: Some(self.t("multi_stage.qr_broadcast_label")),
+                // No caption: a line above the code shrank it below what
+                // the peer's camera read, so the peer never finished
+                // (issue #315). The hold-position ask rides on the status.
+                label: None,
                 scan_quality: None,
                 a11y: None,
             });
@@ -529,7 +532,7 @@ impl MultiStageExchangeEngine {
             id: COMPONENT_ID_STATUS.into(),
             icon: Some("checkmark.circle".into()),
             title: self.t("exchange.terminal.complete"),
-            detail: None,
+            detail: Some(self.t("multi_stage.qr_broadcast_label")),
             status: Status::Success,
             status_label: self.t(Status::Success.label_key()),
             a11y: None,

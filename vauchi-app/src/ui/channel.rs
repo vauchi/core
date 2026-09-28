@@ -295,6 +295,11 @@ pub enum MyInfoEntryDetailUpdate {
         visible: bool,
         visible_contacts: Vec<super::my_info_entry_detail::EntryContactInfo>,
     },
+    /// The contacts the entry is sent to changed without a group toggle
+    /// (the all-contacts switch).
+    Viewers {
+        visible_contacts: Vec<super::my_info_entry_detail::EntryContactInfo>,
+    },
 }
 
 impl EngineUpdate {
@@ -384,6 +389,7 @@ impl EngineUpdate {
                 MyInfoEntryDetailUpdate::GroupVisibility { .. } => {
                     "MyInfoEntryDetail::GroupVisibility"
                 }
+                MyInfoEntryDetailUpdate::Viewers { .. } => "MyInfoEntryDetail::Viewers",
             },
         }
     }

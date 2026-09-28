@@ -174,7 +174,7 @@ pub use multi_stage_exchange::{
     SWITCH_CAMERA_ACTION_ID as MULTI_STAGE_SWITCH_CAMERA_ACTION_ID,
 };
 pub use my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, MyInfoViewMode, OwnFieldInfo};
-pub use my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
+pub use my_info_entry_detail::{EntryContactInfo, EntryViewerVia, MyInfoEntryDetailEngine};
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
 pub use places_list::{PlaceSummary, PlacesEngine};
 pub use prepared_surface::{PreparedSurface, PreparedSurfaceError};

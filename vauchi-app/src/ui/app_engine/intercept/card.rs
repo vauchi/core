@@ -81,6 +81,16 @@ impl AppEngine {
                 // storage unchanged and the next rebuild shows truth
                 #[allow(clippy::let_underscore_must_use)]
                 let _ = self.vauchi.set_field_shown(field_id, new_shown);
+                let visible_contacts =
+                    super::super::entry_viewers::entry_viewers(&self.vauchi, field_id);
+                if !self
+                    .engine
+                    .apply_update(crate::ui::EngineUpdate::MyInfoEntryDetail(
+                        crate::ui::MyInfoEntryDetailUpdate::Viewers { visible_contacts },
+                    ))
+                {
+                    tracing::warn!("entry viewers update not consumed by entry detail engine");
+                }
                 // Invalidate MyInfo cache so it refreshes; the engine's own
                 // handler renders the flipped toggle.
                 self.engine_cache.remove(&AppScreen::MyInfo);

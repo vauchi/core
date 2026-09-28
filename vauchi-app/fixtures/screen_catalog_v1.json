@@ -2197,7 +2197,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_693630495d51f1d9",
+                    "id": "field_5f43961129b6e2bb",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2228,13 +2228,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:693630495d51f1d9",
+                    "id": "field_note:5f43961129b6e2bb",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:693630495d51f1d9",
+                          "id": "field_note:5f43961129b6e2bb",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2274,7 +2274,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_8584cbd693888c2f",
+                    "id": "field_104dde95708cfc58",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2305,13 +2305,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:8584cbd693888c2f",
+                    "id": "field_note:104dde95708cfc58",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:8584cbd693888c2f",
+                          "id": "field_note:104dde95708cfc58",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2351,7 +2351,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_fa21e0405a46a7ef",
+                    "id": "field_282ab57d119bd16a",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2382,13 +2382,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:fa21e0405a46a7ef",
+                    "id": "field_note:282ab57d119bd16a",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:fa21e0405a46a7ef",
+                          "id": "field_note:282ab57d119bd16a",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4450,10 +4450,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "1549 6338 EA1F F871 ABA5 B94B 876B 4F66 06A1 A6E9 5A6B D6A5 B56E 5E39 BD90 B7DD",
+                    "content": "5374 7624 B26B 6549 BD7F 41F9 1708 D22B 3875 6519 FBD3 31A9 C1AC 9291 9C21 E834",
                     "style": "body",
                     "accessibility": {
-                      "label": "1549 6338 EA1F F871 ABA5 B94B 876B 4F66 06A1 A6E9 5A6B D6A5 B56E 5E39 BD90 B7DD",
+                      "label": "5374 7624 B26B 6549 BD7F 41F9 1708 D22B 3875 6519 FBD3 31A9 C1AC 9291 9C21 E834",
                       "description": null
                     }
                   }
@@ -4472,10 +4472,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "7156 9D90 79E5 064E 8555 EA51 5CFA 51F1 17F2 E9F4 F24A 8411 2AED A9DE 55C7 DAFF",
+                    "content": "483F B940 BBB4 6589 2BFC F9C1 296E 9429 8ABB 2B97 3F28 E50E F584 801C A67D 1BA0",
                     "style": "body",
                     "accessibility": {
-                      "label": "7156 9D90 79E5 064E 8555 EA51 5CFA 51F1 17F2 E9F4 F24A 8411 2AED A9DE 55C7 DAFF",
+                      "label": "483F B940 BBB4 6589 2BFC F9C1 296E 9429 8ABB 2B97 3F28 E50E F584 801C A67D 1BA0",
                       "description": null
                     }
                   }
@@ -6253,7 +6253,7 @@
                       {
                         "title": "Version",
                         "subtitle": null,
-                        "detail": "0.67.1",
+                        "detail": "0.68.0",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": null,
@@ -8466,7 +8466,7 @@
                             },
                             {
                               "title": "About",
-                              "subtitle": "Vauchi 0.67.1 · core 0.67.1",
+                              "subtitle": "Vauchi 0.68.0 · core 0.68.0",
                               "detail": null,
                               "icon_token": null,
                               "image_data": null,
@@ -12752,11 +12752,169 @@
                 "Divider",
                 {
                   "Text": {
-                    "id": "no_contacts",
-                    "content": "No contacts can see this entry.",
-                    "style": "caption",
+                    "id": "contacts_header",
+                    "content": "Visible to 6 contacts",
+                    "style": "muted",
                     "accessibility": {
-                      "label": "No contacts can see this entry.",
+                      "label": "Visible to 6 contacts",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "visible_contacts",
+                    "label": null,
+                    "rows": [
+                      {
+                        "title": "Alan Turing",
+                        "subtitle": "Everyone",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "Alan Turing",
+                          "accessibility_label": "Alan Turing",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Alan Turing",
+                          "description": null
+                        }
+                      },
+                      {
+                        "title": "Annabella Byron",
+                        "subtitle": "Everyone",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.2",
+                          "label": "Annabella Byron",
+                          "accessibility_label": "Annabella Byron",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Annabella Byron",
+                          "description": null
+                        }
+                      },
+                      {
+                        "title": "Charles Babbage",
+                        "subtitle": "Everyone",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.3",
+                          "label": "Charles Babbage",
+                          "accessibility_label": "Charles Babbage",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Charles Babbage",
+                          "description": null
+                        }
+                      },
+                      {
+                        "title": "Emmy Noether",
+                        "subtitle": "Everyone",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.4",
+                          "label": "Emmy Noether",
+                          "accessibility_label": "Emmy Noether",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Emmy Noether",
+                          "description": null
+                        }
+                      },
+                      {
+                        "title": "Grace Hopper",
+                        "subtitle": "Everyone",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.5",
+                          "label": "Grace Hopper",
+                          "accessibility_label": "Grace Hopper",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Grace Hopper",
+                          "description": null
+                        }
+                      },
+                      {
+                        "title": "Mary Somerville",
+                        "subtitle": "Everyone",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.6",
+                          "label": "Mary Somerville",
+                          "accessibility_label": "Mary Somerville",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Mary Somerville",
+                          "description": null
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "",
                       "description": null
                     }
                   }
@@ -16528,7 +16686,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=rRhP-H6XLF_n4f3XR6z20rSN660qfuvhyrOLeG6sOQM&n=yxQYLOVN5B6nLh3LjQMUdh5PQvddCG6tEmz2xhip68I",
+                    "content": "vauchi://exchange?pk=9TxO2zmRTt7POhIcAasy0NK4RNiPtvEO2eV94-ZR6HU&n=O5U1R_GDJyJABEfFjqP6aLh-G9-TDJlBd0T4Da0eVA0",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -16987,7 +17145,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,78,120,86,112,50,81,101,101,85,71,84,111,86,86,54,108,70,99,43,108,72,120,70,47,76,112,57,80,74,75,104,66,69,113,55,97,110,101,86,99,102,97,47,120,99,73,54,99,105,115,98,49,121,78,68,73,104,106,69,108,117,119,101,101,54,75,84,99,49,65,102,56,65,84,119,115,80,84,122,110,106,107,121,107,85,97,110,53,74,113,75,112,52,43,68,78,48,115,110,48,108,76,52,119,70,105,112,72,100,121,72,86,72,105,107,90,77,116,57,73,115,101,88,66,115,43,107,98,100,43,53,88,114,71,51,120,73,53,67,51,102,75,117,47,118,120,102,51,68,103,65,65,65,65,65,71,113,50,79,82,73,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,122,67,99,116,43,117,43,118,117,68,67,77,47,51,87,104,119,77,108,110,57,99,85,49,87,120,70,102,111,67,119,97,108,105,83,54,69,65,102,119,84,100,69,111,107,86,86,99,54,97,122,88,75,109,90,76,78,79,109,105,54,114,72,99,105,97,81,115,87,90,105,97,77,90,87,104,80,79,84,79,122,57,98,81,73],
+            "payload": [86,48,74,70,87,65,78,73,80,55,108,65,117,55,82,108,105,83,118,56,43,99,69,112,98,112,81,112,105,114,115,114,108,122,56,111,53,81,55,49,104,73,65,99,112,110,48,98,111,65,122,43,109,70,110,72,67,106,116,86,79,50,117,116,86,43,49,99,97,55,108,79,78,116,80,73,88,78,121,71,111,75,114,111,50,99,120,78,49,109,99,73,74,107,56,67,78,110,99,77,117,98,118,100,97,65,79,111,89,48,90,50,109,52,54,82,120,107,47,76,118,89,110,108,87,56,43,101,73,71,55,82,49,122,55,81,50,84,86,116,99,102,69,65,101,108,56,105,104,55,50,72,113,74,122,73,65,65,65,65,65,71,113,54,120,107,85,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,112,88,82,71,116,117,98,112,117,104,74,115,72,73,74,109,106,49,105,54,65,85,75,48,98,54,81,55,56,89,83,109,83,83,120,47,122,82,88,84,117,109,111,66,103,85,107,104,110,84,72,122,105,79,111,72,55,47,47,117,90,103,107,103,52,69,71,100,56,99,50,79,74,55,48,111,119,81,114,98,49,108,98,99,73],
             "is_initiator": true
           }
         }
@@ -17019,7 +17177,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI2OX75UUESAN6U.Y3SNNHY1HEO67UUHKC*QJAR0MQG948VK%E197A:RNKR27.CUJN/R8-UTY.G/9I-GOLI7.-FSOHN:4ZNRS:SI7EOTMDFO$*3LOL*51/VI3C011Vauchi User00"
+                      "INI2M/D5%UND5W5D0MF/ZQZ4OGA3B5053B9QCO2RL.LI7LWV8GFJS2K*BQOW1B6H4I7G.J4RETPEXK2WXGK694*VYW9YT0A/FJGVUYH/S1WTC-6RW KW+4SLK3V411Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": "Show this",
@@ -17608,7 +17766,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [113,86,157,144,121,229,6,78,133,85,234,81,92,250,81,241,23,242,233,244,242,74,132,17,42,237,169,222,85,199,218,255]
+            "payload": [72,63,185,64,187,180,101,137,43,252,249,193,41,110,148,41,138,187,43,151,63,40,229,14,245,132,128,28,166,125,27,160]
           }
         },
         {
@@ -17763,7 +17921,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [113,86,157,144,121,229,6,78,133,85,234,81,92,250,81,241,23,242,233,244,242,74,132,17,42,237,169,222,85,199,218,255]
+            "payload": [72,63,185,64,187,180,101,137,43,252,249,193,41,110,148,41,138,187,43,151,63,40,229,14,245,132,128,28,166,125,27,160]
           }
         },
         {
@@ -17918,7 +18076,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [113,86,157,144,121,229,6,78,133,85,234,81,92,250,81,241,23,242,233,244,242,74,132,17,42,237,169,222,85,199,218,255]
+            "payload": [72,63,185,64,187,180,101,137,43,252,249,193,41,110,148,41,138,187,43,151,63,40,229,14,245,132,128,28,166,125,27,160]
           }
         },
         {
@@ -20236,7 +20394,7 @@
                     "label": null,
                     "rows": [
                       {
-                        "title": "Preview as...",
+                        "title": "Vorschau als...",
                         "subtitle": null,
                         "detail": null,
                         "icon_token": null,
@@ -20246,8 +20404,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.2",
-                          "label": "Preview as...",
-                          "accessibility_label": "Preview as...",
+                          "label": "Vorschau als...",
+                          "accessibility_label": "Vorschau als...",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -20255,7 +20413,7 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "Preview as...",
+                          "label": "Vorschau als...",
                           "description": null
                         }
                       }

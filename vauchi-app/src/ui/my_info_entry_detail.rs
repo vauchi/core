@@ -12,7 +12,18 @@ use crate::ui::*;
 pub struct EntryContactInfo {
     pub contact_id: String,
     pub name: String,
-    pub via_group: String,
+    pub via: EntryViewerVia,
+}
+
+/// Why a contact receives an entry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EntryViewerVia {
+    /// A group the contact is in grants the entry.
+    Group(String),
+    /// The entry is shared with all contacts.
+    Everyone,
+    /// A grant for this contact alone.
+    Individual,
 }
 
 /// Engine for the MyInfo entry detail screen.
@@ -26,7 +37,7 @@ pub struct MyInfoEntryDetailEngine {
     pub note: Option<String>,
     /// All groups with their visibility state for this field.
     pub groups: Vec<(String, String, bool)>, // (group_id, group_name, is_visible)
-    /// Contacts who can see this field (derived from group membership).
+    /// Contacts this field is sent to.
     pub visible_contacts: Vec<EntryContactInfo>,
     /// The unassigned entry's Visible/Hidden toggle state (explicit
     /// `Everyone`). Rendered only while no group grants the entry —
@@ -113,6 +124,9 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                 if let Some(entry) = self.groups.iter_mut().find(|(gid, _, _)| gid == &group_id) {
                     entry.2 = visible;
                 }
+                self.visible_contacts = visible_contacts;
+            }
+            crate::ui::MyInfoEntryDetailUpdate::Viewers { visible_contacts } => {
                 self.visible_contacts = visible_contacts;
             }
         }
@@ -202,11 +216,15 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                     id: c.contact_id.clone(),
                     label: c.name.clone(),
                     icon: None,
-                    detail: Some(get_string_with_args(
-                        self.locale,
-                        "my_info_entry_detail.via_group",
-                        &[("group", &c.via_group)],
-                    )),
+                    detail: match &c.via {
+                        EntryViewerVia::Group(group) => Some(get_string_with_args(
+                            self.locale,
+                            "my_info_entry_detail.via_group",
+                            &[("group", group)],
+                        )),
+                        EntryViewerVia::Everyone => Some(self.t("my_info.visibility_everyone")),
+                        EntryViewerVia::Individual => None,
+                    },
                     a11y: None,
                     info_key: None,
                 })

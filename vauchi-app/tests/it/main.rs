@@ -112,6 +112,7 @@ mod local_listener_tests;
 mod local_rendezvous_tests;
 mod local_wire_tests;
 mod locale_provenance_tests;
+mod lock_screen_feedback_tests;
 mod multi_stage_deadline_tests;
 mod multi_stage_exchange_i18n_tests;
 mod multi_stage_machine_proptest;

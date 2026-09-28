@@ -208,29 +208,38 @@ fn finalized_before_session_ended_shows_success_with_qr_broadcast() {
     // broadcast that follows exists only for the peer (two-generals
     // last-ack: a still-Complete peer needs our RDYY). The user must
     // see Success immediately — with the own-QR still broadcasting
-    // under a keep-facing caption — instead of parking on
-    // "Almost done" for the whole grace window
+    // and the status asking them to keep facing — instead of parking
+    // on "Almost done" for the whole grace window
     // (2026-07-01-hover-exchange-completion-latency).
     let mut engine = engine_with_qr(ProtocolState::Finalized, "GRACE-QR");
     engine.set_finalized("Alice".into());
     let screen = engine.current_screen();
 
-    let has_success = screen.components.iter().any(|c| {
-        matches!(
-            c,
-            Component::StatusIndicator { title, status: Status::Success, .. }
-                if title == "Exchange Complete",
-        )
+    let success_detail = screen.components.iter().find_map(|c| match c {
+        Component::StatusIndicator {
+            title,
+            status: Status::Success,
+            detail,
+            ..
+        } if title == "Exchange Complete" => Some(detail.clone()),
+        _ => None,
     });
-    assert!(
-        has_success,
-        "Finalized before session end must already show the success indicator"
+    assert_eq!(
+        success_detail,
+        Some(Some(
+            "Keep screens facing each other until the other phone finishes".to_string()
+        )),
+        "Finalized before session end must already show success, asking the user to hold"
     );
 
     // The peer's camera must always see the QR: FIRST component on a
     // fixed (non-scrolling) layout — same pinned-QR contract as the
     // active screen. Appending it below a scrollable success summary
     // would push it below the fold exactly when the peer needs it.
+    // No caption either: a caption line above it shrank the code to
+    // ~284 pt on an iPhone SE, below what a Pixel 3a read at 11 cm, so
+    // the peer never finished (issue #315, exchange journal HE-0 vs
+    // HE-G: 0/3 vs 3/3).
     let broadcast_qr = match screen.components.first() {
         Some(Component::QrCode {
             data,
@@ -242,10 +251,7 @@ fn finalized_before_session_ended_shows_success_with_qr_broadcast() {
     };
     assert_eq!(
         broadcast_qr,
-        Some((
-            "GRACE-QR".to_string(),
-            Some("Keep screens facing each other until the other phone finishes".to_string())
-        )),
+        Some(("GRACE-QR".to_string(), None)),
         "the own-QR must keep broadcasting FIRST on the grace screen"
     );
     assert_eq!(

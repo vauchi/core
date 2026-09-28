@@ -320,6 +320,8 @@
   "cli.cmd.diag.animated_qr.input": "Input:      {file}",
   "cli.cmd.diag.animated_qr.payload": "Payload:    {size} bytes",
   "cli.cmd.diag.animated_qr.title": "Animated QR Encoding",
+  "cli.cmd.diag.ohttp_probe.failed": "OHTTP forward hop FAILED at {step} ({url}): {detail}",
+  "cli.cmd.diag.ohttp_probe.ok": "OHTTP forward hop OK: {url}",
   "cli.cmd.diag.trace.summary": "--- Trace Summary ---",
   "cli.cmd.diag.trace.total_events": "Total events: {count}",
   "cli.cmd.exchange.after_complete": "After they complete the exchange, run 'vauchi sync' to receive their info.",

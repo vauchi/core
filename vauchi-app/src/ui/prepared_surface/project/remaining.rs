@@ -208,6 +208,7 @@ impl Projection {
             searchable: false,
             paging: None,
             accessibility: accessibility(a11y, title),
+            style: vauchi_core::PresentationListStyle::Rows,
         })
     }
 

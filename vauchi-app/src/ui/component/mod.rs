@@ -156,6 +156,13 @@ pub enum Component {
         id: String,
         items: Vec<ActionListItem>,
     },
+    /// An `ActionList` drawn as native buttons: a short set of commands
+    /// that must read as tappable at a glance (the exchange screen's
+    /// switch-camera and cancel beside the camera preview).
+    ButtonList {
+        id: String,
+        items: Vec<ActionListItem>,
+    },
     /// A horizontal container — lays its child components out in a single
     /// row. Used to place a camera preview beside its action buttons so a
     /// fixed-layout screen fits the viewport without scrolling

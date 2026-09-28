@@ -218,6 +218,7 @@ fn list_surface(surface_id: &str, title: String, rows: Vec<PresentationRow>) -> 
             searchable: false,
             paging: None,
             accessibility: accessibility(&title),
+            style: vauchi_core::PresentationListStyle::Rows,
         }],
     )
 }

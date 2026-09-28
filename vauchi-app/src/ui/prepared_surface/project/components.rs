@@ -3,8 +3,8 @@
 
 use vauchi_core::{
     AccessibilitySpec, ActionTone, BindingId, ChoiceOption, PresentationAxis,
-    PresentationImageShape, PresentationInputKind, PresentationNode, PresentationQrPurpose,
-    PresentationTone,
+    PresentationImageShape, PresentationInputKind, PresentationListStyle, PresentationNode,
+    PresentationQrPurpose, PresentationTone,
 };
 
 use super::{
@@ -121,7 +121,12 @@ impl Projection {
                 window,
             } => self.list(id, items, *searchable, *total_count, *offset, *window),
             Component::SettingsGroup { id, label, items } => self.settings_group(id, label, items),
-            Component::ActionList { id, items } => self.action_list(id, None, items),
+            Component::ActionList { id, items } => {
+                self.action_list(id, None, items, PresentationListStyle::Rows)
+            }
+            Component::ButtonList { id, items } => {
+                self.action_list(id, None, items, PresentationListStyle::Buttons)
+            }
             Component::SectionedActionList { id, sections } => {
                 let mut children = Vec::with_capacity(sections.len());
                 for section in sections {
@@ -129,6 +134,7 @@ impl Projection {
                         &format!("{id}.{}", section.id),
                         Some(section.label.clone()),
                         &section.items,
+                        PresentationListStyle::Rows,
                     )?);
                 }
                 Ok(group(

@@ -40,10 +40,10 @@ pub use presentation::{
     DocumentSpec, ExportFileSpec, InputMode, InputValue, InteractionId, InvocationOutcome,
     MotionPreference, NavigationItem, NavigationSpec, NotificationSpec, NotificationUrgency,
     OverlayKind, OverlaySpec, PaneLayout, PresentationAxis, PresentationIdError,
-    PresentationImageShape, PresentationInputKind, PresentationNode, PresentationPaging,
-    PresentationProfile, PresentationQrPurpose, PresentationRow, PresentationTextStyle,
-    PresentationTokens, PresentationTone, StandardShortcut, SurfaceId, SurfaceLayout, SurfaceSpec,
-    ToastSpec, WindowClass,
+    PresentationImageShape, PresentationInputKind, PresentationListStyle, PresentationNode,
+    PresentationPaging, PresentationProfile, PresentationQrPurpose, PresentationRow,
+    PresentationTextStyle, PresentationTokens, PresentationTone, StandardShortcut, SurfaceId,
+    SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass,
 };
 
 /// A command from core to the frontend requesting a hardware action.

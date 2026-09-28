@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_core::{
-    AccessibilitySpec, ActionTone, ChoiceOption, PresentationImageShape, PresentationNode,
-    PresentationPaging, PresentationRow,
+    AccessibilitySpec, ActionTone, ChoiceOption, PresentationImageShape, PresentationListStyle,
+    PresentationNode, PresentationPaging, PresentationRow,
 };
 
 use super::{
@@ -78,6 +78,7 @@ impl Projection {
                 window,
             }),
             accessibility: AccessibilitySpec::label(""),
+            style: PresentationListStyle::Rows,
         })
     }
 
@@ -150,6 +151,7 @@ impl Projection {
             searchable: false,
             paging: None,
             accessibility: AccessibilitySpec::label(label),
+            style: PresentationListStyle::Rows,
         })
     }
 
@@ -182,6 +184,7 @@ impl Projection {
         id: &str,
         label: Option<String>,
         items: &[ActionListItem],
+        style: PresentationListStyle,
     ) -> Result<PresentationNode, PreparedSurfaceError> {
         let mut rows = Vec::with_capacity(items.len());
         for item in items {
@@ -216,6 +219,7 @@ impl Projection {
             searchable: false,
             paging: None,
             accessibility: AccessibilitySpec::label(label.as_deref().unwrap_or("")),
+            style,
         })
     }
 
@@ -283,6 +287,7 @@ impl Projection {
             searchable: false,
             paging: None,
             accessibility: accessibility(a11y, name),
+            style: PresentationListStyle::Rows,
         });
         Ok(group(
             None,

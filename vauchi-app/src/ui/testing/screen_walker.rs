@@ -116,7 +116,7 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                 });
             }
         }
-        Component::ActionList { id, items } => {
+        Component::ActionList { id, items } | Component::ButtonList { id, items } => {
             for item in items {
                 out.push(UserAction::ListItemSelected {
                     component_id: id.clone(),

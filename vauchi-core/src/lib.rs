@@ -116,10 +116,10 @@ pub use platform::{
     MAX_EVENT_INPUT_VALUE_BYTES, MAX_EVENT_JSON_BYTES, MAX_EVENT_JSON_NESTING_DEPTH,
     MotionPreference, NavigationItem, NavigationSpec, NotificationSpec, NotificationUrgency,
     Orientation, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis, PresentationIdError,
-    PresentationImageShape, PresentationInputKind, PresentationNode, PresentationPaging,
-    PresentationProfile, PresentationQrPurpose, PresentationRow, PresentationTextStyle,
-    PresentationTokens, PresentationTone, StandardShortcut, SurfaceId, SurfaceLayout, SurfaceSpec,
-    ToastSpec, WindowClass, event_from_json,
+    PresentationImageShape, PresentationInputKind, PresentationListStyle, PresentationNode,
+    PresentationPaging, PresentationProfile, PresentationQrPurpose, PresentationRow,
+    PresentationTextStyle, PresentationTokens, PresentationTone, StandardShortcut, SurfaceId,
+    SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass, event_from_json,
 };
 
 pub mod recovery;

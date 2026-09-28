@@ -616,7 +616,7 @@ impl MultiStageExchangeEngine {
         } else {
             self.t("multi_stage.use_front_camera_button")
         };
-        let buttons = Component::ActionList {
+        let buttons = Component::ButtonList {
             id: EXCHANGE_ACTIONS_ID.into(),
             items: vec![
                 ActionListItem {

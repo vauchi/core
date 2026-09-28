@@ -15,6 +15,26 @@ pub enum PresentationAxis {
     Vertical,
 }
 
+/// How a shell draws a `List`'s rows. `Rows` is the ordinary list;
+/// `Buttons` draws each activatable row as a native button, for a short
+/// set of commands that must read as tappable at a glance (the exchange
+/// screen's switch-camera and cancel beside the camera preview).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum PresentationListStyle {
+    #[default]
+    Rows,
+    Buttons,
+}
+
+impl PresentationListStyle {
+    pub fn is_rows(&self) -> bool {
+        matches!(self, Self::Rows)
+    }
+}
+
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -165,6 +185,10 @@ pub enum PresentationNode {
         searchable: bool,
         paging: Option<PresentationPaging>,
         accessibility: AccessibilitySpec,
+        /// Omitted on the wire when `Rows`, so every existing fixture and
+        /// shell keeps working unchanged.
+        #[serde(default, skip_serializing_if = "PresentationListStyle::is_rows")]
+        style: PresentationListStyle,
     },
     Image {
         id: Option<BindingId>,

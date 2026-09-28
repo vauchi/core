@@ -73,28 +73,9 @@ impl MultiStageExchangeEngine {
     /// was disposed and the stall could never clear (vauchi/private#9).
     /// Only the caption and the bottom action row are Stalled-specific.
     pub(super) fn build_stalled_screen(&self, title: String) -> ScreenModel {
+        // The stall warning rides in the status text, which
+        // `build_active_screen` writes from `self.stalled`.
         let mut screen = self.build_active_screen(title);
-        let stalled_title = self.t("exchange.stalled_title");
-        for component in &mut screen.components {
-            if let Component::QrCode {
-                id, label, a11y, ..
-            } = component
-                && id == COMPONENT_ID_OWN_QR
-            {
-                // Keeps the frame current/total progress visible via the
-                // existing transferring-progress strings rather than
-                // duplicating that formatting in a new locale key.
-                *label = Some(format!(
-                    "{stalled_title} · {}",
-                    own_qr_label(&self.state, self.locale)
-                ));
-                *a11y = Some(A11y {
-                    label: Some(stalled_title.clone()),
-                    hint: Some(self.t("exchange.stalled_detail")),
-                    role: None,
-                });
-            }
-        }
         screen.contextual_actions = vec![
             ScreenAction {
                 id: RETRY_ACTION_ID.into(),

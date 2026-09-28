@@ -97,6 +97,10 @@ const EXCHANGE_ACTIONS_ID: &str = "exchange_actions";
 /// Component id of the `Row` grouping the peer-scan preview with the
 /// action buttons on the active exchange screen.
 const EXCHANGE_PREVIEW_ROW_ID: &str = "exchange_preview_row";
+/// The `Column` beside the preview: exchange status, then the buttons.
+const EXCHANGE_SIDE_COLUMN_ID: &str = "exchange_side_column";
+/// The exchange status text ("Show this", "Sending 1/3 · Receiving 2/3").
+const EXCHANGE_STATUS_ID: &str = "exchange_status";
 const COMPONENT_ID_STATUS: &str = "status";
 const COMPONENT_ID_PEER_NAME: &str = "peer_name";
 const COMPONENT_ID_PERMISSION: &str = "permission_required";
@@ -583,13 +587,10 @@ impl MultiStageExchangeEngine {
                 // Animated-QR frame carrier (ADR-044 Am2a C2a); see module doc.
                 frames: vec![data.clone()],
                 mode: QrMode::Display,
-                // The QR label doubles as the exchange status: "Show this"
-                // while waiting, then the live progress once the exchange is
-                // running (e.g. "Transferring 3/5"). Folding the status into
-                // the QR caption lets the non-scrolling layout fit the
-                // full-width QR + camera + buttons on a compact screen — there
-                // is no separate status row to push them off-screen.
-                label: Some(own_qr_label(&self.state, self.locale)),
+                // No caption: the exchange status sits beside the camera
+                // preview instead (see the side column below), so this line
+                // of height goes to the preview on a compact screen.
+                label: None,
                 scan_quality: None,
                 a11y: None,
             });
@@ -636,9 +637,41 @@ impl MultiStageExchangeEngine {
                 },
             ],
         };
+        // The status ("Show this", then the live progress) shares the
+        // preview's height with the buttons rather than captioning the QR,
+        // which cost the preview a line on a compact screen.
+        let progress = own_qr_label(&self.state, self.locale);
+        let status = if self.stalled {
+            // Keeps the progress visible through the existing
+            // transferring-progress strings rather than a new locale key.
+            let stalled_title = self.t("exchange.stalled_title");
+            Component::Text {
+                id: EXCHANGE_STATUS_ID.into(),
+                content: format!("{stalled_title} · {progress}"),
+                style: TextStyle::Body,
+                a11y: Some(A11y {
+                    label: Some(stalled_title),
+                    hint: Some(self.t("exchange.stalled_detail")),
+                    role: None,
+                }),
+            }
+        } else {
+            Component::Text {
+                id: EXCHANGE_STATUS_ID.into(),
+                content: progress,
+                style: TextStyle::Body,
+                a11y: None,
+            }
+        };
         components.push(Component::Row {
             id: EXCHANGE_PREVIEW_ROW_ID.into(),
-            items: vec![scan, buttons],
+            items: vec![
+                scan,
+                Component::Column {
+                    id: EXCHANGE_SIDE_COLUMN_ID.into(),
+                    items: vec![status, buttons],
+                },
+            ],
         });
 
         let mut screen = ScreenModel::new(SCREEN_ID, title, components, Vec::new());

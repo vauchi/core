@@ -138,7 +138,12 @@ impl Projection {
                     AccessibilitySpec::label(""),
                 ))
             }
-            Component::Row { id, items } => {
+            Component::Row { id, items } | Component::Column { id, items } => {
+                let axis = if matches!(component, Component::Row { .. }) {
+                    PresentationAxis::Horizontal
+                } else {
+                    PresentationAxis::Vertical
+                };
                 let mut children = Vec::with_capacity(items.len());
                 for item in items {
                     children.push(self.component(item)?);
@@ -146,7 +151,7 @@ impl Projection {
                 Ok(PresentationNode::Group {
                     id: Some(BindingId::new(id)?),
                     label: None,
-                    axis: PresentationAxis::Horizontal,
+                    axis,
                     children,
                     accessibility: AccessibilitySpec::label(id),
                 })

@@ -124,7 +124,7 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                 });
             }
         }
-        Component::Row { items, .. } => {
+        Component::Row { items, .. } | Component::Column { items, .. } => {
             // A layout container — recurse so nested affordances (e.g.
             // the exchange preview row's `ActionList` switch/cancel)
             // are still walked for reachability.

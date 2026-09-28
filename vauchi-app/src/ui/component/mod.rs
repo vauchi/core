@@ -165,6 +165,14 @@ pub enum Component {
         id: String,
         items: Vec<Component>,
     },
+    /// A vertical container — stacks its child components. Sits inside a
+    /// `Row` beside a camera preview so status text and buttons share the
+    /// preview's height instead of taking lines of their own
+    /// (vauchi/private#9).
+    Column {
+        id: String,
+        items: Vec<Component>,
+    },
     StatusIndicator {
         id: String,
         icon: Option<String>,

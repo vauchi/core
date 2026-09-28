@@ -292,6 +292,10 @@ pub struct MultiStageSession {
     transport_decrypt_failures: u32,
 
     peer_reveal_key: Option<[u8; 32]>,
+    /// A peer CONF decoded before we reached Confirming, applied once we get
+    /// there: the peer shows it while we are still processing its reveal
+    /// key, and may have moved on by the time we could accept it (#315).
+    early_peer_payload_hash: Option<[u8; 32]>,
 
     state: ProtocolState,
 
@@ -463,6 +467,7 @@ impl MultiStageSession {
             peer_chunks_total: None,
             transport_decrypt_failures: 0,
             peer_reveal_key: None,
+            early_peer_payload_hash: None,
             state: ProtocolState::Idle,
             received_data: None,
             init_qr_cache: None,
@@ -1108,6 +1113,10 @@ impl MultiStageSession {
                 Some(qr)
             }
             ProtocolState::Confirming => {
+                self.apply_early_confirm();
+                if !matches!(self.state, ProtocolState::Confirming) {
+                    return self.get_display_qr();
+                }
                 self.display_cycle += 1;
                 // TapHoverShake exchanges its accel envelope via SHAK on phase 6
                 // (advisory co-location signal); preserve that. Otherwise emit
@@ -1582,6 +1591,7 @@ impl MultiStageSession {
                 self.received_data = Some(plaintext);
                 self.peer_reveal_key = Some(reveal_key);
                 self.state = ProtocolState::Confirming;
+                self.apply_early_confirm();
             }
             Err(_) => {
                 self.fail_from_mismatch("decryption failed");
@@ -1603,7 +1613,28 @@ impl MultiStageSession {
         }
     }
 
+    /// Applies a CONF kept from before Confirming. Held while a shake is
+    /// still being recorded: TapHoverShake swaps its motion envelope only
+    /// in Confirming, and applying the CONF would carry us straight past it.
+    fn apply_early_confirm(&mut self) {
+        if !matches!(self.state, ProtocolState::Confirming)
+            || self.accel_proximity == AccelerometerProximityState::Listening
+        {
+            return;
+        }
+        if let Some(payload_hash) = self.early_peer_payload_hash.take() {
+            self.handle_confirm(payload_hash);
+        }
+    }
+
     fn handle_confirm(&mut self, payload_hash: [u8; 32]) -> ProtocolState {
+        if matches!(
+            self.state,
+            ProtocolState::Transferring { .. } | ProtocolState::Verifying
+        ) {
+            self.early_peer_payload_hash = Some(payload_hash);
+            return self.state.clone();
+        }
         if !matches!(self.state, ProtocolState::Confirming) {
             return self.state.clone();
         }
@@ -2087,7 +2118,8 @@ impl MultiStageSession {
                 | ProtocolState::Confirming
                 | ProtocolState::Complete
                 | ProtocolState::RetryReady
-        ) || (matches!(self.state, ProtocolState::Failed(_)) && self.failed_from_mismatch);
+        ) || (matches!(self.state, ProtocolState::Failed(_))
+            && self.failed_from_mismatch);
         if !resettable {
             return false;
         }
@@ -2138,6 +2170,7 @@ impl MultiStageSession {
         }
         self.transport_key = None;
         self.peer_reveal_key = None;
+        self.early_peer_payload_hash = None;
         self.peer_ephemeral = None;
         self.peer_commitment_hash = None;
         self.peer_session_id = None;
@@ -2172,7 +2205,10 @@ impl MultiStageSession {
         // `handle_init` otherwise refuses. It is sound here: our INIT QR is
         // public and unchanged, so a peer scanning it twice learns nothing new,
         // and each peer's shared secret still differs by its own ephemeral.
-        self.ephemeral_secret = self.ephemeral_secret.take().or_else(|| self.ratchet_ephemeral.take());
+        self.ephemeral_secret = self
+            .ephemeral_secret
+            .take()
+            .or_else(|| self.ratchet_ephemeral.take());
         self.state = ProtocolState::Advertising;
         self.last_rehandshake_at = Some(self.monotonic.now());
         self.last_accepted_at = Some(self.monotonic.now());
@@ -2187,6 +2223,7 @@ impl MultiStageSession {
         }
         self.transport_key = None;
         self.peer_reveal_key = None;
+        self.early_peer_payload_hash = None;
         self.ephemeral_secret = None;
         self.ratchet_ephemeral = None;
         self.outbound_chunks.clear();

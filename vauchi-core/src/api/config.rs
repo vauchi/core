@@ -657,6 +657,33 @@ mod tests {
         assert_eq!(explicit.ohttp_endpoint(), "https://ohttp.self.example");
     }
 
+    // @internal
+    #[test]
+    fn ohttp_endpoint_pins_follow_the_host_the_endpoint_resolves_to() {
+        let production = RelayConfig::default();
+        assert_eq!(
+            production.ohttp_endpoint_pins(),
+            production.ohttp_pinned_certs,
+            "a distinct OHTTP host is pinned by its own key"
+        );
+
+        let same_host = RelayConfig {
+            server_url: "https://relay.self.example".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            same_host.ohttp_endpoint_pins(),
+            same_host.pinned_certs,
+            "OHTTP on the relay's own host uses the relay pins"
+        );
+
+        assert!(
+            RelayConfig::unpinned("https://relay.self.example".into())
+                .ohttp_endpoint_pins()
+                .is_empty()
+        );
+    }
+
     // @scenario: pinning :: production default pins the OHTTP host distinctly
     #[test]
     fn default_relay_config_pins_ohttp_host_with_distinct_key() {

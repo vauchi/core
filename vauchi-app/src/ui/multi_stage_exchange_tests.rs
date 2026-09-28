@@ -114,7 +114,7 @@ fn action_ids(screen: &ScreenModel) -> Vec<&str> {
             Component::ActionList { items, .. } => {
                 out.extend(items.iter().map(|i| i.id.as_str()));
             }
-            Component::Row { items, .. } => {
+            Component::Row { items, .. } | Component::Column { items, .. } => {
                 for child in items {
                     collect(child, out);
                 }
@@ -129,7 +129,7 @@ fn action_ids(screen: &ScreenModel) -> Vec<&str> {
 }
 
 /// Pull the switch-camera button label out of the active screen's
-/// preview `Row` `ActionList`.
+/// preview row's `ActionList`.
 fn switch_camera_label(screen: &ScreenModel) -> String {
     fn dig(c: &Component) -> Option<String> {
         match c {
@@ -137,7 +137,9 @@ fn switch_camera_label(screen: &ScreenModel) -> String {
                 .iter()
                 .find(|i| i.id == SWITCH_CAMERA_ACTION_ID)
                 .map(|i| i.label.clone()),
-            Component::Row { items, .. } => items.iter().find_map(dig),
+            Component::Row { items, .. } | Component::Column { items, .. } => {
+                items.iter().find_map(dig)
+            }
             _ => None,
         }
     }
@@ -204,17 +206,53 @@ fn active_screen_groups_preview_and_actions_in_row() {
         )),
         "row must contain the peer-scan preview"
     );
-    let button_ids: Vec<&str> = row
+    let button_ids: Vec<&str> = side_column(&screen)
         .iter()
         .find_map(|c| match c {
             Component::ActionList { id, items } if id == EXCHANGE_ACTIONS_ID => Some(items),
             _ => None,
         })
-        .expect("row must contain the action list")
+        .expect("the side column must contain the action list")
         .iter()
         .map(|i| i.id.as_str())
         .collect();
     assert_eq!(button_ids, vec![SWITCH_CAMERA_ACTION_ID, CANCEL_ACTION_ID]);
+}
+
+/// The column beside the camera preview: status text, then the buttons.
+fn side_column(screen: &ScreenModel) -> &[Component] {
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::Row { id, items } if id == EXCHANGE_PREVIEW_ROW_ID => Some(items),
+            _ => None,
+        })
+        .and_then(|row| {
+            row.iter().find_map(|c| match c {
+                Component::Column { id, items } if id == EXCHANGE_SIDE_COLUMN_ID => {
+                    Some(items.as_slice())
+                }
+                _ => None,
+            })
+        })
+        .expect("the preview row must hold the side column")
+}
+
+// The exchange status used to caption the own QR, above it. On a compact
+// screen that line cost the camera preview its height; beside the preview
+// it costs nothing (owner, vauchi/private#9, 2026-09-28).
+// @internal
+#[test]
+fn active_screen_shows_the_status_beside_the_preview_not_above_the_qr() {
+    let screen = engine_with_qr(ProtocolState::Advertising, "payload").current_screen();
+
+    assert_eq!(own_qr_caption(&screen), None);
+    assert!(matches!(
+        side_column(&screen).first(),
+        Some(Component::Text { id, content, .. })
+            if id == EXCHANGE_STATUS_ID && content == "Show this"
+    ));
 }
 
 // Buttons now dispatch via `ListItemSelected` (ActionList); the engine
@@ -931,6 +969,14 @@ fn own_qr_caption(screen: &ScreenModel) -> Option<&str> {
     })
 }
 
+/// The exchange status text beside the camera preview.
+fn status_text(screen: &ScreenModel) -> Option<&str> {
+    side_column(screen).iter().find_map(|c| match c {
+        Component::Text { id, content, .. } if id == EXCHANGE_STATUS_ID => Some(content.as_str()),
+        _ => None,
+    })
+}
+
 // A banner inserted above the QR pushed the scanner off the fixed layout on
 // a phone-sized viewport, where it was disposed and never came back — so the
 // stall could not clear (vauchi/private#9, runs E3/E6/E8).
@@ -956,12 +1002,12 @@ fn stalling_keeps_the_active_layout_unchanged() {
 
 // @internal
 #[test]
-fn stalled_warning_rides_in_the_own_qr_caption_with_the_progress() {
+fn stalled_warning_rides_in_the_status_with_the_progress() {
     let mut engine = transferring_engine();
     engine.set_stalled(true);
 
     assert_eq!(
-        own_qr_caption(&engine.current_screen()),
+        status_text(&engine.current_screen()),
         Some("Taking longer than expected · Sending 1/3 · Receiving 2/3")
     );
 }
@@ -975,7 +1021,7 @@ fn clearing_stall_restores_the_plain_progress_caption() {
     engine.set_stalled(false);
 
     assert_eq!(
-        own_qr_caption(&engine.current_screen()),
+        status_text(&engine.current_screen()),
         Some("Sending 1/3 · Receiving 2/3")
     );
 }

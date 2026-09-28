@@ -6,8 +6,8 @@ use vauchi_app::ui::{
     InputType, Item, PreparedSurface, ScreenModel, Section, TextStyle, UserAction, WorkflowEngine,
 };
 use vauchi_core::{
-    Command, Event, InputValue, PresentationInputKind, PresentationNode, PresentationTextStyle,
-    SurfaceId,
+    Command, Event, InputValue, PresentationInputKind, PresentationListStyle, PresentationNode,
+    PresentationTextStyle, SurfaceId,
 };
 
 fn screen() -> ScreenModel {
@@ -718,4 +718,58 @@ fn a_titled_panel_still_renders_its_heading() {
 
     assert_eq!(label.as_deref(), Some("Before you continue"));
     assert_eq!(spoken, "Before you continue");
+}
+
+fn command_items() -> Vec<ActionListItem> {
+    ["switch", "cancel"]
+        .iter()
+        .map(|id| ActionListItem {
+            id: (*id).into(),
+            label: format!("{id} label"),
+            icon: None,
+            detail: None,
+            a11y: None,
+            info_key: None,
+        })
+        .collect()
+}
+
+fn projected_list(component: Component) -> (PresentationListStyle, serde_json::Value) {
+    let screen = ScreenModel::new("exchange", "Exchange", vec![component], vec![]);
+    let prepared = PreparedSurface::from_screen(SurfaceId::new("exchange").unwrap(), 1, &screen)
+        .expect("supported generic projection");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("surface projection must be atomic");
+    };
+    let PresentationNode::List { style, .. } = &surface.nodes[0] else {
+        panic!("expected a List node, got {:?}", surface.nodes[0]);
+    };
+    (*style, serde_json::to_value(&surface.nodes[0]).unwrap())
+}
+
+// A short set of commands beside the exchange camera preview read as plain
+// text on both shells (owner, vauchi/private#9, 2026-09-28).
+// @scenario: generic_presentation_protocol.feature :: A list of commands can ask to be drawn as buttons
+#[test]
+fn a_button_list_projects_to_a_list_drawn_as_buttons() {
+    let (style, json) = projected_list(Component::ButtonList {
+        id: "exchange_actions".into(),
+        items: command_items(),
+    });
+
+    assert_eq!(style, PresentationListStyle::Buttons);
+    assert_eq!(json["List"]["style"], "buttons");
+}
+
+// Every existing list keeps the ordinary style and its wire shape.
+// @internal
+#[test]
+fn an_action_list_stays_an_ordinary_list_with_no_style_on_the_wire() {
+    let (style, json) = projected_list(Component::ActionList {
+        id: "settings_actions".into(),
+        items: command_items(),
+    });
+
+    assert_eq!(style, PresentationListStyle::Rows);
+    assert_eq!(json["List"].get("style"), None);
 }

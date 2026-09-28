@@ -345,16 +345,19 @@ fn multi_stage_exchange_navigates_to_engine_idle_screen() {
     assert!(!action_ids.contains(&"retry"));
 }
 
-/// Collect `ActionList` item ids from components, recursing into `Row`
-/// containers (the active exchange screen nests its buttons there).
+/// Collect `ActionList`/`ButtonList` item ids from components, recursing
+/// into `Row`/`Column` containers (the active exchange screen nests its
+/// buttons in a column beside the camera preview).
 fn collect_row_action_ids(components: &[vauchi_app::ui::Component], out: &mut Vec<String>) {
     use vauchi_app::ui::Component;
     for c in components {
         match c {
-            Component::ActionList { items, .. } => {
+            Component::ActionList { items, .. } | Component::ButtonList { items, .. } => {
                 out.extend(items.iter().map(|i| i.id.clone()));
             }
-            Component::Row { items, .. } => collect_row_action_ids(items, out),
+            Component::Row { items, .. } | Component::Column { items, .. } => {
+                collect_row_action_ids(items, out)
+            }
             _ => {}
         }
     }

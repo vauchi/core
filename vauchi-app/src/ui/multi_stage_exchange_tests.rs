@@ -111,7 +111,7 @@ fn action_ids(screen: &ScreenModel) -> Vec<&str> {
         .collect();
     fn collect<'a>(component: &'a Component, out: &mut Vec<&'a str>) {
         match component {
-            Component::ActionList { items, .. } => {
+            Component::ActionList { items, .. } | Component::ButtonList { items, .. } => {
                 out.extend(items.iter().map(|i| i.id.as_str()));
             }
             Component::Row { items, .. } | Component::Column { items, .. } => {
@@ -133,7 +133,7 @@ fn action_ids(screen: &ScreenModel) -> Vec<&str> {
 fn switch_camera_label(screen: &ScreenModel) -> String {
     fn dig(c: &Component) -> Option<String> {
         match c {
-            Component::ActionList { items, .. } => items
+            Component::ActionList { items, .. } | Component::ButtonList { items, .. } => items
                 .iter()
                 .find(|i| i.id == SWITCH_CAMERA_ACTION_ID)
                 .map(|i| i.label.clone()),
@@ -209,7 +209,7 @@ fn active_screen_groups_preview_and_actions_in_row() {
     let button_ids: Vec<&str> = side_column(&screen)
         .iter()
         .find_map(|c| match c {
-            Component::ActionList { id, items } if id == EXCHANGE_ACTIONS_ID => Some(items),
+            Component::ButtonList { id, items } if id == EXCHANGE_ACTIONS_ID => Some(items),
             _ => None,
         })
         .expect("the side column must contain the action list")

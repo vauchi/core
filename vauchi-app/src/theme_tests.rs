@@ -220,10 +220,15 @@ fn test_load_real_themes_json() {
 #[test]
 fn test_design_tokens_default_spacing() {
     let tokens = DesignTokens::default();
+    assert_eq!(tokens.spacing.xxs, 2);
     assert_eq!(tokens.spacing.xs, 4);
+    assert_eq!(tokens.spacing.xs_sm, 6);
     assert_eq!(tokens.spacing.sm, 8);
+    assert_eq!(tokens.spacing.sm_smd, 10);
     assert_eq!(tokens.spacing.sm_md, 12);
+    assert_eq!(tokens.spacing.smd_md, 14);
     assert_eq!(tokens.spacing.md, 16);
+    assert_eq!(tokens.spacing.md_lg, 20);
     assert_eq!(tokens.spacing.lg, 24);
     assert_eq!(tokens.spacing.xl, 32);
 }
@@ -249,6 +254,7 @@ fn test_design_tokens_default_typography() {
 #[test]
 fn test_design_tokens_default_border_radius() {
     let tokens = DesignTokens::default();
+    assert_eq!(tokens.border_radius.xs, 2);
     assert_eq!(tokens.border_radius.sm, 4);
     assert_eq!(tokens.border_radius.md, 8);
     assert_eq!(tokens.border_radius.md_lg, 12);
@@ -256,6 +262,7 @@ fn test_design_tokens_default_border_radius() {
     assert_eq!(tokens.border_radius.chip, 12);
     assert_eq!(tokens.border_radius.card, 20);
     assert_eq!(tokens.border_radius.sheet, 28);
+    assert_eq!(tokens.border_radius.pill, 999);
 }
 
 // @internal

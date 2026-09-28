@@ -11,7 +11,7 @@
 use sha2::{Digest, Sha256};
 use vauchi_core::exchange::multistage::qr_codec;
 use vauchi_core::exchange::multistage::session::MultiStageSession;
-use vauchi_core::exchange::multistage::types::ProtocolState;
+use vauchi_core::exchange::multistage::types::{AccelerometerProximityState, ProtocolState};
 
 struct Staged {
     bob: MultiStageSession,
@@ -118,5 +118,39 @@ fn an_early_confirm_with_the_wrong_hash_still_fails_closed() {
         matches!(bob.get_state(), ProtocolState::Failed(_)),
         "a kept CONF must be checked like a fresh one, got {:?}",
         bob.get_state()
+    );
+}
+
+// @internal
+#[test]
+fn a_session_still_recording_a_shake_holds_an_early_confirm_until_it_stops() {
+    let alice_card = b"Alice (iPhone)".to_vec();
+    let Staged {
+        mut bob,
+        alice_session_id,
+        alice_verify,
+    } = bob_verifying_with_alice_verify_withheld(&alice_card, b"Bob (Pixel)");
+    let alice_card_hash: [u8; 32] = Sha256::digest(&alice_card).into();
+    bob.set_accel_proximity(AccelerometerProximityState::Listening)
+        .unwrap();
+
+    bob.process_scanned_qr(&qr_codec::format_confirm_qr(
+        &alice_session_id,
+        &alice_card_hash,
+    ));
+    bob.process_scanned_qr(&alice_verify);
+    assert_eq!(
+        bob.get_state(),
+        ProtocolState::Confirming,
+        "a shake still recording needs Confirming to swap its envelope"
+    );
+
+    bob.set_accel_proximity(AccelerometerProximityState::Confirmed)
+        .unwrap();
+    let _ = bob.get_display_qr();
+    assert_eq!(
+        bob.get_state(),
+        ProtocolState::Complete,
+        "once the shake stops, the kept CONF completes the exchange"
     );
 }

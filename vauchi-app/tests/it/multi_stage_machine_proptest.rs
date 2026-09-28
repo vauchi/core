@@ -626,6 +626,11 @@ fn drive_two_to_confirming() -> (MultiStageMachine, MultiStageMachine, u64) {
     let mut b = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
     for i in 0..4000u64 {
         let t = i * 1_000; // step past the per-frame display-duration gate
+        // The engine starts the shake capture once the peer is discovered,
+        // long before Confirming; a session still recording holds a peer
+        // CONF so it passes through Confirming to swap envelopes (#315).
+        let _ = a.try_accel_capture_start();
+        let _ = b.try_accel_capture_start();
         let ae = a.advance(t);
         let be = b.advance(t);
         // Stop feeding a side that has already arrived. Frames are drawn per

@@ -173,6 +173,12 @@ fn shake_qr_is_emitted_in_confirming_when_recording() {
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
+    // Listening from peer discovery, as the engine does: a session still
+    // recording holds a peer CONF, so it stays in Confirming to swap its
+    // envelope (#315).
+    alice
+        .set_accel_proximity(AccelerometerProximityState::Listening)
+        .unwrap();
 
     let mut reached = false;
     for _ in 0..2000 {
@@ -194,9 +200,6 @@ fn shake_qr_is_emitted_in_confirming_when_recording() {
         "Alice never reached Confirming with a transport_key"
     );
 
-    alice
-        .set_accel_proximity(AccelerometerProximityState::Listening)
-        .unwrap();
     alice.record_accel_envelope_samples(&shake_impulse());
 
     // Poll the display cycle; phase 6 of mod-7 carries SHAK. 14 polls cover two

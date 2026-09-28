@@ -551,7 +551,16 @@ fn test_atomicity_without_peer_finalization_frame_no_finalize() {
         "Bob never reached the point where Alice's finalization frame was withheld"
     );
     assert_eq!(alice.get_state(), ProtocolState::Finalized);
-    assert_eq!(bob.get_state(), ProtocolState::Confirming);
+    // Complete when a CONF Bob decoded before Confirming was kept (#315);
+    // either way he still lacks Alice's finalization frame.
+    assert!(
+        matches!(
+            bob.get_state(),
+            ProtocolState::Confirming | ProtocolState::Complete
+        ),
+        "Bob must be short of Finalized, got {:?}",
+        bob.get_state()
+    );
 
     let alice_confirm = qr_codec::format_confirm_qr(&alice.session_id(), &alice_card_hash);
     assert_eq!(
@@ -893,8 +902,11 @@ fn test_finalization_states_broadcast_combo() {
     for _ in 0..500 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
+        // Withhold CONF too: a CONF Bob decodes before Confirming is kept and
+        // would carry him straight to Complete (#315); this test hands him
+        // Alice's CONF itself below.
         if let Some(aq) = &aq {
-            if !aq.data.starts_with("CMBO") {
+            if !aq.data.starts_with("CMBO") && !aq.data.starts_with("CONF") {
                 bob.process_scanned_qr(&aq.data);
             }
         }

@@ -149,17 +149,49 @@ pub struct DesignTokens {
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpacingTokens {
+    // The intermediate steps are the Vauchi Shells canvas's routine
+    // values (#411); defaulted so token files written before them parse.
+    #[serde(default = "default_spacing_xxs")]
+    pub xxs: u16,
     pub xs: u16,
+    #[serde(default = "default_spacing_xs_sm")]
+    pub xs_sm: u16,
     pub sm: u16,
+    #[serde(default = "default_spacing_sm_smd")]
+    pub sm_smd: u16,
     #[serde(default = "default_spacing_sm_md")]
     pub sm_md: u16,
+    #[serde(default = "default_spacing_smd_md")]
+    pub smd_md: u16,
     pub md: u16,
+    #[serde(default = "default_spacing_md_lg")]
+    pub md_lg: u16,
     pub lg: u16,
     pub xl: u16,
 }
 
+fn default_spacing_xxs() -> u16 {
+    2
+}
+
+fn default_spacing_xs_sm() -> u16 {
+    6
+}
+
+fn default_spacing_sm_smd() -> u16 {
+    10
+}
+
 fn default_spacing_sm_md() -> u16 {
     12
+}
+
+fn default_spacing_smd_md() -> u16 {
+    14
+}
+
+fn default_spacing_md_lg() -> u16 {
+    20
 }
 
 /// Font size tokens for text hierarchy.
@@ -260,6 +292,8 @@ fn default_list_item_inline() -> u16 {
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BorderRadiusTokens {
+    #[serde(default = "default_radius_xs")]
+    pub xs: u16,
     pub sm: u16,
     pub md: u16,
     pub md_lg: u16,
@@ -272,6 +306,16 @@ pub struct BorderRadiusTokens {
     pub card: u16,
     #[serde(default = "default_radius_sheet")]
     pub sheet: u16,
+    #[serde(default = "default_radius_pill")]
+    pub pill: u16,
+}
+
+fn default_radius_xs() -> u16 {
+    2
+}
+
+fn default_radius_pill() -> u16 {
+    999
 }
 
 fn default_radius_chip() -> u16 {

@@ -48,6 +48,8 @@ fn arb_phase3_action() -> impl Strategy<Value = UserAction> {
             Just("back".to_string()),
             Just("done".to_string()),
             Just("wipe".to_string()),
+            Just("confirm_shred".to_string()),
+            Just("cancel_shred".to_string()),
             Just("retry".to_string()),
             Just("confirm".to_string()),
             Just("reject".to_string()),
@@ -73,6 +75,8 @@ fn arb_phase3_action() -> impl Strategy<Value = UserAction> {
             prop_oneof![
                 Just(String::new()),
                 Just("DELETE".to_string()),
+                Just("WIPE".to_string()),
+                Just(" wipe ".to_string()),
                 Just("123456".to_string()),
                 Just("test-password".to_string()),
                 "\\PC{1,20}",
@@ -426,20 +430,28 @@ proptest! {
 
 // @internal
     #[test]
-    fn shred_progress_invariants(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
+    fn shred_hands_off_a_wipe_only_for_the_typed_word(
+        actions in prop::collection::vec(arb_phase3_action(), 0..30),
+    ) {
         let mut engine = make_shred();
         for action in actions {
             let _ = engine.handle_action(action);
         }
         let screen = engine.current_screen();
-        let progress = screen.progress.as_ref().expect("shred screens must have progress");
-        prop_assert!(progress.total_steps > 0, "total_steps must be > 0");
         prop_assert!(
-            progress.current_step >= 1 && progress.current_step <= progress.total_steps,
-            "current_step {} out of range [1, {}]",
-            progress.current_step,
-            progress.total_steps,
+            screen.contextual_actions.is_empty(),
+            "shred commands belong in the body, not the Actions menu"
         );
+        if engine.engine_output().is_some() {
+            let typed = screen.components.iter().find_map(|c| match c {
+                Component::TextInput { id, value, .. } if id == "confirmation" => Some(value.clone()),
+                _ => None,
+            });
+            prop_assert!(
+                typed.is_some_and(|v| v.trim().eq_ignore_ascii_case("WIPE")),
+                "a wipe was handed off without the word WIPE"
+            );
+        }
     }
 }
 
@@ -624,25 +636,19 @@ proptest! {
         prop_assert_eq!(engine.current_screen().screen_id, "duress_enter_pin");
     }
 
-    /// EmergencyShred: warning → confirm → type DELETE → wipe = Complete,
-    /// handing the wipe to the AppEngine (#431).
+    /// EmergencyShred: type WIPE → Shred Everything = Complete, handing
+    /// the wipe to the AppEngine (#431).
 // @internal
     #[test]
     fn shred_forward_progress(_dummy in 0..1u8) {
         let mut engine = make_shred();
 
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        prop_assert_eq!(engine.current_screen().screen_id, "shred_confirm");
-
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "confirmation".into(),
-            value: "DELETE".into(),
+            value: "WIPE".into(),
         });
-
         let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "wipe".into(),
+            action_id: "confirm_shred".into(),
         });
         prop_assert_eq!(result, ActionResult::Complete);
         prop_assert!(matches!(

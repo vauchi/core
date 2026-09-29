@@ -2169,7 +2169,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_978c3ba9c3cfedcb",
+                    "id": "field_625d4174812a0029",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2200,13 +2200,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:978c3ba9c3cfedcb",
+                    "id": "field_note:625d4174812a0029",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:978c3ba9c3cfedcb",
+                          "id": "field_note:625d4174812a0029",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2246,7 +2246,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_279551a0c89c0049",
+                    "id": "field_ed443eab8a8f5a4d",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2277,13 +2277,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:279551a0c89c0049",
+                    "id": "field_note:ed443eab8a8f5a4d",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:279551a0c89c0049",
+                          "id": "field_note:ed443eab8a8f5a4d",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2323,7 +2323,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_05a324154f2160f8",
+                    "id": "field_bf2650c1cedbf3ff",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2354,13 +2354,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:05a324154f2160f8",
+                    "id": "field_note:bf2650c1cedbf3ff",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:05a324154f2160f8",
+                          "id": "field_note:bf2650c1cedbf3ff",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4570,10 +4570,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "DA93 F73F 292E 5146 8B1C B11A D4F0 DF9E 9540 68E1 C4F7 652D 3BB9 F6D0 66B8 3667",
+                    "content": "7B9C CDA3 0A18 CFA7 05DB 4200 CD37 FCD4 2DF4 EBEF BF00 DEC8 0B48 FA7B DA3E 4533",
                     "style": "body",
                     "accessibility": {
-                      "label": "DA93 F73F 292E 5146 8B1C B11A D4F0 DF9E 9540 68E1 C4F7 652D 3BB9 F6D0 66B8 3667",
+                      "label": "7B9C CDA3 0A18 CFA7 05DB 4200 CD37 FCD4 2DF4 EBEF BF00 DEC8 0B48 FA7B DA3E 4533",
                       "description": null
                     }
                   }
@@ -4592,10 +4592,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "BF85 06D9 5A3F 2C1A A221 5055 BB6E 3965 850E EE24 8A24 8E1F A307 2F87 88C7 450C",
+                    "content": "65CC D2EA BD2E 8A46 9AD0 57BD 1038 0BBB 8B6A 0D29 8A30 24BB 7048 E780 16BB 4264",
                     "style": "body",
                     "accessibility": {
-                      "label": "BF85 06D9 5A3F 2C1A A221 5055 BB6E 3965 850E EE24 8A24 8E1F A307 2F87 88C7 450C",
+                      "label": "65CC D2EA BD2E 8A46 9AD0 57BD 1038 0BBB 8B6A 0D29 8A30 24BB 7048 E780 16BB 4264",
                       "description": null
                     }
                   }
@@ -9982,7 +9982,7 @@
               "surface_id": "emergency_shred",
               "revision": 1,
               "title": "Emergency Data Wipe",
-              "subtitle": null,
+              "subtitle": "Immediately destroys all data on this device and asks your contacts' apps to delete your card.",
               "accessibility_label": "Emergency Data Wipe",
               "layout": "scroll",
               "tokens": {
@@ -10074,11 +10074,44 @@
                   }
                 },
                 {
-                  "Progress": {
-                    "label": null,
-                    "value": 0.5,
+                  "Input": {
+                    "binding_id": "surface.1.confirmation",
+                    "label": "Type WIPE to confirm",
+                    "value": "",
+                    "placeholder": null,
+                    "input_kind": "text",
+                    "max_length": null,
+                    "validation_error": null,
+                    "enabled": true,
                     "accessibility": {
-                      "label": "Progress",
+                      "label": "Type WIPE to confirm",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Confirmation": {
+                    "id": "shred",
+                    "warning": "Shred everything on this device now?",
+                    "confirm": {
+                      "interaction_id": "surface.1.interaction.1",
+                      "label": "Shred Everything",
+                      "accessibility_label": "Shred Everything",
+                      "icon_token": null,
+                      "enabled": true,
+                      "tone": "destructive",
+                      "shortcut": null
+                    },
+                    "cancel": {
+                      "interaction_id": "surface.1.interaction.2",
+                      "label": "Cancel",
+                      "accessibility_label": "Cancel",
+                      "icon_token": null,
+                      "enabled": true,
+                      "shortcut": null
+                    },
+                    "accessibility": {
+                      "label": "Shred everything on this device now?",
                       "description": null
                     }
                   }
@@ -10109,14 +10142,7 @@
                 "shortcut": null
               },
               "primary": null,
-              "secondary": {
-                "interaction_id": "surface.1.context.presentation.secondary",
-                "label": "Actions",
-                "accessibility_label": "Actions",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": null
-              }
+              "secondary": null
             }
           }
         },
@@ -16929,7 +16955,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=V5zat5CWu1FO-J9F4X4N2XucesmLOIZ1Ysw9m5-imTw&n=iLQP1jxPZPTiPw8uraKAn9lGhdwwA5t6Ssu0r42xa7Q",
+                    "content": "vauchi://exchange?pk=3kVDP_qGHHtXuuy6JqbKc7B1Y-EFG_9ppBwlF5nsHzI&n=ZQ3xmclmf1EClOtiLsaTQiIBSkhCjOmLYKOeTZlJ__w",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17388,7 +17414,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,79,47,104,81,98,90,87,106,56,115,71,113,73,104,85,70,87,55,98,106,108,108,104,81,55,117,74,73,111,107,106,104,43,106,66,121,43,72,105,77,100,70,68,71,53,71,72,98,68,47,117,99,77,53,43,67,85,86,48,113,86,70,70,73,121,54,105,74,56,43,116,100,88,76,55,108,84,97,90,117,74,71,114,74,70,103,56,87,105,85,88,111,108,48,90,88,103,47,80,49,81,43,84,50,74,104,71,52,99,87,74,104,89,56,78,78,83,105,110,55,76,103,70,122,107,100,113,81,87,116,122,115,72,79,47,78,121,86,120,99,80,52,119,112,107,105,103,48,106,66,65,65,65,65,65,71,113,55,99,75,52,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,68,65,115,87,47,74,120,81,106,67,99,75,69,49,57,119,107,119,113,85,122,47,75,97,104,70,89,49,75,88,47,119,83,69,122,53,121,121,78,72,68,102,71,77,87,85,117,110,75,122,112,49,47,49,43,102,76,114,47,47,81,97,80,108,57,119,66,102,68,43,79,106,86,71,82,53,105,101,90,119,100,88,75,69,103,71],
+            "payload": [86,48,74,70,87,65,78,108,122,78,76,113,118,83,54,75,82,112,114,81,86,55,48,81,79,65,117,55,105,50,111,78,75,89,111,119,74,76,116,119,83,79,101,65,70,114,116,67,90,75,102,88,87,54,50,76,114,47,122,76,112,87,86,101,72,47,71,90,68,87,69,89,120,111,52,84,105,78,73,107,75,97,100,67,47,57,101,83,104,52,69,52,111,76,65,84,65,122,116,83,71,53,108,107,55,84,101,121,87,118,115,105,108,80,68,99,90,71,89,73,74,48,70,87,83,55,49,55,65,83,84,80,116,72,119,85,79,115,120,117,52,43,111,88,118,99,69,121,48,104,77,113,120,97,66,57,65,65,65,65,65,71,113,55,50,56,81,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,81,55,112,122,70,54,70,74,101,121,57,51,86,117,65,72,78,88,49,88,67,100,120,86,116,51,69,78,120,113,118,106,119,68,75,115,85,56,50,101,108,117,69,43,70,110,114,88,55,106,69,98,84,108,70,48,68,120,99,86,118,87,54,82,117,54,87,118,88,104,56,98,98,117,103,114,115,104,72,108,52,115,49,81,70],
             "is_initiator": true
           }
         }
@@ -17420,7 +17446,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI26W79UK7+26D01PHH5S3RAH%4M4T%AW8X1AZH07BES1%ZBV7QWPM+JIR*ACK3Z223Y52*RVZE 6A9/CGUSNEH0G5%V8SJQTN2 AP0TFR%S41IJPOYWOPU9L.A11Vauchi User00"
+                      "INI29H2VRSN9TZZB-6L:WJ1UE71HYYM/Q2QPI5:OVWEURHF8TWA37B9G.65AM-MV60MN0TRIQY BTQECRS4%JG1UBYOKONN6PPQR9DANGU2-PG5W/ZR0L7BX6ZT011Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -18059,7 +18085,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [191,133,6,217,90,63,44,26,162,33,80,85,187,110,57,101,133,14,238,36,138,36,142,31,163,7,47,135,136,199,69,12]
+            "payload": [101,204,210,234,189,46,138,70,154,208,87,189,16,56,11,187,139,106,13,41,138,48,36,187,112,72,231,128,22,187,66,100]
           }
         },
         {
@@ -18214,7 +18240,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [191,133,6,217,90,63,44,26,162,33,80,85,187,110,57,101,133,14,238,36,138,36,142,31,163,7,47,135,136,199,69,12]
+            "payload": [101,204,210,234,189,46,138,70,154,208,87,189,16,56,11,187,139,106,13,41,138,48,36,187,112,72,231,128,22,187,66,100]
           }
         },
         {
@@ -18369,7 +18395,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [191,133,6,217,90,63,44,26,162,33,80,85,187,110,57,101,133,14,238,36,138,36,142,31,163,7,47,135,136,199,69,12]
+            "payload": [101,204,210,234,189,46,138,70,154,208,87,189,16,56,11,187,139,106,13,41,138,48,36,187,112,72,231,128,22,187,66,100]
           }
         },
         {

@@ -4,20 +4,17 @@
 
 //! Reachability test for `EmergencyShredEngine`.
 //!
-//! Destructive two-step flow (ADR-022): `shred_warning` ->
-//! `shred_confirm`. `continue` advances warning -> confirm; `wipe`
-//! completes only when the `confirmation` TextInput equals the exact
-//! string "DELETE", handing the wipe to the AppEngine (#431). The
-//! reachable affordance set is `continue` / `cancel` (warning) plus
-//! `wipe` / `cancel` (confirm).
+//! One destructive screen (ADR-022, #419 item 4): `confirm_shred`
+//! completes only when the `confirmation` TextInput holds the word WIPE,
+//! handing the wipe to the AppEngine (#431); `cancel_shred` leaves.
 
 use vauchi_app::ui::testing::assert_reachability_across_screens;
 use vauchi_app::ui::{EmergencyShredEngine, WorkflowEngine};
 
-/// Action ids emitted across the two BFS-reachable screens and
+/// Action ids emitted by the one wipe screen and
 /// consumed by `EmergencyShredEngine::handle_action` -
 /// `core/vauchi-app/src/ui/emergency_shred.rs`.
-const HANDLED: &[&str] = &["continue", "cancel", "wipe"];
+const HANDLED: &[&str] = &["confirm_shred", "cancel_shred"];
 
 fn factory() -> EmergencyShredEngine {
     EmergencyShredEngine::new(vauchi_app::i18n::Locale::English)

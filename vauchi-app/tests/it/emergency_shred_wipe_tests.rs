@@ -45,12 +45,11 @@ fn confirmation_error(result: &ActionResult) -> Option<String> {
 #[test]
 fn confirming_the_emergency_wipe_destroys_the_identity() {
     let mut engine = engine_on_shred();
-    let _ = press(&mut engine, "continue");
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirmation".into(),
-        value: "DELETE".into(),
+        value: "WIPE".into(),
     });
-    let result = press(&mut engine, "wipe");
+    let result = press(&mut engine, "confirm_shred");
 
     assert!(
         matches!(result, ActionResult::WipeComplete),
@@ -63,7 +62,7 @@ fn confirming_the_emergency_wipe_destroys_the_identity() {
 #[test]
 fn cancelling_the_emergency_wipe_keeps_the_data_and_returns_to_settings() {
     let mut engine = engine_on_shred();
-    let _ = press(&mut engine, "cancel");
+    let _ = press(&mut engine, "cancel_shred");
 
     assert_eq!(engine.current_app_screen(), &AppScreen::Settings);
     assert!(engine.vauchi().identity().is_some());
@@ -72,18 +71,17 @@ fn cancelling_the_emergency_wipe_keeps_the_data_and_returns_to_settings() {
 // @internal
 #[test]
 fn a_near_miss_confirmation_word_wipes_nothing() {
-    for typed in ["", "delete", "DELETE ", "DELETED", "DELETE\0"] {
+    for typed in ["", "DELETE", "WIPED"] {
         let mut engine = engine_on_shred();
-        let _ = press(&mut engine, "continue");
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "confirmation".into(),
             value: typed.into(),
         });
-        let result = press(&mut engine, "wipe");
+        let result = press(&mut engine, "confirm_shred");
 
         assert_eq!(
             confirmation_error(&result).as_deref(),
-            Some("Type DELETE to confirm"),
+            Some("Type the word WIPE to shred everything."),
             "{typed:?} should be refused on the field"
         );
         assert!(

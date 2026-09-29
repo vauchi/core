@@ -62,8 +62,8 @@ fn the_wipe_screen_holds_the_warning_the_field_and_the_buttons() {
         } => {
             assert_eq!(confirm_text, "Shred Everything");
             assert_eq!(cancel_text, "Cancel");
-            assert_eq!(confirm_action_id, "wipe");
-            assert_eq!(cancel_action_id, "cancel");
+            assert_eq!(confirm_action_id, "confirm_shred");
+            assert_eq!(cancel_action_id, "cancel_shred");
             assert!(*destructive);
         }
         other => panic!("expected the Shred Everything / Cancel pair, got {other:?}"),
@@ -82,7 +82,7 @@ fn the_word_wipe_confirms_however_the_keyboard_typed_it() {
         type_word(&mut engine, typed);
 
         assert_eq!(
-            press(&mut engine, "wipe"),
+            press(&mut engine, "confirm_shred"),
             ActionResult::Complete,
             "{typed:?}"
         );
@@ -104,7 +104,7 @@ fn any_other_word_is_refused_on_the_field() {
         type_word(&mut engine, typed);
 
         assert_eq!(
-            press(&mut engine, "wipe"),
+            press(&mut engine, "confirm_shred"),
             ActionResult::ValidationError {
                 component_id: "confirmation".into(),
                 message: "Type the word WIPE to shred everything.".into(),

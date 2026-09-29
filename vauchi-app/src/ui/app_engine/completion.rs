@@ -362,10 +362,31 @@ impl AppEngine {
         ActionResult::NavigateTo(screen)
     }
 
-    /// Emergency shred complete: route to onboarding (data already wiped).
+    /// Emergency shred complete: wipe when the user confirmed, else back.
     pub(super) fn complete_emergency_shred(&mut self) -> ActionResult {
-        let screen = self.navigate_to_internal(AppScreen::Onboarding);
-        ActionResult::NavigateTo(screen)
+        match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Gdpr(crate::ui::GdprChoice::Shred)) => {
+                self.emergency_wipe()
+            }
+            _ => {
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
+            }
+        }
+    }
+
+    fn emergency_wipe(&mut self) -> ActionResult {
+        match self.vauchi.perform_emergency_wipe(true) {
+            Ok(_) => {
+                self.engine_cache.clear();
+                ActionResult::WipeComplete
+            }
+            Err(_) => ActionResult::ShowToast {
+                message: self.t("privacy.emergency_wipe_failed"),
+                undo_action_id: None,
+                undo_label: None,
+            },
+        }
     }
 
     /// Privacy / GDPR complete: export, delete, cancel, execute, or shred.
@@ -473,17 +494,7 @@ impl AppEngine {
                     },
                 }
             }
-            Some(GdprChoice::Shred) => match self.vauchi.perform_emergency_wipe(true) {
-                Ok(_) => {
-                    self.engine_cache.clear();
-                    ActionResult::WipeComplete
-                }
-                Err(_) => ActionResult::ShowToast {
-                    message: self.t("privacy.emergency_wipe_failed"),
-                    undo_action_id: None,
-                    undo_label: None,
-                },
-            },
+            Some(GdprChoice::Shred) => self.emergency_wipe(),
             None => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)

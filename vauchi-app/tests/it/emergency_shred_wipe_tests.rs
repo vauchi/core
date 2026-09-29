@@ -6,7 +6,7 @@
 //! Someone reaching for it may be under coercion; a screen that reports
 //! "wiping" while the identity survives is worse than no button.
 
-use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
+use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 
 fn engine_on_shred() -> AppEngine {
@@ -24,6 +24,20 @@ fn engine_on_shred() -> AppEngine {
 fn press(engine: &mut AppEngine, id: &str) -> ActionResult {
     engine.handle_action(UserAction::ActionPressed {
         action_id: id.into(),
+    })
+}
+
+fn confirmation_error(result: &ActionResult) -> Option<String> {
+    let ActionResult::UpdateScreen(screen) = result else {
+        return None;
+    };
+    screen.components.iter().find_map(|c| match c {
+        Component::TextInput {
+            id,
+            validation_error,
+            ..
+        } if id == "confirmation" => validation_error.clone(),
+        _ => None,
     })
 }
 
@@ -53,4 +67,28 @@ fn cancelling_the_emergency_wipe_keeps_the_data_and_returns_to_settings() {
 
     assert_eq!(engine.current_app_screen(), &AppScreen::Settings);
     assert!(engine.vauchi().identity().is_some());
+}
+
+// @internal
+#[test]
+fn a_near_miss_confirmation_word_wipes_nothing() {
+    for typed in ["", "delete", "DELETE ", "DELETED", "DELETE\0"] {
+        let mut engine = engine_on_shred();
+        let _ = press(&mut engine, "continue");
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "confirmation".into(),
+            value: typed.into(),
+        });
+        let result = press(&mut engine, "wipe");
+
+        assert_eq!(
+            confirmation_error(&result).as_deref(),
+            Some("Type DELETE to confirm"),
+            "{typed:?} should be refused on the field"
+        );
+        assert!(
+            engine.vauchi().identity().is_some(),
+            "{typed:?} wiped the identity"
+        );
+    }
 }

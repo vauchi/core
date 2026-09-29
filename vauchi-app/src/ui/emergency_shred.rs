@@ -15,6 +15,7 @@ use crate::ui::*;
 pub struct EmergencyShredEngine {
     step: ShredStep,
     typed_confirmation: String,
+    wipe_confirmed: bool,
     locale: Locale,
 }
 
@@ -22,8 +23,6 @@ pub struct EmergencyShredEngine {
 enum ShredStep {
     Warning,
     Confirm,
-    Wiping,
-    Complete,
 }
 
 impl Default for EmergencyShredEngine {
@@ -37,19 +36,13 @@ impl EmergencyShredEngine {
         Self {
             step: ShredStep::Warning,
             typed_confirmation: String::new(),
+            wipe_confirmed: false,
             locale,
         }
     }
 
     fn t(&self, key: &str) -> String {
         get_string(self.locale, key)
-    }
-
-    /// Signal that the wipe operation has finished. Moves from Wiping to Complete.
-    pub fn wipe_complete(&mut self) {
-        if self.step == ShredStep::Wiping {
-            self.step = ShredStep::Complete;
-        }
     }
 
     fn warning_screen(&self) -> ScreenModel {
@@ -98,7 +91,7 @@ impl EmergencyShredEngine {
             ],
             progress: Some(Progress {
                 current_step: 1,
-                total_steps: 3,
+                total_steps: 2,
                 label: None,
             }),
             ..Default::default()
@@ -139,61 +132,7 @@ impl EmergencyShredEngine {
             ],
             progress: Some(Progress {
                 current_step: 2,
-                total_steps: 3,
-                label: None,
-            }),
-            ..Default::default()
-        }
-    }
-
-    fn wiping_screen(&self) -> ScreenModel {
-        ScreenModel {
-            screen_id: "shred_wiping".into(),
-            title: self.t("shred.wipe.wiping_title"),
-            subtitle: None,
-            components: vec![Component::StatusIndicator {
-                id: "wipe_status".into(),
-                icon: None,
-                title: self.t("shred.wipe.wiping_status"),
-                detail: None,
-                status: Status::InProgress,
-                status_label: self.t(Status::InProgress.label_key()),
-                a11y: None,
-            }],
-            contextual_actions: vec![],
-            progress: Some(Progress {
-                current_step: 3,
-                total_steps: 3,
-                label: None,
-            }),
-            ..Default::default()
-        }
-    }
-
-    fn complete_screen(&self) -> ScreenModel {
-        ScreenModel {
-            screen_id: "shred_complete".into(),
-            title: self.t("shred.wipe.complete_title"),
-            subtitle: None,
-            components: vec![Component::StatusIndicator {
-                id: "wipe_status".into(),
-                icon: None,
-                title: self.t("shred.wipe.complete_title"),
-                detail: None,
-                status: Status::Success,
-                status_label: self.t(Status::Success.label_key()),
-                a11y: None,
-            }],
-            contextual_actions: vec![ScreenAction {
-                id: "done".into(),
-                label: self.t("action.done"),
-                style: ActionStyle::Primary,
-                enabled: true,
-                a11y: Some(A11y::labeled(self.t("action.done"))),
-            }],
-            progress: Some(Progress {
-                current_step: 3,
-                total_steps: 3,
+                total_steps: 2,
                 label: None,
             }),
             ..Default::default()
@@ -206,17 +145,13 @@ impl WorkflowEngine for EmergencyShredEngine {
         match self.step {
             ShredStep::Warning => self.warning_screen(),
             ShredStep::Confirm => self.confirm_screen(),
-            ShredStep::Wiping => self.wiping_screen(),
-            ShredStep::Complete => self.complete_screen(),
         }
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
-            UserAction::ActionPressed { action_id }
-                if action_id == "cancel"
-                    && (self.step == ShredStep::Warning || self.step == ShredStep::Confirm) =>
-            {
+            UserAction::ActionPressed { action_id } if action_id == "cancel" => {
+                self.wipe_confirmed = false;
                 ActionResult::Complete
             }
             UserAction::ActionPressed { action_id } if action_id == "continue" => {
@@ -245,19 +180,21 @@ impl WorkflowEngine for EmergencyShredEngine {
                             message: self.t("shred.wipe.type_delete"),
                         }
                     } else {
-                        self.step = ShredStep::Wiping;
-                        ActionResult::NavigateTo(self.current_screen())
+                        // The AppEngine performs the wipe on completion; if it
+                        // fails the user stays here and can retry (#431).
+                        self.wipe_confirmed = true;
+                        ActionResult::Complete
                     }
                 } else {
                     ActionResult::UpdateScreen(self.current_screen())
                 }
             }
-            UserAction::ActionPressed { action_id }
-                if action_id == "done" && self.step == ShredStep::Complete =>
-            {
-                ActionResult::WipeComplete
-            }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
+    }
+
+    fn engine_output(&self) -> Option<EngineOutput> {
+        self.wipe_confirmed
+            .then_some(EngineOutput::Gdpr(GdprChoice::Shred))
     }
 }

@@ -35,12 +35,7 @@ const DURESS_SCREENS: &[&str] = &[
     "duress_alerts",
 ];
 
-const SHRED_SCREENS: &[&str] = &[
-    "shred_warning",
-    "shred_confirm",
-    "shred_wiping",
-    "shred_complete",
-];
+const SHRED_SCREENS: &[&str] = &["shred_warning", "shred_confirm"];
 
 // ── Strategies ──────────────────────────────────────────────────────
 
@@ -268,13 +263,9 @@ proptest! {
     #[test]
     fn shred_random_actions_never_panic(
         actions in prop::collection::vec(arb_phase3_action(), 0..50),
-        trigger_external in prop::collection::vec(0..10u8, 0..5),
     ) {
         let mut engine = make_shred();
-        for (i, action) in actions.iter().enumerate() {
-            if trigger_external.get(i % trigger_external.len().max(1)).copied().unwrap_or(0) < 3 {
-                engine.wipe_complete();
-            }
+        for action in &actions {
             let result = engine.handle_action(action.clone());
             validate_result(&result, SHRED_SCREENS, "EmergencyShredEngine")?;
         }
@@ -633,13 +624,13 @@ proptest! {
         prop_assert_eq!(engine.current_screen().screen_id, "duress_enter_pin");
     }
 
-    /// EmergencyShred: warning → confirm → type DELETE → wipe → wipe_complete → done = WipeComplete.
+    /// EmergencyShred: warning → confirm → type DELETE → wipe = Complete,
+    /// handing the wipe to the AppEngine (#431).
 // @internal
     #[test]
     fn shred_forward_progress(_dummy in 0..1u8) {
         let mut engine = make_shred();
 
-        // Warning → Confirm
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
@@ -650,20 +641,13 @@ proptest! {
             value: "DELETE".into(),
         });
 
-        // Wipe → Wiping
-        let _ = engine.handle_action(UserAction::ActionPressed {
+        let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "wipe".into(),
         });
-        prop_assert_eq!(engine.current_screen().screen_id, "shred_wiping");
-
-        // External: wipe done
-        engine.wipe_complete();
-        prop_assert_eq!(engine.current_screen().screen_id, "shred_complete");
-
-        // Done → WipeComplete
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "done".into(),
-        });
-        prop_assert!(matches!(result, ActionResult::WipeComplete));
+        prop_assert_eq!(result, ActionResult::Complete);
+        prop_assert!(matches!(
+            engine.engine_output(),
+            Some(EngineOutput::Gdpr(GdprChoice::Shred))
+        ));
     }
 }

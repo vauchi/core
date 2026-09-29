@@ -143,9 +143,9 @@ fn shred_wizard_english_copy_unchanged() {
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "wipe".into(),
     });
-    assert!(
-        matches!(result, ActionResult::NavigateTo(_)),
-        "correct token advances to wiping, got {result:?}"
+    assert_eq!(
+        result,
+        ActionResult::Complete,
+        "the correct token hands the wipe to the app"
     );
-    assert_eq!(engine.current_screen().screen_id, "shred_wiping");
 }

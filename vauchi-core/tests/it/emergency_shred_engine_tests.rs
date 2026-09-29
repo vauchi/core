@@ -11,7 +11,7 @@ fn shred_starts_at_warning() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "shred_warning");
     assert_eq!(screen.progress.as_ref().unwrap().current_step, 1);
-    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 3);
+    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 2);
 }
 
 // @internal
@@ -125,49 +125,31 @@ fn shred_confirm_wrong_text_validation_error() {
 // @scenario: emergency_shred :: Panic shred destroys everything immediately
 // @internal
 #[test]
-fn shred_confirm_delete_starts_wipe() {
+fn shred_confirm_delete_hands_the_wipe_to_the_app() {
+    // The engine cannot wipe; the AppEngine does on completion (#431).
     let mut engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirmation".into(),
         value: "DELETE".into(),
     });
-
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "wipe".into(),
     });
 
-    match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "shred_wiping");
-            assert_eq!(screen.progress.as_ref().unwrap().current_step, 3);
-
-            match &screen.components[0] {
-                Component::StatusIndicator { status, title, .. } => {
-                    assert_eq!(status, &Status::InProgress);
-                    assert_eq!(title, "Wiping data...");
-                }
-                other => panic!("expected StatusIndicator, got {:?}", other),
-            }
-
-            assert!(
-                screen.contextual_actions.is_empty(),
-                "wiping screen should have no actions"
-            );
-        }
-        other => panic!("expected NavigateTo, got {:?}", other),
-    }
+    assert_eq!(result, ActionResult::Complete);
+    assert!(matches!(
+        engine.engine_output(),
+        Some(EngineOutput::Gdpr(GdprChoice::Shred))
+    ));
 }
 
-// @scenario: emergency_shred :: Shred report tracks what was destroyed
 // @internal
 #[test]
-fn shred_wipe_complete() {
+fn shred_cancel_after_confirming_hands_off_no_wipe() {
     let mut engine = EmergencyShredEngine::new(vauchi_app::i18n::Locale::English);
-
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -175,29 +157,16 @@ fn shred_wipe_complete() {
         component_id: "confirmation".into(),
         value: "DELETE".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "wipe".into(),
     });
-
-    engine.wipe_complete();
-
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "shred_complete");
-    assert_eq!(screen.contextual_actions.len(), 1);
-    assert_eq!(screen.contextual_actions[0].id, "done");
-
-    match &screen.components[0] {
-        Component::StatusIndicator { status, title, .. } => {
-            assert_eq!(status, &Status::Success);
-            assert_eq!(title, "Data Wiped");
-        }
-        other => panic!("expected StatusIndicator, got {:?}", other),
-    }
+    assert_eq!(result, ActionResult::Complete);
 
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "done".into(),
+        action_id: "cancel".into(),
     });
-    assert_eq!(result, ActionResult::WipeComplete);
+    assert_eq!(result, ActionResult::Complete);
+    assert!(engine.engine_output().is_none());
 }
 
 // @scenario: emergency_shred :: Cancel soft shred during grace period

@@ -209,6 +209,8 @@ fn the_screen_counts_only_contacts_marked_trusted_against_the_real_threshold() {
     vauchi.create_identity("Ada").unwrap();
     let amira = contact(&vauchi, "Amira");
     let _bob = contact(&vauchi, "Bob");
+    // Recovery trust needs a Verified or High trust level (ADR-034).
+    vauchi.verify_contact_fingerprint(&amira).unwrap();
     vauchi.toggle_recovery_trust(&amira).unwrap();
     let threshold = vauchi.get_recovery_readiness().unwrap().threshold;
 

@@ -2169,7 +2169,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_6474a8063eb73f7d",
+                    "id": "field_9d63d5d125249837",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2200,13 +2200,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:6474a8063eb73f7d",
+                    "id": "field_note:9d63d5d125249837",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:6474a8063eb73f7d",
+                          "id": "field_note:9d63d5d125249837",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2246,7 +2246,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_01787c9e2400074c",
+                    "id": "field_631e6c9305a400db",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2277,13 +2277,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:01787c9e2400074c",
+                    "id": "field_note:631e6c9305a400db",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:01787c9e2400074c",
+                          "id": "field_note:631e6c9305a400db",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2323,7 +2323,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_5b4cad297b29b47e",
+                    "id": "field_88be1ffc755ec929",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2354,13 +2354,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:5b4cad297b29b47e",
+                    "id": "field_note:88be1ffc755ec929",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:5b4cad297b29b47e",
+                          "id": "field_note:88be1ffc755ec929",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4514,10 +4514,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "5813 4E32 6F1F 76FD 1194 AED5 76DD 3B17 5E43 69A6 B2BF 559C B046 114A 8DA1 003F",
+                    "content": "618C 45B7 2CB7 4B4A F75B 7313 41E6 DCCC 610D 379F AA77 CEA0 C6E7 B47B 67B3 2630",
                     "style": "body",
                     "accessibility": {
-                      "label": "5813 4E32 6F1F 76FD 1194 AED5 76DD 3B17 5E43 69A6 B2BF 559C B046 114A 8DA1 003F",
+                      "label": "618C 45B7 2CB7 4B4A F75B 7313 41E6 DCCC 610D 379F AA77 CEA0 C6E7 B47B 67B3 2630",
                       "description": null
                     }
                   }
@@ -4536,10 +4536,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "82A3 8862 59E7 FA8D CBA6 6980 22DD D564 A4BA C0D3 69F4 A3E4 23CE 47E6 92FC 8B7E",
+                    "content": "2EE5 083C 2B6B 8666 DD8C 5EAB EC6A E5F2 6E04 C9CD B327 C466 C457 C359 DA9B 7EB1",
                     "style": "body",
                     "accessibility": {
-                      "label": "82A3 8862 59E7 FA8D CBA6 6980 22DD D564 A4BA C0D3 69F4 A3E4 23CE 47E6 92FC 8B7E",
+                      "label": "2EE5 083C 2B6B 8666 DD8C 5EAB EC6A E5F2 6E04 C9CD B327 C466 C457 C359 DA9B 7EB1",
                       "description": null
                     }
                   }
@@ -10363,162 +10363,110 @@
                   }
                 },
                 {
-                  "Group": {
+                  "Text": {
                     "id": "intro",
-                    "label": "Lost Your Device?",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "",
-                          "detail": "You can recover your contact relationships through social vouching.",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "",
-                            "description": null
-                          }
-                        }
-                      }
-                    ],
+                    "content": "If you lose every device, the contacts you trust can vouch for you in person. 3 are needed; you trust 0 so far.",
+                    "style": "body",
                     "accessibility": {
-                      "label": "Lost Your Device?",
+                      "label": "If you lose every device, the contacts you trust can vouch for you in person. 3 are needed; you trust 0 so far.",
                       "description": null
                     }
                   }
                 },
                 {
-                  "Group": {
-                    "id": "settings",
-                    "label": "Recovery Settings",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Required vouchers",
-                          "detail": "3",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Required vouchers",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Claim expiry",
-                          "detail": "7 days",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Claim expiry",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Trusted contacts",
-                          "detail": "6/3",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Trusted contacts",
-                            "description": null
-                          }
-                        }
-                      }
-                    ],
+                  "Text": {
+                    "id": "recovery_trusted_label",
+                    "content": "Trusted for recovery · 0",
+                    "style": "muted",
                     "accessibility": {
-                      "label": "Recovery Settings",
+                      "label": "Trusted for recovery · 0",
                       "description": null
                     }
                   }
                 },
                 {
-                  "Group": {
-                    "id": "how_it_works",
-                    "label": "How it works",
-                    "axis": "vertical",
-                    "children": [
+                  "Text": {
+                    "id": "recovery_trusted_empty",
+                    "content": "No one yet. Turn on Trust for recovery on the page of a contact you have met in person.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "No one yet. Turn on Trust for recovery on the page of a contact you have met in person.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Text": {
+                    "id": "guardians_not_told",
+                    "content": "Vauchi does not tell them they are trusted, and it is safest if you do not either. Only if you lose every device, reach them yourself, one at a time, by phone or in person and never in a shared group, and ask each to vouch for you.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "Vauchi does not tell them they are trusted, and it is safest if you do not either. Only if you lose every device, reach them yourself, one at a time, by phone or in person and never in a shared group, and ask each to vouch for you.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "recovery_actions",
+                    "label": null,
+                    "rows": [
                       {
-                        "Status": {
-                          "id": null,
-                          "title": "1. Create New Identity",
-                          "detail": "First, create a new identity on your new device.",
+                        "title": "Start recovery",
+                        "subtitle": "Lost every device? Set up Vauchi again, then start here.",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "Start recovery",
+                          "accessibility_label": "Start recovery",
                           "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "1. Create New Identity",
-                            "description": null
-                          }
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Start recovery",
+                          "description": null
                         }
                       },
                       {
-                        "Status": {
-                          "id": null,
-                          "title": "2. Generate Recovery Claim",
-                          "detail": "Create a claim using your OLD public key from your lost identity.",
+                        "title": "How recovery works",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.2",
+                          "label": "How recovery works",
+                          "accessibility_label": "How recovery works",
                           "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "2. Generate Recovery Claim",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "3. Collect Vouchers",
-                          "detail": "Meet with trusted contacts in person. Have them vouch for your recovery.",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "3. Collect Vouchers",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "4. Share Recovery Proof",
-                          "detail": "Once you have enough vouchers, share your recovery proof with all contacts.",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "4. Share Recovery Proof",
-                            "description": null
-                          }
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "How recovery works",
+                          "description": null
                         }
                       }
                     ],
+                    "searchable": false,
+                    "paging": null,
                     "accessibility": {
-                      "label": "How it works",
+                      "label": "",
                       "description": null
-                    }
+                    },
+                    "style": "buttons"
                   }
                 }
               ]
@@ -10546,14 +10494,7 @@
                 "enabled": true,
                 "shortcut": null
               },
-              "primary": {
-                "interaction_id": "surface.1.context.start_recovery_process",
-                "label": "Start Recovery Process",
-                "accessibility_label": "Start Recovery Process",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": "activate_primary"
-              },
+              "primary": null,
               "secondary": null
             }
           }
@@ -10633,162 +10574,110 @@
               },
               "nodes": [
                 {
-                  "Group": {
+                  "Text": {
                     "id": "intro",
-                    "label": "Lost Your Device?",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "",
-                          "detail": "You can recover your contact relationships through social vouching.",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "",
-                            "description": null
-                          }
-                        }
-                      }
-                    ],
+                    "content": "If you lose every device, the contacts you trust can vouch for you in person. 3 are needed; you trust 0 so far.",
+                    "style": "body",
                     "accessibility": {
-                      "label": "Lost Your Device?",
+                      "label": "If you lose every device, the contacts you trust can vouch for you in person. 3 are needed; you trust 0 so far.",
                       "description": null
                     }
                   }
                 },
                 {
-                  "Group": {
-                    "id": "settings",
-                    "label": "Recovery Settings",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Required vouchers",
-                          "detail": "3",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Required vouchers",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Claim expiry",
-                          "detail": "7 days",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Claim expiry",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Trusted contacts",
-                          "detail": "6/3",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Trusted contacts",
-                            "description": null
-                          }
-                        }
-                      }
-                    ],
+                  "Text": {
+                    "id": "recovery_trusted_label",
+                    "content": "Trusted for recovery · 0",
+                    "style": "muted",
                     "accessibility": {
-                      "label": "Recovery Settings",
+                      "label": "Trusted for recovery · 0",
                       "description": null
                     }
                   }
                 },
                 {
-                  "Group": {
-                    "id": "how_it_works",
-                    "label": "How it works",
-                    "axis": "vertical",
-                    "children": [
+                  "Text": {
+                    "id": "recovery_trusted_empty",
+                    "content": "No one yet. Turn on Trust for recovery on the page of a contact you have met in person.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "No one yet. Turn on Trust for recovery on the page of a contact you have met in person.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Text": {
+                    "id": "guardians_not_told",
+                    "content": "Vauchi does not tell them they are trusted, and it is safest if you do not either. Only if you lose every device, reach them yourself, one at a time, by phone or in person and never in a shared group, and ask each to vouch for you.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "Vauchi does not tell them they are trusted, and it is safest if you do not either. Only if you lose every device, reach them yourself, one at a time, by phone or in person and never in a shared group, and ask each to vouch for you.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "recovery_actions",
+                    "label": null,
+                    "rows": [
                       {
-                        "Status": {
-                          "id": null,
-                          "title": "1. Create New Identity",
-                          "detail": "First, create a new identity on your new device.",
+                        "title": "Start recovery",
+                        "subtitle": "Lost every device? Set up Vauchi again, then start here.",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.0",
+                          "label": "Start recovery",
+                          "accessibility_label": "Start recovery",
                           "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "1. Create New Identity",
-                            "description": null
-                          }
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Start recovery",
+                          "description": null
                         }
                       },
                       {
-                        "Status": {
-                          "id": null,
-                          "title": "2. Generate Recovery Claim",
-                          "detail": "Create a claim using your OLD public key from your lost identity.",
+                        "title": "How recovery works",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "How recovery works",
+                          "accessibility_label": "How recovery works",
                           "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "2. Generate Recovery Claim",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "3. Collect Vouchers",
-                          "detail": "Meet with trusted contacts in person. Have them vouch for your recovery.",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "3. Collect Vouchers",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "4. Share Recovery Proof",
-                          "detail": "Once you have enough vouchers, share your recovery proof with all contacts.",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "4. Share Recovery Proof",
-                            "description": null
-                          }
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "How recovery works",
+                          "description": null
                         }
                       }
                     ],
+                    "searchable": false,
+                    "paging": null,
                     "accessibility": {
-                      "label": "How it works",
+                      "label": "",
                       "description": null
-                    }
+                    },
+                    "style": "buttons"
                   }
                 }
               ]
@@ -10968,14 +10857,7 @@
                 "enabled": true,
                 "shortcut": null
               },
-              "primary": {
-                "interaction_id": "surface.1.context.start_recovery_process",
-                "label": "Start Recovery Process",
-                "accessibility_label": "Start Recovery Process",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": "activate_primary"
-              },
+              "primary": null,
               "secondary": null
             }
           }
@@ -16522,162 +16404,110 @@
               },
               "nodes": [
                 {
-                  "Group": {
+                  "Text": {
                     "id": "intro",
-                    "label": "Lost Your Device?",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "",
-                          "detail": "You can recover your contact relationships through social vouching.",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "",
-                            "description": null
-                          }
-                        }
-                      }
-                    ],
+                    "content": "If you lose every device, the contacts you trust can vouch for you in person. 3 are needed; you trust 0 so far.",
+                    "style": "body",
                     "accessibility": {
-                      "label": "Lost Your Device?",
+                      "label": "If you lose every device, the contacts you trust can vouch for you in person. 3 are needed; you trust 0 so far.",
                       "description": null
                     }
                   }
                 },
                 {
-                  "Group": {
-                    "id": "settings",
-                    "label": "Recovery Settings",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Required vouchers",
-                          "detail": "3",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Required vouchers",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Claim expiry",
-                          "detail": "7 days",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Claim expiry",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Trusted contacts",
-                          "detail": "6/3",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Trusted contacts",
-                            "description": null
-                          }
-                        }
-                      }
-                    ],
+                  "Text": {
+                    "id": "recovery_trusted_label",
+                    "content": "Trusted for recovery · 0",
+                    "style": "muted",
                     "accessibility": {
-                      "label": "Recovery Settings",
+                      "label": "Trusted for recovery · 0",
                       "description": null
                     }
                   }
                 },
                 {
-                  "Group": {
-                    "id": "how_it_works",
-                    "label": "How it works",
-                    "axis": "vertical",
-                    "children": [
+                  "Text": {
+                    "id": "recovery_trusted_empty",
+                    "content": "No one yet. Turn on Trust for recovery on the page of a contact you have met in person.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "No one yet. Turn on Trust for recovery on the page of a contact you have met in person.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Text": {
+                    "id": "guardians_not_told",
+                    "content": "Vauchi does not tell them they are trusted, and it is safest if you do not either. Only if you lose every device, reach them yourself, one at a time, by phone or in person and never in a shared group, and ask each to vouch for you.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "Vauchi does not tell them they are trusted, and it is safest if you do not either. Only if you lose every device, reach them yourself, one at a time, by phone or in person and never in a shared group, and ask each to vouch for you.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "recovery_actions",
+                    "label": null,
+                    "rows": [
                       {
-                        "Status": {
-                          "id": null,
-                          "title": "1. Create New Identity",
-                          "detail": "First, create a new identity on your new device.",
+                        "title": "Start recovery",
+                        "subtitle": "Lost every device? Set up Vauchi again, then start here.",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.0",
+                          "label": "Start recovery",
+                          "accessibility_label": "Start recovery",
                           "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "1. Create New Identity",
-                            "description": null
-                          }
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Start recovery",
+                          "description": null
                         }
                       },
                       {
-                        "Status": {
-                          "id": null,
-                          "title": "2. Generate Recovery Claim",
-                          "detail": "Create a claim using your OLD public key from your lost identity.",
+                        "title": "How recovery works",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "How recovery works",
+                          "accessibility_label": "How recovery works",
                           "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "2. Generate Recovery Claim",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "3. Collect Vouchers",
-                          "detail": "Meet with trusted contacts in person. Have them vouch for your recovery.",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "3. Collect Vouchers",
-                            "description": null
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "4. Share Recovery Proof",
-                          "detail": "Once you have enough vouchers, share your recovery proof with all contacts.",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "4. Share Recovery Proof",
-                            "description": null
-                          }
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "How recovery works",
+                          "description": null
                         }
                       }
                     ],
+                    "searchable": false,
+                    "paging": null,
                     "accessibility": {
-                      "label": "How it works",
+                      "label": "",
                       "description": null
-                    }
+                    },
+                    "style": "buttons"
                   }
                 }
               ]
@@ -16756,14 +16586,7 @@
                 "enabled": true,
                 "shortcut": null
               },
-              "primary": {
-                "interaction_id": "surface.1.context.start_recovery_process",
-                "label": "Start Recovery Process",
-                "accessibility_label": "Start Recovery Process",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": "activate_primary"
-              },
+              "primary": null,
               "secondary": null
             }
           }
@@ -16957,7 +16780,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=RM_1mbda4_uE0ZQyEGVuN7QC5D4b5VOgeTN7MqOmIgU&n=XR1zBt3Yug4MmsYhBwsRCmTG4eM3Ft8Rd1ghyebQQOM",
+                    "content": "vauchi://exchange?pk=PYBGIjBVqrd3AaJXyaMA4GhW1NHoFXJ3l2rsTcdBiW4&n=unE_7sURhoxacqWohTEAAI7Jn96kQv5KJaJ5GEm4CfE",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17416,7 +17239,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,79,67,111,52,104,105,87,101,102,54,106,99,117,109,97,89,65,105,51,100,86,107,112,76,114,65,48,50,110,48,111,43,81,106,122,107,102,109,107,118,121,76,102,106,101,85,85,72,100,54,51,48,116,82,90,54,73,113,97,114,117,49,109,101,98,109,115,112,103,109,107,98,54,120,69,57,86,81,79,71,84,65,99,43,74,55,119,85,75,56,112,76,113,117,54,99,77,119,85,117,98,77,108,72,65,100,48,89,120,82,120,53,122,54,99,70,83,43,109,53,109,73,68,67,65,104,121,90,68,84,88,56,53,55,48,81,111,54,85,48,79,74,87,112,118,84,89,82,110,56,65,65,65,65,65,71,113,57,79,97,48,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,84,49,80,100,119,102,115,69,88,70,86,54,99,73,86,49,100,101,79,82,50,51,77,89,107,112,118,99,98,57,114,57,57,121,116,112,49,116,52,107,43,72,102,85,121,76,79,55,116,49,119,80,86,113,56,76,79,73,81,98,82,100,116,79,105,108,56,77,106,47,106,89,47,99,106,117,102,88,57,73,99,48,66,99,70],
+            "payload": [86,48,74,70,87,65,77,117,53,81,103,56,75,50,117,71,90,116,50,77,88,113,118,115,97,117,88,121,98,103,84,74,122,98,77,110,120,71,98,69,86,56,78,90,50,112,116,43,115,83,83,117,66,121,48,84,118,79,51,80,115,84,47,117,82,69,90,88,118,50,101,112,103,120,82,99,68,56,50,88,81,111,101,68,88,49,72,97,86,83,108,122,49,53,103,106,103,79,66,101,48,69,98,70,48,103,76,112,102,55,101,119,71,54,79,84,86,120,54,109,49,52,67,51,75,117,110,88,70,110,122,70,75,51,102,80,50,88,86,72,100,76,87,48,43,81,85,122,50,112,83,84,101,86,82,90,65,65,65,65,65,71,113,57,109,69,85,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,76,77,111,56,65,50,110,100,118,73,51,107,111,103,115,86,83,57,90,88,81,116,106,71,105,120,73,47,102,119,51,73,115,110,88,119,77,103,121,48,106,112,79,90,75,110,102,68,73,121,109,56,116,101,79,50,47,76,108,87,74,80,114,105,88,113,101,104,70,71,47,68,69,99,68,107,109,52,73,84,80,78,112,89,71],
             "is_initiator": true
           }
         }
@@ -17448,7 +17271,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI2YRO4%HQNH75KQ3PIGNNSEHT6:7FY6PU.ILTCQ-EQ E8Z0W35/3M%YNN53*BPY5OZUTUMNB3G+4ERHNTWJ5XAM4G0B6FQAMTJ-6GCY2A.F.:HI16CT6AE6O8011Vauchi User00"
+                      "INI2XD4D/F-OGFMA ZJV0B.SOR:R6*OU13OOVKPP6J42AQZ-NOH22HOZBH-IMTGJ- 1UYT$UVG$O-:6R.F96V 8RH34U NF2MIDR1:IBUHN/H%IPT564%3--PERD11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -18087,7 +17910,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [130,163,136,98,89,231,250,141,203,166,105,128,34,221,213,100,164,186,192,211,105,244,163,228,35,206,71,230,146,252,139,126]
+            "payload": [46,229,8,60,43,107,134,102,221,140,94,171,236,106,229,242,110,4,201,205,179,39,196,102,196,87,195,89,218,155,126,177]
           }
         },
         {
@@ -18242,7 +18065,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [130,163,136,98,89,231,250,141,203,166,105,128,34,221,213,100,164,186,192,211,105,244,163,228,35,206,71,230,146,252,139,126]
+            "payload": [46,229,8,60,43,107,134,102,221,140,94,171,236,106,229,242,110,4,201,205,179,39,196,102,196,87,195,89,218,155,126,177]
           }
         },
         {
@@ -18397,7 +18220,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [130,163,136,98,89,231,250,141,203,166,105,128,34,221,213,100,164,186,192,211,105,244,163,228,35,206,71,230,146,252,139,126]
+            "payload": [46,229,8,60,43,107,134,102,221,140,94,171,236,106,229,242,110,4,201,205,179,39,196,102,196,87,195,89,218,155,126,177]
           }
         },
         {

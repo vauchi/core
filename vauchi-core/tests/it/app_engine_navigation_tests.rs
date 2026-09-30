@@ -5,7 +5,9 @@
 //! AppEngine navigation tests: screen routing, cache, history, back navigation,
 //! available_screens, persistence, default_screen.
 
-use vauchi_app::ui::{ActionResult, ActionStyle, AppEngine, AppScreen, UserAction, WorkflowEngine};
+use vauchi_app::ui::{
+    ActionResult, ActionStyle, AppEngine, AppScreen, Component, UserAction, WorkflowEngine,
+};
 use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
@@ -576,21 +578,17 @@ fn navigate_to_recovery_shows_recovery_intro() {
     let screen = engine.navigate_to(AppScreen::Recovery);
     assert_eq!(screen.screen_id, "recovery_status");
     assert_eq!(screen.title, "Social Recovery");
-    // Fresh identity has 0 contacts, quorum not met — Start Recovery
-    // Process disabled. Action ID is `start_recovery_process` on the
-    // new Intro step (was `start_recovery` on the legacy Status step,
-    // which is now reached after creating a claim).
+    // A fresh identity with no contacts is exactly the device recovery
+    // starts from, so Start recovery is offered here, not gated on this
+    // device's trusted contacts (#459).
     assert!(
-        screen
-            .contextual_actions
-            .iter()
-            .any(|a| a.id == "start_recovery_process" && !a.enabled),
-        "Recovery Intro must offer start_recovery_process and disable it when quorum not met, got actions: {:?}",
-        screen
-            .contextual_actions
-            .iter()
-            .map(|a| (&a.id, a.enabled))
-            .collect::<Vec<_>>()
+        screen.components.iter().any(|c| matches!(
+            c,
+            Component::ButtonList { id, items } if id == "recovery_actions"
+                && items.iter().any(|i| i.id == "start_recovery_process")
+        )),
+        "Recovery Intro must offer Start recovery on a fresh identity, got: {:?}",
+        screen.components
     );
 }
 

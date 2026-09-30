@@ -30,6 +30,13 @@ fn press(engine: &mut RecoveryEngine, action_id: &str) -> ActionResult {
     })
 }
 
+fn start(engine: &mut RecoveryEngine) -> ActionResult {
+    engine.handle_action(UserAction::ListItemSelected {
+        component_id: ACTIONS_ID.into(),
+        item_id: START_ACTION.into(),
+    })
+}
+
 fn type_old_key(engine: &mut RecoveryEngine, value: &str) {
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "old_public_key".into(),
@@ -43,55 +50,20 @@ fn starts_on_intro_screen() {
     let engine = engine();
     let screen = engine.build_screen();
     assert_eq!(screen.title, "Social Recovery");
-    // Intro shows the "Lost Your Device?" intro panel.
     assert!(
         screen.components.iter().any(|c| matches!(
             c,
-            Component::InfoPanel { id, .. } if id == "intro"
+            Component::Text { id, .. } if id == "intro"
         )),
-        "Intro screen must include the intro panel"
+        "Intro screen must open with the intro text"
     );
-}
-
-// @internal
-#[test]
-fn intro_disables_start_when_quorum_short() {
-    let engine = engine();
-    let screen = engine.build_screen();
-    let start = screen
-        .contextual_actions
-        .iter()
-        .find(|a| a.id == "start_recovery_process")
-        .unwrap();
-    assert!(!start.enabled);
-    // Warning banner must be visible.
-    assert!(
-        screen.components.iter().any(|c| matches!(
-            c,
-            Component::StatusIndicator { id, .. } if id == "low_trusted_warning"
-        )),
-        "low_trusted_warning must be shown when quorum is short"
-    );
-}
-
-// @internal
-#[test]
-fn intro_enables_start_when_quorum_met() {
-    let engine = engine_with_quorum();
-    let screen = engine.build_screen();
-    let start = screen
-        .contextual_actions
-        .iter()
-        .find(|a| a.id == "start_recovery_process")
-        .unwrap();
-    assert!(start.enabled);
 }
 
 // @internal
 #[test]
 fn start_recovery_process_advances_to_enter_old_key() {
     let mut engine = engine_with_quorum();
-    let _ = press(&mut engine, "start_recovery_process");
+    let _ = start(&mut engine);
     let screen = engine.build_screen();
     assert_eq!(screen.title, "Create Recovery Claim");
     assert!(engine.is_at_enter_old_key_step());
@@ -101,7 +73,7 @@ fn start_recovery_process_advances_to_enter_old_key() {
 #[test]
 fn create_claim_disabled_until_64_hex_chars() {
     let mut engine = engine_with_quorum();
-    let _ = press(&mut engine, "start_recovery_process");
+    let _ = start(&mut engine);
 
     // Empty input → disabled
     let screen = engine.build_screen();
@@ -137,7 +109,7 @@ fn create_claim_disabled_until_64_hex_chars() {
 #[test]
 fn create_claim_returns_complete_so_intercept_can_sign() {
     let mut engine = engine_with_quorum();
-    let _ = press(&mut engine, "start_recovery_process");
+    let _ = start(&mut engine);
     type_old_key(&mut engine, &"f".repeat(64));
 
     let result = press(&mut engine, "create_claim");
@@ -166,7 +138,7 @@ fn set_generated_claim_advances_to_show_generated_claim() {
 #[test]
 fn set_create_claim_error_keeps_user_on_enter_old_key_screen() {
     let mut engine = engine_with_quorum();
-    let _ = press(&mut engine, "start_recovery_process");
+    let _ = start(&mut engine);
     type_old_key(&mut engine, &"a".repeat(64));
     let _ = press(&mut engine, "create_claim");
 
@@ -189,7 +161,7 @@ fn set_create_claim_error_keeps_user_on_enter_old_key_screen() {
 #[test]
 fn editing_old_key_clears_validation_error() {
     let mut engine = engine_with_quorum();
-    let _ = press(&mut engine, "start_recovery_process");
+    let _ = start(&mut engine);
     engine.set_create_claim_error("Invalid hex");
 
     type_old_key(&mut engine, "fixing");
@@ -209,7 +181,7 @@ fn editing_old_key_clears_validation_error() {
 #[test]
 fn cancel_from_enter_old_key_returns_to_intro_and_clears_input() {
     let mut engine = engine_with_quorum();
-    let _ = press(&mut engine, "start_recovery_process");
+    let _ = start(&mut engine);
     type_old_key(&mut engine, "in-progress-input");
     let _ = press(&mut engine, "cancel");
 

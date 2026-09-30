@@ -37,6 +37,11 @@ enum RecoveryStep {
     Complete,
 }
 
+const TRUSTED_LIST_ID: &str = "recovery_trusted";
+const ACTIONS_ID: &str = "recovery_actions";
+const START_ACTION: &str = "start_recovery_process";
+const HOW_IT_WORKS_ACTION: &str = "how_it_works";
+
 /// A voucher collected during recovery (display-only).
 #[derive(Clone, Debug)]
 struct CollectedVoucher {
@@ -176,112 +181,115 @@ impl RecoveryEngine {
     fn build_intro_screen(&self) -> ScreenModel {
         let trusted = self.trusted_contacts.len();
         let threshold = self.quorum_threshold;
-        let quorum_met = trusted >= threshold;
-        let trusted_detail = format!("{trusted}/{threshold}");
-
-        let mut components = vec![
-            Component::InfoPanel {
-                id: "intro".into(),
-                icon: Some("lifebuoy".into()),
-                title: self.t("recovery.lost_device_title"),
-                items: vec![InfoItem {
-                    icon: None,
-                    title: String::new(),
-                    detail: self.t("recovery.lost_device_description"),
-                }],
-                a11y: None,
-            },
-            Component::InfoPanel {
-                id: "settings".into(),
-                icon: None,
-                title: self.t("recovery.settings_title"),
-                items: vec![
-                    InfoItem {
-                        icon: None,
-                        title: self.t("recovery.required_vouchers_label"),
-                        detail: threshold.to_string(),
-                    },
-                    InfoItem {
-                        icon: None,
-                        title: self.t("recovery.claim_expiry_label"),
-                        // 7 days matches RecoveryClaim::is_expired logic
-                        // (claim is valid for 7 days from creation).
-                        detail: self.t("recovery.claim_expiry_days"),
-                    },
-                    InfoItem {
-                        icon: None,
-                        title: self.t("recovery.trusted_contacts_label"),
-                        detail: trusted_detail,
-                    },
-                ],
-                a11y: None,
-            },
+        let counts = [
+            ("threshold", threshold.to_string()),
+            ("trusted", trusted.to_string()),
         ];
+        let args: Vec<(&str, &str)> = counts.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let intro_key = if trusted >= threshold {
+            "recovery.intro_ready"
+        } else {
+            "recovery.intro_short"
+        };
 
-        if !quorum_met {
-            components.push(Component::StatusIndicator {
-                id: "low_trusted_warning".into(),
-                icon: Some("warning".into()),
-                title: self.t("recovery.not_enough_trusted"),
-                detail: Some(get_string_with_args(
-                    self.locale,
-                    "recovery.mark_more_trusted",
-                    &[("count", &threshold.saturating_sub(trusted).to_string())],
-                )),
-                status: Status::Warning,
-                status_label: self.t(Status::Warning.label_key()),
+        let mut components = vec![Component::Text {
+            id: "intro".into(),
+            content: get_string_with_args(self.locale, intro_key, &args),
+            style: TextStyle::Body,
+            a11y: None,
+        }];
+
+        components.push(Component::Text {
+            id: "recovery_trusted_label".into(),
+            content: get_string_with_args(
+                self.locale,
+                "recovery.trusted_list_label",
+                &[("count", &trusted.to_string())],
+            ),
+            style: TextStyle::Subtitle,
+            a11y: None,
+        });
+        if self.trusted_contacts.is_empty() {
+            components.push(Component::Text {
+                id: "recovery_trusted_empty".into(),
+                content: self.t("recovery.trusted_empty"),
+                style: TextStyle::Body,
+                a11y: None,
+            });
+        } else {
+            components.push(Component::List {
+                id: TRUSTED_LIST_ID.into(),
+                items: self.trusted_contacts.clone(),
+                searchable: false,
+                total_count: 0,
+                offset: 0,
+                window: 0,
+            });
+            components.push(Component::Text {
+                id: "recovery_trusted_hint".into(),
+                content: self.t("recovery.trusted_manage_hint"),
+                style: TextStyle::Caption,
                 a11y: None,
             });
         }
 
-        components.push(self.how_it_works_panel());
+        // Owner decision 2026-10-01 (#459): guardians are never told; the
+        // owner reaches them personally, one at a time, only when needed.
+        components.push(Component::Text {
+            id: "guardians_not_told".into(),
+            content: self.t("recovery.guardians_not_told"),
+            style: TextStyle::Body,
+            a11y: None,
+        });
+
+        // Always enabled: recovery starts on a new device with a fresh
+        // identity and no contacts; the lost identity's guardians are the
+        // ones that count, and they live on the relay, not here (#459).
+        components.push(Component::ButtonList {
+            id: ACTIONS_ID.into(),
+            items: vec![
+                ActionListItem {
+                    id: START_ACTION.into(),
+                    label: self.t("recovery.start_button"),
+                    icon: None,
+                    detail: Some(self.t("recovery.start_detail")),
+                    a11y: None,
+                    info_key: None,
+                },
+                ActionListItem {
+                    id: HOW_IT_WORKS_ACTION.into(),
+                    label: self.t("recovery.how_it_works_button"),
+                    icon: None,
+                    detail: None,
+                    a11y: None,
+                    info_key: None,
+                },
+            ],
+        });
 
         ScreenModel {
             screen_id: "recovery_status".into(),
             title: self.t("more.social_recovery"),
             subtitle: None,
             components,
-            contextual_actions: vec![ScreenAction {
-                id: "start_recovery_process".into(),
-                label: self.t("recovery.start_process"),
-                style: ActionStyle::Primary,
-                enabled: quorum_met,
-                a11y: Some(A11y::labeled(self.t("recovery.start_process"))),
-            }],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }
     }
 
-    fn how_it_works_panel(&self) -> Component {
-        Component::InfoPanel {
-            id: "how_it_works".into(),
-            icon: None,
-            title: self.t("recovery.how_it_works_title"),
-            items: vec![
-                InfoItem {
-                    icon: None,
-                    title: format!("1. {}", self.t("recovery.step1_title")),
-                    detail: self.t("recovery.step1_desc"),
-                },
-                InfoItem {
-                    icon: None,
-                    title: format!("2. {}", self.t("recovery.step2_title")),
-                    detail: self.t("recovery.step2_desc"),
-                },
-                InfoItem {
-                    icon: None,
-                    title: format!("3. {}", self.t("recovery.step3_title")),
-                    detail: self.t("recovery.step3_desc_original"),
-                },
-                InfoItem {
-                    icon: None,
-                    title: format!("4. {}", self.t("recovery.step4_title")),
-                    detail: self.t("recovery.step4_desc"),
-                },
-            ],
-            a11y: None,
-        }
+    fn how_it_works_body(&self) -> String {
+        [
+            ("recovery.step1_title", "recovery.step1_desc"),
+            ("recovery.step2_title", "recovery.step2_desc"),
+            ("recovery.step3_title", "recovery.step3_desc_original"),
+            ("recovery.step4_title", "recovery.step4_desc"),
+        ]
+        .iter()
+        .enumerate()
+        .map(|(i, (title, desc))| format!("{}. {}\n{}", i + 1, self.t(title), self.t(desc)))
+        .collect::<Vec<_>>()
+        .join("\n\n")
     }
 
     fn build_enter_old_key_screen(&self) -> ScreenModel {
@@ -677,13 +685,42 @@ impl WorkflowEngine for RecoveryEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match (&self.step, action) {
             // Intro → EnterOldKey
-            (RecoveryStep::Intro, UserAction::ActionPressed { ref action_id })
-                if action_id == "start_recovery_process" =>
-            {
+            (
+                RecoveryStep::Intro,
+                UserAction::ListItemSelected {
+                    ref component_id,
+                    ref item_id,
+                },
+            ) if component_id == ACTIONS_ID && item_id == START_ACTION => {
                 self.step = RecoveryStep::EnterOldKey;
                 self.old_key_input.clear();
                 self.old_key_error = None;
                 ActionResult::UpdateScreen(self.build_screen())
+            }
+            (
+                RecoveryStep::Intro,
+                UserAction::ListItemSelected {
+                    ref component_id,
+                    ref item_id,
+                },
+            ) if component_id == ACTIONS_ID && item_id == HOW_IT_WORKS_ACTION => {
+                ActionResult::ShowInfoOverlay {
+                    title: self.t("recovery.how_it_works_button"),
+                    body: self.how_it_works_body(),
+                }
+            }
+            (
+                RecoveryStep::Intro,
+                UserAction::ListItemSelected {
+                    ref component_id,
+                    ref item_id,
+                },
+            ) if component_id == TRUSTED_LIST_ID
+                && self.trusted_contacts.iter().any(|c| &c.id == item_id) =>
+            {
+                ActionResult::OpenContact {
+                    contact_id: item_id.clone(),
+                }
             }
 
             // EnterOldKey: text input updates

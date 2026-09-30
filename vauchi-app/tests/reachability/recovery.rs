@@ -17,19 +17,17 @@
 use vauchi_app::ui::testing::assert_reachability;
 use vauchi_app::ui::{RecoveryEngine, WorkflowEngine};
 
-/// Action ids consumed when `step == RecoveryStep::Intro` —
-/// `core/vauchi-app/src/ui/recovery_status.rs::handle_action`.
-const INTRO_STEP_HANDLED: &[&str] = &["start_recovery_process"];
+/// The Intro step has no `ActionPressed` affordance: Start recovery and
+/// How recovery works are body buttons and the trusted list is rows, all
+/// `ListItemSelected` pass-throughs covered by `recovery_screen_tests`
+/// (#459).
+const INTRO_STEP_HANDLED: &[&str] = &[];
 
 // @internal
 #[test]
 fn recovery_initial_intro_screen_is_reachable() {
-    // Quorum threshold 3, no trusted contacts — minimal realistic
-    // starting state (the same state users see before adding any
-    // guardians). Engine starts on the Intro step; the
-    // `start_recovery_process` action is rendered (disabled until
-    // quorum is met) — the reachability walker sees the affordance
-    // independent of its enabled state.
+    // No trusted contacts: the state of a new device, where recovery
+    // starts.
     let engine = RecoveryEngine::new(Vec::new(), 3);
     assert_eq!(engine.current_screen().screen_id, "recovery_status");
     assert_reachability(&engine, INTRO_STEP_HANDLED);

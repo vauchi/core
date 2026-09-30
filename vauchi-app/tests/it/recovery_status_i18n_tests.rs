@@ -12,18 +12,30 @@ use super::i18n_support::{assert_translated, load_german};
 use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{Component, RecoveryEngine, WorkflowEngine};
 
-/// `(title, InfoPanel title, primary action label)` for the intro screen.
+/// `(title, intro text, Start recovery label)` for the intro screen.
 fn intro_copy(locale: Locale) -> (String, String, String) {
     let engine = RecoveryEngine::new(vec![], 3).with_locale(locale);
     let screen = engine.current_screen();
-    let Component::InfoPanel { title, .. } = &screen.components[0] else {
-        panic!("expected InfoPanel, got {:?}", screen.components[0]);
-    };
-    (
-        screen.title.clone(),
-        title.clone(),
-        screen.contextual_actions[0].label.clone(),
-    )
+    let intro = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::Text { id, content, .. } if id == "intro" => Some(content.clone()),
+            _ => None,
+        })
+        .expect("intro text");
+    let start = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::ButtonList { items, .. } => items
+                .iter()
+                .find(|i| i.id == "start_recovery_process")
+                .map(|i| i.label.clone()),
+            _ => None,
+        })
+        .expect("Start recovery button");
+    (screen.title.clone(), intro, start)
 }
 
 // @scenario: recovery :: intro screen renders in the active locale
@@ -31,12 +43,12 @@ fn intro_copy(locale: Locale) -> (String, String, String) {
 #[test]
 fn recovery_intro_screen_renders_the_active_locale() {
     load_german();
-    let (de_title, de_panel, de_action) = intro_copy(Locale::German);
-    let (en_title, en_panel, en_action) = intro_copy(Locale::English);
+    let (de_title, de_intro, de_start) = intro_copy(Locale::German);
+    let (en_title, en_intro, en_start) = intro_copy(Locale::English);
 
     assert_translated("recovery intro title", &de_title, &en_title);
-    assert_translated("lost-device panel title", &de_panel, &en_panel);
-    assert_translated("start-recovery action", &de_action, &en_action);
+    assert_translated("recovery intro text", &de_intro, &en_intro);
+    assert_translated("start-recovery button", &de_start, &en_start);
 }
 
 // English stays exactly as before (regression pin). English is the source
@@ -44,12 +56,7 @@ fn recovery_intro_screen_renders_the_active_locale() {
 // @internal
 #[test]
 fn recovery_intro_screen_english_copy_unchanged() {
-    let engine = RecoveryEngine::new(vec![], 3);
-    let screen = engine.current_screen();
-    assert_eq!(screen.title, "Social Recovery");
-    let Component::InfoPanel { title, .. } = &screen.components[0] else {
-        panic!("expected InfoPanel, got {:?}", screen.components[0]);
-    };
-    assert_eq!(title, "Lost Your Device?");
-    assert_eq!(screen.contextual_actions[0].label, "Start Recovery Process");
+    let (title, _, start) = intro_copy(Locale::English);
+    assert_eq!(title, "Social Recovery");
+    assert_eq!(start, "Start recovery");
 }

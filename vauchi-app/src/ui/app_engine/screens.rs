@@ -397,17 +397,30 @@ impl AppEngine {
                 )
             }
             AppScreen::Recovery => {
+                // Only contacts marked "Trust for recovery", against core's
+                // configured threshold (#459); the screen used to count
+                // every contact against a hard-coded 3.
+                let readiness = vauchi.get_recovery_readiness().ok();
+                let trusted_ids: std::collections::HashSet<String> = vauchi
+                    .list_contacts()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|c| c.is_recovery_trusted())
+                    .map(|c| c.id().to_string())
+                    .collect();
                 let contacts: Vec<Item> =
                     Self::load_contact_items(vauchi, render_context.resolved_locale())
                         .into_iter()
                         .map(|c| c.item)
+                        .filter(|item| trusted_ids.contains(&item.id))
                         .collect();
+                let threshold = readiness.map_or(3, |r| r.threshold as usize);
                 let device_count = vauchi
                     .list_devices()
                     .map(|d| d.len().saturating_sub(1))
                     .unwrap_or(0);
-                let mut engine =
-                    RecoveryEngine::new(contacts, 3).with_locale(render_context.resolved_locale());
+                let mut engine = RecoveryEngine::new(contacts, threshold)
+                    .with_locale(render_context.resolved_locale());
                 engine.set_linked_device_count(device_count);
                 Box::new(engine)
             }

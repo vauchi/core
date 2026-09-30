@@ -55,6 +55,11 @@ remote e2e README.md "no manifest
 remote relay Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
 "
 git_quiet -C "$T/src/relay" push -q "$T/remotes/relay.git" HEAD:refs/heads/chore/bump-core-0.70.0
+# web-demo: GitLab refuses the MR. linux-gtk: cargo update fails.
+remote web-demo Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
+"
+remote linux-gtk Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
+"
 
 cat > "$T/table.json" <<'EOF'
 { "consumers": [
@@ -63,6 +68,8 @@ cat > "$T/table.json" <<'EOF'
   { "repo": "tui", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
   { "repo": "e2e", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
   { "repo": "relay", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
+  { "repo": "web-demo", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
+  { "repo": "linux-gtk", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
   { "repo": "android", "kind": "gradle", "file": "app/build.gradle.kts", "bumped_by": "trigger:android" }
 ] }
 EOF
@@ -85,9 +92,11 @@ while [ "$#" -gt 0 ]; do
 done
 echo "$method $url $data" >> "$FAKE_LOG"
 case "$method $url" in
-    "GET "*/user) body='{"name":"Vauchi Bot","email":"bot@example.invalid"}'; status=200 ;;
+    "GET "*/user) [ -n "${FAKE_USER_STATUS:-}" ] && { printf '%s' '{}' > "$out"; printf '%s' "$FAKE_USER_STATUS"; exit 0; }
+        body='{"name":"Vauchi Bot","email":"bot@example.invalid"}'; status=200 ;;
     "GET "*vauchi%2Ftui/merge_requests*) body='[{"web_url":"https://gitlab.example/tui/-/merge_requests/7"}]'; status=200 ;;
     "GET "*/merge_requests*) body='[]'; status=200 ;;
+    "POST "*vauchi%2Fweb-demo/merge_requests) body='{"message":"500 Internal Server Error"}'; status=500 ;;
     "POST "*/merge_requests) body='{"web_url":"https://gitlab.example/mr/new"}'; status=201 ;;
     *) body='{}'; status=404 ;;
 esac
@@ -97,6 +106,7 @@ EOF
 cat > "$T/bin/cargo" <<'EOF'
 #!/bin/sh
 echo "cargo $* (in $(basename "$PWD"))" >> "$FAKE_LOG"
+case "$PWD" in */linux-gtk) echo "error: failed to select a version" >&2; exit 101 ;; esac
 printf '# lock updated\n' > Cargo.lock
 EOF
 chmod +x "$T/bin/curl" "$T/bin/cargo"
@@ -109,7 +119,14 @@ PATH="$T/bin:$PATH" FAKE_LOG="$T/log" PROJECT_ACCESS_TOKEN=token \
 cat "$T/out"
 
 [ "$status" -ne 0 ] || fail "a consumer that cannot be bumped (e2e) must make the job red"
-grep -qx "Not bumped: e2e relay" "$T/out" || fail "the failure summary must name exactly e2e and relay"
+grep -qx "Not bumped: e2e relay web-demo linux-gtk" "$T/out" \
+    || fail "the failure summary must name exactly e2e, relay, web-demo and linux-gtk"
+grep -q "web-demo: ERROR: pushed chore/bump-core-0.70.0 but opening the MR failed (HTTP 500)" "$T/out" \
+    || fail "a refused MR must be reported with its HTTP status"
+if git -C "$T/remotes/linux-gtk.git" rev-parse -q --verify "refs/heads/chore/bump-core-0.70.0" >/dev/null; then
+    fail "a failed cargo update must push nothing"
+fi
+grep -q 'vauchi%2Flinux-gtk/merge_requests' "$T/log" && fail "a failed cargo update must open no MR"
 grep -q 'vauchi%2Fe2e/merge_requests' "$T/log" && fail "e2e has no manifest and must get no MR"
 if git -C "$T/remotes/e2e.git" rev-parse -q --verify "refs/heads/chore/bump-core-0.70.0" >/dev/null; then
     fail "e2e must get no branch"
@@ -144,5 +161,21 @@ for repo in cli linux-qt tui relay; do
     [ "$(git -C "$T/remotes/$repo.git" rev-parse main)" = "$(git -C "$T/src/$repo" rev-parse HEAD)" ] \
         || fail "$repo's main must be untouched"
 done
+
+# Without a bot identity nothing may be pushed: commits would carry no
+# verified author and the pre-receive hook would reject them anyway.
+remote gtk2 Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
+"
+printf '%s\n' '{ "consumers": [ { "repo": "gtk2", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" } ] }' > "$T/table2.json"
+status=0
+PATH="$T/bin:$PATH" FAKE_LOG="$T/log2" FAKE_USER_STATUS=401 PROJECT_ACCESS_TOKEN=token \
+    CI_API_V4_URL=https://gitlab.example/api/v4 CONSUMER_GIT_BASE="$T/remotes" \
+    bash "$HERE/scripts/bump-consumer-pins.sh" v0.70.0 "$T/table2.json" "$CORE_PINS" \
+    > "$T/out2" 2>&1 || status=$?
+[ "$status" -ne 0 ] || fail "an unresolvable bot identity must make the job red"
+grep -q "cannot resolve the bot identity" "$T/out2" || fail "the identity failure must be named"
+if git -C "$T/remotes/gtk2.git" rev-parse -q --verify "refs/heads/chore/bump-core-0.70.0" >/dev/null; then
+    fail "without a bot identity nothing may be pushed"
+fi
 
 echo "consumer-pins-bump: OK"

@@ -12,6 +12,7 @@ mod contacts;
 #[cfg(feature = "network-http")]
 mod device_sync_loop;
 mod devices;
+mod duress_concealment;
 mod emergency;
 #[cfg(feature = "network-http")]
 mod escrow_exchange;
@@ -198,6 +199,8 @@ pub struct Vauchi {
     events: Arc<EventDispatcher>,
     secure_storage: Option<Arc<dyn SecureStorage>>,
     auth_mode: AuthMode,
+    /// What duress mode shows of the duress and decoy setup (#462).
+    concealed_duress: duress_concealment::ConcealedDuressCell,
     /// Explicit-time seam (Phase 1 / Task 1.1 of the pure-functional-core
     /// program). Every `SystemTime::now` callsite under `vauchi-core`
     /// migrates to `self.clock.now()` cluster by cluster — Step 3 follow-up
@@ -363,6 +366,7 @@ impl Vauchi {
             events,
             secure_storage,
             auth_mode: AuthMode::Unauthenticated,
+            concealed_duress: Default::default(),
             clock,
             rng,
             sleeper,
@@ -577,6 +581,7 @@ impl Vauchi {
             events,
             secure_storage: None,
             auth_mode: AuthMode::Unauthenticated,
+            concealed_duress: Default::default(),
             clock,
             rng,
             sleeper: SystemSleeper::shared(),

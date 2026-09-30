@@ -135,14 +135,18 @@ impl Vauchi {
         match config.verify(password) {
             AuthResult::Normal => {
                 self.auth_mode = AuthMode::Normal;
+                self.reset_concealed_duress();
                 Ok(AuthMode::Normal)
             }
             AuthResult::Duress => {
                 self.auth_mode = AuthMode::Duress;
+                self.reset_concealed_duress();
                 // Queue covert duress alerts to configured trusted contacts.
                 // Duress authentication itself must succeed even if alerting
-                // fails, so errors are not propagated.
-                if let Ok(Some(settings)) = self.load_duress_settings() {
+                // fails, so errors are not propagated. Reads storage, not
+                // `load_duress_settings`: in duress mode that answers with
+                // the concealed view, which has no recipients (#462).
+                if let Ok(Some(settings)) = self.storage.duress().load_duress_settings() {
                     let _count = self.queue_safety_alerts(
                         crate::sync::safety_alert::AlertKind::Duress,
                         &settings.alert_contact_ids,
@@ -196,7 +200,9 @@ impl Vauchi {
     /// the constant-time floor — exposed for tests so the assertion
     /// suite does not pay the 300 ms padding on every case.
     pub(crate) fn biometric_unlock_decision(&mut self) -> VauchiResult<BiometricUnlockOutcome> {
-        if self.is_duress_enabled()? {
+        // The real setup decides, even after a duress session: the
+        // concealed view would say "not set up" and unlock the real app.
+        if self.real_duress_enabled()? {
             Ok(BiometricUnlockOutcome::PromptForDuressPin)
         } else {
             self.auth_mode = AuthMode::Normal;
@@ -292,6 +298,10 @@ impl Vauchi {
     /// shells.
     pub fn setup_duress_password(&mut self, duress_password: &str) -> VauchiResult<()> {
         validate_duress_pin(duress_password)?;
+        if self.in_duress_mode() {
+            self.concealed_duress().enabled = true;
+            return Ok(());
+        }
 
         let mut config = self
             .storage
@@ -339,16 +349,31 @@ impl Vauchi {
             .activity_log_query_recent(now, max_age)?)
     }
 
-    /// Returns whether duress mode is enabled.
+    /// Returns whether duress mode is enabled. In duress mode this is the
+    /// concealed view (#462).
     pub fn is_duress_enabled(&self) -> VauchiResult<bool> {
+        if self.in_duress_mode() {
+            return Ok(self.concealed_duress().enabled);
+        }
+        self.real_duress_enabled()
+    }
+
+    fn real_duress_enabled(&self) -> VauchiResult<bool> {
         match self.storage.identity().load_password_config()? {
             Some(config) => Ok(config.duress_enabled()),
             None => Ok(false),
         }
     }
 
-    /// Disables duress mode and clears duress hash/salt.
+    /// Disables duress mode and clears duress hash/salt. In duress mode it
+    /// only clears the concealed view (#462).
     pub fn disable_duress(&mut self) -> VauchiResult<()> {
+        if self.in_duress_mode() {
+            let mut concealed = self.concealed_duress();
+            concealed.enabled = false;
+            concealed.settings = None;
+            return Ok(());
+        }
         self.storage.identity().disable_duress()?;
         Ok(())
     }
@@ -363,19 +388,31 @@ impl Vauchi {
                 settings.alert_contact_ids.len()
             )));
         }
+        if self.in_duress_mode() {
+            self.concealed_duress().settings = Some(settings.clone());
+            return Ok(());
+        }
         self.storage.duress().save_duress_settings(settings)?;
         Ok(())
     }
 
     /// Loads duress alert settings.
     ///
-    /// Returns `None` if no settings have been configured.
+    /// Returns `None` if no settings have been configured. In duress mode
+    /// this is the concealed view (#462).
     pub fn load_duress_settings(&self) -> VauchiResult<Option<DuressSettings>> {
+        if self.in_duress_mode() {
+            return Ok(self.concealed_duress().settings.clone());
+        }
         Ok(self.storage.duress().load_duress_settings()?)
     }
 
     /// Deletes duress alert settings.
     pub fn delete_duress_settings(&self) -> VauchiResult<()> {
+        if self.in_duress_mode() {
+            self.concealed_duress().settings = None;
+            return Ok(());
+        }
         self.storage.duress().delete_duress_settings()?;
         Ok(())
     }

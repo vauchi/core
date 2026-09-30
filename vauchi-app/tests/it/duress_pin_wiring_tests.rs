@@ -318,3 +318,76 @@ fn duress_unlock_enters_decoy_mode_without_wiping() {
         "duress mode lists decoys, never the real contacts"
     );
 }
+
+/// Real duress setup (PIN, one alert contact, one decoy), unlocked with the
+/// given PIN.
+fn unlocked_with(pin: &str) -> AppEngine {
+    let mut engine = engine_ready();
+    let ally = add_contact(&engine, "Ally");
+    engine.vauchi_mut().setup_duress_password(PIN).unwrap();
+    engine
+        .vauchi()
+        .save_duress_settings(&vauchi_core::types::DuressSettings {
+            alert_contact_ids: vec![ally],
+            alert_message: "I need help".into(),
+            include_location: false,
+        })
+        .unwrap();
+    engine
+        .vauchi()
+        .add_decoy_contact("decoy-dora", "Dora", &ContactCard::new("Dora"))
+        .unwrap();
+    let _ = engine.vauchi_mut().authenticate(pin).unwrap();
+    engine
+}
+
+fn duress_status_and_actions(engine: &mut AppEngine) -> (String, Vec<String>) {
+    let screen = engine.navigate_to(AppScreen::DuressPin);
+    let status = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::StatusIndicator { id, title, .. } if id == "duress_status" => {
+                Some(title.clone())
+            }
+            _ => None,
+        })
+        .expect("duress status");
+    let actions = screen
+        .contextual_actions
+        .iter()
+        .map(|a| a.label.clone())
+        .collect();
+    (status, actions)
+}
+
+// @scenario: duress_mode :: The duress setup is invisible in duress mode
+// ADR-032 / #462: a coercer who opens Settings → Security after a duress
+// unlock sees an app with no duress protection, and nothing to disable.
+#[test]
+fn duress_mode_settings_read_as_not_set_up() {
+    let mut normal = unlocked_with("app-password-123");
+    assert_eq!(
+        duress_status_and_actions(&mut normal),
+        (
+            "Duress protection enabled".to_string(),
+            vec!["Change PIN".to_string(), "Disable".to_string()]
+        )
+    );
+    let decoys = normal.navigate_to(AppScreen::DecoyContacts);
+    assert!(format!("{:?}", decoys.components).contains("Dora"));
+
+    let mut duress = unlocked_with(PIN);
+    assert_eq!(
+        duress_status_and_actions(&mut duress),
+        (
+            "Duress PIN not set up".to_string(),
+            vec!["Set Up PIN".to_string()]
+        )
+    );
+    let decoys = duress.navigate_to(AppScreen::DecoyContacts);
+    assert!(
+        !format!("{:?}", decoys.components).contains("Dora"),
+        "the decoy set is not named in duress mode"
+    );
+}

@@ -326,6 +326,14 @@ impl Vauchi {
         display_name: &str,
         card: &ContactCard,
     ) -> VauchiResult<()> {
+        if self.in_duress_mode() {
+            let mut concealed = self.concealed_duress();
+            concealed.decoys.retain(|(existing, _, _)| existing != id);
+            concealed
+                .decoys
+                .push((id.to_string(), display_name.to_string(), card.clone()));
+            return Ok(());
+        }
         self.storage
             .decoy()
             .save_decoy_contact(id, display_name, card)?;
@@ -334,17 +342,31 @@ impl Vauchi {
 
     /// Removes a decoy contact.
     pub fn remove_decoy_contact(&self, id: &str) -> VauchiResult<()> {
+        if self.in_duress_mode() {
+            self.concealed_duress()
+                .decoys
+                .retain(|(existing, _, _)| existing != id);
+            return Ok(());
+        }
         self.storage.decoy().delete_decoy_contact(id)?;
         Ok(())
     }
 
-    /// Lists all decoy contacts as (id, display_name, card) tuples.
+    /// Lists all decoy contacts as (id, display_name, card) tuples. In
+    /// duress mode this is the concealed view (#462).
     pub fn list_decoy_contacts(&self) -> VauchiResult<Vec<(String, String, ContactCard)>> {
+        if self.in_duress_mode() {
+            return Ok(self.concealed_duress().decoys.clone());
+        }
         Ok(self.storage.decoy().load_decoy_contacts()?)
     }
 
     /// Clears all decoy contacts.
     pub fn clear_decoy_contacts(&self) -> VauchiResult<()> {
+        if self.in_duress_mode() {
+            self.concealed_duress().decoys.clear();
+            return Ok(());
+        }
         self.storage.decoy().clear_all_decoy_contacts()?;
         Ok(())
     }

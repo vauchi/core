@@ -100,6 +100,7 @@ mod fingerprint_verify_engine_tests;
 mod form_dialog_i18n_tests;
 mod gdpr_i18n_tests;
 mod group_delete_tests;
+mod groups_screen_tests;
 mod help_canvas_tests;
 mod help_engine_wiring_tests;
 mod humble_surface_contract_tests;

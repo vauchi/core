@@ -682,6 +682,32 @@ trigger:windows:
       MR_URL=$(printf '%s' "$MR_RESPONSE" | jq -r '.web_url')
       echo "✓ Opened Draft Windows CABI update: $MR_URL"
 
+# Pin-bump MRs for the consumers ci/consumer-pins.json assigns to this job
+# (ADR-026 amendment 2026-09-30, #434): the Cargo consumers and linux-qt,
+# which used to be bumped by hand and fell a release behind unnoticed. The
+# other consumers are bumped by the jobs that publish their artifacts
+# (update:swift-bindings, trigger:ios/macos/android/windows). Merging stays
+# with the maintainer; each MR pipeline proves the consumer builds against
+# the release. Like trigger:windows, a red consumer never gates the release.
+bump:consumer-pins:
+  extends: [.linux-runner, .timeout-standard]
+  stage: trigger
+  allow_failure: true
+  interruptible: false
+  needs: []
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  script:
+    - |
+      set -euo pipefail
+      SCRIPTS_DIR=$(mktemp -d)
+      git -C "$SCRIPTS_DIR" init -q
+      git -C "$SCRIPTS_DIR" remote add origin https://gitlab.com/vauchi/scripts.git
+      git -C "$SCRIPTS_DIR" fetch -q --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
+      git -C "$SCRIPTS_DIR" checkout -q --detach FETCH_HEAD
+      bash scripts/bump-consumer-pins.sh "$CI_COMMIT_TAG" ci/consumer-pins.json \
+        "$SCRIPTS_DIR/scripts/core-pins.py"
+
 # Trigger consumer apps directly (no intermediary repos)
 # Note: bridge jobs (trigger:) do not support timeout: — downstream jobs
 # have their own timeouts via .timeout-standard/.timeout-extended.

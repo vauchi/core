@@ -109,7 +109,11 @@ PATH="$T/bin:$PATH" FAKE_LOG="$T/log" PROJECT_ACCESS_TOKEN=token \
 cat "$T/out"
 
 [ "$status" -ne 0 ] || fail "a consumer that cannot be bumped (e2e) must make the job red"
-grep -q "e2e" "$T/out" || fail "the failure summary must name e2e"
+grep -qx "Not bumped: e2e relay" "$T/out" || fail "the failure summary must name exactly e2e and relay"
+grep -q 'vauchi%2Fe2e/merge_requests' "$T/log" && fail "e2e has no manifest and must get no MR"
+if git -C "$T/remotes/e2e.git" rev-parse -q --verify "refs/heads/chore/bump-core-0.70.0" >/dev/null; then
+    fail "e2e must get no branch"
+fi
 
 branch=chore/bump-core-0.70.0
 git_quiet clone -q --branch "$branch" "$T/remotes/cli.git" "$T/check-cli" || fail "cli must get branch $branch"

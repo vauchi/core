@@ -168,6 +168,26 @@ check:auto-tag-order:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+check:consumer-pins-bump:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  before_script:
+    - apk add --no-cache bash git python3
+    - |
+      SCRIPTS_DIR=$(mktemp -d)
+      git -C "$SCRIPTS_DIR" init -q
+      git -C "$SCRIPTS_DIR" remote add origin https://gitlab.com/vauchi/scripts.git
+      git -C "$SCRIPTS_DIR" fetch -q --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
+      git -C "$SCRIPTS_DIR" checkout -q --detach FETCH_HEAD
+      export CORE_PINS="$SCRIPTS_DIR/scripts/core-pins.py"
+  script:
+    - sh ci/tests/consumer-pins-bump.test.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 check:windows-trigger-safety:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21

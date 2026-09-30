@@ -1,0 +1,17 @@
+{
+  "_comment": "Every consumer of Core and where its pin lives (ADR-026 amendment 2026-09-30). The native pin is the only copy of the version. bumped_by names the Core tag-pipeline job that opens the bump MR; scripts/core-pins.py reads this table.",
+  "consumers": [
+    { "repo": "cli", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
+    { "repo": "tui", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
+    { "repo": "e2e", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
+    { "repo": "linux-gtk", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
+    { "repo": "web-demo", "kind": "cargo", "file": "wasm/Cargo.toml", "bumped_by": "bump:consumer-pins" },
+    { "repo": "relay", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
+    { "repo": "linux-qt", "kind": "ref-file", "file": "core-ref", "bumped_by": "bump:consumer-pins" },
+    { "repo": "windows", "kind": "cabi-json", "file": "cabi-version.json", "bumped_by": "trigger:windows" },
+    { "repo": "vauchi-platform-swift", "kind": "swift-let-version", "file": "Package.swift", "bumped_by": "update:swift-bindings" },
+    { "repo": "ios", "kind": "xcode-spm", "file": "Vauchi.xcodeproj/project.pbxproj", "bumped_by": "trigger:ios" },
+    { "repo": "macos", "kind": "xcode-spm", "file": "Vauchi.xcodeproj/project.pbxproj", "bumped_by": "trigger:macos" },
+    { "repo": "android", "kind": "gradle", "file": "app/build.gradle.kts", "bumped_by": "trigger:android" }
+  ]
+}

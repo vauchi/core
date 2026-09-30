@@ -864,10 +864,11 @@ impl WorkflowEngine for MultiStageExchangeEngine {
         }
     }
 
-    /// 65% brightness keeps the front camera from over-exposing while
-    /// scanning the peer's QR (mirror of the prior frontend-side
-    /// `UIScreen.main.brightness = 0.65` / Android
-    /// `Window.attributes.screenBrightness = 0.65f`). The idle timer
+    /// 35% brightness keeps the peer's front camera from over-exposing
+    /// our QR: at 0.65 the white modules bloomed into each other beyond
+    /// ~11 cm, and 0.35 is what carried Hover (and BLE Glance,
+    /// `GLANCE_QR_BRIGHTNESS`) at 17 cm on the Pixel 3a <-> iPhone SE rig
+    /// (issue #9, exchange journal). The idle timer
     /// is disabled so a longer-than-30s handshake does not auto-lock.
     /// Orientation locks to portrait so the QR / camera layout stays
     /// stable while the user moves the device — mirrors the prior
@@ -876,7 +877,7 @@ impl WorkflowEngine for MultiStageExchangeEngine {
     /// Phase 2b + Phase 2c of `2026-05-04-exchange-command-screen-presentation`.
     fn screen_entered(&mut self) -> Vec<vauchi_core::Command> {
         vec![
-            vauchi_core::Command::SetScreenBrightness { level: Some(0.65) },
+            vauchi_core::Command::SetScreenBrightness { level: Some(0.35) },
             vauchi_core::Command::SetIdleTimerDisabled { disabled: true },
             vauchi_core::Command::SetOrientationLock {
                 orientation: Some(vauchi_core::Orientation::Portrait),

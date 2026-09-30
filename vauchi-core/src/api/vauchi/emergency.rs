@@ -276,13 +276,22 @@ impl Vauchi {
     /// Combines the emergency broadcast config, duress settings, app password
     /// state, current deletion state, and recovery-trusted contact count into a
     /// single struct for the frontend emergency overview screen.
+    ///
+    /// In duress mode the duress, broadcast and trusted-contact parts are the
+    /// concealed view: an app with none of them set up (#462).
     pub fn get_emergency_wipe_status(&self) -> VauchiResult<crate::types::EmergencyWipeStatus> {
-        let broadcast_configured = self
-            .storage
-            .emergency()
-            .load_emergency_config()?
-            .is_some_and(|c| !c.trusted_contact_ids.is_empty());
-        let duress_configured = self.storage.duress().load_duress_settings()?.is_some();
+        let concealed = self.in_duress_mode();
+        let broadcast_configured = !concealed
+            && self
+                .storage
+                .emergency()
+                .load_emergency_config()?
+                .is_some_and(|c| !c.trusted_contact_ids.is_empty());
+        let duress_configured = if concealed {
+            self.concealed_duress().enabled
+        } else {
+            self.storage.duress().load_duress_settings()?.is_some()
+        };
 
         let deletion_state = self.storage.consent().load_deletion_state()?;
         let deletion_scheduled = matches!(
@@ -294,10 +303,14 @@ impl Vauchi {
             crate::storage::DeletionState::Executed { .. }
         );
 
-        let trusted_contacts: Vec<_> = self
-            .storage
-            .contacts()
-            .list_contacts()?
+        // Duress mode counts the decoys, which are never recovery-trusted;
+        // normal mode counts every stored contact, hidden ones included.
+        let contacts = if concealed {
+            self.decoy_contacts_as_contacts()?
+        } else {
+            self.storage.contacts().list_contacts()?
+        };
+        let trusted_contacts: Vec<_> = contacts
             .into_iter()
             .filter(|c| c.is_recovery_trusted())
             .collect();

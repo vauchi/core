@@ -567,7 +567,7 @@ fn navigate_to_multi_stage_batch_carries_lifecycle_commands() {
         "expected 4 lifecycle commands; got {commands:?}"
     );
     assert_eq!(
-        commands[0]["SetScreenBrightness"]["level"], 0.65,
+        commands[0]["SetScreenBrightness"]["level"], 0.35,
         "first command must dim brightness; got {commands:?}",
     );
     assert_eq!(

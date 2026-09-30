@@ -853,7 +853,7 @@ fn screen_entered_glance_emits_presentation_commands_and_back_camera() {
     assert_eq!(
         commands,
         vec![
-            Command::SetScreenBrightness { level: Some(0.65) },
+            Command::SetScreenBrightness { level: Some(0.35) },
             Command::SetIdleTimerDisabled { disabled: true },
             Command::SetOrientationLock {
                 orientation: Some(Orientation::Portrait)
@@ -873,7 +873,7 @@ fn screen_entered_hover_emits_presentation_commands_and_front_camera() {
     assert_eq!(
         commands,
         vec![
-            Command::SetScreenBrightness { level: Some(0.65) },
+            Command::SetScreenBrightness { level: Some(0.35) },
             Command::SetIdleTimerDisabled { disabled: true },
             Command::SetOrientationLock {
                 orientation: Some(Orientation::Portrait)

@@ -823,7 +823,7 @@ fn navigate_to_multi_stage_exchange_drains_brightness_idle_timer_and_orientation
     assert_eq!(
         commands,
         vec![
-            Command::SetScreenBrightness { level: Some(0.65) },
+            Command::SetScreenBrightness { level: Some(0.35) },
             Command::SetIdleTimerDisabled { disabled: true },
             Command::SetOrientationLock {
                 orientation: Some(Orientation::Portrait)

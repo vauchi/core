@@ -10,6 +10,7 @@
 
 use vauchi_core::{AlertSpec, Command, Event, ExportFileSpec, SurfaceId, ToastSpec};
 
+use super::rejection;
 use super::{
     ActionResult, ContextualSurface, ContextualSurfaceRoute, EmergencyShredEngine,
     LockScreenEngine, OnboardingEngine, PreparedSurface, PresentationCoordinator, ScreenModel,
@@ -39,6 +40,18 @@ impl DemoPresentationEngine {
 
     pub fn initial_commands(&mut self) -> Result<Vec<Command>, String> {
         self.render_next_revision(Vec::new())
+    }
+
+    /// Decode and reduce one shell event, answering undecodable JSON or a
+    /// rejected event with Core's prepared alert, never the error value
+    /// (ADR-045 Am1). The error is not logged: its text can echo the event.
+    pub fn dispatch_json(&mut self, event_json: &str) -> Vec<Command> {
+        let event = match vauchi_core::event_from_json(event_json) {
+            Ok(event) => event,
+            Err(error) => return rejection::event_json_rejection(Locale::English, &error),
+        };
+        self.dispatch(event)
+            .unwrap_or_else(|_| rejection::dispatch_rejection(Locale::English))
     }
 
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, String> {

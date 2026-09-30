@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_core::{
-    AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, Command, Event, EventJsonError,
-    InteractionId, MAX_EVENT_INPUT_VALUE_BYTES, StandardShortcut, SurfaceId,
+    AccessibilitySpec, ActionSpec, ActionTone, Command, Event, EventJsonError, InteractionId,
+    StandardShortcut, SurfaceId,
 };
 
 use super::{AppEngine, AppScreen, TabLayout};
+use crate::ui::rejection;
 use crate::ui::{
     ActionResult, ContextualSurface, ContextualSurfaceError, ContextualSurfaceRoute,
     PreparedSurface, PreparedSurfaceError, PresentationCoordinatorError, UserAction,
@@ -153,26 +154,10 @@ impl AppEngine {
         })
     }
 
-    /// Presentation for an event the boundary decoder refused.
-    ///
-    /// Core owns error→consequence translation (ADR-045 Am1), so every
-    /// refusal comes back as a prepared alert and no shell composes copy
-    /// from an error value. An over-bound input value is the one refusal a
-    /// user can cause (pasting a whole backup into a text field), so it
-    /// names the bound; the rest are shell defects and get generic copy.
+    /// Presentation for an event the boundary decoder refused: a prepared
+    /// alert, never the error value (ADR-045 Am1).
     pub fn reject_event_json(&self, error: &EventJsonError) -> Vec<Command> {
-        let message = match error {
-            EventJsonError::InputValueTooLarge => crate::i18n::get_string_with_args(
-                self.render_context.resolved_locale(),
-                "validation.too_long",
-                &[("max", &MAX_EVENT_INPUT_VALUE_BYTES.to_string())],
-            ),
-            EventJsonError::TooLarge | EventJsonError::TooDeep | EventJsonError::Malformed => {
-                tracing::warn!(kind = ?error, "event refused at the boundary decoder");
-                self.t("error.generic")
-            }
-        };
-        self.rejection_alert(message)
+        rejection::event_json_rejection(self.render_context.resolved_locale(), error)
     }
 
     /// Presentation for an event `dispatch` rejected.
@@ -182,16 +167,7 @@ impl AppEngine {
     /// never content).
     pub fn reject_dispatch(&self, error: &AppPresentationError) -> Vec<Command> {
         tracing::warn!(kind = error.kind(), "event rejected by dispatch");
-        self.rejection_alert(self.t("error.generic"))
-    }
-
-    fn rejection_alert(&self, message: String) -> Vec<Command> {
-        vec![Command::PresentAlert {
-            alert: AlertSpec {
-                title: self.t("error.title"),
-                message,
-            },
-        }]
+        rejection::dispatch_rejection(self.render_context.resolved_locale())
     }
 
     /// Reduce one raw shell event into the next ordered command batch.

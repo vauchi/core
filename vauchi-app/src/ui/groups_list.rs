@@ -2,21 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Groups engine — displays and manages contact groups with Members/Visibility modes.
+//! Groups engine — lists contact groups, each with how many contacts it has
+//! and how many of your entries they see (#446).
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
-/// Which aspect of groups is being managed.
-#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[non_exhaustive]
-pub enum GroupsMode {
-    /// Show group membership (which contacts are in each group).
-    Members,
-    /// Show field visibility (which of your fields each group can see).
-    Visibility,
-}
+const GROUPS_ID: &str = "groups";
+const ACTIONS_ID: &str = "group_actions";
+const ADD_GROUP_ID: &str = "add_group";
 
 /// Summary info for a group.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -25,20 +19,41 @@ pub struct GroupInfo {
     pub id: String,
     pub name: String,
     pub member_count: usize,
-    pub visible_field_count: usize,
+    /// Entries a contact in only this group is shown: the group's grants
+    /// plus the entries shown to everyone that no group governs.
+    pub entries_seen: usize,
+}
+
+/// Counts the own-card entries a contact whose only group is `group` sees,
+/// by the same partition as `Vauchi::get_effective_field_visibility`, so the
+/// row cannot promise more or less than propagation delivers.
+#[cfg(feature = "network-rustls")]
+pub(crate) fn entries_seen_by_member(
+    card: &vauchi_core::contact_card::ContactCard,
+    groups: &[vauchi_core::Group],
+    group: &vauchi_core::Group,
+) -> usize {
+    card.fields()
+        .iter()
+        .filter(|field| {
+            let id = field.id();
+            group.is_field_visible(id)
+                || (!groups.iter().any(|g| g.is_field_visible(id))
+                    && card.field_visibility().is_explicitly_everyone(id))
+        })
+        .count()
 }
 
 /// Engine that displays contact groups.
 ///
 /// Rename / delete are per-group actions reached by tapping a group row →
 /// `GroupDetail` (which owns them unambiguously). The list itself offers
-/// only "New Group": the former list-level Rename/Delete operated on
+/// only "Add group": the former list-level Rename/Delete operated on
 /// `groups.first()` regardless of which group the user meant — a
 /// wrong-group bug — and "Merge Groups" was an unimplemented stub. See
 /// `2026-06-05-screen-ux-declutter`.
 pub struct GroupsEngine {
     groups: Vec<GroupInfo>,
-    mode: GroupsMode,
     /// One-shot model-shift education, shown the first time the owner
     /// creates a group while already having exchanged contacts: entries
     /// assigned to a group become visible only to its members; unassigned
@@ -49,10 +64,9 @@ pub struct GroupsEngine {
 }
 
 impl GroupsEngine {
-    pub fn new(groups: Vec<GroupInfo>, mode: GroupsMode) -> Self {
+    pub fn new(groups: Vec<GroupInfo>) -> Self {
         Self {
             groups,
-            mode,
             education_banner: false,
             locale: Locale::English,
         }
@@ -94,9 +108,30 @@ impl GroupsEngine {
         get_string(self.locale, key)
     }
 
-    /// Returns the current mode.
-    pub fn mode(&self) -> &GroupsMode {
-        &self.mode
+    fn count(&self, n: usize, singular: &str, plural: &str) -> String {
+        if n == 1 {
+            self.t(singular)
+        } else {
+            get_string_with_args(self.locale, plural, &[("count", &n.to_string())])
+        }
+    }
+
+    fn row_detail(&self, group: &GroupInfo) -> String {
+        let contacts = self.count(
+            group.member_count,
+            "groups_list.contact_count_singular",
+            "groups_list.contact_count_plural",
+        );
+        let entries = self.count(
+            group.entries_seen,
+            "groups_list.sees_entry_count_singular",
+            "groups_list.sees_entry_count_plural",
+        );
+        get_string_with_args(
+            self.locale,
+            "groups_list.row_detail",
+            &[("contacts", &contacts), ("entries", &entries)],
+        )
     }
 
     fn build_screen(&self) -> ScreenModel {
@@ -111,54 +146,41 @@ impl GroupsEngine {
             });
         }
 
-        // Mode choice (one exclusive Choice node, ADR-066)
-        components.push(self.mode_choice());
+        if self.groups.is_empty() {
+            components.push(Component::Text {
+                a11y: None,
+                id: "empty".into(),
+                content: self.t("groups_list.empty_explanation"),
+                style: TextStyle::Body,
+            });
+        } else {
+            components.push(Component::ActionList {
+                id: GROUPS_ID.into(),
+                items: self
+                    .groups
+                    .iter()
+                    .map(|g| ActionListItem {
+                        id: g.id.clone(),
+                        label: g.name.clone(),
+                        icon: Some("people".into()),
+                        detail: Some(self.row_detail(g)),
+                        a11y: None,
+                        info_key: None,
+                    })
+                    .collect(),
+            });
+        }
 
-        // Group list with mode-dependent detail text
-        let items: Vec<ActionListItem> = self
-            .groups
-            .iter()
-            .map(|g| {
-                let detail = match self.mode {
-                    GroupsMode::Members => {
-                        let n = g.member_count;
-                        if n == 1 {
-                            self.t("groups_list.member_count_singular")
-                        } else {
-                            get_string_with_args(
-                                self.locale,
-                                "groups_list.member_count_plural",
-                                &[("count", &n.to_string())],
-                            )
-                        }
-                    }
-                    GroupsMode::Visibility => {
-                        let n = g.visible_field_count;
-                        if n == 1 {
-                            self.t("groups_list.visible_field_count_singular")
-                        } else {
-                            get_string_with_args(
-                                self.locale,
-                                "groups_list.visible_field_count_plural",
-                                &[("count", &n.to_string())],
-                            )
-                        }
-                    }
-                };
-                ActionListItem {
-                    id: g.id.clone(),
-                    label: g.name.clone(),
-                    icon: Some("people".into()),
-                    detail: Some(detail),
-                    a11y: None,
-                    info_key: None,
-                }
-            })
-            .collect();
-
-        components.push(Component::ActionList {
-            id: "groups".into(),
-            items,
+        components.push(Component::ButtonList {
+            id: ACTIONS_ID.into(),
+            items: vec![ActionListItem {
+                id: ADD_GROUP_ID.into(),
+                label: self.t("groups_list.add_group_button"),
+                icon: None,
+                detail: None,
+                a11y: None,
+                info_key: None,
+            }],
         });
 
         ScreenModel {
@@ -166,45 +188,9 @@ impl GroupsEngine {
             title: self.t("nav.groups"),
             subtitle: None,
             components,
-            // Only "New Group" is a list-level action. Rename/delete a group
-            // by opening it (tap a row → GroupDetail), where the target is
-            // unambiguous.
-            contextual_actions: vec![ScreenAction {
-                id: "new_group".into(),
-                label: self.t("form.new_group_title"),
-                style: ActionStyle::Primary,
-                enabled: true,
-                a11y: None,
-            }],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
-        }
-    }
-
-    fn mode_choice(&self) -> Component {
-        let selected = match self.mode {
-            GroupsMode::Members => "members",
-            GroupsMode::Visibility => "visibility",
-        };
-        Component::Dropdown {
-            id: "mode_toggle".into(),
-            label: self.t("groups_list.view_mode_label"),
-            selected: Some(selected.into()),
-            options: vec![
-                DropdownOption {
-                    id: "members".into(),
-                    label: self.t("group_detail.members_label"),
-                },
-                DropdownOption {
-                    id: "visibility".into(),
-                    label: self.t("groups_list.visibility_mode_label"),
-                },
-            ],
-            a11y: Some(A11y {
-                label: Some(self.t("groups_list.view_mode_options_a11y")),
-                hint: None,
-                role: None,
-            }),
         }
     }
 }
@@ -216,226 +202,24 @@ impl WorkflowEngine for GroupsEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
-            // Mode choice: switch between Members and Visibility
-            UserAction::ListItemSelected {
-                component_id,
-                item_id,
-            } if component_id == "mode_toggle" => {
-                self.mode = match item_id.as_str() {
-                    "members" => GroupsMode::Members,
-                    "visibility" => GroupsMode::Visibility,
-                    _ => return ActionResult::UpdateScreen(self.build_screen()),
-                };
-                ActionResult::UpdateScreen(self.build_screen())
-            }
             // Group selected from list — reuses OpenContact to signal "open detail".
             // AppEngine routes this to GroupDetail when the current screen is Groups.
             UserAction::ListItemSelected {
                 component_id,
                 item_id,
-            } if component_id == "groups" => ActionResult::OpenContact {
+            } if component_id == GROUPS_ID => ActionResult::OpenContact {
                 contact_id: item_id,
             },
-            // Screen-level actions. Only "New Group" lives here now; rename
-            // and delete are per-group affordances on `GroupDetail`.
-            UserAction::ActionPressed { action_id } if action_id == "new_group" => {
+            UserAction::ListItemSelected {
+                component_id,
+                item_id,
+            } if component_id == ACTIONS_ID && item_id == ADD_GROUP_ID => {
                 ActionResult::ShowFormDialog {
                     dialog_type: "create_group".into(),
                     context_id: None,
                 }
             }
             _ => ActionResult::UpdateScreen(self.build_screen()),
-        }
-    }
-}
-
-// INLINE_TEST_REQUIRED: Tests access private GroupsEngine internals
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sample_groups() -> Vec<GroupInfo> {
-        vec![
-            GroupInfo {
-                id: "g1".into(),
-                name: "Family".into(),
-                member_count: 5,
-                visible_field_count: 3,
-            },
-            GroupInfo {
-                id: "g2".into(),
-                name: "Work".into(),
-                member_count: 12,
-                visible_field_count: 1,
-            },
-        ]
-    }
-
-    #[test]
-    fn test_default_members_mode_shows_member_counts() {
-        let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-        let screen = engine.current_screen();
-
-        assert_eq!(screen.screen_id, "groups_list");
-        assert_eq!(screen.title, "Groups");
-
-        // ActionList should have 2 groups
-        let action_list = screen
-            .components
-            .iter()
-            .find(|c| matches!(c, Component::ActionList { id, .. } if id == "groups"))
-            .expect("should have groups ActionList");
-        if let Component::ActionList { items, .. } = action_list {
-            assert_eq!(items.len(), 2);
-            assert_eq!(items[0].detail.as_deref(), Some("5 members"));
-            assert_eq!(items[1].detail.as_deref(), Some("12 members"));
-        }
-    }
-
-    #[test]
-    fn test_visibility_mode_shows_field_counts() {
-        let engine = GroupsEngine::new(sample_groups(), GroupsMode::Visibility);
-        let screen = engine.current_screen();
-
-        let action_list = screen
-            .components
-            .iter()
-            .find(|c| matches!(c, Component::ActionList { id, .. } if id == "groups"))
-            .expect("should have groups ActionList");
-        if let Component::ActionList { items, .. } = action_list {
-            assert_eq!(items[0].detail.as_deref(), Some("3 visible fields"));
-            assert_eq!(items[1].detail.as_deref(), Some("1 visible field"));
-        }
-    }
-
-    #[test]
-    fn test_mode_toggle_switches_to_visibility() {
-        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-        assert_eq!(engine.mode(), &GroupsMode::Members);
-
-        let result = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "mode_toggle".into(),
-            item_id: "visibility".into(),
-        });
-        assert!(matches!(result, ActionResult::UpdateScreen(_)));
-        assert_eq!(engine.mode(), &GroupsMode::Visibility);
-    }
-
-    #[test]
-    fn test_mode_toggle_switches_to_members() {
-        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Visibility);
-
-        let _ = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "mode_toggle".into(),
-            item_id: "members".into(),
-        });
-        assert_eq!(engine.mode(), &GroupsMode::Members);
-    }
-
-    #[test]
-    fn test_mode_toggle_component_reflects_current_mode() {
-        let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-        let screen = engine.current_screen();
-
-        // One exclusive Choice for the Members/Visibility pair (ADR-066):
-        // the shell draws a segmented control, Core owns the selection.
-        let Some(Component::Dropdown {
-            selected, options, ..
-        }) = screen
-            .components
-            .iter()
-            .find(|c| matches!(c, Component::Dropdown { id, .. } if id == "mode_toggle"))
-        else {
-            panic!("should have mode choice");
-        };
-        assert_eq!(selected.as_deref(), Some("members"));
-        let ids: Vec<&str> = options.iter().map(|o| o.id.as_str()).collect();
-        assert_eq!(ids, vec!["members", "visibility"]);
-    }
-
-    #[test]
-    fn test_group_list_item_selected_opens_detail() {
-        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-
-        let result = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "groups".into(),
-            item_id: "g1".into(),
-        });
-        assert_eq!(
-            result,
-            ActionResult::OpenContact {
-                contact_id: "g1".into()
-            }
-        );
-    }
-
-    #[test]
-    fn groups_list_offers_only_new_group_action() {
-        // The list is intentionally a single primary action — rename/delete
-        // a group from its detail screen, not here (no ambiguous selection).
-        for groups in [vec![], sample_groups()] {
-            let engine = GroupsEngine::new(groups, GroupsMode::Members);
-            let screen = engine.current_screen();
-            let ids: Vec<&str> = screen
-                .contextual_actions
-                .iter()
-                .map(|a| a.id.as_str())
-                .collect();
-            assert_eq!(
-                ids,
-                vec!["new_group"],
-                "Groups list must offer only New Group, got {ids:?}"
-            );
-            assert!(
-                screen.contextual_actions[0].enabled,
-                "New Group is always enabled"
-            );
-        }
-    }
-
-    #[test]
-    fn test_singular_member_count() {
-        let groups = vec![GroupInfo {
-            id: "g1".into(),
-            name: "Solo".into(),
-            member_count: 1,
-            visible_field_count: 0,
-        }];
-        let engine = GroupsEngine::new(groups, GroupsMode::Members);
-        let screen = engine.current_screen();
-
-        if let Component::ActionList { items, .. } = &screen.components[1] {
-            assert_eq!(items[0].detail.as_deref(), Some("1 member"));
-        }
-    }
-
-    // @internal
-    #[test]
-    fn test_new_group_action_returns_form_dialog() {
-        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "new_group".into(),
-        });
-        assert!(
-            matches!(result, ActionResult::ShowFormDialog { dialog_type, .. } if dialog_type == "create_group")
-        );
-    }
-
-    // @internal
-    #[test]
-    fn unknown_screen_actions_are_inert() {
-        // Rename/delete/merge are no longer list-level actions; if a stale
-        // frontend still emits one, the engine must not crash or mutate —
-        // it just re-renders the current screen.
-        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-        for stale in ["rename_group", "delete_group", "merge_groups"] {
-            let result = engine.handle_action(UserAction::ActionPressed {
-                action_id: stale.into(),
-            });
-            assert!(
-                matches!(result, ActionResult::UpdateScreen(_)),
-                "stale action `{stale}` must be inert, got {result:?}"
-            );
         }
     }
 }
@@ -448,8 +232,8 @@ mod education_tests {
     // @internal
     #[test]
     fn education_banner_renders_only_when_enabled() {
-        let on = GroupsEngine::new(Vec::new(), GroupsMode::Members).with_education_banner(true);
-        let off = GroupsEngine::new(Vec::new(), GroupsMode::Members);
+        let on = GroupsEngine::new(Vec::new()).with_education_banner(true);
+        let off = GroupsEngine::new(Vec::new());
         let has = |e: &GroupsEngine| {
             e.current_screen()
                 .components

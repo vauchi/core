@@ -2,98 +2,42 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! `GroupsEngine` through the public `vauchi_app::ui::*` re-exports. Rows,
+//! Add group and the empty state are pinned in vauchi-app's
+//! `groups_screen_tests` (#446).
+
 use vauchi_app::ui::*;
 
 fn sample_groups() -> Vec<GroupInfo> {
-    vec![
-        GroupInfo {
-            id: "g1".into(),
-            name: "Family".into(),
-            member_count: 3,
-            visible_field_count: 2,
-        },
-        GroupInfo {
-            id: "g2".into(),
-            name: "Work".into(),
-            member_count: 5,
-            visible_field_count: 4,
-        },
-    ]
+    vec![GroupInfo {
+        id: "g1".into(),
+        name: "Family".into(),
+        member_count: 3,
+        entries_seen: 2,
+    }]
 }
 
 // @internal
 #[test]
-fn groups_list_screen_id() {
-    let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-    let screen = engine.current_screen();
+fn groups_list_screen_id_and_title() {
+    let screen = GroupsEngine::new(sample_groups()).current_screen();
     assert_eq!(screen.screen_id, "groups_list");
-}
-
-// @internal
-#[test]
-fn groups_list_title() {
-    let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-    let screen = engine.current_screen();
     assert_eq!(screen.title, "Groups");
 }
 
 // @internal
 #[test]
-fn groups_list_shows_groups_with_member_counts() {
-    let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-    let screen = engine.current_screen();
-
-    // ActionList is the second component (after mode toggle)
-    let action_list = screen
-        .components
-        .iter()
-        .find(|c| {
-            matches!(c, Component::ActionList { id, ..
-        } if id == "groups")
-        })
-        .expect("should have groups ActionList");
-    match action_list {
-        Component::ActionList { id, items, .. } => {
-            assert_eq!(id, "groups");
-            assert_eq!(items.len(), 2);
-            assert_eq!(items[0].id, "g1");
-            assert_eq!(items[0].label, "Family");
-            assert_eq!(items[0].detail.as_deref(), Some("3 members"));
-            assert_eq!(items[1].id, "g2");
-            assert_eq!(items[1].label, "Work");
-            assert_eq!(items[1].detail.as_deref(), Some("5 members"));
+fn groups_list_stale_toolbar_actions_are_inert() {
+    // "new_group" was the toolbar action before #446 moved Add group into
+    // the body; a stale shell emitting it must not open a dialog.
+    let mut engine = GroupsEngine::new(sample_groups());
+    for stale in ["new_group", "rename_group", "delete_group", "unknown"] {
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: stale.into(),
+        });
+        match result {
+            ActionResult::UpdateScreen(screen) => assert_eq!(screen.screen_id, "groups_list"),
+            other => panic!("stale `{stale}` must re-render, got {other:?}"),
         }
-        other => panic!("Expected ActionList, got {other:?}"),
-    }
-}
-
-// @internal
-// @internal
-#[test]
-fn groups_list_new_group_opens_form_dialog() {
-    let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "new_group".into(),
-    });
-    match result {
-        ActionResult::ShowFormDialog { dialog_type, .. } => {
-            assert_eq!(dialog_type, "create_group");
-        }
-        other => panic!("Expected ShowFormDialog for create_group, got {other:?}"),
-    }
-}
-
-// @internal
-#[test]
-fn groups_list_unknown_action_returns_update_screen() {
-    let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "unknown".into(),
-    });
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "groups_list");
-        }
-        other => panic!("Expected UpdateScreen, got {other:?}"),
     }
 }

@@ -157,7 +157,7 @@ pub use fingerprint_verify::{FingerprintVerifyEngine, VerifyAction};
 pub use form_dialog::{FormDialogEngine, FormDialogType};
 pub use gdpr::{DeletionSummary, GdprEngine};
 pub use group_detail::{GroupDetailEngine, GroupFieldVisibility};
-pub use groups_list::{GroupInfo, GroupsEngine, GroupsMode};
+pub use groups_list::{GroupInfo, GroupsEngine};
 pub use help::{HelpEngine, HelpItem};
 pub use link_exchange::{
     ACTION_CANCEL as LINK_EXCHANGE_ACTION_CANCEL, ACTION_DONE as LINK_EXCHANGE_ACTION_DONE,

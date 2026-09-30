@@ -2169,7 +2169,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_0cea9c4cc18ce961",
+                    "id": "field_482b18c14a198782",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2200,13 +2200,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:0cea9c4cc18ce961",
+                    "id": "field_note:482b18c14a198782",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:0cea9c4cc18ce961",
+                          "id": "field_note:482b18c14a198782",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2246,7 +2246,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_728132fdf55add5a",
+                    "id": "field_9d4c736de3de36bc",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2277,13 +2277,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:728132fdf55add5a",
+                    "id": "field_note:9d4c736de3de36bc",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:728132fdf55add5a",
+                          "id": "field_note:9d4c736de3de36bc",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2323,7 +2323,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_6504034740aa57b5",
+                    "id": "field_59c2cf04e4d75b2a",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2354,13 +2354,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:6504034740aa57b5",
+                    "id": "field_note:59c2cf04e4d75b2a",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:6504034740aa57b5",
+                          "id": "field_note:59c2cf04e4d75b2a",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4570,10 +4570,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "28FC A6A3 9174 7D3B 19B9 04F0 B5F7 B413 B272 E895 E16D 6575 6A8F 90AA EA81 DEFC",
+                    "content": "C2D6 4627 F56D 51B4 8AE2 9C35 B670 B6A1 6629 2C4D 1A1A B30D 5F4B 8C25 2917 3F8D",
                     "style": "body",
                     "accessibility": {
-                      "label": "28FC A6A3 9174 7D3B 19B9 04F0 B5F7 B413 B272 E895 E16D 6575 6A8F 90AA EA81 DEFC",
+                      "label": "C2D6 4627 F56D 51B4 8AE2 9C35 B670 B6A1 6629 2C4D 1A1A B30D 5F4B 8C25 2917 3F8D",
                       "description": null
                     }
                   }
@@ -4592,10 +4592,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "54B2 77AC 6623 0B58 BBFA 9B00 3449 A279 208F D13D DF2D BCD3 D9A0 DF44 E744 A58B",
+                    "content": "8F9B A868 299C 07F3 0906 A9E2 84CF D894 686A 8ED3 E669 8051 D31B B654 C2A3 4C93",
                     "style": "body",
                     "accessibility": {
-                      "label": "54B2 77AC 6623 0B58 BBFA 9B00 3449 A279 208F D13D DF2D BCD3 D9A0 DF44 E744 A58B",
+                      "label": "8F9B A868 299C 07F3 0906 A9E2 84CF D894 686A 8ED3 E669 8051 D31B B654 C2A3 4C93",
                       "description": null
                     }
                   }
@@ -11216,35 +11216,13 @@
                   }
                 },
                 {
-                  "Choice": {
-                    "binding_id": "surface.1.binding.0",
-                    "label": "View Mode",
-                    "selected": "members",
-                    "options": [
-                      {
-                        "id": "members",
-                        "label": "Members"
-                      },
-                      {
-                        "id": "visibility",
-                        "label": "Visibility"
-                      }
-                    ],
-                    "enabled": true,
-                    "accessibility": {
-                      "label": "View Mode options",
-                      "description": null
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "groups",
                     "label": null,
                     "rows": [
                       {
                         "title": "Cycling club",
-                        "subtitle": "3 members",
+                        "subtitle": "3 contacts · sees 4 entries",
                         "detail": null,
                         "icon_token": "people",
                         "image_data": null,
@@ -11268,7 +11246,7 @@
                       },
                       {
                         "title": "Family",
-                        "subtitle": "2 members",
+                        "subtitle": "2 contacts · sees 5 entries",
                         "detail": null,
                         "icon_token": "people",
                         "image_data": null,
@@ -11298,6 +11276,45 @@
                       "description": null
                     }
                   }
+                },
+                {
+                  "List": {
+                    "id": "group_actions",
+                    "label": null,
+                    "rows": [
+                      {
+                        "title": "Add group",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.3",
+                          "label": "Add group",
+                          "accessibility_label": "Add group",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Add group",
+                          "description": null
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    },
+                    "style": "buttons"
+                  }
                 }
               ]
             }
@@ -11317,14 +11334,7 @@
                 "enabled": true,
                 "shortcut": null
               },
-              "primary": {
-                "interaction_id": "surface.1.context.new_group",
-                "label": "New Group",
-                "accessibility_label": "New Group",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": "activate_primary"
-              },
+              "primary": null,
               "secondary": null
             }
           }
@@ -11404,35 +11414,13 @@
               },
               "nodes": [
                 {
-                  "Choice": {
-                    "binding_id": "surface.1.binding.0",
-                    "label": "View Mode",
-                    "selected": "members",
-                    "options": [
-                      {
-                        "id": "members",
-                        "label": "Members"
-                      },
-                      {
-                        "id": "visibility",
-                        "label": "Visibility"
-                      }
-                    ],
-                    "enabled": true,
-                    "accessibility": {
-                      "label": "View Mode options",
-                      "description": null
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "groups",
                     "label": null,
                     "rows": [
                       {
                         "title": "Cycling club",
-                        "subtitle": "3 members",
+                        "subtitle": "3 contacts · sees 4 entries",
                         "detail": null,
                         "icon_token": "people",
                         "image_data": null,
@@ -11456,7 +11444,7 @@
                       },
                       {
                         "title": "Family",
-                        "subtitle": "2 members",
+                        "subtitle": "2 contacts · sees 5 entries",
                         "detail": null,
                         "icon_token": "people",
                         "image_data": null,
@@ -11485,6 +11473,45 @@
                       "label": "",
                       "description": null
                     }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "group_actions",
+                    "label": null,
+                    "rows": [
+                      {
+                        "title": "Add group",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.2",
+                          "label": "Add group",
+                          "accessibility_label": "Add group",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Add group",
+                          "description": null
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    },
+                    "style": "buttons"
                   }
                 }
               ]
@@ -11817,14 +11844,7 @@
                 "enabled": true,
                 "shortcut": null
               },
-              "primary": {
-                "interaction_id": "surface.1.context.new_group",
-                "label": "New Group",
-                "accessibility_label": "New Group",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": "activate_primary"
-              },
+              "primary": null,
               "secondary": null
             }
           }
@@ -16993,7 +17013,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=Is8LK5FPNRWcFH2wFblIXOQbxa-VG7rqgDXEBl_8-H0&n=Kur1jiPvJmjjWimUfkaTfh6tH_I1eR7MlrMAcNjbjac",
+                    "content": "vauchi://exchange?pk=dm_FCOP2obcPXGHg-MozpLZJPiork-QZGa5I8BvAI1E&n=5a6aUfPLvrf2D7NnZd_EGsnFpSXP7SriuGhNodRc414",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17452,7 +17472,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,78,85,115,110,101,115,90,105,77,76,87,76,118,54,109,119,65,48,83,97,74,53,73,73,47,82,80,100,56,116,118,78,80,90,111,78,57,69,53,48,83,108,105,48,71,69,47,112,89,69,72,118,104,117,53,106,107,108,78,110,83,55,106,74,51,43,89,102,74,67,50,72,76,65,76,75,106,114,85,57,99,114,53,69,85,76,111,70,115,57,119,118,83,75,85,69,50,68,71,106,43,66,76,104,79,114,97,70,76,100,117,101,73,55,113,53,66,79,108,48,102,47,65,74,65,47,103,103,53,89,72,43,107,51,81,83,101,76,114,119,100,113,111,79,65,53,74,78,43,110,65,65,65,65,65,71,113,57,75,82,77,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,113,115,73,86,73,119,47,69,103,73,113,87,69,48,84,43,73,99,115,72,104,51,111,105,118,119,81,81,43,65,48,67,57,72,66,57,55,66,109,52,56,78,86,113,103,57,112,120,43,109,118,118,106,111,48,47,47,79,85,81,98,85,81,74,78,111,98,57,49,78,113,102,121,68,118,112,75,43,47,75,53,52,116,115,72],
+            "payload": [86,48,74,70,87,65,79,80,109,54,104,111,75,90,119,72,56,119,107,71,113,101,75,69,122,57,105,85,97,71,113,79,48,43,90,112,103,70,72,84,71,55,90,85,119,113,78,77,107,50,73,74,97,117,108,102,78,77,104,56,97,115,73,76,117,50,69,97,119,48,101,67,99,105,120,43,71,114,98,56,57,100,79,122,113,86,104,54,77,74,81,107,72,73,102,52,80,120,48,119,104,77,99,79,50,54,101,47,79,57,49,104,74,89,78,49,119,56,99,103,116,70,101,85,102,79,80,75,88,79,120,105,67,104,54,67,53,48,53,82,86,49,104,116,115,109,71,118,52,43,88,114,79,69,67,103,65,65,65,65,65,71,113,57,77,72,77,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,90,111,90,117,97,52,120,114,90,55,106,99,105,48,85,111,51,56,71,105,85,109,120,69,56,66,102,68,108,122,97,82,89,97,100,105,79,121,114,80,114,109,85,43,109,75,103,87,98,56,120,102,109,109,117,52,117,53,57,65,82,67,117,121,88,65,100,65,115,85,80,51,97,106,99,122,83,86,103,100,106,87,83,99,68],
             "is_initiator": true
           }
         }
@@ -17484,7 +17504,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI2LHVQMB0AFD*6$7OAQ2R73NDK1Q4FA92KJMOQMMDZ98*MJF MD3OHBGM%4DGG-FBFEK9%L*DR0PRBWRTW8LV8HBN498+7QKD6OP41HAPFS.O5YLV2H3DY3PYQ11Vauchi User00"
+                      "INI2.MO8-52A02Z3UF3 ZCILS9AS.VL%XCI646VGV6JPJC*EDXC86530*TNO6-OL%S7YGD7:F-.RGJKMFO:MOV08%C55KP2/DSEN3X4F7VPQHG ERUL*1Q.1ABSO11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -18123,7 +18143,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [84,178,119,172,102,35,11,88,187,250,155,0,52,73,162,121,32,143,209,61,223,45,188,211,217,160,223,68,231,68,165,139]
+            "payload": [143,155,168,104,41,156,7,243,9,6,169,226,132,207,216,148,104,106,142,211,230,105,128,81,211,27,182,84,194,163,76,147]
           }
         },
         {
@@ -18278,7 +18298,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [84,178,119,172,102,35,11,88,187,250,155,0,52,73,162,121,32,143,209,61,223,45,188,211,217,160,223,68,231,68,165,139]
+            "payload": [143,155,168,104,41,156,7,243,9,6,169,226,132,207,216,148,104,106,142,211,230,105,128,81,211,27,182,84,194,163,76,147]
           }
         },
         {
@@ -18433,7 +18453,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [84,178,119,172,102,35,11,88,187,250,155,0,52,73,162,121,32,143,209,61,223,45,188,211,217,160,223,68,231,68,165,139]
+            "payload": [143,155,168,104,41,156,7,243,9,6,169,226,132,207,216,148,104,106,142,211,230,105,128,81,211,27,182,84,194,163,76,147]
           }
         },
         {

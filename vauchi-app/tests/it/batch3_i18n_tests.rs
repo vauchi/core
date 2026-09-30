@@ -16,8 +16,8 @@ use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{
     ArchivedContactsEngine, ChangePasswordEngine, ContactVisibilityEngine, DecoyContactsEngine,
     DeepLinkConsentEngine, DuplicateDetectionEngine, FingerprintVerifyEngine, GroupInfo,
-    GroupsEngine, GroupsMode, HelpEngine, LinkResponderEngine, LockScreenEngine, PlacesEngine,
-    SupportEngine, TagPromotionEngine, WorkflowEngine,
+    GroupsEngine, HelpEngine, LinkResponderEngine, LockScreenEngine, PlacesEngine, SupportEngine,
+    TagPromotionEngine, WorkflowEngine,
 };
 use vauchi_core::exchange::link_mode::{initiator_generate, parse_exchange_deep_link};
 
@@ -31,22 +31,24 @@ fn sample_groups() -> Vec<GroupInfo> {
         id: "g1".into(),
         name: "Work".into(),
         member_count: 1,
-        visible_field_count: 1,
+        entries_seen: 1,
     }]
 }
 
-/// The groups-list view-mode choice label.
-fn groups_view_mode_label(locale: Locale) -> String {
-    GroupsEngine::new(sample_groups(), GroupsMode::Members)
+/// The groups-list "Add group" button label.
+fn groups_add_group_label(locale: Locale) -> String {
+    GroupsEngine::new(sample_groups())
         .with_locale(locale)
         .current_screen()
         .components
         .iter()
         .find_map(|c| match c {
-            vauchi_app::ui::Component::Dropdown { label, .. } => Some(label.clone()),
+            vauchi_app::ui::Component::ButtonList { items, .. } => {
+                items.first().map(|i| i.label.clone())
+            }
             _ => None,
         })
-        .expect("groups list renders a view-mode choice")
+        .expect("groups list renders an Add group button")
 }
 
 /// Every screen title in this batch, for one locale.
@@ -180,9 +182,9 @@ fn batch3_screens_render_the_active_locale() {
 fn groups_list_renders_the_active_locale() {
     load_german();
     assert_translated(
-        "view-mode toggle label",
-        &groups_view_mode_label(Locale::German),
-        &groups_view_mode_label(Locale::English),
+        "add group button",
+        &groups_add_group_label(Locale::German),
+        &groups_add_group_label(Locale::English),
     );
 }
 

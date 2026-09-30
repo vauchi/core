@@ -9,6 +9,7 @@
 //! button in the body, not a toolbar action; with no groups, one sentence
 //! says what groups do.
 
+use super::i18n_support::load_german;
 use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{
     ActionResult, AppEngine, AppScreen, Component, GroupInfo, GroupsEngine, ScreenModel,
@@ -86,6 +87,7 @@ fn each_row_counts_contacts_and_the_entries_they_see() {
 // @internal
 #[test]
 fn rows_are_localized() {
+    load_german();
     let screen = GroupsEngine::new(vec![group("g1", "Familie", 3, 1)])
         .with_locale(Locale::German)
         .current_screen();

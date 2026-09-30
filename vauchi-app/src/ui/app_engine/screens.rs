@@ -24,7 +24,7 @@ use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogEngine;
 use crate::ui::gdpr::GdprEngine;
 use crate::ui::group_detail::GroupDetailEngine;
-use crate::ui::groups_list::{GroupInfo, GroupsEngine, GroupsMode};
+use crate::ui::groups_list::{GroupInfo, GroupsEngine, entries_seen_by_member};
 use crate::ui::help::HelpEngine;
 use crate::ui::lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
 use crate::ui::my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, OwnFieldInfo};
@@ -475,6 +475,7 @@ impl AppEngine {
             AppScreen::Groups => {
                 let all_groups = vauchi.list_groups().unwrap_or_default();
                 let contacts = Self::load_contact_items(vauchi, render_context.resolved_locale());
+                let own_card = vauchi.own_card().ok().flatten();
                 let group_infos: Vec<GroupInfo> = all_groups
                     .iter()
                     .map(|g| {
@@ -486,13 +487,15 @@ impl AppEngine {
                             id: g.id().to_string(),
                             name: g.name().to_string(),
                             member_count,
-                            visible_field_count: g.visible_fields().len(),
+                            entries_seen: own_card
+                                .as_ref()
+                                .map_or(0, |card| entries_seen_by_member(card, &all_groups, g)),
                         }
                     })
                     .collect();
                 let education = GroupsEngine::first_group_education(vauchi, group_infos.len());
                 Box::new(
-                    GroupsEngine::new(group_infos, GroupsMode::Members)
+                    GroupsEngine::new(group_infos)
                         .with_education_banner(education)
                         .with_locale(render_context.resolved_locale()),
                 )

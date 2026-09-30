@@ -361,9 +361,6 @@ impl WorkflowEngine for DeliveryStatusEngine {
                 },
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
-            UserAction::ActionPressed { action_id } if action_id == RETRY_ALL_ACTION_ID => {
-                self.retry_all()
-            }
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
     }

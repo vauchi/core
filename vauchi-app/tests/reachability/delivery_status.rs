@@ -7,9 +7,10 @@
 use vauchi_app::ui::testing::{assert_reachability_across_screens, check_reachability};
 use vauchi_app::ui::{DeliveryItem, DeliveryStatusEngine, Status, WorkflowEngine};
 
-/// Action ids handled by `DeliveryStatusEngine` —
-/// `core/vauchi-app/src/ui/delivery.rs:RETRY_ALL_ACTION_ID`.
-const HANDLED: &[&str] = &["retry_all"];
+/// No `ActionPressed` affordance: "Retry all failed" is a body button in
+/// the Failed list (#445), so it, the list switch and the rows are
+/// `ListItemSelected` pass-throughs, validated by `delivery_screen_tests`.
+const HANDLED: &[&str] = &[];
 
 fn factory() -> DeliveryStatusEngine {
     DeliveryStatusEngine::new(vec![

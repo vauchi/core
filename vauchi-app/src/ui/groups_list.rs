@@ -24,9 +24,21 @@ pub struct GroupInfo {
     pub entries_seen: usize,
 }
 
+/// Whether an own-card entry reaches every contact, grouped or not: set to
+/// Visible and governed by no group — the same partition as
+/// `Vauchi::get_effective_field_visibility`.
+#[cfg(feature = "network-rustls")]
+pub(crate) fn shown_to_everyone(
+    card: &vauchi_core::contact_card::ContactCard,
+    groups: &[vauchi_core::Group],
+    field_id: &str,
+) -> bool {
+    !groups.iter().any(|g| g.is_field_visible(field_id))
+        && card.field_visibility().is_explicitly_everyone(field_id)
+}
+
 /// Counts the own-card entries a contact whose only group is `group` sees,
-/// by the same partition as `Vauchi::get_effective_field_visibility`, so the
-/// row cannot promise more or less than propagation delivers.
+/// so the row cannot promise more or less than propagation delivers.
 #[cfg(feature = "network-rustls")]
 pub(crate) fn entries_seen_by_member(
     card: &vauchi_core::contact_card::ContactCard,
@@ -36,10 +48,7 @@ pub(crate) fn entries_seen_by_member(
     card.fields()
         .iter()
         .filter(|field| {
-            let id = field.id();
-            group.is_field_visible(id)
-                || (!groups.iter().any(|g| g.is_field_visible(id))
-                    && card.field_visibility().is_explicitly_everyone(id))
+            group.is_field_visible(field.id()) || shown_to_everyone(card, groups, field.id())
         })
         .count()
 }

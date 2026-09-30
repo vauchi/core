@@ -22,6 +22,9 @@ pub struct GroupFieldVisibility {
     pub label: String,
     pub value: String,
     pub is_visible: bool,
+    /// Seen by this group's members whatever the toggle says, because the
+    /// entry is set to Visible and no group governs it.
+    pub shown_to_everyone: bool,
 }
 
 /// Action id prefix for the per-field visibility toggle component.
@@ -80,13 +83,13 @@ impl GroupDetailEngine {
             items: vec![
                 InfoItem {
                     icon: Some("people".into()),
-                    title: self.t("group_detail.members_label"),
+                    title: self.t("group_detail.contacts_label"),
                     detail: format!("{}", self.members.len()),
                 },
                 InfoItem {
                     icon: Some("eye".into()),
-                    title: self.t("group_detail.visible_fields_label"),
-                    detail: format!("{}", self.visible_field_count()),
+                    title: self.t("group_detail.sees_label"),
+                    detail: self.entries_seen(),
                 },
             ],
             a11y: Some(A11y {
@@ -99,7 +102,7 @@ impl GroupDetailEngine {
         if !self.fields.is_empty() {
             components.push(Component::ToggleList {
                 id: FIELD_VISIBILITY_COMPONENT_ID.into(),
-                label: self.t("group_detail.field_visibility_label"),
+                label: self.t("group_detail.entries_label"),
                 items: self
                     .fields
                     .iter()
@@ -107,26 +110,22 @@ impl GroupDetailEngine {
                         id: f.field_id.clone(),
                         label: f.label.clone(),
                         selected: f.is_visible,
-                        subtitle: Some(f.value.clone()),
+                        subtitle: Some(self.entry_subtitle(f)),
                         a11y: Some(A11y {
                             label: Some(get_string_with_args(
                                 self.locale,
                                 "group_detail.visibility_for_a11y",
                                 &[("label", &f.label)],
                             )),
-                            hint: Some(if f.is_visible {
-                                self.t("group_detail.visible_to_group_hint")
-                            } else {
-                                self.t("group_detail.hidden_from_group_hint")
-                            }),
+                            hint: Some(self.entry_hint(f)),
                             role: None,
                         }),
                         info_key: None,
                     })
                     .collect(),
                 a11y: Some(A11y {
-                    label: Some(self.t("group_detail.field_visibility_toggles_a11y")),
-                    hint: Some(self.t("group_detail.field_visibility_hint")),
+                    label: Some(self.t("group_detail.entries_label")),
+                    hint: Some(self.t("group_detail.entries_hint")),
                     role: None,
                 }),
             });
@@ -202,8 +201,43 @@ impl GroupDetailEngine {
         actions
     }
 
-    fn visible_field_count(&self) -> usize {
-        self.fields.iter().filter(|f| f.is_visible).count()
+    fn entries_seen(&self) -> String {
+        let n = self
+            .fields
+            .iter()
+            .filter(|f| f.is_visible || f.shown_to_everyone)
+            .count();
+        if n == 1 {
+            self.t("group_detail.entry_count_singular")
+        } else {
+            get_string_with_args(
+                self.locale,
+                "group_detail.entry_count_plural",
+                &[("count", &n.to_string())],
+            )
+        }
+    }
+
+    fn entry_subtitle(&self, field: &GroupFieldVisibility) -> String {
+        if field.shown_to_everyone && !field.is_visible {
+            get_string_with_args(
+                self.locale,
+                "group_detail.shown_to_everyone_subtitle",
+                &[("value", &field.value)],
+            )
+        } else {
+            field.value.clone()
+        }
+    }
+
+    fn entry_hint(&self, field: &GroupFieldVisibility) -> String {
+        if field.is_visible {
+            self.t("group_detail.visible_to_group_hint")
+        } else if field.shown_to_everyone {
+            self.t("group_detail.shown_to_everyone_hint")
+        } else {
+            self.t("group_detail.hidden_from_group_hint")
+        }
     }
 }
 
@@ -292,6 +326,7 @@ mod tests {
             label: label.into(),
             value: value.into(),
             is_visible: visible,
+            shown_to_everyone: false,
         }
     }
 
@@ -334,7 +369,7 @@ mod tests {
 
     // @internal
     #[test]
-    fn info_panel_includes_visible_field_count() {
+    fn info_panel_counts_contacts_and_entries_seen() {
         let e =
             GroupDetailEngine::new("g1".into(), "Work".into(), vec![]).with_field_visibility(vec![
                 fld("f1", "Email", "x", true),
@@ -345,10 +380,10 @@ mod tests {
         match &screen.components[0] {
             Component::InfoPanel { items, .. } => {
                 assert_eq!(items.len(), 2);
-                assert_eq!(items[0].title, "Members");
+                assert_eq!(items[0].title, "Contacts");
                 assert_eq!(items[0].detail, "0");
-                assert_eq!(items[1].title, "Visible Fields");
-                assert_eq!(items[1].detail, "2");
+                assert_eq!(items[1].title, "Sees");
+                assert_eq!(items[1].detail, "2 entries");
             }
             other => panic!("expected InfoPanel, got {other:?}"),
         }

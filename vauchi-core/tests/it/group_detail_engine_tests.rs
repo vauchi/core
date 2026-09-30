@@ -49,7 +49,7 @@ fn group_detail_shows_member_count() {
     let engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
     let screen = engine.current_screen();
 
-    let detail = find_info_detail(&screen, "group_info", "Members");
+    let detail = find_info_detail(&screen, "group_info", "Contacts");
     assert_eq!(detail, "2");
 }
 

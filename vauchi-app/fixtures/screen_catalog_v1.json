@@ -2169,7 +2169,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_482b18c14a198782",
+                    "id": "field_44a540cd1c483426",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2200,13 +2200,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:482b18c14a198782",
+                    "id": "field_note:44a540cd1c483426",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:482b18c14a198782",
+                          "id": "field_note:44a540cd1c483426",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2246,7 +2246,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_9d4c736de3de36bc",
+                    "id": "field_2bb44632410378a3",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2277,13 +2277,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:9d4c736de3de36bc",
+                    "id": "field_note:2bb44632410378a3",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:9d4c736de3de36bc",
+                          "id": "field_note:2bb44632410378a3",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2323,7 +2323,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_59c2cf04e4d75b2a",
+                    "id": "field_66d1463cf125b734",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2354,13 +2354,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:59c2cf04e4d75b2a",
+                    "id": "field_note:66d1463cf125b734",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:59c2cf04e4d75b2a",
+                          "id": "field_note:66d1463cf125b734",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4570,10 +4570,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "C2D6 4627 F56D 51B4 8AE2 9C35 B670 B6A1 6629 2C4D 1A1A B30D 5F4B 8C25 2917 3F8D",
+                    "content": "9EF0 2C39 E4E4 2633 EBF1 F59C E9F5 0026 1419 2DA0 9502 DF62 ACA3 C111 6F64 46E8",
                     "style": "body",
                     "accessibility": {
-                      "label": "C2D6 4627 F56D 51B4 8AE2 9C35 B670 B6A1 6629 2C4D 1A1A B30D 5F4B 8C25 2917 3F8D",
+                      "label": "9EF0 2C39 E4E4 2633 EBF1 F59C E9F5 0026 1419 2DA0 9502 DF62 ACA3 C111 6F64 46E8",
                       "description": null
                     }
                   }
@@ -4592,10 +4592,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "8F9B A868 299C 07F3 0906 A9E2 84CF D894 686A 8ED3 E669 8051 D31B B654 C2A3 4C93",
+                    "content": "91FA 172F 874F D893 4E35 034D 0988 5B6F 7483 5BD3 FDB4 6808 9181 E592 6DC5 B46A",
                     "style": "body",
                     "accessibility": {
-                      "label": "8F9B A868 299C 07F3 0906 A9E2 84CF D894 686A 8ED3 E669 8051 D31B B654 C2A3 4C93",
+                      "label": "91FA 172F 874F D893 4E35 034D 0988 5B6F 7483 5BD3 FDB4 6808 9181 E592 6DC5 B46A",
                       "description": null
                     }
                   }
@@ -11566,14 +11566,14 @@
                       {
                         "Status": {
                           "id": null,
-                          "title": "Members",
+                          "title": "Contacts",
                           "detail": "2",
                           "icon_token": "people",
                           "badge": null,
                           "tone": "neutral",
                           "activation": null,
                           "accessibility": {
-                            "label": "Members",
+                            "label": "Contacts",
                             "description": null
                           }
                         }
@@ -11581,14 +11581,14 @@
                       {
                         "Status": {
                           "id": null,
-                          "title": "Visible Fields",
-                          "detail": "2",
+                          "title": "Sees",
+                          "detail": "5 entries",
                           "icon_token": "eye",
                           "badge": null,
                           "tone": "neutral",
                           "activation": null,
                           "accessibility": {
-                            "label": "Visible Fields",
+                            "label": "Sees",
                             "description": null
                           }
                         }
@@ -11603,11 +11603,11 @@
                 {
                   "List": {
                     "id": "field_visibility",
-                    "label": "Field Visibility",
+                    "label": "Entries this group sees",
                     "rows": [
                       {
                         "title": "mobile",
-                        "subtitle": "+44 20 7946 0958",
+                        "subtitle": "+44 20 7946 0958 · Shown to everyone",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -11625,19 +11625,19 @@
                               "enabled": true,
                               "accessibility": {
                                 "label": "Visibility for mobile",
-                                "description": "Hidden from this group"
+                                "description": "Shown to everyone, including this group"
                               }
                             }
                           }
                         ],
                         "accessibility": {
                           "label": "Visibility for mobile",
-                          "description": "Hidden from this group"
+                          "description": "Shown to everyone, including this group"
                         }
                       },
                       {
                         "title": "work",
-                        "subtitle": "ada@analytical.example.org",
+                        "subtitle": "ada@analytical.example.org · Shown to everyone",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -11655,19 +11655,19 @@
                               "enabled": true,
                               "accessibility": {
                                 "label": "Visibility for work",
-                                "description": "Hidden from this group"
+                                "description": "Shown to everyone, including this group"
                               }
                             }
                           }
                         ],
                         "accessibility": {
                           "label": "Visibility for work",
-                          "description": "Hidden from this group"
+                          "description": "Shown to everyone, including this group"
                         }
                       },
                       {
                         "title": "homepage",
-                        "subtitle": "https://ada.example.org",
+                        "subtitle": "https://ada.example.org · Shown to everyone",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -11685,14 +11685,14 @@
                               "enabled": true,
                               "accessibility": {
                                 "label": "Visibility for homepage",
-                                "description": "Hidden from this group"
+                                "description": "Shown to everyone, including this group"
                               }
                             }
                           }
                         ],
                         "accessibility": {
                           "label": "Visibility for homepage",
-                          "description": "Hidden from this group"
+                          "description": "Shown to everyone, including this group"
                         }
                       },
                       {
@@ -11759,8 +11759,8 @@
                     "searchable": false,
                     "paging": null,
                     "accessibility": {
-                      "label": "Field Visibility toggles",
-                      "description": "Toggle which of your fields contacts in this group can see."
+                      "label": "Entries this group sees",
+                      "description": "Choose which of your entries contacts in this group see."
                     }
                   }
                 },
@@ -17013,7 +17013,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=dm_FCOP2obcPXGHg-MozpLZJPiork-QZGa5I8BvAI1E&n=5a6aUfPLvrf2D7NnZd_EGsnFpSXP7SriuGhNodRc414",
+                    "content": "vauchi://exchange?pk=oAysCFHa9HSdk_c8AAEhj1zwgSV60Uk-t0XeHgy6MSQ&n=TDBUiXbm-frRBL6hgS_JkRq77AzSYwHlA9AE23fEN0A",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17472,7 +17472,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,79,80,109,54,104,111,75,90,119,72,56,119,107,71,113,101,75,69,122,57,105,85,97,71,113,79,48,43,90,112,103,70,72,84,71,55,90,85,119,113,78,77,107,50,73,74,97,117,108,102,78,77,104,56,97,115,73,76,117,50,69,97,119,48,101,67,99,105,120,43,71,114,98,56,57,100,79,122,113,86,104,54,77,74,81,107,72,73,102,52,80,120,48,119,104,77,99,79,50,54,101,47,79,57,49,104,74,89,78,49,119,56,99,103,116,70,101,85,102,79,80,75,88,79,120,105,67,104,54,67,53,48,53,82,86,49,104,116,115,109,71,118,52,43,88,114,79,69,67,103,65,65,65,65,65,71,113,57,77,72,77,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,90,111,90,117,97,52,120,114,90,55,106,99,105,48,85,111,51,56,71,105,85,109,120,69,56,66,102,68,108,122,97,82,89,97,100,105,79,121,114,80,114,109,85,43,109,75,103,87,98,56,120,102,109,109,117,52,117,53,57,65,82,67,117,121,88,65,100,65,115,85,80,51,97,106,99,122,83,86,103,100,106,87,83,99,68],
+            "payload": [86,48,74,70,87,65,79,82,43,104,99,118,104,48,47,89,107,48,52,49,65,48,48,74,105,70,116,118,100,73,78,98,48,47,50,48,97,65,105,82,103,101,87,83,98,99,87,48,97,116,68,120,119,86,83,83,113,115,120,116,116,110,78,109,82,109,72,74,90,54,67,52,56,47,107,80,53,74,53,54,77,90,76,51,49,107,78,66,68,43,89,86,102,109,48,87,53,104,110,84,48,51,112,52,105,52,112,117,77,121,74,99,99,99,117,107,80,87,87,56,78,89,115,57,85,68,117,103,99,51,110,85,78,81,81,52,67,121,71,87,50,119,67,75,112,119,86,108,65,71,75,84,77,88,72,49,65,65,65,65,65,71,113,57,77,47,89,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,68,50,54,117,67,122,90,100,81,86,86,57,89,112,78,78,51,83,86,43,56,49,97,78,89,84,79,83,102,100,74,65,48,117,113,115,55,99,68,79,81,43,54,73,73,67,110,87,55,53,108,88,86,79,52,100,75,81,110,74,102,67,101,102,67,104,66,56,78,84,72,70,52,82,105,115,81,73,48,50,81,77,73,88,56,75],
             "is_initiator": true
           }
         }
@@ -17504,7 +17504,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI2.MO8-52A02Z3UF3 ZCILS9AS.VL%XCI646VGV6JPJC*EDXC86530*TNO6-OL%S7YGD7:F-.RGJKMFO:MOV08%C55KP2/DSEN3X4F7VPQHG ERUL*1Q.1ABSO11Vauchi User00"
+                      "INI2Q3D3BGKKU+BBDGAZ*G5.6B48C$65%DOIE.H734AHCP5Z1NRL9Z4D5G$ 5R1TVHS04V3BNI 1CTE/8FKXR%8C3%7VPO$87%8K3FD841*ITA KLT7L1U%Z1SEM11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -18143,7 +18143,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [143,155,168,104,41,156,7,243,9,6,169,226,132,207,216,148,104,106,142,211,230,105,128,81,211,27,182,84,194,163,76,147]
+            "payload": [145,250,23,47,135,79,216,147,78,53,3,77,9,136,91,111,116,131,91,211,253,180,104,8,145,129,229,146,109,197,180,106]
           }
         },
         {
@@ -18298,7 +18298,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [143,155,168,104,41,156,7,243,9,6,169,226,132,207,216,148,104,106,142,211,230,105,128,81,211,27,182,84,194,163,76,147]
+            "payload": [145,250,23,47,135,79,216,147,78,53,3,77,9,136,91,111,116,131,91,211,253,180,104,8,145,129,229,146,109,197,180,106]
           }
         },
         {
@@ -18453,7 +18453,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [143,155,168,104,41,156,7,243,9,6,169,226,132,207,216,148,104,106,142,211,230,105,128,81,211,27,182,84,194,163,76,147]
+            "payload": [145,250,23,47,135,79,216,147,78,53,3,77,9,136,91,111,116,131,91,211,253,180,104,8,145,129,229,146,109,197,180,106]
           }
         },
         {

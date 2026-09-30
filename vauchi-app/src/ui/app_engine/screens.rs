@@ -534,16 +534,23 @@ impl AppEngine {
                 // (Pair 2 of Pure Humble UI retirement).
                 let field_visibility: Vec<crate::ui::group_detail::GroupFieldVisibility> =
                     match (vauchi.own_card().ok().flatten(), group.as_ref()) {
-                        (Some(card), Some(g)) => card
-                            .fields()
-                            .iter()
-                            .map(|f| crate::ui::group_detail::GroupFieldVisibility {
-                                field_id: f.id().to_string(),
-                                label: f.label().to_string(),
-                                value: f.value().to_string(),
-                                is_visible: g.is_field_visible(f.id()),
-                            })
-                            .collect(),
+                        (Some(card), Some(g)) => {
+                            let all_groups = vauchi.list_groups().unwrap_or_default();
+                            card.fields()
+                                .iter()
+                                .map(|f| crate::ui::group_detail::GroupFieldVisibility {
+                                    field_id: f.id().to_string(),
+                                    label: f.label().to_string(),
+                                    value: f.value().to_string(),
+                                    is_visible: g.is_field_visible(f.id()),
+                                    shown_to_everyone: crate::ui::groups_list::shown_to_everyone(
+                                        &card,
+                                        &all_groups,
+                                        f.id(),
+                                    ),
+                                })
+                                .collect()
+                        }
                         _ => Vec::new(),
                     };
 

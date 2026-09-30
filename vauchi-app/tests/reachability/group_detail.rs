@@ -41,6 +41,7 @@ fn factory() -> GroupDetailEngine {
         label: "Email".into(),
         value: "alice@example.com".into(),
         is_visible: true,
+        shown_to_everyone: false,
     }])
 }
 

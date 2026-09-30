@@ -59,6 +59,7 @@ mod contextual_surface_tests;
 #[path = "../contextual_undo_tests.rs"]
 mod contextual_undo_tests;
 mod deep_link_consent_engine_tests;
+mod demo_presentation_tests;
 mod device_link_bridge_tests;
 mod device_link_live_device_tests;
 mod device_link_local_hosting_tests;

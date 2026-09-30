@@ -38,7 +38,7 @@
 include:
   - project: 'vauchi/scripts'
     # Pin the commit because tags are not protected.
-    ref: 7ad595f3365f3a14c7581fce267b9fd317578cf6
+    ref: 449d7eaa012c15bf98eb73e2013dffba9cc7a7c5
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -102,7 +102,7 @@ variables:
   # keeps the SHA form because tags here are not protected), the lint:typos
   # linux tag (vauchi/scripts!552) and retired_boundary_vocabulary
   # (vauchi/scripts!502).
-  VAUCHI_SCRIPTS_REF: "7ad595f3365f3a14c7581fce267b9fd317578cf6"
+  VAUCHI_SCRIPTS_REF: "449d7eaa012c15bf98eb73e2013dffba9cc7a7c5"
   # cargo audit runs with --deny warnings; every entry here is an
   # advisory with no fix available to us, not one we chose to skip.
   #   RUSTSEC-2026-0192  ttf-parser unmaintained, reached through

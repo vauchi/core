@@ -2,8 +2,12 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Delivery status engine — shows delivery state per contact in three
-//! sections (Recent, Failed, Pending Retries).
+//! Update Delivery engine — where a card update has reached, one list at a
+//! time behind a Recent / Pending / Failed switch (#445).
+//!
+//! The switch opens on the most urgent non-empty list (Failed, then
+//! Pending, then Recent), so a failure is never hidden behind a tab (owner
+//! decision 2026-09-30). Row details arrive localized from the loader.
 //!
 //! See `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens/`
 //! for the architectural context (Pair 1 — DeliveryStatus retirement).
@@ -11,8 +15,13 @@
 use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
-/// Action id emitted by the "retry all failed" footer button.
+/// Action id of the "Retry all failed" button.
 pub const RETRY_ALL_ACTION_ID: &str = "retry_all";
+
+const FILTER_ID: &str = "delivery_filter";
+const ROWS_ID: &str = "deliveries";
+const ACTIONS_ID: &str = "delivery_actions";
+const HELP_ID: &str = "delivery_help";
 
 /// A single delivery item with status and retry info.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -37,6 +46,45 @@ pub struct RetryEntry {
     pub attempt: u32,
     pub max_attempts: u32,
     pub max_exceeded: bool,
+    /// Seconds until the next attempt; `None` when unknown.
+    #[serde(default)]
+    pub next_retry_in_secs: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Tab {
+    Recent,
+    Pending,
+    Failed,
+}
+
+impl Tab {
+    fn id(self) -> &'static str {
+        match self {
+            Tab::Recent => "recent",
+            Tab::Pending => "pending",
+            Tab::Failed => "failed",
+        }
+    }
+
+    fn from_id(id: &str) -> Option<Self> {
+        match id {
+            "recent" => Some(Tab::Recent),
+            "pending" => Some(Tab::Pending),
+            "failed" => Some(Tab::Failed),
+            _ => None,
+        }
+    }
+}
+
+/// One row of the screen, whichever record it came from.
+struct Row {
+    message_id: String,
+    contact_id: String,
+    contact_name: String,
+    detail: Option<String>,
+    tab: Tab,
+    retryable: bool,
 }
 
 /// Engine that displays delivery status for a set of contacts.
@@ -45,6 +93,7 @@ pub struct DeliveryStatusEngine {
     items: Vec<DeliveryItem>,
     retries: Vec<RetryEntry>,
     locale: Locale,
+    chosen: Option<Tab>,
 }
 
 impl DeliveryStatusEngine {
@@ -53,6 +102,7 @@ impl DeliveryStatusEngine {
             items,
             retries: Vec::new(),
             locale: Locale::English,
+            chosen: None,
         }
     }
 
@@ -72,145 +122,213 @@ impl DeliveryStatusEngine {
         get_string(self.locale, key)
     }
 
+    fn rows(&self) -> Vec<Row> {
+        let items = self.items.iter().map(|item| Row {
+            message_id: item.message_id.clone(),
+            contact_id: item.contact_id.clone(),
+            contact_name: item.contact_name.clone(),
+            detail: item.detail.clone(),
+            tab: match item.status {
+                Status::Failed | Status::Warning => Tab::Failed,
+                Status::Pending | Status::InProgress => Tab::Pending,
+                _ => Tab::Recent,
+            },
+            retryable: item.retryable,
+        });
+        let retries = self.retries.iter().map(|retry| Row {
+            message_id: retry.message_id.clone(),
+            contact_id: retry.contact_id.clone(),
+            contact_name: retry.contact_name.clone(),
+            detail: Some(self.retry_detail(retry)),
+            tab: if retry.max_exceeded {
+                Tab::Failed
+            } else {
+                Tab::Pending
+            },
+            retryable: false,
+        });
+        items.chain(retries).collect()
+    }
+
+    fn retry_detail(&self, retry: &RetryEntry) -> String {
+        let attempt = retry.attempt.to_string();
+        let max = retry.max_attempts.to_string();
+        if retry.max_exceeded {
+            return get_string_with_args(
+                self.locale,
+                "delivery_status.max_attempts_exceeded",
+                &[("max", &max)],
+            );
+        }
+        match retry.next_retry_in_secs {
+            Some(secs) if secs > 0 => get_string_with_args(
+                self.locale,
+                "delivery_status.retry_next_minutes",
+                &[
+                    ("attempt", &attempt),
+                    ("max", &max),
+                    ("minutes", &secs.div_ceil(60).to_string()),
+                ],
+            ),
+            Some(_) => get_string_with_args(
+                self.locale,
+                "delivery_status.retry_now",
+                &[("attempt", &attempt), ("max", &max)],
+            ),
+            None => get_string_with_args(
+                self.locale,
+                "delivery_status.attempt_of",
+                &[("attempt", &attempt), ("max", &max)],
+            ),
+        }
+    }
+
+    /// The chosen list, else the most urgent non-empty one.
+    fn tab(&self, rows: &[Row]) -> Tab {
+        self.chosen.unwrap_or_else(|| {
+            [Tab::Failed, Tab::Pending]
+                .into_iter()
+                .find(|tab| rows.iter().any(|row| row.tab == *tab))
+                .unwrap_or(Tab::Recent)
+        })
+    }
+
     fn build_screen(&self) -> ScreenModel {
-        let recent: Vec<&DeliveryItem> = self
-            .items
-            .iter()
-            .filter(|i| !matches!(i.status, Status::Failed | Status::Warning))
-            .collect();
-        let failed: Vec<&DeliveryItem> = self.items.iter().filter(|i| i.retryable).collect();
-
-        let any_data = !self.items.is_empty() || !self.retries.is_empty();
-
-        let mut components: Vec<Component> = Vec::new();
-
-        if !any_data {
+        let rows = self.rows();
+        let mut components = Vec::new();
+        if rows.is_empty() {
             components.push(Component::InfoPanel {
                 id: "empty".into(),
                 icon: Some("checkmark".into()),
-                title: self.t("delivery_status.all_delivered_title"),
+                title: self.t("delivery_status.all_delivered"),
                 items: vec![],
                 a11y: None,
             });
         } else {
-            // Section: Recent
-            if !recent.is_empty() {
-                components.push(section_header(
-                    "section_recent",
-                    &self.t("delivery_status.recent_section"),
-                ));
-                for item in &recent {
-                    components.push(status_indicator_for(item, self.locale));
-                }
-            }
-            // Section: Failed (with per-row retry actions)
-            if !failed.is_empty() {
-                if !components.is_empty() {
-                    components.push(Component::Divider);
-                }
-                components.push(section_header(
-                    "section_failed",
-                    &get_string_with_args(
-                        self.locale,
-                        "delivery_status.failed_section",
-                        &[("count", &failed.len().to_string())],
-                    ),
-                ));
-                for item in &failed {
-                    components.push(status_indicator_for(item, self.locale));
-                }
-            }
-            // Section: Pending Retries
-            if !self.retries.is_empty() {
-                if !components.is_empty() {
-                    components.push(Component::Divider);
-                }
-                components.push(section_header(
-                    "section_pending",
-                    &self.t("delivery_status.pending_retries_section"),
-                ));
-                for retry in &self.retries {
-                    components.push(retry_indicator(retry, self.locale));
-                }
+            let tab = self.tab(&rows);
+            components.push(self.switch(&rows, tab));
+            components.push(self.list_or_empty(&rows, tab));
+            if tab == Tab::Failed && rows.iter().any(|r| r.tab == Tab::Failed && r.retryable) {
+                components.push(Component::ButtonList {
+                    id: ACTIONS_ID.into(),
+                    items: vec![ActionListItem {
+                        id: RETRY_ALL_ACTION_ID.into(),
+                        label: self.t("delivery_status.retry_failed_button"),
+                        icon: None,
+                        detail: None,
+                        a11y: None,
+                        info_key: None,
+                    }],
+                });
             }
         }
-
-        let actions = if self.items.iter().any(|item| item.retryable) {
-            vec![ScreenAction {
-                id: RETRY_ALL_ACTION_ID.into(),
-                label: self.t("delivery_status.retry_failed_button"),
-                style: ActionStyle::Primary,
-                enabled: true,
+        components.push(Component::SettingsGroup {
+            id: HELP_ID.into(),
+            label: self.t("settings.help"),
+            items: vec![SettingsItem {
+                id: "help".into(),
+                label: self.t("delivery_status.help_label"),
+                kind: SettingsItemKind::Link { detail: None },
+                subtitle: None,
                 a11y: None,
-            }]
-        } else {
-            vec![]
-        };
+                info_key: None,
+            }],
+        });
 
         ScreenModel {
             screen_id: "delivery_status".into(),
             title: self.t("delivery_status.title"),
             subtitle: None,
             components,
-            contextual_actions: actions,
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }
     }
-}
 
-fn section_header(id: &str, label: &str) -> Component {
-    Component::Text {
-        a11y: None,
-        id: id.into(),
-        content: label.into(),
-        style: TextStyle::Subtitle,
-    }
-}
-
-fn status_indicator_for(item: &DeliveryItem, locale: Locale) -> Component {
-    Component::StatusIndicator {
-        id: item.message_id.clone(),
-        icon: None,
-        title: item.contact_name.clone(),
-        detail: item.detail.clone(),
-        status: item.status,
-        status_label: get_string(locale, item.status.label_key()),
-        a11y: None,
-    }
-}
-
-fn retry_indicator(retry: &RetryEntry, locale: Locale) -> Component {
-    let detail = if retry.max_exceeded {
-        Some(get_string_with_args(
-            locale,
-            "delivery_status.max_attempts_exceeded",
-            &[("max", &retry.max_attempts.to_string())],
-        ))
-    } else {
-        Some(get_string_with_args(
-            locale,
-            "delivery_status.attempt_of",
-            &[
-                ("attempt", &retry.attempt.to_string()),
-                ("max", &retry.max_attempts.to_string()),
+    fn switch(&self, rows: &[Row], tab: Tab) -> Component {
+        let option = |t: Tab, key: &str| DropdownOption {
+            id: t.id().into(),
+            label: get_string_with_args(
+                self.locale,
+                key,
+                &[(
+                    "count",
+                    &rows.iter().filter(|r| r.tab == t).count().to_string(),
+                )],
+            ),
+        };
+        Component::Dropdown {
+            id: FILTER_ID.into(),
+            label: self.t("delivery_status.filter_label"),
+            selected: Some(tab.id().into()),
+            options: vec![
+                option(Tab::Recent, "delivery_status.tab_recent"),
+                option(Tab::Pending, "delivery_status.tab_pending"),
+                option(Tab::Failed, "delivery_status.tab_failed"),
             ],
-        ))
-    };
-    let status = if retry.max_exceeded {
-        Status::Failed
-    } else {
-        Status::Pending
-    };
-    Component::StatusIndicator {
-        id: format!("pending:{}", retry.message_id),
-        icon: None,
-        title: retry.contact_name.clone(),
-        detail,
-        status,
-        status_label: get_string(locale, status.label_key()),
-        a11y: None,
+            a11y: None,
+        }
     }
+
+    fn list_or_empty(&self, rows: &[Row], tab: Tab) -> Component {
+        let items: Vec<Item> = rows
+            .iter()
+            .filter(|row| row.tab == tab)
+            .map(|row| Item {
+                id: row.message_id.clone(),
+                name: row.contact_name.clone(),
+                subtitle: row.detail.clone(),
+                initials: initials(&row.contact_name),
+                status: None,
+                actions: vec![],
+                a11y: None,
+            })
+            .collect();
+        if items.is_empty() {
+            let key = match tab {
+                Tab::Recent => "delivery_status.empty_recent",
+                Tab::Pending => "delivery_status.empty_pending",
+                Tab::Failed => "delivery_status.empty_failed",
+            };
+            return Component::Text {
+                id: "empty_list".into(),
+                content: self.t(key),
+                style: TextStyle::Body,
+                a11y: None,
+            };
+        }
+        Component::List {
+            id: ROWS_ID.into(),
+            items,
+            searchable: false,
+            total_count: 0,
+            offset: 0,
+            window: 0,
+        }
+    }
+
+    fn retry_all(&self) -> ActionResult {
+        let message_ids: Vec<String> = self
+            .items
+            .iter()
+            .filter(|i| i.retryable)
+            .map(|i| i.message_id.clone())
+            .collect();
+        if message_ids.is_empty() {
+            ActionResult::UpdateScreen(self.build_screen())
+        } else {
+            ActionResult::RetryFailedDeliveries { message_ids }
+        }
+    }
+}
+
+fn initials(name: &str) -> String {
+    name.split_whitespace()
+        .filter_map(|word| word.chars().next())
+        .take(2)
+        .flat_map(char::to_uppercase)
+        .collect()
 }
 
 impl WorkflowEngine for DeliveryStatusEngine {
@@ -221,228 +339,46 @@ impl WorkflowEngine for DeliveryStatusEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ListItemSelected {
-                component_id: _,
+                component_id,
                 item_id,
-            } => ActionResult::OpenContact {
-                contact_id: item_id,
+            } => match component_id.as_str() {
+                FILTER_ID => {
+                    if let Some(tab) = Tab::from_id(&item_id) {
+                        self.chosen = Some(tab);
+                    }
+                    ActionResult::UpdateScreen(self.build_screen())
+                }
+                ROWS_ID => match self.rows().into_iter().find(|r| r.message_id == item_id) {
+                    Some(row) => ActionResult::OpenContact {
+                        contact_id: row.contact_id,
+                    },
+                    None => ActionResult::UpdateScreen(self.build_screen()),
+                },
+                ACTIONS_ID if item_id == RETRY_ALL_ACTION_ID => self.retry_all(),
+                HELP_ID => ActionResult::ShowInfoOverlay {
+                    title: self.t("delivery_status.help_label"),
+                    body: self.t("delivery_status.help_body"),
+                },
+                _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             UserAction::ActionPressed { action_id } if action_id == RETRY_ALL_ACTION_ID => {
-                let message_ids: Vec<String> = self
-                    .items
-                    .iter()
-                    .filter(|i| i.retryable)
-                    .map(|i| i.message_id.clone())
-                    .collect();
-                if message_ids.is_empty() {
-                    ActionResult::UpdateScreen(self.build_screen())
-                } else {
-                    ActionResult::RetryFailedDeliveries { message_ids }
-                }
+                self.retry_all()
             }
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
     }
 }
 
-// INLINE_TEST_REQUIRED: covers private build_screen helpers (section
-// partitioning) without leaking them to pub API. Cross-crate integration
-// in vauchi-core/tests/it/delivery_engine_tests.rs covers the public surface.
+// INLINE_TEST_REQUIRED: none of the rendering is private any more; the
+// behaviour lives in vauchi-app/tests/it/delivery_screen_tests.rs. This
+// keeps the adversarial input check next to the handler it guards.
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn delivered(name: &str) -> DeliveryItem {
-        DeliveryItem {
-            message_id: format!("msg-{name}"),
-            contact_id: format!("c-{name}"),
-            contact_name: name.into(),
-            status: Status::Success,
-            detail: None,
-            retryable: false,
-        }
-    }
-
-    fn failed(name: &str) -> DeliveryItem {
-        DeliveryItem {
-            message_id: format!("msg-{name}"),
-            contact_id: format!("c-{name}"),
-            contact_name: name.into(),
-            status: Status::Failed,
-            detail: Some("network error".into()),
-            retryable: true,
-        }
-    }
-
-    fn retry(name: &str, attempt: u32, max: u32) -> RetryEntry {
-        RetryEntry {
-            message_id: format!("msg-{name}"),
-            contact_id: format!("c-{name}"),
-            contact_name: name.into(),
-            attempt,
-            max_attempts: max,
-            max_exceeded: attempt >= max,
-        }
-    }
-
     // @internal
     #[test]
-    fn empty_engine_emits_all_delivered_panel() {
-        let engine = DeliveryStatusEngine::new(vec![]);
-        let screen = engine.current_screen();
-        assert_eq!(screen.screen_id, "delivery_status");
-        assert_eq!(screen.title, "Delivery Status");
-        assert_eq!(screen.components.len(), 1);
-        assert!(matches!(
-            &screen.components[0],
-            Component::InfoPanel { title, .. } if title == "All Delivered"
-        ));
-        assert!(screen.contextual_actions.is_empty());
-    }
-
-    // @internal
-    #[test]
-    fn all_delivered_emits_recent_section_only() {
-        let engine = DeliveryStatusEngine::new(vec![delivered("alice"), delivered("bob")]);
-        let screen = engine.current_screen();
-        // 1 header + 2 indicators = 3 components, no retry_all action
-        assert_eq!(screen.components.len(), 3);
-        assert!(matches!(
-            &screen.components[0],
-            Component::Text { content, .. } if content == "Recent"
-        ));
-        assert!(screen.contextual_actions.is_empty());
-    }
-
-    // @internal
-    #[test]
-    fn failed_records_emit_failed_section_and_retry_all_action() {
-        let engine = DeliveryStatusEngine::new(vec![failed("alice"), failed("bob")]);
-        let screen = engine.current_screen();
-        // header + 2 indicators
-        assert_eq!(screen.components.len(), 3);
-        assert!(matches!(
-            &screen.components[0],
-            Component::Text { content, .. } if content == "Failed (2)"
-        ));
-        match &screen.components[1] {
-            Component::StatusIndicator { id, status, .. } => {
-                assert_eq!(id, "msg-alice");
-                assert_eq!(*status, Status::Failed);
-            }
-            other => panic!("expected StatusIndicator, got {other:?}"),
-        }
-        // Footer: "Retry Failed" (single global action)
-        assert_eq!(screen.contextual_actions.len(), 1);
-        assert_eq!(screen.contextual_actions[0].id, RETRY_ALL_ACTION_ID);
-    }
-
-    // @internal
-    #[test]
-    fn pending_retries_emit_pending_section() {
-        let engine = DeliveryStatusEngine::new(vec![]).with_retries(vec![retry("alice", 2, 5)]);
-        let screen = engine.current_screen();
-        assert_eq!(screen.components.len(), 2);
-        assert!(matches!(
-            &screen.components[0],
-            Component::Text { content, .. } if content == "Pending Retries"
-        ));
-        match &screen.components[1] {
-            Component::StatusIndicator { detail, status, .. } => {
-                assert_eq!(detail.as_deref(), Some("Attempt 2 of 5"));
-                assert_eq!(*status, Status::Pending);
-            }
-            other => panic!("expected StatusIndicator, got {other:?}"),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn max_exceeded_retry_marked_failed() {
-        let engine = DeliveryStatusEngine::new(vec![]).with_retries(vec![retry("alice", 5, 5)]);
-        let screen = engine.current_screen();
-        match &screen.components[1] {
-            Component::StatusIndicator { detail, status, .. } => {
-                assert_eq!(detail.as_deref(), Some("Max attempts (5) exceeded"));
-                assert_eq!(*status, Status::Failed);
-            }
-            other => panic!("expected StatusIndicator, got {other:?}"),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn mixed_state_emits_all_three_sections_with_dividers() {
-        let engine = DeliveryStatusEngine::new(vec![delivered("alice"), failed("bob")])
-            .with_retries(vec![retry("carol", 1, 3)]);
-        let screen = engine.current_screen();
-        let ids: Vec<String> = screen
-            .components
-            .iter()
-            .filter_map(|c| match c {
-                Component::Text { content, .. } => Some(content.clone()),
-                Component::Divider => Some("---".into()),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(
-            ids,
-            vec![
-                "Recent".to_string(),
-                "---".into(),
-                "Failed (1)".into(),
-                "---".into(),
-                "Pending Retries".into(),
-            ]
-        );
-        assert_eq!(screen.contextual_actions.len(), 1);
-    }
-
-    // @internal
-    #[test]
-    fn retry_all_action_returns_retry_failed_deliveries() {
-        let mut engine =
-            DeliveryStatusEngine::new(vec![failed("alice"), delivered("bob"), failed("carol")]);
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: RETRY_ALL_ACTION_ID.into(),
-        });
-        match result {
-            ActionResult::RetryFailedDeliveries { message_ids } => {
-                assert_eq!(
-                    message_ids,
-                    vec!["msg-alice".to_string(), "msg-carol".into()]
-                );
-            }
-            other => panic!("expected RetryFailedDeliveries, got {other:?}"),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn retry_all_action_with_no_failed_returns_update_screen() {
-        let mut engine = DeliveryStatusEngine::new(vec![delivered("alice")]);
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: RETRY_ALL_ACTION_ID.into(),
-        });
-        assert!(matches!(result, ActionResult::UpdateScreen(_)));
-    }
-
-    // @internal
-    #[test]
-    fn list_item_selected_routes_to_open_contact() {
-        let mut engine = DeliveryStatusEngine::new(vec![delivered("alice")]);
-        let result = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "section_recent".into(),
-            item_id: "c-alice".into(),
-        });
-        match result {
-            ActionResult::OpenContact { contact_id } => assert_eq!(contact_id, "c-alice"),
-            other => panic!("expected OpenContact, got {other:?}"),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn adversarial_retry_ids_do_not_panic() {
+    fn adversarial_ids_do_not_panic() {
         let mut engine = DeliveryStatusEngine::new(vec![]);
         for case in &[
             "",
@@ -451,10 +387,20 @@ mod tests {
             "retry:🦀",
             "retry:'; DROP TABLE--",
         ] {
-            let result = engine.handle_action(UserAction::ActionPressed {
+            let pressed = engine.handle_action(UserAction::ActionPressed {
                 action_id: (*case).into(),
             });
-            assert!(matches!(result, ActionResult::UpdateScreen(_)));
+            assert!(matches!(pressed, ActionResult::UpdateScreen(_)));
+            for component in [FILTER_ID, ROWS_ID, ACTIONS_ID, "unknown"] {
+                let selected = engine.handle_action(UserAction::ListItemSelected {
+                    component_id: component.into(),
+                    item_id: (*case).into(),
+                });
+                assert!(
+                    matches!(selected, ActionResult::UpdateScreen(_)),
+                    "{component} {case}"
+                );
+            }
         }
     }
 }

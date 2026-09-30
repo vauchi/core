@@ -154,6 +154,6 @@ fn contact_edit_renders_the_active_locale() {
 fn batch2_english_copy_unchanged() {
     assert_eq!(merge_title(Locale::English), "Merge Contacts");
     assert_eq!(limit_title(Locale::English), "Contact Limit");
-    assert_eq!(delivery_title(Locale::English), "Delivery Status");
+    assert_eq!(delivery_title(Locale::English), "Update Delivery");
     assert_eq!(contact_edit_copy(Locale::English).0, "Edit Contact");
 }

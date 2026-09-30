@@ -387,7 +387,8 @@ impl AppEngine {
                 Box::new(EmergencyShredEngine::new(render_context.resolved_locale()))
             }
             AppScreen::DeliveryStatus => {
-                let items = Self::load_delivery_items(vauchi);
+                let locale = render_context.resolved_locale();
+                let items = Self::load_delivery_items(vauchi, locale);
                 let retries = Self::load_retry_entries(vauchi);
                 Box::new(
                     DeliveryStatusEngine::new(items)
@@ -802,20 +803,24 @@ impl AppEngine {
             .collect()
     }
 
-    fn load_delivery_items(vauchi: &Vauchi) -> Vec<DeliveryItem> {
+    /// Delivery rows with localized details: the state, the devices reached
+    /// when the per-device summary knows them, and how long ago (#445).
+    fn load_delivery_items(vauchi: &Vauchi, locale: crate::i18n::Locale) -> Vec<DeliveryItem> {
+        use crate::i18n::get_string_with_args;
+        use vauchi_core::storage::DeliveryStatus;
+
         let records = vauchi
             .storage()
             .deliveries()
             .get_all_delivery_records()
             .unwrap_or_default();
-
-        // Build contact name lookup for recipient IDs.
         let contacts: HashMap<String, String> = vauchi
             .list_contacts()
             .unwrap_or_default()
             .into_iter()
             .map(|c| (c.id().to_string(), c.display_name().to_string()))
             .collect();
+        let now = vauchi.clock().unix_seconds();
 
         records
             .into_iter()
@@ -824,27 +829,62 @@ impl AppEngine {
                     .get(&r.recipient_id)
                     .cloned()
                     .unwrap_or_else(|| r.recipient_id.clone());
-
+                let when = crate::relative_time::format_relative_time(now, r.updated_at, locale);
+                let detail = |key: &str, extra: &[(&str, &str)]| {
+                    let mut args = vec![("when", when.as_str())];
+                    args.extend_from_slice(extra);
+                    Some(get_string_with_args(locale, key, &args))
+                };
                 let (status, detail, retryable) = match &r.status {
-                    vauchi_core::storage::DeliveryStatus::Queued => {
-                        (Status::Pending, Some("Queued".into()), false)
+                    DeliveryStatus::Queued => (
+                        Status::Pending,
+                        detail("delivery_status.detail_queued", &[]),
+                        false,
+                    ),
+                    DeliveryStatus::Sent => (
+                        Status::InProgress,
+                        detail("delivery_status.detail_sent", &[]),
+                        false,
+                    ),
+                    DeliveryStatus::Stored => (
+                        Status::InProgress,
+                        detail("delivery_status.detail_stored", &[]),
+                        false,
+                    ),
+                    DeliveryStatus::Delivered => {
+                        let summary = vauchi
+                            .storage()
+                            .device_deliveries()
+                            .get_delivery_summary(&r.message_id)
+                            .ok()
+                            .filter(|s| s.total_devices > 0);
+                        let detail = match summary {
+                            Some(s) => detail(
+                                "delivery_status.detail_delivered_devices",
+                                &[
+                                    ("delivered", &s.delivered_devices.to_string()),
+                                    ("total", &s.total_devices.to_string()),
+                                ],
+                            ),
+                            None => detail("delivery_status.detail_delivered", &[]),
+                        };
+                        (Status::Success, detail, false)
                     }
-                    vauchi_core::storage::DeliveryStatus::Sent => {
-                        (Status::InProgress, Some("Sent to relay".into()), false)
-                    }
-                    vauchi_core::storage::DeliveryStatus::Stored => {
-                        (Status::InProgress, Some("Stored on relay".into()), false)
-                    }
-                    vauchi_core::storage::DeliveryStatus::Delivered => {
-                        (Status::Success, None, false)
-                    }
-                    vauchi_core::storage::DeliveryStatus::Expired => {
-                        (Status::Warning, Some("Expired".into()), true)
-                    }
-                    vauchi_core::storage::DeliveryStatus::Failed { reason } => {
-                        (Status::Failed, Some(reason.clone()), true)
-                    }
-                    _ => (Status::Pending, None, false),
+                    DeliveryStatus::Expired => (
+                        Status::Warning,
+                        detail("delivery_status.detail_expired", &[]),
+                        true,
+                    ),
+                    DeliveryStatus::Failed { reason } => (
+                        Status::Failed,
+                        detail("delivery_status.detail_failed", &[("reason", reason)]),
+                        true,
+                    ),
+                    _ => (
+                        Status::Pending,
+                        detail("delivery_status.detail_queued", &[]),
+                        false,
+                    ),
                 };
 
                 DeliveryItem {
@@ -860,6 +900,7 @@ impl AppEngine {
     }
 
     fn load_retry_entries(vauchi: &Vauchi) -> Vec<RetryEntry> {
+        let now = vauchi.clock().unix_seconds();
         let entries = vauchi
             .storage()
             .retries()
@@ -882,6 +923,7 @@ impl AppEngine {
                     .unwrap_or_else(|| e.recipient_id.clone());
                 let max_exceeded = e.is_max_attempts_exceeded();
                 RetryEntry {
+                    next_retry_in_secs: Some(e.next_retry.saturating_sub(now)),
                     message_id: e.message_id,
                     contact_id: e.recipient_id,
                     contact_name,

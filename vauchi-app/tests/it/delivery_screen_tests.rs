@@ -269,3 +269,14 @@ fn help_explains_what_a_delivery_is() {
         other => panic!("expected the help overlay, got {other:?}"),
     }
 }
+
+// @internal
+#[test]
+fn the_help_group_is_named_for_screen_readers() {
+    let screen = mixed().current_screen();
+    let label = screen.components.iter().find_map(|c| match c {
+        Component::SettingsGroup { id, label, .. } if id == "delivery_help" => Some(label.clone()),
+        _ => None,
+    });
+    assert_eq!(label.as_deref(), Some("Help"));
+}

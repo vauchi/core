@@ -5,19 +5,76 @@
 //! Tests for AppEngine delivery status screen population.
 //!
 //! Verifies that navigating to `AppScreen::DeliveryStatus` shows actual
-//! delivery records from storage, not an empty placeholder.
+//! delivery records from storage, sorted into the Recent / Pending /
+//! Failed lists with localized details (#445), not an empty placeholder.
 //!
 //! Traces to: features/message_delivery.feature @delivery @status
 
-use vauchi_app::ui::{AppEngine, AppScreen, Component, Status};
+use vauchi_app::ui::{AppEngine, AppScreen, Component, ScreenModel, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 use vauchi_core::storage::{DeliveryRecord, DeliveryStatus};
 
-fn now() -> u64 {
+const TWO_HOURS: u64 = 2 * 60 * 60;
+
+fn two_hours_ago() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs()
+        - TWO_HOURS
+}
+
+fn record(vauchi: &Vauchi, message_id: &str, recipient_id: &str, status: DeliveryStatus) {
+    let at = two_hours_ago();
+    vauchi
+        .storage()
+        .deliveries()
+        .create_delivery_record(&DeliveryRecord {
+            message_id: message_id.to_string(),
+            recipient_id: recipient_id.to_string(),
+            status,
+            created_at: at,
+            updated_at: at,
+            expires_at: None,
+        })
+        .unwrap();
+}
+
+fn switch_labels(screen: &ScreenModel) -> Vec<String> {
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::Dropdown { id, options, .. } if id == "delivery_filter" => {
+                Some(options.iter().map(|o| o.label.clone()).collect())
+            }
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
+fn row_details(screen: &ScreenModel) -> Vec<String> {
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::List { id, items, .. } if id == "deliveries" => Some(
+                items
+                    .iter()
+                    .map(|i| i.subtitle.clone().unwrap_or_default())
+                    .collect(),
+            ),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
+fn show(engine: &mut AppEngine, list: &str) -> ScreenModel {
+    engine.handle_action(UserAction::ListItemSelected {
+        component_id: "delivery_filter".into(),
+        item_id: list.into(),
+    });
+    engine.current_screen()
 }
 
 // @scenario: message_delivery :: Delivery status screen shows pending and failed records
@@ -25,74 +82,30 @@ fn now() -> u64 {
 fn test_delivery_status_screen_shows_records_from_storage() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-
-    let timestamp = now();
-
-    vauchi
-        .storage()
-        .deliveries()
-        .create_delivery_record(&DeliveryRecord {
-            message_id: "msg-pending".to_string(),
-            recipient_id: "contact-bob".to_string(),
-            status: DeliveryStatus::Sent,
-            created_at: timestamp,
-            updated_at: timestamp,
-            expires_at: None,
-        })
-        .unwrap();
-
-    vauchi
-        .storage()
-        .deliveries()
-        .create_delivery_record(&DeliveryRecord {
-            message_id: "msg-failed".to_string(),
-            recipient_id: "contact-carol".to_string(),
-            status: DeliveryStatus::Failed {
-                reason: "timeout".to_string(),
-            },
-            created_at: timestamp,
-            updated_at: timestamp,
-            expires_at: None,
-        })
-        .unwrap();
-
-    vauchi
-        .storage()
-        .deliveries()
-        .create_delivery_record(&DeliveryRecord {
-            message_id: "msg-delivered".to_string(),
-            recipient_id: "contact-dave".to_string(),
-            status: DeliveryStatus::Delivered,
-            created_at: timestamp,
-            updated_at: timestamp,
-            expires_at: None,
-        })
-        .unwrap();
+    record(&vauchi, "msg-pending", "contact-bob", DeliveryStatus::Sent);
+    record(
+        &vauchi,
+        "msg-failed",
+        "contact-carol",
+        DeliveryStatus::Failed {
+            reason: "timeout".to_string(),
+        },
+    );
+    record(
+        &vauchi,
+        "msg-delivered",
+        "contact-dave",
+        DeliveryStatus::Delivered,
+    );
 
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::DeliveryStatus);
 
     assert_eq!(screen.screen_id, "delivery_status");
-
-    // With 3 delivery records in storage, we must see StatusIndicator
-    // components — NOT the "All Delivered" empty InfoPanel.
-    let status_indicators: Vec<_> = screen
-        .components
-        .iter()
-        .filter(|c| matches!(c, Component::StatusIndicator { .. }))
-        .collect();
-
-    assert!(
-        !status_indicators.is_empty(),
-        "Expected StatusIndicator components for delivery records, \
-         but got: {:?}",
-        screen.components
-    );
-
     assert_eq!(
-        status_indicators.len(),
-        3,
-        "Expected 3 StatusIndicator components (one per delivery record)"
+        switch_labels(&screen),
+        ["Recent (1)", "Pending (1)", "Failed (1)"],
+        "each stored record is counted in exactly one list"
     );
 }
 
@@ -107,7 +120,6 @@ fn test_delivery_status_screen_empty_when_no_records() {
 
     assert_eq!(screen.screen_id, "delivery_status");
 
-    // No delivery records → show "All Delivered" InfoPanel
     let info_panels: Vec<_> = screen
         .components
         .iter()
@@ -126,37 +138,30 @@ fn test_delivery_status_screen_empty_when_no_records() {
 fn test_delivery_status_screen_shows_retry_for_failed() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-
-    let timestamp = now();
-
-    vauchi
-        .storage()
-        .deliveries()
-        .create_delivery_record(&DeliveryRecord {
-            message_id: "msg-fail".to_string(),
-            recipient_id: "contact-eve".to_string(),
-            status: DeliveryStatus::Failed {
-                reason: "relay unreachable".to_string(),
-            },
-            created_at: timestamp,
-            updated_at: timestamp,
-            expires_at: None,
-        })
-        .unwrap();
+    record(
+        &vauchi,
+        "msg-fail",
+        "contact-eve",
+        DeliveryStatus::Failed {
+            reason: "relay unreachable".to_string(),
+        },
+    );
 
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::DeliveryStatus);
 
     assert_eq!(screen.screen_id, "delivery_status");
-
-    let retry_action = screen
-        .contextual_actions
-        .iter()
-        .find(|a| a.id == "retry_all");
+    let retry_all = screen.components.iter().any(|c| {
+        matches!(
+            c,
+            Component::ButtonList { id, items } if id == "delivery_actions"
+                && items.iter().any(|i| i.id == "retry_all")
+        )
+    });
     assert!(
-        retry_action.is_some(),
-        "Expected 'retry_all' action for failed deliveries, got actions: {:?}",
-        screen.contextual_actions
+        retry_all,
+        "Expected a 'retry_all' button in the Failed list, got: {:?}",
+        screen.components
     );
 }
 
@@ -165,73 +170,32 @@ fn test_delivery_status_screen_shows_retry_for_failed() {
 fn test_delivery_status_maps_statuses_correctly() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-
-    let timestamp = now();
-
-    // Queued → Pending
-    vauchi
-        .storage()
-        .deliveries()
-        .create_delivery_record(&DeliveryRecord {
-            message_id: "msg-queued".to_string(),
-            recipient_id: "contact-a".to_string(),
-            status: DeliveryStatus::Queued,
-            created_at: timestamp,
-            updated_at: timestamp,
-            expires_at: None,
-        })
-        .unwrap();
-
-    // Delivered → Success
-    vauchi
-        .storage()
-        .deliveries()
-        .create_delivery_record(&DeliveryRecord {
-            message_id: "msg-delivered".to_string(),
-            recipient_id: "contact-b".to_string(),
-            status: DeliveryStatus::Delivered,
-            created_at: timestamp + 1,
-            updated_at: timestamp + 1,
-            expires_at: None,
-        })
-        .unwrap();
-
-    // Failed → Failed
-    vauchi
-        .storage()
-        .deliveries()
-        .create_delivery_record(&DeliveryRecord {
-            message_id: "msg-failed".to_string(),
-            recipient_id: "contact-c".to_string(),
-            status: DeliveryStatus::Failed {
-                reason: "timeout".to_string(),
-            },
-            created_at: timestamp + 2,
-            updated_at: timestamp + 2,
-            expires_at: None,
-        })
-        .unwrap();
+    record(&vauchi, "msg-queued", "contact-a", DeliveryStatus::Queued);
+    record(
+        &vauchi,
+        "msg-delivered",
+        "contact-b",
+        DeliveryStatus::Delivered,
+    );
+    record(
+        &vauchi,
+        "msg-failed",
+        "contact-c",
+        DeliveryStatus::Failed {
+            reason: "timeout".to_string(),
+        },
+    );
 
     let mut engine = AppEngine::new(vauchi);
-    let screen = engine.navigate_to(AppScreen::DeliveryStatus);
+    let failed = engine.navigate_to(AppScreen::DeliveryStatus);
 
-    // The screen now groups records into sections (Recent / Failed /
-    // Pending Retries). Within "Recent" the storage created_at DESC
-    // order is preserved; "Failed" is its own section, so the failed
-    // record appears after the recent ones (not interleaved).
-    let statuses: Vec<&Status> = screen
-        .components
-        .iter()
-        .filter_map(|c| match c {
-            Component::StatusIndicator { status, .. } => Some(status),
-            _ => None,
-        })
-        .collect();
-
-    assert_eq!(statuses.len(), 3, "Expected 3 status indicators");
-    // Recent section: delivered (ts+1), queued (ts) — failed is excluded
-    assert_eq!(statuses[0], &Status::Success, "Delivered → Status::Success");
-    assert_eq!(statuses[1], &Status::Pending, "Queued → Status::Pending");
-    // Failed section: failed
-    assert_eq!(statuses[2], &Status::Failed, "Failed → Status::Failed");
+    assert_eq!(row_details(&failed), ["Failed: timeout · 2 hours ago"]);
+    assert_eq!(
+        row_details(&show(&mut engine, "pending")),
+        ["Queued · 2 hours ago"]
+    );
+    assert_eq!(
+        row_details(&show(&mut engine, "recent")),
+        ["Delivered · 2 hours ago"]
+    );
 }

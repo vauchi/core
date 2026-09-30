@@ -141,7 +141,6 @@ mod deletion_manager_tests;
 mod deletion_sync_tests;
 mod delivery_connectivity_tests;
 mod delivery_diagnostics_tests;
-mod delivery_engine_tests;
 mod delivery_error_messages_tests;
 mod delivery_key_rotation_tests;
 mod delivery_offline_manager_tests;

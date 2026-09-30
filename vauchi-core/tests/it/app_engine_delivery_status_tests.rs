@@ -70,7 +70,7 @@ fn row_details(screen: &ScreenModel) -> Vec<String> {
 }
 
 fn show(engine: &mut AppEngine, list: &str) -> ScreenModel {
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "delivery_filter".into(),
         item_id: list.into(),
     });

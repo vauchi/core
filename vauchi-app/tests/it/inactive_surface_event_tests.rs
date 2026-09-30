@@ -12,13 +12,13 @@
 #![cfg(feature = "testing")]
 
 use vauchi_app::ui::{AppEngine, AppScreen};
-use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::platform::{
     BindingId, Command, InputValue, PresentationNode, PresentationQrPurpose, SurfaceSpec,
 };
+use vauchi_core::{Event, InputMode, MotionPreference};
 
 fn on_glance_with_camera() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
@@ -107,6 +107,30 @@ fn a_late_focus_end_for_a_surface_left_behind_is_ignored() {
 
     assert_eq!(
         out.expect("a late event is ignored, not refused"),
+        Vec::new()
+    );
+    assert_eq!(rendered(&mut engine).surface_id, now.surface_id);
+}
+
+// @internal
+#[test]
+fn a_late_activation_of_a_surface_left_behind_is_ignored() {
+    let (mut engine, before, now) = left_behind();
+    engine
+        .dispatch(Event::PresentationEnvironmentChanged {
+            available_width: 390,
+            available_height: 800,
+            input_modes: vec![InputMode::Touch],
+            motion: MotionPreference::Full,
+        })
+        .expect("phone environment");
+
+    let out = engine.dispatch(Event::SurfaceActivated {
+        surface_id: before.surface_id.clone(),
+    });
+
+    assert_eq!(
+        out.expect("a late activation is ignored, not refused"),
         Vec::new()
     );
     assert_eq!(rendered(&mut engine).surface_id, now.surface_id);

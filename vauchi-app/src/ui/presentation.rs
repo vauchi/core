@@ -16,12 +16,17 @@ pub enum PresentationCoordinatorError {
     UnsupportedEvent,
 }
 
+/// Surfaces recently left behind, remembered so a shell event still in
+/// flight for one of them reads as a race, not a defect (vauchi/private#438).
+const LEFT_BEHIND_MEMORY: usize = 4;
+
 #[derive(Clone, Debug)]
 pub struct PresentationCoordinator {
     primary_surface: SurfaceId,
     detail_surface: Option<SurfaceId>,
     active_surface: SurfaceId,
     window_class: Option<WindowClass>,
+    left_behind: Vec<SurfaceId>,
 }
 
 impl PresentationCoordinator {
@@ -31,14 +36,38 @@ impl PresentationCoordinator {
             primary_surface,
             detail_surface: None,
             window_class: None,
+            left_behind: Vec::new(),
         }
+    }
+
+    fn activate(&mut self, surface: SurfaceId) {
+        if surface == self.active_surface {
+            return;
+        }
+        self.left_behind.retain(|left| left != &surface);
+        let previous = std::mem::replace(&mut self.active_surface, surface);
+        self.left_behind.push(previous);
+        if self.left_behind.len() > LEFT_BEHIND_MEMORY {
+            self.left_behind.remove(0);
+        }
+    }
+
+    /// Whether `surface` was shown a moment ago and no longer is: an event
+    /// for it is a shell still catching up, not a malformed one. A pane
+    /// still on screen but inactive is not left behind; it must be
+    /// activated before it takes input.
+    pub(crate) fn was_left_behind(&self, surface: &SurfaceId) -> bool {
+        surface != &self.active_surface
+            && surface != &self.primary_surface
+            && self.detail_surface.as_ref() != Some(surface)
+            && self.left_behind.contains(surface)
     }
 
     pub fn set_detail_surface(&mut self, detail_surface: Option<SurfaceId>) {
         if self.active_surface != self.primary_surface
             && detail_surface.as_ref() != Some(&self.active_surface)
         {
-            self.active_surface = self.primary_surface.clone();
+            self.activate(self.primary_surface.clone());
         }
         self.detail_surface = detail_surface;
     }
@@ -47,7 +76,7 @@ impl PresentationCoordinator {
         if self.primary_surface != primary_surface {
             self.primary_surface = primary_surface.clone();
             self.detail_surface = None;
-            self.active_surface = primary_surface;
+            self.activate(primary_surface);
         }
     }
 
@@ -62,11 +91,11 @@ impl PresentationCoordinator {
             active_surface == primary_surface || detail_surface.as_ref() == Some(&active_surface);
         self.primary_surface = primary_surface.clone();
         self.detail_surface = detail_surface;
-        self.active_surface = if active_is_visible {
+        self.activate(if active_is_visible {
             active_surface
         } else {
             primary_surface
-        };
+        });
     }
 
     #[cfg(feature = "network-rustls")]
@@ -101,7 +130,7 @@ impl PresentationCoordinator {
                 if !self.surface_is_visible(&surface_id)? {
                     return Err(PresentationCoordinatorError::SurfaceNotVisible);
                 }
-                self.active_surface = surface_id;
+                self.activate(surface_id);
             }
             _ => return Err(PresentationCoordinatorError::UnsupportedEvent),
         }

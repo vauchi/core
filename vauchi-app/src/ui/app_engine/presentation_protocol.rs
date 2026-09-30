@@ -193,6 +193,12 @@ impl AppEngine {
             return Ok(commands);
         }
 
+        if let Event::SurfaceActivated { surface_id } = &event
+            && self.presentation_coordinator.was_left_behind(surface_id)
+        {
+            tracing::info!("[Presentation] ignored an activation of a surface Core has left");
+            return Ok(Vec::new());
+        }
         if matches!(
             event,
             Event::PresentationEnvironmentChanged { .. } | Event::SurfaceActivated { .. }
@@ -214,6 +220,13 @@ impl AppEngine {
 
         let event_surface_id = presentation_event_surface_id(&event)
             .expect("interactive presentation events always carry a surface");
+        if self
+            .presentation_coordinator
+            .was_left_behind(event_surface_id)
+        {
+            tracing::info!("[Presentation] ignored an event for a surface Core has left");
+            return Ok(Vec::new());
+        }
         self.presentation_coordinator
             .ensure_active_surface(event_surface_id)?;
         let (event_screen, screen, prepared) = self.prepared_visible_surface(event_surface_id)?;

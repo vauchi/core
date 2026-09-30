@@ -42,6 +42,7 @@ fn factory() -> GroupDetailEngine {
         value: "alice@example.com".into(),
         is_visible: true,
         shown_to_everyone: false,
+        stop_seeing_if_granted: 0,
     }])
 }
 

@@ -25,7 +25,15 @@ pub struct GroupFieldVisibility {
     /// Seen by this group's members whatever the toggle says, because the
     /// entry is set to Visible and no group governs it.
     pub shown_to_everyone: bool,
+    /// Contacts outside this group who see the entry now and would lose it
+    /// if this group took it over: a grant makes it group-governed, closed
+    /// to everyone without one (field-centric partition, 2026-07-10).
+    pub stop_seeing_if_granted: usize,
 }
+
+const GRANT_CONFIRM_ID: &str = "grant_entry";
+const CONFIRM_GRANT_ACTION: &str = "confirm_grant_entry";
+const CANCEL_GRANT_ACTION: &str = "cancel_grant_entry";
 
 /// Action id prefix for the per-field visibility toggle component.
 pub const FIELD_VISIBILITY_COMPONENT_ID: &str = "field_visibility";
@@ -38,6 +46,7 @@ pub struct GroupDetailEngine {
     members: Vec<Item>,
     fields: Vec<GroupFieldVisibility>,
     pending_delete: bool,
+    pending_grant: Option<String>,
     locale: Locale,
 }
 
@@ -49,6 +58,7 @@ impl GroupDetailEngine {
             members,
             fields: Vec::new(),
             pending_delete: false,
+            pending_grant: None,
             locale: Locale::English,
         }
     }
@@ -131,6 +141,10 @@ impl GroupDetailEngine {
             });
         }
 
+        if let Some(confirm) = self.grant_confirmation() {
+            components.push(confirm);
+        }
+
         components.push(Component::List {
             id: "members".into(),
             items: self.members.clone(),
@@ -201,6 +215,55 @@ impl GroupDetailEngine {
         actions
     }
 
+    fn grant_confirmation(&self) -> Option<Component> {
+        let field_id = self.pending_grant.as_ref()?;
+        let field = self.fields.iter().find(|f| &f.field_id == field_id)?;
+        let others = field.stop_seeing_if_granted;
+        let warning = if others == 1 {
+            get_string_with_args(
+                self.locale,
+                "group_detail.grant_scope_warning_singular",
+                &[("group", &self.group_name)],
+            )
+        } else {
+            get_string_with_args(
+                self.locale,
+                "group_detail.grant_scope_warning_plural",
+                &[("group", &self.group_name), ("count", &others.to_string())],
+            )
+        };
+        Some(Component::InlineConfirm {
+            id: GRANT_CONFIRM_ID.into(),
+            warning,
+            confirm_text: get_string_with_args(
+                self.locale,
+                "group_detail.grant_scope_confirm",
+                &[("group", &self.group_name)],
+            ),
+            cancel_text: self.t("action.cancel"),
+            confirm_action_id: CONFIRM_GRANT_ACTION.into(),
+            cancel_action_id: CANCEL_GRANT_ACTION.into(),
+            destructive: false,
+            a11y: None,
+        })
+    }
+
+    /// Flips the toggle optimistically; AppEngine routing persists the
+    /// change via `set_group_field_visibility_and_repropagate` and
+    /// re-fetches the engine afterwards.
+    fn set_visible(&mut self, field_id: String) -> ActionResult {
+        let mut new_visible = false;
+        if let Some(field) = self.fields.iter_mut().find(|f| f.field_id == field_id) {
+            field.is_visible = !field.is_visible;
+            new_visible = field.is_visible;
+        }
+        ActionResult::SetGroupFieldVisibility {
+            group_id: self.group_id.clone(),
+            field_id,
+            visible: new_visible,
+        }
+    }
+
     fn entries_seen(&self) -> String {
         let n = self
             .fields
@@ -252,22 +315,17 @@ impl WorkflowEngine for GroupDetailEngine {
                 component_id,
                 item_id,
             } if component_id == FIELD_VISIBILITY_COMPONENT_ID => {
-                // Find the toggle and flip its in-memory state so the next
-                // build_screen reflects the optimistic value. AppEngine
-                // routing persists the change via
-                // `vauchi.set_group_field_visibility_and_repropagate` and
-                // re-fetches the engine afterwards, so the optimistic
-                // update is merely a UI smoothness aid.
-                let mut new_visible = false;
-                if let Some(field) = self.fields.iter_mut().find(|f| f.field_id == item_id) {
-                    field.is_visible = !field.is_visible;
-                    new_visible = field.is_visible;
+                let takes_from_others = self.fields.iter().any(|f| {
+                    f.field_id == item_id
+                        && !f.is_visible
+                        && f.shown_to_everyone
+                        && f.stop_seeing_if_granted > 0
+                });
+                if takes_from_others {
+                    self.pending_grant = Some(item_id);
+                    return ActionResult::UpdateScreen(self.build_screen());
                 }
-                ActionResult::SetGroupFieldVisibility {
-                    group_id: self.group_id.clone(),
-                    field_id: item_id,
-                    visible: new_visible,
-                }
+                self.set_visible(item_id)
             }
             UserAction::ActionPressed { action_id } => {
                 if let Some(contact_id) = action_id.strip_prefix("preview-as-member:") {
@@ -290,6 +348,14 @@ impl WorkflowEngine for GroupDetailEngine {
                     }
                     "cancel_delete_group" => {
                         self.pending_delete = false;
+                        ActionResult::UpdateScreen(self.build_screen())
+                    }
+                    CONFIRM_GRANT_ACTION => match self.pending_grant.take() {
+                        Some(field_id) => self.set_visible(field_id),
+                        None => ActionResult::UpdateScreen(self.build_screen()),
+                    },
+                    CANCEL_GRANT_ACTION => {
+                        self.pending_grant = None;
                         ActionResult::UpdateScreen(self.build_screen())
                     }
                     _ => ActionResult::UpdateScreen(self.build_screen()),
@@ -327,6 +393,7 @@ mod tests {
             value: value.into(),
             is_visible: visible,
             shown_to_everyone: false,
+            stop_seeing_if_granted: 0,
         }
     }
 

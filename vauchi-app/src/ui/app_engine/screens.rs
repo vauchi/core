@@ -536,18 +536,37 @@ impl AppEngine {
                     match (vauchi.own_card().ok().flatten(), group.as_ref()) {
                         (Some(card), Some(g)) => {
                             let all_groups = vauchi.list_groups().unwrap_or_default();
+                            let outsiders: Vec<String> = vauchi
+                                .list_contacts()
+                                .unwrap_or_default()
+                                .into_iter()
+                                .map(|c| c.id().to_string())
+                                .filter(|id| !g.contains_contact(id))
+                                .collect();
                             card.fields()
                                 .iter()
-                                .map(|f| crate::ui::group_detail::GroupFieldVisibility {
-                                    field_id: f.id().to_string(),
-                                    label: f.label().to_string(),
-                                    value: f.value().to_string(),
-                                    is_visible: g.is_field_visible(f.id()),
-                                    shown_to_everyone: crate::ui::groups_list::shown_to_everyone(
-                                        &card,
-                                        &all_groups,
-                                        f.id(),
-                                    ),
+                                .map(|f| {
+                                    let is_visible = g.is_field_visible(f.id());
+                                    let shown_to_everyone =
+                                        crate::ui::groups_list::shown_to_everyone(
+                                            &card,
+                                            &all_groups,
+                                            f.id(),
+                                        );
+                                    let stop_seeing_if_granted = if shown_to_everyone && !is_visible
+                                    {
+                                        Self::outsiders_losing_entry(vauchi, &outsiders, f.id())
+                                    } else {
+                                        0
+                                    };
+                                    crate::ui::group_detail::GroupFieldVisibility {
+                                        field_id: f.id().to_string(),
+                                        label: f.label().to_string(),
+                                        value: f.value().to_string(),
+                                        is_visible,
+                                        shown_to_everyone,
+                                        stop_seeing_if_granted,
+                                    }
                                 })
                                 .collect()
                         }
@@ -811,6 +830,23 @@ impl AppEngine {
                 a11y: None,
             })
             .collect()
+    }
+
+    /// Contacts outside a group who see `field_id` now and hold no override
+    /// of their own for it: a grant to the group closes the entry to them.
+    fn outsiders_losing_entry(vauchi: &Vauchi, outsiders: &[String], field_id: &str) -> usize {
+        outsiders
+            .iter()
+            .filter(|id| {
+                let overridden = vauchi
+                    .get_contact_visibility_overrides(id)
+                    .is_ok_and(|o| o.contains_key(field_id));
+                !overridden
+                    && vauchi
+                        .get_effective_field_visibility(id, field_id)
+                        .unwrap_or(false)
+            })
+            .count()
     }
 
     /// Delivery rows with localized details: the state, the devices reached

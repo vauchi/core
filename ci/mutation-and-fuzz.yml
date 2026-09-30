@@ -51,20 +51,27 @@ mutation:baseline-check:
 
 mutation:nightly:
   extends: [.mutation-nightly, .linux-runner]
-  timeout: 12h
+  timeout: 4h
   # `.linux-runner` (via rust-base.yml) defaults to interruptible: true, so a
   # push to main auto-cancels this still-running scheduled job under GitLab's
   # auto-cancel-redundant-pipelines. core's 11k-mutant run takes hours, so an
   # ordinary push would kill it mid-flight (~800/11297 resolved before cancel
   # in pipeline 2549972279). The nightly must run to completion or hit its own
-  # 12h timeout — never be cancelled by an unrelated push.
+  # timeout — never be cancelled by an unrelated push.
   interruptible: false
-  # Gate the 12h run on the baseline-health guard: a red baseline aborts
+  # Gate the nightly run on the baseline-health guard: a red baseline aborts
   # cargo-mutants anyway, so skip the wasted run and let the guard alarm.
   needs:
     - job: mutation:baseline-check
   variables:
     MUTATION_PACKAGE: "vauchi-core"
+    # ~14.6k mutants at the ~61/h measured on allyson under `--jobs 8`
+    # (2026-09-29: 711 of a 2080-mutant 1/7 shard in 11.6 h) is ~240 h of
+    # runner time. 80 shards is ~180 mutants, ~3 h a night, inside the 4h
+    # timeout and before the working day: the 12 h run shared allyson with
+    # MR pipelines and tripled how long core's serialized cargo jobs held
+    # their lock (vauchi/private#435). A full pass takes 80 nights.
+    MUTATION_SHARDS: "80"
     # With `--features testing` (.cargo/mutants.toml) each mutant runs the full
     # integration suite: baseline ~115s single-threaded, and 2-4x that under
     # `--jobs 8` CPU contention. 240s caused spurious timeouts on survivors,
@@ -114,14 +121,12 @@ mutation:nightly:
     - export VAUCHI_LOCALES_DIR="$(cd ../locales && pwd)"
     - 'MUTATION_JOBS=$(nproc); [ "$MUTATION_JOBS" -gt 8 ] && MUTATION_JOBS=8'
     - export MUTATION_EXTRA_FLAGS="${MUTATION_EXTRA_FLAGS} --jobs ${MUTATION_JOBS}"
-    # Run one balanced 1/7 shard per weekday: each mutant now runs the full
-    # integration suite (~115s), so the whole 11k-mutant crate cannot finish in
-    # one 12h night. round-robin spreads every module evenly across shards, so
-    # each day tests ~1615 mutants (uniform runtime regardless of module size)
-    # and the full crate is covered over a week. `date -u +%u` is 1=Mon..7=Sun;
-    # cargo-mutants shards are 0-indexed, hence the -1.
-    - export MUTATION_SHARD="$(( $(date -u +%u) - 1 ))"
-    - export MUTATION_EXTRA_FLAGS="${MUTATION_EXTRA_FLAGS} --shard ${MUTATION_SHARD}/7 --sharding round-robin"
+    # One balanced shard per night: round-robin spreads every module evenly,
+    # so each shard's runtime is uniform regardless of module size. Days since
+    # the epoch, not the weekday, pick it, so consecutive nights walk all
+    # MUTATION_SHARDS shards in turn.
+    - export MUTATION_SHARD="$(( $(date -u +%s) / 86400 % MUTATION_SHARDS ))"
+    - export MUTATION_EXTRA_FLAGS="${MUTATION_EXTRA_FLAGS} --shard ${MUTATION_SHARD}/${MUTATION_SHARDS} --sharding round-robin"
 
 # ============================================================
 # Fuzz Testing (Nightly scheduled, T2-10)

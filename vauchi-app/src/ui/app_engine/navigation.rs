@@ -353,11 +353,15 @@ impl AppEngine {
     /// so a cached engine revives as an un-repaintable zombie frozen on
     /// its mid-transfer chrome
     /// (2026-07-02-multistage-zombie-engine-across-mode-reentry).
+    /// `ContactEdit` is a form like `FormDialog`: a cached engine would
+    /// reopen on the last visit's draft and its Save/Discard exit instead
+    /// of what is stored (#451).
     fn is_cacheable(screen: &AppScreen) -> bool {
         !matches!(
             screen,
             AppScreen::Lock
                 | AppScreen::FormDialog { .. }
+                | AppScreen::ContactEdit { .. }
                 | AppScreen::DeepLinkConsent { .. }
                 | AppScreen::DeepLinkResponder { .. }
                 | AppScreen::DeviceLinkJoin { .. }

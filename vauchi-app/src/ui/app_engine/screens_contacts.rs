@@ -14,7 +14,7 @@ use crate::ui::component::{
 };
 use crate::ui::contact_detail::{ContactDetailEngine, ContactNotFoundEngine, DeliverySummary};
 use crate::ui::contact_detail_rules::{ContactPlace, ContactTag};
-use crate::ui::contact_edit::{ContactEditEngine, EditableContact, EditableField};
+use crate::ui::contact_edit::{ContactEditEngine, EditableContact};
 use crate::ui::contact_limit::ContactLimitEngine;
 use crate::ui::contact_list::{ContactListEngine, IndexedItem};
 use crate::ui::contact_merge::{ContactMergeEngine, MergePreview};
@@ -274,32 +274,19 @@ impl AppEngine {
             }
             AppScreen::ContactEdit { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
-                    let fields = contact
-                        .card()
-                        .fields()
-                        .iter()
-                        .map(|f| EditableField {
-                            id: f.id().to_string(),
-                            field_type: format!("{:?}", f.field_type()),
-                            label: f.label().to_string(),
-                            value: f.value().to_string(),
-                            visible_to_groups: vec![],
-                            shown: true,
-                        })
-                        .collect();
-                    let editable = EditableContact {
-                        display_name: contact.display_name().to_string(),
-                        fields,
-                    };
-                    let avatar_data = vauchi
-                        .own_card()
+                    let personal_note = vauchi
+                        .load_personal_notes(contact_id)
                         .ok()
                         .flatten()
-                        .and_then(|c| c.avatar().map(|a| a.to_vec()));
+                        .and_then(|bytes| String::from_utf8(bytes).ok())
+                        .unwrap_or_default();
                     Box::new(
-                        ContactEditEngine::new(editable, vec![])
-                            .with_avatar_data(avatar_data)
-                            .with_locale(render_context.resolved_locale()),
+                        ContactEditEngine::new(EditableContact {
+                            card_name: contact.card().display_name().to_string(),
+                            display_name: contact.display_name().to_string(),
+                            personal_note,
+                        })
+                        .with_locale(render_context.resolved_locale()),
                     )
                 }
                 _ => Box::new(

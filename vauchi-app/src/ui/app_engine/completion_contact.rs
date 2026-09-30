@@ -30,23 +30,34 @@ impl AppEngine {
         ActionResult::NavigateTo(screen)
     }
 
-    /// Contact-edit complete: persist the edited display name as a local
-    /// nickname override (`Vauchi::set_contact_display_name`), then return to
-    /// the contact detail. The edited name is read off the engine BEFORE
-    /// `navigate_back` replaces it (same ordering constraint as
-    /// `complete_exchange`).
+    /// Contact-edit complete: persist what changed — the name as a local
+    /// nickname (`set_contact_display_name`, which clears the nickname when
+    /// the name matches their card) and the personal note, stored like the
+    /// contact screen's note editor — then return to the contact detail.
+    /// The values are read off the engine BEFORE `navigate_back` replaces it
+    /// (same ordering constraint as `complete_exchange`).
     pub(super) fn complete_contact_edit(&mut self, contact_id: &str) -> ActionResult {
-        let edited_name = match self.engine.engine_output() {
-            Some(crate::ui::EngineOutput::ContactEdit { display_name }) => Some(display_name),
+        let (edited_name, edited_note) = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::ContactEdit {
+                display_name,
+                personal_note,
+            }) => (display_name, personal_note),
             other => {
                 tracing::warn!(?other, "contact-edit completion without ContactEdit output");
-                None
+                (None, None)
             }
         };
 
-        if let Some(name) = edited_name
-            && let Err(e) = self.vauchi.set_contact_display_name(contact_id, &name)
-        {
+        let saved = edited_name
+            .map_or(Ok(()), |name| {
+                self.vauchi.set_contact_display_name(contact_id, &name)
+            })
+            .and_then(|()| {
+                edited_note.map_or(Ok(()), |note| {
+                    self.vauchi.save_personal_notes(contact_id, note.as_bytes())
+                })
+            });
+        if let Err(e) = saved {
             return ActionResult::ShowAlert {
                 title: self.t("contact_edit.error_title"),
                 message: format!("{e}"),

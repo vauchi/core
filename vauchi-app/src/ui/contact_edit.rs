@@ -2,74 +2,71 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Contact-edit workflow engine — a pure state machine for the 3-step
-//! contact editing flow (EditFields → EditVisibility → Preview).
-//! No Storage or Vauchi dependency; the caller persists results when
-//! [`ActionResult::Complete`] is returned.
+//! Edit Contact — one form for what is yours about a contact: the name you
+//! see them by (a private nickname) and your personal note (#451). Their
+//! entries are theirs and arrive with their card updates, so the retired
+//! visibility and preview steps edited nothing that was ever saved.
+//! No Storage or Vauchi dependency; the caller persists the changed values
+//! from [`EngineOutput::ContactEdit`] when [`ActionResult::Complete`] is
+//! returned.
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
-// ── Public data types ───────────────────────────────────────────────
+const NAME_ID: &str = "display_name";
+const NOTE_ID: &str = "personal_note";
+const NAME_ACTIONS_ID: &str = "name_actions";
+const USE_CARD_NAME_ID: &str = "use_card_name";
+const FORM_ACTIONS_ID: &str = "contact_edit_actions";
+const SAVE_ID: &str = "save";
+const DISCARD_CONFIRM_ID: &str = "discard_changes";
+const KEEP_EDITING_ID: &str = "keep_editing";
+/// `Vauchi::set_contact_nickname` rejects longer names.
+const NAME_MAX_LENGTH: usize = 100;
 
-/// Data to edit — mirrors the contact card structure but in UI-friendly form.
+/// What the form starts from.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct EditableContact {
+    /// The name on the contact's own card.
+    pub card_name: String,
+    /// The name you see them by: your nickname, or their card name.
     pub display_name: String,
-    pub fields: Vec<EditableField>,
+    pub personal_note: String,
 }
 
-/// A single editable field on a contact card.
-#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct EditableField {
-    pub id: String,
-    pub field_type: String,
-    pub label: String,
-    pub value: String,
-    pub visible_to_groups: Vec<String>,
-    pub shown: bool,
-}
-
-// ── ContactEditEngine ───────────────────────────────────────────────
-
-/// Pure state-machine driving the 3-step contact edit flow.
+/// Engine for the single Edit Contact form.
 #[derive(Clone, Debug)]
 pub struct ContactEditEngine {
-    step: ContactEditStep,
-    contact: EditableContact,
-    available_groups: Vec<String>,
-    selected_preview_group: Option<String>,
-    /// Avatar image bytes (WebP) for the Preview component.
-    avatar_data: Option<Vec<u8>>,
+    original: EditableContact,
+    name: String,
+    note: String,
+    name_error: Option<String>,
+    confirming_discard: bool,
+    leaving: Option<Leave>,
     locale: Locale,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-enum ContactEditStep {
-    EditFields,
-    EditVisibility,
-    Preview,
+/// How the form was left. Completion leaves through `navigate_back`, which
+/// asks [`WorkflowEngine::navigate_back_within`] first, so the engine must
+/// not ask about unsaved changes once the owner has chosen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Leave {
+    Save,
+    Discard,
 }
 
 impl ContactEditEngine {
-    /// Creates a new engine pre-populated with the given contact data.
-    pub fn new(contact: EditableContact, available_groups: Vec<String>) -> Self {
+    pub fn new(contact: EditableContact) -> Self {
         Self {
-            step: ContactEditStep::EditFields,
-            contact,
-            available_groups,
-            selected_preview_group: None,
-            avatar_data: None,
+            name: contact.display_name.clone(),
+            note: contact.personal_note.clone(),
+            original: contact,
+            name_error: None,
+            confirming_discard: false,
+            leaving: None,
             locale: Locale::English,
         }
-    }
-
-    /// Set the avatar image data for the Preview component.
-    pub fn with_avatar_data(mut self, data: Option<Vec<u8>>) -> Self {
-        self.avatar_data = data;
-        self
     }
 
     /// Set the render locale (defaults to English) — threaded from the
@@ -83,284 +80,164 @@ impl ContactEditEngine {
         get_string(self.locale, key)
     }
 
-    /// Returns a reference to the edited contact data.
-    pub fn edited_contact(&self) -> &EditableContact {
-        &self.contact
+    fn name_changed(&self) -> bool {
+        self.name.trim() != self.original.display_name
     }
 
-    // ── Private helpers ─────────────────────────────────────────────
-
-    fn field_to_display(&self, field: &EditableField) -> Field {
-        let visibility = if !field.visible_to_groups.is_empty() {
-            UiFieldVisibility::Scopes(field.visible_to_groups.clone())
-        } else if field.shown {
-            UiFieldVisibility::Shown
-        } else {
-            UiFieldVisibility::Hidden
-        };
-
-        Field {
-            id: field.id.clone(),
-            field_type: field.field_type.clone(),
-            label: field.label.clone(),
-            value: field.value.clone(),
-            icon: crate::ui::component::icon_for_field_type(&field.field_type).into(),
-            a11y: Some(A11y {
-                label: Some(format!("{}: {}", field.label, field.value)),
-                hint: match visibility {
-                    UiFieldVisibility::Shown => None,
-                    UiFieldVisibility::Hidden => Some(self.t("contact_edit.field_hidden_hint")),
-                    UiFieldVisibility::Scopes(_) => Some(self.t("contact_edit.field_groups_hint")),
-                },
-                role: None,
-            }),
-            visibility_label: crate::ui::component::visibility_label(&visibility, self.locale),
-            visibility,
-        }
+    fn note_changed(&self) -> bool {
+        self.note != self.original.personal_note
     }
 
-    fn build_variants(&self) -> Vec<PreviewVariant> {
-        self.available_groups
-            .iter()
-            .map(|group| {
-                let visible_fields: Vec<Field> = self
-                    .contact
-                    .fields
-                    .iter()
-                    .filter(|f| f.visible_to_groups.contains(group))
-                    .map(|f| self.field_to_display(f))
-                    .collect();
-
-                PreviewVariant {
-                    variant_id: group.clone(),
-                    display_name: self.contact.display_name.clone(),
-                    visible_fields,
-                }
-            })
-            .collect()
+    fn has_changes(&self) -> bool {
+        self.name_changed() || self.note_changed()
     }
 
-    fn build_edit_fields_screen(&self) -> ScreenModel {
-        let fields: Vec<Field> = self
-            .contact
-            .fields
-            .iter()
-            .map(|f| self.field_to_display(f))
-            .collect();
-
-        let name_not_empty = !self.contact.display_name.trim().is_empty();
-
-        ScreenModel {
-            screen_id: "edit_fields".into(),
-            title: self.t("contact_edit.edit_contact_title"),
-            subtitle: None,
-            components: vec![
-                Component::TextInput {
-                    id: "display_name".into(),
-                    label: self.t("settings.display_name"),
-                    value: self.contact.display_name.clone(),
-                    placeholder: Some(self.t("contact_edit.enter_name_placeholder")),
-                    max_length: None,
-                    validation_error: None,
-                    input_type: InputType::Text,
-                    a11y: None,
-                    info_key: None,
-                },
-                Component::Divider,
-                Component::FieldList {
-                    id: "fields".into(),
-                    title: self.t("fields.a11y_contact_fields"),
-                    fields,
-                    visibility_mode: VisibilityMode::ShowHide,
-                    available_scopes: self.available_groups.clone(),
-                    a11y: Some(A11y {
-                        label: Some(self.t("fields.a11y_contact_fields")),
-                        hint: Some(self.t("fields.a11y_toggle_hint")),
-                        role: None,
-                    }),
-                },
-            ],
-            contextual_actions: vec![ScreenAction {
-                id: "continue".into(),
-                label: self.t("action.continue"),
-                style: ActionStyle::Primary,
-                enabled: name_not_empty,
-                a11y: None,
-            }],
-            progress: Some(Progress {
-                current_step: 1,
-                total_steps: 3,
-                label: None,
-            }),
-            ..Default::default()
-        }
-    }
-
-    fn build_edit_visibility_screen(&self) -> ScreenModel {
-        let toggle_hint = self.t("onboarding.a11y_toggle_hint");
-        let toggle_lists: Vec<Component> = self
-            .contact
-            .fields
-            .iter()
-            .map(|field| {
-                let items: Vec<ToggleItem> = self
-                    .available_groups
-                    .iter()
-                    .map(|group| {
-                        let selected = field.visible_to_groups.contains(group);
-                        ToggleItem {
-                            id: group.clone(),
-                            label: group.clone(),
-                            selected,
-                            subtitle: None,
-                            a11y: Some(A11y {
-                                label: Some(format!(
-                                    "{}, {}",
-                                    group,
-                                    if selected {
-                                        self.t("onboarding.a11y_selected")
-                                    } else {
-                                        self.t("onboarding.a11y_not_selected")
-                                    }
-                                )),
-                                hint: Some(toggle_hint.clone()),
-                                role: Some(AccessibilityRole::Toggle),
-                            }),
-                            info_key: None,
-                        }
-                    })
-                    .collect();
-
-                Component::ToggleList {
-                    id: format!("vis_{}", field.id),
-                    label: field.label.clone(),
-                    items,
-                    a11y: Some(A11y {
-                        label: Some(get_string_with_args(
-                            self.locale,
-                            "contact_edit.field_options_a11y",
-                            &[("label", &field.label)],
-                        )),
-                        hint: Some(self.t("contact_detail.select_items_hint")),
-                        role: None,
-                    }),
-                }
-            })
-            .collect();
-
-        ScreenModel {
-            screen_id: "edit_visibility".into(),
-            title: self.t("group_detail.field_visibility_label"),
-            subtitle: None,
-            components: toggle_lists,
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "back".into(),
-                    label: self.t("action.back"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                },
-                ScreenAction {
-                    id: "continue".into(),
-                    label: self.t("contact_edit.preview_button"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: None,
-                },
-            ],
-            progress: Some(Progress {
-                current_step: 2,
-                total_steps: 3,
-                label: None,
-            }),
-            ..Default::default()
-        }
-    }
-
-    fn build_preview_screen(&self) -> ScreenModel {
-        let fields: Vec<Field> = self
-            .contact
-            .fields
-            .iter()
-            .map(|f| self.field_to_display(f))
-            .collect();
-        let variants = self.build_variants();
-        let selected_variant = self.selected_preview_group.clone();
-        let visible_fields =
-            crate::ui::component::build_visible_fields(&fields, &variants, &selected_variant);
-
-        ScreenModel {
-            screen_id: "edit_preview".into(),
-            title: self.t("contact_edit.preview_card_title"),
-            subtitle: None,
-            components: vec![Component::Preview {
-                name: self.contact.display_name.clone(),
-                initials: crate::ui::component::initials(&self.contact.display_name),
-                image_data: self.avatar_data.clone(),
-                fields,
-                variants,
-                selected_variant,
-                visible_fields,
+    fn build_screen(&self) -> ScreenModel {
+        let mut components = vec![
+            Component::TextInput {
+                id: NAME_ID.into(),
+                label: self.t("contact_edit.name_label"),
+                value: self.name.clone(),
+                placeholder: Some(self.t("contact_edit.enter_name_placeholder")),
+                max_length: Some(NAME_MAX_LENGTH),
+                validation_error: self.name_error.clone(),
+                input_type: InputType::Text,
                 a11y: Some(A11y {
-                    label: Some(get_string_with_args(
-                        self.locale,
-                        "contact_edit.card_preview_a11y",
-                        &[("name", &self.contact.display_name)],
-                    )),
-                    hint: Some(self.t("contact_edit.card_preview_hint")),
+                    label: Some(self.t("contact_edit.name_label")),
+                    hint: Some(self.t("contact_edit.name_hint")),
                     role: None,
                 }),
-            }],
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "back".into(),
-                    label: self.t("action.back"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
+                info_key: None,
+            },
+            Component::Text {
+                id: "name_hint".into(),
+                content: self.t("contact_edit.name_hint"),
+                style: TextStyle::Caption,
+                a11y: None,
+            },
+        ];
+
+        if self.name.trim() != self.original.card_name {
+            components.push(Component::ButtonList {
+                id: NAME_ACTIONS_ID.into(),
+                items: vec![ActionListItem {
+                    id: USE_CARD_NAME_ID.into(),
+                    label: get_string_with_args(
+                        self.locale,
+                        "contact_edit.use_card_name_button",
+                        &[("name", &self.original.card_name)],
+                    ),
+                    icon: None,
+                    detail: None,
                     a11y: None,
-                },
-                ScreenAction {
-                    id: "save".into(),
-                    label: self.t("contact_edit.save_changes_button"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: None,
-                },
-            ],
-            progress: Some(Progress {
-                current_step: 3,
-                total_steps: 3,
-                label: None,
+                    info_key: None,
+                }],
+            });
+        }
+
+        components.push(Component::TextInput {
+            id: NOTE_ID.into(),
+            label: self.t("contact_edit.note_label"),
+            value: self.note.clone(),
+            placeholder: Some(self.t("contact_edit.note_placeholder")),
+            max_length: None,
+            validation_error: None,
+            input_type: InputType::Text,
+            a11y: Some(A11y {
+                label: Some(self.t("contact_edit.note_label")),
+                hint: Some(self.t("contact_edit.note_placeholder")),
+                role: None,
             }),
+            info_key: None,
+        });
+
+        if self.confirming_discard {
+            components.push(Component::InlineConfirm {
+                id: DISCARD_CONFIRM_ID.into(),
+                warning: self.t("contact_edit.discard_warning"),
+                confirm_text: self.t("contact_edit.discard_button"),
+                cancel_text: self.t("contact_edit.keep_editing_button"),
+                confirm_action_id: DISCARD_CONFIRM_ID.into(),
+                cancel_action_id: KEEP_EDITING_ID.into(),
+                destructive: true,
+                a11y: None,
+            });
+        }
+
+        components.push(Component::ButtonList {
+            id: FORM_ACTIONS_ID.into(),
+            items: vec![ActionListItem {
+                id: SAVE_ID.into(),
+                label: self.t("action.save"),
+                icon: None,
+                detail: None,
+                a11y: None,
+                info_key: None,
+            }],
+        });
+
+        ScreenModel {
+            screen_id: "contact_edit".into(),
+            title: self.t("contact_edit.edit_contact_title"),
+            subtitle: None,
+            components,
+            contextual_actions: vec![],
+            progress: None,
             ..Default::default()
         }
     }
 
-    fn toggle_group_for_field(&mut self, field_id: &str, group: &str) {
-        if let Some(field) = self.contact.fields.iter_mut().find(|f| f.id == field_id) {
-            if let Some(pos) = field.visible_to_groups.iter().position(|g| g == group) {
-                field.visible_to_groups.remove(pos);
-            } else {
-                field.visible_to_groups.push(group.to_string());
-            }
+    fn save(&mut self) -> ActionResult {
+        if self.name.trim().is_empty() {
+            let message = self.t("contact_edit.name_required_error");
+            self.name_error = Some(message.clone());
+            return ActionResult::ValidationError {
+                component_id: NAME_ID.into(),
+                message,
+            };
         }
+        self.leaving = Some(Leave::Save);
+        ActionResult::Complete
+    }
+
+    fn asks_before_leaving(&self) -> bool {
+        self.leaving.is_none() && self.has_changes() && !self.confirming_discard
     }
 }
 
 impl WorkflowEngine for ContactEditEngine {
+    /// Only the values that changed, so Discard and an unchanged Save
+    /// write nothing.
     fn engine_output(&self) -> Option<EngineOutput> {
+        if self.leaving != Some(Leave::Save) {
+            return Some(EngineOutput::ContactEdit {
+                display_name: None,
+                personal_note: None,
+            });
+        }
         Some(EngineOutput::ContactEdit {
-            display_name: self.edited_contact().display_name.clone(),
+            display_name: self.name_changed().then(|| self.name.trim().to_string()),
+            personal_note: self.note_changed().then(|| self.note.clone()),
         })
     }
 
     fn current_screen(&self) -> ScreenModel {
-        match self.step {
-            ContactEditStep::EditFields => self.build_edit_fields_screen(),
-            ContactEditStep::EditVisibility => self.build_edit_visibility_screen(),
-            ContactEditStep::Preview => self.build_preview_screen(),
+        self.build_screen()
+    }
+
+    fn can_navigate_back_within(&self) -> bool {
+        self.asks_before_leaving()
+    }
+
+    /// The first Back with unsaved changes stays and asks; a second Back
+    /// while asking leaves, as Discard would.
+    fn navigate_back_within(&mut self) -> bool {
+        if self.asks_before_leaving() {
+            self.confirming_discard = true;
+            return true;
         }
+        self.leaving.get_or_insert(Leave::Discard);
+        false
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
@@ -368,94 +245,40 @@ impl WorkflowEngine for ContactEditEngine {
             UserAction::TextChanged {
                 component_id,
                 value,
-            } if component_id == "display_name" => {
-                self.contact.display_name = value;
-                ActionResult::UpdateScreen(self.current_screen())
+            } if component_id == NAME_ID => {
+                self.name = value;
+                self.name_error = None;
+                ActionResult::UpdateScreen(self.build_screen())
             }
-
-            UserAction::ActionPressed { action_id } if action_id == "continue" => match self.step {
-                ContactEditStep::EditFields => {
-                    if self.contact.display_name.trim().is_empty() {
-                        return ActionResult::ValidationError {
-                            component_id: "display_name".into(),
-                            message: self.t("contact_edit.name_required_error"),
-                        };
-                    }
-                    self.step = ContactEditStep::EditVisibility;
-                    ActionResult::NavigateTo(self.current_screen())
-                }
-                ContactEditStep::EditVisibility => {
-                    self.step = ContactEditStep::Preview;
-                    ActionResult::NavigateTo(self.current_screen())
-                }
-                ContactEditStep::Preview => ActionResult::UpdateScreen(self.current_screen()),
-            },
-
-            UserAction::ActionPressed { action_id } if action_id == "back" => match self.step {
-                ContactEditStep::EditVisibility => {
-                    self.step = ContactEditStep::EditFields;
-                    ActionResult::NavigateTo(self.current_screen())
-                }
-                ContactEditStep::Preview => {
-                    self.step = ContactEditStep::EditVisibility;
-                    ActionResult::NavigateTo(self.current_screen())
-                }
-                ContactEditStep::EditFields => ActionResult::UpdateScreen(self.current_screen()),
-            },
-
-            UserAction::ActionPressed { action_id } if action_id == "save" => {
-                if self.step == ContactEditStep::Preview {
-                    ActionResult::Complete
-                } else {
-                    ActionResult::UpdateScreen(self.current_screen())
-                }
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == NOTE_ID => {
+                self.note = value;
+                ActionResult::UpdateScreen(self.build_screen())
             }
-
-            UserAction::FieldVisibilityChanged {
-                field_id,
-                group_id: Some(group),
-                visible,
-            } => {
-                if let Some(field) = self.contact.fields.iter_mut().find(|f| f.id == field_id) {
-                    if visible {
-                        if !field.visible_to_groups.contains(&group) {
-                            field.visible_to_groups.push(group);
-                        }
-                    } else {
-                        field.visible_to_groups.retain(|g| g != &group);
-                    }
-                }
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-
-            UserAction::FieldVisibilityChanged {
-                field_id,
-                group_id: None,
-                visible,
-            } => {
-                if let Some(field) = self.contact.fields.iter_mut().find(|f| f.id == field_id) {
-                    field.shown = visible;
-                }
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-
-            UserAction::ItemToggled {
+            UserAction::ListItemSelected {
                 component_id,
                 item_id,
-            } => {
-                // component_id is "vis_{field_id}"
-                if let Some(field_id) = component_id.strip_prefix("vis_") {
-                    self.toggle_group_for_field(field_id, &item_id);
-                }
-                ActionResult::UpdateScreen(self.current_screen())
+            } if component_id == NAME_ACTIONS_ID && item_id == USE_CARD_NAME_ID => {
+                self.name = self.original.card_name.clone();
+                self.name_error = None;
+                ActionResult::UpdateScreen(self.build_screen())
             }
-
-            UserAction::VariantSelected { variant_id } => {
-                self.selected_preview_group = variant_id;
-                ActionResult::UpdateScreen(self.current_screen())
+            UserAction::ListItemSelected {
+                component_id,
+                item_id,
+            } if component_id == FORM_ACTIONS_ID && item_id == SAVE_ID => self.save(),
+            UserAction::ActionPressed { action_id } if action_id == DISCARD_CONFIRM_ID => {
+                self.confirming_discard = false;
+                self.leaving = Some(Leave::Discard);
+                ActionResult::Complete
             }
-
-            _ => ActionResult::UpdateScreen(self.current_screen()),
+            UserAction::ActionPressed { action_id } if action_id == KEEP_EDITING_ID => {
+                self.confirming_discard = false;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            _ => ActionResult::UpdateScreen(self.build_screen()),
         }
     }
 }

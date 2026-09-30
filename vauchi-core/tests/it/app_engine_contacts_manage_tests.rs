@@ -87,8 +87,7 @@ fn contact_edit_nonexistent_shows_not_found() {
     let screen = engine.navigate_to(AppScreen::ContactEdit {
         contact_id: "nonexistent".into(),
     });
-    // Non-existent contact should show edit_fields (empty) or not_found
-    // ContactEditEngine starts on edit_fields, but with nonexistent we show not_found
+    // A missing contact has nothing to edit: not_found, not an empty form.
     assert_eq!(screen.screen_id, "contact_not_found");
 }
 
@@ -123,8 +122,8 @@ fn contact_detail_edit_navigates_to_edit_screen() {
         panic!("expected NavigateTo for edit button, got {result:?}");
     };
     assert_eq!(
-        screen.screen_id, "edit_fields",
-        "edit button should navigate to edit_fields screen"
+        screen.screen_id, "contact_edit",
+        "edit button should navigate to the Edit Contact form"
     );
     assert_eq!(
         engine.current_app_screen(),
@@ -148,19 +147,14 @@ fn editing_contact_display_name_persists_through_completion() {
         contact_id: bob_id.clone(),
     });
 
-    // Edit the display name, advance through the wizard, and save.
+    // Edit the display name and save the one-form Edit Contact (#451).
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bobby".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    }); // EditFields -> EditVisibility
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    }); // EditVisibility -> Preview
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "save".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "contact_edit_actions".into(),
+        item_id: "save".into(),
     });
 
     // Re-open the detail fresh: the edited name must be the resolved title.

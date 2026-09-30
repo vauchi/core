@@ -122,30 +122,10 @@ fn sample_delivery_items() -> Vec<DeliveryItem> {
 
 fn sample_editable_contact() -> EditableContact {
     EditableContact {
+        card_name: "Alice Liddell".into(),
         display_name: "Alice".into(),
-        fields: vec![
-            EditableField {
-                id: "f1".into(),
-                field_type: "Phone".into(),
-                label: "Mobile".into(),
-                value: "+1-555-0100".into(),
-                visible_to_groups: vec!["Family".into()],
-                shown: true,
-            },
-            EditableField {
-                id: "f2".into(),
-                field_type: "Email".into(),
-                label: "Work".into(),
-                value: "alice@example.com".into(),
-                visible_to_groups: vec!["Friends".into(), "Work".into()],
-                shown: true,
-            },
-        ],
+        personal_note: "Met at the conference".into(),
     }
-}
-
-fn sample_edit_groups() -> Vec<String> {
-    vec!["Family".into(), "Friends".into(), "Work".into()]
 }
 
 fn sample_duress_config() -> DuressConfig {
@@ -229,23 +209,15 @@ fn walk_onboarding_screens() -> Vec<(&'static str, ScreenModel)> {
 
 // ── Engine screen matrix ─────────────────────────────────────────
 
-/// Builds the 23 engine screens the retired golden fixtures captured.
+/// Builds the 21 engine screens the retired golden fixtures captured.
 fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
-    let contact_edit_visibility = {
-        let mut e = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
-        let _ = e.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
+    let contact_edit_discard = {
+        let mut e = ContactEditEngine::new(sample_editable_contact());
+        let _ = e.handle_action(UserAction::TextChanged {
+            component_id: "personal_note".into(),
+            value: "Owes me a book".into(),
         });
-        e.current_screen()
-    };
-    let contact_edit_preview = {
-        let mut e = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
-        let _ = e.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        let _ = e.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
+        let _ = e.navigate_back_within();
         e.current_screen()
     };
 
@@ -300,12 +272,10 @@ fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
         ),
         ("lock_screen", LockScreenEngine::new(5).current_screen()),
         (
-            "contact_edit_fields",
-            ContactEditEngine::new(sample_editable_contact(), sample_edit_groups())
-                .current_screen(),
+            "contact_edit_form",
+            ContactEditEngine::new(sample_editable_contact()).current_screen(),
         ),
-        ("contact_edit_visibility", contact_edit_visibility),
-        ("contact_edit_preview", contact_edit_preview),
+        ("contact_edit_discard", contact_edit_discard),
         (
             "device_linking",
             DeviceLinkingEngine::new("vauchi://link?token=abc123".to_string()).current_screen(),
@@ -357,7 +327,7 @@ fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
         ),
     ];
 
-    assert_eq!(screens.len(), 22, "expected 22 engine screens");
+    assert_eq!(screens.len(), 21, "expected 21 engine screens");
     screens
 }
 
@@ -371,8 +341,9 @@ fn every_legacy_screen_projects_without_a_legacy_component_escape_hatch() {
     matrix.extend(walk_onboarding_screens());
     assert_eq!(
         matrix.len(),
-        28,
-        "the matrix replaces 28 golden fixtures — a dropped screen is lost coverage"
+        27,
+        "the matrix replaces the golden fixtures (28, less the two retired contact-edit \
+         steps plus the discard prompt) — a dropped screen is lost coverage"
     );
 
     for (name, screen) in &matrix {

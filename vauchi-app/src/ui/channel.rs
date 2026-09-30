@@ -39,8 +39,12 @@ pub enum EngineOutput {
     /// selection, ContactInfo fields), plus the wizard step and any
     /// pending backup-restore file, read at completion time.
     Onboarding(Box<OnboardingSnapshot>),
-    /// The display name as edited on the contact-edit screen.
-    ContactEdit { display_name: String },
+    /// The Edit Contact values that changed; `None` means leave as stored
+    /// (Discard sets both to `None`). Redacted in `Debug`: personal data.
+    ContactEdit {
+        display_name: Option<String>,
+        personal_note: Option<String>,
+    },
     /// The backup/restore form state (password redacted in `Debug`).
     Backup(BackupFormSnapshot),
     /// PIN/password typed on the lock screen (redacted in `Debug`).
@@ -520,9 +524,13 @@ impl std::fmt::Debug for EngineOutput {
         match self {
             Self::FingerprintVerify(a) => f.debug_tuple("FingerprintVerify").field(a).finish(),
             Self::Onboarding(d) => f.debug_tuple("Onboarding").field(d).finish(),
-            Self::ContactEdit { display_name } => f
+            Self::ContactEdit {
+                display_name,
+                personal_note,
+            } => f
                 .debug_struct("ContactEdit")
-                .field("display_name", display_name)
+                .field("display_name_changed", &display_name.is_some())
+                .field("personal_note_changed", &personal_note.is_some())
                 .finish(),
             Self::Backup(s) => f.debug_tuple("Backup").field(s).finish(),
             Self::Lock { .. } => f.debug_struct("Lock").field("pin", &"<redacted>").finish(),

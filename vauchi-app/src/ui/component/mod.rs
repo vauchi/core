@@ -10,8 +10,7 @@ mod preview;
 pub use list::{Item, ListItemAction, ListItemActionKind};
 pub(crate) use preview::initials;
 pub use preview::{
-    Field, PreviewVariant, UiFieldVisibility, build_visible_fields, icon_for_field_type,
-    visibility_label,
+    Field, PreviewVariant, UiFieldVisibility, icon_for_field_type, visibility_label,
 };
 
 /// Serde skip-helper: windowing fields are omitted from the wire when
@@ -103,7 +102,7 @@ pub enum Component {
         selected_variant: Option<String>,
         /// Pre-filtered fields to render — what the user actually sees.
         ///
-        /// Computed by [`build_visible_fields`]: when `selected_variant` is set
+        /// When `selected_variant` is set
         /// and matches a `PreviewVariant`, returns that group's
         /// `visible_fields`. Otherwise returns `fields` filtered to keep only
         /// `Shown` and `Groups` visibility variants. Frontends render this

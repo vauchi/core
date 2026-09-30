@@ -28,8 +28,9 @@ fn merge_preview() -> MergePreview {
 
 fn editable_contact() -> EditableContact {
     EditableContact {
+        card_name: "Alice".into(),
         display_name: "Alice".into(),
-        fields: vec![],
+        personal_note: String::new(),
     }
 }
 
@@ -73,17 +74,19 @@ fn group_info_panel_title(locale: Locale) -> String {
 
 /// `(screen title, field-list title)` for contact edit.
 fn contact_edit_copy(locale: Locale) -> (String, String) {
-    let engine = ContactEditEngine::new(editable_contact(), vec![]).with_locale(locale);
+    let engine = ContactEditEngine::new(editable_contact()).with_locale(locale);
     let screen = engine.current_screen();
-    let field_list = screen
+    let note_label = screen
         .components
         .iter()
         .find_map(|c| match c {
-            vauchi_app::ui::Component::FieldList { title, .. } => Some(title.clone()),
+            vauchi_app::ui::Component::TextInput { id, label, .. } if id == "personal_note" => {
+                Some(label.clone())
+            }
             _ => None,
         })
-        .expect("contact edit renders a FieldList");
-    (screen.title.clone(), field_list)
+        .expect("contact edit renders the personal note input");
+    (screen.title.clone(), note_label)
 }
 
 // @scenario: contact-merge :: screen renders in the active locale
@@ -143,7 +146,7 @@ fn contact_edit_renders_the_active_locale() {
     let (en_title, en_fields) = contact_edit_copy(Locale::English);
 
     assert_translated("contact-edit title", &de_title, &en_title);
-    assert_translated("contact-fields list title", &de_fields, &en_fields);
+    assert_translated("personal note label", &de_fields, &en_fields);
 }
 
 // English stays exactly as before (regression pin) — one representative

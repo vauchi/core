@@ -101,7 +101,6 @@ mod contact_delete_archive_tests;
 mod contact_delete_cleanup_tests;
 mod contact_detail_delivery_tests;
 mod contact_detail_engine_tests;
-mod contact_edit_engine_tests;
 mod contact_favorites_notes_tests;
 mod contact_field_note_storage_tests;
 mod contact_has_contacts_tests;

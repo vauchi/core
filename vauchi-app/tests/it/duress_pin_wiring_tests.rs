@@ -384,3 +384,65 @@ fn duress_mode_settings_read_as_not_set_up() {
         "the decoy set is not named in duress mode"
     );
 }
+
+// @scenario: duress_mode :: The duress setup is invisible in duress mode
+// #468: after a duress unlock no screen shows the real contacts, groups,
+// tags or places. My Card stays real (owner decision 2026-10-01), so its
+// entries are not markers here.
+#[test]
+fn duress_mode_screens_show_no_real_data() {
+    let mut engine = engine_ready();
+    let real = Contact::from_exchange(
+        [7u8; 32],
+        ContactCard::new("RealRita"),
+        vauchi_core::SymmetricKey::generate(),
+        0,
+    );
+    let rita = real.id().to_string();
+    engine.vauchi().add_contact(real).unwrap();
+    engine
+        .vauchi()
+        .add_tag_to_contact(&rita, "RealTagX")
+        .unwrap();
+    engine
+        .vauchi()
+        .set_exchange_location(&rita, 47.0, 8.0)
+        .unwrap();
+    engine
+        .vauchi()
+        .name_exchange_place(&rita, "RealPlaceY")
+        .unwrap();
+    let group = engine.vauchi().create_group("RealGroupZ").unwrap();
+    engine
+        .vauchi()
+        .add_contact_to_group(group.id(), &rita)
+        .unwrap();
+    engine
+        .vauchi()
+        .add_decoy_contact("decoy-dora", "Dora", &ContactCard::new("Dora"))
+        .unwrap();
+    engine.vauchi_mut().setup_duress_password(PIN).unwrap();
+    let _ = engine.vauchi_mut().authenticate(PIN).unwrap();
+
+    let markers = ["RealRita", "RealTagX", "RealPlaceY", "RealGroupZ"];
+    let mut screens = engine.available_screens();
+    screens.push(AppScreen::ContactDetail { contact_id: rita });
+    screens.push(AppScreen::GroupDetail {
+        group_id: group.id().to_string(),
+    });
+    let mut leaks = Vec::new();
+    for screen in screens {
+        let label = format!("{screen:?}");
+        let model = engine.navigate_to(screen);
+        let shown = format!(
+            "{:?} {:?} {:?}",
+            model.title, model.components, model.contextual_actions
+        );
+        for marker in markers {
+            if shown.contains(marker) {
+                leaks.push(format!("{label}: {marker}"));
+            }
+        }
+    }
+    assert!(leaks.is_empty(), "real data in duress mode: {leaks:?}");
+}

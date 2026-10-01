@@ -35,6 +35,7 @@ mod api_error_tests;
 mod api_events_tests;
 mod api_nickname_tests;
 mod api_personal_notes_tests;
+mod api_place_overview_tests;
 mod api_places_tests;
 mod api_prepare_card_update_tests;
 mod api_relay_exchange_tests;

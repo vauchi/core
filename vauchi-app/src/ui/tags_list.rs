@@ -80,7 +80,20 @@ impl TagsEngine {
     }
 
     fn build_screen(&self) -> ScreenModel {
-        let mut components = Vec::new();
+        let mut components = vec![Component::Text {
+            id: "tags_intro".into(),
+            content: self.t("tags_list.intro"),
+            style: TextStyle::Body,
+            a11y: None,
+        }];
+        if self.tags.is_empty() {
+            components.push(Component::Text {
+                id: "tags_empty".into(),
+                content: self.t("tags_list.empty"),
+                style: TextStyle::Body,
+                a11y: None,
+            });
+        }
 
         let items: Vec<Item> = self
             .tags
@@ -112,7 +125,7 @@ impl TagsEngine {
                             id: "request_delete".into(),
                             label: self.t("action.delete"),
                             kind: ListItemActionKind::Custom,
-                            destructive: false,
+                            destructive: true,
                         },
                     ],
                     a11y: None,
@@ -120,14 +133,16 @@ impl TagsEngine {
             })
             .collect();
 
-        components.push(Component::List {
-            id: "tags".into(),
-            items,
-            searchable: false,
-            total_count: 0,
-            offset: 0,
-            window: 0,
-        });
+        if !items.is_empty() {
+            components.push(Component::List {
+                id: "tags".into(),
+                items,
+                searchable: false,
+                total_count: 0,
+                offset: 0,
+                window: 0,
+            });
+        }
 
         if let Some(name) = self.pending_name() {
             components.push(Component::InlineConfirm {

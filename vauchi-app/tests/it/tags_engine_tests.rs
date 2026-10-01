@@ -34,7 +34,8 @@ fn tag_list_items(screen: &vauchi_app::ui::ScreenModel) -> Vec<vauchi_app::ui::I
             Component::List { id, items, .. } if id == "tags" => Some(items.clone()),
             _ => None,
         })
-        .expect("tags List component must be present")
+        // No tags shows the empty-state text instead of an empty list (#467).
+        .unwrap_or_default()
 }
 
 fn has_delete_confirm(screen: &vauchi_app::ui::ScreenModel) -> bool {

@@ -189,5 +189,5 @@ fn confirm_promotion_creates_group_and_consumes_tag() {
         Component::List { id, items, .. } if id == "tags" => Some(items.len()),
         _ => None,
     });
-    assert_eq!(remaining, Some(0), "promoted tag is deleted");
+    assert_eq!(remaining.unwrap_or(0), 0, "promoted tag is deleted");
 }

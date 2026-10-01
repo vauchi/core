@@ -134,15 +134,11 @@ impl Vauchi {
 
         match config.verify(password) {
             AuthResult::Normal => {
-                self.auth_mode = AuthMode::Normal;
-                self.reset_concealed_duress();
-                self.reset_duress_store();
+                self.enter_auth_mode(AuthMode::Normal);
                 Ok(AuthMode::Normal)
             }
             AuthResult::Duress => {
-                self.auth_mode = AuthMode::Duress;
-                self.reset_concealed_duress();
-                self.reset_duress_store();
+                self.enter_auth_mode(AuthMode::Duress);
                 // Queue covert duress alerts to configured trusted contacts.
                 // Duress authentication itself must succeed even if alerting
                 // fails, so errors are not propagated. Reads storage, not
@@ -207,7 +203,7 @@ impl Vauchi {
         if self.real_duress_enabled()? {
             Ok(BiometricUnlockOutcome::PromptForDuressPin)
         } else {
-            self.auth_mode = AuthMode::Normal;
+            self.enter_auth_mode(AuthMode::Normal);
             Ok(BiometricUnlockOutcome::Unlocked)
         }
     }

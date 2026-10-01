@@ -43,8 +43,16 @@ impl Vauchi {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    pub(super) fn reset_concealed_duress(&self) {
+    fn reset_concealed_duress(&self) {
         *self.concealed_duress() = ConcealedDuress::default();
+    }
+
+    /// Every unlock starts a fresh session: nothing a duress session saw or
+    /// made outlives it, whichever unlock path ends it.
+    pub(super) fn enter_auth_mode(&mut self, mode: AuthMode) {
+        self.auth_mode = mode;
+        self.reset_concealed_duress();
+        self.reset_duress_store();
     }
 
     /// Where screens read and write groups, tags and places: in duress mode
@@ -62,7 +70,7 @@ impl Vauchi {
     }
 
     /// Starts or ends the duress session store at an unlock.
-    pub(super) fn reset_duress_store(&mut self) {
+    fn reset_duress_store(&mut self) {
         self.duress_store = if self.in_duress_mode() {
             Storage::in_memory(crate::crypto::SymmetricKey::generate()).ok()
         } else {

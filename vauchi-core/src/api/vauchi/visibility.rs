@@ -160,7 +160,7 @@ impl Vauchi {
     /// `Contact` objects. Contacts that no longer exist in storage are
     /// silently skipped.
     pub fn get_group_members(&self, label_id: &str) -> VauchiResult<Vec<crate::contact::Contact>> {
-        if self.auth_mode == super::AuthMode::Duress {
+        if self.in_duress_mode() {
             return Ok(Vec::new());
         }
         let label = self.vocabulary_store()?.labels().load_group(label_id)?;

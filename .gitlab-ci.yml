@@ -183,11 +183,11 @@ check:consumer-pins-bump:
       git -C "$SCRIPTS_DIR" checkout -q --detach FETCH_HEAD
       echo "scripts checked out at $(git -C "$SCRIPTS_DIR" rev-parse HEAD)"
       export CORE_PINS="$SCRIPTS_DIR/scripts/core-pins.py"
-      # diag #465: core-pins.py intermittently missing. Name where it
-      # disappears: after checkout, before the test, or during it.
+      # A triggering pipeline that forwards its own older VAUCHI_SCRIPTS_REF
+      # checks out scripts without core-pins.py (#465); say so, not rc=141.
       if [ ! -f "$CORE_PINS" ]; then
-        echo "core-pins.py missing right after checkout of ${VAUCHI_SCRIPTS_REF}"
-        ls -la "$SCRIPTS_DIR" "$SCRIPTS_DIR/scripts" 2>&1 | head -40
+        echo "scripts ref ${VAUCHI_SCRIPTS_REF} has no scripts/core-pins.py;"
+        echo "a triggering pipeline (${CI_PIPELINE_SOURCE}) may have forwarded its own pin"
         exit 1
       fi
   script:

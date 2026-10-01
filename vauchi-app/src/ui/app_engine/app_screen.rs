@@ -75,7 +75,6 @@ pub enum AppScreen {
         secondary_name: String,
         secondary_fields: Vec<String>,
     },
-    ContactLimit,
     VerifyFingerprint {
         contact_id: String,
     },
@@ -217,7 +216,6 @@ impl AppScreen {
             Self::MyInfoEntryDetail { .. } => "entry_detail",
             Self::ContactDuplicates => "contact_duplicates",
             Self::ContactMerge { .. } => "contact_merge",
-            Self::ContactLimit => "contact_limit",
             Self::VerifyFingerprint { .. } => "verify_fingerprint",
             Self::ActivityLog => "activity_log",
             Self::ArchivedContacts => "archived_contacts",
@@ -280,7 +278,6 @@ impl AppScreen {
             "privacy" => Self::Privacy,
             "support" => Self::Support,
             "contact_duplicates" => Self::ContactDuplicates,
-            "contact_limit" => Self::ContactLimit,
             "activity_log" => Self::ActivityLog,
             "archived_contacts" => Self::ArchivedContacts,
             "device_replacement" => Self::DeviceReplacement,
@@ -306,7 +303,6 @@ impl AppScreen {
             | Self::ContactVisibility { .. }
             | Self::ContactDuplicates
             | Self::ContactMerge { .. }
-            | Self::ContactLimit
             | Self::ArchivedContacts
             | Self::VerifyFingerprint { .. } => Some("contacts"),
             Self::GroupDetail { .. } => Some("groups"),
@@ -361,7 +357,6 @@ impl AppScreen {
             | Self::ContactVisibility { .. }
             | Self::ContactDuplicates
             | Self::ContactMerge { .. }
-            | Self::ContactLimit
             | Self::ArchivedContacts
             | Self::VerifyFingerprint { .. } => "contacts",
             Self::Exchange

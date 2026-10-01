@@ -304,7 +304,7 @@ fn batch_after_navigation(engine: &mut AppEngine) -> *mut c_char {
 /// "help", "backup", "lock", "onboarding", "emergency_shred",
 /// "device_linking", "device_management", "duress_pin", "delivery_status",
 /// "sync", "recovery", "groups", "privacy", "support",
-/// "contact_duplicates", "contact_limit", "more".
+/// "contact_duplicates", "more".
 ///
 /// Test-only arrange seam: it lets the suite land on a screen without
 /// replaying the interactions that lead there. Frontends never construct

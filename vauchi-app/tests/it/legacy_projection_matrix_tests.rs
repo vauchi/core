@@ -209,7 +209,7 @@ fn walk_onboarding_screens() -> Vec<(&'static str, ScreenModel)> {
 
 // ── Engine screen matrix ─────────────────────────────────────────
 
-/// Builds the 21 engine screens the retired golden fixtures captured.
+/// Builds the 20 engine screens the retired golden fixtures captured.
 fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
     let contact_edit_discard = {
         let mut e = ContactEditEngine::new(sample_editable_contact());
@@ -305,10 +305,6 @@ fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
             ChangePasswordEngine::new(false).current_screen(),
         ),
         (
-            "contact_limit",
-            ContactLimitEngine::new(150, 150).current_screen(),
-        ),
-        (
             "archived_contacts",
             ArchivedContactsEngine::new(vec![
                 ("c1".into(), "Alice".into()),
@@ -327,7 +323,7 @@ fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
         ),
     ];
 
-    assert_eq!(screens.len(), 21, "expected 21 engine screens");
+    assert_eq!(screens.len(), 20, "expected 20 engine screens");
     screens
 }
 
@@ -341,9 +337,10 @@ fn every_legacy_screen_projects_without_a_legacy_component_escape_hatch() {
     matrix.extend(walk_onboarding_screens());
     assert_eq!(
         matrix.len(),
-        27,
+        26,
         "the matrix replaces the golden fixtures (28, less the two retired contact-edit \
-         steps plus the discard prompt) — a dropped screen is lost coverage"
+         steps plus the discard prompt, less the removed contact limit) — a dropped screen \
+         is lost coverage"
     );
 
     for (name, screen) in &matrix {

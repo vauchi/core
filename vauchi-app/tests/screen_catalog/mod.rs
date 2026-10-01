@@ -276,7 +276,6 @@ fn record_seeded(world: SeededWorld, locale: &'static str, screens: &mut Vec<Scr
         },
         AppScreen::ContactDuplicates,
         contact_merge,
-        AppScreen::ContactLimit,
         AppScreen::ActivityLog,
         AppScreen::ArchivedContacts,
         AppScreen::DeviceReplacement,

@@ -13,8 +13,8 @@
 use super::i18n_support::{assert_translated, load_german};
 use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{
-    ContactEditEngine, ContactLimitEngine, ContactMergeEngine, DeliveryStatusEngine,
-    EditableContact, GroupDetailEngine, MergePreview, WorkflowEngine,
+    ContactEditEngine, ContactMergeEngine, DeliveryStatusEngine, EditableContact,
+    GroupDetailEngine, MergePreview, WorkflowEngine,
 };
 
 fn merge_preview() -> MergePreview {
@@ -36,14 +36,6 @@ fn editable_contact() -> EditableContact {
 
 fn merge_title(locale: Locale) -> String {
     ContactMergeEngine::new(merge_preview())
-        .with_locale(locale)
-        .current_screen()
-        .title
-        .clone()
-}
-
-fn limit_title(locale: Locale) -> String {
-    ContactLimitEngine::new(5, 100)
         .with_locale(locale)
         .current_screen()
         .title
@@ -101,18 +93,6 @@ fn contact_merge_renders_the_active_locale() {
     );
 }
 
-// @scenario: contact-limit :: screen renders in the active locale
-// @internal
-#[test]
-fn contact_limit_renders_the_active_locale() {
-    load_german();
-    assert_translated(
-        "contact-limit title",
-        &limit_title(Locale::German),
-        &limit_title(Locale::English),
-    );
-}
-
 // @scenario: delivery-status :: screen renders in the active locale
 // @internal
 #[test]
@@ -156,7 +136,6 @@ fn contact_edit_renders_the_active_locale() {
 #[test]
 fn batch2_english_copy_unchanged() {
     assert_eq!(merge_title(Locale::English), "Merge Contacts");
-    assert_eq!(limit_title(Locale::English), "Contact Limit");
     assert_eq!(delivery_title(Locale::English), "Update Delivery");
     assert_eq!(contact_edit_copy(Locale::English).0, "Edit Contact");
 }

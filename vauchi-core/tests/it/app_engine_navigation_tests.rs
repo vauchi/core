@@ -728,7 +728,6 @@ fn cabi_completeness_all_simple_screens_roundtrip_via_screen_id() {
         AppScreen::Privacy,
         AppScreen::Support,
         AppScreen::ContactDuplicates,
-        AppScreen::ContactLimit,
         AppScreen::Tags,
     ];
 

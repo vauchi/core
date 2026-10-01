@@ -15,7 +15,6 @@ use crate::ui::component::{
 use crate::ui::contact_detail::{ContactDetailEngine, ContactNotFoundEngine, DeliverySummary};
 use crate::ui::contact_detail_rules::{ContactPlace, ContactTag};
 use crate::ui::contact_edit::{ContactEditEngine, EditableContact};
-use crate::ui::contact_limit::ContactLimitEngine;
 use crate::ui::contact_list::{ContactListEngine, IndexedItem};
 use crate::ui::contact_merge::{ContactMergeEngine, MergePreview};
 use crate::ui::contact_visibility::ContactVisibilityEngine;
@@ -357,13 +356,6 @@ impl AppEngine {
                 })
                 .with_locale(render_context.resolved_locale()),
             ),
-            AppScreen::ContactLimit => {
-                let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
-                Box::new(
-                    ContactLimitEngine::new(contact_count, 0)
-                        .with_locale(render_context.resolved_locale()),
-                )
-            }
             AppScreen::VerifyFingerprint { contact_id } => {
                 let contact = vauchi.get_contact(contact_id).ok().flatten();
                 let their_fp = contact

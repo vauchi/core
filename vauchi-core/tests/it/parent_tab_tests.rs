@@ -87,7 +87,6 @@ fn parameterized_contact_screens_resolve_to_contacts_on_both_layouts() {
             contact_id: cid("c"),
         },
         AppScreen::ContactDuplicates,
-        AppScreen::ContactLimit,
         AppScreen::ArchivedContacts,
     ] {
         assert_eq!(

@@ -17,7 +17,6 @@ mod ble_exchange;
 mod change_password;
 mod contact_detail;
 mod contact_edit;
-mod contact_limit;
 mod contact_list;
 mod contact_merge;
 mod contact_not_found;

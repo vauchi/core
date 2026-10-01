@@ -107,7 +107,6 @@ mod contact_has_contacts_tests;
 mod contact_ignore_api_tests;
 mod contact_ignore_tests;
 mod contact_kind_tests;
-mod contact_limit_engine_tests;
 mod contact_limit_tests;
 mod contact_list_engine_tests;
 mod contact_merge_action_tests;

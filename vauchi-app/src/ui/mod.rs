@@ -21,7 +21,6 @@ mod component;
 mod contact_detail;
 mod contact_detail_rules;
 mod contact_edit;
-mod contact_limit;
 mod contact_list;
 mod contact_merge;
 mod contact_visibility;
@@ -105,7 +104,6 @@ pub use contact_detail_rules::{
     show_recovery_trusted_indicator, show_verified_badge, tag_components, verify_button_visible,
 };
 pub use contact_edit::{ContactEditEngine, EditableContact};
-pub use contact_limit::ContactLimitEngine;
 pub use contact_list::{ContactListEngine, IndexedItem};
 pub use contact_merge::{ContactMergeEngine, MergePreview};
 pub use contact_visibility::ContactVisibilityEngine;

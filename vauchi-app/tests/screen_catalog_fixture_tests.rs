@@ -13,7 +13,7 @@ use screen_catalog::{
 use vauchi_app::ui::{ScreenCatalogEntry, ScreenCatalogFixture};
 use vauchi_core::{Command, PresentationNode, PresentationRow};
 
-const REQUIRED_CODE_IDS: [&str; 53] = [
+const REQUIRED_CODE_IDS: [&str; 52] = [
     "onboarding",
     "my_info-empty",
     "my_info",
@@ -50,7 +50,6 @@ const REQUIRED_CODE_IDS: [&str; 53] = [
     "entry_detail",
     "contact_duplicates",
     "contact_merge",
-    "contact_limit",
     "activity_log",
     "archived_contacts",
     "device_replacement",

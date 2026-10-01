@@ -36,7 +36,6 @@ fn app_screen_serde_roundtrip_simple_variants() {
         AppScreen::Privacy,
         AppScreen::Support,
         AppScreen::ContactDuplicates,
-        AppScreen::ContactLimit,
         AppScreen::MultiStageExchange {
             mode: ExchangeMode::Glance,
         },

@@ -46,7 +46,7 @@ impl AppScreen {
             | Self::ContactVisibility { .. }
             | Self::VerifyFingerprint { .. }
             | Self::ContactMerge { .. } => Self::Contacts,
-            Self::ContactDuplicates | Self::ContactLimit | Self::ArchivedContacts => Self::Contacts,
+            Self::ContactDuplicates | Self::ArchivedContacts => Self::Contacts,
             Self::MyInfoEntryDetail { .. } | Self::AvatarEditor => Self::MyInfo,
             Self::GroupDetail { .. } => Self::Groups,
             Self::TagPromotion { .. } => Self::Tags,

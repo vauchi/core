@@ -341,24 +341,21 @@ fn unlocked_with(pin: &str) -> AppEngine {
     engine
 }
 
-fn duress_status_and_actions(engine: &mut AppEngine) -> (String, Vec<String>) {
+/// Everything the Duress PIN screen shows, toolbar and body alike, so the
+/// test holds whichever layout the screen has (#459 moved its actions
+/// into the body).
+fn duress_screen_text(engine: &mut AppEngine) -> String {
     let screen = engine.navigate_to(AppScreen::DuressPin);
-    let status = screen
-        .components
-        .iter()
-        .find_map(|c| match c {
-            Component::StatusIndicator { id, title, .. } if id == "duress_status" => {
-                Some(title.clone())
-            }
-            _ => None,
-        })
-        .expect("duress status");
-    let actions = screen
+    let toolbar: Vec<&str> = screen
         .contextual_actions
         .iter()
-        .map(|a| a.label.clone())
+        .map(|a| a.label.as_str())
         .collect();
-    (status, actions)
+    format!("{:?} {:?}", screen.components, toolbar)
+}
+
+fn offers_turn_off(text: &str) -> bool {
+    text.contains("Disable") || text.contains("Turn off")
 }
 
 // @scenario: duress_mode :: The duress setup is invisible in duress mode
@@ -367,24 +364,20 @@ fn duress_status_and_actions(engine: &mut AppEngine) -> (String, Vec<String>) {
 #[test]
 fn duress_mode_settings_read_as_not_set_up() {
     let mut normal = unlocked_with("app-password-123");
-    assert_eq!(
-        duress_status_and_actions(&mut normal),
-        (
-            "Duress protection enabled".to_string(),
-            vec!["Change PIN".to_string(), "Disable".to_string()]
-        )
+    let shown = duress_screen_text(&mut normal);
+    assert!(
+        offers_turn_off(&shown),
+        "normal mode can turn it off: {shown}"
     );
+    assert!(!shown.contains("not set up"), "{shown}");
     let decoys = normal.navigate_to(AppScreen::DecoyContacts);
     assert!(format!("{:?}", decoys.components).contains("Dora"));
 
     let mut duress = unlocked_with(PIN);
-    assert_eq!(
-        duress_status_and_actions(&mut duress),
-        (
-            "Duress PIN not set up".to_string(),
-            vec!["Set Up PIN".to_string()]
-        )
-    );
+    let shown = duress_screen_text(&mut duress);
+    assert!(shown.contains("Duress PIN not set up"), "{shown}");
+    assert!(shown.contains("Set Up PIN"), "{shown}");
+    assert!(!offers_turn_off(&shown), "nothing to disable: {shown}");
     let decoys = duress.navigate_to(AppScreen::DecoyContacts);
     assert!(
         !format!("{:?}", decoys.components).contains("Dora"),

@@ -14,7 +14,7 @@
 
 use super::super::error::{VauchiError, VauchiResult};
 use super::Vauchi;
-use crate::contact::place::{ExchangeLocation, Place};
+use crate::contact::place::{ExchangeLocation, PLACE_MATCH_RADIUS_M, Place, haversine_m};
 
 impl Vauchi {
     // === Named-place vocabulary ===
@@ -138,5 +138,50 @@ impl Vauchi {
         };
         self.storage.save_exchange_location(contact_id, &linked)?;
         Ok(place)
+    }
+
+    /// How many contacts were met at each named place: exchange locations
+    /// linked to the place, keyed by place id. A place nobody was met at is
+    /// absent.
+    pub fn place_contact_counts(&self) -> VauchiResult<std::collections::HashMap<String, usize>> {
+        let mut counts = std::collections::HashMap::new();
+        for (_, location) in self.storage.list_exchange_locations()? {
+            if let Some(place_id) = location.place_id {
+                *counts.entry(place_id).or_insert(0) += 1;
+            }
+        }
+        Ok(counts)
+    }
+
+    /// Exchange locations nobody has named yet, grouped by spot: a location
+    /// joins the first group whose anchor (its first location) lies within
+    /// [`PLACE_MATCH_RADIUS_M`], else starts its own. Locations are taken in
+    /// contact-id order, so the grouping is stable. Each group lists contact
+    /// ids, anchor first.
+    pub fn unnamed_exchange_spots(&self) -> VauchiResult<Vec<Vec<String>>> {
+        let mut unnamed: Vec<(String, ExchangeLocation)> = self
+            .storage
+            .list_exchange_locations()?
+            .into_iter()
+            .filter(|(_, location)| location.place_id.is_none())
+            .collect();
+        unnamed.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let mut spots: Vec<(ExchangeLocation, Vec<String>)> = Vec::new();
+        for (contact_id, location) in unnamed {
+            let near = spots.iter_mut().find(|(anchor, _)| {
+                haversine_m(
+                    anchor.latitude,
+                    anchor.longitude,
+                    location.latitude,
+                    location.longitude,
+                ) <= PLACE_MATCH_RADIUS_M
+            });
+            match near {
+                Some((_, members)) => members.push(contact_id),
+                None => spots.push((location, vec![contact_id])),
+            }
+        }
+        Ok(spots.into_iter().map(|(_, members)| members).collect())
     }
 }

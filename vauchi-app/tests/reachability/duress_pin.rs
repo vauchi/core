@@ -15,8 +15,13 @@
 //! `ConfirmPin`'s "continue" (`duress_pin.rs`) both clear, exposing
 //! `duress_alerts` and its `save` affordance.
 //!
+//! The overview has no `ActionPressed` affordance (#459): Set Up PIN,
+//! How duress mode looks and Turn off are body buttons, and the PIN,
+//! decoy and alerts entries are rows — `ListItemSelected` pass-throughs
+//! covered by `duress_screen_tests`.
+//!
 //! Still pinned via the engine integration tests, not BFS-reachable:
-//! - `confirm_disable` / `cancel_disable` — pressing `disable` flips
+//! - `confirm_disable` / `cancel_disable` — Turn off flips
 //!   `pending_disable` and adds an `InlineConfirm`, but that screen
 //!   keeps `screen_id == "duress_overview"`, so `screen_id` dedup
 //!   collapses it.
@@ -32,12 +37,11 @@ use vauchi_app::ui::{DuressConfig, DuressPinEngine, WorkflowEngine};
 /// `duress_alerts`) and consumed by `DuressPinEngine::handle_action`
 /// — `core/vauchi-app/src/ui/duress_pin.rs`. `save` is the
 /// alerts-step affordance reached once the PIN gates clear.
-const HANDLED: &[&str] = &["configure", "disable", "back", "continue", "save"];
+const HANDLED: &[&str] = &["back", "continue", "save"];
 
 fn factory() -> DuressPinEngine {
-    // `enabled = true` so the `Overview` step renders the `disable`
-    // affordance (it is hidden when duress is off). Empty alert
-    // config — the alerts step still renders `save` / `back`.
+    // `enabled = true` so the overview renders its management rows.
+    // Empty alert config — the alerts step still renders `save` / `back`.
     DuressPinEngine::new(
         DuressConfig {
             enabled: true,

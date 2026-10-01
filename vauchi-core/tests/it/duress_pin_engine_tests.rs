@@ -54,8 +54,9 @@ fn config_with_contacts() -> DuressConfig {
 /// Drive a fresh engine through the PIN steps to the ConfigureAlerts screen.
 fn engine_at_alerts(config: DuressConfig) -> DuressPinEngine {
     let mut engine = DuressPinEngine::new(config, vauchi_app::i18n::Locale::English);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
@@ -81,21 +82,9 @@ fn duress_starts_at_overview() {
     let engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "duress_overview");
-    assert_eq!(
-        screen
-            .progress
-            .as_ref()
-            .expect("should have progress")
-            .current_step,
-        1
-    );
-    assert_eq!(
-        screen
-            .progress
-            .as_ref()
-            .expect("should have progress")
-            .total_steps,
-        4
+    assert!(
+        screen.progress.is_none(),
+        "the overview is a screen of its own, not step 1 of a wizard (#459)"
     );
 }
 
@@ -131,46 +120,50 @@ fn duress_overview_shows_read_only_status_not_dead_toggle() {
         "default (not set up) duress must surface a Warning status"
     );
 
-    // When disabled, should show "Set Up PIN" and no disable action
-    let configure = screen
-        .contextual_actions
-        .iter()
-        .find(|a| a.id == "configure")
-        .expect("should have configure action");
-    assert_eq!(configure.label, "Set Up PIN");
-    assert!(
-        screen.contextual_actions.iter().all(|a| a.id != "disable"),
-        "disable action should not appear when not enabled"
-    );
+    // Not set up: Set Up PIN is the only action (#459: body buttons).
+    assert_eq!(body_buttons(&screen), ["Set Up PIN"]);
 
-    // When enabled, should show "Change PIN" and a disable action
+    // Set up: rows carry the state, and Turn off sits beside the help.
     let engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::English);
     let screen = engine.current_screen();
-    let configure = screen
-        .contextual_actions
+    assert!(
+        !screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::ToggleList { .. })),
+        "no dead toggle when set up either"
+    );
+    assert_eq!(
+        body_buttons(&screen),
+        ["How duress mode looks", "Turn off duress PIN"]
+    );
+}
+
+fn body_buttons(screen: &ScreenModel) -> Vec<String> {
+    screen
+        .components
         .iter()
-        .find(|a| a.id == "configure")
-        .expect("should have configure action");
-    assert_eq!(configure.label, "Change PIN");
-    let disable = screen
-        .contextual_actions
-        .iter()
-        .find(|a| a.id == "disable")
-        .expect("should have disable action when enabled");
-    assert_eq!(disable.style, ActionStyle::Destructive);
+        .find_map(|c| match c {
+            Component::ButtonList { id, items } if id == "duress_actions" => {
+                Some(items.iter().map(|i| i.label.clone()).collect())
+            }
+            _ => None,
+        })
+        .unwrap_or_default()
 }
 
 // @internal
 #[test]
 fn duress_configure_goes_to_pin() {
     let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
     match result {
         ActionResult::NavigateTo(screen) => {
             assert_eq!(screen.screen_id, "duress_enter_pin");
-            assert_eq!(screen.progress.as_ref().expect("progress").current_step, 2);
+            assert_eq!(screen.progress.as_ref().expect("progress").current_step, 1);
         }
         other => panic!("expected NavigateTo, got {:?}", other),
     }
@@ -180,8 +173,9 @@ fn duress_configure_goes_to_pin() {
 #[test]
 fn duress_enter_pin_validation() {
     let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
 
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -223,8 +217,9 @@ fn duress_enter_pin_validation() {
 #[test]
 fn duress_pin_mismatch_error() {
     let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
@@ -258,8 +253,9 @@ fn duress_pin_mismatch_error() {
 fn duress_pin_match_to_alerts() {
     let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
     // Navigate through EnterPin → ConfirmPin with matching PINs
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
@@ -278,7 +274,7 @@ fn duress_pin_match_to_alerts() {
     match result {
         ActionResult::NavigateTo(screen) => {
             assert_eq!(screen.screen_id, "duress_alerts");
-            assert_eq!(screen.progress.as_ref().expect("progress").current_step, 4);
+            assert_eq!(screen.progress.as_ref().expect("progress").current_step, 3);
         }
         other => panic!("expected NavigateTo alerts, got {:?}", other),
     }
@@ -329,8 +325,9 @@ fn duress_disable_shows_inline_confirm() {
     let mut engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::English);
     assert!(engine.config().enabled, "should start enabled");
 
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "disable".into(),
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "turn_off".into(),
     });
     let screen = match result {
         ActionResult::UpdateScreen(s) => s,
@@ -355,8 +352,9 @@ fn duress_disable_shows_inline_confirm() {
 #[test]
 fn duress_confirm_disable_completes() {
     let mut engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::English);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "disable".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "turn_off".into(),
     });
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "confirm_disable".into(),
@@ -376,8 +374,9 @@ fn duress_confirm_disable_completes() {
 #[test]
 fn duress_cancel_disable_keeps_enabled() {
     let mut engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::English);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "disable".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "turn_off".into(),
     });
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel_disable".into(),
@@ -403,8 +402,9 @@ fn duress_back_navigation() {
     let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
 
     // Overview → EnterPin
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
     assert_eq!(engine.current_screen().screen_id, "duress_enter_pin");
 
@@ -419,8 +419,9 @@ fn duress_back_navigation() {
         other => panic!("expected NavigateTo overview, got {:?}", other),
     }
 
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
@@ -474,8 +475,9 @@ fn duress_back_navigation() {
 #[test]
 fn duress_pin_accumulates_single_chars() {
     let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
 
     for ch in ['1', '2', '3', '4', '5', '6'] {
@@ -525,8 +527,9 @@ fn duress_pin_accumulates_single_chars() {
 #[test]
 fn duress_pin_backspace_removes_last_char() {
     let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
 
     for ch in ['1', '2', '3'] {

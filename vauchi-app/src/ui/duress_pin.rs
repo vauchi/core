@@ -57,8 +57,16 @@ pub struct DuressPinEngine {
     new_pin: String,
     confirm_pin: String,
     pending_disable: bool,
+    /// Number of decoy contacts, for the overview's decoy row.
+    decoy_count: usize,
+    /// Alerts opened from the overview's alerts row: no PIN is asked, Back
+    /// returns to the overview, and saving leaves the PIN as it is.
+    alerts_only: bool,
     locale: Locale,
 }
+
+const ROWS_ID: &str = "duress_rows";
+const ACTIONS_ID: &str = "duress_actions";
 
 impl Drop for DuressPinEngine {
     fn drop(&mut self) {
@@ -83,8 +91,32 @@ impl DuressPinEngine {
             new_pin: String::new(),
             confirm_pin: String::new(),
             pending_disable: false,
+            decoy_count: 0,
+            alerts_only: false,
             locale,
         }
+    }
+
+    /// Set the number of decoy contacts shown on the overview.
+    pub fn with_decoy_count(mut self, count: usize) -> Self {
+        self.decoy_count = count;
+        self
+    }
+
+    fn count(&self, n: usize, none: &str, one: &str, many: &str) -> String {
+        match n {
+            0 => self.t(none),
+            1 => self.t(one),
+            _ => get_string_with_args(self.locale, many, &[("count", &n.to_string())]),
+        }
+    }
+
+    fn start_pin_entry(&mut self) -> ActionResult {
+        self.step = DuressPinStep::EnterPin;
+        self.alerts_only = false;
+        self.new_pin.clear();
+        self.confirm_pin.clear();
+        ActionResult::NavigateTo(self.current_screen())
     }
 
     fn t(&self, key: &str) -> String {
@@ -100,80 +132,101 @@ impl DuressPinEngine {
         &self.new_pin
     }
 
-    fn progress(&self) -> Progress {
+    /// Setup is three steps; the overview is not one of them, and editing
+    /// only the alerts is a single screen without a step bar (#459).
+    fn progress(&self) -> Option<Progress> {
         let current_step = match self.step {
-            DuressPinStep::Overview => 1,
-            DuressPinStep::EnterPin => 2,
-            DuressPinStep::ConfirmPin => 3,
-            DuressPinStep::ConfigureAlerts => 4,
+            DuressPinStep::Overview => return None,
+            DuressPinStep::ConfigureAlerts if self.alerts_only => return None,
+            DuressPinStep::EnterPin => 1,
+            DuressPinStep::ConfirmPin => 2,
+            DuressPinStep::ConfigureAlerts => 3,
         };
-        Progress {
+        Some(Progress {
             current_step,
-            total_steps: 4,
+            total_steps: 3,
             label: None,
-        }
+        })
     }
 
     fn overview_screen(&self) -> ScreenModel {
-        let duress_status = if self.config.enabled {
-            Status::Success
-        } else {
-            Status::Warning
-        };
-        let mut components = vec![
-            Component::InfoPanel {
-                id: "duress_info".into(),
-                icon: Some("shield".into()),
-                title: self.t("resistance.duress.pin_label"),
-                items: vec![InfoItem {
-                    icon: Some("info".into()),
-                    title: self.t("resistance.duress.what_is_title"),
-                    detail: self.t("resistance.duress.what_is_detail"),
-                }],
-                a11y: None,
-            },
-            Component::StatusIndicator {
-                id: "duress_status".into(),
-                icon: Some(
-                    if self.config.enabled {
-                        "checkmark.shield.fill"
-                    } else {
-                        "exclamationmark.shield"
-                    }
-                    .into(),
-                ),
-                title: if self.config.enabled {
-                    self.t("resistance.duress.enabled")
-                } else {
-                    self.t("resistance.duress.not_set_up")
-                },
-                detail: None,
-                status: duress_status,
-                status_label: self.t(duress_status.label_key()),
-                a11y: None,
-            },
-        ];
-
-        let configure_label = if self.config.enabled {
-            self.t("resistance.duress.change_pin")
-        } else {
-            self.t("resistance.duress.set_up_pin")
-        };
-        let mut actions = vec![ScreenAction {
-            id: "configure".into(),
-            label: configure_label.clone(),
-            style: ActionStyle::Primary,
-            enabled: true,
-            a11y: Some(A11y::labeled(configure_label)),
+        let mut components = vec![Component::Text {
+            id: "duress_intro".into(),
+            content: self.t("resistance.duress.what_is_detail"),
+            style: TextStyle::Body,
+            a11y: None,
         }];
 
+        let button = |id: &str, key: &str| ActionListItem {
+            id: id.into(),
+            label: self.t(key),
+            icon: None,
+            detail: None,
+            a11y: None,
+            info_key: None,
+        };
+
         if self.config.enabled {
-            actions.push(ScreenAction {
-                id: "disable".into(),
-                label: self.t("resistance.duress.disable_button"),
-                style: ActionStyle::Destructive,
-                enabled: true,
-                a11y: Some(A11y::labeled(self.t("resistance.duress.disable_button"))),
+            let row = |id: &str, key: &str, detail: String| ActionListItem {
+                id: id.into(),
+                label: self.t(key),
+                icon: None,
+                detail: Some(detail),
+                a11y: None,
+                info_key: None,
+            };
+            components.push(Component::ActionList {
+                id: ROWS_ID.into(),
+                items: vec![
+                    row(
+                        "pin",
+                        "resistance.duress.row_pin",
+                        self.t("resistance.duress.row_pin_set"),
+                    ),
+                    row(
+                        "decoys",
+                        "resistance.duress.row_decoys",
+                        self.count(
+                            self.decoy_count,
+                            "resistance.duress.row_decoys_none",
+                            "resistance.duress.row_decoys_one",
+                            "resistance.duress.row_decoys_many",
+                        ),
+                    ),
+                    row(
+                        "alerts",
+                        "resistance.duress.row_alerts",
+                        self.count(
+                            self.config.selected_contact_ids.len(),
+                            "resistance.duress.row_alerts_off",
+                            "resistance.duress.row_alerts_one",
+                            "resistance.duress.row_alerts_many",
+                        ),
+                    ),
+                ],
+            });
+            components.push(Component::ButtonList {
+                id: ACTIONS_ID.into(),
+                items: vec![
+                    button("how_it_looks", "resistance.duress.how_it_looks_button"),
+                    button("turn_off", "resistance.duress.turn_off_button"),
+                ],
+            });
+        } else {
+            // A read-only status states "not set up" plainly; a toggle here
+            // would be a control that cannot act (2026-07-03 config gaps).
+            components.push(Component::StatusIndicator {
+                id: "duress_status".into(),
+                icon: Some("exclamationmark.shield".into()),
+                title: self.t("resistance.duress.not_set_up"),
+                detail: None,
+                status: Status::Warning,
+                status_label: self.t(Status::Warning.label_key()),
+                a11y: None,
+            });
+            components.push(Component::ButtonList {
+                id: ACTIONS_ID.into(),
+                items: vec![button("set_up", "resistance.duress.set_up_pin")],
             });
         }
 
@@ -199,8 +252,8 @@ impl DuressPinEngine {
             title: self.t("resistance.duress.pin_label"),
             subtitle: None,
             components,
-            contextual_actions: actions,
-            progress: Some(self.progress()),
+            contextual_actions: vec![],
+            progress: None,
             ..Default::default()
         }
     }
@@ -210,19 +263,28 @@ impl DuressPinEngine {
             screen_id: "duress_enter_pin".into(),
             title: self.t("resistance.duress.setup"),
             subtitle: None,
-            components: vec![Component::PinInput {
-                id: "pin".into(),
-                label: self.t("resistance.duress.enter_pin"),
-                length: PIN_LENGTH,
-                filled: self.new_pin.len(),
-                masked: true,
-                validation_error: None,
-                a11y: Some(A11y {
-                    label: Some(self.t("resistance.duress.enter_pin")),
-                    hint: Some(self.t("resistance.duress.enter_hint")),
-                    role: None,
-                }),
-            }],
+            components: vec![
+                Component::PinInput {
+                    id: "pin".into(),
+                    label: self.t("resistance.duress.enter_pin"),
+                    length: PIN_LENGTH,
+                    filled: self.new_pin.len(),
+                    masked: true,
+                    validation_error: None,
+                    a11y: Some(A11y {
+                        label: Some(self.t("resistance.duress.enter_pin")),
+                        hint: Some(self.t("resistance.duress.enter_hint")),
+                        role: None,
+                    }),
+                },
+                // Owner decision 2026-10-01 (#462): say it at setup.
+                Component::Text {
+                    id: "shred_note".into(),
+                    content: self.t("resistance.duress.shred_note"),
+                    style: TextStyle::Caption,
+                    a11y: None,
+                },
+            ],
             contextual_actions: vec![
                 ScreenAction {
                     id: "back".into(),
@@ -239,7 +301,7 @@ impl DuressPinEngine {
                     a11y: Some(A11y::labeled(self.t("action.continue"))),
                 },
             ],
-            progress: Some(self.progress()),
+            progress: self.progress(),
             ..Default::default()
         }
     }
@@ -285,7 +347,7 @@ impl DuressPinEngine {
                     a11y: Some(A11y::labeled(self.t("action.continue"))),
                 },
             ],
-            progress: Some(self.progress()),
+            progress: self.progress(),
             ..Default::default()
         }
     }
@@ -367,7 +429,7 @@ impl DuressPinEngine {
                     a11y: Some(A11y::labeled(self.t("action.save"))),
                 },
             ],
-            progress: Some(self.progress()),
+            progress: self.progress(),
             ..Default::default()
         }
     }
@@ -379,7 +441,12 @@ impl WorkflowEngine for DuressPinEngine {
         Some(crate::ui::EngineOutput::DuressPin(
             crate::ui::DuressPinSetup {
                 enabled: config.enabled,
-                pin: self.pin().to_string(),
+                // Empty when only the alerts were edited: the PIN stays.
+                pin: if self.alerts_only {
+                    String::new()
+                } else {
+                    self.pin().to_string()
+                },
                 alert_contact_ids: config.selected_contact_ids.clone(),
                 alert_message: config.alert_message.clone(),
                 include_location: config.include_location,
@@ -399,17 +466,47 @@ impl WorkflowEngine for DuressPinEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match (&self.step, action) {
             // --- Overview ---
-            (DuressPinStep::Overview, UserAction::ActionPressed { action_id })
-                if action_id == "configure" =>
+            (
+                DuressPinStep::Overview,
+                UserAction::ListItemSelected {
+                    component_id,
+                    item_id,
+                },
+            ) if (component_id == ACTIONS_ID && item_id == "set_up")
+                || (component_id == ROWS_ID && item_id == "pin") =>
             {
-                self.step = DuressPinStep::EnterPin;
-                self.new_pin.clear();
-                self.confirm_pin.clear();
+                self.start_pin_entry()
+            }
+            (
+                DuressPinStep::Overview,
+                UserAction::ListItemSelected {
+                    component_id,
+                    item_id,
+                },
+            ) if component_id == ROWS_ID && item_id == "alerts" => {
+                self.step = DuressPinStep::ConfigureAlerts;
+                self.alerts_only = true;
                 ActionResult::NavigateTo(self.current_screen())
             }
-            (DuressPinStep::Overview, UserAction::ActionPressed { action_id })
-                if action_id == "disable" =>
-            {
+            (
+                DuressPinStep::Overview,
+                UserAction::ListItemSelected {
+                    component_id,
+                    item_id,
+                },
+            ) if component_id == ACTIONS_ID && item_id == "how_it_looks" => {
+                ActionResult::ShowInfoOverlay {
+                    title: self.t("resistance.duress.how_it_looks_button"),
+                    body: self.t("resistance.duress.how_it_looks_body"),
+                }
+            }
+            (
+                DuressPinStep::Overview,
+                UserAction::ListItemSelected {
+                    component_id,
+                    item_id,
+                },
+            ) if component_id == ACTIONS_ID && item_id == "turn_off" => {
                 self.pending_disable = true;
                 ActionResult::UpdateScreen(self.current_screen())
             }
@@ -566,7 +663,12 @@ impl WorkflowEngine for DuressPinEngine {
             (DuressPinStep::ConfigureAlerts, UserAction::ActionPressed { action_id })
                 if action_id == "back" =>
             {
-                self.step = DuressPinStep::ConfirmPin;
+                self.step = if self.alerts_only {
+                    self.alerts_only = false;
+                    DuressPinStep::Overview
+                } else {
+                    DuressPinStep::ConfirmPin
+                };
                 ActionResult::NavigateTo(self.current_screen())
             }
 

@@ -418,7 +418,13 @@ proptest! {
             let _ = engine.handle_action(action);
         }
         let screen = engine.current_screen();
-        let progress = screen.progress.as_ref().expect("duress screens must have progress");
+        // The overview is a management screen, not step 1 (#459); every
+        // setup step carries a step bar.
+        if screen.screen_id == "duress_overview" {
+            prop_assert!(screen.progress.is_none(), "no step bar on the overview");
+            return Ok(());
+        }
+        let progress = screen.progress.as_ref().expect("setup steps must have progress");
         prop_assert!(progress.total_steps > 0, "total_steps must be > 0");
         prop_assert!(
             progress.current_step >= 1 && progress.current_step <= progress.total_steps,
@@ -571,8 +577,9 @@ proptest! {
         let mut engine = make_duress();
 
         // Overview → EnterPin
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "configure".into(),
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "duress_actions".into(),
+            item_id: "set_up".into(),
         });
         prop_assert_eq!(engine.current_screen().screen_id, "duress_enter_pin");
 
@@ -618,8 +625,9 @@ proptest! {
     fn duress_short_pin_does_not_advance(pin in "[0-9]{1,5}") {
         let mut engine = make_duress();
 
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "configure".into(),
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "duress_actions".into(),
+            item_id: "set_up".into(),
         });
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),

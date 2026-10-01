@@ -2169,7 +2169,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_9d63d5d125249837",
+                    "id": "field_8afbf9fd2264a53d",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2200,13 +2200,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:9d63d5d125249837",
+                    "id": "field_note:8afbf9fd2264a53d",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:9d63d5d125249837",
+                          "id": "field_note:8afbf9fd2264a53d",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2246,7 +2246,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_631e6c9305a400db",
+                    "id": "field_392dccb9f84b04a4",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2277,13 +2277,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:631e6c9305a400db",
+                    "id": "field_note:392dccb9f84b04a4",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:631e6c9305a400db",
+                          "id": "field_note:392dccb9f84b04a4",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2323,7 +2323,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_88be1ffc755ec929",
+                    "id": "field_8f274c302079be73",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2354,13 +2354,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:88be1ffc755ec929",
+                    "id": "field_note:8f274c302079be73",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:88be1ffc755ec929",
+                          "id": "field_note:8f274c302079be73",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4514,10 +4514,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "618C 45B7 2CB7 4B4A F75B 7313 41E6 DCCC 610D 379F AA77 CEA0 C6E7 B47B 67B3 2630",
+                    "content": "FE47 498E E443 CFBC 6703 968D AF6D F2C3 A9EF 83BD 6680 FB6D 413D 2AE6 DD59 81AF",
                     "style": "body",
                     "accessibility": {
-                      "label": "618C 45B7 2CB7 4B4A F75B 7313 41E6 DCCC 610D 379F AA77 CEA0 C6E7 B47B 67B3 2630",
+                      "label": "FE47 498E E443 CFBC 6703 968D AF6D F2C3 A9EF 83BD 6680 FB6D 413D 2AE6 DD59 81AF",
                       "description": null
                     }
                   }
@@ -4536,10 +4536,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "2EE5 083C 2B6B 8666 DD8C 5EAB EC6A E5F2 6E04 C9CD B327 C466 C457 C359 DA9B 7EB1",
+                    "content": "08DF F978 903E 3A98 C037 AB74 899B D5A5 D85E 6D34 0540 9D5D AA40 8B4D 85D7 7CA6",
                     "style": "body",
                     "accessibility": {
-                      "label": "2EE5 083C 2B6B 8666 DD8C 5EAB EC6A E5F2 6E04 C9CD B327 C466 C457 C359 DA9B 7EB1",
+                      "label": "08DF F978 903E 3A98 C037 AB74 899B D5A5 D85E 6D34 0540 9D5D AA40 8B4D 85D7 7CA6",
                       "description": null
                     }
                   }
@@ -9414,29 +9414,12 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "duress_info",
-                    "label": "Duress PIN",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "What is a Duress PIN?",
-                          "detail": "A secondary PIN that, when entered, silently alerts your chosen contacts while appearing to unlock normally.",
-                          "icon_token": "info",
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "What is a Duress PIN?",
-                            "description": null
-                          }
-                        }
-                      }
-                    ],
+                  "Text": {
+                    "id": "duress_intro",
+                    "content": "A secondary PIN that, when entered, silently alerts your chosen contacts while appearing to unlock normally.",
+                    "style": "body",
                     "accessibility": {
-                      "label": "Duress PIN",
+                      "label": "A secondary PIN that, when entered, silently alerts your chosen contacts while appearing to unlock normally.",
                       "description": null
                     }
                   }
@@ -9457,13 +9440,42 @@
                   }
                 },
                 {
-                  "Progress": {
+                  "List": {
+                    "id": "duress_actions",
                     "label": null,
-                    "value": 0.25,
+                    "rows": [
+                      {
+                        "title": "Set Up PIN",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "Set Up PIN",
+                          "accessibility_label": "Set Up PIN",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Set Up PIN",
+                          "description": null
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
                     "accessibility": {
-                      "label": "Progress",
+                      "label": "",
                       "description": null
-                    }
+                    },
+                    "style": "buttons"
                   }
                 }
               ]
@@ -9491,14 +9503,7 @@
                 "enabled": true,
                 "shortcut": null
               },
-              "primary": {
-                "interaction_id": "surface.1.context.configure",
-                "label": "Set Up PIN",
-                "accessibility_label": "Set Up PIN",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": "activate_primary"
-              },
+              "primary": null,
               "secondary": null
             }
           }
@@ -16780,7 +16785,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=PYBGIjBVqrd3AaJXyaMA4GhW1NHoFXJ3l2rsTcdBiW4&n=unE_7sURhoxacqWohTEAAI7Jn96kQv5KJaJ5GEm4CfE",
+                    "content": "vauchi://exchange?pk=n7JMvBs8TkKCm_GnaygrBmPj-DSHH-OXMlsSvuD9tSQ&n=TFmaeZfUrZcFZD-M6yWj_3-Cg-I9eKWDexPWUUegW04",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17239,7 +17244,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,77,117,53,81,103,56,75,50,117,71,90,116,50,77,88,113,118,115,97,117,88,121,98,103,84,74,122,98,77,110,120,71,98,69,86,56,78,90,50,112,116,43,115,83,83,117,66,121,48,84,118,79,51,80,115,84,47,117,82,69,90,88,118,50,101,112,103,120,82,99,68,56,50,88,81,111,101,68,88,49,72,97,86,83,108,122,49,53,103,106,103,79,66,101,48,69,98,70,48,103,76,112,102,55,101,119,71,54,79,84,86,120,54,109,49,52,67,51,75,117,110,88,70,110,122,70,75,51,102,80,50,88,86,72,100,76,87,48,43,81,85,122,50,112,83,84,101,86,82,90,65,65,65,65,65,71,113,57,109,69,85,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,76,77,111,56,65,50,110,100,118,73,51,107,111,103,115,86,83,57,90,88,81,116,106,71,105,120,73,47,102,119,51,73,115,110,88,119,77,103,121,48,106,112,79,90,75,110,102,68,73,121,109,56,116,101,79,50,47,76,108,87,74,80,114,105,88,113,101,104,70,71,47,68,69,99,68,107,109,52,73,84,80,78,112,89,71],
+            "payload": [86,48,74,70,87,65,77,73,51,47,108,52,107,68,52,54,109,77,65,51,113,51,83,74,109,57,87,108,50,70,53,116,78,65,86,65,110,86,50,113,81,73,116,78,104,100,100,56,112,117,112,115,57,48,104,110,109,82,65,47,119,80,48,103,110,102,52,114,67,99,110,106,69,104,99,69,89,116,65,81,116,106,117,121,110,68,68,79,108,89,73,107,68,112,66,116,53,52,103,97,51,70,109,109,69,108,65,119,109,84,107,115,83,104,83,87,49,90,69,113,103,99,79,121,114,87,66,115,105,85,97,120,116,65,109,89,75,120,88,115,103,54,57,108,97,101,106,55,66,122,50,52,104,82,75,53,65,65,65,65,65,71,113,57,112,104,65,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,56,114,102,87,56,68,97,68,99,47,84,83,100,100,109,56,109,47,56,56,76,79,97,54,101,114,105,121,52,50,76,117,48,108,72,79,43,109,78,120,98,49,117,81,56,50,51,47,69,89,109,77,116,83,82,68,76,88,50,118,53,104,110,90,76,69,117,111,100,80,50,66,118,97,103,75,66,78,66,118,56,120,111,115,70],
             "is_initiator": true
           }
         }
@@ -17271,7 +17276,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI2XD4D/F-OGFMA ZJV0B.SOR:R6*OU13OOVKPP6J42AQZ-NOH22HOZBH-IMTGJ- 1UYT$UVG$O-:6R.F96V 8RH34U NF2MIDR1:IBUHN/H%IPT564%3--PERD11Vauchi User00"
+                      "INI24VHAPSZNQHV1NZJ%W8V8Q+2OOAR/-O:H81.HNJLFRTV6AF/T*+RAPD.:3K/EB D1HKGO0YVRZO2CR6B.J2P6BCI3*IRG9PGK19A2 7.W3M$MV5MMTT2D74$C11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17910,7 +17915,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [46,229,8,60,43,107,134,102,221,140,94,171,236,106,229,242,110,4,201,205,179,39,196,102,196,87,195,89,218,155,126,177]
+            "payload": [8,223,249,120,144,62,58,152,192,55,171,116,137,155,213,165,216,94,109,52,5,64,157,93,170,64,139,77,133,215,124,166]
           }
         },
         {
@@ -18065,7 +18070,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [46,229,8,60,43,107,134,102,221,140,94,171,236,106,229,242,110,4,201,205,179,39,196,102,196,87,195,89,218,155,126,177]
+            "payload": [8,223,249,120,144,62,58,152,192,55,171,116,137,155,213,165,216,94,109,52,5,64,157,93,170,64,139,77,133,215,124,166]
           }
         },
         {
@@ -18220,7 +18225,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [46,229,8,60,43,107,134,102,221,140,94,171,236,106,229,242,110,4,201,205,179,39,196,102,196,87,195,89,218,155,126,177]
+            "payload": [8,223,249,120,144,62,58,152,192,55,171,116,137,155,213,165,216,94,109,52,5,64,157,93,170,64,139,77,133,215,124,166]
           }
         },
         {

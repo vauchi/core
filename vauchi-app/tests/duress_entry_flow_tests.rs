@@ -116,7 +116,9 @@ fn drive_until_native_back(
                     .expect("value change");
             }
         }
-        let Some((surface_id, interaction_id)) = optional_primary_interaction(&commands) else {
+        let Some((surface_id, interaction_id)) =
+            optional_primary_interaction(&commands).or_else(|| first_body_action(&commands))
+        else {
             return commands;
         };
         commands = app
@@ -127,6 +129,27 @@ fn drive_until_native_back(
             .expect("activate primary");
     }
     panic!("duress sub-flow did not terminate within {max_steps} steps");
+}
+
+/// The first activatable row in the surface body — a body button, such as
+/// the duress overview's "Set Up PIN" (#459), which a user taps where no
+/// context-bar primary exists.
+fn first_body_action(commands: &[Command]) -> Option<(SurfaceId, vauchi_core::InteractionId)> {
+    fn find(nodes: &[PresentationNode]) -> Option<vauchi_core::InteractionId> {
+        nodes.iter().find_map(|node| match node {
+            PresentationNode::List { rows, .. } => rows
+                .iter()
+                .find_map(|row| row.activation.as_ref().map(|a| a.interaction_id.clone())),
+            PresentationNode::Group { children, .. } => find(children),
+            _ => None,
+        })
+    }
+    commands.iter().find_map(|command| match command {
+        Command::ReplaceSurface { surface } => {
+            find(&surface.nodes).map(|id| (surface.surface_id.clone(), id))
+        }
+        _ => None,
+    })
 }
 
 fn optional_primary_interaction(

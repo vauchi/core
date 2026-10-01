@@ -347,26 +347,28 @@ impl AppEngine {
                 // Load ALL contacts as the picker pool (even with no stored
                 // settings) so a recipient can be chosen (config-gaps defect 1).
                 let available_contacts = Self::picker_contacts(vauchi);
-                let (enabled, selected_contact_ids, alert_message, include_location) =
-                    match vauchi.load_duress_settings().ok().flatten() {
-                        Some(s) => (
-                            true,
-                            s.alert_contact_ids,
-                            s.alert_message,
-                            s.include_location,
-                        ),
-                        None => (false, Vec::new(), String::new(), false),
-                    };
-                Box::new(DuressPinEngine::new(
-                    DuressConfig {
-                        enabled,
-                        available_contacts,
-                        selected_contact_ids,
-                        alert_message,
-                        include_location,
-                    },
-                    render_context.resolved_locale(),
-                ))
+                let settings = vauchi.load_duress_settings().ok().flatten();
+                // Set up means a duress PIN exists, with or without alerts;
+                // it used to mean "alert settings exist" (#459).
+                let enabled = vauchi.is_duress_enabled().unwrap_or(false) || settings.is_some();
+                let (selected_contact_ids, alert_message, include_location) = match settings {
+                    Some(s) => (s.alert_contact_ids, s.alert_message, s.include_location),
+                    None => (Vec::new(), String::new(), false),
+                };
+                let decoy_count = vauchi.list_decoy_contacts().map_or(0, |d| d.len());
+                Box::new(
+                    DuressPinEngine::new(
+                        DuressConfig {
+                            enabled,
+                            available_contacts,
+                            selected_contact_ids,
+                            alert_message,
+                            include_location,
+                        },
+                        render_context.resolved_locale(),
+                    )
+                    .with_decoy_count(decoy_count),
+                )
             }
             AppScreen::DecoyContacts => {
                 let decoys: Vec<DecoyContactItem> = vauchi

@@ -313,6 +313,15 @@ impl AppEngine {
             return Some(ActionResult::NavigateTo(screen));
         }
 
+        // The Duress PIN overview's decoy row opens Decoy Contacts (#459).
+        if matches!(action, UserAction::ListItemSelected { component_id, item_id }
+                if component_id == "duress_rows" && item_id == "decoys")
+            && matches!(self.screen, AppScreen::DuressPin)
+        {
+            let screen = self.navigate_to(AppScreen::DecoyContacts);
+            return Some(ActionResult::NavigateTo(screen));
+        }
+
         // "View archived" from contacts → navigate to ArchivedContacts screen
         if matches!(action, UserAction::ActionPressed { action_id } if action_id == "view_archived")
             && matches!(self.screen, AppScreen::Contacts)

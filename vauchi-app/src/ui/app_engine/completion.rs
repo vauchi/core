@@ -591,7 +591,10 @@ impl AppEngine {
         };
         if let Some(setup) = setup {
             if setup.enabled {
-                if let Err(e) = self.vauchi.setup_duress_password(&setup.pin) {
+                // An empty PIN means only the alerts were edited (#459).
+                if !setup.pin.is_empty()
+                    && let Err(e) = self.vauchi.setup_duress_password(&setup.pin)
+                {
                     return ActionResult::ShowAlert {
                         title: self.t("error.title"),
                         message: format!("Failed to set duress PIN: {e}"),

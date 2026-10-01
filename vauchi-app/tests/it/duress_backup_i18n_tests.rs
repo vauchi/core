@@ -21,6 +21,20 @@ use vauchi_app::ui::{
     WorkflowEngine,
 };
 
+/// A body button's label (#459: the duress overview's Set Up PIN).
+fn body_button(screen: &vauchi_app::ui::ScreenModel, list: &str, id: &str) -> String {
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::ButtonList { id: list_id, items } if list_id == list => {
+                items.iter().find(|i| i.id == id).map(|i| i.label.clone())
+            }
+            _ => None,
+        })
+        .expect("body button")
+}
+
 /// Copy a shell would show walking the duress wizard to its confirm step.
 struct DuressCopy {
     overview_title: String,
@@ -38,10 +52,11 @@ fn walk_duress(locale: Locale) -> DuressCopy {
 
     let overview = engine.current_screen();
     let overview_title = overview.title.clone();
-    let configure_action = action_label(&overview, "configure");
+    let configure_action = body_button(&overview, "duress_actions", "set_up");
 
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
     let enter = engine.current_screen();
     let enter_title = enter.title.clone();
@@ -196,7 +211,10 @@ fn duress_and_backup_english_copy_unchanged() {
     let engine = DuressPinEngine::new(DuressConfig::default(), Locale::English);
     let overview = engine.current_screen();
     assert_eq!(overview.title, "Duress PIN");
-    assert_eq!(action_label(&overview, "configure"), "Set Up PIN");
+    assert_eq!(
+        body_button(&overview, "duress_actions", "set_up"),
+        "Set Up PIN"
+    );
 
     let backup = BackupRecoveryEngine::new(None, true, Locale::English);
     let choose = backup.current_screen();

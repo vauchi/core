@@ -142,8 +142,9 @@ fn duress_pin_setup_persists_via_handle_completion() {
     engine.navigate_to(AppScreen::DuressPin);
 
     // Step 1: Press "configure" on overview
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "configure".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
     });
 
     // Step 2: Enter PIN digits
@@ -202,8 +203,9 @@ fn duress_pin_disable_persists_via_handle_completion() {
 
     engine.navigate_to(AppScreen::DuressPin);
 
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "disable".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "turn_off".into(),
     });
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "confirm_disable".into(),

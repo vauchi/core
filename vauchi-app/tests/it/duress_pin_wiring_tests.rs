@@ -68,6 +68,13 @@ fn press(engine: &mut AppEngine, action_id: &str) -> ActionResult {
     })
 }
 
+fn start_setup(engine: &mut AppEngine) -> ActionResult {
+    engine.handle_action(UserAction::ListItemSelected {
+        component_id: "duress_actions".into(),
+        item_id: "set_up".into(),
+    })
+}
+
 fn type_into(engine: &mut AppEngine, component_id: &str, text: &str) {
     for ch in text.chars() {
         let _ = engine.handle_action(UserAction::TextChanged {
@@ -87,7 +94,7 @@ fn toggle(engine: &mut AppEngine, component_id: &str, item_id: &str) -> ActionRe
 /// Overview → EnterPin → ConfirmPin → ConfigureAlerts with matching PINs,
 /// leaving the engine parked on the alerts screen (no recipient chosen).
 fn advance_to_alerts(engine: &mut AppEngine) {
-    let _ = press(engine, "configure");
+    let _ = start_setup(engine);
     type_into(engine, "pin", PIN);
     let _ = press(engine, "continue");
     type_into(engine, "confirm_pin", PIN);
@@ -181,7 +188,7 @@ fn duress_mismatched_confirmation_is_rejected() {
     add_contact(&engine, "Bob");
     engine.navigate_to(AppScreen::DuressPin);
 
-    let _ = press(&mut engine, "configure");
+    let _ = start_setup(&mut engine);
     type_into(&mut engine, "pin", PIN);
     let _ = press(&mut engine, "continue");
     type_into(&mut engine, "confirm_pin", "999999");

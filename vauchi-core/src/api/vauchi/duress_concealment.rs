@@ -17,6 +17,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use crate::contact_card::ContactCard;
 use crate::emergency::DuressSettings;
+use crate::storage::Storage;
 
 use super::{AuthMode, Vauchi};
 
@@ -44,5 +45,28 @@ impl Vauchi {
 
     pub(super) fn reset_concealed_duress(&self) {
         *self.concealed_duress() = ConcealedDuress::default();
+    }
+
+    /// Where screens read and write groups, tags and places: in duress mode
+    /// an empty session store, so the coercer sees none and what they make
+    /// never reaches the real ones (#468). Engine internals that decide what
+    /// real contacts receive keep using `self.storage`. Fails closed: without
+    /// a session store, duress mode gets an error, never the real data.
+    pub(super) fn vocabulary_store(&self) -> crate::api::error::VauchiResult<&Storage> {
+        if !self.in_duress_mode() {
+            return Ok(&self.storage);
+        }
+        self.duress_store.as_ref().ok_or_else(|| {
+            crate::api::error::VauchiError::InvalidState("no duress session store".into())
+        })
+    }
+
+    /// Starts or ends the duress session store at an unlock.
+    pub(super) fn reset_duress_store(&mut self) {
+        self.duress_store = if self.in_duress_mode() {
+            Storage::in_memory(crate::crypto::SymmetricKey::generate()).ok()
+        } else {
+            None
+        };
     }
 }

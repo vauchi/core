@@ -466,6 +466,9 @@ impl Vauchi {
         contact_id: &str,
     ) -> VauchiResult<()> {
         self.add_contact_to_group(label_id, contact_id)?;
+        if self.in_duress_mode() {
+            return Ok(());
+        }
         self.repropagate_to_contact(contact_id)
     }
 
@@ -478,6 +481,9 @@ impl Vauchi {
         contact_id: &str,
     ) -> VauchiResult<()> {
         self.remove_contact_from_group(label_id, contact_id)?;
+        if self.in_duress_mode() {
+            return Ok(());
+        }
         self.repropagate_to_contact(contact_id)
     }
 
@@ -486,6 +492,10 @@ impl Vauchi {
     /// until an unrelated own-card edit. Members are snapshotted before the
     /// delete because `get_effective_field_visibility` reads the live group set.
     pub fn delete_group_and_repropagate(&self, label_id: &str) -> VauchiResult<()> {
+        // Duress mode: a session-store group; nothing goes to real contacts.
+        if self.in_duress_mode() {
+            return self.delete_group(label_id);
+        }
         let members: Vec<String> = self
             .storage
             .labels()
@@ -510,6 +520,9 @@ impl Vauchi {
         is_visible: bool,
     ) -> VauchiResult<()> {
         self.set_group_field_visibility(label_id, field_id, is_visible)?;
+        if self.in_duress_mode() {
+            return Ok(());
+        }
 
         // Re-propagate to all contacts in this label
         let label = self.storage.labels().load_group(label_id)?;

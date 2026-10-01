@@ -136,11 +136,13 @@ impl Vauchi {
             AuthResult::Normal => {
                 self.auth_mode = AuthMode::Normal;
                 self.reset_concealed_duress();
+                self.reset_duress_store();
                 Ok(AuthMode::Normal)
             }
             AuthResult::Duress => {
                 self.auth_mode = AuthMode::Duress;
                 self.reset_concealed_duress();
+                self.reset_duress_store();
                 // Queue covert duress alerts to configured trusted contacts.
                 // Duress authentication itself must succeed even if alerting
                 // fails, so errors are not propagated. Reads storage, not

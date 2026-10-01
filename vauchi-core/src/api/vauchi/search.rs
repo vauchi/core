@@ -54,7 +54,7 @@ impl Vauchi {
 
         // Hoist the tag vocabulary once (avoids re-loading per contact).
         let tags = if facets.tags {
-            self.storage.tags().list_tags()?
+            self.vocabulary_store()?.tags().list_tags()?
         } else {
             Vec::new()
         };
@@ -111,9 +111,11 @@ impl Vauchi {
             return Ok(true);
         }
         if facets.place
-            && let Some(loc) = self.storage.load_exchange_location(contact.id())?
+            && let Some(loc) = self
+                .vocabulary_store()?
+                .load_exchange_location(contact.id())?
             && let Some(place_id) = &loc.place_id
-            && let Some(place) = self.storage.places().get_place(place_id)?
+            && let Some(place) = self.vocabulary_store()?.places().get_place(place_id)?
             && place.name.to_lowercase().contains(q)
         {
             return Ok(true);

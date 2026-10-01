@@ -201,6 +201,9 @@ pub struct Vauchi {
     auth_mode: AuthMode,
     /// What duress mode shows of the duress and decoy setup (#462).
     concealed_duress: duress_concealment::ConcealedDuressCell,
+    /// Groups, tags and places as screens see them in duress mode: an empty
+    /// session store, dropped at the next unlock (#468).
+    duress_store: Option<Storage>,
     /// Explicit-time seam (Phase 1 / Task 1.1 of the pure-functional-core
     /// program). Every `SystemTime::now` callsite under `vauchi-core`
     /// migrates to `self.clock.now()` cluster by cluster — Step 3 follow-up
@@ -367,6 +370,7 @@ impl Vauchi {
             secure_storage,
             auth_mode: AuthMode::Unauthenticated,
             concealed_duress: Default::default(),
+            duress_store: None,
             clock,
             rng,
             sleeper,
@@ -582,6 +586,7 @@ impl Vauchi {
             secure_storage: None,
             auth_mode: AuthMode::Unauthenticated,
             concealed_duress: Default::default(),
+            duress_store: None,
             clock,
             rng,
             sleeper: SystemSleeper::shared(),

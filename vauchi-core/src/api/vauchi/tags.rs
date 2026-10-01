@@ -25,6 +25,9 @@ fn normalise_name(name: &str) -> &str {
 
 impl Vauchi {
     fn record_tag_change(&self, tag: &Tag) {
+        if self.in_duress_mode() {
+            return;
+        }
         self.record_sync_item(crate::sync::SyncItem::TagChanged {
             tag_data: crate::sync::device_sync::TagSyncData::from_tag(tag),
             timestamp: self.clock.unix_seconds(),
@@ -32,6 +35,9 @@ impl Vauchi {
     }
 
     fn record_tag_deletion(&self, tag_id: &str) {
+        if self.in_duress_mode() {
+            return;
+        }
         self.record_sync_item(crate::sync::SyncItem::TagDeleted {
             tag_id: tag_id.to_string(),
             timestamp: self.clock.unix_seconds(),
@@ -40,7 +46,7 @@ impl Vauchi {
 
     /// Lists all tags in the owner's vocabulary, oldest first.
     pub fn list_tags(&self) -> VauchiResult<Vec<Tag>> {
-        Ok(self.storage.tags().list_tags()?)
+        Ok(self.vocabulary_store()?.tags().list_tags()?)
     }
 
     /// Creates a new tag with the given name.
@@ -53,7 +59,7 @@ impl Vauchi {
         if name.is_empty() {
             return Err(VauchiError::InvalidState("Tag name cannot be empty".into()));
         }
-        let tag = self.storage.tags().create_tag(name)?;
+        let tag = self.vocabulary_store()?.tags().create_tag(name)?;
         self.record_tag_change(&tag);
         Ok(tag)
     }
@@ -61,7 +67,7 @@ impl Vauchi {
     /// Deletes a tag from the vocabulary. Tagged contacts simply lose the tag.
     /// Returns `true` if the tag existed.
     pub fn delete_tag(&self, tag_id: &str) -> VauchiResult<bool> {
-        let deleted = self.storage.tags().delete_tag(tag_id)?;
+        let deleted = self.vocabulary_store()?.tags().delete_tag(tag_id)?;
         if deleted {
             self.record_tag_deletion(tag_id);
         }
@@ -77,7 +83,7 @@ impl Vauchi {
             return Ok(None);
         }
         Ok(self
-            .storage
+            .vocabulary_store()?
             .tags()
             .list_tags()?
             .into_iter()
@@ -97,19 +103,22 @@ impl Vauchi {
             return Err(VauchiError::InvalidState("Tag name cannot be empty".into()));
         }
         // Validate the contact exists (avoid orphan membership).
-        if self.storage.contacts().load_contact(contact_id)?.is_none() {
+        // The visible contacts: in duress mode the decoys (#468).
+        if self.get_contact(contact_id)?.is_none() {
             return Err(VauchiError::ContactNotFound(contact_id.to_string()));
         }
 
         let tag = match self.find_tag_by_name(name)? {
             Some(existing) => existing,
-            None => self.storage.tags().create_tag(name)?,
+            None => self.vocabulary_store()?.tags().create_tag(name)?,
         };
-        self.storage.tags().add_to_tag(&tag.id, contact_id)?;
+        self.vocabulary_store()?
+            .tags()
+            .add_to_tag(&tag.id, contact_id)?;
 
         // Return the up-to-date tag (with the new membership reflected).
         let tag = self
-            .storage
+            .vocabulary_store()?
             .tags()
             .get_tag(&tag.id)?
             .ok_or_else(|| VauchiError::NotFound("Tag vanished after creation".into()))?;
@@ -121,9 +130,11 @@ impl Vauchi {
     /// exist. The tag itself stays in the vocabulary (use [`Vauchi::delete_tag`]
     /// to remove it entirely).
     pub fn remove_tag_from_contact(&self, tag_id: &str, contact_id: &str) -> VauchiResult<()> {
-        self.storage.tags().remove_from_tag(tag_id, contact_id)?;
+        self.vocabulary_store()?
+            .tags()
+            .remove_from_tag(tag_id, contact_id)?;
         let tag = self
-            .storage
+            .vocabulary_store()?
             .tags()
             .get_tag(tag_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("tag: {tag_id}")))?;
@@ -134,7 +145,7 @@ impl Vauchi {
     /// Returns the tags applied to a given contact, oldest first.
     pub fn tags_for_contact(&self, contact_id: &str) -> VauchiResult<Vec<Tag>> {
         Ok(self
-            .storage
+            .vocabulary_store()?
             .tags()
             .list_tags()?
             .into_iter()
@@ -149,7 +160,7 @@ impl Vauchi {
     pub fn tag_name_suggestions(&self, prefix: &str) -> VauchiResult<Vec<String>> {
         let needle = normalise_name(prefix).to_lowercase();
         Ok(self
-            .storage
+            .vocabulary_store()?
             .tags()
             .list_tags()?
             .into_iter()
@@ -185,7 +196,7 @@ impl Vauchi {
     /// Errors if the tag does not exist.
     pub fn begin_tag_promotion(&self, tag_id: &str) -> VauchiResult<GroupDraft> {
         let tag = self
-            .storage
+            .vocabulary_store()?
             .tags()
             .get_tag(tag_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("tag: {tag_id}")))?;
@@ -227,22 +238,22 @@ impl Vauchi {
         visible_fields: Vec<String>,
     ) -> VauchiResult<String> {
         let tag = self
-            .storage
+            .vocabulary_store()?
             .tags()
             .get_tag(tag_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("tag: {tag_id}")))?;
 
         let now = self.clock.unix_seconds();
-        let mut group = self.storage.labels().create_group(&tag.name)?;
+        let mut group = self.vocabulary_store()?.labels().create_group(&tag.name)?;
         for contact_id in &tag.contact_ids {
             group.add_contact(contact_id, now);
         }
         group.set_visible_fields(visible_fields.into_iter().collect(), now);
-        self.storage.labels().save_group(&group)?;
+        self.vocabulary_store()?.labels().save_group(&group)?;
         self.record_group_change(&group);
 
         // Replace: consume the tag now that the group is fully persisted.
-        self.storage.tags().delete_tag(tag_id)?;
+        self.vocabulary_store()?.tags().delete_tag(tag_id)?;
         self.record_tag_deletion(tag_id);
 
         Ok(group.id().to_string())

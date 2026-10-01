@@ -55,6 +55,7 @@ mod routing;
 mod screens;
 mod screens_contacts;
 mod screens_exchange;
+mod screens_security;
 
 pub use app_screen::AppScreen;
 use overlays::{

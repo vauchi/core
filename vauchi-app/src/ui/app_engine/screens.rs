@@ -10,7 +10,6 @@ use super::AppEngine;
 use super::AppScreen;
 use super::help_catalog;
 use crate::ui::activity_log::{ActivityLogEngine, ActivityLogItem};
-use crate::ui::backup_recovery::BackupRecoveryEngine;
 use crate::ui::change_password::ChangePasswordEngine;
 use crate::ui::component::{A11y, Field, Item, Status, UiFieldVisibility, initials};
 use crate::ui::contact_detail::{ContactNotFoundEngine, SharedInfoView};
@@ -18,7 +17,6 @@ use crate::ui::decoy_contacts::{DecoyContactItem, DecoyContactsEngine};
 use crate::ui::delivery::{DeliveryItem, DeliveryStatusEngine, RetryEntry};
 use crate::ui::device_linking::DeviceLinkingEngine;
 use crate::ui::device_management::{DeviceListItem, DeviceManagementEngine};
-use crate::ui::duress_pin::{DuressConfig, DuressPinEngine};
 use crate::ui::emergency_shred::EmergencyShredEngine;
 use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogEngine;
@@ -34,7 +32,6 @@ use crate::ui::places_list::{PlaceSummary, PlacesEngine};
 use crate::ui::recovery_claim_review::{
     ClaimContext, Confidence, RecoveryClaimReviewEngine, ReviewMode,
 };
-use crate::ui::recovery_status::RecoveryEngine;
 use crate::ui::settings::{SettingsConfig, SettingsEngine, SettingsMode};
 use crate::ui::support::SupportEngine;
 use crate::ui::tag_promotion::{PromotionField, TagPromotionEngine};
@@ -297,20 +294,9 @@ impl AppEngine {
                 ))
                 .with_locale(render_context.resolved_locale()),
             ),
-            AppScreen::Backup => Box::new(
-                BackupRecoveryEngine::new(
-                    None,
-                    vauchi.has_identity(),
-                    render_context.resolved_locale(),
-                )
-                .with_last_backup(
-                    vauchi
-                        .load_backup_reminder_state()
-                        .ok()
-                        .and_then(|s| s.last_backup_timestamp),
-                    vauchi.clock().unix_seconds(),
-                ),
-            ),
+            AppScreen::Backup | AppScreen::DuressPin | AppScreen::Recovery => {
+                Self::create_security_engine(vauchi, screen, render_context)
+            }
             AppScreen::Lock => Box::new(
                 LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)
                     .with_device_capabilities(device_capabilities)
@@ -352,33 +338,6 @@ impl AppEngine {
                         .with_locale(render_context.resolved_locale()),
                 )
             }
-            AppScreen::DuressPin => {
-                // Load ALL contacts as the picker pool (even with no stored
-                // settings) so a recipient can be chosen (config-gaps defect 1).
-                let available_contacts = Self::picker_contacts(vauchi);
-                let settings = vauchi.load_duress_settings().ok().flatten();
-                // Set up means a duress PIN exists, with or without alerts;
-                // it used to mean "alert settings exist" (#459).
-                let enabled = vauchi.is_duress_enabled().unwrap_or(false) || settings.is_some();
-                let (selected_contact_ids, alert_message, include_location) = match settings {
-                    Some(s) => (s.alert_contact_ids, s.alert_message, s.include_location),
-                    None => (Vec::new(), String::new(), false),
-                };
-                let decoy_count = vauchi.list_decoy_contacts().map_or(0, |d| d.len());
-                Box::new(
-                    DuressPinEngine::new(
-                        DuressConfig {
-                            enabled,
-                            available_contacts,
-                            selected_contact_ids,
-                            alert_message,
-                            include_location,
-                        },
-                        render_context.resolved_locale(),
-                    )
-                    .with_decoy_count(decoy_count),
-                )
-            }
             AppScreen::DecoyContacts => {
                 let decoys: Vec<DecoyContactItem> = vauchi
                     .list_decoy_contacts()
@@ -406,34 +365,6 @@ impl AppEngine {
                         .with_retries(retries)
                         .with_locale(render_context.resolved_locale()),
                 )
-            }
-            AppScreen::Recovery => {
-                // Only contacts marked "Trust for recovery", against core's
-                // configured threshold (#459); the screen used to count
-                // every contact against a hard-coded 3.
-                let readiness = vauchi.get_recovery_readiness().ok();
-                let trusted_ids: std::collections::HashSet<String> = vauchi
-                    .list_contacts()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|c| c.is_recovery_trusted())
-                    .map(|c| c.id().to_string())
-                    .collect();
-                let contacts: Vec<Item> =
-                    Self::load_contact_items(vauchi, render_context.resolved_locale())
-                        .into_iter()
-                        .map(|c| c.item)
-                        .filter(|item| trusted_ids.contains(&item.id))
-                        .collect();
-                let threshold = readiness.map_or(3, |r| r.threshold as usize);
-                let device_count = vauchi
-                    .list_devices()
-                    .map(|d| d.len().saturating_sub(1))
-                    .unwrap_or(0);
-                let mut engine = RecoveryEngine::new(contacts, threshold)
-                    .with_locale(render_context.resolved_locale());
-                engine.set_linked_device_count(device_count);
-                Box::new(engine)
             }
             AppScreen::RecoveryHelp => Box::new(
                 crate::ui::recovery_help::RecoveryHelpEngine::new()
@@ -839,7 +770,7 @@ impl AppEngine {
 
     /// Full contact list as picker `Item`s (the pool duress/emergency pickers
     /// render). a11y omitted: each maps to a ToggleItem whose label labels it.
-    fn picker_contacts(vauchi: &Vauchi) -> Vec<Item> {
+    pub(super) fn picker_contacts(vauchi: &Vauchi) -> Vec<Item> {
         vauchi
             .list_contacts()
             .unwrap_or_default()

@@ -51,6 +51,7 @@ mod contact_detail_place_tests;
 mod contact_edit_form_tests;
 mod contact_ignore_notification_tests;
 mod contact_ignore_ui_tests;
+mod contact_limit_removed_tests;
 mod contact_list_faceted_tests;
 mod contact_list_i18n_tests;
 mod contact_list_intercepts_tests;

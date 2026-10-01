@@ -179,11 +179,20 @@ check:consumer-pins-bump:
       SCRIPTS_DIR=$(mktemp -d)
       git -C "$SCRIPTS_DIR" init -q
       git -C "$SCRIPTS_DIR" remote add origin https://gitlab.com/vauchi/scripts.git
-      git -C "$SCRIPTS_DIR" fetch -q --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
+      git -C "$SCRIPTS_DIR" fetch --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
       git -C "$SCRIPTS_DIR" checkout -q --detach FETCH_HEAD
+      echo "scripts checked out at $(git -C "$SCRIPTS_DIR" rev-parse HEAD)"
       export CORE_PINS="$SCRIPTS_DIR/scripts/core-pins.py"
+      # diag #465: core-pins.py intermittently missing. Name where it
+      # disappears: after checkout, before the test, or during it.
+      if [ ! -f "$CORE_PINS" ]; then
+        echo "core-pins.py missing right after checkout of ${VAUCHI_SCRIPTS_REF}"
+        ls -la "$SCRIPTS_DIR" "$SCRIPTS_DIR/scripts" 2>&1 | head -40
+        exit 1
+      fi
   script:
-    - sh ci/tests/consumer-pins-bump.test.sh
+    - test -f "$CORE_PINS" || { echo "core-pins.py gone before the test started"; exit 1; }
+    - sh ci/tests/consumer-pins-bump.test.sh || { rc=$?; echo "test failed (rc=$rc); core-pins.py now:"; ls -la "$CORE_PINS" 2>&1; exit "$rc"; }
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

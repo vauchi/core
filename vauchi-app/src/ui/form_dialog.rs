@@ -37,6 +37,11 @@ pub enum FormDialogType {
         group_id: String,
         current_name: String,
     },
+    /// Name a spot where exchanges were recorded: every contact location in
+    /// it is linked to the named place (#467).
+    NamePlace {
+        contact_ids: Vec<String>,
+    },
 }
 
 /// Returns a placeholder hint for a given catalog entry key.
@@ -106,6 +111,7 @@ impl FormDialogEngine {
             FormDialogType::RenameGroup { current_name, .. } => {
                 vec![("group_name".into(), current_name.clone())]
             }
+            FormDialogType::NamePlace { .. } => vec![("place_name".into(), String::new())],
         };
         let catalog_entries = if matches!(dialog_type, FormDialogType::AddField { .. }) {
             let registry = SocialNetworkRegistry::with_defaults();
@@ -179,6 +185,7 @@ impl FormDialogEngine {
             FormDialogType::RenameGroup { current_name, .. } => {
                 self.get_value("group_name") != current_name.as_str()
             }
+            FormDialogType::NamePlace { .. } => !self.get_value("place_name").trim().is_empty(),
         }
     }
 
@@ -416,6 +423,7 @@ impl FormDialogEngine {
                 self.t("form.rename_group_title"),
                 self.t("form.rename_button"),
             ),
+            FormDialogType::NamePlace { .. } => self.build_place_name_screen(),
         }
     }
 
@@ -555,6 +563,49 @@ impl FormDialogEngine {
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: Some(A11y::labeled(self.t("action.save"))),
+                },
+                ScreenAction {
+                    id: "cancel".into(),
+                    label: self.t("action.cancel"),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
+                },
+            ],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn build_place_name_screen(&self) -> ScreenModel {
+        let name = self.get_value("place_name");
+        let submit = self.t("action.save");
+        ScreenModel {
+            screen_id: "form_name_place".into(),
+            title: self.t("form.name_place_title"),
+            subtitle: None,
+            components: vec![Component::TextInput {
+                id: "place_name".into(),
+                label: self.t("form.place_name_label"),
+                value: name.into(),
+                placeholder: Some(self.t("form.place_name_placeholder")),
+                max_length: Some(80),
+                validation_error: None,
+                input_type: InputType::Text,
+                a11y: Some(A11y {
+                    label: Some(self.t("form.place_name_label")),
+                    hint: Some(self.t("form.place_name_placeholder")),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            }],
+            contextual_actions: vec![
+                ScreenAction {
+                    id: "submit".into(),
+                    label: submit.clone(),
+                    style: ActionStyle::Primary,
+                    enabled: !name.trim().is_empty(),
+                    a11y: Some(A11y::labeled(submit)),
                 },
                 ScreenAction {
                     id: "cancel".into(),
@@ -736,6 +787,9 @@ impl WorkflowEngine for FormDialogEngine {
             },
             FormDialogType::RenameGroup { .. } => FormInput::RenameGroup {
                 name: self.get_value("group_name").to_string(),
+            },
+            FormDialogType::NamePlace { .. } => FormInput::NamePlace {
+                name: self.get_value("place_name").to_string(),
             },
         };
         Some(crate::ui::EngineOutput::Form(input))

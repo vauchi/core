@@ -93,6 +93,9 @@ impl AppEngine {
                 url != *current_url
             }
             (FormDialogType::CreateGroup, FormInput::CreateGroup { name }) => !name.is_empty(),
+            (FormDialogType::NamePlace { .. }, FormInput::NamePlace { name }) => {
+                !name.trim().is_empty()
+            }
             (FormDialogType::RenameGroup { current_name, .. }, FormInput::RenameGroup { name }) => {
                 name != *current_name
             }

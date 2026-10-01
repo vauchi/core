@@ -254,6 +254,21 @@ impl AppEngine {
     ) -> ActionResult {
         let form_type = match dialog_type {
             "create_group" => Some(crate::ui::form_dialog::FormDialogType::CreateGroup),
+            // The spot whose anchor the Places row carries: every contact
+            // location in it gets the name (#467).
+            "name_place" => {
+                let anchor = context_id.clone().unwrap_or_default();
+                self.vauchi
+                    .unnamed_exchange_spots()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .find(|spot| spot.first() == Some(&anchor))
+                    .map(
+                        |contact_ids| crate::ui::form_dialog::FormDialogType::NamePlace {
+                            contact_ids,
+                        },
+                    )
+            }
             "rename_group" => {
                 let group_id = context_id.unwrap_or_default();
                 let current_name = self

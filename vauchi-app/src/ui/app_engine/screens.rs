@@ -28,7 +28,7 @@ use crate::ui::lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
 use crate::ui::my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, OwnFieldInfo};
 use crate::ui::my_info_entry_detail::MyInfoEntryDetailEngine;
 use crate::ui::onboarding::OnboardingEngine;
-use crate::ui::places_list::{PlaceSummary, PlacesEngine};
+use crate::ui::places_list::{PlaceSummary, PlacesEngine, UnnamedPlace};
 use crate::ui::recovery_claim_review::{
     ClaimContext, Confidence, RecoveryClaimReviewEngine, ReviewMode,
 };
@@ -402,16 +402,44 @@ impl AppEngine {
                 ),
             },
             AppScreen::Places => {
+                let counts = vauchi.place_contact_counts().unwrap_or_default();
                 let places: Vec<PlaceSummary> = vauchi
                     .list_places()
                     .unwrap_or_default()
                     .into_iter()
                     .map(|p| PlaceSummary {
+                        met_count: counts.get(&p.id).copied().unwrap_or(0),
                         id: p.id,
                         name: p.name,
                     })
                     .collect();
-                Box::new(PlacesEngine::new(places).with_locale(render_context.resolved_locale()))
+                let names: HashMap<String, String> = vauchi
+                    .list_contacts()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| (c.id().to_string(), c.display_name().to_string()))
+                    .collect();
+                let unnamed: Vec<UnnamedPlace> = vauchi
+                    .unnamed_exchange_spots()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|spot| {
+                        let anchor_contact_id = spot.first()?.clone();
+                        let met = spot
+                            .iter()
+                            .filter_map(|id| names.get(id).cloned())
+                            .collect();
+                        Some(UnnamedPlace {
+                            anchor_contact_id,
+                            met,
+                        })
+                    })
+                    .collect();
+                Box::new(
+                    PlacesEngine::new(places)
+                        .with_unnamed(unnamed)
+                        .with_locale(render_context.resolved_locale()),
+                )
             }
             AppScreen::Tags => {
                 let tags: Vec<TagSummary> = vauchi

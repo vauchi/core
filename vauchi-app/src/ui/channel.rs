@@ -490,6 +490,9 @@ pub enum FormInput {
     RenameGroup {
         name: String,
     },
+    NamePlace {
+        name: String,
+    },
     EditRelayUrl {
         url: String,
     },

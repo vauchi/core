@@ -175,7 +175,7 @@ pub use multi_stage_exchange::{
 pub use my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, MyInfoViewMode, OwnFieldInfo};
 pub use my_info_entry_detail::{EntryContactInfo, EntryViewerVia, MyInfoEntryDetailEngine};
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
-pub use places_list::{PlaceSummary, PlacesEngine};
+pub use places_list::{PlaceSummary, PlacesEngine, UnnamedPlace};
 pub use prepared_surface::{PreparedSurface, PreparedSurfaceError};
 pub use presentation::{PresentationCoordinator, PresentationCoordinatorError};
 pub use presentation_contract_fixture::presentation_contract_fixture_json;

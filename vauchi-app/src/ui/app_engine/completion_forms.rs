@@ -52,6 +52,13 @@ impl AppEngine {
                 };
                 self.form_create_group(name)
             }
+            FormDialogType::NamePlace { contact_ids } => {
+                let name = match input {
+                    Some(FormInput::NamePlace { name }) => name,
+                    _ => String::new(),
+                };
+                self.form_name_place(contact_ids, &name)
+            }
             FormDialogType::RenameGroup { group_id, .. } => {
                 let name = match input {
                     Some(FormInput::RenameGroup { name }) => Some(name),
@@ -322,6 +329,22 @@ impl AppEngine {
             };
         }
         let result = self.vauchi.create_group(name.trim()).map(|_| ());
+        self.form_saved(result)
+    }
+
+    /// `FormDialogType::NamePlace` — name every exchange location in a spot.
+    /// The first call creates the place; the rest find it by name.
+    fn form_name_place(&mut self, contact_ids: &[String], name: &str) -> ActionResult {
+        let name = name.trim();
+        if name.is_empty() {
+            return ActionResult::ValidationError {
+                component_id: "place_name".into(),
+                message: self.t("validation.field_empty"),
+            };
+        }
+        let result = contact_ids
+            .iter()
+            .try_for_each(|id| self.vauchi.name_exchange_place(id, name).map(|_| ()));
         self.form_saved(result)
     }
 

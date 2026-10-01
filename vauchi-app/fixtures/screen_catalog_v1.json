@@ -2169,7 +2169,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_c3129d422974319c",
+                    "id": "field_d90ef4906673a446",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2200,13 +2200,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:c3129d422974319c",
+                    "id": "field_note:d90ef4906673a446",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:c3129d422974319c",
+                          "id": "field_note:d90ef4906673a446",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2246,7 +2246,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_6eb5041425bff7a8",
+                    "id": "field_2dd8c1ca5b433487",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2277,13 +2277,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:6eb5041425bff7a8",
+                    "id": "field_note:2dd8c1ca5b433487",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:6eb5041425bff7a8",
+                          "id": "field_note:2dd8c1ca5b433487",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2323,7 +2323,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_7b3ed317d9f71062",
+                    "id": "field_23f6d060ff37b0fa",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2354,13 +2354,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:7b3ed317d9f71062",
+                    "id": "field_note:23f6d060ff37b0fa",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:7b3ed317d9f71062",
+                          "id": "field_note:23f6d060ff37b0fa",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4514,10 +4514,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "0DFA E0EA 3E05 E8AE 8FE7 2ADB 7118 3683 997D 5E71 4B1D 48C2 D875 A6EC 9BA4 AE99",
+                    "content": "B373 E1D9 180F 96AD C3D9 DAD9 FFD2 4155 942F 15EE EDF9 5534 7BCD 635F 4317 2DA3",
                     "style": "body",
                     "accessibility": {
-                      "label": "0DFA E0EA 3E05 E8AE 8FE7 2ADB 7118 3683 997D 5E71 4B1D 48C2 D875 A6EC 9BA4 AE99",
+                      "label": "B373 E1D9 180F 96AD C3D9 DAD9 FFD2 4155 942F 15EE EDF9 5534 7BCD 635F 4317 2DA3",
                       "description": null
                     }
                   }
@@ -4536,10 +4536,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "DD13 49BC 6918 4D51 F14C 8973 A293 D8FF E7D9 9DAD 4C82 0BD5 60B5 6803 E14A 3CDE",
+                    "content": "2CB3 C158 55BB 71B2 CEFC E4CD 0566 CD83 B149 7784 9C01 5BCA 652F 8F90 DE38 C460",
                     "style": "body",
                     "accessibility": {
-                      "label": "DD13 49BC 6918 4D51 F14C 8973 A293 D8FF E7D9 9DAD 4C82 0BD5 60B5 6803 E14A 3CDE",
+                      "label": "2CB3 C158 55BB 71B2 CEFC E4CD 0566 CD83 B149 7784 9C01 5BCA 652F 8F90 DE38 C460",
                       "description": null
                     }
                   }
@@ -11877,14 +11877,23 @@
                   }
                 },
                 {
-                  "List": {
-                    "id": "tags",
-                    "label": null,
-                    "rows": [],
-                    "searchable": false,
-                    "paging": null,
+                  "Text": {
+                    "id": "tags_intro",
+                    "content": "Private labels, only on your devices. A tag that grows can become a group.",
+                    "style": "body",
                     "accessibility": {
-                      "label": "",
+                      "label": "Private labels, only on your devices. A tag that grows can become a group.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Text": {
+                    "id": "tags_empty",
+                    "content": "No tags yet. Tag a contact from their page; tags stay on your devices only.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "No tags yet. Tag a contact from their page; tags stay on your devices only.",
                       "description": null
                     }
                   }
@@ -12016,14 +12025,23 @@
                   }
                 },
                 {
-                  "List": {
-                    "id": "places",
-                    "label": null,
-                    "rows": [],
-                    "searchable": false,
-                    "paging": null,
+                  "Text": {
+                    "id": "places_intro",
+                    "content": "Where you exchanged cards, named by you. Places stay on your devices.",
+                    "style": "body",
                     "accessibility": {
-                      "label": "",
+                      "label": "Where you exchanged cards, named by you. Places stay on your devices.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Text": {
+                    "id": "places_empty",
+                    "content": "No places yet. When an exchange records where it happened, the place appears here for you to name.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "No places yet. When an exchange records where it happened, the place appears here for you to name.",
                       "description": null
                     }
                   }
@@ -16218,7 +16236,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=O0L7L5cTe9Jeqm_PQnWjht0CFRq74C003OCYy1PRYDg&n=wT_ORBPjHo5ctNBKKzfOMLNdykvEXdrqRzlgfWix_IM",
+                    "content": "vauchi://exchange?pk=V7ft3m5-xufi4y8lO9EOYOOkGOYbvDoemaHi2cSHUGY&n=iKZft6mZ8s1zp8YnTV-7oTzefEvl5ehQ40JT0dxvYGw",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -16677,7 +16695,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,80,100,69,48,109,56,97,82,104,78,85,102,70,77,105,88,79,105,107,57,106,47,53,57,109,100,114,85,121,67,67,57,86,103,116,87,103,68,52,85,111,56,51,109,50,114,115,120,54,75,121,86,113,66,120,84,48,90,65,76,98,117,114,48,48,56,79,106,98,52,101,66,108,97,97,66,76,68,109,114,104,122,115,98,70,47,108,51,81,53,79,80,121,99,87,86,88,87,111,112,114,99,70,78,102,97,84,68,73,53,118,98,98,120,120,56,49,119,80,116,54,78,81,116,111,56,73,75,68,110,109,53,76,66,108,79,116,76,72,65,101,81,115,120,88,85,49,54,85,43,65,65,65,65,65,71,113,57,43,68,56,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,66,90,103,67,88,108,78,88,73,56,49,79,71,76,53,57,98,99,70,67,86,115,51,55,101,55,70,68,106,121,103,110,81,114,116,43,53,70,108,48,87,66,107,65,82,83,105,119,78,88,66,51,48,54,103,117,77,102,76,57,55,51,106,75,111,49,83,99,89,109,117,90,88,67,121,105,83,106,43,69,86,65,69,85,65],
+            "payload": [86,48,74,70,87,65,77,115,115,56,70,89,86,98,116,120,115,115,55,56,53,77,48,70,90,115,50,68,115,85,108,51,104,74,119,66,87,56,112,108,76,52,43,81,51,106,106,69,89,71,108,66,77,89,53,108,89,108,106,115,68,71,50,108,90,86,69,70,70,47,109,109,76,79,75,48,50,48,73,43,110,65,87,105,121,68,118,78,104,87,85,48,119,71,118,114,48,69,120,108,75,119,115,106,110,99,87,57,120,97,110,70,117,114,106,87,53,122,81,109,54,101,90,86,85,66,120,74,71,78,80,101,97,76,53,122,121,110,105,66,118,112,76,77,81,69,99,49,113,56,116,98,118,71,113,120,65,65,65,65,65,71,113,57,43,110,107,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,68,54,111,122,76,121,118,104,81,112,83,71,103,107,56,55,85,48,68,78,65,102,102,109,52,112,117,106,78,121,115,85,98,111,106,112,55,75,80,72,79,66,73,43,121,107,47,104,66,118,54,102,112,99,43,90,102,57,49,66,51,103,100,101,88,69,105,67,79,66,108,106,115,101,109,72,49,121,73,55,117,65,119,47,115,73],
             "is_initiator": true
           }
         }
@@ -16709,7 +16727,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI2TLEBENS8PME4W7O419CMV:H8+Z9KKCM 8POT*WTU9A:XM-B7:F098LGLU606$EUZB0X$HO$P-7U0XRAG0%2W-8IW+OATM/OO22IEWQ5L2N8RVOIZ6AI6J*5D11Vauchi User00"
+                      "INI2$ CVVP4W2BBFCXDD 99X92LMDAA514+5TYVJTUPYHMAU4QUDGBRUQAG9T/008JE149Q3RB$RBBMVDJ2E2A8VE*UG8KJ*V.0J+0A8IC7S6845/B5.96H:9Z8P11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17348,7 +17366,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [221,19,73,188,105,24,77,81,241,76,137,115,162,147,216,255,231,217,157,173,76,130,11,213,96,181,104,3,225,74,60,222]
+            "payload": [44,179,193,88,85,187,113,178,206,252,228,205,5,102,205,131,177,73,119,132,156,1,91,202,101,47,143,144,222,56,196,96]
           }
         },
         {
@@ -17503,7 +17521,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [221,19,73,188,105,24,77,81,241,76,137,115,162,147,216,255,231,217,157,173,76,130,11,213,96,181,104,3,225,74,60,222]
+            "payload": [44,179,193,88,85,187,113,178,206,252,228,205,5,102,205,131,177,73,119,132,156,1,91,202,101,47,143,144,222,56,196,96]
           }
         },
         {
@@ -17658,7 +17676,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [221,19,73,188,105,24,77,81,241,76,137,115,162,147,216,255,231,217,157,173,76,130,11,213,96,181,104,3,225,74,60,222]
+            "payload": [44,179,193,88,85,187,113,178,206,252,228,205,5,102,205,131,177,73,119,132,156,1,91,202,101,47,143,144,222,56,196,96]
           }
         },
         {

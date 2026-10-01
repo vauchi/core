@@ -18,10 +18,12 @@ fn factory() -> PlacesEngine {
         PlaceSummary {
             id: "p1".into(),
             name: "Anchor Bar".into(),
+            met_count: 0,
         },
         PlaceSummary {
             id: "p2".into(),
             name: "Zurich HB".into(),
+            met_count: 0,
         },
     ])
 }

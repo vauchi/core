@@ -35,6 +35,20 @@ fn body_button(screen: &vauchi_app::ui::ScreenModel, list: &str, id: &str) -> St
         .expect("body button")
 }
 
+/// A backup row's label (#459: Export / Restore are rows).
+fn row_label(screen: &vauchi_app::ui::ScreenModel, id: &str) -> String {
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::ActionList { id: list, items } if list == "backup_rows" => {
+                items.iter().find(|i| i.id == id).map(|i| i.label.clone())
+            }
+            _ => None,
+        })
+        .expect("backup row")
+}
+
 /// Copy a shell would show walking the duress wizard to its confirm step.
 struct DuressCopy {
     overview_title: String,
@@ -124,18 +138,24 @@ fn walk_backup(locale: Locale) -> BackupCopy {
     let choose = engine.current_screen();
     let choose_screen_id = choose.screen_id.clone();
     let choose_title = choose.title.clone();
-    let create_action = action_label(&choose, "create");
-    let restore_action = action_label(&choose, "restore");
+    let create_action = row_label(&choose, "create");
+    let restore_action = row_label(&choose, "restore");
 
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "create".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "backup_rows".into(),
+        item_id: "create".into(),
     });
     let password = engine.current_screen();
     let password_screen_id = password.screen_id.clone();
     let password_title = password.title.clone();
-    let Component::TextInput { label, .. } = &password.components[0] else {
-        panic!("password step leads with the password input");
-    };
+    let label = password
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::TextInput { id, label, .. } if id == "password" => Some(label),
+            _ => None,
+        })
+        .expect("the password input");
 
     BackupCopy {
         choose_screen_id,
@@ -219,5 +239,5 @@ fn duress_and_backup_english_copy_unchanged() {
     let backup = BackupRecoveryEngine::new(None, true, Locale::English);
     let choose = backup.current_screen();
     assert_eq!(choose.title, "Backup & Recovery");
-    assert_eq!(action_label(&choose, "create"), "Create Backup");
+    assert_eq!(row_label(&choose, "create"), "Export backup");
 }

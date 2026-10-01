@@ -2169,7 +2169,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_8afbf9fd2264a53d",
+                    "id": "field_b194241ade96bf1c",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2200,13 +2200,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:8afbf9fd2264a53d",
+                    "id": "field_note:b194241ade96bf1c",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:8afbf9fd2264a53d",
+                          "id": "field_note:b194241ade96bf1c",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2246,7 +2246,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_392dccb9f84b04a4",
+                    "id": "field_7df97f8023a4abca",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2277,13 +2277,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:392dccb9f84b04a4",
+                    "id": "field_note:7df97f8023a4abca",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:392dccb9f84b04a4",
+                          "id": "field_note:7df97f8023a4abca",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2323,7 +2323,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_8f274c302079be73",
+                    "id": "field_f800852e487bc518",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2354,13 +2354,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:8f274c302079be73",
+                    "id": "field_note:f800852e487bc518",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:8f274c302079be73",
+                          "id": "field_note:f800852e487bc518",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4514,10 +4514,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "FE47 498E E443 CFBC 6703 968D AF6D F2C3 A9EF 83BD 6680 FB6D 413D 2AE6 DD59 81AF",
+                    "content": "A0EB 386F B01D 9007 625C CB08 2737 87F5 A636 652E EBCD F110 6E3D E609 78A8 A779",
                     "style": "body",
                     "accessibility": {
-                      "label": "FE47 498E E443 CFBC 6703 968D AF6D F2C3 A9EF 83BD 6680 FB6D 413D 2AE6 DD59 81AF",
+                      "label": "A0EB 386F B01D 9007 625C CB08 2737 87F5 A636 652E EBCD F110 6E3D E609 78A8 A779",
                       "description": null
                     }
                   }
@@ -4536,10 +4536,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "08DF F978 903E 3A98 C037 AB74 899B D5A5 D85E 6D34 0540 9D5D AA40 8B4D 85D7 7CA6",
+                    "content": "9FC7 B52A A3B3 F162 9F86 E189 C3E3 ADED F1A9 1050 0B12 5697 1495 AA67 0F3F EB8C",
                     "style": "body",
                     "accessibility": {
-                      "label": "08DF F978 903E 3A98 C037 AB74 899B D5A5 D85E 6D34 0540 9D5D AA40 8B4D 85D7 7CA6",
+                      "label": "9FC7 B52A A3B3 F162 9F86 E189 C3E3 ADED F1A9 1050 0B12 5697 1495 AA67 0F3F EB8C",
                       "description": null
                     }
                   }
@@ -8743,54 +8743,85 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "backup_info",
-                    "label": "Protect your data",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Backup",
-                          "detail": "Create an encrypted backup of your identity, contacts, and labels.",
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Backup",
-                            "description": null
-                          }
-                        }
-                      }
-                    ],
+                  "Text": {
+                    "id": "backup_intro",
+                    "content": "An encrypted backup lets you restore Vauchi after reinstalling it, or move to a new device.",
+                    "style": "body",
                     "accessibility": {
-                      "label": "Protect your data",
+                      "label": "An encrypted backup lets you restore Vauchi after reinstalling it, or move to a new device.",
                       "description": null
                     }
                   }
                 },
                 {
-                  "Group": {
-                    "id": "backup_level",
-                    "label": "Backup level",
-                    "axis": "vertical",
-                    "children": [
+                  "List": {
+                    "id": "backup_rows",
+                    "label": null,
+                    "rows": [
                       {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "Full backup (recommended)",
-                          "value": true,
+                        "title": "Export backup",
+                        "subtitle": "Encrypted file, protected by a password you choose",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "Export backup",
+                          "accessibility_label": "Export backup",
+                          "icon_token": null,
                           "enabled": true,
-                          "accessibility": {
-                            "label": "Backup level toggle",
-                            "description": "When on, backs up everything. When off, backs up identity only."
-                          }
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Export backup",
+                          "description": null
+                        }
+                      },
+                      {
+                        "title": "Restore from backup",
+                        "subtitle": "Replaces the identity on this device",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.2",
+                          "label": "Restore from backup",
+                          "accessibility_label": "Restore from backup",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Restore from backup",
+                          "description": null
                         }
                       }
                     ],
+                    "searchable": false,
+                    "paging": null,
                     "accessibility": {
-                      "label": "Backup level",
+                      "label": "",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Text": {
+                    "id": "last_backup",
+                    "content": "Last backup · never",
+                    "style": "caption",
+                    "accessibility": {
+                      "label": "Last backup · never",
                       "description": null
                     }
                   }
@@ -8820,22 +8851,8 @@
                 "enabled": true,
                 "shortcut": null
               },
-              "primary": {
-                "interaction_id": "surface.1.context.create",
-                "label": "Create Backup",
-                "accessibility_label": "Create Backup",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": "activate_primary"
-              },
-              "secondary": {
-                "interaction_id": "surface.1.context.presentation.secondary",
-                "label": "Actions",
-                "accessibility_label": "Actions",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": null
-              }
+              "primary": null,
+              "secondary": null
             }
           }
         },
@@ -16785,7 +16802,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=n7JMvBs8TkKCm_GnaygrBmPj-DSHH-OXMlsSvuD9tSQ&n=TFmaeZfUrZcFZD-M6yWj_3-Cg-I9eKWDexPWUUegW04",
+                    "content": "vauchi://exchange?pk=dg8J8gf54ahRVfJIjAU2REACr6ZnWExMer-T_4tyqhg&n=vNuxFx4NN5sfKbUPMtBlhCLlmg-dgf6AMtrLuWJNPOA",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17244,7 +17261,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,77,73,51,47,108,52,107,68,52,54,109,77,65,51,113,51,83,74,109,57,87,108,50,70,53,116,78,65,86,65,110,86,50,113,81,73,116,78,104,100,100,56,112,117,112,115,57,48,104,110,109,82,65,47,119,80,48,103,110,102,52,114,67,99,110,106,69,104,99,69,89,116,65,81,116,106,117,121,110,68,68,79,108,89,73,107,68,112,66,116,53,52,103,97,51,70,109,109,69,108,65,119,109,84,107,115,83,104,83,87,49,90,69,113,103,99,79,121,114,87,66,115,105,85,97,120,116,65,109,89,75,120,88,115,103,54,57,108,97,101,106,55,66,122,50,52,104,82,75,53,65,65,65,65,65,71,113,57,112,104,65,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,56,114,102,87,56,68,97,68,99,47,84,83,100,100,109,56,109,47,56,56,76,79,97,54,101,114,105,121,52,50,76,117,48,108,72,79,43,109,78,120,98,49,117,81,56,50,51,47,69,89,109,77,116,83,82,68,76,88,50,118,53,104,110,90,76,69,117,111,100,80,50,66,118,97,103,75,66,78,66,118,56,120,111,115,70],
+            "payload": [86,48,74,70,87,65,79,102,120,55,85,113,111,55,80,120,89,112,43,71,52,89,110,68,52,54,51,116,56,97,107,81,85,65,115,83,86,112,99,85,108,97,112,110,68,122,47,114,106,75,47,104,120,66,122,51,107,85,99,49,103,47,107,79,104,69,68,57,104,49,70,65,71,65,68,121,111,75,72,98,71,78,82,111,77,54,82,52,77,103,56,72,106,74,121,116,111,104,121,66,49,101,82,67,67,49,107,72,81,80,105,122,102,68,57,65,90,108,113,81,47,51,72,122,102,101,113,119,67,80,115,98,108,69,120,116,73,122,65,116,75,55,104,74,57,101,82,67,52,43,121,83,70,71,89,112,65,65,65,65,65,71,113,57,112,52,77,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,119,67,48,69,112,49,112,67,52,49,47,98,99,116,88,84,47,102,88,55,98,121,122,83,56,57,88,76,97,72,55,80,118,82,122,51,72,110,98,111,107,79,73,121,78,49,102,113,68,84,97,74,116,82,67,69,74,47,100,88,85,82,98,88,48,52,73,120,82,51,111,114,73,89,116,76,86,82,71,106,90,107,110,65,66],
             "is_initiator": true
           }
         }
@@ -17276,7 +17293,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI24VHAPSZNQHV1NZJ%W8V8Q+2OOAR/-O:H81.HNJLFRTV6AF/T*+RAPD.:3K/EB D1HKGO0YVRZO2CR6B.J2P6BCI3*IRG9PGK19A2 7.W3M$MV5MMTT2D74$C11Vauchi User00"
+                      "INI2:S162J7%VP*5:Q4BJ5INAVZUL72VSH4+A9XPCD14%911I.JV :D:4I9$HXZ1QMI9536BCP8RMO77$9%8V:L1OUH4VC+IJFKI0.VK-O8$BN-0F.HUY2L1N.Z311Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17915,7 +17932,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [8,223,249,120,144,62,58,152,192,55,171,116,137,155,213,165,216,94,109,52,5,64,157,93,170,64,139,77,133,215,124,166]
+            "payload": [159,199,181,42,163,179,241,98,159,134,225,137,195,227,173,237,241,169,16,80,11,18,86,151,20,149,170,103,15,63,235,140]
           }
         },
         {
@@ -18070,7 +18087,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [8,223,249,120,144,62,58,152,192,55,171,116,137,155,213,165,216,94,109,52,5,64,157,93,170,64,139,77,133,215,124,166]
+            "payload": [159,199,181,42,163,179,241,98,159,134,225,137,195,227,173,237,241,169,16,80,11,18,86,151,20,149,170,103,15,63,235,140]
           }
         },
         {
@@ -18225,7 +18242,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [8,223,249,120,144,62,58,152,192,55,171,116,137,155,213,165,216,94,109,52,5,64,157,93,170,64,139,77,133,215,124,166]
+            "payload": [159,199,181,42,163,179,241,98,159,134,225,137,195,227,173,237,241,169,16,80,11,18,86,151,20,149,170,103,15,63,235,140]
           }
         },
         {

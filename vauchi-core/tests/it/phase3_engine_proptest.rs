@@ -499,8 +499,9 @@ proptest! {
     fn backup_create_forward_progress(password in "[a-zA-Z0-9]{4,20}") {
         let mut engine = make_backup(None);
 
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "create".into(),
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "backup_rows".into(),
+            item_id: "create".into(),
         });
         prop_assert_eq!(engine.current_screen().screen_id, "backup_password");
 
@@ -538,8 +539,9 @@ proptest! {
     fn backup_restore_forward_progress(password in "[a-zA-Z0-9]{4,20}") {
         let mut engine = make_backup(None);
 
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "restore".into(),
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "backup_rows".into(),
+            item_id: "restore".into(),
         });
         prop_assert_eq!(engine.current_screen().screen_id, "backup_password");
 

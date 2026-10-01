@@ -52,6 +52,8 @@ pub struct BackupRecoveryEngine {
     /// Pasted backup blob (Restore mode only). Hex-encoded ASCII matching
     /// `Vauchi::export_full_backup` output. Captured on the password screen.
     restore_data: String,
+    last_backup: Option<u64>,
+    now: u64,
     locale: Locale,
 }
 
@@ -92,7 +94,59 @@ impl BackupRecoveryEngine {
             confirm_password: String::new(),
             has_identity,
             restore_data: String::new(),
+            last_backup: None,
+            now: 0,
             locale,
+        }
+    }
+
+    /// When the last backup was made (Unix seconds), and the current time
+    /// to say how long ago that was.
+    pub fn with_last_backup(mut self, last_backup: Option<u64>, now: u64) -> Self {
+        self.last_backup = last_backup;
+        self.now = now;
+        self
+    }
+
+    fn last_backup_line(&self) -> String {
+        match self.last_backup {
+            Some(then) => get_string_with_args(
+                self.locale,
+                "backup.manage.last_backup",
+                &[(
+                    "when",
+                    &crate::relative_time::format_relative_time(self.now, then, self.locale),
+                )],
+            ),
+            None => self.t("backup.manage.last_backup_never"),
+        }
+    }
+
+    fn level_choice(&self) -> Component {
+        let detail = match self.level {
+            BackupLevel::Full => self.t("backup.wizard.full_detail"),
+            BackupLevel::IdentityOnly => self.t("backup.wizard.identity_only_detail"),
+        };
+        let toggle_label = match self.level {
+            BackupLevel::Full => self.t("backup.wizard.level_full"),
+            BackupLevel::IdentityOnly => self.t("backup.wizard.level_identity_only"),
+        };
+        Component::ToggleList {
+            id: "backup_level".into(),
+            label: self.t("backup.wizard.level_label"),
+            items: vec![ToggleItem {
+                id: "level_toggle".into(),
+                label: toggle_label,
+                selected: self.level == BackupLevel::Full,
+                subtitle: Some(detail),
+                a11y: Some(A11y {
+                    label: Some(self.t("backup.wizard.level_a11y")),
+                    hint: Some(self.t("backup.wizard.level_a11y_hint")),
+                    role: Some(AccessibilityRole::Toggle),
+                }),
+                info_key: None,
+            }],
+            a11y: None,
         }
     }
 
@@ -167,64 +221,48 @@ impl BackupRecoveryEngine {
     }
 
     fn choose_screen(&self) -> ScreenModel {
-        let detail = match self.level {
-            BackupLevel::Full => self.t("backup.wizard.full_detail"),
-            BackupLevel::IdentityOnly => self.t("backup.wizard.identity_only_detail"),
-        };
-        let toggle_label = match self.level {
-            BackupLevel::Full => self.t("backup.wizard.level_full"),
-            BackupLevel::IdentityOnly => self.t("backup.wizard.level_identity_only"),
+        let row = |id: &str, title: &str, detail: &str| ActionListItem {
+            id: id.into(),
+            label: self.t(title),
+            icon: None,
+            detail: Some(self.t(detail)),
+            a11y: None,
+            info_key: None,
         };
         ScreenModel {
             screen_id: "backup_choose".into(),
             title: self.t("backup.wizard.title"),
             subtitle: None,
             components: vec![
-                Component::InfoPanel {
-                    id: "backup_info".into(),
-                    icon: Some("drive".into()),
-                    title: self.t("backup.wizard.protect_title"),
-                    items: vec![InfoItem {
-                        icon: None,
-                        title: self.t("backup.wizard.backup_item"),
-                        detail,
-                    }],
+                Component::Text {
+                    id: "backup_intro".into(),
+                    content: self.t("backup.manage.intro"),
+                    style: TextStyle::Body,
                     a11y: None,
                 },
-                Component::ToggleList {
-                    id: "backup_level".into(),
-                    label: self.t("backup.wizard.level_label"),
-                    items: vec![ToggleItem {
-                        id: "level_toggle".into(),
-                        label: toggle_label,
-                        selected: self.level == BackupLevel::Full,
-                        subtitle: None,
-                        a11y: Some(A11y {
-                            label: Some(self.t("backup.wizard.level_a11y")),
-                            hint: Some(self.t("backup.wizard.level_a11y_hint")),
-                            role: Some(AccessibilityRole::Toggle),
-                        }),
-                        info_key: None,
-                    }],
+                Component::ActionList {
+                    id: "backup_rows".into(),
+                    items: vec![
+                        row(
+                            "create",
+                            "backup.manage.export_title",
+                            "backup.manage.export_detail",
+                        ),
+                        row(
+                            "restore",
+                            "backup.manage.restore_title",
+                            "backup.manage.restore_detail",
+                        ),
+                    ],
+                },
+                Component::Text {
+                    id: "last_backup".into(),
+                    content: self.last_backup_line(),
+                    style: TextStyle::Caption,
                     a11y: None,
                 },
             ],
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "create".into(),
-                    label: self.t("backup.wizard.create"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("backup.wizard.create"))),
-                },
-                ScreenAction {
-                    id: "restore".into(),
-                    label: self.t("backup.wizard.restore"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("backup.wizard.restore"))),
-                },
-            ],
+            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }
@@ -236,6 +274,10 @@ impl BackupRecoveryEngine {
             BackupMode::Restore => self.t("backup.wizard.enter_password"),
         };
         let mut components = Vec::new();
+        // Full or identity-only is an export question (#459).
+        if matches!(self.mode, BackupMode::Create) {
+            components.push(self.level_choice());
+        }
         // Restore needs the backup blob. Offer a paste field (keyboard
         // frontends) ahead of the password; mobile may still drive restore
         // through the file picker, which sets `restore_data` out of band.
@@ -553,27 +595,31 @@ impl WorkflowEngine for BackupRecoveryEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match (&self.step, action) {
             // ChooseMode
-            (BackupStep::ChooseMode, UserAction::ActionPressed { action_id })
-                if action_id == "create" =>
-            {
-                self.mode = BackupMode::Create;
-                self.step = BackupStep::EnterPassword;
-                ActionResult::NavigateTo(self.current_screen())
-            }
-            (BackupStep::ChooseMode, UserAction::ActionPressed { action_id })
-                if action_id == "restore" =>
-            {
-                self.mode = BackupMode::Restore;
+            (
+                BackupStep::ChooseMode,
+                UserAction::ListItemSelected {
+                    component_id,
+                    item_id,
+                },
+            ) if component_id == "backup_rows" && (item_id == "create" || item_id == "restore") => {
+                self.mode = if item_id == "create" {
+                    BackupMode::Create
+                } else {
+                    BackupMode::Restore
+                };
                 self.step = BackupStep::EnterPassword;
                 ActionResult::NavigateTo(self.current_screen())
             }
             (
-                BackupStep::ChooseMode,
+                BackupStep::EnterPassword,
                 UserAction::ItemToggled {
                     component_id,
                     item_id,
                 },
-            ) if component_id == "backup_level" && item_id == "level_toggle" => {
+            ) if self.mode == BackupMode::Create
+                && component_id == "backup_level"
+                && item_id == "level_toggle" =>
+            {
                 self.level = match self.level {
                     BackupLevel::Full => BackupLevel::IdentityOnly,
                     BackupLevel::IdentityOnly => BackupLevel::Full,

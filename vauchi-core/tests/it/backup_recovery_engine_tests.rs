@@ -11,19 +11,30 @@ fn backup_starts_at_choose() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "backup_choose");
     assert!(screen.progress.is_none());
-    assert_eq!(screen.contextual_actions.len(), 2);
-    assert_eq!(screen.contextual_actions[0].id, "create");
-    assert_eq!(screen.contextual_actions[0].style, ActionStyle::Primary);
-    assert_eq!(screen.contextual_actions[1].id, "restore");
-    assert_eq!(screen.contextual_actions[1].style, ActionStyle::Secondary);
+    assert!(
+        screen.contextual_actions.is_empty(),
+        "export and restore are rows (#459)"
+    );
+    let ids: Vec<&str> = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::ActionList { id, items } if id == "backup_rows" => {
+                Some(items.iter().map(|i| i.id.as_str()).collect())
+            }
+            _ => None,
+        })
+        .expect("backup rows");
+    assert_eq!(ids, ["create", "restore"]);
 }
 
 // @internal
 #[test]
 fn backup_create_flow_to_password() {
     let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "create".into(),
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "backup_rows".into(),
+        item_id: "create".into(),
     });
 
     match result {
@@ -41,8 +52,9 @@ fn backup_create_flow_to_password() {
 #[test]
 fn backup_restore_flow_to_password() {
     let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "restore".into(),
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "backup_rows".into(),
+        item_id: "restore".into(),
     });
 
     match result {
@@ -322,8 +334,9 @@ fn backup_processing_failed() {
 fn backup_back_navigation() {
     let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
 
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "create".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "backup_rows".into(),
+        item_id: "create".into(),
     });
     assert_eq!(engine.current_screen().screen_id, "backup_password");
 
@@ -338,8 +351,9 @@ fn backup_back_navigation() {
     }
 
     // Go to create, enter password, go to confirm, then back to password
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "create".into(),
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "backup_rows".into(),
+        item_id: "create".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
@@ -462,6 +476,11 @@ fn backup_defaults_to_full_level() {
 fn backup_level_toggle_switches_to_identity_only_and_back() {
     let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
     assert_eq!(*engine.level(), BackupLevel::Full);
+    // The level is an export question, asked on the export password step.
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "backup_rows".into(),
+        item_id: "create".into(),
+    });
 
     let result = engine.handle_action(UserAction::ItemToggled {
         component_id: "backup_level".into(),
@@ -470,7 +489,7 @@ fn backup_level_toggle_switches_to_identity_only_and_back() {
     assert_eq!(*engine.level(), BackupLevel::IdentityOnly);
     match result {
         ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "backup_choose");
+            assert_eq!(screen.screen_id, "backup_password");
         }
         other => panic!("Expected UpdateScreen, got {:?}", other),
     }

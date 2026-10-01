@@ -297,11 +297,20 @@ impl AppEngine {
                 ))
                 .with_locale(render_context.resolved_locale()),
             ),
-            AppScreen::Backup => Box::new(BackupRecoveryEngine::new(
-                None,
-                vauchi.has_identity(),
-                render_context.resolved_locale(),
-            )),
+            AppScreen::Backup => Box::new(
+                BackupRecoveryEngine::new(
+                    None,
+                    vauchi.has_identity(),
+                    render_context.resolved_locale(),
+                )
+                .with_last_backup(
+                    vauchi
+                        .load_backup_reminder_state()
+                        .ok()
+                        .and_then(|s| s.last_backup_timestamp),
+                    vauchi.clock().unix_seconds(),
+                ),
+            ),
             AppScreen::Lock => Box::new(
                 LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)
                     .with_device_capabilities(device_capabilities)

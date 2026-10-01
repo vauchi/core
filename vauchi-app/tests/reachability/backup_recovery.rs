@@ -18,9 +18,10 @@
 //! (`backup_recovery.rs:493`) and advances past it. From the
 //! `has_identity = true` restore path it reaches `ConfirmReplace`
 //! (`backup_confirm_replace`); from the create path it reaches
-//! `ConfirmPassword` (`backup_confirm`). The reachable affordance
-//! set is therefore `{create, restore}` (choose) ∪
-//! `{back, continue}` (password / confirm) ∪
+//! `ConfirmPassword` (`backup_confirm`). Export and Restore on the
+//! choose screen are rows (#459), `ListItemSelected` pass-throughs the
+//! walk follows, so the declared `ActionPressed` set is
+//! `{back, continue, choose_file}` (password / confirm) ∪
 //! `{confirm_replace, cancel_replace}` (replace).
 //!
 //! ## What stays unreachable (pinned elsewhere)
@@ -45,8 +46,6 @@ use vauchi_app::ui::{BackupRecoveryEngine, WorkflowEngine};
 /// and consumed by `BackupRecoveryEngine::handle_action` —
 /// `core/vauchi-app/src/ui/backup_recovery.rs`.
 const HANDLED: &[&str] = &[
-    "create",
-    "restore",
     "back",
     "continue",
     // Restore-only: asks the shell for the backup file. A real export

@@ -75,6 +75,7 @@ mod display_hint_tests;
 mod drain_notifications_tests;
 mod duress_backup_i18n_tests;
 mod duress_pin_wiring_tests;
+mod duress_screen_tests;
 mod emergency_shred_screen_tests;
 mod emergency_shred_wipe_tests;
 mod engine_output_tests;

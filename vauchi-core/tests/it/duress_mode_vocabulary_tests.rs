@@ -43,6 +43,15 @@ fn in_duress_mode() -> World {
     wb.add_tag_to_contact(&rita, "climbing").unwrap();
     wb.set_exchange_location(&rita, 47.0, 8.0).unwrap();
     wb.name_exchange_place(&rita, "Zürich").unwrap();
+    let met_elsewhere = Contact::from_exchange(
+        [8u8; 32],
+        ContactCard::new("Ugo"),
+        SymmetricKey::generate(),
+        0,
+    );
+    let ugo = met_elsewhere.id().to_string();
+    wb.add_contact(met_elsewhere).unwrap();
+    wb.set_exchange_location(&ugo, 46.0, 9.0).unwrap();
     wb.setup_duress_password(DURESS_PIN).unwrap();
     assert_eq!(wb.authenticate(DURESS_PIN).unwrap(), AuthMode::Duress);
     World {
@@ -64,6 +73,8 @@ fn duress_mode_shows_no_real_groups_tags_or_places() {
     assert!(w.wb.list_groups().unwrap().is_empty());
     assert!(w.wb.list_tags().unwrap().is_empty());
     assert!(w.wb.list_places().unwrap().is_empty());
+    assert!(w.wb.place_contact_counts().unwrap().is_empty());
+    assert!(w.wb.unnamed_exchange_spots().unwrap().is_empty());
 }
 
 // @scenario: duress_mode :: Changes made in duress mode look like they worked
@@ -101,6 +112,14 @@ fn what_is_made_in_duress_mode_stays_in_the_session() {
         names(w.wb.list_places().unwrap(), |p| p.name.clone()),
         ["Zürich"]
     );
+    assert_eq!(
+        w.wb.place_contact_counts()
+            .unwrap()
+            .into_values()
+            .collect::<Vec<_>>(),
+        [1]
+    );
+    assert_eq!(w.wb.unnamed_exchange_spots().unwrap().len(), 1);
 }
 
 // @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts

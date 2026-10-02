@@ -135,3 +135,106 @@ fn a_late_activation_of_a_surface_left_behind_is_ignored() {
     );
     assert_eq!(rendered(&mut engine).surface_id, now.surface_id);
 }
+
+fn on_hover_with_camera() -> AppEngine {
+    let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
+    vauchi.create_identity("Alice").expect("identity");
+    let mut engine = AppEngine::new(vauchi);
+    engine.set_device_capabilities(DeviceCapabilities {
+        has_camera: true,
+        ..Default::default()
+    });
+    let _ = engine.navigate_to(AppScreen::Exchange);
+    let _ = engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Hover,
+    });
+    engine
+}
+
+fn has_capture(surface: &SurfaceSpec) -> bool {
+    fn walk(nodes: &[PresentationNode]) -> bool {
+        nodes.iter().any(|node| match node {
+            PresentationNode::Qr { purpose, .. } => *purpose == PresentationQrPurpose::Capture,
+            PresentationNode::Group { children, .. } => walk(children),
+            _ => false,
+        })
+    }
+    walk(&surface.nodes)
+}
+
+fn replaced_surface(commands: Vec<Command>) -> SurfaceSpec {
+    commands
+        .into_iter()
+        .rev()
+        .find_map(|c| match c {
+            Command::ReplaceSurface { surface } => Some(surface),
+            _ => None,
+        })
+        .expect("the scan re-renders the surface")
+}
+
+/// The scan that ends an exchange (here the peer's FAIL frame; on device
+/// the frame that finalizes) takes the camera off the surface it arrived
+/// on.
+fn hover_ended_by_a_scan() -> (AppEngine, SurfaceSpec, SurfaceSpec) {
+    let mut engine = on_hover_with_camera();
+    let scanning = rendered(&mut engine);
+    let ended = replaced_surface(
+        engine
+            .dispatch(Event::ValueChanged {
+                surface_id: scanning.surface_id.clone(),
+                binding_id: capture_binding(&scanning),
+                value: InputValue::Text(
+                    vauchi_core::exchange::multistage::qr_codec::format_fail_qr(&[7u8; 16]),
+                ),
+            })
+            .expect("the peer's frame is accepted"),
+    );
+    assert!(
+        !has_capture(&ended),
+        "precondition: the ended exchange has no camera"
+    );
+    (engine, scanning, ended)
+}
+
+/// Shells drop a value whose binding belongs to an older revision. When a
+/// scan removed the camera, the surface without it went out under the
+/// revision that still had it, so nothing marked the camera's binding as
+/// old. Device-observed as `UnknownBinding binding=surface.17.binding.0
+/// stale=false engine_rev=17` in 10 of 12 Hover runs (2026-10-02, Pixel 3a,
+/// vauchi/private#438).
+// @internal
+#[test]
+fn a_scan_that_removes_the_camera_moves_the_surface_to_a_new_revision() {
+    let (_engine, scanning, ended) = hover_ended_by_a_scan();
+
+    assert_eq!(ended.surface_id, scanning.surface_id);
+    assert!(
+        ended.revision > scanning.revision,
+        "the bindings changed, so the revision must: was {}, is {}",
+        scanning.revision,
+        ended.revision
+    );
+}
+
+/// The camera delivers a few more decodes after the scan that ended the
+/// exchange. Refusing them raised "Something went wrong" over the finished
+/// exchange's last QR, which the peer then could not read: one phone saved
+/// the contact and the other never finished (2026-10-02, run H14-p640-1).
+// @internal
+#[test]
+fn a_decode_still_in_flight_when_a_scan_ended_the_exchange_is_ignored() {
+    let (mut engine, scanning, ended) = hover_ended_by_a_scan();
+
+    let out = engine.dispatch(Event::ValueChanged {
+        surface_id: scanning.surface_id.clone(),
+        binding_id: capture_binding(&scanning),
+        value: InputValue::Text("a decode still in flight".to_string()),
+    });
+
+    assert_eq!(
+        out.expect("a late decode is ignored, not refused"),
+        Vec::new()
+    );
+    assert_eq!(rendered(&mut engine).revision, ended.revision);
+}

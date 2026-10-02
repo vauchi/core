@@ -784,7 +784,13 @@ test:app:
     # builds the workspace, where vauchi-platform enables the feature and
     # unification hides the gap, so a test can pass locally and vanish in
     # CI. No network is touched: those tests drive fakes.
-    - cargo nextest run --profile ci -p vauchi-app --features test-kdf,network-http
+    #
+    # `testing` is the same trap: tests behind `cfg(feature = "testing")`
+    # (they need FakeClock, or vauchi-core modules that are public only
+    # under its `testing` feature) compiled out here and in
+    # `just test core`, so 14 tests ran nowhere. One had gone stale and one
+    # failed one run in four, unnoticed (2026-10-02, vauchi/private#438).
+    - cargo nextest run --profile ci -p vauchi-app --features test-kdf,network-http,testing
   artifacts:
     when: always
     reports:

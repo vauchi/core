@@ -54,8 +54,10 @@ schema-gen = ["schemars", "vauchi-core/schema-gen"]
 test-support = []
 # Forwards `vauchi-core/testing` so the integration test binary can
 # reach `FakeClock` + `DeterministicRng`. Mirrors vauchi-core's
-# `it` test target wiring. Enable via `--features testing` (or via
-# the workspace `just check` recipe which forwards it).
+# `it` test target wiring. Enable via `--features testing`; the
+# workspace `just test` / `just check` recipes and CI's `test:app` job
+# pass it, because tests gated on it are otherwise compiled out
+# without any warning.
 testing = ["vauchi-core/testing"]
 # Weakens Argon2id KDF params for fast test execution (forwards to
 # vauchi-core/test-kdf). Test-only — release builds are blocked by

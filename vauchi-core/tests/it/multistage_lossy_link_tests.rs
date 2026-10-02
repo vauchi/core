@@ -13,7 +13,12 @@
 
 use vauchi_core::exchange::multistage::qr_codec::{StageQr, parse_qr};
 use vauchi_core::exchange::multistage::session::MultiStageSession;
-use vauchi_core::exchange::multistage::types::ProtocolState;
+use vauchi_core::exchange::multistage::types::{ProtocolState, QrPayload};
+
+/// A camera model: whether the frame the peer shows at `tick` is read.
+trait Camera {
+    fn reads(&mut self, tick: usize, frame: &QrPayload) -> bool;
+}
 
 /// How a camera samples the peer's display: one frame in `every`, at `phase`.
 #[derive(Clone, Copy, Debug)]
@@ -22,19 +27,20 @@ struct Sampling {
     phase: usize,
 }
 
-impl Sampling {
-    fn catches(self, tick: usize) -> bool {
+impl Camera for Sampling {
+    fn reads(&mut self, tick: usize, _frame: &QrPayload) -> bool {
         tick % self.every == self.phase
     }
 }
 
-/// Drive two sessions across a sampled link. Returns the tick both reached
-/// `Finalized`, or `None` if they were still unfinished after `ticks`.
-fn exchange_over_sampled_link(
+/// Drive two sessions across a link where each side reads the other through
+/// its own camera model. Returns the tick both reached `Finalized`, or `None`
+/// if they were still unfinished after `ticks`.
+fn exchange_over_link(
     alice_card: Vec<u8>,
     bob_card: Vec<u8>,
-    alice_sees: Sampling,
-    bob_sees: Sampling,
+    alice_camera: &mut dyn Camera,
+    bob_camera: &mut dyn Camera,
     ticks: usize,
 ) -> Option<usize> {
     let mut alice = MultiStageSession::new(alice_card);
@@ -44,12 +50,12 @@ fn exchange_over_sampled_link(
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(aq) = &aq
-            && bob_sees.catches(tick)
+            && bob_camera.reads(tick, aq)
         {
             bob.process_scanned_qr(&aq.data);
         }
         if let Some(bq) = &bq
-            && alice_sees.catches(tick)
+            && alice_camera.reads(tick, bq)
         {
             alice.process_scanned_qr(&bq.data);
         }
@@ -75,19 +81,19 @@ fn exchange_completes_across_every_camera_sampling_offset() {
         for alice_phase in 0..alice_every {
             for bob_every in 1..=5 {
                 for bob_phase in 0..bob_every {
-                    let alice_sees = Sampling {
+                    let mut alice_sees = Sampling {
                         every: alice_every,
                         phase: alice_phase,
                     };
-                    let bob_sees = Sampling {
+                    let mut bob_sees = Sampling {
                         every: bob_every,
                         phase: bob_phase,
                     };
-                    if exchange_over_sampled_link(
+                    if exchange_over_link(
                         three_chunk_card(0xA1),
                         three_chunk_card(0xB2),
-                        alice_sees,
-                        bob_sees,
+                        &mut alice_sees,
+                        &mut bob_sees,
                         4000,
                     )
                     .is_none()

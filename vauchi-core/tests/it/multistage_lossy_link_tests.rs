@@ -320,6 +320,38 @@ fn a_restarted_peer_on_the_previous_format_does_not_pull_a_session_back() {
     assert_ne!(ahead.peer_session_id(), Some(restarted.session_id()));
 }
 
+/// Reading the old peer's frames trains the link but moves nothing forward.
+/// If that counted as progress, a link that only trains would hide the
+/// stall and the restarted peer could never pull the session back (design
+/// D6).
+// @internal
+#[test]
+fn frames_that_only_train_do_not_hide_a_stall_from_the_rehandshake() {
+    let (mut ahead, mut gone, clock) = session_stranded_in_verifying();
+    // The old peer's opening frame: read, counted by the trainer, and
+    // declined by a session already past Advertising.
+    let stale_opening = (0..40)
+        .filter_map(|_| gone.get_display_qr())
+        .find(|frame| frame.data.starts_with("INI3"))
+        .expect("the old peer still re-shows its opening frame");
+    let mut restarted =
+        MultiStageSession::new(three_chunk_card(0xCC)).with_monotonic(clock.clone());
+    let init = restarted.get_display_qr().expect("advertises");
+
+    clock.advance(std::time::Duration::from_secs(6));
+    for _ in 0..40 {
+        ahead.process_scanned_qr(&stale_opening.data);
+        ahead.process_scanned_qr(&init.data);
+        let _ = ahead.get_display_qr();
+    }
+
+    assert_eq!(
+        ahead.peer_session_id(),
+        Some(restarted.session_id()),
+        "the session stayed bound to the peer that went away"
+    );
+}
+
 /// After the reset the pair must actually complete — a reset that only
 /// re-advertises without re-handshaking would trade one deadlock for another.
 // @internal

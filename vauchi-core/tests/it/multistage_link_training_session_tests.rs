@@ -408,3 +408,41 @@ fn the_chunk_size_does_not_change_once_data_has_started() {
         "chunk count changed mid-transfer: {before:?} then {after:?}"
     );
 }
+
+// @internal
+#[test]
+fn every_frame_a_session_shows_fits_37_modules_at_the_level_it_names() {
+    let mut alice = MultiStageSession::new(vec![0xA1; 400]);
+    let mut bob = MultiStageSession::new(vec![0xB2; 400]);
+    let mut seen = std::collections::BTreeSet::new();
+
+    for _ in 0..400 {
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        for frame in [&aq, &bq].into_iter().flatten() {
+            assert_eq!(frame.error_correction, "L", "{}", &frame.data[..4]);
+            let code = qrcode::QrCode::with_error_correction_level(&frame.data, qrcode::EcLevel::L)
+                .expect("frame encodes");
+            assert_eq!(
+                code.width(),
+                37,
+                "a {}-char {} frame",
+                frame.data.len(),
+                &frame.data[..4]
+            );
+            seen.insert(frame.data[..4].to_string());
+        }
+        if let Some(aq) = &aq {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+    }
+
+    assert_eq!(
+        seen.into_iter().collect::<Vec<_>>(),
+        ["DAT3", "FIN3", "INI3"],
+        "the run showed every frame type"
+    );
+}

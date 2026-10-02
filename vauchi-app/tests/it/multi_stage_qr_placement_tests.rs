@@ -12,7 +12,8 @@ use vauchi_app::ui::{AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::{ProtocolState, QrPayload};
 use vauchi_core::platform::{
-    Command, PresentationNode, PresentationQrPurpose, QrPlacement, SurfaceSpec,
+    Command, PresentationNode, PresentationQrErrorCorrection, PresentationQrPurpose, QrPlacement,
+    SurfaceSpec,
 };
 
 fn engine_on_hover() -> AppEngine {
@@ -207,4 +208,54 @@ fn every_placed_code_keeps_a_quiet_zone_inside_the_square() {
             );
         }
     }
+}
+
+fn own_code_error_correction(
+    surface: &SurfaceSpec,
+) -> Option<Option<PresentationQrErrorCorrection>> {
+    fn walk(nodes: &[PresentationNode]) -> Option<Option<PresentationQrErrorCorrection>> {
+        nodes.iter().find_map(|node| match node {
+            PresentationNode::Qr {
+                purpose: PresentationQrPurpose::Display,
+                error_correction,
+                ..
+            } => Some(*error_correction),
+            PresentationNode::Group { children, .. } => walk(children),
+            _ => None,
+        })
+    }
+    walk(&surface.nodes)
+}
+
+/// At 7 cm the Pixel read the iPhone's 37-module frames and none of its
+/// 41-module ones (rig series F7–L7, 2026-10-02). At level L every
+/// exchange frame fits 37 modules, so the exchange code asks for it.
+// @internal
+#[test]
+fn the_exchange_code_asks_for_the_error_correction_level_its_frame_names() {
+    let mut engine = engine_on_hover();
+    let mut frame = frame_at_layout(3);
+
+    frame.error_correction = "L".into();
+    assert!(engine.apply_multi_stage_qr_payload(&frame));
+    let low = presented_surface(&mut engine);
+    assert_eq!(
+        own_code_error_correction(&low),
+        Some(Some(PresentationQrErrorCorrection::Low))
+    );
+    assert!(
+        serde_json::to_string(&low)
+            .unwrap()
+            .contains(r#""error_correction":"low""#)
+    );
+
+    frame.error_correction = "M".into();
+    assert!(engine.apply_multi_stage_qr_payload(&frame));
+    let unset = presented_surface(&mut engine);
+    assert_eq!(own_code_error_correction(&unset), Some(None));
+    assert!(
+        !serde_json::to_string(&unset)
+            .unwrap()
+            .contains("error_correction")
+    );
 }

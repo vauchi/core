@@ -217,9 +217,7 @@ impl Projection {
                 ..
             } => Ok(PresentationNode::Qr {
                 id: if matches!(mode, QrMode::Scan) {
-                    self.binding(ValueRoute::Text {
-                        component_id: id.clone(),
-                    })?
+                    self.capture_binding(id)?
                 } else {
                     self.qualified_id(id)?
                 },

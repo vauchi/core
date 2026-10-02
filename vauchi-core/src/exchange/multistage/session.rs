@@ -369,6 +369,9 @@ pub struct MultiStageSession {
     own_frames_seen: u32,
     /// Reads per window the bound peer reported in its latest header.
     peer_reported_reads: u8,
+    /// The training state last written to the dev log: whether sweeping,
+    /// and the settled layout.
+    logged_training: Option<(bool, Option<u8>)>,
     /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Source for
     /// every `Instant` this session stamps (`phase_entered_at`,
     /// `audio_listening_started_at`) and the finalized grace comparison. Defaults to `SystemMonotonicClock::shared()`;
@@ -463,6 +466,7 @@ impl MultiStageSession {
             trainer: LinkTrainer::starting_at(0),
             own_frames_seen: 0,
             peer_reported_reads: 0,
+            logged_training: None,
             monotonic: SystemMonotonicClock::shared(),
         }
     }
@@ -965,10 +969,23 @@ impl MultiStageSession {
             // stays where the peer last read it (design D6, D12).
             self.trainer.hold();
         }
-        if self.trainer.is_sweeping(now) {
+        let sweeping = self.trainer.is_sweeping(now);
+        if sweeping {
             payload.display_duration_ms = jittered(self.trainer.sweep_dwell_ms());
         }
         let header = self.trainer.next_frame(now);
+        // Dev instrumentation (dev-logging only; no PII — layout ids and a
+        // count). Logged on change, so a run shows when the link settled,
+        // where, and how often it fell back to sweeping.
+        let training = (sweeping, self.trainer.last_good_layout());
+        if self.logged_training != Some(training) {
+            self.logged_training = Some(training);
+            tracing::info!(
+                "[MSX] train sweeping={sweeping} settled={:?} peer_reads={}",
+                training.1,
+                header.total_reads()
+            );
+        }
         Some(Self::with_training_header(payload, &header))
     }
 

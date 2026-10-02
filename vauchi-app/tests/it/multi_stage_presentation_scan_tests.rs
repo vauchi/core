@@ -178,12 +178,14 @@ fn a_decode_reported_after_the_screen_moved_on_still_advances_hover() {
 
     // Alice's own code moves on to its next sweep frames before the decode
     // made against `drawn` is reported.
+    let mut current = drawn.clone();
     for _ in 0..3 {
         clock_a.advance(Duration::from_millis(150));
-        alice.poll_notifications();
+        let _ = alice.on_wakeup();
+        if let Some(surface) = latest_surface(&alice.drain_pending_commands()) {
+            current = surface;
+        }
     }
-    let current = latest_surface(&alice.initial_commands().expect("alice commands"))
-        .expect("Alice renders a surface");
     assert!(
         current.revision > drawn.revision,
         "precondition: the surface moved on ({} then {})",

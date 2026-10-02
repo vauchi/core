@@ -182,6 +182,18 @@ impl PreparedSurface {
             .is_some_and(|minted| minted < self.surface.revision)
     }
 
+    /// Whether `binding` belongs to a camera this surface no longer shows:
+    /// a decode still in flight when the capture node went away. With a
+    /// camera on screen, an unknown capture binding is one Core never
+    /// minted, and stays an error.
+    pub fn is_retired_capture_binding(&self, binding: &BindingId) -> bool {
+        Projection::is_capture_binding(binding.as_str())
+            && !self
+                .value_routes
+                .keys()
+                .any(|known| Projection::is_capture_binding(known.as_str()))
+    }
+
     fn ensure_surface(&self, surface_id: &SurfaceId) -> Result<(), PreparedSurfaceError> {
         if surface_id == &self.surface.surface_id {
             Ok(())

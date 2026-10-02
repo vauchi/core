@@ -266,6 +266,14 @@ impl AppEngine {
                         );
                         return Ok(Vec::new());
                     }
+                    Err(PreparedSurfaceError::UnknownBinding)
+                        if prepared.is_retired_capture_binding(&binding_id) =>
+                    {
+                        tracing::info!(
+                            "[Presentation] dropped a decode for a camera no longer on screen"
+                        );
+                        return Ok(Vec::new());
+                    }
                     Err(error) => return Err(error.into()),
                 }
             }

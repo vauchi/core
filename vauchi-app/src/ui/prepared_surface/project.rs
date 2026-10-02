@@ -18,6 +18,9 @@ mod collections;
 mod components;
 mod remaining;
 
+/// Prefix of a capture node's binding id; no revision follows it.
+const CAPTURE_BINDING_PREFIX: &str = "surface.capture.";
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ValueRoute {
     Text {
@@ -127,6 +130,31 @@ impl Projection {
         self.next_binding += 1;
         self.value_routes.insert(id.clone(), route);
         Ok(id)
+    }
+
+    /// The binding of a camera's capture node. Unlike every other id it
+    /// carries no revision: the camera is the same node for as long as it
+    /// is on screen, and it reads on its own clock, so a decode is often
+    /// reported after the surface moved on by a frame. Re-minting it per
+    /// revision made those decodes stale (about half of them at a 100 ms
+    /// frame, rig runs E7, 2026-10-02).
+    pub(super) fn capture_binding(
+        &mut self,
+        component_id: &str,
+    ) -> Result<BindingId, PreparedSurfaceError> {
+        let id = BindingId::new(format!("{CAPTURE_BINDING_PREFIX}{component_id}"))?;
+        self.value_routes.insert(
+            id.clone(),
+            ValueRoute::Text {
+                component_id: component_id.to_owned(),
+            },
+        );
+        Ok(id)
+    }
+
+    /// Whether `id` has the form of a capture binding.
+    pub(super) fn is_capture_binding(id: &str) -> bool {
+        id.starts_with(CAPTURE_BINDING_PREFIX)
     }
 
     pub(super) fn node_id(&mut self) -> Result<BindingId, PreparedSurfaceError> {

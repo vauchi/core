@@ -347,3 +347,114 @@ fn an_idle_wakeup_does_not_re_present_the_screen() {
         "an idle heartbeat must not re-present, got {cmds:?}"
     );
 }
+
+fn wakeups_in(commands: Vec<Command>) -> Vec<(u32, Option<u32>)> {
+    commands
+        .into_iter()
+        .filter_map(|c| match c {
+            Command::ScheduleWakeup {
+                earliest_secs,
+                earliest_millis,
+                ..
+            } => Some((earliest_secs, earliest_millis)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Opening an exchange must reschedule the shell's wakeup in the same command
+/// batch. The shell sleeps for whatever the last heartbeat asked, 30 s when
+/// idle, and only a `ScheduleWakeup` shortens that. Emitted from `on_wakeup`
+/// alone, the short interval reached the shell when the idle sleep ended:
+/// device-measured as a first poll 27.5–29.8 s after "Exchange started" in
+/// 8 of 15 Hover runs, always on the 30 s grid from app start, with the QR
+/// frozen on its first frame until then (2026-10-02, Pixel 3a,
+/// `2026-10-02-exchange-first-tick-waits-for-idle-heartbeat`).
+// @internal
+#[test]
+fn opening_an_exchange_reschedules_the_wakeup_in_the_same_batch() {
+    let mut engine = engine_with_identity();
+    let _ = engine.on_wakeup();
+    assert_eq!(
+        first_wakeup_earliest_secs(&mut engine),
+        30,
+        "precondition: the shell is asleep on the idle heartbeat"
+    );
+
+    engine.navigate_to(vauchi_app::ui::AppScreen::MultiStageExchange {
+        mode: vauchi_core::exchange::mode::ExchangeMode::Hover,
+    });
+    assert!(
+        engine.multi_stage_session_active(),
+        "precondition: the session is live"
+    );
+
+    let wakeups = wakeups_in(engine.drain_pending_commands());
+    assert_eq!(
+        wakeups.len(),
+        1,
+        "exactly one reschedule rides the navigation's commands, got {wakeups:?}"
+    );
+    let (secs, millis) = wakeups[0];
+    assert_eq!(secs, 1, "whole-second shells wake within a second");
+    let millis = millis.expect("a live exchange names its frame dwell in ms");
+    assert!(
+        (100..=500).contains(&millis),
+        "the first tick is due at the frame dwell (~300ms), got {millis}ms"
+    );
+}
+
+/// The same gap for Link: each leg of the relay rendezvous waits on a
+/// heartbeat, so a session opened during the idle sleep must not wait it out.
+// @internal
+#[test]
+fn opening_a_link_session_reschedules_the_wakeup_in_the_same_batch() {
+    let mut initiating = engine_with_identity();
+    let _ = initiating.on_wakeup();
+    let _ = initiating.drain_pending_commands();
+    initiating.navigate_to(vauchi_app::ui::AppScreen::LinkExchange);
+    assert!(
+        initiating.link_session_active(),
+        "precondition: the initiator machine is live"
+    );
+    assert_eq!(
+        wakeups_in(initiating.drain_pending_commands()),
+        vec![(1, None)],
+        "a live Link initiator is rescheduled to its one-second cadence"
+    );
+
+    let (initiation, _presence) = vauchi_core::exchange::link_mode::initiator_generate();
+    let payload = vauchi_core::exchange::link_mode::parse_exchange_deep_link(&initiation.url)
+        .expect("a generated link parses");
+    let mut responding = engine_with_identity();
+    let _ = responding.on_wakeup();
+    let _ = responding.drain_pending_commands();
+    responding.navigate_to(vauchi_app::ui::AppScreen::DeepLinkResponder { payload });
+    assert!(
+        responding.link_session_active(),
+        "precondition: the responder machine is live"
+    );
+    assert_eq!(
+        wakeups_in(responding.drain_pending_commands()),
+        vec![(1, None)],
+        "a live Link responder is rescheduled to its one-second cadence"
+    );
+}
+
+/// Navigation that starts no session leaves the heartbeat alone: a reschedule
+/// on every screen change would wake every shell for nothing.
+// @internal
+#[test]
+fn navigation_without_a_live_session_does_not_reschedule_the_wakeup() {
+    let mut engine = engine_with_identity();
+    let _ = engine.on_wakeup();
+    let _ = engine.drain_pending_commands();
+
+    engine.navigate_to(vauchi_app::ui::AppScreen::Settings);
+
+    assert_eq!(
+        wakeups_in(engine.drain_pending_commands()),
+        Vec::<(u32, Option<u32>)>::new(),
+        "no session went live, so the idle heartbeat stands"
+    );
+}

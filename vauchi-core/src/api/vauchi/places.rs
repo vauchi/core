@@ -155,7 +155,7 @@ impl Vauchi {
     /// absent.
     pub fn place_contact_counts(&self) -> VauchiResult<std::collections::HashMap<String, usize>> {
         let mut counts = std::collections::HashMap::new();
-        for (_, location) in self.storage.list_exchange_locations()? {
+        for (_, location) in self.vocabulary_store()?.list_exchange_locations()? {
             if let Some(place_id) = location.place_id {
                 *counts.entry(place_id).or_insert(0) += 1;
             }
@@ -170,7 +170,7 @@ impl Vauchi {
     /// ids, anchor first.
     pub fn unnamed_exchange_spots(&self) -> VauchiResult<Vec<Vec<String>>> {
         let mut unnamed: Vec<(String, ExchangeLocation)> = self
-            .storage
+            .vocabulary_store()?
             .list_exchange_locations()?
             .into_iter()
             .filter(|(_, location)| location.place_id.is_none())

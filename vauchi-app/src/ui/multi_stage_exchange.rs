@@ -45,6 +45,7 @@ use vauchi_core::Event;
 use vauchi_core::exchange::{
     AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
 };
+use vauchi_core::platform::QrPlacement;
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::exchange::scan_quality::ScanQualityTracker;
@@ -113,6 +114,23 @@ const COMPONENT_ID_HARDWARE: &str = "hardware_unavailable";
 /// frontends differentiate by inspecting the components list.
 pub const SCREEN_ID: &str = "multi_stage_exchange";
 
+/// Where each link-training layout draws the code: 0 fills the square,
+/// 1–4 are 80 % of it in the four corners, 5–13 are 65 % on a 3 × 3 grid,
+/// row by row. An id outside the set draws full size.
+fn placement_for_layout(layout: u8) -> Option<QrPlacement> {
+    let (size, columns, index) = match layout {
+        1..=4 => (800, 2, layout - 1),
+        5..=13 => (650, 3, layout - 5),
+        _ => return None,
+    };
+    let step = (1000 - size) / (columns - 1);
+    QrPlacement::new(
+        size,
+        u16::from(index % columns as u8) * step,
+        u16::from(index / columns as u8) * step,
+    )
+}
+
 /// Engine for the multi-stage face-to-face exchange screen.
 ///
 /// Pure state container — does not own the
@@ -125,6 +143,8 @@ pub struct MultiStageExchangeEngine {
     /// Latest QR data emitted by the cycle thread for the local card —
     /// rendered as a `QrCode { mode: Display }` to the peer.
     current_qr_data: Option<String>,
+    /// The link-training layout `current_qr_data` is drawn at.
+    current_qr_layout: u8,
     /// Peer display name — set on the Finalized transition.
     peer_name: Option<String>,
     /// Rich success-screen summary (received card + group + visibility),
@@ -183,6 +203,7 @@ impl MultiStageExchangeEngine {
         Self {
             state: ProtocolState::Idle,
             current_qr_data: None,
+            current_qr_layout: 0,
             peer_name: None,
             success_summary: None,
             session_ended: false,
@@ -224,6 +245,7 @@ impl MultiStageExchangeEngine {
         Self {
             state: ProtocolState::Idle,
             current_qr_data: None,
+            current_qr_layout: 0,
             peer_name: None,
             success_summary: None,
             session_ended: false,
@@ -249,6 +271,7 @@ impl MultiStageExchangeEngine {
         Self {
             state: ProtocolState::Idle,
             current_qr_data: None,
+            current_qr_layout: 0,
             peer_name: None,
             success_summary: None,
             session_ended: false,
@@ -284,6 +307,7 @@ impl MultiStageExchangeEngine {
             return;
         }
         self.current_qr_data = Some(payload.data.clone());
+        self.current_qr_layout = payload.layout;
     }
 
     /// Update the audio-proximity state. Called by the AppEngine
@@ -525,6 +549,7 @@ impl MultiStageExchangeEngine {
                 // (issue #315). The hold-position ask rides on the status.
                 label: None,
                 scan_quality: None,
+                placement: placement_for_layout(self.current_qr_layout),
                 a11y: None,
             });
         }
@@ -595,6 +620,7 @@ impl MultiStageExchangeEngine {
                 // of height goes to the preview on a compact screen.
                 label: None,
                 scan_quality: None,
+                placement: placement_for_layout(self.current_qr_layout),
                 a11y: None,
             });
         }
@@ -612,6 +638,7 @@ impl MultiStageExchangeEngine {
             mode: QrMode::Scan,
             label: Some(self.t("exchange.ble.glance_scan")),
             scan_quality: Some(self.scan_quality_tracker.quality()),
+            placement: None,
             a11y: None,
         };
         let switch_camera_label = if self.use_front_camera {

@@ -259,6 +259,7 @@ impl DeviceReplacementEngine {
                     mode: QrMode::Display,
                     label: Some(self.t("device.scan_on_new_device_label")),
                     scan_quality: None,
+                    placement: None,
                     a11y: Some(A11y {
                         label: Some(self.t("device.transfer_qr_a11y")),
                         hint: Some(self.t("device.transfer_qr_hint")),

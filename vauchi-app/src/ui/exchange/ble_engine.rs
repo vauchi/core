@@ -256,6 +256,7 @@ impl BleExchangeEngine {
                 mode: QrMode::Display,
                 label: Some(self.t("exchange.ble.glance_show_qr")),
                 scan_quality: None,
+                placement: None,
                 a11y: None,
             });
         }
@@ -269,6 +270,7 @@ impl BleExchangeEngine {
                     mode: QrMode::Scan,
                     label: Some(self.t("exchange.ble.glance_scan")),
                     scan_quality: None,
+                    placement: None,
                     a11y: None,
                 });
                 actions.push(ScreenAction {

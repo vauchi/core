@@ -42,8 +42,8 @@ pub use presentation::{
     OverlayKind, OverlaySpec, PaneLayout, PresentationAxis, PresentationIdError,
     PresentationImageShape, PresentationInputKind, PresentationListStyle, PresentationNode,
     PresentationPaging, PresentationProfile, PresentationQrPurpose, PresentationRow,
-    PresentationTextStyle, PresentationTokens, PresentationTone, StandardShortcut, SurfaceId,
-    SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass,
+    PresentationTextStyle, PresentationTokens, PresentationTone, QrPlacement, StandardShortcut,
+    SurfaceId, SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass,
 };
 
 /// A command from core to the frontend requesting a hardware action.

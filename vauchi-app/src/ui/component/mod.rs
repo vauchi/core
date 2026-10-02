@@ -224,6 +224,10 @@ pub enum Component {
         /// Only meaningful when `mode` is `Scan`; `None` when `Display`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         scan_quality: Option<ScanQuality>,
+        /// Where in the component's square a `Display` code is drawn;
+        /// `None` is the full square.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        placement: Option<vauchi_core::platform::QrPlacement>,
         #[serde(default)]
         a11y: Option<A11y>,
     },

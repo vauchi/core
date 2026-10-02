@@ -370,6 +370,7 @@ fn all_components() -> Vec<Component> {
             mode: QrMode::Display,
             label: Some("Scan me".to_string()),
             scan_quality: None,
+            placement: None,
             a11y: None,
         },
         Component::InlineConfirm {

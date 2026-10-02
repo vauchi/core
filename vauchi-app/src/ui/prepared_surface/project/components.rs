@@ -212,6 +212,7 @@ impl Projection {
                 frames,
                 mode,
                 label,
+                placement,
                 a11y,
                 ..
             } => Ok(PresentationNode::Qr {
@@ -232,6 +233,7 @@ impl Projection {
                     QrMode::Scan => PresentationQrPurpose::Capture,
                 },
                 label: label.clone(),
+                placement: *placement,
                 accessibility: accessibility(a11y, label.as_deref().unwrap_or(id)),
             }),
             Component::Preview {

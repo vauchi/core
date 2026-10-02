@@ -118,8 +118,8 @@ pub use platform::{
     Orientation, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis, PresentationIdError,
     PresentationImageShape, PresentationInputKind, PresentationListStyle, PresentationNode,
     PresentationPaging, PresentationProfile, PresentationQrPurpose, PresentationRow,
-    PresentationTextStyle, PresentationTokens, PresentationTone, StandardShortcut, SurfaceId,
-    SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass, event_from_json,
+    PresentationTextStyle, PresentationTokens, PresentationTone, QrPlacement, StandardShortcut,
+    SurfaceId, SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass, event_from_json,
 };
 
 pub mod recovery;

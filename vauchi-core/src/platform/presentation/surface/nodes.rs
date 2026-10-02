@@ -83,6 +83,64 @@ pub enum PresentationImageShape {
     Circle,
 }
 
+/// Where inside its square a display code is drawn: the code's side and
+/// the offset of its top-left corner, in permille of the square's side.
+///
+/// Built only through [`Self::new`] and deserialisation, both of which
+/// keep the code inside the square and at least half its side, so a held
+/// value never asks a shell to draw outside its node.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct QrPlacement {
+    size: u16,
+    x: u16,
+    y: u16,
+}
+
+impl QrPlacement {
+    /// Smallest side a placed code may have, in permille of the square.
+    pub const MIN_SIZE: u16 = 500;
+    const FULL: u16 = 1000;
+
+    /// A placement, or `None` if the code would be smaller than
+    /// [`Self::MIN_SIZE`] or reach outside the square.
+    pub fn new(size: u16, x: u16, y: u16) -> Option<Self> {
+        let fits = |offset: u16| offset <= Self::FULL - size;
+        ((Self::MIN_SIZE..=Self::FULL).contains(&size) && fits(x) && fits(y)).then_some(Self {
+            size,
+            x,
+            y,
+        })
+    }
+
+    pub fn size(&self) -> u16 {
+        self.size
+    }
+
+    pub fn x(&self) -> u16 {
+        self.x
+    }
+
+    pub fn y(&self) -> u16 {
+        self.y
+    }
+}
+
+impl<'de> Deserialize<'de> for QrPlacement {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            size: u16,
+            x: u16,
+            y: u16,
+        }
+        let wire = Wire::deserialize(deserializer)?;
+        Self::new(wire.size, wire.x, wire.y)
+            .ok_or_else(|| serde::de::Error::custom("placement outside its square"))
+    }
+}
+
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -221,6 +279,10 @@ pub enum PresentationNode {
         payloads: Vec<String>,
         purpose: PresentationQrPurpose,
         label: Option<String>,
+        /// Where in the node's square to draw a display code. Absent
+        /// means the full square, centred.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        placement: Option<QrPlacement>,
         accessibility: AccessibilitySpec,
     },
     Confirmation {

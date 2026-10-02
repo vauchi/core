@@ -75,7 +75,7 @@ pub use surface::{
     AccessibilitySpec, ChoiceOption, InputValue, PresentationAxis, PresentationImageShape,
     PresentationInputKind, PresentationListStyle, PresentationNode, PresentationPaging,
     PresentationQrPurpose, PresentationRow, PresentationTextStyle, PresentationTokens,
-    PresentationTone, SurfaceLayout, SurfaceSpec,
+    PresentationTone, QrPlacement, SurfaceLayout, SurfaceSpec,
 };
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]

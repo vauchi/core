@@ -93,6 +93,7 @@ mod exchange_group_filter_preview_tests;
 mod exchange_group_selection_actions_tests;
 mod exchange_last_used_defaults_tests;
 mod exchange_location_capture_tests;
+mod exchange_mode_pictogram_tests;
 mod exchange_no_numeric_progress_tests;
 mod exchange_picker_hero_tests;
 mod exchange_picker_i18n_tests;

@@ -266,7 +266,7 @@ fn finalized_machine_exposes_combo_for_broadcast_seed() {
         .finalization_combo_qr()
         .expect("a finalized machine must expose a COMBO to seed the broadcast");
     assert!(
-        combo.data.starts_with("CMBO"),
+        combo.data.starts_with("CMB3"),
         "the broadcast seed must be a COMBO (VRFY+CONF+RDYY), got prefix {:?}",
         &combo.data[..combo.data.len().min(4)],
     );
@@ -275,7 +275,7 @@ fn finalized_machine_exposes_combo_for_broadcast_seed() {
             bob.finalization_combo_qr()
                 .expect("finalized slow peer must also expose a COMBO")
                 .data
-                .starts_with("CMBO"),
+                .starts_with("CMB3"),
             "the slow peer's broadcast seed must also be a COMBO",
         );
     }

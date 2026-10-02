@@ -49,7 +49,7 @@ fn test_get_display_qr_starts_advertising() {
     let mut session = MultiStageSession::new(card);
     let qr = session.get_display_qr();
     let qr = qr.expect("expected Some");
-    assert!(qr.data.starts_with("INI2"));
+    assert!(qr.data.starts_with("INI3"));
     assert!(matches!(session.get_state(), ProtocolState::Advertising));
 }
 
@@ -65,8 +65,8 @@ fn test_full_exchange_two_sessions() {
     // Stage 1: Both display INIT QRs
     let alice_init = alice.get_display_qr().unwrap();
     let bob_init = bob.get_display_qr().unwrap();
-    assert!(alice_init.data.starts_with("INI2"));
-    assert!(bob_init.data.starts_with("INI2"));
+    assert!(alice_init.data.starts_with("INI3"));
+    assert!(bob_init.data.starts_with("INI3"));
 
     let alice_state = alice.process_scanned_qr(&bob_init.data);
     let bob_state = bob.process_scanned_qr(&alice_init.data);

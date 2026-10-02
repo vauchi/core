@@ -37,9 +37,9 @@ fn bob_verifying_with_alice_verify_withheld(alice_card: &[u8], bob_card: &[u8]) 
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(aq) = &aq
-            && !aq.data.starts_with("VRFY")
-            && !aq.data.starts_with("CONF")
-            && !aq.data.starts_with("CMBO")
+            && !aq.data.starts_with("VRF3")
+            && !aq.data.starts_with("CNF3")
+            && !aq.data.starts_with("CMB3")
         {
             bob.process_scanned_qr(&aq.data);
         }
@@ -52,7 +52,7 @@ fn bob_verifying_with_alice_verify_withheld(alice_card: &[u8], bob_card: &[u8]) 
     let mut alice_verify = None;
     for _ in 0..500 {
         if let Some(aq) = alice.get_display_qr()
-            && aq.data.starts_with("VRFY")
+            && aq.data.starts_with("VRF3")
         {
             alice_verify = Some(aq.data);
             break;

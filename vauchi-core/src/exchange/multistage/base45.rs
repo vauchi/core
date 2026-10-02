@@ -30,6 +30,20 @@ fn char_to_val(c: u8) -> Result<u32, Base45Error> {
         .ok_or(Base45Error::InvalidCharacter(c as char))
 }
 
+/// The character for one base45 digit.
+///
+/// # Panics
+///
+/// Panics if `value` is 45 or more.
+pub fn digit(value: u8) -> char {
+    CHARSET[usize::from(value)] as char
+}
+
+/// The value of one base45 digit, 0–44.
+pub fn digit_value(c: u8) -> Result<u8, Base45Error> {
+    char_to_val(c).map(|v| v as u8)
+}
+
 /// Encode bytes to base45 string (RFC 9285).
 pub fn encode(data: &[u8]) -> String {
     let mut result = String::with_capacity(data.len() * 3 / 2 + 1);

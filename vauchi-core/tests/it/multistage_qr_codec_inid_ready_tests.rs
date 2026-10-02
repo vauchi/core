@@ -29,7 +29,7 @@ fn inid_qr_roundtrips_without_relay_fields() {
     let qr = format_in2d_qr(&SID, &EPH, &COMMITMENT, "Alice", None, &ciphertext);
 
     assert!(
-        qr.starts_with("IN2D"),
+        qr.starts_with("IN3D"),
         "QR must carry IN2D prefix, got: {}",
         &qr[..4]
     );
@@ -98,7 +98,7 @@ fn inid_qr_handles_empty_ciphertext() {
 #[test]
 fn ready_qr_roundtrips() {
     let qr = format_ready_qr(&SID, &ACK_HASH);
-    assert!(qr.starts_with("RDYY"));
+    assert!(qr.starts_with("RDY3"));
 
     let parsed = parse_qr(&qr).unwrap();
     match parsed {
@@ -129,8 +129,12 @@ fn ready_qr_truncated_body_is_rejected() {
 #[test]
 fn combo_qr_roundtrips_carrying_all_three_components() {
     let qr = format_combo_qr(&SID, &REVEAL_KEY, &PAYLOAD_HASH, &ACK_HASH);
-    assert!(qr.starts_with("CMBO"));
-    assert_eq!(qr.len(), 4 + 24 + 48 * 3, "CMBO total layout per ADR");
+    assert!(qr.starts_with("CMB3"));
+    assert_eq!(
+        qr.len(),
+        4 + 8 + 24 + 48 * 3,
+        "prefix, header, session id, three hashes"
+    );
 
     let parsed = parse_qr(&qr).unwrap();
     match parsed {
@@ -157,7 +161,7 @@ fn combo_qr_roundtrips_carrying_all_three_components() {
 #[test]
 fn fail_qr_roundtrips() {
     let qr = format_fail_qr(&SID);
-    assert!(qr.starts_with("FAIL"));
+    assert!(qr.starts_with("FAI3"));
 
     let parsed = parse_qr(&qr).unwrap();
     match parsed {

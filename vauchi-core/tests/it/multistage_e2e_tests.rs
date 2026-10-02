@@ -337,7 +337,7 @@ fn test_e2e_grace_period_broadcasts_combo() {
     // interleaving DATA. The guarantee is that COMBO keeps coming.
     let combo_frames = (0..50)
         .filter_map(|_| alice.get_display_qr())
-        .filter(|qr| qr.data.starts_with("CMBO"))
+        .filter(|qr| qr.data.starts_with("CMB3"))
         .count();
     assert!(
         combo_frames > 0,
@@ -521,7 +521,7 @@ fn test_atomicity_without_peer_finalization_frame_no_finalize() {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if !bob_stopped_before_finalization_frame && let Some(aq) = &aq {
-            if aq.data.starts_with("CMBO") {
+            if aq.data.starts_with("CMB3") {
                 bob_stopped_before_finalization_frame = true;
             } else {
                 bob.process_scanned_qr(&aq.data);
@@ -612,7 +612,7 @@ fn test_asymmetric_finalization_both_reach_finalized() {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(aq) = &aq {
-            if aq.data.starts_with("CMBO") {
+            if aq.data.starts_with("CMB3") {
                 withheld_alice_finalization_frame = true;
             } else {
                 bob.process_scanned_qr(&aq.data);
@@ -725,7 +725,7 @@ fn test_fail_qr_roundtrip() {
 
     let session_id: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
     let qr = qr_codec::format_fail_qr(&session_id);
-    assert!(qr.starts_with("FAIL"));
+    assert!(qr.starts_with("FAI3"));
 
     let parsed = qr_codec::parse_qr(&qr).unwrap();
     match parsed {
@@ -794,7 +794,7 @@ fn test_adaptive_display_durations() {
     // (2026-08-18-multistage-data-frames-too-brief-to-capture).
     let data_qr = (0..60)
         .filter_map(|_| alice.get_display_qr())
-        .find(|qr| qr.data.starts_with("DATA"))
+        .find(|qr| qr.data.starts_with("DAT3"))
         .expect("a Transferring session shows DATA");
     assert!(
         (240..=360).contains(&data_qr.display_duration_ms),
@@ -906,7 +906,7 @@ fn test_finalization_states_broadcast_combo() {
         // would carry him straight to Complete (#315); this test hands him
         // Alice's CONF itself below.
         if let Some(aq) = &aq {
-            if !aq.data.starts_with("CMBO") && !aq.data.starts_with("CONF") {
+            if !aq.data.starts_with("CMB3") && !aq.data.starts_with("CNF3") {
                 bob.process_scanned_qr(&aq.data);
             }
         }
@@ -932,10 +932,10 @@ fn test_finalization_states_broadcast_combo() {
             .expect("Bob must display a QR while awaiting Alice's readiness frame");
         let tag = &qr.data[..4];
         assert!(
-            tag == "CMBO" || tag == "DATA",
+            tag == "CMB3" || tag == "DAT3",
             "Complete-state QR should be CMBO or an interleaved DATA chunk, got: {tag}"
         );
-        if tag == "CMBO" {
+        if tag == "CMB3" {
             assert_eq!(qr.error_correction, "Q");
             combo_frames += 1;
         }
@@ -1036,7 +1036,7 @@ fn transport_decrypt_failure_count_does_not_increment_on_legitimate_data_chunk()
 /// session that reaches Verifying stays there (its VRFY is not delivered
 /// to advance the peer). Acks ride on DATA, so both still reach Verifying.
 fn is_transfer_frame(data: &str) -> bool {
-    data.starts_with("DATA") || data.starts_with("INI") || data.starts_with("IN2")
+    data.starts_with("DAT3") || data.starts_with("INI") || data.starts_with("IN3")
 }
 
 // @internal
@@ -1092,8 +1092,8 @@ fn verifying_state_also_offers_conf_so_confirming_peer_does_not_starve() {
         if let Some(qr) = alice.get_display_qr() {
             let prefix = &qr.data[..4.min(qr.data.len())];
             match prefix {
-                "VRFY" => saw_vrfy = true,
-                "CONF" => saw_conf = true,
+                "VRF3" => saw_vrfy = true,
+                "CNF3" => saw_conf = true,
                 _ => {}
             }
         }

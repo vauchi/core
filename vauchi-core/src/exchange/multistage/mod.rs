@@ -15,4 +15,5 @@ pub mod commitment;
 pub mod crc16;
 pub mod qr_codec;
 pub mod session;
+pub mod training_header;
 pub mod types;

@@ -275,9 +275,10 @@ fn test_shake_qr_crc_rejects_corrupted_payload() {
     let qr_a = format_shake_qr(&session_id, &sealed_a);
     let qr_b = format_shake_qr(&session_id, &sealed_b);
 
-    // Layout: "SHAK"(4) + sid(24) + crc(3) + payload. Splice A's crc onto
-    // B's payload → CRC describes A but covers B's bytes → mismatch.
-    let header_len = 4 + 24 + 3;
+    // Layout: prefix(4) + training header(8) + sid(24) + crc(3) + payload.
+    // Splice A's crc onto B's payload → CRC describes A but covers B's
+    // bytes → mismatch.
+    let header_len = 4 + 8 + 24 + 3;
     let frankenstein = format!("{}{}", &qr_a[..header_len], &qr_b[header_len..]);
     let err = parse_qr(&frankenstein).unwrap_err();
     assert!(

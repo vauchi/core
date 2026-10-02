@@ -21,6 +21,7 @@
 
 use super::base45;
 use super::crc16;
+use super::training_header::{HEADER_LEN, TrainingHeader};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -38,6 +39,19 @@ pub enum QrCodecError {
     CrcMismatch { expected: u16, got: u16 },
     #[error("QR string too short")]
     TooShort,
+    /// A frame in the format used before link training: the sender needs
+    /// an update. Distinct from a QR that is not ours at all.
+    #[error("frame is in the previous format")]
+    OldFormat,
+    #[error("invalid training header")]
+    InvalidHeader,
+}
+
+/// A parsed frame: its training header and its stage payload.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Frame {
+    pub header: TrainingHeader,
+    pub stage: StageQr,
 }
 
 /// Parsed stage QR payload.
@@ -133,6 +147,9 @@ const FLAG_HAS_RELAY_URL: u8 = 0x01;
 
 /// Stage prefixes (4 chars each).
 const PREFIX_LEN: usize = 4;
+const PREFIXES: [&str; 9] = [
+    "INI3", "IN3D", "DAT3", "VRF3", "CNF3", "RDY3", "FAI3", "SHK3", "CMB3",
+];
 
 fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> {
     let bytes = base45::decode(encoded)?;
@@ -169,15 +186,37 @@ fn take_rest(s: &str, pos: usize) -> &str {
 /// through here, and every parse through [`split_frame`].
 fn frame(prefix: &str, body: &str) -> String {
     debug_assert_eq!(prefix.len(), PREFIX_LEN);
-    format!("{prefix}{body}")
+    format!("{prefix}{}{body}", TrainingHeader::default().encode())
 }
 
-/// Split a frame into its stage prefix and body.
-fn split_frame(raw: &str) -> Result<(&str, &str), QrCodecError> {
+/// Stage prefixes of the format used before every frame carried a header.
+const OLD_FORMAT_PREFIXES: [&str; 9] = [
+    "INI2", "IN2D", "DATA", "VRFY", "CONF", "RDYY", "FAIL", "SHAK", "CMBO",
+];
+
+/// Split a frame into its stage prefix, training header and body.
+fn split_frame(raw: &str) -> Result<(&str, TrainingHeader, &str), QrCodecError> {
     // `split_at_checked`, not slicing: any QR a camera sees lands here, and
-    // slicing panics when byte 4 falls inside a multi-byte character.
-    raw.split_at_checked(PREFIX_LEN)
-        .ok_or(QrCodecError::UnknownPrefix)
+    // slicing panics when a boundary falls inside a multi-byte character.
+    let (prefix, rest) = raw
+        .split_at_checked(PREFIX_LEN)
+        .ok_or(QrCodecError::UnknownPrefix)?;
+    if OLD_FORMAT_PREFIXES.contains(&prefix) {
+        return Err(QrCodecError::OldFormat);
+    }
+    if !PREFIXES.contains(&prefix) {
+        return Err(QrCodecError::UnknownPrefix);
+    }
+    let (header, body) = rest
+        .split_at_checked(HEADER_LEN)
+        .ok_or(QrCodecError::TooShort)?;
+    Ok((prefix, TrainingHeader::parse(header)?, body))
+}
+
+/// The same frame carrying `header` in place of the one it has.
+pub fn with_header(frame: &str, header: &TrainingHeader) -> Result<String, QrCodecError> {
+    let (prefix, _, body) = split_frame(frame)?;
+    Ok(format!("{prefix}{}{body}", header.encode()))
 }
 
 /// Format an INIT stage QR string with optional relay metadata.
@@ -218,7 +257,7 @@ pub fn format_ini2_qr_with_relay(
     }
 
     let mut result = frame(
-        "INI2",
+        "INI3",
         &format!(
             "{sid}{eph}{ch}{name_len:02}{name}{flags}",
             sid = base45::encode(session_id),
@@ -275,7 +314,7 @@ pub fn format_in2d_qr(
 
     // Build same as INIT but with INID prefix, then append ciphertext at the end
     let mut result = frame(
-        "IN2D",
+        "IN3D",
         &format!(
             "{sid}{eph}{ch}{name_len:02}{name}{flags}",
             sid = base45::encode(session_id),
@@ -311,7 +350,7 @@ pub fn format_data_qr(
     let crc = crc16::compute(payload);
     let ack_encoded = base45::encode(ack_bitmap);
     frame(
-        "DATA",
+        "DAT3",
         &format!(
             "{sid}{idx:04}/{total:04}{ack_len:02}{ack}{crc}{data}",
             sid = base45::encode(session_id),
@@ -328,7 +367,7 @@ pub fn format_data_qr(
 /// Format a VRFY (verify) stage QR string.
 pub fn format_verify_qr(session_id: &[u8; 16], reveal_key: &[u8; 32]) -> String {
     frame(
-        "VRFY",
+        "VRF3",
         &format!(
             "{sid}{rk}",
             sid = base45::encode(session_id),
@@ -340,7 +379,7 @@ pub fn format_verify_qr(session_id: &[u8; 16], reveal_key: &[u8; 32]) -> String 
 /// Format a CONF (confirm) stage QR string.
 pub fn format_confirm_qr(session_id: &[u8; 16], payload_hash: &[u8; 32]) -> String {
     frame(
-        "CONF",
+        "CNF3",
         &format!(
             "{sid}{ph}",
             sid = base45::encode(session_id),
@@ -357,7 +396,7 @@ pub fn format_confirm_qr(session_id: &[u8; 16], payload_hash: &[u8; 32]) -> Stri
 #[allow(dead_code)]
 pub fn format_ready_qr(session_id: &[u8; 16], ack_hash: &[u8; 32]) -> String {
     frame(
-        "RDYY",
+        "RDY3",
         &format!(
             "{sid}{ah}",
             sid = base45::encode(session_id),
@@ -379,7 +418,7 @@ pub fn format_combo_qr(
     ack_hash: &[u8; 32],
 ) -> String {
     frame(
-        "CMBO",
+        "CMB3",
         &format!(
             "{sid}{rk}{ph}{ah}",
             sid = base45::encode(session_id),
@@ -394,7 +433,7 @@ pub fn format_combo_qr(
 ///
 /// Broadcast to peer so they abort immediately instead of waiting for timeout.
 pub fn format_fail_qr(session_id: &[u8; 16]) -> String {
-    frame("FAIL", &base45::encode(session_id))
+    frame("FAI3", &base45::encode(session_id))
 }
 
 /// Format a SHAK (shake-envelope) stage QR string with CRC-16 integrity check.
@@ -406,7 +445,7 @@ pub fn format_fail_qr(session_id: &[u8; 16]) -> String {
 pub fn format_shake_qr(session_id: &[u8; 16], sealed_envelope: &[u8]) -> String {
     let crc = crc16::compute(sealed_envelope);
     frame(
-        "SHAK",
+        "SHK3",
         &format!(
             "{sid}{crc}{env}",
             sid = base45::encode(session_id),
@@ -416,25 +455,28 @@ pub fn format_shake_qr(session_id: &[u8; 16], sealed_envelope: &[u8]) -> String 
     )
 }
 
-/// Parse a QR string into a [`StageQr`] variant.
+/// Parse a QR string into its stage payload, dropping the training header.
 pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
-    let (prefix, body) = split_frame(raw)?;
+    parse_frame(raw).map(|frame| frame.stage)
+}
 
-    match prefix {
-        "INI2" => parse_ini2(body),
-        "IN2D" => parse_in2d(body),
-        "DATA" => parse_data(body),
-        "VRFY" => parse_verify(body),
-        "CONF" => parse_confirm(body),
-        "RDYY" => parse_ready(body),
-        "FAIL" => parse_fail(body),
-        "SHAK" => parse_shake(body),
-        "CMBO" => parse_combo(body),
-        // v1 prefixes are explicitly rejected (the identity-pubkey footgun
-        // has been removed; see qr_codec.rs `StageQr::Init` doc comment).
-        "INIT" | "INID" => Err(QrCodecError::UnknownPrefix),
+/// Parse a QR string into its training header and stage payload.
+pub fn parse_frame(raw: &str) -> Result<Frame, QrCodecError> {
+    let (prefix, header, body) = split_frame(raw)?;
+
+    let stage = match prefix {
+        "INI3" => parse_ini2(body),
+        "IN3D" => parse_in2d(body),
+        "DAT3" => parse_data(body),
+        "VRF3" => parse_verify(body),
+        "CNF3" => parse_confirm(body),
+        "RDY3" => parse_ready(body),
+        "FAI3" => parse_fail(body),
+        "SHK3" => parse_shake(body),
+        "CMB3" => parse_combo(body),
         _ => Err(QrCodecError::UnknownPrefix),
-    }
+    }?;
+    Ok(Frame { header, stage })
 }
 
 fn parse_ini2(body: &str) -> Result<StageQr, QrCodecError> {

@@ -668,7 +668,7 @@ fn capture_shake_frame(m: &mut MultiStageMachine, start_now: u64) -> String {
     for i in 0..200u64 {
         let now = start_now + (i + 1) * 2_000;
         if let MultiStageEvent::QrFrameReady(p) = m.advance(now)
-            && p.data.starts_with("SHAK")
+            && p.data.starts_with("SHK3")
         {
             return p.data;
         }

@@ -175,7 +175,7 @@ fn replaced_surface(commands: Vec<Command>) -> SurfaceSpec {
 /// `qr_codec::format_fail_qr` writes it. A literal, because that module is
 /// public only under the `testing` feature and these tests must run in the
 /// standard suite.
-const PEER_FAIL_FRAME: &str = "FAIL:*0:*0:*0:*0:*0:*0:*0:*0";
+const PEER_FAIL_FRAME: &str = "FAI30:0:0:00:*0:*0:*0:*0:*0:*0:*0:*0";
 
 /// The scan that ends an exchange (here the peer's FAIL frame; on device
 /// the frame that finalizes) takes the camera off the surface it arrived

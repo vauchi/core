@@ -228,6 +228,10 @@ pub enum Component {
         /// `None` is the full square.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         placement: Option<vauchi_core::platform::QrPlacement>,
+        /// The error-correction level a `Display` code is drawn at; `None`
+        /// leaves it to the shell.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_correction: Option<vauchi_core::platform::PresentationQrErrorCorrection>,
         #[serde(default)]
         a11y: Option<A11y>,
     },

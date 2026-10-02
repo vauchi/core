@@ -9,8 +9,8 @@ mod nodes;
 
 pub use nodes::{
     ChoiceOption, InputValue, PresentationAxis, PresentationImageShape, PresentationInputKind,
-    PresentationListStyle, PresentationNode, PresentationPaging, PresentationQrPurpose,
-    PresentationRow, PresentationTextStyle, PresentationTone, QrPlacement,
+    PresentationListStyle, PresentationNode, PresentationPaging, PresentationQrErrorCorrection,
+    PresentationQrPurpose, PresentationRow, PresentationTextStyle, PresentationTone, QrPlacement,
 };
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]

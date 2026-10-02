@@ -257,6 +257,7 @@ impl BleExchangeEngine {
                 label: Some(self.t("exchange.ble.glance_show_qr")),
                 scan_quality: None,
                 placement: None,
+                error_correction: None,
                 a11y: None,
             });
         }
@@ -271,6 +272,7 @@ impl BleExchangeEngine {
                     label: Some(self.t("exchange.ble.glance_scan")),
                     scan_quality: None,
                     placement: None,
+                    error_correction: None,
                     a11y: None,
                 });
                 actions.push(ScreenAction {

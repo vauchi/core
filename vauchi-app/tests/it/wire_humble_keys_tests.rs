@@ -371,6 +371,7 @@ fn all_components() -> Vec<Component> {
             label: Some("Scan me".to_string()),
             scan_quality: None,
             placement: None,
+            error_correction: None,
             a11y: None,
         },
         Component::InlineConfirm {

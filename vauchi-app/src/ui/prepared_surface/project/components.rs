@@ -213,6 +213,7 @@ impl Projection {
                 mode,
                 label,
                 placement,
+                error_correction,
                 a11y,
                 ..
             } => Ok(PresentationNode::Qr {
@@ -232,6 +233,7 @@ impl Projection {
                 },
                 label: label.clone(),
                 placement: *placement,
+                error_correction: *error_correction,
                 accessibility: accessibility(a11y, label.as_deref().unwrap_or(id)),
             }),
             Component::Preview {

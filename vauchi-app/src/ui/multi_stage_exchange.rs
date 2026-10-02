@@ -45,7 +45,7 @@ use vauchi_core::Event;
 use vauchi_core::exchange::{
     AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
 };
-use vauchi_core::platform::QrPlacement;
+use vauchi_core::platform::{PresentationQrErrorCorrection, QrPlacement};
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::exchange::scan_quality::ScanQualityTracker;
@@ -154,6 +154,8 @@ pub struct MultiStageExchangeEngine {
     current_qr_data: Option<String>,
     /// The link-training layout `current_qr_data` is drawn at.
     current_qr_layout: u8,
+    /// The error-correction level `current_qr_data` asks to be drawn at.
+    current_qr_error_correction: Option<PresentationQrErrorCorrection>,
     /// Peer display name — set on the Finalized transition.
     peer_name: Option<String>,
     /// Rich success-screen summary (received card + group + visibility),
@@ -213,6 +215,7 @@ impl MultiStageExchangeEngine {
             state: ProtocolState::Idle,
             current_qr_data: None,
             current_qr_layout: 0,
+            current_qr_error_correction: None,
             peer_name: None,
             success_summary: None,
             session_ended: false,
@@ -255,6 +258,7 @@ impl MultiStageExchangeEngine {
             state: ProtocolState::Idle,
             current_qr_data: None,
             current_qr_layout: 0,
+            current_qr_error_correction: None,
             peer_name: None,
             success_summary: None,
             session_ended: false,
@@ -281,6 +285,7 @@ impl MultiStageExchangeEngine {
             state: ProtocolState::Idle,
             current_qr_data: None,
             current_qr_layout: 0,
+            current_qr_error_correction: None,
             peer_name: None,
             success_summary: None,
             session_ended: false,
@@ -317,6 +322,10 @@ impl MultiStageExchangeEngine {
         }
         self.current_qr_data = Some(payload.data.clone());
         self.current_qr_layout = payload.layout;
+        self.current_qr_error_correction = match payload.error_correction.as_str() {
+            "L" => Some(PresentationQrErrorCorrection::Low),
+            _ => None,
+        };
     }
 
     /// Update the audio-proximity state. Called by the AppEngine
@@ -559,6 +568,7 @@ impl MultiStageExchangeEngine {
                 label: None,
                 scan_quality: None,
                 placement: placement_for_layout(self.current_qr_layout),
+                error_correction: self.current_qr_error_correction,
                 a11y: None,
             });
         }
@@ -630,6 +640,7 @@ impl MultiStageExchangeEngine {
                 label: None,
                 scan_quality: None,
                 placement: placement_for_layout(self.current_qr_layout),
+                error_correction: self.current_qr_error_correction,
                 a11y: None,
             });
         }
@@ -648,6 +659,7 @@ impl MultiStageExchangeEngine {
             label: Some(self.t("exchange.ble.glance_scan")),
             scan_quality: Some(self.scan_quality_tracker.quality()),
             placement: None,
+            error_correction: None,
             a11y: None,
         };
         let switch_camera_label = if self.use_front_camera {

@@ -141,6 +141,18 @@ impl<'de> Deserialize<'de> for QrPlacement {
     }
 }
 
+/// How much of a display code is redundancy. Lower levels fit the same
+/// payload in fewer, larger modules, which a camera resolves from closer
+/// or through more blur; higher levels survive more damage.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum PresentationQrErrorCorrection {
+    Low,
+    Medium,
+}
+
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -283,6 +295,10 @@ pub enum PresentationNode {
         /// means the full square, centred.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         placement: Option<QrPlacement>,
+        /// The error-correction level to draw a display code at. Absent
+        /// leaves it to the shell, which draws at medium.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_correction: Option<PresentationQrErrorCorrection>,
         accessibility: AccessibilitySpec,
     },
     Confirmation {

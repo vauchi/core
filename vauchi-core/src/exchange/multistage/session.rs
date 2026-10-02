@@ -91,6 +91,13 @@ const AUDIO_LISTEN_TIMEOUT: Duration = Duration::from_secs(5);
 /// [`MultiStageSession::check_and_apply_accel_timeout`].
 const ACCEL_LISTEN_TIMEOUT: Duration = Duration::from_secs(8);
 
+/// Error-correction level every frame asks to be drawn at. At level L each
+/// frame (at most 154 characters) fits 37 modules; at M all but the short
+/// last chunk need 41, which the Pixel 3a did not resolve from the iPhone
+/// SE's 65 % layouts at 7 cm (rig series F7–L7, 2026-10-02: 0 of 16 at M,
+/// 4 of 5 at L).
+const FRAME_ERROR_CORRECTION: &str = "L";
+
 /// Base display durations per QR type (jitter added at runtime).
 /// Tuned for <5s total exchange on typical hardware.
 /// Shorter = more scan opportunities per second = faster convergence.
@@ -1025,7 +1032,7 @@ impl MultiStageSession {
         {
             return Some(QrPayload {
                 data: qr_data,
-                error_correction: "L".to_string(),
+                error_correction: FRAME_ERROR_CORRECTION.to_string(),
                 display_duration_ms: jittered(DISPLAY_MS_INIT),
                 layout: 0,
             });
@@ -1041,11 +1048,9 @@ impl MultiStageSession {
                 // 43 s an exchange spent looking frozen could not be
                 // attributed (2026-08-19 Hover run).
                 tracing::info!("[MSX] INIT built — now Advertising");
-                // Use "L" error correction for INIT/INID — produces less dense QR
-                // that scans faster on older cameras (Samsung S7).
                 Some(QrPayload {
                     data: qr_data,
-                    error_correction: "L".to_string(),
+                    error_correction: FRAME_ERROR_CORRECTION.to_string(),
                     display_duration_ms: jittered(DISPLAY_MS_INIT),
                     layout: 0,
                 })
@@ -1057,7 +1062,7 @@ impl MultiStageSession {
                     .unwrap_or_else(|| self.build_init_qr());
                 Some(QrPayload {
                     data: qr_data,
-                    error_correction: "L".to_string(),
+                    error_correction: FRAME_ERROR_CORRECTION.to_string(),
                     display_duration_ms: jittered(DISPLAY_MS_INIT),
                     layout: 0,
                 })
@@ -1080,7 +1085,7 @@ impl MultiStageSession {
                         .unwrap_or_else(|| self.build_init_qr());
                     Some(QrPayload {
                         data: qr_data,
-                        error_correction: "M".to_string(),
+                        error_correction: FRAME_ERROR_CORRECTION.to_string(),
                         // INIT dwell, not DATA: this frame exists so a peer
                         // still in Advertising can discover us, and that peer
                         // is scanning for an INIT at INIT cadence. Emitting
@@ -1137,7 +1142,7 @@ impl MultiStageSession {
                 {
                     Some(QrPayload {
                         data: shake_qr,
-                        error_correction: "M".to_string(),
+                        error_correction: FRAME_ERROR_CORRECTION.to_string(),
                         display_duration_ms: jittered(DISPLAY_MS_FINAL),
                         layout: 0,
                     })
@@ -1743,7 +1748,7 @@ impl MultiStageSession {
 
         Some(QrPayload {
             data: qr_data,
-            error_correction: "L".to_string(),
+            error_correction: FRAME_ERROR_CORRECTION.to_string(),
             display_duration_ms: jittered(DISPLAY_MS_DATA),
             layout: 0,
         })
@@ -1936,7 +1941,7 @@ impl MultiStageSession {
         let tag = self.final_tag(&self.compute_card_hash(&self.local_card));
         QrPayload {
             data: qr_codec::format_final_qr(&self.session_id, self.commitment.reveal_key(), &tag),
-            error_correction: "M".to_string(),
+            error_correction: FRAME_ERROR_CORRECTION.to_string(),
             display_duration_ms: jittered(DISPLAY_MS_FINAL),
             layout: 0,
         }

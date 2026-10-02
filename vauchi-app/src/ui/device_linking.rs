@@ -412,6 +412,7 @@ impl DeviceLinkingEngine {
                     label: Some(self.t("devices.link.scan_on_new_device")),
                     scan_quality: None,
                     placement: None,
+                    error_correction: None,
                     a11y: Some(A11y {
                         label: Some(self.t("device_link.a11y_qr")),
                         hint: Some(self.t("devices.link.scan_to_begin_hint")),
@@ -580,6 +581,7 @@ impl DeviceLinkingEngine {
                     label: Some(self.t("devices.link.scan_on_new_device")),
                     scan_quality: None,
                     placement: None,
+                    error_correction: None,
                     a11y: Some(A11y {
                         label: Some(self.t("device_link.a11y_qr")),
                         hint: Some(self.t("devices.link.scan_to_begin_hint")),

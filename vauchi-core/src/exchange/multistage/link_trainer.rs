@@ -47,16 +47,19 @@ pub const STEP_UP_TO_V8_READS: u8 = 40;
 /// reads in its window.
 ///
 /// A full chunk's frame is `50 + 1.5 × (bytes + 28) + ack` characters. The
-/// sizes leave room for a 5-character ACK field, which covers a peer
-/// sending up to 24 chunks: 154, 178 and 220 characters at most, within QR
-/// versions 6, 7 and 8.
+/// sizes leave room for a 5-character ACK field (a peer sending up to 24
+/// chunks) and six more characters under what QR versions 5, 7 and 8 hold
+/// at level L (154, 224, 279): an encoder that splits the frame into
+/// segments spends a few bits per extra segment, and 2 characters of room
+/// was not always enough (a 152-char frame drawn at 41 modules once in a
+/// test run).
 pub fn chunk_bytes_for(peer_reads: u8) -> usize {
     if peer_reads >= STEP_UP_TO_V8_READS {
-        82
+        78
     } else if peer_reads >= STEP_UP_TO_V7_READS {
-        54
+        50
     } else {
-        38
+        34
     }
 }
 

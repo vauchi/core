@@ -305,9 +305,9 @@ fn a_link_with_no_read_rate_yet_sends_chunks_that_fit_qr_version_6() {
 
     assert!(!lengths.is_empty(), "no DATA frames shown");
     let longest = *lengths.iter().max().unwrap();
-    // 5 characters short of the version's 154: the ACK field is empty
+    // 11 characters short of the version's 154: the ACK field is empty
     // until the peer's chunk count is known, and may grow to 5.
-    assert_eq!(longest, 149);
+    assert_eq!(longest, 143);
 }
 
 // @internal
@@ -316,8 +316,8 @@ fn data_frames_stay_in_qr_version_6_while_acking_a_24_chunk_peer() {
     use vauchi_core::exchange::multistage::qr_codec::{StageQr, parse_qr};
 
     let mut alice = MultiStageSession::new(vec![0xA1; 400]);
-    // 24 chunks of 38 bytes once sealed (870 + 24 + 16 = 910 bytes).
-    let mut bob = MultiStageSession::new(vec![0xB2; 870]);
+    // 24 chunks of 34 bytes once sealed (776 + 24 + 16 = 816 bytes).
+    let mut bob = MultiStageSession::new(vec![0xB2; 776]);
     let a_opening = alice.get_display_qr().expect("advertises");
     let b_opening = bob.get_display_qr().expect("advertises");
     alice.process_scanned_qr(&b_opening.data);
@@ -340,10 +340,7 @@ fn data_frames_stay_in_qr_version_6_while_acking_a_24_chunk_peer() {
         .max()
         .expect("alice shows DATA");
 
-    assert_eq!(
-        longest, 154,
-        "a full chunk with a 3-byte ACK fills version 6"
-    );
+    assert_eq!(longest, 148, "a full chunk with a 3-byte ACK");
 }
 
 // @internal
@@ -357,11 +354,11 @@ fn a_peer_that_reports_reading_fast_gets_denser_chunks() {
     let version_7 = data_frame_lengths_for_a_peer_reporting(STEP_UP_TO_V7_READS);
     let version_8 = data_frame_lengths_for_a_peer_reporting(STEP_UP_TO_V8_READS);
 
-    // Each 5 characters short of what its QR version holds (154, 178,
+    // Each 11 characters short of what its QR version holds (154, 178,
     // 221), kept for the ACK field.
-    assert_eq!(*just_below.iter().max().unwrap(), 149);
-    assert_eq!(*version_7.iter().max().unwrap(), 173);
-    assert_eq!(*version_8.iter().max().unwrap(), 215);
+    assert_eq!(*just_below.iter().max().unwrap(), 143);
+    assert_eq!(*version_7.iter().max().unwrap(), 167);
+    assert_eq!(*version_8.iter().max().unwrap(), 209);
 }
 
 // @internal
@@ -426,9 +423,10 @@ fn every_frame_a_session_shows_fits_37_modules_at_the_level_it_names() {
             assert_eq!(
                 code.width(),
                 37,
-                "a {}-char {} frame",
+                "a {}-char {} frame: {}",
                 frame.data.len(),
-                &frame.data[..4]
+                &frame.data[..4],
+                frame.data
             );
             seen.insert(frame.data[..4].to_string());
         }

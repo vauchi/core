@@ -69,8 +69,8 @@ fn exchange_over_link(
 }
 
 fn three_chunk_card(tag: u8) -> Vec<u8> {
-    // 70 bytes seal to 110, three chunks of 38.
-    vec![tag; 70]
+    // 62 bytes seal to 102, three chunks of 34.
+    vec![tag; 62]
 }
 
 // @internal

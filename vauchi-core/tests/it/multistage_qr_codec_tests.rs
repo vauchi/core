@@ -321,3 +321,30 @@ fn a_scan_whose_prefix_boundary_splits_a_character_is_rejected() {
 
     assert!(matches!(result, Err(QrCodecError::UnknownPrefix)));
 }
+
+// @internal
+#[test]
+fn frame_length_sets_the_module_count_in_these_steps() {
+    // The link-training design sizes every frame against these steps
+    // (alphanumeric mode, error correction M): the last length that still
+    // fits each QR version, and the first that no longer does.
+    let steps = [
+        (90, 33),
+        (91, 37),
+        (122, 37),
+        (123, 41),
+        (154, 41),
+        (155, 45),
+        (178, 45),
+        (179, 49),
+        (221, 49),
+        (222, 53),
+    ];
+
+    for (chars, modules) in steps {
+        let frame = "A".repeat(chars);
+        let code = qrcode::QrCode::with_error_correction_level(&frame, qrcode::EcLevel::M)
+            .expect("alphanumeric frame encodes");
+        assert_eq!(code.width(), modules, "a {chars}-char frame");
+    }
+}

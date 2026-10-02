@@ -1,0 +1,184 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! The exchange screen draws its own code where the link trainer says: a
+//! `placement` on the display QR node, in permille of the node's square
+//! (#450, design D7).
+
+#![cfg(feature = "testing")]
+
+use vauchi_app::ui::{AppEngine, AppScreen, UserAction, WorkflowEngine};
+use vauchi_core::api::Vauchi;
+use vauchi_core::exchange::{ProtocolState, QrPayload};
+use vauchi_core::platform::{
+    Command, PresentationNode, PresentationQrPurpose, QrPlacement, SurfaceSpec,
+};
+
+fn engine_on_hover() -> AppEngine {
+    let mut vauchi = Vauchi::in_memory().expect("in-memory Vauchi");
+    vauchi.create_identity("Alice").expect("identity");
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Exchange);
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "category:quick".into(),
+        item_id: "mode:hover".into(),
+    });
+    engine
+}
+
+fn presented_surface(engine: &mut AppEngine) -> SurfaceSpec {
+    engine
+        .initial_commands()
+        .expect("commands")
+        .into_iter()
+        .rev()
+        .find_map(|command| match command {
+            Command::ReplaceSurface { surface } => Some(surface),
+            _ => None,
+        })
+        .expect("a surface is presented")
+}
+
+/// Placement of the display QR node, wherever it sits in the surface.
+fn own_code_placement(surface: &SurfaceSpec) -> Option<Option<QrPlacement>> {
+    fn walk(nodes: &[PresentationNode]) -> Option<Option<QrPlacement>> {
+        nodes.iter().find_map(|node| match node {
+            PresentationNode::Qr {
+                purpose: PresentationQrPurpose::Display,
+                placement,
+                ..
+            } => Some(*placement),
+            PresentationNode::Group { children, .. } => walk(children),
+            _ => None,
+        })
+    }
+    walk(&surface.nodes)
+}
+
+fn frame_at_layout(layout: u8) -> QrPayload {
+    QrPayload {
+        data: "FRAME".into(),
+        error_correction: "M".into(),
+        display_duration_ms: 300,
+        layout,
+    }
+}
+
+fn placement(size: u16, x: u16, y: u16) -> QrPlacement {
+    QrPlacement::new(size, x, y).expect("placement inside the square")
+}
+
+// @internal
+#[test]
+fn a_placement_outside_the_square_cannot_be_built() {
+    assert_eq!(placement(1000, 0, 0).size(), 1000);
+    assert_eq!(placement(650, 350, 175).x(), 350);
+    assert_eq!(placement(650, 350, 175).y(), 175);
+    assert_eq!(placement(500, 500, 500).size(), 500);
+
+    let refused = [
+        ("smaller than half the square", (499, 0, 0)),
+        ("larger than the square", (1001, 0, 0)),
+        ("past the right edge", (800, 201, 0)),
+        ("past the bottom edge", (800, 0, 201)),
+        ("far outside", (650, u16::MAX, 0)),
+        ("size overflowing", (u16::MAX, 0, 0)),
+    ];
+    for (case, (size, x, y)) in refused {
+        assert_eq!(QrPlacement::new(size, x, y), None, "{case}");
+    }
+}
+
+// @internal
+#[test]
+fn a_placement_outside_the_square_is_refused_from_json() {
+    let inside: QrPlacement =
+        serde_json::from_str(r#"{"size":800,"x":200,"y":0}"#).expect("valid placement");
+    assert_eq!(inside, placement(800, 200, 0));
+
+    for outside in [
+        r#"{"size":800,"x":201,"y":0}"#,
+        r#"{"size":400,"x":0,"y":0}"#,
+        r#"{"size":800,"x":0}"#,
+        r#"{"size":-1,"x":0,"y":0}"#,
+        r#"{"size":800,"x":0,"y":0,"z":1}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<QrPlacement>(outside).is_err(),
+            "{outside}"
+        );
+    }
+}
+
+// @internal
+#[test]
+fn a_full_size_code_carries_no_placement_on_the_wire() {
+    let mut engine = engine_on_hover();
+    assert!(engine.apply_multi_stage_qr_payload(&frame_at_layout(0)));
+
+    let surface = presented_surface(&mut engine);
+
+    assert_eq!(own_code_placement(&surface), Some(None));
+    let json = serde_json::to_string(&surface).expect("surface serialises");
+    assert!(!json.contains("placement"), "{json}");
+}
+
+// @internal
+#[test]
+fn the_exchange_screen_draws_its_code_at_the_trainers_layout() {
+    // Layout 0 is full size; 1–4 are 80 % in the four corners; 5–13 are
+    // 65 % on a 3 × 3 grid, row by row.
+    let expected = [
+        (1, placement(800, 0, 0)),
+        (2, placement(800, 200, 0)),
+        (3, placement(800, 0, 200)),
+        (4, placement(800, 200, 200)),
+        (5, placement(650, 0, 0)),
+        (6, placement(650, 175, 0)),
+        (7, placement(650, 350, 0)),
+        (8, placement(650, 0, 175)),
+        (9, placement(650, 175, 175)),
+        (10, placement(650, 350, 175)),
+        (11, placement(650, 0, 350)),
+        (12, placement(650, 175, 350)),
+        (13, placement(650, 350, 350)),
+    ];
+    let mut engine = engine_on_hover();
+
+    for (layout, at) in expected {
+        assert!(engine.apply_multi_stage_qr_payload(&frame_at_layout(layout)));
+        let surface = presented_surface(&mut engine);
+        assert_eq!(
+            own_code_placement(&surface),
+            Some(Some(at)),
+            "layout {layout}"
+        );
+    }
+}
+
+// @internal
+#[test]
+fn a_layout_outside_the_set_is_drawn_full_size() {
+    let mut engine = engine_on_hover();
+    assert!(engine.apply_multi_stage_qr_payload(&frame_at_layout(200)));
+
+    let surface = presented_surface(&mut engine);
+
+    assert_eq!(own_code_placement(&surface), Some(None));
+}
+
+// @internal
+#[test]
+fn the_saved_screen_keeps_the_code_where_it_was() {
+    let mut engine = engine_on_hover();
+    assert!(engine.apply_multi_stage_qr_payload(&frame_at_layout(12)));
+
+    assert!(engine.apply_multi_stage_state(ProtocolState::Finalized));
+    let surface = presented_surface(&mut engine);
+
+    assert_eq!(
+        own_code_placement(&surface),
+        Some(Some(placement(650, 175, 350)))
+    );
+}

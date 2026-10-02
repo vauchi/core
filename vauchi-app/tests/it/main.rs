@@ -149,6 +149,7 @@ mod multi_stage_persist_reciprocity_tests;
 #[cfg(feature = "testing")]
 mod multi_stage_poll_cadence_tests;
 mod multi_stage_presentation_scan_tests;
+mod multi_stage_qr_placement_tests;
 mod multi_stage_two_party_tests;
 mod nav_chrome_overlay_tests;
 mod nav_destination_self_reference_tests;

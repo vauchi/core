@@ -489,7 +489,18 @@ impl MultiStageMachine {
         // `display_duration_ms` is `u32` on the protocol type; widen
         // to `u64` to match the machine's time domain.
         self.current_frame_duration = u64::from(payload.display_duration_ms);
+        let prior = self.phase.clone();
         self.sync_phase_from_inner_state();
+        // Showing a frame is also when the session opens a card with a
+        // reveal key it kept, and a kept final tag can finish the exchange
+        // right there. That is the one transition the engine must hear
+        // about, because it saves the contact on it; the frame follows on
+        // the next tick.
+        if !matches!(prior, MultiStagePhase::Finalized { .. })
+            && matches!(self.phase, MultiStagePhase::Finalized { .. })
+        {
+            return phase_transition_event(&prior, &self.phase);
+        }
         // If the inner transition flipped us into a terminal phase
         // (e.g. the FAIL frame on a hardware-failed exchange) the
         // I4 contract is "no QrDisplay after terminal" — drop the

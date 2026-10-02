@@ -269,9 +269,10 @@ pub struct MultiStageSession {
     transport_decrypt_failures: u32,
 
     peer_reveal_key: Option<[u8; 32]>,
-    /// The tag of a peer final frame read in Confirming while a shake was
-    /// still recording, applied once the recording stops.
-    kept_peer_final_tag: Option<[u8; 32]>,
+    /// The tag of a peer final frame that could not be checked when it was
+    /// read, applied once it can be: read before the card was opened, or in
+    /// Confirming while a shake was still recording.
+    kept_peer_final_tag: Option<KeptFinalTag>,
 
     state: ProtocolState,
 
@@ -379,6 +380,16 @@ pub struct MultiStageSession {
     /// tests. Note `check_and_apply_audio_timeout` retains its explicit
     /// `now: Instant` parameter for cycle-thread callers.
     monotonic: Arc<dyn MonotonicClock>,
+}
+
+/// A peer final-frame tag waiting to be checked.
+#[derive(Debug, Clone, Copy)]
+enum KeptFinalTag {
+    /// Read before the peer's card could be opened. A mismatch drops it.
+    ReadEarlier([u8; 32]),
+    /// Read with the card open, or opening it in the same step; held only
+    /// for a shake still recording. A mismatch fails the exchange.
+    ReadInConfirming([u8; 32]),
 }
 
 /// Errors building the post-finalize Double Ratchet for a multi-stage exchange.
@@ -1549,31 +1560,35 @@ impl MultiStageSession {
         }
     }
 
-    /// Applies a final-frame tag kept from before Confirming. Held while a
-    /// shake is still being recorded: TapHoverShake swaps its motion
-    /// envelope only in Confirming, and applying the tag would carry us
-    /// straight past it.
+    /// Applies a kept final-frame tag. Held while a shake is still being
+    /// recorded: TapHoverShake swaps its motion envelope only in
+    /// Confirming, and applying the tag would carry us straight past it.
     fn apply_kept_final_tag(&mut self) {
         if !matches!(self.state, ProtocolState::Confirming)
             || self.accel_proximity == AccelerometerProximityState::Listening
         {
             return;
         }
-        if let Some(tag) = self.kept_peer_final_tag.take() {
-            self.confirm_final_tag(tag);
+        match self.kept_peer_final_tag.take() {
+            Some(KeptFinalTag::ReadInConfirming(tag)) => self.confirm_final_tag(tag),
+            // A peer about to re-handshake (ADR-071) shows final frames
+            // bound to its old partner until it does. Such a tag is not
+            // evidence against this exchange: drop it and let the peer's
+            // next final frame decide. Failing on it broke the
+            // staggered-start recovery in about half of the runs.
+            Some(KeptFinalTag::ReadEarlier(tag)) if self.final_tag_matches(&tag) => {
+                self.confirm_final_tag(tag);
+            }
+            Some(KeptFinalTag::ReadEarlier(_)) | None => {}
         }
     }
 
     /// Handle the peer's final frame: its reveal key and the tag that
     /// confirms its card and both session ids. One read takes a session
-    /// that holds every chunk from Verifying or Confirming to Finalized
-    /// (design D5).
+    /// that holds every chunk to Finalized (design D5).
     ///
-    /// Before Confirming only the reveal key is taken, as a VRFY was. The
-    /// tag is not kept from there: a peer that re-handshakes (ADR-071) shows
-    /// final frames bound to its old partner until it does, and such a tag
-    /// applied later would fail a healthy exchange. The peer shows its final
-    /// frame until its grace period ends, so the tag is read again.
+    /// Read before the card can be opened, the key and the tag are kept:
+    /// the peer may not be read again soon (rig run L7-1).
     fn handle_final(
         &mut self,
         sender: [u8; 16],
@@ -1588,19 +1603,31 @@ impl MultiStageSession {
         }
         if !matches!(
             self.state,
-            ProtocolState::Transferring { .. } | ProtocolState::Verifying | ProtocolState::Confirming
+            ProtocolState::Transferring { .. }
+                | ProtocolState::Verifying
+                | ProtocolState::Confirming
         ) {
             return self.state.clone();
         }
         if !matches!(self.state, ProtocolState::Confirming) {
             self.handle_verify(reveal_key);
         }
-        if matches!(self.state, ProtocolState::Confirming) {
-            // Kept, not applied, only while a shake is still recording.
-            self.kept_peer_final_tag = Some(tag);
-            self.apply_kept_final_tag();
-        }
+        // Checked against the card in this same call: a mismatch fails
+        // closed. Only a tag that has to wait for the card is lenient.
+        self.kept_peer_final_tag = Some(if matches!(self.state, ProtocolState::Confirming) {
+            KeptFinalTag::ReadInConfirming(tag)
+        } else {
+            KeptFinalTag::ReadEarlier(tag)
+        });
+        self.apply_kept_final_tag();
         self.state.clone()
+    }
+
+    fn final_tag_matches(&self, tag: &[u8; 32]) -> bool {
+        self.received_data.as_ref().is_some_and(|data| {
+            let expected = self.final_tag(&self.compute_card_hash(data));
+            bool::from(tag.ct_eq(&expected))
+        })
     }
 
     /// Check the peer's final tag against the card we opened and finalize.

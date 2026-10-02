@@ -269,20 +269,20 @@ impl AppEngine {
                 self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Confirming)
             }
             MultiStageEvent::Finalized { peer_name } => {
-                // Seed the success-screen broadcast with the finalization COMBO
+                // Seed the success-screen broadcast with the final frame
                 // *before* any Finalized screen builds. That screen is a single
                 // frozen frame (`build_finalized_broadcast_screen`); without this
                 // it inherits whatever `current_qr_data` last held — a stale DATA
-                // chunk from the `Complete`-state interleave — and a still-`Complete`
-                // peer scans DATA forever, timing out with no contact (device-proven
-                // half-exchange, 2026-07-25 Pixel↔Samsung Hover). The COMBO carries
-                // our RDYY, the only frame the trailing peer needs to finalize.
-                if let Some(combo) = self
+                // chunk — and a peer still waiting scans DATA forever, timing
+                // out with no contact (device-proven half-exchange, 2026-07-25
+                // Pixel↔Samsung Hover). The final frame is the only one the
+                // trailing peer needs to finalize.
+                if let Some(final_frame) = self
                     .multi_stage_session
                     .as_ref()
-                    .and_then(|h| h.machine.finalization_combo_qr())
+                    .map(|h| h.machine.finalization_qr())
                 {
-                    let _ = self.apply_multi_stage_qr_payload(&combo);
+                    let _ = self.apply_multi_stage_qr_payload(&final_frame);
                 }
                 let state_applied =
                     self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Finalized);

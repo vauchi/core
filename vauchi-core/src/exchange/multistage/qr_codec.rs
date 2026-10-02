@@ -12,8 +12,7 @@
 //! Layout:
 //! - `INIT<sid:24><pk:48><eph:48><ch:48><display_name>`
 //! - `DATA<sid:24><idx:3>/<total:3><ack_len:2><ack:variable><crc:3><payload>`
-//! - `VRFY<sid:24><rk:48>`
-//! - `CONF<sid:24><ph:48>`
+//! - `FIN3<header:8><sid:24><rk:48><tag:48>`
 //!
 //! All binary fields are base45-encoded (fixed-width for known-size inputs).
 //! The only non-positional field is `display_name` at the tail of INIT,
@@ -73,17 +72,13 @@ pub enum StageQr {
         crc: u16,
         payload: Vec<u8>,
     },
-    Verify {
+    /// The final frame: the sender's reveal key and one value confirming
+    /// its card and both session ids, `SHA-256(card hash ‖ ready hash)`.
+    /// One read takes a peer that holds every chunk to Finalized.
+    Final {
         session_id: [u8; 16],
         reveal_key: [u8; 32],
-    },
-    Confirm {
-        session_id: [u8; 16],
-        payload_hash: [u8; 32],
-    },
-    Ready {
-        session_id: [u8; 16],
-        ack_hash: [u8; 32],
+        tag: [u8; 32],
     },
     /// INIT with embedded data: for small payloads (1 chunk), includes the
     /// raw commitment ciphertext. Eliminates the DATA phase entirely.
@@ -103,14 +98,6 @@ pub enum StageQr {
         relay_url: Option<String>,
         /// Raw commitment ciphertext (not transport-encrypted).
         ciphertext: Vec<u8>,
-    },
-    /// Compound QR: VRFY + CONF + RDYY in one scan.
-    /// Lets a slower peer jump from Transferring → Finalized in a single scan.
-    Combo {
-        session_id: [u8; 16],
-        reveal_key: [u8; 32],
-        payload_hash: [u8; 32],
-        ack_hash: [u8; 32],
     },
     /// Failure notification — tells peer to abort immediately.
     Fail { session_id: [u8; 16] },
@@ -134,11 +121,8 @@ impl StageQr {
         match self {
             Self::Init { session_id, .. }
             | Self::Data { session_id, .. }
-            | Self::Verify { session_id, .. }
-            | Self::Confirm { session_id, .. }
-            | Self::Ready { session_id, .. }
+            | Self::Final { session_id, .. }
             | Self::Inid { session_id, .. }
-            | Self::Combo { session_id, .. }
             | Self::Fail { session_id }
             | Self::Shake { session_id, .. } => session_id,
         }
@@ -167,9 +151,7 @@ const FLAG_HAS_RELAY_URL: u8 = 0x01;
 
 /// Stage prefixes (4 chars each).
 const PREFIX_LEN: usize = 4;
-const PREFIXES: [&str; 9] = [
-    "INI3", "IN3D", "DAT3", "VRF3", "CNF3", "RDY3", "FAI3", "SHK3", "CMB3",
-];
+const PREFIXES: [&str; 6] = ["INI3", "IN3D", "DAT3", "FIN3", "FAI3", "SHK3"];
 
 fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> {
     let bytes = base45::decode(encoded)?;
@@ -393,67 +375,16 @@ pub fn format_data_qr(
     )
 }
 
-/// Format a VRFY (verify) stage QR string.
-pub fn format_verify_qr(session_id: &[u8; 16], reveal_key: &[u8; 32]) -> String {
+/// Format a final frame: `FIN3<header:8><sid:24><rk:48><tag:48>`, 132
+/// characters, the density of the opening frame.
+pub fn format_final_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
     frame(
-        "VRF3",
+        "FIN3",
         &format!(
-            "{sid}{rk}",
+            "{sid}{rk}{tag}",
             sid = base45::encode(session_id),
             rk = base45::encode(reveal_key),
-        ),
-    )
-}
-
-/// Format a CONF (confirm) stage QR string.
-pub fn format_confirm_qr(session_id: &[u8; 16], payload_hash: &[u8; 32]) -> String {
-    frame(
-        "CNF3",
-        &format!(
-            "{sid}{ph}",
-            sid = base45::encode(session_id),
-            ph = base45::encode(payload_hash),
-        ),
-    )
-}
-
-/// Format a READY QR: `RDYY<sid:24><ack_hash:48>`
-///
-/// The ack_hash is SHA-256(min(sid_a, sid_b) || max(sid_a, sid_b)),
-/// proving both sides participated in the same exchange.
-/// Kept for backward compatibility with older clients that don't understand CMBO.
-#[allow(dead_code)]
-pub fn format_ready_qr(session_id: &[u8; 16], ack_hash: &[u8; 32]) -> String {
-    frame(
-        "RDY3",
-        &format!(
-            "{sid}{ah}",
-            sid = base45::encode(session_id),
-            ah = base45::encode(ack_hash),
-        ),
-    )
-}
-
-/// Format a COMBO QR: `CMBO<sid:24><rk:48><ph:48><ah:48>`
-///
-/// Compound QR containing VRFY reveal_key + CONF payload_hash + RDYY ack_hash.
-/// A slower peer can process all three in one scan, jumping from
-/// Transferring/Verifying straight to Finalized.
-/// Total: 4 + 24 + 48 + 48 + 48 = 172 chars (well within QR capacity).
-pub fn format_combo_qr(
-    session_id: &[u8; 16],
-    reveal_key: &[u8; 32],
-    payload_hash: &[u8; 32],
-    ack_hash: &[u8; 32],
-) -> String {
-    frame(
-        "CMB3",
-        &format!(
-            "{sid}{rk}{ph}{ah}",
-            sid = base45::encode(session_id),
-            rk = base45::encode(reveal_key),
-            ph = base45::encode(payload_hash),
-            ah = base45::encode(ack_hash),
+            tag = base45::encode(tag),
         ),
     )
 }
@@ -497,12 +428,9 @@ pub fn parse_frame(raw: &str) -> Result<Frame, QrCodecError> {
         "INI3" => parse_ini2(body),
         "IN3D" => parse_in2d(body),
         "DAT3" => parse_data(body),
-        "VRF3" => parse_verify(body),
-        "CNF3" => parse_confirm(body),
-        "RDY3" => parse_ready(body),
+        "FIN3" => parse_final(body),
         "FAI3" => parse_fail(body),
         "SHK3" => parse_shake(body),
-        "CMB3" => parse_combo(body),
         _ => Err(QrCodecError::UnknownPrefix),
     }?;
     Ok(Frame { header, stage })
@@ -651,36 +579,16 @@ fn parse_data(body: &str) -> Result<StageQr, QrCodecError> {
     })
 }
 
-fn parse_verify(body: &str) -> Result<StageQr, QrCodecError> {
+fn parse_final(body: &str) -> Result<StageQr, QrCodecError> {
     let mut pos = 0;
     let sid = take(body, &mut pos, SID_LEN)?;
     let rk = take(body, &mut pos, F32_LEN)?;
+    let tag = take(body, &mut pos, F32_LEN)?;
 
-    Ok(StageQr::Verify {
+    Ok(StageQr::Final {
         session_id: decode_fixed(sid)?,
         reveal_key: decode_fixed(rk)?,
-    })
-}
-
-fn parse_confirm(body: &str) -> Result<StageQr, QrCodecError> {
-    let mut pos = 0;
-    let sid = take(body, &mut pos, SID_LEN)?;
-    let ph = take(body, &mut pos, F32_LEN)?;
-
-    Ok(StageQr::Confirm {
-        session_id: decode_fixed(sid)?,
-        payload_hash: decode_fixed(ph)?,
-    })
-}
-
-fn parse_ready(body: &str) -> Result<StageQr, QrCodecError> {
-    let mut pos = 0;
-    let sid = take(body, &mut pos, SID_LEN)?;
-    let ah = take(body, &mut pos, F32_LEN)?;
-
-    Ok(StageQr::Ready {
-        session_id: decode_fixed(sid)?,
-        ack_hash: decode_fixed(ah)?,
+        tag: decode_fixed(tag)?,
     })
 }
 
@@ -717,20 +625,5 @@ fn parse_shake(body: &str) -> Result<StageQr, QrCodecError> {
     Ok(StageQr::Shake {
         session_id: decode_fixed(sid)?,
         sealed_envelope,
-    })
-}
-
-fn parse_combo(body: &str) -> Result<StageQr, QrCodecError> {
-    let mut pos = 0;
-    let sid = take(body, &mut pos, SID_LEN)?;
-    let rk = take(body, &mut pos, F32_LEN)?;
-    let ph = take(body, &mut pos, F32_LEN)?;
-    let ah = take(body, &mut pos, F32_LEN)?;
-
-    Ok(StageQr::Combo {
-        session_id: decode_fixed(sid)?,
-        reveal_key: decode_fixed(rk)?,
-        payload_hash: decode_fixed(ph)?,
-        ack_hash: decode_fixed(ah)?,
     })
 }

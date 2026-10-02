@@ -325,24 +325,23 @@ fn test_e2e_invalid_qr_during_transfer_ignored() {
 
 // @internal
 #[test]
-fn test_e2e_grace_period_broadcasts_combo() {
+fn test_e2e_grace_period_keeps_showing_the_final_frame() {
     let (mut alice, mut bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
 
     assert_eq!(alice.get_state(), ProtocolState::Finalized);
     assert_eq!(bob.get_state(), ProtocolState::Finalized);
 
-    // After finalization, COMBO QRs are still displayed for a grace period
-    // so the peer can also finalize (C3 fix: prevents asymmetric failure).
-    // A one-chunk INID exchange never carries an ACK bitmap in either
-    // direction, so neither side can know its own chunk landed and both keep
-    // interleaving DATA. The guarantee is that COMBO keeps coming.
-    let combo_frames = (0..50)
+    // After finalization the final frame is still displayed for a grace
+    // period so the peer can also finalize (C3 fix: prevents asymmetric
+    // failure). DATA may be interleaved while chunks are unacked; the
+    // guarantee is that the final frame keeps coming.
+    let final_frames = (0..50)
         .filter_map(|_| alice.get_display_qr())
-        .filter(|qr| qr.data.starts_with("CMB3"))
+        .filter(|qr| qr.data.starts_with("FIN3"))
         .count();
     assert!(
-        combo_frames > 0,
-        "Grace period must keep broadcasting COMBO so the peer can finalize"
+        final_frames > 0,
+        "Grace period must keep showing the final frame so the peer can finalize"
     );
 
     // Verify QRs are still produced after a short delay (still within grace).
@@ -502,98 +501,50 @@ fn test_atomicity_ready_exchange_reaches_finalized() {
 // @internal
 #[test]
 fn test_atomicity_without_peer_finalization_frame_no_finalize() {
-    use sha2::{Digest, Sha256};
-    use vauchi_core::exchange::multistage::qr_codec;
-
-    let alice_card = b"Alice".to_vec();
-    let bob_card = b"Bob".to_vec();
-    let alice_card_hash: [u8; 32] = Sha256::digest(&alice_card).into();
-
-    let mut alice = MultiStageSession::new(alice_card);
-    let mut bob = MultiStageSession::new(bob_card);
+    let mut alice = MultiStageSession::new(b"Alice".to_vec());
+    let mut bob = MultiStageSession::new(b"Bob".to_vec());
 
     let ai = alice.get_display_qr().unwrap();
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    let mut bob_stopped_before_finalization_frame = false;
+    // Bob reads everything Alice shows except her final frame.
+    let mut withheld = 0;
     for _ in 0..500 {
-        let aq = alice.get_display_qr();
-        let bq = bob.get_display_qr();
-        if !bob_stopped_before_finalization_frame && let Some(aq) = &aq {
-            if aq.data.starts_with("CMB3") {
-                bob_stopped_before_finalization_frame = true;
+        if let Some(aq) = alice.get_display_qr() {
+            if aq.data.starts_with("FIN3") {
+                withheld += 1;
             } else {
                 bob.process_scanned_qr(&aq.data);
-                bob_stopped_before_finalization_frame = matches!(
-                    bob.get_state(),
-                    ProtocolState::Confirming | ProtocolState::Complete
-                );
             }
         }
-        if let Some(bq) = &bq {
+        if let Some(bq) = bob.get_display_qr() {
             alice.process_scanned_qr(&bq.data);
         }
         assert_ne!(
             bob.get_state(),
             ProtocolState::Finalized,
-            "Bob finalized without Alice's finalization frame"
-        );
-        if matches!(alice.get_state(), ProtocolState::Finalized)
-            && bob_stopped_before_finalization_frame
-        {
-            break;
-        }
-    }
-
-    assert!(
-        bob_stopped_before_finalization_frame,
-        "Bob never reached the point where Alice's finalization frame was withheld"
-    );
-    assert_eq!(alice.get_state(), ProtocolState::Finalized);
-    // Complete when a CONF Bob decoded before Confirming was kept (#315);
-    // either way he still lacks Alice's finalization frame.
-    assert!(
-        matches!(
-            bob.get_state(),
-            ProtocolState::Confirming | ProtocolState::Complete
-        ),
-        "Bob must be short of Finalized, got {:?}",
-        bob.get_state()
-    );
-
-    let alice_confirm = qr_codec::format_confirm_qr(&alice.session_id(), &alice_card_hash);
-    assert_eq!(
-        bob.process_scanned_qr(&alice_confirm),
-        ProtocolState::Complete
-    );
-
-    for _ in 0..100 {
-        let bq = bob.get_display_qr();
-        if let Some(bq) = &bq {
-            alice.process_scanned_qr(&bq.data);
-        }
-        let _withheld_alice_qr = alice.get_display_qr();
-        assert_ne!(
-            bob.get_state(),
-            ProtocolState::Finalized,
-            "Bob finalized without scanning Alice's finalization frame"
+            "Bob finalized without Alice's final frame"
         );
         assert_eq!(bob.get_received_data(), None);
     }
 
-    assert_ne!(bob.get_state(), ProtocolState::Finalized);
-    assert_eq!(bob.get_received_data(), None);
+    assert!(withheld > 0, "Alice never showed a final frame to withhold");
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(
+        bob.get_state(),
+        ProtocolState::Verifying,
+        "Bob holds every chunk and waits for the reveal key"
+    );
 }
 
 /// Feature: contact_exchange.feature @atomicity
 /// Regression test for C3: asymmetric exchange failure (Samsung ↔ iPhone).
 ///
-/// When one side finalizes first (scans peer's RDYY), it must continue
-/// broadcasting its own RDYY so the peer can also finalize. Without this,
-/// the first-to-finalize side stops displaying QRs and the peer times out
-/// with "peer did not confirm readiness".
+/// When one side finalizes first (reads the peer's final frame), it must
+/// keep showing its own so the peer can also finalize. Without this, the
+/// first-to-finalize side stops displaying QRs and the peer times out.
 // @internal
 #[test]
 fn test_asymmetric_finalization_both_reach_finalized() {
@@ -613,7 +564,7 @@ fn test_asymmetric_finalization_both_reach_finalized() {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(aq) = &aq {
-            if aq.data.starts_with("CMB3") {
+            if aq.data.starts_with("FIN3") {
                 withheld_alice_finalization_frame = true;
             } else {
                 bob.process_scanned_qr(&aq.data);
@@ -891,86 +842,6 @@ fn test_clear_sensitive_covers_all_security_fields() {
     );
 }
 
-/// S2: Finalization states broadcast the COMBO rather than cycling VRFY/CONF,
-/// so a trailing peer never has to catch one specific frame type. Chunks the
-/// peer has not yet ACK'd are interleaved by design, so the guarantee is that
-/// COMBO keeps coming — not that nothing else is ever shown.
-// @internal
-#[test]
-fn test_finalization_states_broadcast_combo() {
-    use sha2::{Digest, Sha256};
-    use vauchi_core::exchange::multistage::qr_codec;
-
-    let alice_card = b"Alice".to_vec();
-    let alice_card_hash: [u8; 32] = Sha256::digest(&alice_card).into();
-    let mut alice = MultiStageSession::new(alice_card);
-    let mut bob = MultiStageSession::new(b"Bob".to_vec());
-
-    let ai = alice.get_display_qr().unwrap();
-    let bi = bob.get_display_qr().unwrap();
-    alice.process_scanned_qr(&bi.data);
-    bob.process_scanned_qr(&ai.data);
-
-    for _ in 0..500 {
-        let aq = alice.get_display_qr();
-        let bq = bob.get_display_qr();
-        // Withhold CONF too: a CONF Bob decodes before Confirming is kept and
-        // would carry him straight to Complete (#315); this test hands him
-        // Alice's CONF itself below.
-        if let Some(aq) = &aq {
-            if !aq.data.starts_with("CMB3") && !aq.data.starts_with("CNF3") {
-                bob.process_scanned_qr(&aq.data);
-            }
-        }
-        if let Some(bq) = &bq {
-            alice.process_scanned_qr(&bq.data);
-        }
-        if matches!(bob.get_state(), ProtocolState::Confirming) {
-            break;
-        }
-    }
-
-    assert_eq!(bob.get_state(), ProtocolState::Confirming);
-    let alice_confirm = qr_codec::format_confirm_qr(&alice.session_id(), &alice_card_hash);
-    assert_eq!(
-        bob.process_scanned_qr(&alice_confirm),
-        ProtocolState::Complete
-    );
-
-    let mut combo_frames = 0;
-    for _ in 0..50 {
-        let qr = bob
-            .get_display_qr()
-            .expect("Bob must display a QR while awaiting Alice's readiness frame");
-        let tag = &qr.data[..4];
-        assert!(
-            tag == "CMB3" || tag == "DAT3",
-            "Complete-state QR should be CMBO or an interleaved DATA chunk, got: {tag}"
-        );
-        if tag == "CMB3" {
-            assert_eq!(qr.error_correction, "Q");
-            combo_frames += 1;
-        }
-    }
-
-    assert!(
-        combo_frames > 0,
-        "Complete must broadcast COMBO so a trailing peer can finalize from one decode"
-    );
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
-}
-
-// ============================================================
-// (site 1 of _private/.../2026-05-21-silent-failures-in-security-paths)
-//
-// Pre-2026-05-23 `transport_decrypt` returned `Option<Vec<u8>>`, conflating
-// ciphertext-too-short, AEAD-tag-mismatch, and "no chunk yet". The caller
-// `if let Some(decrypted) = self.transport_decrypt(...)` had no `else`, so
-// forgery probes and tag-mismatch corruption were indistinguishable from a
-// legitimate "still buffering" state. The counter exposed below is the
-// observability surface the audit asked for.
-// ============================================================
-
 // @internal
 #[test]
 fn transport_decrypt_failure_count_starts_at_zero() {
@@ -1041,86 +912,5 @@ fn transport_decrypt_failure_count_does_not_increment_on_legitimate_data_chunk()
         alice.transport_decrypt_failure_count(),
         0,
         "legitimate DATA chunks must not raise the counter"
-    );
-}
-
-/// Feed only pre-finalization frames (INIT/DATA), never VRFY/CONF, so a
-/// session that reaches Verifying stays there (its VRFY is not delivered
-/// to advance the peer). Acks ride on DATA, so both still reach Verifying.
-fn is_transfer_frame(data: &str) -> bool {
-    data.starts_with("DAT3") || data.starts_with("INI") || data.starts_with("IN3")
-}
-
-// @internal
-#[test]
-fn verifying_state_also_offers_conf_so_confirming_peer_does_not_starve() {
-    // Device-proven deadlock (2026-07-24 Pixel↔Samsung Hover): a peer that
-    // reaches Confirming first needs the other's CONF (card hash), but a
-    // peer lingering in Verifying emitted ONLY VRFY — so the Confirming
-    // peer starved for CONF and timed out. Verifying must ALSO offer CONF
-    // (the card hash is always computable), so a peer ahead of us can
-    // finalize regardless of our sub-state.
-    let alice_card = vec![0xAAu8; 200];
-    let bob_card = vec![0xBBu8; 200];
-    let mut alice = MultiStageSession::new(alice_card);
-    let mut bob = MultiStageSession::new(bob_card);
-
-    let ai = alice.get_display_qr().unwrap();
-    let bi = bob.get_display_qr().unwrap();
-    alice.process_scanned_qr(&bi.data);
-    bob.process_scanned_qr(&ai.data);
-
-    // Drive DATA both ways until BOTH reach Verifying.
-    for _ in 0..4000 {
-        if matches!(alice.get_state(), ProtocolState::Verifying)
-            && matches!(bob.get_state(), ProtocolState::Verifying)
-        {
-            break;
-        }
-        let aq = alice.get_display_qr();
-        let bq = bob.get_display_qr();
-        if let Some(aq) = &aq {
-            if is_transfer_frame(&aq.data) {
-                bob.process_scanned_qr(&aq.data);
-            }
-        }
-        if let Some(bq) = &bq {
-            if is_transfer_frame(&bq.data) {
-                alice.process_scanned_qr(&bq.data);
-            }
-        }
-    }
-    assert!(
-        matches!(alice.get_state(), ProtocolState::Verifying),
-        "precondition: alice reaches Verifying, got {:?}",
-        alice.get_state()
-    );
-
-    // Sample alice's display while she is in Verifying (no peer VRFY is
-    // delivered, so she stays in Verifying). She must offer both types.
-    let mut saw_vrfy = false;
-    let mut saw_conf = false;
-    for _ in 0..300 {
-        if let Some(qr) = alice.get_display_qr() {
-            let prefix = &qr.data[..4.min(qr.data.len())];
-            match prefix {
-                "VRF3" => saw_vrfy = true,
-                "CNF3" => saw_conf = true,
-                _ => {}
-            }
-        }
-        if saw_vrfy && saw_conf {
-            break;
-        }
-    }
-    assert!(
-        matches!(alice.get_state(), ProtocolState::Verifying),
-        "alice must stay in Verifying while sampling, got {:?}",
-        alice.get_state()
-    );
-    assert!(saw_vrfy, "Verifying must still offer VRFY");
-    assert!(
-        saw_conf,
-        "Verifying must ALSO offer CONF so a Confirming peer does not starve"
     );
 }

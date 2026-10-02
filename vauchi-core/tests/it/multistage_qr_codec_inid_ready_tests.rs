@@ -8,15 +8,12 @@
 //! not these four variants. They were 0% covered before this file.
 
 use vauchi_core::exchange::multistage::qr_codec::{
-    StageQr, format_combo_qr, format_fail_qr, format_in2d_qr, format_ready_qr, parse_qr,
+    StageQr, format_fail_qr, format_in2d_qr, parse_qr,
 };
 
 const SID: [u8; 16] = [0x11; 16];
 const EPH: [u8; 32] = [0x33; 32];
 const COMMITMENT: [u8; 32] = [0x44; 32];
-const REVEAL_KEY: [u8; 32] = [0x55; 32];
-const PAYLOAD_HASH: [u8; 32] = [0x66; 32];
-const ACK_HASH: [u8; 32] = [0x77; 32];
 
 // ============================================================
 // INID — INIT-with-embedded-data, single-chunk fast path
@@ -87,69 +84,6 @@ fn inid_qr_handles_empty_ciphertext() {
         assert!(ciphertext.is_empty());
     } else {
         panic!("expected Inid");
-    }
-}
-
-// ============================================================
-// READY — backward-compat handshake
-// ============================================================
-
-// @internal
-#[test]
-fn ready_qr_roundtrips() {
-    let qr = format_ready_qr(&SID, &ACK_HASH);
-    assert!(qr.starts_with("RDY3"));
-
-    let parsed = parse_qr(&qr).unwrap();
-    match parsed {
-        StageQr::Ready {
-            session_id,
-            ack_hash,
-        } => {
-            assert_eq!(session_id, SID);
-            assert_eq!(ack_hash, ACK_HASH);
-        }
-        other => panic!("expected Ready, got {:?}", other),
-    }
-}
-
-// @internal
-#[test]
-fn ready_qr_truncated_body_is_rejected() {
-    let mut qr = format_ready_qr(&SID, &ACK_HASH);
-    qr.truncate(qr.len() - 5);
-    assert!(parse_qr(&qr).is_err(), "truncated RDYY must error");
-}
-
-// ============================================================
-// CMBO — compound VRFY+CONF+RDYY
-// ============================================================
-
-// @internal
-#[test]
-fn combo_qr_roundtrips_carrying_all_three_components() {
-    let qr = format_combo_qr(&SID, &REVEAL_KEY, &PAYLOAD_HASH, &ACK_HASH);
-    assert!(qr.starts_with("CMB3"));
-    assert_eq!(
-        qr.len(),
-        4 + 8 + 24 + 48 * 3,
-        "prefix, header, session id, three hashes"
-    );
-
-    let parsed = parse_qr(&qr).unwrap();
-    match parsed {
-        StageQr::Combo {
-            session_id,
-            reveal_key,
-            payload_hash,
-            ack_hash,
-        } => {
-            assert_eq!(session_id, SID);
-            assert_eq!(reveal_key, REVEAL_KEY);
-            assert_eq!(payload_hash, PAYLOAD_HASH);
-            assert_eq!(ack_hash, ACK_HASH);
-        }
-        other => panic!("expected Combo, got {:?}", other),
     }
 }
 

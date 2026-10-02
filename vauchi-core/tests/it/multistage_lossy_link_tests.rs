@@ -223,7 +223,11 @@ fn session_stranded_in_verifying() -> (MultiStageSession, MultiStageSession, Str
         }
         let aq = ahead.get_display_qr();
         let bq = gone.get_display_qr();
-        if let Some(bq) = &bq {
+        // One read of the peer's final frame would finalize `ahead`; it is
+        // the frame that never arrives from a peer that went away.
+        if let Some(bq) = &bq
+            && !bq.data.starts_with("FIN3")
+        {
             ahead.process_scanned_qr(&bq.data);
         }
         if let Some(aq) = &aq {
@@ -328,20 +332,23 @@ fn a_restarted_peer_on_the_previous_format_does_not_pull_a_session_back() {
 // @internal
 #[test]
 fn frames_that_only_train_do_not_hide_a_stall_from_the_rehandshake() {
-    let (mut ahead, mut gone, clock) = session_stranded_in_verifying();
-    // The old peer's opening frame: read, counted by the trainer, and
-    // declined by a session already past Advertising.
-    let stale_opening = (0..40)
-        .filter_map(|_| gone.get_display_qr())
-        .find(|frame| frame.data.starts_with("INI3"))
-        .expect("the old peer still re-shows its opening frame");
+    let (mut ahead, gone, clock) = session_stranded_in_verifying();
+    // An opening frame from the peer `ahead` is bound to: read, counted by
+    // the trainer, and declined by a session already past Advertising.
+    let stale_opening = vauchi_core::exchange::multistage::qr_codec::format_ini2_qr_with_relay(
+        &gone.session_id(),
+        &[3u8; 32],
+        &[4u8; 32],
+        "gone",
+        None,
+    );
     let mut restarted =
         MultiStageSession::new(three_chunk_card(0xCC)).with_monotonic(clock.clone());
     let init = restarted.get_display_qr().expect("advertises");
 
     clock.advance(std::time::Duration::from_secs(6));
     for _ in 0..40 {
-        ahead.process_scanned_qr(&stale_opening.data);
+        ahead.process_scanned_qr(&stale_opening);
         ahead.process_scanned_qr(&init.data);
         let _ = ahead.get_display_qr();
     }
@@ -358,35 +365,40 @@ fn frames_that_only_train_do_not_hide_a_stall_from_the_rehandshake() {
 // @internal
 #[test]
 fn a_pair_recovers_and_completes_after_a_staggered_start() {
-    let (mut ahead, _gone, clock) = session_stranded_in_verifying();
-    let mut late = MultiStageSession::new(three_chunk_card(0xCC)).with_monotonic(clock.clone());
-    clock.advance(std::time::Duration::from_secs(6));
+    // Many runs: which frames get shown is drawn at random, and a final
+    // frame still bound to the old partner failed about half of them
+    // before the tag stopped being kept from before Confirming.
+    for run in 0..30 {
+        let (mut ahead, _gone, clock) = session_stranded_in_verifying();
+        let mut late = MultiStageSession::new(three_chunk_card(0xCC)).with_monotonic(clock.clone());
+        clock.advance(std::time::Duration::from_secs(6));
 
-    let mut finished = false;
-    for _ in 0..4000 {
-        clock.advance(std::time::Duration::from_millis(300));
-        let aq = ahead.get_display_qr();
-        let lq = late.get_display_qr();
-        if let Some(lq) = &lq {
-            ahead.process_scanned_qr(&lq.data);
+        let mut finished = false;
+        for _ in 0..4000 {
+            clock.advance(std::time::Duration::from_millis(300));
+            let aq = ahead.get_display_qr();
+            let lq = late.get_display_qr();
+            if let Some(lq) = &lq {
+                ahead.process_scanned_qr(&lq.data);
+            }
+            if let Some(aq) = &aq {
+                late.process_scanned_qr(&aq.data);
+            }
+            if matches!(ahead.get_state(), ProtocolState::Finalized)
+                && matches!(late.get_state(), ProtocolState::Finalized)
+            {
+                finished = true;
+                break;
+            }
         }
-        if let Some(aq) = &aq {
-            late.process_scanned_qr(&aq.data);
-        }
-        if matches!(ahead.get_state(), ProtocolState::Finalized)
-            && matches!(late.get_state(), ProtocolState::Finalized)
-        {
-            finished = true;
-            break;
-        }
+
+        assert!(
+            finished,
+            "run {run}: a staggered start must recover and complete; ahead={:?} late={:?}",
+            ahead.get_state(),
+            late.get_state()
+        );
     }
-
-    assert!(
-        finished,
-        "a staggered start must recover and complete; ahead={:?} late={:?}",
-        ahead.get_state(),
-        late.get_state()
-    );
 }
 
 /// A DATA frame carries an empty ACK until its sender has received anything,
@@ -469,7 +481,7 @@ fn two_mutually_stranded_sessions_converge_instead_of_racing() {
 /// runs in ten (2026-08-19).
 // @internal
 #[test]
-fn an_early_peer_vrfy_does_not_kill_an_incomplete_transfer() {
+fn an_early_peer_final_frame_does_not_kill_an_incomplete_transfer() {
     let mut ours = MultiStageSession::new(three_chunk_card(0xA1));
     let mut peer = MultiStageSession::new(three_chunk_card(0xB2));
     let oi = ours.get_display_qr().expect("advertises");
@@ -482,19 +494,20 @@ fn an_early_peer_vrfy_does_not_kill_an_incomplete_transfer() {
         ours.get_state()
     );
 
-    // The peer reaches Verifying and repeats its VRFY, as it would while
-    // waiting for us.
-    let vrfy = vauchi_core::exchange::multistage::qr_codec::format_verify_qr(
+    // The peer reaches Verifying and repeats its final frame, as it would
+    // while waiting for us.
+    let final_frame = vauchi_core::exchange::multistage::qr_codec::format_final_qr(
         &peer.session_id(),
         &[7u8; 32],
+        &[8u8; 32],
     );
     for _ in 0..5 {
-        ours.process_scanned_qr(&vrfy);
+        ours.process_scanned_qr(&final_frame);
     }
 
     assert!(
         !matches!(ours.get_state(), ProtocolState::Failed(_)),
-        "an early VRFY must not fail a transfer that can still complete, got {:?}",
+        "an early final frame must not fail a transfer that can still complete, got {:?}",
         ours.get_state()
     );
 }

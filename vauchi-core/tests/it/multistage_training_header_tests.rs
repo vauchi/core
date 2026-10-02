@@ -60,37 +60,12 @@ fn one_frame_of_every_type() -> Vec<(&'static str, String, StageQr)> {
             },
         ),
         (
-            "verify",
-            format_verify_qr(&session_id, &key),
-            StageQr::Verify {
+            "final",
+            format_final_qr(&session_id, &key, &other),
+            StageQr::Final {
                 session_id,
                 reveal_key: key,
-            },
-        ),
-        (
-            "confirm",
-            format_confirm_qr(&session_id, &hash),
-            StageQr::Confirm {
-                session_id,
-                payload_hash: hash,
-            },
-        ),
-        (
-            "ready",
-            format_ready_qr(&session_id, &other),
-            StageQr::Ready {
-                session_id,
-                ack_hash: other,
-            },
-        ),
-        (
-            "combined",
-            format_combo_qr(&session_id, &key, &hash, &other),
-            StageQr::Combo {
-                session_id,
-                reveal_key: key,
-                payload_hash: hash,
-                ack_hash: other,
+                tag: other,
             },
         ),
         (

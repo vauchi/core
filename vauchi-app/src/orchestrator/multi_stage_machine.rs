@@ -650,13 +650,12 @@ impl MultiStageMachine {
         self.inner.get_transport_key()
     }
 
-    /// The finalized session's COMBO frame (VRFY+CONF+RDYY), for seeding the
-    /// success-screen broadcast so a still-`Complete` peer scans our RDYY
-    /// rather than a stale DATA frame the frozen single-frame broadcast would
-    /// otherwise inherit from the `Complete`-state interleave (device-proven
+    /// The session's final frame, for seeding the success-screen broadcast
+    /// so a peer still waiting reads it rather than a stale DATA frame the
+    /// frozen single-frame broadcast would otherwise inherit (device-proven
     /// half-exchange, 2026-07-25 Pixel↔Samsung Hover). Non-mutating.
-    pub fn finalization_combo_qr(&self) -> Option<QrPayload> {
-        self.inner.finalization_combo_qr()
+    pub fn finalization_qr(&self) -> QrPayload {
+        self.inner.finalization_qr()
     }
 
     /// Build the role-correct Double Ratchet for the finalized exchange.

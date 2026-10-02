@@ -12,12 +12,12 @@
 //! ensures atomicity (neither side can decrypt until both reveal keys are exchanged).
 //!
 //! Resilience features:
-//! - Wall-clock timeouts with progress extension (not tick-based)
-//! - COMBO QR (VRFY+CONF+RDYY) display in Complete state for single-scan finalization
+//! - One final frame (reveal key + confirmation tag) for single-scan
+//!   finalization from Verifying or Confirming
 //! - Adaptive QR display durations per stage
-//! - Graduated retry: Complete → RetryReady → Failed (one auto-retry)
 //! - FAIL QR type for immediate peer abort notification
-//! - Scan acknowledgment via RDYY payload
+//! - Link training: every frame is drawn at a layout the peer's camera
+//!   reads (`link_trainer`)
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -63,24 +63,10 @@ const REJOIN_COOLDOWN: Duration = Duration::from_secs(5);
 /// HKDF info string for transport key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-multistage-v1";
 
-/// Wall-clock timeout for the RDYY phase (Complete + RetryReady).
-/// From device testing: Samsung S7 finalizes ~18s after Pixel.
-/// 30s base gives comfortable margin for slow devices.
-const RDYY_BASE_TIMEOUT: Duration = Duration::from_secs(30);
-
-/// How much extra time is granted when the peer shows progress (e.g. scan detected).
-const RDYY_PROGRESS_EXTENSION: Duration = Duration::from_secs(10);
-
-/// Absolute maximum time in the RDYY phase (prevents infinite extension).
-const RDYY_MAX_TIMEOUT: Duration = Duration::from_secs(45);
-
-/// How long to broadcast FAIL QR after entering Failed state.
-const FAIL_BROADCAST_DURATION: Duration = Duration::from_secs(5);
-
-/// How long to continue broadcasting RDYY after Finalized (grace period for peer).
-/// MUST be >= RDYY_MAX_TIMEOUT so the fast device never stops before the slow
-/// device's timeout expires. The user sees "Contact exchanged!" immediately
-/// (save on Finalized) while QRs continue in the background.
+/// How long to keep showing the final frame after Finalized, so the peer
+/// can read it and finalize too. The user sees "Contact exchanged!"
+/// immediately (save on Finalized) while the code stays up in the
+/// background.
 const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(60);
 
 /// How long after `set_audio_proximity(Listening)` to wait for an
@@ -138,10 +124,7 @@ const DISPLAY_MS_INIT: u32 = 400;
 /// `generateQrBitmap` defaults every code to Medium, iOS never references the
 /// field), so INIT and DATA render identically on device.
 const DISPLAY_MS_DATA: u32 = 300;
-const DISPLAY_MS_VRFY: u32 = 300;
-const DISPLAY_MS_CONF: u32 = 300;
-const DISPLAY_MS_RDYY: u32 = 400;
-const DISPLAY_MS_FAIL: u32 = 400;
+const DISPLAY_MS_FINAL: u32 = 300;
 
 /// Add ±20% jitter to prevent synchronization lock between two devices.
 /// When both devices cycle QRs at identical cadence, they can stay in phase
@@ -286,10 +269,9 @@ pub struct MultiStageSession {
     transport_decrypt_failures: u32,
 
     peer_reveal_key: Option<[u8; 32]>,
-    /// A peer CONF decoded before we reached Confirming, applied once we get
-    /// there: the peer shows it while we are still processing its reveal
-    /// key, and may have moved on by the time we could accept it (#315).
-    early_peer_payload_hash: Option<[u8; 32]>,
+    /// The tag of a peer final frame read in Confirming while a shake was
+    /// still recording, applied once the recording stops.
+    kept_peer_final_tag: Option<[u8; 32]>,
 
     state: ProtocolState,
 
@@ -309,10 +291,8 @@ pub struct MultiStageSession {
 
     // Wall-clock timestamps for timeout management.
     phase_entered_at: Option<Instant>,
-    last_progress_at: Option<Instant>,
     /// Last time a peer frame was *accepted* or the state advanced — the
-    /// ADR-071 stall signal. Distinct from `last_progress_at`, which only
-    /// tracks RDYY for the finalization deadline.
+    /// ADR-071 stall signal.
     last_accepted_at: Option<Instant>,
     /// Peer INITs bearing a session id we are not bound to, since the last
     /// accepted frame.
@@ -324,12 +304,6 @@ pub struct MultiStageSession {
     /// ours — the signature of a peer that restarted mid-exchange, as opposed
     /// to a cancel or a peer-reported failure, which are meant to be final.
     failed_from_mismatch: bool,
-
-    // Track whether we've already used the auto-retry.
-    retry_used: bool,
-
-    // When Failed, continue broadcasting FAIL QR until this deadline.
-    fail_broadcast_until: Option<Instant>,
 
     // Our relay metadata (included in our INIT QR)
     our_relay_url: Option<String>,
@@ -397,9 +371,7 @@ pub struct MultiStageSession {
     peer_reported_reads: u8,
     /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Source for
     /// every `Instant` this session stamps (`phase_entered_at`,
-    /// `last_progress_at`, `fail_broadcast_until`,
-    /// `audio_listening_started_at`) and the RDYY/finalized/FAIL
-    /// timeout comparisons. Defaults to `SystemMonotonicClock::shared()`;
+    /// `audio_listening_started_at`) and the finalized grace comparison. Defaults to `SystemMonotonicClock::shared()`;
     /// inject via [`Self::with_monotonic`] for deterministic timeout
     /// tests. Note `check_and_apply_audio_timeout` retains its explicit
     /// `now: Instant` parameter for cycle-thread callers.
@@ -469,21 +441,18 @@ impl MultiStageSession {
             peer_chunks_total: None,
             transport_decrypt_failures: 0,
             peer_reveal_key: None,
-            early_peer_payload_hash: None,
+            kept_peer_final_tag: None,
             state: ProtocolState::Idle,
             received_data: None,
             init_qr_cache: None,
             pending_chunk_order: Vec::new(),
             display_cycle: 0,
             phase_entered_at: None,
-            last_progress_at: None,
             last_accepted_at: None,
             foreign_inits: 0,
             last_rehandshake_at: None,
             dropped_frames: 0,
             failed_from_mismatch: false,
-            retry_used: false,
-            fail_broadcast_until: None,
             our_relay_url: relay_url,
             peer_relay_url: None,
             audio_proximity: AudioProximityState::Pending,
@@ -519,7 +488,7 @@ impl MultiStageSession {
 
     /// Replace the [`MonotonicClock`] driving this session's timeout and
     /// timestamp logic. Default is [`SystemMonotonicClock::shared`];
-    /// inject a `FakeMonotonicClock` for deterministic RDYY/finalized/
+    /// inject a `FakeMonotonicClock` for deterministic finalized/
     /// audio-timeout tests.
     #[must_use]
     /// Borrow this session's monotonic clock so the platform cycle-thread
@@ -919,54 +888,6 @@ impl MultiStageSession {
     /// `accel_proximity == Listening`, and we have recorded samples. The
     /// envelope is sealed under our own `session_id` (F2 sender-AAD binding) so
     /// a peer that reflects it back fails AEAD at us.
-    /// Build a finalization-stage QR, interleaving VRFY and CONF across the
-    /// `display_cycle % 7` phases (VRFY on 0–2, CONF on 3–6; SHAK on 6 when
-    /// available). Both VRFY (our reveal key) and CONF (our card hash) are
-    /// always computable in the finalization states, and a peer may be in
-    /// Verifying (needs our VRFY) or Confirming (needs our CONF) — so **both
-    /// must be offered from BOTH states**. Offering CONF from Verifying is
-    /// the fix for the device-proven Pixel↔Samsung Hover deadlock 2026-07-24:
-    /// one peer lingered in Verifying emitting only VRFY while the other
-    /// starved for CONF and timed out. A peer that receives a frame it is not
-    /// yet ready for ignores it (`handle_confirm`/`handle_verify` no-op
-    /// off-state). Deterministic (no RNG) so the exchange timing is
-    /// reproducible. The cadence alone does not stop a scanner locking onto
-    /// one phase — COMBO is what makes finalization robust to that, since any
-    /// single COMBO decode advances the peer (see `random_below` for the
-    /// DATA-phase instance where no such frame exists).
-    fn build_finalization_qr(&self, include_shake: bool) -> QrPayload {
-        let phase = self.display_cycle % 7;
-        // SHAK carries the advisory accel envelope (TapHoverShake);
-        // `build_shake_qr` returns None for Glance/Hover, falling through.
-        if include_shake
-            && phase == 6
-            && let Some(shake_qr) = self.build_shake_qr()
-        {
-            return QrPayload {
-                data: shake_qr,
-                error_correction: "M".to_string(),
-                display_duration_ms: jittered(DISPLAY_MS_CONF),
-                layout: 0,
-            };
-        }
-        if phase < 3 {
-            QrPayload {
-                data: qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key()),
-                error_correction: "M".to_string(),
-                display_duration_ms: jittered(DISPLAY_MS_VRFY),
-                layout: 0,
-            }
-        } else {
-            let card_hash = self.compute_card_hash(&self.local_card);
-            QrPayload {
-                data: qr_codec::format_confirm_qr(&self.session_id, &card_hash),
-                error_correction: "M".to_string(),
-                display_duration_ms: jittered(DISPLAY_MS_CONF),
-                layout: 0,
-            }
-        }
-    }
-
     fn build_shake_qr(&self) -> Option<String> {
         if self.accel_proximity != AccelerometerProximityState::Listening
             || self.accel_local_envelope.is_empty()
@@ -1160,9 +1081,9 @@ impl MultiStageSession {
                 // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
                 let qr = if self.display_cycle % 7 < 2 {
                     self.get_data_chunk_qr()
-                        .unwrap_or_else(|| self.build_finalization_qr(false))
+                        .unwrap_or_else(|| self.final_frame_qr())
                 } else {
-                    self.build_finalization_qr(false)
+                    self.final_frame_qr()
                 };
                 // If we stashed the peer's reveal key (received VRFY while still
                 // Transferring), process it now that we've generated our own VRFY
@@ -1171,94 +1092,38 @@ impl MultiStageSession {
                 Some(qr)
             }
             ProtocolState::Confirming => {
-                self.apply_early_confirm();
+                self.apply_kept_final_tag();
                 if !matches!(self.state, ProtocolState::Confirming) {
                     return self.next_stage_frame();
                 }
                 self.display_cycle += 1;
                 // TapHoverShake exchanges its accel envelope via SHAK on phase 6
-                // (advisory co-location signal); preserve that. Otherwise emit
-                // the dense COMBO (VRFY+CONF+RDYY) rather than cycling VRFY/CONF:
-                // two peers both in Confirming each need the *other's* CONF to
-                // advance, and catching one specific frame type out of a
-                // multi-type cycle is decode-phase-lockable — it deadlocked both
-                // sides for the full timeout (device-proven 2026-07-25
-                // Pixel↔Samsung: both stuck in Confirming ~2min, both failed). A
-                // single COMBO decode advances the peer Confirming→Complete→
-                // Finalized via `handle_combo`, so the handshake no longer
-                // depends on catching a specific type (COMBO decodability on
-                // these devices is proven — the Complete arm already emits it and
-                // the 07:40 run decoded it). SHAK gate mirrors
-                // `build_finalization_qr`; fall back to the VRFY/CONF cycle only
-                // if the COMBO can't be built.
+                // (advisory co-location signal). Every other frame is the
+                // final frame: one read of it advances a peer in Verifying
+                // or Confirming, so the ending never depends on catching one
+                // frame type out of a cycle. Cycling VRFY and CONF deadlocked
+                // two Confirming peers for the full timeout (device-proven
+                // 2026-07-25 Pixel↔Samsung).
                 if self.display_cycle % 7 == 6
                     && let Some(shake_qr) = self.build_shake_qr()
                 {
                     Some(QrPayload {
                         data: shake_qr,
                         error_correction: "M".to_string(),
-                        display_duration_ms: jittered(DISPLAY_MS_CONF),
+                        display_duration_ms: jittered(DISPLAY_MS_FINAL),
                         layout: 0,
                     })
                 } else {
-                    self.get_combo_qr()
-                        .or_else(|| Some(self.build_finalization_qr(true)))
+                    Some(self.final_frame_qr())
                 }
             }
-            ProtocolState::Complete | ProtocolState::RetryReady => {
-                // S1: Wall-clock timeout with progress extension.
-                let now = self.monotonic.now();
-                let entered = *self.phase_entered_at.get_or_insert(now);
-
-                // Compute deadline: base + extension from last progress, capped at max.
-                let progress_deadline = self
-                    .last_progress_at
-                    .map(|p| p + RDYY_PROGRESS_EXTENSION)
-                    .unwrap_or(entered + RDYY_BASE_TIMEOUT);
-                let deadline = progress_deadline
-                    .max(entered + RDYY_BASE_TIMEOUT)
-                    .min(entered + RDYY_MAX_TIMEOUT);
-
-                if now > deadline {
-                    // S4: Graduated retry — try once more before failing.
-                    if !self.retry_used {
-                        self.retry_used = true;
-                        self.state = ProtocolState::RetryReady;
-                        self.phase_entered_at = Some(now);
-                        self.last_progress_at = None;
-                        self.display_cycle = 0;
-                        // Fall through to display RDYY
-                    } else {
-                        // Both attempts exhausted — fail with FAIL broadcast.
-                        self.state =
-                            ProtocolState::Failed("peer did not confirm readiness".to_string());
-                        self.fail_broadcast_until = Some(now + FAIL_BROADCAST_DURATION);
-                        return self.get_fail_qr();
-                    }
-                }
-
-                self.display_cycle += 1;
-
-                // Interleave DATA with COMBO: if our outbound chunks aren't
-                // fully ACK'd, the peer still needs our DATA. Show DATA every
-                // 3rd cycle so the peer can receive chunks while also getting
-                // COMBO for the stages it's ready for.
-                let all_acked = self
-                    .peer_ack_bitmap
-                    .as_ref()
-                    .map(|b| b.is_complete())
-                    .unwrap_or(false);
-                // Interleave DATA (3 per 7 cycles) when peer hasn't ACK'd.
-                let phase = self.display_cycle % 7;
-                if !all_acked && phase < 3 {
-                    self.get_data_chunk_qr().or_else(|| self.get_combo_qr())
-                } else {
-                    self.get_combo_qr()
-                }
-            }
+            // Not resting states any more: one final frame takes a session
+            // from Confirming straight to Finalized. Kept in the public
+            // enum for the shells' bindings.
+            ProtocolState::Complete | ProtocolState::RetryReady => Some(self.final_frame_qr()),
             ProtocolState::Finalized => {
-                // Continue broadcasting COMBO for a grace period so the peer
-                // can scan it and also finalize.
+                // Keep showing the final frame for a grace period so the
+                // peer can read it and finalize too.
                 let now = self.monotonic.now();
                 let entered = *self.phase_entered_at.get_or_insert(now);
                 if now.duration_since(entered) > FINALIZED_GRACE_DURATION {
@@ -1271,24 +1136,15 @@ impl MultiStageSession {
                     .map(|b| b.is_complete())
                     .unwrap_or(false);
                 let phase = self.display_cycle % 7;
+                self.display_cycle += 1;
                 if !all_acked && phase < 3 {
-                    self.display_cycle += 1;
-                    self.get_data_chunk_qr().or_else(|| self.get_combo_qr())
+                    self.get_data_chunk_qr()
+                        .or_else(|| Some(self.final_frame_qr()))
                 } else {
-                    self.display_cycle += 1;
-                    self.get_combo_qr()
+                    Some(self.final_frame_qr())
                 }
             }
-            ProtocolState::Failed(_) => {
-                // S5: Broadcast FAIL QR so peer aborts immediately.
-                if self
-                    .fail_broadcast_until
-                    .is_some_and(|until| self.monotonic.now() <= until)
-                {
-                    return self.get_fail_qr();
-                }
-                None
-            }
+            ProtocolState::Failed(_) => None,
         }
     }
 
@@ -1334,24 +1190,11 @@ impl MultiStageSession {
                 crc: _,
                 payload,
             } => self.handle_data(chunk_idx, chunk_total, ack_bitmap, payload),
-            StageQr::Verify {
-                session_id: _,
+            StageQr::Final {
+                session_id,
                 reveal_key,
-            } => self.handle_verify(reveal_key),
-            StageQr::Confirm {
-                session_id: _,
-                payload_hash,
-            } => self.handle_confirm(payload_hash),
-            StageQr::Ready {
-                session_id: _,
-                ack_hash,
-            } => self.handle_ready(ack_hash),
-            StageQr::Combo {
-                session_id: _,
-                reveal_key,
-                payload_hash,
-                ack_hash,
-            } => self.handle_combo(reveal_key, payload_hash, ack_hash),
+                tag,
+            } => self.handle_final(session_id, reveal_key, tag),
             StageQr::Inid {
                 session_id,
                 ephemeral,
@@ -1376,7 +1219,7 @@ impl MultiStageSession {
 
     fn build_init_qr(&self) -> String {
         // INID (INIT+Data) disabled for now — the combined QR is too dense for
-        // older cameras (Samsung S7). The COMBO QR still optimizes the RDYY phase.
+        // older cameras (Samsung S7).
         // TODO: re-enable when QR scanning reliability improves (bigger screens,
         // better cameras, or binary QR mode).
         //
@@ -1667,7 +1510,7 @@ impl MultiStageSession {
                 self.received_data = Some(plaintext);
                 self.peer_reveal_key = Some(reveal_key);
                 self.state = ProtocolState::Confirming;
-                self.apply_early_confirm();
+                self.apply_kept_final_tag();
             }
             Err(_) => {
                 self.fail_from_mismatch("decryption failed");
@@ -1689,54 +1532,85 @@ impl MultiStageSession {
         }
     }
 
-    /// Applies a CONF kept from before Confirming. Held while a shake is
-    /// still being recorded: TapHoverShake swaps its motion envelope only
-    /// in Confirming, and applying the CONF would carry us straight past it.
-    fn apply_early_confirm(&mut self) {
+    /// Applies a final-frame tag kept from before Confirming. Held while a
+    /// shake is still being recorded: TapHoverShake swaps its motion
+    /// envelope only in Confirming, and applying the tag would carry us
+    /// straight past it.
+    fn apply_kept_final_tag(&mut self) {
         if !matches!(self.state, ProtocolState::Confirming)
             || self.accel_proximity == AccelerometerProximityState::Listening
         {
             return;
         }
-        if let Some(payload_hash) = self.early_peer_payload_hash.take() {
-            self.handle_confirm(payload_hash);
+        if let Some(tag) = self.kept_peer_final_tag.take() {
+            self.confirm_final_tag(tag);
         }
     }
 
-    fn handle_confirm(&mut self, payload_hash: [u8; 32]) -> ProtocolState {
-        if matches!(
+    /// Handle the peer's final frame: its reveal key and the tag that
+    /// confirms its card and both session ids. One read takes a session
+    /// that holds every chunk from Verifying or Confirming to Finalized
+    /// (design D5).
+    ///
+    /// Before Confirming only the reveal key is taken, as a VRFY was. The
+    /// tag is not kept from there: a peer that re-handshakes (ADR-071) shows
+    /// final frames bound to its old partner until it does, and such a tag
+    /// applied later would fail a healthy exchange. The peer shows its final
+    /// frame until its grace period ends, so the tag is read again.
+    fn handle_final(
+        &mut self,
+        sender: [u8; 16],
+        reveal_key: [u8; 32],
+        tag: [u8; 32],
+    ) -> ProtocolState {
+        // The tag binds both session ids, so a final frame from any session
+        // but our peer's could only ever mismatch. Ignoring it keeps a
+        // bystander's frame from failing a live exchange.
+        if self.peer_session_id != Some(sender) {
+            return self.state.clone();
+        }
+        if !matches!(
             self.state,
-            ProtocolState::Transferring { .. } | ProtocolState::Verifying
+            ProtocolState::Transferring { .. } | ProtocolState::Verifying | ProtocolState::Confirming
         ) {
-            self.early_peer_payload_hash = Some(payload_hash);
             return self.state.clone();
         }
         if !matches!(self.state, ProtocolState::Confirming) {
-            return self.state.clone();
+            self.handle_verify(reveal_key);
         }
+        if matches!(self.state, ProtocolState::Confirming) {
+            // Kept, not applied, only while a shake is still recording.
+            self.kept_peer_final_tag = Some(tag);
+            self.apply_kept_final_tag();
+        }
+        self.state.clone()
+    }
 
-        // Verify: payload_hash should be SHA-256 of peer's original plaintext
-        // The peer sends SHA-256(their_plaintext), which should match
-        // SHA-256(what we decrypted from their commitment)
-        let expected_hash = match &self.received_data {
-            Some(data) => self.compute_card_hash(data),
-            None => {
-                self.state = ProtocolState::Failed("no received data to confirm".to_string());
-                return self.state.clone();
-            }
+    /// Check the peer's final tag against the card we opened and finalize.
+    fn confirm_final_tag(&mut self, tag: [u8; 32]) {
+        let Some(data) = &self.received_data else {
+            self.state = ProtocolState::Failed("no received data to confirm".to_string());
+            return;
         };
-
-        if bool::from(payload_hash.ct_eq(&expected_hash)) {
-            self.state = ProtocolState::Complete;
-            // S1: Start wall-clock timer for the RDYY phase.
+        let expected = self.final_tag(&self.compute_card_hash(data));
+        if bool::from(tag.ct_eq(&expected)) {
+            self.state = ProtocolState::Finalized;
+            // Start of the finalized grace period (wall-clock based).
             self.phase_entered_at = Some(self.monotonic.now());
-            self.last_progress_at = None;
             self.display_cycle = 0;
         } else {
             self.fail_from_mismatch("confirmation mismatch");
         }
+    }
 
-        self.state.clone()
+    /// What a final frame confirms: `SHA-256(card hash ‖ ready hash)`, the
+    /// sender's card and the two session ids. Unkeyed, as the separate
+    /// confirmation hashes it replaces were.
+    fn final_tag(&self, card_hash: &[u8; 32]) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(card_hash);
+        hasher.update(self.compute_ready_hash());
+        hasher.finalize().into()
     }
 
     fn prepare_outbound_chunks(&mut self) {
@@ -1998,31 +1872,6 @@ impl MultiStageSession {
         context
     }
 
-    fn handle_ready(&mut self, ack_hash: [u8; 32]) -> ProtocolState {
-        // Accept READY in Complete or RetryReady states.
-        if !matches!(
-            self.state,
-            ProtocolState::Complete | ProtocolState::RetryReady
-        ) {
-            return self.state.clone();
-        }
-
-        // S6: Any RDYY scan is progress — extend the deadline.
-        self.last_progress_at = Some(self.monotonic.now());
-
-        // Verify ack_hash matches our computation.
-        let expected = self.compute_ready_hash();
-        if bool::from(ack_hash.ct_eq(&expected)) {
-            self.state = ProtocolState::Finalized;
-            // Reset for the finalized grace period (wall-clock based).
-            self.phase_entered_at = Some(self.monotonic.now());
-            self.display_cycle = 0;
-        }
-        // Ignore mismatched READY (could be from a different exchange)
-
-        self.state.clone()
-    }
-
     /// Handle a FAIL QR from the peer — abort immediately.
     fn handle_fail(&mut self) -> ProtocolState {
         // Don't overwrite Finalized — if we already succeeded, ignore peer's failure.
@@ -2037,91 +1886,27 @@ impl MultiStageSession {
         self.state.clone()
     }
 
-    /// Generate a FAIL QR payload for broadcasting failure to peer.
-    fn get_fail_qr(&self) -> Option<QrPayload> {
-        let qr_data = qr_codec::format_fail_qr(&self.session_id);
-        Some(QrPayload {
-            data: qr_data,
-            error_correction: "L".to_string(),
-            display_duration_ms: jittered(DISPLAY_MS_FAIL),
+    /// The final frame: our reveal key and the tag confirming our card and
+    /// both session ids.
+    fn final_frame_qr(&self) -> QrPayload {
+        let tag = self.final_tag(&self.compute_card_hash(&self.local_card));
+        QrPayload {
+            data: qr_codec::format_final_qr(&self.session_id, self.commitment.reveal_key(), &tag),
+            error_correction: "M".to_string(),
+            display_duration_ms: jittered(DISPLAY_MS_FINAL),
             layout: 0,
-        })
+        }
     }
 
-    /// Generate a COMBO QR containing VRFY + CONF + RDYY.
-    /// One scan by the peer can advance through all remaining stages at once.
-    fn get_combo_qr(&self) -> Option<QrPayload> {
-        let ack_hash = self.compute_ready_hash();
-        let card_hash = self.compute_card_hash(&self.local_card);
-        let qr_data = qr_codec::format_combo_qr(
-            &self.session_id,
-            self.commitment.reveal_key(),
-            &card_hash,
-            &ack_hash,
-        );
-        Some(QrPayload {
-            data: qr_data,
-            // COMBO is the densest QR (~172 chars). Use Q (25% error recovery)
-            // instead of M (15%) — compensates for brightness asymmetry and
-            // camera-screen distance at the scanning margin.
-            error_correction: "Q".to_string(),
-            display_duration_ms: jittered(DISPLAY_MS_RDYY),
-            layout: 0,
-        })
-    }
-
-    /// The finalization COMBO (VRFY+CONF+RDYY) for this session,
-    /// independent of the display cycle and grace window. The engine seeds
-    /// the `Finalized` success-screen broadcast with this so a still-`Complete`
-    /// peer always scans our RDYY — never a stale DATA frame the frozen
-    /// single-frame broadcast would otherwise inherit from the `Complete`-state
-    /// interleave (device-proven half-exchange, 2026-07-25 Pixel↔Samsung Hover).
-    pub fn finalization_combo_qr(&self) -> Option<QrPayload> {
+    /// The final frame for this session, independent of the display cycle
+    /// and grace window, drawn where the last frame was. The engine seeds
+    /// the `Finalized` success-screen broadcast with it, so a peer still
+    /// waiting never reads a stale DATA frame the frozen single-frame
+    /// broadcast would otherwise inherit (device-proven half-exchange,
+    /// 2026-07-25 Pixel↔Samsung Hover).
+    pub fn finalization_qr(&self) -> QrPayload {
         let header = self.trainer.current_frame(self.monotonic.now());
-        self.get_combo_qr()
-            .map(|payload| Self::with_training_header(payload, &header))
-    }
-
-    /// Handle a COMBO QR from the peer — process VRFY + CONF + RDYY in one shot.
-    /// Allows jumping from Verifying/Confirming/Complete straight to Finalized.
-    ///
-    /// SAFETY: Only processes VRFY if we have all inbound chunks. If we're still
-    /// Transferring without complete data, the COMBO is treated as a stashed
-    /// reveal key (same as receiving a standalone VRFY during Transferring).
-    fn handle_combo(
-        &mut self,
-        reveal_key: [u8; 32],
-        payload_hash: [u8; 32],
-        ack_hash: [u8; 32],
-    ) -> ProtocolState {
-        // If still Transferring, stash the reveal key but don't chain further.
-        // We can't process CONF/RDYY without the actual data.
-        if matches!(self.state, ProtocolState::Transferring { .. }) {
-            // handle_verify will stash the reveal key if chunks aren't complete
-            self.handle_verify(reveal_key);
-            // Don't chain — we need more DATA chunks first
-            return self.state.clone();
-        }
-
-        // In Verifying: process reveal key → should move to Confirming
-        if matches!(self.state, ProtocolState::Verifying) {
-            self.handle_verify(reveal_key);
-        }
-
-        // In Confirming: process payload hash → should move to Complete
-        if matches!(self.state, ProtocolState::Confirming) {
-            self.handle_confirm(payload_hash);
-        }
-
-        // In Complete/RetryReady: process ack hash → should move to Finalized
-        if matches!(
-            self.state,
-            ProtocolState::Complete | ProtocolState::RetryReady
-        ) {
-            self.handle_ready(ack_hash);
-        }
-
-        self.state.clone()
+        Self::with_training_header(self.final_frame_qr(), &header)
     }
 
     /// Compute the READY acknowledgment hash.
@@ -2257,7 +2042,7 @@ impl MultiStageSession {
         }
         self.transport_key = None;
         self.peer_reveal_key = None;
-        self.early_peer_payload_hash = None;
+        self.kept_peer_final_tag = None;
         self.peer_ephemeral = None;
         self.peer_commitment_hash = None;
         self.peer_session_id = None;
@@ -2275,10 +2060,7 @@ impl MultiStageSession {
         self.failed_from_mismatch = false;
         self.foreign_inits = 0;
         self.dropped_frames = 0;
-        self.retry_used = false;
-        self.fail_broadcast_until = None;
         self.phase_entered_at = None;
-        self.last_progress_at = None;
 
         // Our own identity is deliberately kept — session id, ephemeral and
         // commitment. Minting fresh ones invalidates whatever the peer already
@@ -2310,7 +2092,7 @@ impl MultiStageSession {
         }
         self.transport_key = None;
         self.peer_reveal_key = None;
-        self.early_peer_payload_hash = None;
+        self.kept_peer_final_tag = None;
         self.ephemeral_secret = None;
         self.ratchet_ephemeral = None;
         self.outbound_chunks.clear();

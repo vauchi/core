@@ -262,21 +262,16 @@ fn finalized_machine_exposes_combo_for_broadcast_seed() {
         "precondition: Alice must be Finalized after {ticks} ticks, got {:?}",
         alice.phase(),
     );
-    let combo = alice
-        .finalization_combo_qr()
-        .expect("a finalized machine must expose a COMBO to seed the broadcast");
+    let seed = alice.finalization_qr();
     assert!(
-        combo.data.starts_with("CMB3"),
-        "the broadcast seed must be a COMBO (VRFY+CONF+RDYY), got prefix {:?}",
-        &combo.data[..combo.data.len().min(4)],
+        seed.data.starts_with("FIN3"),
+        "the broadcast seed must be the final frame, got prefix {:?}",
+        &seed.data[..seed.data.len().min(4)],
     );
     if matches!(bob.phase(), MultiStagePhase::Finalized { .. }) {
         assert!(
-            bob.finalization_combo_qr()
-                .expect("finalized slow peer must also expose a COMBO")
-                .data
-                .starts_with("CMB3"),
-            "the slow peer's broadcast seed must also be a COMBO",
+            bob.finalization_qr().data.starts_with("FIN3"),
+            "the slow peer's broadcast seed must also be the final frame",
         );
     }
 }

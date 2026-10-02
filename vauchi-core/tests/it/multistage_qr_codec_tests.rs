@@ -60,40 +60,33 @@ fn test_parse_data_qr() {
 
 // @internal
 #[test]
-fn test_parse_verify_qr() {
+fn test_parse_final_qr() {
     let session_id = [6u8; 16];
     let reveal_key = [7u8; 32];
-    let qr = format_verify_qr(&session_id, &reveal_key);
+    let tag = [9u8; 32];
+    let qr = format_final_qr(&session_id, &reveal_key, &tag);
+    assert!(qr.starts_with("FIN3"));
     let parsed = parse_qr(&qr).unwrap();
     match parsed {
-        StageQr::Verify {
+        StageQr::Final {
             session_id: sid,
             reveal_key: rk,
+            tag: t,
         } => {
             assert_eq!(sid, session_id);
             assert_eq!(rk, reveal_key);
+            assert_eq!(t, tag);
         }
-        _ => panic!("expected Verify"),
+        _ => panic!("expected Final"),
     }
 }
 
 // @internal
 #[test]
-fn test_parse_confirm_qr() {
-    let session_id = [8u8; 16];
-    let payload_hash = [9u8; 32];
-    let qr = format_confirm_qr(&session_id, &payload_hash);
-    let parsed = parse_qr(&qr).unwrap();
-    match parsed {
-        StageQr::Confirm {
-            session_id: sid,
-            payload_hash: ph,
-        } => {
-            assert_eq!(sid, session_id);
-            assert_eq!(ph, payload_hash);
-        }
-        _ => panic!("expected Confirm"),
-    }
+fn a_final_frame_cut_short_is_rejected() {
+    let mut qr = format_final_qr(&[6u8; 16], &[7u8; 32], &[9u8; 32]);
+    qr.truncate(qr.len() - 5);
+    assert!(parse_qr(&qr).is_err());
 }
 
 // @internal

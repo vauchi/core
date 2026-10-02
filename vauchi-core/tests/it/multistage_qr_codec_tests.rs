@@ -309,3 +309,15 @@ fn test_shake_qr_fits_single_dense_qr() {
     // Roundtrips intact.
     assert!(matches!(parse_qr(&qr).unwrap(), StageQr::Shake { .. }));
 }
+
+// @internal
+#[test]
+fn a_scan_whose_prefix_boundary_splits_a_character_is_rejected() {
+    // Any QR a camera sees reaches the parser; "é" is two bytes, so byte 4
+    // falls inside it.
+    let scanned = "abcé and more text";
+
+    let result = parse_qr(scanned);
+
+    assert!(matches!(result, Err(QrCodecError::UnknownPrefix)));
+}

@@ -72,6 +72,11 @@ impl AppEngine {
         if self.device_link_initiator.is_some() {
             return;
         }
+        // No link code before the PIN step is passed (#469); its hook calls
+        // back here once the PIN is confirmed.
+        if self.engine.current_screen().screen_id == "link_confirm_pin" {
+            return;
+        }
         let (initiator, transport, identity_id, persistence) =
             match self.build_device_link_initiator() {
                 Ok(parts) => parts,

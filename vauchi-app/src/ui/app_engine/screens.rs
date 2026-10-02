@@ -306,7 +306,15 @@ impl AppEngine {
                 // the relay offer and supplies the real `vauchi://` invitation
                 // via `QrReady`, or surfaces `link_failed` on relay error
                 // (F1a/join-QR device-cert regression).
-                DeviceLinkingEngine::pending().with_locale(render_context.resolved_locale()),
+                // With an app password, the PIN is asked again first: a
+                // completed link hands the new device the identity (#469).
+                if vauchi.is_password_enabled().unwrap_or(true) {
+                    DeviceLinkingEngine::pending()
+                        .awaiting_pin()
+                        .with_locale(render_context.resolved_locale())
+                } else {
+                    DeviceLinkingEngine::pending().with_locale(render_context.resolved_locale())
+                },
             ),
             AppScreen::DeviceLinkJoin { .. } => {
                 let default_name = device_capabilities

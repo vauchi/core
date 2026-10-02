@@ -195,6 +195,9 @@ pub struct AppEngine {
     /// only on `AppScreen::DeviceLinking`. See `app_engine/device_link_initiator.rs`.
     #[cfg(all(feature = "network-http", feature = "storage"))]
     device_link_initiator: Option<device_link_initiator::DeviceLinkInitiatorHolder>,
+    /// Wrong PINs at the device-link PIN step since the last right one;
+    /// survives leaving the screen so retrying there cannot reset it (#469).
+    device_link_pin_failures: usize,
     /// Where this device is reachable on the network it is attached to, as
     /// reported by the shell (ADR-070).
     ///
@@ -514,6 +517,7 @@ impl AppEngine {
             link_initiator_x3dh: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_initiator: None,
+            device_link_pin_failures: 0,
             local_network_address: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_responder: None,
@@ -681,6 +685,10 @@ impl WorkflowEngine for AppEngine {
         // Mode-picker grant affordance (`grant:<mode>:<requirement>`): re-learn
         // a denied OS permission and re-render the picker. See
         // `screens_exchange::intercept_grant_permission`.
+        if let Some(result) = self.intercept_device_link_pin(&action) {
+            return result;
+        }
+
         if let Some(result) = self.intercept_grant_permission(&action) {
             return result;
         }

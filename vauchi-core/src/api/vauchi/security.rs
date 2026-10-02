@@ -208,6 +208,23 @@ impl Vauchi {
         }
     }
 
+    /// Checks a PIN against the one that opened this session, without
+    /// changing the session. Device linking asks for it again before any
+    /// link code exists (#469). Only the real PIN confirms a normal
+    /// session and only the duress PIN a duress one: telling a coercer that
+    /// the PIN they unlocked with is wrong would reveal duress mode. With no
+    /// app password there is nothing to confirm.
+    pub fn confirm_session_password(&self, password: &str) -> VauchiResult<bool> {
+        let Some(config) = self.storage.identity().load_password_config()? else {
+            return Ok(true);
+        };
+        Ok(match config.verify(password) {
+            AuthResult::Normal => self.auth_mode == AuthMode::Normal,
+            AuthResult::Duress => self.auth_mode == AuthMode::Duress,
+            AuthResult::Invalid => false,
+        })
+    }
+
     /// Sets up an app password (PIN).
     ///
     /// Requires an identity to be created first (the password columns

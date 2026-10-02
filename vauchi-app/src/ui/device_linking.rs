@@ -8,6 +8,7 @@
 //! (`_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens/`).
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
+use crate::ui::device_link_pin::{EnteredPin, PIN_INPUT_ID, confirm_pin_screen};
 use crate::ui::*;
 
 /// Steps in the device linking flow.
@@ -54,6 +55,10 @@ enum DeviceLinkStep {
         challenge_hex: String,
     },
     Syncing,
+    /// The PIN is asked before any link code exists (#469).
+    ConfirmPin {
+        error: Option<String>,
+    },
     /// Sending credentials to the new device; ephemeral progress state
     /// between proximity confirmation and final success.
     Completing,
@@ -90,6 +95,7 @@ pub struct DeviceLinkingEngine {
     invitation_url: String,
     verification_code: Option<String>,
     locale: Locale,
+    entered_pin: EnteredPin,
 }
 
 impl DeviceLinkingEngine {
@@ -106,6 +112,7 @@ impl DeviceLinkingEngine {
             invitation_url,
             verification_code: None,
             locale: Locale::English,
+            entered_pin: EnteredPin::default(),
         }
     }
 
@@ -118,6 +125,7 @@ impl DeviceLinkingEngine {
             invitation_url,
             verification_code: None,
             locale: Locale::English,
+            entered_pin: EnteredPin::default(),
         }
     }
 
@@ -136,7 +144,20 @@ impl DeviceLinkingEngine {
             invitation_url: String::new(),
             verification_code: None,
             locale: Locale::English,
+            entered_pin: EnteredPin::default(),
         }
+    }
+
+    /// Start at the PIN step: the app has a password, and linking asks for
+    /// it again before any link code exists (#469).
+    pub fn awaiting_pin(mut self) -> Self {
+        self.step = DeviceLinkStep::ConfirmPin { error: None };
+        self
+    }
+
+    /// Whether the PIN step is showing, so the link session waits for it.
+    pub fn awaits_pin(&self) -> bool {
+        matches!(self.step, DeviceLinkStep::ConfirmPin { .. })
     }
 
     /// Set the render locale (defaults to English) — threaded from the
@@ -228,6 +249,7 @@ impl DeviceLinkingEngine {
         match &self.step {
             DeviceLinkStep::TransportSelection
             | DeviceLinkStep::OfflineStub
+            | DeviceLinkStep::ConfirmPin { .. }
             | DeviceLinkStep::QrExpired
             | DeviceLinkStep::LinkFailed { .. } => 0,
             DeviceLinkStep::QrPending
@@ -247,6 +269,7 @@ impl DeviceLinkingEngine {
             &self.step,
             DeviceLinkStep::TransportSelection
                 | DeviceLinkStep::OfflineStub
+                | DeviceLinkStep::ConfirmPin { .. }
                 | DeviceLinkStep::QrExpired
                 | DeviceLinkStep::LinkFailed { .. }
         ) {
@@ -263,6 +286,9 @@ impl DeviceLinkingEngine {
         match &self.step {
             DeviceLinkStep::TransportSelection => self.transport_selection_screen(),
             DeviceLinkStep::OfflineStub => self.offline_stub_screen(),
+            DeviceLinkStep::ConfirmPin { error } => {
+                confirm_pin_screen(self.locale, self.entered_pin.as_str(), error.as_deref())
+            }
             DeviceLinkStep::ShowQr => self.show_qr_screen(),
             DeviceLinkStep::VerifyCode => self.verify_code_screen(),
             DeviceLinkStep::Syncing => self.syncing_screen(),
@@ -779,8 +805,26 @@ impl WorkflowEngine for DeviceLinkingEngine {
             }
             U::Completed => self.transition_to_link_success(),
             U::Failed(reason) => self.transition_to_link_failed(reason),
+            U::PinRequired => {
+                self.entered_pin.clear();
+                self.step = DeviceLinkStep::ConfirmPin { error: None };
+            }
+            U::PinRejected => {
+                self.entered_pin.clear();
+                self.step = DeviceLinkStep::ConfirmPin {
+                    error: Some(self.t("lock_screen.wrong_password")),
+                };
+            }
         }
         true
+    }
+
+    fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
+        (self.awaits_pin() && !self.entered_pin.as_str().is_empty()).then(|| {
+            crate::ui::EngineOutput::DeviceLinkPin {
+                pin: self.entered_pin.as_str().to_string(),
+            }
+        })
     }
 
     fn current_screen(&self) -> ScreenModel {
@@ -788,6 +832,16 @@ impl WorkflowEngine for DeviceLinkingEngine {
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        if let UserAction::TextChanged {
+            component_id,
+            value,
+        } = &action
+            && component_id == PIN_INPUT_ID
+            && self.awaits_pin()
+        {
+            self.entered_pin.set(value.clone());
+            return ActionResult::UpdateScreen(self.build_screen());
+        }
         let UserAction::ActionPressed { action_id } = action else {
             return ActionResult::UpdateScreen(self.build_screen());
         };

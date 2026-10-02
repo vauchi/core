@@ -31,6 +31,7 @@ mod deep_link_consent;
 pub mod delivery;
 mod demo_presentation;
 mod device_link_join;
+mod device_link_pin;
 mod device_linking;
 mod device_management;
 mod device_replacement;

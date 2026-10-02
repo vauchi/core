@@ -17,7 +17,12 @@
 
 use super::AppEngine;
 use crate::ui::ScreenModel;
-use crate::ui::{DeviceLinkUpdate, EngineUpdate};
+use crate::ui::device_link_pin::CONFIRM_PIN_ACTION_ID;
+use crate::ui::lock_screen::DEFAULT_LOCK_MAX_ATTEMPTS;
+use crate::ui::{
+    ActionResult, AppScreen, DeviceLinkUpdate, EngineOutput, EngineUpdate, UserAction,
+};
+use zeroize::Zeroize;
 
 impl AppEngine {
     /// Cycle-thread bridge: signal that a fresh device-link session
@@ -96,5 +101,45 @@ impl AppEngine {
         self.engine
             .apply_update(EngineUpdate::DeviceLink(DeviceLinkUpdate::Failed(reason)))
             .then(|| self.engine.current_screen())
+    }
+
+    /// The PIN step that opens device linking (#469): check the PIN against
+    /// the one that opened this session, start the link on a match, and
+    /// lock the app after as many misses as the lock screen allows, so
+    /// someone holding the unlocked phone cannot keep guessing here.
+    pub(super) fn intercept_device_link_pin(
+        &mut self,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        let UserAction::ActionPressed { action_id } = action else {
+            return None;
+        };
+        if action_id != CONFIRM_PIN_ACTION_ID || !matches!(self.screen, AppScreen::DeviceLinking) {
+            return None;
+        }
+        // An empty entry stays with the engine, which keeps the step.
+        let Some(EngineOutput::DeviceLinkPin { mut pin }) = self.engine.engine_output() else {
+            return None;
+        };
+        let confirmed = self.vauchi.confirm_session_password(&pin).unwrap_or(false);
+        pin.zeroize();
+        if confirmed {
+            self.device_link_pin_failures = 0;
+            let _ = self.device_link_qr_pending();
+            #[cfg(all(feature = "network-http", feature = "storage"))]
+            self.ensure_device_link_session();
+            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+        }
+        self.device_link_pin_failures += 1;
+        if self.device_link_pin_failures >= DEFAULT_LOCK_MAX_ATTEMPTS {
+            self.device_link_pin_failures = 0;
+            if let Some(locked) = self.handle_app_backgrounded() {
+                return Some(ActionResult::NavigateTo(locked));
+            }
+        }
+        let _ = self
+            .engine
+            .apply_update(EngineUpdate::DeviceLink(DeviceLinkUpdate::PinRejected));
+        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 }

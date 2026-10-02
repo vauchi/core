@@ -50,6 +50,9 @@ pub enum EngineOutput {
     /// PIN/password typed on the lock screen (redacted in `Debug`).
     /// Absent (engine returns `None`) while the entry is empty.
     Lock { pin: String },
+    /// PIN typed to confirm a device link (redacted in `Debug`). Absent
+    /// while the entry is empty or the screen is past the PIN step.
+    DeviceLinkPin { pin: String },
     /// A verified Glance peer code the user typed instead of scanning;
     /// the AppEngine pins the peer from it as from a camera scan. Absent
     /// until a code is accepted. `Debug` prints the length only: a code
@@ -191,6 +194,10 @@ pub enum DeviceLinkUpdate {
     },
     Completed,
     Failed(String),
+    /// Ask for the PIN before any link code exists (#469).
+    PinRequired,
+    /// The PIN did not match the one that opened this session.
+    PinRejected,
 }
 
 /// Cycle-thread bridge updates for the device-link join (responder) engine.
@@ -330,6 +337,8 @@ impl EngineUpdate {
                 DeviceLinkUpdate::RequestReceived { .. } => "DeviceLink::RequestReceived",
                 DeviceLinkUpdate::Completed => "DeviceLink::Completed",
                 DeviceLinkUpdate::Failed(_) => "DeviceLink::Failed",
+                DeviceLinkUpdate::PinRequired => "DeviceLink::PinRequired",
+                DeviceLinkUpdate::PinRejected => "DeviceLink::PinRejected",
             },
             Self::DeviceLinkJoin(u) => match u {
                 DeviceLinkJoinUpdate::NameAccepted => "DeviceLinkJoin::NameAccepted",
@@ -537,6 +546,10 @@ impl std::fmt::Debug for EngineOutput {
                 .finish(),
             Self::Backup(s) => f.debug_tuple("Backup").field(s).finish(),
             Self::Lock { .. } => f.debug_struct("Lock").field("pin", &"<redacted>").finish(),
+            Self::DeviceLinkPin { .. } => f
+                .debug_struct("DeviceLinkPin")
+                .field("pin", &"<redacted>")
+                .finish(),
             Self::GlancePeerCode { data } => f
                 .debug_struct("GlancePeerCode")
                 .field("len", &data.len())

@@ -614,3 +614,39 @@ fn test_verify_fingerprint_is_serious_not_destructive() {
         .expect("unverified contact offers verify_fingerprint");
     assert_eq!(verify.style, ActionStyle::Serious);
 }
+
+fn contact_info_titles(screen: &ScreenModel) -> Vec<String> {
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::InfoPanel { id, items, .. } if id == "contact_info" => {
+                Some(items.iter().map(|i| i.title.clone()).collect())
+            }
+            _ => None,
+        })
+        .expect("contact_info panel must exist")
+}
+
+// @internal
+#[test]
+fn test_contact_detail_says_verified_once_when_the_trust_level_is_verified() {
+    let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+        .with_trust("Verified".into(), false)
+        .with_verification(true, TrustLevel::Verified);
+
+    assert_eq!(contact_info_titles(&engine.current_screen()), vec!["Trust"]);
+}
+
+// @internal
+#[test]
+fn test_contact_detail_keeps_the_verified_row_under_another_trust_level() {
+    let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+        .with_trust("Cautious".into(), false)
+        .with_verification(true, TrustLevel::Cautious);
+
+    assert_eq!(
+        contact_info_titles(&engine.current_screen()),
+        vec!["Trust", "Verified"]
+    );
+}

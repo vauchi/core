@@ -98,6 +98,18 @@ fn settings_main_screen_is_the_three_canvas_sections() {
 
 // @scenario: navigation :: Settings groups follow the design canvas
 #[test]
+fn backup_row_says_no_backup_yet_until_one_exists() {
+    let screen = SettingsEngine::new(config()).current_screen();
+    let (_, items) = group(&screen.components, "identity");
+
+    assert_eq!(
+        row(items, "backup_export").subtitle.as_deref(),
+        Some("No backup yet")
+    );
+}
+
+// @scenario: navigation :: Settings groups follow the design canvas
+#[test]
 fn identity_section_lists_the_canvas_rows_with_their_descriptions() {
     let screen = SettingsEngine::new(config()).current_screen();
     let (_, items) = group(&screen.components, "identity");

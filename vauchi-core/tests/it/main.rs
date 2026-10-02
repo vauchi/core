@@ -309,6 +309,7 @@ mod multistage_crc16_tests;
 mod multistage_e2e_tests;
 mod multistage_early_confirm_tests;
 mod multistage_link_trainer_tests;
+mod multistage_link_training_session_tests;
 mod multistage_lossy_link_tests;
 mod multistage_proptest;
 mod multistage_qr_codec_inid_ready_tests;

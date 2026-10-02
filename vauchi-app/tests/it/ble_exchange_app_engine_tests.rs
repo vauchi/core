@@ -313,12 +313,13 @@ fn back_from_fallback_screen_returns_to_picker_not_failed_transport() {
 // @internal
 #[cfg(feature = "testing")]
 #[test]
-fn ble_discovery_times_out_via_poll_notifications_past_budget() {
-    // The wait-forever fix: a peerless BLE discovery ("Searching…") must fail
-    // once the engine's stall budget (BLE_STEP_TIMEOUT_SECS = 60s) elapses,
-    // driven by the `poll_notifications` pump (the only non-test tick driver).
-    // Reproduces the live Pixel 3a observation (discovery never timed out)
-    // through the real AppEngine surface with a FakeClock instead of a wait
+fn a_peerless_ble_discovery_offers_nothing_found_via_poll_notifications() {
+    // The wait-forever fix: a peerless BLE discovery ("Searching…") must end
+    // on its own, driven by the `poll_notifications` pump (the only non-test
+    // tick driver). Since the nothing-found chrome (`f41c7424`) it ends at
+    // `BLE_DISCOVERY_TIMEOUT_SECS` (15 s) on a retry / switch-to-QR offer,
+    // well before the 60 s stall failure this test used to wait for.
+    // Through the real AppEngine surface with a FakeClock, not a wait
     // (CC-06). Pairs with the Android app-level pump that calls
     // pollNotifications on every Ready screen.
     let fake = Arc::new(FakeClock::new(
@@ -339,21 +340,30 @@ fn ble_discovery_times_out_via_poll_notifications_past_budget() {
         "Magic should land on the live BLE discovering screen"
     );
 
-    // Below the 60s budget: a poll must NOT trip the timeout.
-    fake.advance(Duration::from_secs(55));
-    let _ = engine.poll_notifications();
-    assert_eq!(
-        engine.current_screen().screen_id,
-        "exchange_ble_discovering",
-        "must still be discovering before the 60s stall budget"
-    );
-
-    // Past the budget (total 65s): a poll MUST fail the stalled discovery.
+    // Below the 15 s discovery budget: a poll must not end the search.
     fake.advance(Duration::from_secs(10));
     let _ = engine.poll_notifications();
     assert_eq!(
         engine.current_screen().screen_id,
-        "exchange_failed",
-        "poll_notifications past BLE_STEP_TIMEOUT_SECS must fail the peerless BLE discovery"
+        "exchange_ble_discovering",
+        "must still be discovering before the 15s discovery budget"
+    );
+
+    // Past the budget (total 20 s): a poll must end the peerless search.
+    fake.advance(Duration::from_secs(10));
+    let _ = engine.poll_notifications();
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_ble_nothing_found",
+        "poll_notifications past BLE_DISCOVERY_TIMEOUT_SECS must offer nothing-found"
+    );
+
+    // Nothing-found is terminal: the 60 s stall failure never replaces it.
+    fake.advance(Duration::from_secs(60));
+    let _ = engine.poll_notifications();
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_ble_nothing_found",
+        "the stall failure must not replace the nothing-found offer"
     );
 }

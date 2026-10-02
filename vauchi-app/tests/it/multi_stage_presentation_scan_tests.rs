@@ -152,6 +152,62 @@ fn a_reported_decode_advances_hover_past_advertising() {
     );
 }
 
+/// A camera reads on its own clock. By the time a decode reaches Core the
+/// screen has often moved on by a frame: at a 100 ms sweep the shell needs
+/// most of each frame to draw the new surface, and about half of the Pixel's
+/// decodes were reported against the one before and dropped as stale (rig
+/// runs E7, 2026-10-02). The capture node is the same camera across those
+/// revisions, so its binding does not change with them.
+// @internal
+#[test]
+fn a_decode_reported_after_the_screen_moved_on_still_advances_hover() {
+    let start = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+    let clock_a = Arc::new(FakeClock::new(start));
+    let clock_b = Arc::new(FakeClock::new(start));
+    let mut alice = engine_on_hover("Alice", clock_a.clone());
+    let mut bob = engine_on_hover("Bob", clock_b);
+    alice.poll_notifications();
+    bob.poll_notifications();
+    let drawn = latest_surface(&alice.initial_commands().expect("alice commands"))
+        .expect("Alice renders a surface");
+    let binding = capture_binding(&drawn).expect("Alice renders a capture node");
+    let bob_qr = displayed_qr(
+        &latest_surface(&bob.initial_commands().expect("bob commands")).expect("Bob renders"),
+    )
+    .expect("Bob displays an opening frame");
+
+    // Alice's own code moves on to its next sweep frames before the decode
+    // made against `drawn` is reported.
+    for _ in 0..3 {
+        clock_a.advance(Duration::from_millis(150));
+        alice.poll_notifications();
+    }
+    let current = latest_surface(&alice.initial_commands().expect("alice commands"))
+        .expect("Alice renders a surface");
+    assert!(
+        current.revision > drawn.revision,
+        "precondition: the surface moved on ({} then {})",
+        drawn.revision,
+        current.revision
+    );
+    assert_eq!(
+        capture_binding(&current),
+        Some(binding.clone()),
+        "the camera keeps its binding across revisions"
+    );
+
+    report_decode(&mut alice, &drawn.surface_id, &binding, bob_qr);
+
+    assert!(
+        !matches!(
+            alice.multi_stage_phase(),
+            Some(MultiStagePhase::Advertising)
+        ),
+        "a decode from the same camera, one frame late, must still count, got {:?}",
+        alice.multi_stage_phase()
+    );
+}
+
 /// Two Hover devices aimed at each other, each decoding whatever the
 /// peer displays, reach a persisted success — driven only through
 /// `ReplaceSurface` out and `ValueChanged` in.

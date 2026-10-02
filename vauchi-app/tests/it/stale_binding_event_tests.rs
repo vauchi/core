@@ -77,36 +77,36 @@ fn decoded(surface: &SurfaceSpec, binding: &BindingId, frame: &str) -> Event {
     }
 }
 
-// @scenario: generic_presentation_protocol :: A value on a binding from an older revision is dropped
+// @scenario: generic_presentation_protocol :: Invalid boundary input fails safely
 #[test]
-fn a_decode_on_a_binding_re_minted_by_a_ble_discovery_is_dropped() {
+fn a_decode_reported_across_a_ble_discovery_re_render_is_not_refused() {
     let mut alice = on_glance_with_camera("Alice");
     let mut bob = on_glance_with_camera("Bob");
     let alice_qr = qr(&rendered(&mut alice), PresentationQrPurpose::Display).1[0].clone();
     let before = rendered(&mut bob);
-    let (old_binding, _) = qr(&before, PresentationQrPurpose::Capture);
+    let (binding, _) = qr(&before, PresentationQrPurpose::Capture);
     bob.dispatch(Event::BleDeviceDiscovered {
         id: "stranger".into(),
         rssi: -60,
         adv_data: vec![0xAB, 0xCD],
     })
     .expect("discovery handled");
-    let (new_binding, _) = qr(&rendered(&mut bob), PresentationQrPurpose::Capture);
-    assert_ne!(
-        new_binding, old_binding,
-        "the discovery must re-mint the capture binding"
-    );
-
-    let out = bob.dispatch(decoded(&before, &old_binding, &alice_qr));
-
-    assert_eq!(
-        out.expect("a stale decode is dropped, not an error"),
-        Vec::new()
+    let after = rendered(&mut bob);
+    assert!(
+        after.revision > before.revision,
+        "precondition: the discovery re-rendered the surface"
     );
     assert_eq!(
-        qr(&rendered(&mut bob), PresentationQrPurpose::Capture).0,
-        new_binding,
-        "the dropped decode must not move the surface on"
+        qr(&after, PresentationQrPurpose::Capture).0,
+        binding,
+        "the camera is the same node across the re-render and keeps its binding"
+    );
+
+    let out = bob.dispatch(decoded(&before, &binding, &alice_qr));
+
+    assert!(
+        out.is_ok(),
+        "a decode from a camera still on screen is an observation, not a stale value: {out:?}"
     );
 }
 

@@ -150,7 +150,10 @@ const SID_LEN: usize = 24; // base45(16 bytes) = 8 pairs × 3
 const F32_LEN: usize = 48; // base45(32 bytes) = 16 pairs × 3
 const CRC_LEN: usize = 3; // base45(2 bytes) = 1 pair × 3
 const IDX_LEN: usize = 4; // zero-padded decimal "0000"–"9999"
-const ACK_LEN_LEN: usize = 2; // zero-padded decimal length of ack field "00"–"99"
+const ACK_LEN_LEN: usize = 2; // length of the ack field, two base45 digits
+/// Longest ack field two base45 digits can count: a bitmap for 10 792
+/// chunks, far past the 32 KB card limit at any chunk size.
+const MAX_ACK_LEN: usize = 44 * 45 + 44;
 
 /// Name length field width (zero-padded decimal "00"–"99").
 const NAME_LEN_LEN: usize = 2;
@@ -356,7 +359,11 @@ pub fn format_in2d_qr(
 
 /// Format a DATA stage QR string with CRC-16 integrity check.
 ///
-/// Layout: `DATA<sid:24><idx:4>/<total:4><ack_len:02><ack:variable><crc:3><payload>`
+/// Layout: `DAT3<header:8><sid:24><idx:4>/<total:4><ack_len:2><ack:variable><crc:3><payload>`
+///
+/// # Panics
+///
+/// Panics if the encoded ack bitmap is longer than 2024 characters.
 pub fn format_data_qr(
     session_id: &[u8; 16],
     chunk_idx: u16,
@@ -366,14 +373,19 @@ pub fn format_data_qr(
 ) -> String {
     let crc = crc16::compute(payload);
     let ack_encoded = base45::encode(ack_bitmap);
+    assert!(
+        ack_encoded.len() <= MAX_ACK_LEN,
+        "ack bitmap exceeds what the two-digit length field can count"
+    );
     frame(
         "DAT3",
         &format!(
-            "{sid}{idx:04}/{total:04}{ack_len:02}{ack}{crc}{data}",
+            "{sid}{idx:04}/{total:04}{ack_len_high}{ack_len_low}{ack}{crc}{data}",
             sid = base45::encode(session_id),
             idx = chunk_idx,
             total = chunk_total,
-            ack_len = ack_encoded.len(),
+            ack_len_high = base45::digit((ack_encoded.len() / 45) as u8),
+            ack_len_low = base45::digit((ack_encoded.len() % 45) as u8),
             ack = ack_encoded,
             crc = base45::encode(&crc.to_be_bytes()),
             data = base45::encode(payload),
@@ -604,10 +616,12 @@ fn parse_data(body: &str) -> Result<StageQr, QrCodecError> {
         .map_err(|_| QrCodecError::InvalidFieldCount)?;
 
     // ack_len(2) + ack(variable)
-    let ack_len_str = take(body, &mut pos, ACK_LEN_LEN)?;
-    let ack_len: usize = ack_len_str
-        .parse()
-        .map_err(|_| QrCodecError::InvalidFieldCount)?;
+    let ack_len = match take(body, &mut pos, ACK_LEN_LEN)?.as_bytes() {
+        [high, low] => {
+            usize::from(base45::digit_value(*high)?) * 45 + usize::from(base45::digit_value(*low)?)
+        }
+        _ => return Err(QrCodecError::InvalidFieldCount),
+    };
     let ack_encoded = take(body, &mut pos, ack_len)?;
 
     // crc(3) + payload(rest)

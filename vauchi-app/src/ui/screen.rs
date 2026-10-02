@@ -40,10 +40,11 @@ pub enum ScreenPresentationKind {
 /// used by screens that must not reflow while a live element updates —
 /// e.g. the QR exchange screen, where a moving QR breaks the peer
 /// camera lock (`2026-06-03-exchange-qr-scan-stability`). `Pinned` is
-/// used by list-dominant screens: chrome stays pinned while the list
-/// component owns scrolling lazily — eager rendering of 10k rows froze
-/// and crashed the mobile renderers
-/// (`2026-06-11-contacts-list-windowing-design`).
+/// used by list-dominant screens: the content is one lazy scroll host,
+/// header included, and only the action bar and the navigation below it
+/// stay pinned — eager rendering of 10k rows froze and crashed the
+/// mobile renderers, and pinning the header left the list no height on
+/// a small phone (`2026-06-11-contacts-list-windowing-design`).
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -54,8 +55,8 @@ pub enum ScreenLayout {
     Scroll,
     /// Content is sized to the viewport and must not scroll or reflow.
     Fixed,
-    /// Chrome is sized to the viewport and does not scroll; the
-    /// screen's list component is the scroll host (and, unlike
+    /// The content scrolls as one lazy host, header and list rows
+    /// together; the action bar and navigation stay pinned (and, unlike
     /// `Fixed`, overlays such as sync chrome may still reflow it).
     Pinned,
 }

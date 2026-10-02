@@ -316,6 +316,7 @@ mod multistage_ratchet_roundtrip_tests;
 mod multistage_session_tests;
 mod multistage_shake_envelope_tests;
 mod multistage_timing_proptest;
+mod multistage_training_header_tests;
 mod multistage_types_tests;
 mod mutation_coverage_contact_card_tests;
 mod mutation_coverage_contact_tests;

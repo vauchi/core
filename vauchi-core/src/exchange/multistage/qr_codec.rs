@@ -165,6 +165,21 @@ fn take_rest(s: &str, pos: usize) -> &str {
     s.get(pos..).unwrap_or("")
 }
 
+/// Join a stage prefix and its body into a frame. Every `format_*` goes
+/// through here, and every parse through [`split_frame`].
+fn frame(prefix: &str, body: &str) -> String {
+    debug_assert_eq!(prefix.len(), PREFIX_LEN);
+    format!("{prefix}{body}")
+}
+
+/// Split a frame into its stage prefix and body.
+fn split_frame(raw: &str) -> Result<(&str, &str), QrCodecError> {
+    if raw.len() < PREFIX_LEN {
+        return Err(QrCodecError::UnknownPrefix);
+    }
+    Ok((&raw[..PREFIX_LEN], &raw[PREFIX_LEN..]))
+}
+
 /// Format an INIT stage QR string with optional relay metadata.
 ///
 /// v2 layout (`INI2` prefix): `INI2<sid:24><eph:48><ch:48><name_len:2><name><flags:3>[<url_len:3><url>][<pubkey:48>]`
@@ -202,14 +217,17 @@ pub fn format_ini2_qr_with_relay(
         flags |= FLAG_HAS_RELAY_URL;
     }
 
-    let mut result = format!(
-        "INI2{sid}{eph}{ch}{name_len:02}{name}{flags}",
-        sid = base45::encode(session_id),
-        eph = base45::encode(ephemeral),
-        ch = base45::encode(commitment_hash),
-        name_len = display_name.len(),
-        name = display_name,
-        flags = base45::encode(&[flags]),
+    let mut result = frame(
+        "INI2",
+        &format!(
+            "{sid}{eph}{ch}{name_len:02}{name}{flags}",
+            sid = base45::encode(session_id),
+            eph = base45::encode(ephemeral),
+            ch = base45::encode(commitment_hash),
+            name_len = display_name.len(),
+            name = display_name,
+            flags = base45::encode(&[flags]),
+        ),
     );
 
     if let Some(url) = relay_url {
@@ -256,14 +274,17 @@ pub fn format_in2d_qr(
     let ct_encoded = base45::encode(ciphertext);
 
     // Build same as INIT but with INID prefix, then append ciphertext at the end
-    let mut result = format!(
-        "IN2D{sid}{eph}{ch}{name_len:02}{name}{flags}",
-        sid = base45::encode(session_id),
-        eph = base45::encode(ephemeral),
-        ch = base45::encode(commitment_hash),
-        name_len = display_name.len(),
-        name = display_name,
-        flags = base45::encode(&[flags]),
+    let mut result = frame(
+        "IN2D",
+        &format!(
+            "{sid}{eph}{ch}{name_len:02}{name}{flags}",
+            sid = base45::encode(session_id),
+            eph = base45::encode(ephemeral),
+            ch = base45::encode(commitment_hash),
+            name_len = display_name.len(),
+            name = display_name,
+            flags = base45::encode(&[flags]),
+        ),
     );
 
     // Relay fields (same position as INIT)
@@ -289,33 +310,42 @@ pub fn format_data_qr(
 ) -> String {
     let crc = crc16::compute(payload);
     let ack_encoded = base45::encode(ack_bitmap);
-    format!(
-        "DATA{sid}{idx:04}/{total:04}{ack_len:02}{ack}{crc}{data}",
-        sid = base45::encode(session_id),
-        idx = chunk_idx,
-        total = chunk_total,
-        ack_len = ack_encoded.len(),
-        ack = ack_encoded,
-        crc = base45::encode(&crc.to_be_bytes()),
-        data = base45::encode(payload),
+    frame(
+        "DATA",
+        &format!(
+            "{sid}{idx:04}/{total:04}{ack_len:02}{ack}{crc}{data}",
+            sid = base45::encode(session_id),
+            idx = chunk_idx,
+            total = chunk_total,
+            ack_len = ack_encoded.len(),
+            ack = ack_encoded,
+            crc = base45::encode(&crc.to_be_bytes()),
+            data = base45::encode(payload),
+        ),
     )
 }
 
 /// Format a VRFY (verify) stage QR string.
 pub fn format_verify_qr(session_id: &[u8; 16], reveal_key: &[u8; 32]) -> String {
-    format!(
-        "VRFY{sid}{rk}",
-        sid = base45::encode(session_id),
-        rk = base45::encode(reveal_key),
+    frame(
+        "VRFY",
+        &format!(
+            "{sid}{rk}",
+            sid = base45::encode(session_id),
+            rk = base45::encode(reveal_key),
+        ),
     )
 }
 
 /// Format a CONF (confirm) stage QR string.
 pub fn format_confirm_qr(session_id: &[u8; 16], payload_hash: &[u8; 32]) -> String {
-    format!(
-        "CONF{sid}{ph}",
-        sid = base45::encode(session_id),
-        ph = base45::encode(payload_hash),
+    frame(
+        "CONF",
+        &format!(
+            "{sid}{ph}",
+            sid = base45::encode(session_id),
+            ph = base45::encode(payload_hash),
+        ),
     )
 }
 
@@ -326,10 +356,13 @@ pub fn format_confirm_qr(session_id: &[u8; 16], payload_hash: &[u8; 32]) -> Stri
 /// Kept for backward compatibility with older clients that don't understand CMBO.
 #[allow(dead_code)]
 pub fn format_ready_qr(session_id: &[u8; 16], ack_hash: &[u8; 32]) -> String {
-    format!(
-        "RDYY{sid}{ah}",
-        sid = base45::encode(session_id),
-        ah = base45::encode(ack_hash),
+    frame(
+        "RDYY",
+        &format!(
+            "{sid}{ah}",
+            sid = base45::encode(session_id),
+            ah = base45::encode(ack_hash),
+        ),
     )
 }
 
@@ -345,12 +378,15 @@ pub fn format_combo_qr(
     payload_hash: &[u8; 32],
     ack_hash: &[u8; 32],
 ) -> String {
-    format!(
-        "CMBO{sid}{rk}{ph}{ah}",
-        sid = base45::encode(session_id),
-        rk = base45::encode(reveal_key),
-        ph = base45::encode(payload_hash),
-        ah = base45::encode(ack_hash),
+    frame(
+        "CMBO",
+        &format!(
+            "{sid}{rk}{ph}{ah}",
+            sid = base45::encode(session_id),
+            rk = base45::encode(reveal_key),
+            ph = base45::encode(payload_hash),
+            ah = base45::encode(ack_hash),
+        ),
     )
 }
 
@@ -358,7 +394,7 @@ pub fn format_combo_qr(
 ///
 /// Broadcast to peer so they abort immediately instead of waiting for timeout.
 pub fn format_fail_qr(session_id: &[u8; 16]) -> String {
-    format!("FAIL{sid}", sid = base45::encode(session_id),)
+    frame("FAIL", &base45::encode(session_id))
 }
 
 /// Format a SHAK (shake-envelope) stage QR string with CRC-16 integrity check.
@@ -369,21 +405,20 @@ pub fn format_fail_qr(session_id: &[u8; 16]) -> String {
 /// in addition to — the AEAD tag).
 pub fn format_shake_qr(session_id: &[u8; 16], sealed_envelope: &[u8]) -> String {
     let crc = crc16::compute(sealed_envelope);
-    format!(
-        "SHAK{sid}{crc}{env}",
-        sid = base45::encode(session_id),
-        crc = base45::encode(&crc.to_be_bytes()),
-        env = base45::encode(sealed_envelope),
+    frame(
+        "SHAK",
+        &format!(
+            "{sid}{crc}{env}",
+            sid = base45::encode(session_id),
+            crc = base45::encode(&crc.to_be_bytes()),
+            env = base45::encode(sealed_envelope),
+        ),
     )
 }
 
 /// Parse a QR string into a [`StageQr`] variant.
 pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
-    if raw.len() < PREFIX_LEN {
-        return Err(QrCodecError::UnknownPrefix);
-    }
-    let prefix = &raw[..PREFIX_LEN];
-    let body = &raw[PREFIX_LEN..];
+    let (prefix, body) = split_frame(raw)?;
 
     match prefix {
         "INI2" => parse_ini2(body),

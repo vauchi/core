@@ -86,19 +86,27 @@ fn multi_stage_poll_advances_frame_after_peer_scan_and_frame_window() {
         engine.forward_multi_stage_hardware_event(&Event::QrScanned { data: bob_init });
     engine.apply_multi_stage_event(scan_event);
 
-    // Advance wall-clock by 2 s — well past the ~400 ms INIT frame window
-    // (even with jitter) — and poll again. The next frame must emit, so
+    // Advance wall-clock 2 s at a time — well past the ~400 ms INIT frame
+    // window (even with jitter) — and poll. A frame must emit each time, so
     // `own_qr` advances off the INIT payload.
     //
+    // Not on the first window necessarily: while transferring, the session
+    // re-shows INIT on about one frame in four, drawn at random
+    // (`session.rs`, `random_below(4)`), so a single window shows INIT again
+    // a quarter of the time. Twenty windows all on INIT has probability
+    // 4^-20.
+    //
     // Regression guard: with the seconds/millis unit bug the poll gate
-    // (400 ms treated as 400 s) keeps the frame frozen and `own_qr`
-    // stays the INIT payload, deadlocking the exchange.
-    fake.advance(Duration::from_secs(2));
-    engine.poll_notifications();
-    let next_qr = own_qr_data(&engine).expect("own_qr present after the frame window");
+    // (400 ms treated as 400 s) keeps the frame frozen for the whole 40 s
+    // this loop covers, and `own_qr` stays the INIT payload.
+    let advanced = (0..20).any(|_| {
+        fake.advance(Duration::from_secs(2));
+        engine.poll_notifications();
+        own_qr_data(&engine).expect("own_qr present after a frame window") != init_qr
+    });
 
-    assert_ne!(
-        next_qr, init_qr,
+    assert!(
+        advanced,
         "multi-stage display frame must advance past INIT after a peer scan + frame window; \
          a frozen frame means the poll cadence regressed to a seconds/millis unit mismatch"
     );

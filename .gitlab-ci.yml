@@ -157,6 +157,23 @@ stages:
   - deploy
   - tag
 
+check:vendor-locales:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  before_script:
+    - apk add --no-cache git
+  script:
+    - sh ci/tests/vendor-locales.test.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - scripts/vendor-locales.sh
+        - ci/tests/vendor-locales.test.sh
+        - .gitlab-ci.yml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 check:auto-tag-order:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
@@ -350,8 +367,19 @@ lint:cross-cutting-blocking:
     - bash ../locales/scripts/check-locale-key-coverage.sh
         vauchi-app/src ../locales '*.rs'
     # lint:vendored-locales — the copy consumers build against must not
-    # drift from locales, or a build without a checkout ships stale copy
-    - sh scripts/vendor-locales.sh --check
+    # drift from locales, or a build without a checkout ships stale copy.
+    # An MR only has to carry exactly the revision it names: a locales merge
+    # stales every open MR at once, and sync:vendor-locales refreshes main
+    # (#432). Main and tags still require locales HEAD.
+    - |
+      if [ "${CI_PIPELINE_SOURCE}" = "merge_request_event" ]; then
+        if [ "$(git -C ../locales rev-parse --is-shallow-repository)" = true ]; then
+          git -C ../locales fetch --quiet --unshallow origin main
+        fi
+        sh scripts/vendor-locales.sh --check-revision
+      else
+        sh scripts/vendor-locales.sh --check
+      fi
     # lint:portable-content-links
     - |
       set -eu

@@ -19,8 +19,15 @@
 # checkout fall back to the vendored one.
 #
 # Usage:
-#   vendor-locales.sh              refresh the vendored copy from ../locales
-#   vendor-locales.sh --check      fail if the vendored copy has drifted
+#   vendor-locales.sh                   refresh the vendored copy from ../locales
+#   vendor-locales.sh --check           fail if the vendored copy is not locales HEAD
+#   vendor-locales.sh --check-revision  fail if the vendored copy is not the
+#                                       locales revision its REVISION names
+#
+# MR pipelines use --check-revision: a locales merge makes every open core
+# MR's copy stale at once, through no fault of the MR, and sync:vendor-locales
+# refreshes it on main (#432). --check-revision needs that revision in the
+# checkout, so unshallow a --depth=1 clone first.
 #
 # Portability: POSIX shell only (runs in alpine CI).
 set -eu
@@ -31,10 +38,18 @@ VENDOR_DIR="$CRATE_DIR/locales"
 SOURCE_DIR="${VAUCHI_LOCALES_DIR:-$SCRIPT_DIR/../../locales}"
 
 CHECK_MODE=0
-[ "${1:-}" = "--check" ] && CHECK_MODE=1
+case "${1:-}" in
+    "") ;;
+    --check) CHECK_MODE=1 ;;
+    --check-revision) CHECK_MODE=2 ;;
+    *)
+        echo "vendor-locales: unknown argument '$1' (expected --check or --check-revision)" >&2
+        exit 2
+        ;;
+esac
 
 if [ ! -f "$SOURCE_DIR/en.json" ]; then
-    if [ "$CHECK_MODE" -eq 1 ]; then
+    if [ "$CHECK_MODE" -ne 0 ]; then
         # Nothing to compare against. Not an error: consumers legitimately
         # build without the checkout — that is what the vendored copy is
         # for. Only a workspace that HAS the source can police drift.
@@ -47,6 +62,33 @@ if [ ! -f "$SOURCE_DIR/en.json" ]; then
 fi
 
 SOURCE_REV=$(git -C "$SOURCE_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)
+
+if [ "$CHECK_MODE" -eq 2 ]; then
+    VENDORED_REV=$(cat "$VENDOR_DIR/REVISION" 2>/dev/null || true)
+    if [ -z "$VENDORED_REV" ] || [ "$VENDORED_REV" = unknown ]; then
+        echo "vendor-locales: $VENDOR_DIR/REVISION does not name a locales revision" >&2
+        echo "Run: core/scripts/vendor-locales.sh" >&2
+        exit 1
+    fi
+    if ! git -C "$SOURCE_DIR" rev-parse --verify --quiet "$VENDORED_REV^{commit}" >/dev/null; then
+        echo "vendor-locales: locales revision $VENDORED_REV is not in $SOURCE_DIR" >&2
+        echo "(a --depth=1 clone needs: git -C $SOURCE_DIR fetch --unshallow origin main)" >&2
+        exit 1
+    fi
+    VENDORED_BLOB=$(git hash-object "$VENDOR_DIR/en.json" 2>/dev/null || echo missing)
+    if [ "$VENDORED_BLOB" != "$(git -C "$SOURCE_DIR" rev-parse --verify --quiet "$VENDORED_REV:en.json")" ]; then
+        echo "vendor-locales: the vendored en.json is not locales $VENDORED_REV's." >&2
+        echo "Run: core/scripts/vendor-locales.sh" >&2
+        exit 1
+    fi
+    if git -C "$SOURCE_DIR" diff --quiet "$VENDORED_REV" HEAD -- en.json; then
+        echo "vendor-locales: vendored catalogue is locales $VENDORED_REV, current"
+    else
+        echo "vendor-locales: vendored catalogue is locales $VENDORED_REV, behind locales $SOURCE_REV;"
+        echo "sync:vendor-locales refreshes it on main"
+    fi
+    exit 0
+fi
 
 if [ "$CHECK_MODE" -eq 1 ]; then
     if [ ! -f "$VENDOR_DIR/en.json" ]; then

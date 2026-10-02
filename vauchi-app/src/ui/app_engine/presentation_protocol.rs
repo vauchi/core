@@ -487,6 +487,12 @@ impl AppEngine {
                 matches!(self.screen, AppScreen::MultiStageExchange { .. })
             );
         }
+        // Taken before the scan is applied: a frame that ends the exchange
+        // removes the camera, and a snapshot taken after it compares the
+        // new screen with itself. The surface then went out under the
+        // revision that still had the camera, so the decodes still in flight
+        // were refused as unknown, not dropped as stale (vauchi/private#438).
+        let before = self.projected_visible_surface();
         if let UserAction::TextChanged {
             component_id,
             value,
@@ -497,7 +503,6 @@ impl AppEngine {
             #[allow(clippy::let_underscore_must_use)]
             let _ = self.apply_multi_stage_peer_scan(value);
         }
-        let before = self.projected_visible_surface();
         let result = self.handle_action(action);
         // DeviceLinkConfirmManual/Deny/Retry are Core-internal signals:
         // their machine side effects already ran inside `handle_action`

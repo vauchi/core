@@ -178,7 +178,7 @@ impl MyInfoEngine {
         self
     }
 
-    /// "Shared with N contacts · M pending updates" — the header line under
+    /// "N contacts can see this card · M pending updates" — the header line under
     /// the display name; the pending part only while updates are queued.
     fn sharing_summary(&self) -> String {
         let contacts = if self.contact_count == 1 {

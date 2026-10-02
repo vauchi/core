@@ -59,7 +59,7 @@ pub struct SettingsConfig {
     #[serde(default)]
     pub backup_reminder_frequency: String,
     #[serde(default)]
-    pub last_backup_display: String,
+    pub last_backup_display: Option<String>,
 }
 
 fn default_true() -> bool {

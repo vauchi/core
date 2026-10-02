@@ -51,7 +51,7 @@ fn my_info_shows_own_fields_as_the_own_entries_list() {
     assert_eq!(items[0].name, "+41 79 123 45 67");
     assert_eq!(items[0].subtitle.as_deref(), Some("Mobile"));
     assert_eq!(items[0].status.as_deref(), Some("Family"));
-    assert_eq!(items[1].status.as_deref(), Some("Everyone"));
+    assert_eq!(items[1].status.as_deref(), Some("All contacts"));
 }
 
 // @internal

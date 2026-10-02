@@ -88,7 +88,7 @@ fn backup_is_export_and_restore_with_the_last_backup() {
                 .to_string()
         )
     );
-    assert!(texts.contains(&"Last backup · never".to_string()));
+    assert!(texts.contains(&"No backup yet".to_string()));
     assert!(screen.contextual_actions.is_empty());
     assert_eq!(
         level_toggle(&screen),

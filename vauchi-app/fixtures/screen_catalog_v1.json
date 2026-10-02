@@ -217,7 +217,7 @@
               "surface_id": "my_info",
               "revision": 1,
               "title": "Ada Lovelace",
-              "subtitle": "Shared with 0 contacts",
+              "subtitle": "0 contacts can see this card",
               "accessibility_label": "Ada Lovelace",
               "layout": "scroll",
               "tokens": {
@@ -935,7 +935,7 @@
               "surface_id": "my_info",
               "revision": 1,
               "title": "Ada Lovelace",
-              "subtitle": "Shared with 6 contacts",
+              "subtitle": "6 contacts can see this card",
               "accessibility_label": "Ada Lovelace",
               "layout": "scroll",
               "tokens": {
@@ -1057,7 +1057,7 @@
                       {
                         "title": "+44 20 7946 0958",
                         "subtitle": "mobile",
-                        "detail": "Everyone",
+                        "detail": "All contacts",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "M",
@@ -1081,7 +1081,7 @@
                       {
                         "title": "ada@analytical.example.org",
                         "subtitle": "work",
-                        "detail": "Everyone",
+                        "detail": "All contacts",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "W",
@@ -1105,7 +1105,7 @@
                       {
                         "title": "https://ada.example.org",
                         "subtitle": "homepage",
-                        "detail": "Everyone",
+                        "detail": "All contacts",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",
@@ -2100,7 +2100,7 @@
                       },
                       {
                         "id": "my_info_for_them",
-                        "label": "My Info for Them"
+                        "label": "What they see of me"
                       }
                     ],
                     "enabled": true,
@@ -2144,21 +2144,6 @@
                             "description": null
                           }
                         }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Verified",
-                          "detail": "Yes",
-                          "icon_token": "checkmark.seal",
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": null,
-                          "accessibility": {
-                            "label": "Verified",
-                            "description": null
-                          }
-                        }
                       }
                     ],
                     "accessibility": {
@@ -2169,7 +2154,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_abb9ea227646906b",
+                    "id": "field_6b7543bd56419693",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2200,13 +2185,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:abb9ea227646906b",
+                    "id": "field_note:6b7543bd56419693",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:abb9ea227646906b",
+                          "id": "field_note:6b7543bd56419693",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2246,7 +2231,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_de259aae02df8b62",
+                    "id": "field_e3e7112fd09cfd99",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2277,13 +2262,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:de259aae02df8b62",
+                    "id": "field_note:e3e7112fd09cfd99",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:de259aae02df8b62",
+                          "id": "field_note:e3e7112fd09cfd99",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2323,7 +2308,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_a709c92f455cd4eb",
+                    "id": "field_f76f70543f7dba5a",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2354,13 +2339,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:a709c92f455cd4eb",
+                    "id": "field_note:f76f70543f7dba5a",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:a709c92f455cd4eb",
+                          "id": "field_note:f76f70543f7dba5a",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4514,10 +4499,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "3C11 7111 9629 0FEB 2319 7F19 D387 478A B1CB E671 179A 0C6D F9E1 04D2 DB0E DE1C",
+                    "content": "691A 5C5C 49C9 0FC3 F9CA 3EC1 41CF F9E5 2A74 2D2F CEA4 8218 8D34 62E7 3E4B ED5D",
                     "style": "body",
                     "accessibility": {
-                      "label": "3C11 7111 9629 0FEB 2319 7F19 D387 478A B1CB E671 179A 0C6D F9E1 04D2 DB0E DE1C",
+                      "label": "691A 5C5C 49C9 0FC3 F9CA 3EC1 41CF F9E5 2A74 2D2F CEA4 8218 8D34 62E7 3E4B ED5D",
                       "description": null
                     }
                   }
@@ -4536,10 +4521,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "FE2D 3501 261C B0EC 1397 CD2F 4ADA 4150 1BD7 D7D3 2D6C 2B5F CD13 F996 391A ED60",
+                    "content": "CB9A 2084 A58B DF07 DAB1 9AA3 008A 89AF 3E37 176F 5717 554D 1B47 D41B 63AF 3061",
                     "style": "body",
                     "accessibility": {
-                      "label": "FE2D 3501 261C B0EC 1397 CD2F 4ADA 4150 1BD7 D7D3 2D6C 2B5F CD13 F996 391A ED60",
+                      "label": "CB9A 2084 A58B DF07 DAB1 9AA3 008A 89AF 3E37 176F 5717 554D 1B47 D41B 63AF 3061",
                       "description": null
                     }
                   }
@@ -5009,7 +4994,7 @@
                       },
                       {
                         "title": "Backup",
-                        "subtitle": "Last backup: Never",
+                        "subtitle": "No backup yet",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -5094,8 +5079,8 @@
                         }
                       },
                       {
-                        "title": "Suppress Presence",
-                        "subtitle": "When enabled, hides your online status from contacts",
+                        "title": "Hide when I'm online",
+                        "subtitle": "Contacts can't tell when your device is online",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -5112,15 +5097,15 @@
                               "value": false,
                               "enabled": true,
                               "accessibility": {
-                                "label": "Suppress Presence toggle",
-                                "description": "When enabled, hides your online status from contacts"
+                                "label": "Hide when I'm online toggle",
+                                "description": "Contacts can't tell when your device is online"
                               }
                             }
                           }
                         ],
                         "accessibility": {
-                          "label": "Suppress Presence toggle",
-                          "description": "When enabled, hides your online status from contacts"
+                          "label": "Hide when I'm online toggle",
+                          "description": "Contacts can't tell when your device is online"
                         }
                       },
                       {
@@ -5569,7 +5554,7 @@
                       },
                       {
                         "title": "Backup",
-                        "subtitle": "Last backup: Never",
+                        "subtitle": "No backup yet",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -5654,8 +5639,8 @@
                         }
                       },
                       {
-                        "title": "Suppress Presence",
-                        "subtitle": "When enabled, hides your online status from contacts",
+                        "title": "Hide when I'm online",
+                        "subtitle": "Contacts can't tell when your device is online",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -5672,15 +5657,15 @@
                               "value": false,
                               "enabled": true,
                               "accessibility": {
-                                "label": "Suppress Presence toggle",
-                                "description": "When enabled, hides your online status from contacts"
+                                "label": "Hide when I'm online toggle",
+                                "description": "Contacts can't tell when your device is online"
                               }
                             }
                           }
                         ],
                         "accessibility": {
-                          "label": "Suppress Presence toggle",
-                          "description": "When enabled, hides your online status from contacts"
+                          "label": "Hide when I'm online toggle",
+                          "description": "Contacts can't tell when your device is online"
                         }
                       },
                       {
@@ -6668,7 +6653,7 @@
                       },
                       {
                         "title": "Backup",
-                        "subtitle": "Last backup: Never",
+                        "subtitle": "No backup yet",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -6753,8 +6738,8 @@
                         }
                       },
                       {
-                        "title": "Suppress Presence",
-                        "subtitle": "When enabled, hides your online status from contacts",
+                        "title": "Hide when I'm online",
+                        "subtitle": "Contacts can't tell when your device is online",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -6771,15 +6756,15 @@
                               "value": false,
                               "enabled": true,
                               "accessibility": {
-                                "label": "Suppress Presence toggle",
-                                "description": "When enabled, hides your online status from contacts"
+                                "label": "Hide when I'm online toggle",
+                                "description": "Contacts can't tell when your device is online"
                               }
                             }
                           }
                         ],
                         "accessibility": {
-                          "label": "Suppress Presence toggle",
-                          "description": "When enabled, hides your online status from contacts"
+                          "label": "Hide when I'm online toggle",
+                          "description": "Contacts can't tell when your device is online"
                         }
                       },
                       {
@@ -7496,7 +7481,7 @@
                       },
                       {
                         "title": "Backup",
-                        "subtitle": "Last backup: Never",
+                        "subtitle": "No backup yet",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -7581,8 +7566,8 @@
                         }
                       },
                       {
-                        "title": "Suppress Presence",
-                        "subtitle": "When enabled, hides your online status from contacts",
+                        "title": "Hide when I'm online",
+                        "subtitle": "Contacts can't tell when your device is online",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -7599,15 +7584,15 @@
                               "value": false,
                               "enabled": true,
                               "accessibility": {
-                                "label": "Suppress Presence toggle",
-                                "description": "When enabled, hides your online status from contacts"
+                                "label": "Hide when I'm online toggle",
+                                "description": "Contacts can't tell when your device is online"
                               }
                             }
                           }
                         ],
                         "accessibility": {
-                          "label": "Suppress Presence toggle",
-                          "description": "When enabled, hides your online status from contacts"
+                          "label": "Hide when I'm online toggle",
+                          "description": "Contacts can't tell when your device is online"
                         }
                       },
                       {
@@ -8818,10 +8803,10 @@
                 {
                   "Text": {
                     "id": "last_backup",
-                    "content": "Last backup · never",
+                    "content": "No backup yet",
                     "style": "caption",
                     "accessibility": {
-                      "label": "Last backup · never",
+                      "label": "No backup yet",
                       "description": null
                     }
                   }
@@ -12567,7 +12552,7 @@
               "surface_id": "my_info",
               "revision": 1,
               "title": "Ada Lovelace",
-              "subtitle": "Shared with 6 contacts",
+              "subtitle": "6 contacts can see this card",
               "accessibility_label": "Ada Lovelace",
               "layout": "scroll",
               "tokens": {
@@ -12667,7 +12652,7 @@
                       {
                         "title": "+44 20 7946 0958",
                         "subtitle": "mobile",
-                        "detail": "Everyone",
+                        "detail": "All contacts",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "M",
@@ -12691,7 +12676,7 @@
                       {
                         "title": "ada@analytical.example.org",
                         "subtitle": "work",
-                        "detail": "Everyone",
+                        "detail": "All contacts",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "W",
@@ -12715,7 +12700,7 @@
                       {
                         "title": "https://ada.example.org",
                         "subtitle": "homepage",
-                        "detail": "Everyone",
+                        "detail": "All contacts",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",
@@ -12929,7 +12914,7 @@
                     "rows": [
                       {
                         "title": "Alan Turing",
-                        "subtitle": "Everyone",
+                        "subtitle": "All contacts",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -12953,7 +12938,7 @@
                       },
                       {
                         "title": "Annabella Byron",
-                        "subtitle": "Everyone",
+                        "subtitle": "All contacts",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -12977,7 +12962,7 @@
                       },
                       {
                         "title": "Charles Babbage",
-                        "subtitle": "Everyone",
+                        "subtitle": "All contacts",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -13001,7 +12986,7 @@
                       },
                       {
                         "title": "Emmy Noether",
-                        "subtitle": "Everyone",
+                        "subtitle": "All contacts",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -13025,7 +13010,7 @@
                       },
                       {
                         "title": "Grace Hopper",
-                        "subtitle": "Everyone",
+                        "subtitle": "All contacts",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -13049,7 +13034,7 @@
                       },
                       {
                         "title": "Mary Somerville",
-                        "subtitle": "Everyone",
+                        "subtitle": "All contacts",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -16264,7 +16249,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=ExpL2wGzJeFGtnwI_JCjWG3ajRN3oAbFl-4a9x2C4yg&n=ygqt6c7wPu_YF3uFa6U5srXZRowZtF0EAkIi1_F-Mxg",
+                    "content": "vauchi://exchange?pk=iKob8-TXpPsSqkfi4NZzeoYapdFBxveqIIIVtU27Gw0&n=-v3yBz7SZ3KujHrUjBJZR84QY8EX4k5bdMSYIhL9cV8",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -16787,7 +16772,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,80,43,76,84,85,66,74,104,121,119,55,66,79,88,122,83,57,75,50,107,70,81,71,57,102,88,48,121,49,115,75,49,47,78,69,47,109,87,79,82,114,116,89,79,107,48,76,72,122,73,106,88,75,80,53,102,70,116,108,70,101,111,78,82,104,77,108,67,87,120,101,122,75,72,52,76,113,90,51,52,87,82,48,89,53,56,77,79,76,80,108,103,76,84,90,113,101,73,65,85,72,51,104,83,115,117,49,84,82,79,50,55,47,74,75,105,74,73,117,100,115,78,117,70,52,57,57,78,77,85,54,68,57,50,57,86,100,67,50,104,90,105,71,76,87,82,87,83,103,109,65,65,65,65,65,71,113,47,101,122,73,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,79,52,112,113,97,65,51,88,71,99,53,90,72,83,99,98,82,75,120,97,105,104,70,97,71,53,75,87,116,87,70,68,53,81,110,75,48,55,111,82,97,115,52,57,85,85,90,75,107,122,101,105,81,117,81,65,116,113,47,118,75,68,66,76,47,114,119,120,100,82,104,52,89,71,53,81,81,101,76,122,82,48,118,85,72],
+            "payload": [86,48,74,70,87,65,80,76,109,105,67,69,112,89,118,102,66,57,113,120,109,113,77,65,105,111,109,118,80,106,99,88,98,49,99,88,86,85,48,98,82,57,81,98,89,54,56,119,89,86,65,55,69,52,85,114,85,87,78,69,121,66,69,65,101,90,73,89,107,88,104,51,106,89,111,116,82,118,43,118,54,102,113,78,48,97,75,99,87,107,77,90,108,103,65,85,51,52,109,115,81,43,88,122,83,55,80,101,106,78,102,73,106,65,107,87,80,108,72,48,105,65,43,109,119,98,65,89,43,80,51,81,111,118,77,85,78,54,113,105,79,122,79,54,73,72,77,112,47,118,83,83,79,57,118,119,65,65,65,65,65,71,113,47,114,79,85,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,68,82,75,114,112,114,108,113,115,78,82,66,109,105,82,107,102,107,83,119,75,48,108,50,99,43,103,114,103,108,73,87,103,67,103,48,113,100,75,106,108,117,116,113,66,107,74,117,110,50,110,108,112,115,120,86,98,79,102,53,87,77,106,121,106,100,65,99,83,113,112,49,56,99,69,120,103,101,43,57,69,102,101,73,115,74],
             "is_initiator": true
           }
         }
@@ -16847,7 +16832,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI26H6BPH/FO8O3YAK:89*YNO4P-PTX17-PQ51A2-QJCUYFKOFPVV3/E9G/UOU8QWJHU6182M5KEWUCJ6Z/Q4G5D%I3$14%5ZXPW09D+SHA2H%EL*ITPCNSB5S111Vauchi User00"
+                      "INI2L2T9D6.AL7+E8H3ROK4I278GFBAPJ4I825$Q5K6GVG71HBSBE8IY2GLY9Q:B/POLDN*6KMKD4HQ.3H7%FY66LMO8QR2O6$%9F9DP6Q+NN 3GOKLWDI%KJRKE11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17076,7 +17061,7 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 392
+            "earliest_millis": 350
           }
         }
       ]
@@ -17550,7 +17535,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [254,45,53,1,38,28,176,236,19,151,205,47,74,218,65,80,27,215,215,211,45,108,43,95,205,19,249,150,57,26,237,96]
+            "payload": [203,154,32,132,165,139,223,7,218,177,154,163,0,138,137,175,62,55,23,111,87,23,85,77,27,71,212,27,99,175,48,97]
           }
         },
         {
@@ -17733,7 +17718,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [254,45,53,1,38,28,176,236,19,151,205,47,74,218,65,80,27,215,215,211,45,108,43,95,205,19,249,150,57,26,237,96]
+            "payload": [203,154,32,132,165,139,223,7,218,177,154,163,0,138,137,175,62,55,23,111,87,23,85,77,27,71,212,27,99,175,48,97]
           }
         },
         {
@@ -17916,7 +17901,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [254,45,53,1,38,28,176,236,19,151,205,47,74,218,65,80,27,215,215,211,45,108,43,95,205,19,249,150,57,26,237,96]
+            "payload": [203,154,32,132,165,139,223,7,218,177,154,163,0,138,137,175,62,55,23,111,87,23,85,77,27,71,212,27,99,175,48,97]
           }
         },
         {
@@ -20152,7 +20137,7 @@
               "surface_id": "my_info",
               "revision": 1,
               "title": "Ada Lovelace",
-              "subtitle": "Mit 6 Kontakten geteilt",
+              "subtitle": "6 Kontakte können diese Karte sehen",
               "accessibility_label": "Ada Lovelace",
               "layout": "scroll",
               "tokens": {
@@ -20274,7 +20259,7 @@
                       {
                         "title": "+44 20 7946 0958",
                         "subtitle": "mobile",
-                        "detail": "Alle",
+                        "detail": "Alle Kontakte",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "M",
@@ -20298,7 +20283,7 @@
                       {
                         "title": "ada@analytical.example.org",
                         "subtitle": "work",
-                        "detail": "Alle",
+                        "detail": "Alle Kontakte",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "W",
@@ -20322,7 +20307,7 @@
                       {
                         "title": "https://ada.example.org",
                         "subtitle": "homepage",
-                        "detail": "Alle",
+                        "detail": "Alle Kontakte",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",
@@ -21054,7 +21039,7 @@
                       },
                       {
                         "title": "Backup",
-                        "subtitle": "Letztes Backup: Never",
+                        "subtitle": "Noch kein Backup",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -21139,8 +21124,8 @@
                         }
                       },
                       {
-                        "title": "Präsenz verbergen",
-                        "subtitle": "Wenn aktiviert, wird dein Online-Status vor Kontakten verborgen",
+                        "title": "Verbergen, wann ich online bin",
+                        "subtitle": "Kontakte sehen nicht, wann dein Gerät online ist",
                         "detail": null,
                         "icon_token": null,
                         "image_data": null,
@@ -21157,15 +21142,15 @@
                               "value": false,
                               "enabled": true,
                               "accessibility": {
-                                "label": "Schalter zum Verbergen der Präsenz",
-                                "description": "Wenn aktiviert, wird dein Online-Status vor Kontakten verborgen"
+                                "label": "Schalter: Verbergen, wann ich online bin",
+                                "description": "Kontakte sehen nicht, wann dein Gerät online ist"
                               }
                             }
                           }
                         ],
                         "accessibility": {
-                          "label": "Schalter zum Verbergen der Präsenz",
-                          "description": "Wenn aktiviert, wird dein Online-Status vor Kontakten verborgen"
+                          "label": "Schalter: Verbergen, wann ich online bin",
+                          "description": "Kontakte sehen nicht, wann dein Gerät online ist"
                         }
                       },
                       {

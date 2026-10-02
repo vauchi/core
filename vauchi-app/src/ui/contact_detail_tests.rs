@@ -264,7 +264,7 @@ fn test_main_screen_has_no_back_action() {
 #[test]
 fn test_contact_detail_has_no_preview_action() {
     // "What do they see?" was removed (2026-06-05-screen-ux-declutter):
-    // it duplicated the on-screen "My Info for Them" perspective toggle.
+    // it duplicated the on-screen "What they see of me" perspective toggle.
     // The full preview-as flow stays reachable from My Card → "Preview
     // as…". The footer is leaner as a result.
     let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());

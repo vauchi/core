@@ -351,7 +351,8 @@ impl ContactDetailEngine {
                 detail: self.trust_level.clone(),
             });
         }
-        if show_verified_badge(self.is_verified) {
+        // A trust level of Verified already says it on the row above.
+        if show_verified_badge(self.is_verified) && self.trust_level_enum != TrustLevel::Verified {
             contact_info_items.push(InfoItem {
                 icon: Some("checkmark.seal".into()),
                 title: self.t("contacts.verified"),

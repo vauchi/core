@@ -260,7 +260,6 @@ impl AppEngine {
                             .ok()
                             .and_then(|s| s.last_backup_timestamp)
                             .map(|t| crate::relative_time::format_relative_time(now, t, locale))
-                            .unwrap_or_else(|| "Never".to_string())
                     },
                 };
                 let mode = match screen {

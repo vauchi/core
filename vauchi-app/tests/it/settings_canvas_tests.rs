@@ -20,7 +20,7 @@ fn config() -> SettingsConfig {
     SettingsConfig {
         display_name: "Sample User".into(),
         device_count: 1,
-        last_backup_display: "Never".into(),
+        last_backup_display: None,
         show_help_icons: true,
         ..Default::default()
     }
@@ -106,6 +106,18 @@ fn backup_row_says_no_backup_yet_until_one_exists() {
         row(items, "backup_export").subtitle.as_deref(),
         Some("No backup yet")
     );
+
+    let backed_up = SettingsConfig {
+        last_backup_display: Some("2 days ago".into()),
+        ..config()
+    };
+    let screen = SettingsEngine::new(backed_up).current_screen();
+    let (_, items) = group(&screen.components, "identity");
+
+    assert_eq!(
+        row(items, "backup_export").subtitle.as_deref(),
+        Some("Last backup: 2 days ago")
+    );
 }
 
 // @scenario: navigation :: Settings groups follow the design canvas
@@ -130,7 +142,7 @@ fn identity_section_lists_the_canvas_rows_with_their_descriptions() {
             ("display_name", "Display Name", None),
             ("edit_profile", "My Contact Info", None),
             ("devices", "My Devices", None),
-            ("backup_export", "Backup", Some("Last backup: Never")),
+            ("backup_export", "Backup", Some("No backup yet")),
             (
                 "recovery",
                 "Recovery",
@@ -179,10 +191,10 @@ fn privacy_section_keeps_the_toggles_next_to_your_data() {
     assert_eq!(your_data.kind, SettingsItemKind::Link { detail: None });
 
     let presence = row(items, "suppress_presence");
-    assert_eq!(presence.label, "Suppress Presence");
+    assert_eq!(presence.label, "Hide when I'm online");
     assert_eq!(
         presence.subtitle.as_deref(),
-        Some("When enabled, hides your online status from contacts")
+        Some("Contacts can't tell when your device is online")
     );
     assert_eq!(presence.kind, SettingsItemKind::Toggle { enabled: false });
     for toggle in [

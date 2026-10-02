@@ -270,7 +270,10 @@ fn entry_shown_to_every_contact_carries_the_everyone_chip() {
         true,
     )])
     .current_screen();
-    assert_eq!(own_entries(&screen)[0].status.as_deref(), Some("Everyone"));
+    assert_eq!(
+        own_entries(&screen)[0].status.as_deref(),
+        Some("All contacts")
+    );
 }
 
 // @internal
@@ -337,7 +340,7 @@ fn sharing_summary_joins_contact_count_and_pending_updates() {
         .current_screen();
     assert_eq!(
         screen.subtitle.as_deref(),
-        Some("Shared with 7 contacts · 1 pending update")
+        Some("7 contacts can see this card · 1 pending update")
     );
 }
 
@@ -347,7 +350,10 @@ fn sharing_summary_uses_the_singular_for_one_contact() {
     let screen = MyInfoEngine::new(MyInfoProgress::default())
         .with_contact_count(1)
         .current_screen();
-    assert_eq!(screen.subtitle.as_deref(), Some("Shared with 1 contact"));
+    assert_eq!(
+        screen.subtitle.as_deref(),
+        Some("1 contact can see this card")
+    );
 }
 
 // @internal
@@ -357,7 +363,10 @@ fn sharing_summary_omits_pending_updates_when_none_are_queued() {
         .with_contact_count(3)
         .with_pending_updates(0)
         .current_screen();
-    assert_eq!(screen.subtitle.as_deref(), Some("Shared with 3 contacts"));
+    assert_eq!(
+        screen.subtitle.as_deref(),
+        Some("3 contacts can see this card")
+    );
     assert!(caption_content(&screen, "pending_updates_caption").is_none());
 }
 
@@ -370,6 +379,6 @@ fn pending_updates_live_in_the_sharing_summary_not_a_caption() {
     assert!(caption_content(&screen, "pending_updates_caption").is_none());
     assert_eq!(
         screen.subtitle.as_deref(),
-        Some("Shared with 0 contacts · 3 pending updates")
+        Some("0 contacts can see this card · 3 pending updates")
     );
 }

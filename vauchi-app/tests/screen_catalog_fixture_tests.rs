@@ -342,9 +342,9 @@ fn screen_catalog_my_info_rows_carry_a_realistic_visibility_mix() {
     let visibility = my_info_visibility_by_label(entry);
 
     let expected: BTreeMap<String, String> = [
-        ("mobile", "Everyone"),
-        ("work", "Everyone"),
-        ("homepage", "Everyone"),
+        ("mobile", "All contacts"),
+        ("work", "All contacts"),
+        ("homepage", "All contacts"),
         ("home", "Family"),
         ("birthday", "Cycling club, Family"),
     ]

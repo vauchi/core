@@ -127,11 +127,14 @@ impl SettingsEngine {
                     "backup_export",
                     self.t("settings.backup"),
                     Some(self.t("settings.backup_export_hint")),
-                    Some(get_string_with_args(
-                        self.locale(),
-                        "settings.backup_last_hint",
-                        &[("when", &self.config.last_backup_display)],
-                    )),
+                    Some(match &self.config.last_backup_display {
+                        Some(when) => get_string_with_args(
+                            self.locale(),
+                            "settings.backup_last_hint",
+                            &[("when", when)],
+                        ),
+                        None => self.t("settings.backup_none_hint"),
+                    }),
                     None,
                 ),
                 self.destination_row(

@@ -28,7 +28,7 @@ fn sample_config() -> SettingsConfig {
         failed_deliveries: 0,
         debug_mode: false,
         backup_reminder_frequency: "Weekly".into(),
-        last_backup_display: "Never".into(),
+        last_backup_display: None,
     }
 }
 
@@ -512,7 +512,7 @@ fn settings_backup_section_has_links() {
         .find(|i| i.id == "backup_export")
         .expect("identity group carries the Backup row");
     assert!(matches!(backup.kind, SettingsItemKind::Link { .. }));
-    assert_eq!(backup.subtitle.as_deref(), Some("Last backup: Never"));
+    assert_eq!(backup.subtitle.as_deref(), Some("No backup yet"));
 
     let advanced = SettingsEngine::new_advanced(sample_config()).current_screen();
     let security = find_settings_group(&advanced, "security");

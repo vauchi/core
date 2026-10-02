@@ -74,7 +74,7 @@ fn sample_settings_config() -> SettingsConfig {
         failed_deliveries: 0,
         debug_mode: false,
         backup_reminder_frequency: "Weekly".into(),
-        last_backup_display: "Never".into(),
+        last_backup_display: None,
     }
 }
 

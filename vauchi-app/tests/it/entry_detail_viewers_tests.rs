@@ -93,8 +93,8 @@ fn an_entry_shared_with_all_contacts_lists_every_contact() {
     assert_eq!(
         rows,
         vec![
-            ("Alan".to_string(), Some("Everyone".to_string())),
-            ("Grace".to_string(), Some("Everyone".to_string())),
+            ("Alan".to_string(), Some("All contacts".to_string())),
+            ("Grace".to_string(), Some("All contacts".to_string())),
         ]
     );
 }

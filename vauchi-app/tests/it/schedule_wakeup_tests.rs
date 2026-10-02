@@ -113,9 +113,11 @@ fn an_active_exchange_schedules_a_far_shorter_wakeup_than_the_idle_heartbeat() {
     let _ = exchanging2.on_wakeup();
     let active_millis =
         first_wakeup_earliest_millis_from(&mut exchanging2).expect("a live exchange names its ms");
+    // With no peer heard yet the session sweeps its layouts: a ~100ms dwell
+    // with ±20% jitter. Settled frames carry their stage's 300–400ms.
     assert!(
-        (100..=500).contains(&active_millis),
-        "a live exchange must be driven at its frame dwell (~300ms), got {active_millis}ms"
+        (80..=500).contains(&active_millis),
+        "a live exchange must be driven at its frame dwell (80–500ms), got {active_millis}ms"
     );
 }
 
@@ -196,7 +198,7 @@ fn the_sub_second_wakeup_survives_json() {
         .and_then(serde_json::Value::as_u64)
         .unwrap_or_else(|| panic!("no sub-second interval in {json}"));
     assert!(
-        (100..=500).contains(&millis),
+        (80..=500).contains(&millis),
         "a live exchange must ask for its frame dwell, got {millis}ms"
     );
 }
@@ -399,8 +401,8 @@ fn opening_an_exchange_reschedules_the_wakeup_in_the_same_batch() {
     assert_eq!(secs, 1, "whole-second shells wake within a second");
     let millis = millis.expect("a live exchange names its frame dwell in ms");
     assert!(
-        (100..=500).contains(&millis),
-        "the first tick is due at the frame dwell (~300ms), got {millis}ms"
+        (80..=500).contains(&millis),
+        "the first tick is due at the frame dwell (80–500ms), got {millis}ms"
     );
 }
 

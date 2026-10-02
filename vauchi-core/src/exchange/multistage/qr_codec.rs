@@ -391,7 +391,10 @@ pub fn format_final_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 
 
 /// Format a FAIL QR: `FAIL<sid:24>`
 ///
-/// Broadcast to peer so they abort immediately instead of waiting for timeout.
+/// Tells the peer to abort immediately. No session sends it since the
+/// wait-for-RDYY timeout went with the one final frame (#450); sessions
+/// still accept it, and tests build it.
+#[allow(dead_code)]
 pub fn format_fail_qr(session_id: &[u8; 16]) -> String {
     frame("FAI3", &base45::encode(session_id))
 }
@@ -416,6 +419,8 @@ pub fn format_shake_qr(session_id: &[u8; 16], sealed_envelope: &[u8]) -> String 
 }
 
 /// Parse a QR string into its stage payload, dropping the training header.
+/// The session parses with [`parse_frame`]; tests use this.
+#[allow(dead_code)]
 pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
     parse_frame(raw).map(|frame| frame.stage)
 }

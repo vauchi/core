@@ -293,6 +293,33 @@ fn a_restarted_peer_pulls_a_stranded_session_back_to_advertising() {
     );
 }
 
+/// A phone still on the previous frame format can never complete with this
+/// one, so its opening frame is no reason to drop a live binding.
+// @internal
+#[test]
+fn a_restarted_peer_on_the_previous_format_does_not_pull_a_session_back() {
+    let (mut ahead, _gone, clock) = session_stranded_in_verifying();
+    let mut restarted =
+        MultiStageSession::new(three_chunk_card(0xCC)).with_monotonic(clock.clone());
+    let init = restarted.get_display_qr().expect("advertises");
+    // The same opening frame as the previous format wrote it: its old
+    // prefix and no training header.
+    let old_format_init = format!("INI2{}", &init.data[12..]);
+
+    clock.advance(std::time::Duration::from_secs(6));
+    for _ in 0..40 {
+        ahead.process_scanned_qr(&old_format_init);
+        let _ = ahead.get_display_qr();
+    }
+
+    assert!(
+        matches!(ahead.get_state(), ProtocolState::Verifying),
+        "an old-format INIT must not count toward the rehandshake, got {:?}",
+        ahead.get_state()
+    );
+    assert_ne!(ahead.peer_session_id(), Some(restarted.session_id()));
+}
+
 /// After the reset the pair must actually complete — a reset that only
 /// re-advertises without re-handshaking would trade one deadlock for another.
 // @internal

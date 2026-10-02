@@ -26,5 +26,5 @@
 
   [[semgrep.passthrough]]
     type = "url"
-    value = "https://gitlab.com/api/v4/projects/77957857/repository/files/semgrep-rules%2Fvauchi-security.yml/raw?ref=50d5c42edcd115f3df170d3754ce3dc082c34136"
+    value = "https://gitlab.com/api/v4/projects/77957857/repository/files/semgrep-rules%2Fvauchi-security.yml/raw?ref=7925877d205d24fd7734bf696826f3ba719e7e9a"
     target = "semgrep-vauchi-security.yml"

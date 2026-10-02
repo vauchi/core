@@ -128,6 +128,23 @@ pub enum StageQr {
     },
 }
 
+impl StageQr {
+    /// The session id of the phone that drew this frame.
+    pub fn session_id(&self) -> &[u8; 16] {
+        match self {
+            Self::Init { session_id, .. }
+            | Self::Data { session_id, .. }
+            | Self::Verify { session_id, .. }
+            | Self::Confirm { session_id, .. }
+            | Self::Ready { session_id, .. }
+            | Self::Inid { session_id, .. }
+            | Self::Combo { session_id, .. }
+            | Self::Fail { session_id }
+            | Self::Shake { session_id, .. } => session_id,
+        }
+    }
+}
+
 /// Base45-encoded widths for fixed-size binary fields.
 const SID_LEN: usize = 24; // base45(16 bytes) = 8 pairs × 3
 const F32_LEN: usize = 48; // base45(32 bytes) = 16 pairs × 3

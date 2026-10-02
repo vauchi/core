@@ -35,7 +35,9 @@ use zeroize::Zeroize;
 use super::accel_envelope;
 use super::chunker::{Chunker, ReassemblyBuffer};
 use super::commitment::Commitment;
-use super::qr_codec::{self, StageQr};
+use super::link_trainer::LinkTrainer;
+use super::qr_codec::{self, Frame, StageQr};
+use super::training_header::TrainingHeader;
 use super::types::{
     AccelerometerProximityState, AudioProximityState, ChunkBitmap, ProtocolState, QrPayload,
 };
@@ -393,6 +395,12 @@ pub struct MultiStageSession {
     /// cross-correlated against the peer's on receive. Dropped after correlation
     /// and in `clear_sensitive` (F7) — transient proximity proof, never card data.
     accel_local_envelope: Vec<f32>,
+    /// Picks the layout each frame is drawn at and builds its training
+    /// header from the peer frames read (design D1–D3).
+    trainer: LinkTrainer,
+    /// Frames read that carry our own session id: this phone's code seen in
+    /// a reflection or in the peer's preview. Dropped, never processed.
+    own_frames_seen: u32,
     /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Source for
     /// every `Instant` this session stamps (`phase_entered_at`,
     /// `last_progress_at`, `fail_broadcast_until`,
@@ -489,8 +497,29 @@ impl MultiStageSession {
             accel_proximity: AccelerometerProximityState::Pending,
             accel_recording_started_at: None,
             accel_local_envelope: Vec::new(),
+            trainer: LinkTrainer::starting_at(0),
+            own_frames_seen: 0,
             monotonic: SystemMonotonicClock::shared(),
         }
+    }
+
+    /// Start the first layout sweep at `layout`, the one that last worked on
+    /// this device.
+    #[must_use]
+    pub fn with_start_layout(mut self, layout: u8) -> Self {
+        self.trainer = LinkTrainer::starting_at(layout);
+        self
+    }
+
+    /// The layout the peer last reported reading, for the next session on
+    /// this device to start at.
+    pub fn last_good_layout(&self) -> Option<u8> {
+        self.trainer.last_good_layout()
+    }
+
+    /// How many frames carrying this session's own id were read and dropped.
+    pub fn own_frames_seen(&self) -> u32 {
+        self.own_frames_seen
     }
 
     /// Replace the [`MonotonicClock`] driving this session's timeout and
@@ -922,6 +951,7 @@ impl MultiStageSession {
                 data: shake_qr,
                 error_correction: "M".to_string(),
                 display_duration_ms: jittered(DISPLAY_MS_CONF),
+                layout: 0,
             };
         }
         if phase < 3 {
@@ -929,6 +959,7 @@ impl MultiStageSession {
                 data: qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key()),
                 error_correction: "M".to_string(),
                 display_duration_ms: jittered(DISPLAY_MS_VRFY),
+                layout: 0,
             }
         } else {
             let card_hash = self.compute_card_hash(&self.local_card);
@@ -936,6 +967,7 @@ impl MultiStageSession {
                 data: qr_codec::format_confirm_qr(&self.session_id, &card_hash),
                 error_correction: "M".to_string(),
                 display_duration_ms: jittered(DISPLAY_MS_CONF),
+                layout: 0,
             }
         }
     }
@@ -1004,11 +1036,38 @@ impl MultiStageSession {
         self.clear_sensitive();
     }
 
-    /// Get the QR payload to display based on current state.
+    /// Get the QR payload to display based on current state, drawn at the
+    /// layout the link trainer picks for it.
     ///
     /// Returns `None` after the finalized grace period expires or after
     /// the FAIL broadcast window closes.
     pub fn get_display_qr(&mut self) -> Option<QrPayload> {
+        let mut payload = self.next_stage_frame()?;
+        let now = self.monotonic.now();
+        if matches!(self.state, ProtocolState::Finalized) {
+            // No camera, so no echo, once the exchange is saved: the code
+            // stays where the peer last read it (design D6, D12).
+            self.trainer.hold();
+        }
+        if self.trainer.is_sweeping(now) {
+            payload.display_duration_ms = jittered(self.trainer.sweep_dwell_ms());
+        }
+        let header = self.trainer.next_frame(now);
+        Some(Self::with_training_header(payload, &header))
+    }
+
+    fn with_training_header(mut payload: QrPayload, header: &TrainingHeader) -> QrPayload {
+        // Every frame this session formats takes a header; an error here
+        // would mean the codec built a frame it cannot parse.
+        if let Ok(data) = qr_codec::with_header(&payload.data, header) {
+            payload.data = data;
+            payload.layout = header.layout();
+        }
+        payload
+    }
+
+    /// The frame for the current state, before the trainer places it.
+    fn next_stage_frame(&mut self) -> Option<QrPayload> {
         // A stalled session re-advertises. Recovery is driven by *receiving* a
         // peer INIT, but no state past Transferring shows one — so two stalled
         // sides can neither act on each other nor announce themselves, which is
@@ -1024,6 +1083,7 @@ impl MultiStageSession {
                 data: qr_data,
                 error_correction: "L".to_string(),
                 display_duration_ms: jittered(DISPLAY_MS_INIT),
+                layout: 0,
             });
         }
         match &self.state {
@@ -1043,6 +1103,7 @@ impl MultiStageSession {
                     data: qr_data,
                     error_correction: "L".to_string(),
                     display_duration_ms: jittered(DISPLAY_MS_INIT),
+                    layout: 0,
                 })
             }
             ProtocolState::Advertising => {
@@ -1054,6 +1115,7 @@ impl MultiStageSession {
                     data: qr_data,
                     error_correction: "L".to_string(),
                     display_duration_ms: jittered(DISPLAY_MS_INIT),
+                    layout: 0,
                 })
             }
             ProtocolState::Discovered => {
@@ -1081,6 +1143,7 @@ impl MultiStageSession {
                         // the rescue frame at the shorter DATA dwell made the
                         // recovery path itself too brief to capture.
                         display_duration_ms: jittered(DISPLAY_MS_INIT),
+                        layout: 0,
                     })
                 } else {
                     self.get_data_chunk_qr()
@@ -1115,7 +1178,7 @@ impl MultiStageSession {
             ProtocolState::Confirming => {
                 self.apply_early_confirm();
                 if !matches!(self.state, ProtocolState::Confirming) {
-                    return self.get_display_qr();
+                    return self.next_stage_frame();
                 }
                 self.display_cycle += 1;
                 // TapHoverShake exchanges its accel envelope via SHAK on phase 6
@@ -1140,6 +1203,7 @@ impl MultiStageSession {
                         data: shake_qr,
                         error_correction: "M".to_string(),
                         display_duration_ms: jittered(DISPLAY_MS_CONF),
+                        layout: 0,
                     })
                 } else {
                     self.get_combo_qr()
@@ -1237,10 +1301,26 @@ impl MultiStageSession {
     ///
     /// Returns the new protocol state after processing.
     pub fn process_scanned_qr(&mut self, raw: &str) -> ProtocolState {
-        let parsed = match qr_codec::parse_qr(raw) {
-            Ok(p) => p,
+        let Frame {
+            header,
+            stage: parsed,
+        } = match qr_codec::parse_frame(raw) {
+            Ok(frame) => frame,
             Err(_) => return self.state.clone(),
         };
+        let sender = parsed.session_id();
+        // Our own code, seen in a reflection or in the peer's preview. Told
+        // by session id: two phones can draw byte-identical frames, so the
+        // content cannot tell (design D9).
+        if *sender == self.session_id {
+            self.own_frames_seen = self.own_frames_seen.saturating_add(1);
+            return self.state.clone();
+        }
+        // Only the phone we are exchanging with trains us; before a peer is
+        // bound, any opening frame may be it.
+        if self.peer_session_id.is_none_or(|peer| peer == *sender) {
+            self.trainer.note_peer_frame(&header, self.monotonic.now());
+        }
 
         match parsed {
             StageQr::Init {
@@ -1745,6 +1825,7 @@ impl MultiStageSession {
             data: qr_data,
             error_correction: "L".to_string(),
             display_duration_ms: jittered(DISPLAY_MS_DATA),
+            layout: 0,
         })
     }
 
@@ -1961,6 +2042,7 @@ impl MultiStageSession {
             data: qr_data,
             error_correction: "L".to_string(),
             display_duration_ms: jittered(DISPLAY_MS_FAIL),
+            layout: 0,
         })
     }
 
@@ -1982,6 +2064,7 @@ impl MultiStageSession {
             // camera-screen distance at the scanning margin.
             error_correction: "Q".to_string(),
             display_duration_ms: jittered(DISPLAY_MS_RDYY),
+            layout: 0,
         })
     }
 
@@ -1992,7 +2075,9 @@ impl MultiStageSession {
     /// single-frame broadcast would otherwise inherit from the `Complete`-state
     /// interleave (device-proven half-exchange, 2026-07-25 Pixel↔Samsung Hover).
     pub fn finalization_combo_qr(&self) -> Option<QrPayload> {
+        let header = self.trainer.current_frame(self.monotonic.now());
         self.get_combo_qr()
+            .map(|payload| Self::with_training_header(payload, &header))
     }
 
     /// Handle a COMBO QR from the peer — process VRFY + CONF + RDYY in one shot.

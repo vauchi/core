@@ -118,6 +118,7 @@ fn reentering_multi_stage_after_cancel_starts_fresh() {
         data: "frame-1".into(),
         error_correction: "L".into(),
         display_duration_ms: 300,
+        layout: 0,
     }));
     assert!(engine.apply_multi_stage_state(ProtocolState::Transferring {
         chunks_sent: 0,
@@ -148,6 +149,7 @@ fn reentering_multi_stage_after_cancel_starts_fresh() {
         data: "frame-2".into(),
         error_correction: "L".into(),
         display_duration_ms: 300,
+        layout: 0,
     }));
     assert!(
         rendered(&engine).contains("Show this"),

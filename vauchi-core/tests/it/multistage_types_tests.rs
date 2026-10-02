@@ -64,6 +64,7 @@ fn test_qr_payload_has_error_correction() {
         data: "INIT:test".to_string(),
         error_correction: "M".to_string(),
         display_duration_ms: 0,
+        layout: 0,
     };
     assert_eq!(payload.error_correction, "M");
 }

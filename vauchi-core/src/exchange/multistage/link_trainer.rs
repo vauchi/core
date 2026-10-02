@@ -100,7 +100,19 @@ impl LinkTrainer {
         self.forget_old_reads(now);
         let layout = self.next_layout(now);
         self.shown = Some(layout);
-        let (echo, total) = self.echo();
+        let (echo, total) = self.echo(now);
+        TrainingHeader::new(layout, &echo, total)
+            .expect("layout, echo and total are built within their ranges")
+    }
+
+    /// The header of a frame drawn where the last one was, without moving
+    /// the sweep on. For a frame shown outside the display cycle.
+    pub fn current_frame(&self, now: Instant) -> TrainingHeader {
+        let layout = self
+            .shown
+            .or(self.fresh_layout(now))
+            .unwrap_or(self.sweep_start());
+        let (echo, total) = self.echo(now);
         TrainingHeader::new(layout, &echo, total)
             .expect("layout, echo and total are built within their ranges")
     }
@@ -181,10 +193,13 @@ impl LinkTrainer {
 
     /// The peer layouts read most in the window, most read first, and the
     /// number of reads in the window; both saturate at one digit.
-    fn echo(&self) -> (Vec<LayoutReads>, u8) {
+    fn echo(&self, now: Instant) -> (Vec<LayoutReads>, u8) {
+        let in_window = |at: &Instant| now.saturating_duration_since(*at) < READ_WINDOW;
         let mut counts = [0usize; LAYOUT_COUNT as usize];
-        for (_, layout) in &self.reads {
+        let mut total = 0usize;
+        for (_, layout) in self.reads.iter().filter(|(at, _)| in_window(at)) {
             counts[usize::from(*layout)] += 1;
+            total += 1;
         }
         let saturate = |n: usize| u8::try_from(n).unwrap_or(u8::MAX).min(MAX_READ_COUNT);
         let mut read: Vec<LayoutReads> = (0..LAYOUT_COUNT)
@@ -201,6 +216,6 @@ impl LinkTrainer {
             )
         });
         read.truncate(ECHO_SLOTS);
-        (read, saturate(self.reads.len()))
+        (read, saturate(total))
     }
 }

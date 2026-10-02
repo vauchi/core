@@ -89,6 +89,7 @@ fn engine_with_qr(state: ProtocolState, data: &str) -> MultiStageExchangeEngine 
         data: data.into(),
         error_correction: "L".into(),
         display_duration_ms: 400,
+        layout: 0,
     });
     e
 }

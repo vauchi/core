@@ -772,20 +772,31 @@ fn test_fail_qr_ignored_when_finalized() {
 // @internal
 #[test]
 fn test_adaptive_display_durations() {
-    let mut alice = MultiStageSession::new(b"Alice".to_vec());
-    let mut bob = MultiStageSession::new(b"Bob".to_vec());
+    // Three chunks each, so the two frames that settle the layouts below
+    // cannot complete the transfer.
+    let mut alice = MultiStageSession::new(vec![0xA1; 150]);
+    let mut bob = MultiStageSession::new(vec![0xB2; 150]);
 
-    // INIT should be ~400ms (±20% jitter: 320–480ms)
+    // With no peer heard yet the opening frame is a sweep frame: ~100ms
+    // (±20% jitter: 80–120ms), one per layout.
     let init_qr = alice.get_display_qr().unwrap();
     assert!(
-        (320..=480).contains(&init_qr.display_duration_ms),
-        "INIT display should be ~400ms, got {}",
+        (80..=120).contains(&init_qr.display_duration_ms),
+        "a sweeping INIT should be ~100ms, got {}",
         init_qr.display_duration_ms
     );
 
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&init_qr.data);
+    // Two more frames each way: both have then heard the other's echo and
+    // stopped sweeping, so the frames below carry their stage's own dwell.
+    for _ in 0..2 {
+        let aq = alice.get_display_qr().unwrap();
+        let bq = bob.get_display_qr().unwrap();
+        alice.process_scanned_qr(&bq.data);
+        bob.process_scanned_qr(&aq.data);
+    }
 
     // DATA should be ~300ms (±20%: 240–360ms). Raised from 100ms, at which a
     // Pixel 3a decoded zero of the peer's DATA frames; 300ms decoded 1048 and

@@ -18,6 +18,9 @@ pub struct QrPayload {
     pub error_correction: String,
     /// Suggested minimum display duration in milliseconds.
     pub display_duration_ms: u32,
+    /// Which of the link-training layouts to draw this frame at; 0 is the
+    /// full-size centred code.
+    pub layout: u8,
 }
 
 /// Protocol state machine states.

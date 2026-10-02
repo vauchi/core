@@ -136,6 +136,7 @@ impl AppEngine {
         let deadline = self.vauchi.clock().unix_seconds() + RESPONDER_POLL_DEADLINE_SECS;
         self.link_responder = Some(LinkResponderSession::new(keys, deposits, deadline));
         self.link_responder_x3dh = Some(x3dh);
+        self.reschedule_wakeup_for_new_session();
     }
 
     /// Build the v2 symmetric-exchange bootstrap (ADR-050) we deposit: our

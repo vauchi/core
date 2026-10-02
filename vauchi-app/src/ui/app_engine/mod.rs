@@ -820,6 +820,16 @@ impl AppEngine {
         notifications
     }
 
+    /// Tell the shell the heartbeat cadence changed now, not at the end of
+    /// its current sleep. `on_wakeup` is the only other place a
+    /// `ScheduleWakeup` is emitted, and a shell sleeps until the previous one
+    /// comes due: 30 s when idle. A session that goes live in between waited
+    /// that sleep out before its first tick, with its QR frozen on the first
+    /// frame (`2026-10-02-exchange-first-tick-waits-for-idle-heartbeat`).
+    fn reschedule_wakeup_for_new_session(&mut self) {
+        self.pending_commands.push_back(self.compute_next_wakeup());
+    }
+
     /// Compute the next app-heartbeat wakeup window (ADR-044 Am2a Option C).
     /// Core is the single authority on *when*; the shell only executes the
     /// resulting `ScheduleWakeup`. First cut: a fixed ~30 s foreground cadence

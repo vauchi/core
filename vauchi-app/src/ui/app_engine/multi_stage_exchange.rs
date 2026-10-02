@@ -136,6 +136,7 @@ impl AppEngine {
         // "Exchange started" to the first QR, throwing away 40 peer INITs
         // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
         self.advance_multi_stage_session();
+        self.reschedule_wakeup_for_new_session();
     }
 
     /// Cancel + drop the active machine. Idempotent. `pub` so

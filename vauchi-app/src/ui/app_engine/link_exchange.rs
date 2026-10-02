@@ -137,6 +137,7 @@ impl AppEngine {
             .apply_update(crate::ui::EngineUpdate::LinkExchange(
                 crate::ui::LinkExchangeUpdate::ShareUrl(share_url),
             ));
+        self.reschedule_wakeup_for_new_session();
     }
 
     /// Feed a `LinkShared` / `LinkOpened` / `RelayEscrow*` hardware event

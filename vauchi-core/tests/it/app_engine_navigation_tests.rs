@@ -816,9 +816,10 @@ fn navigate_to_multi_stage_exchange_drains_brightness_idle_timer_and_orientation
         mode: ExchangeMode::Glance,
     });
     let commands = engine.drain_pending_commands();
+    let (screen_entered, session_started) = commands.split_at(commands.len().min(4));
 
     assert_eq!(
-        commands,
+        screen_entered,
         vec![
             Command::SetScreenBrightness { level: Some(0.35) },
             Command::SetIdleTimerDisabled { disabled: true },
@@ -834,6 +835,21 @@ fn navigate_to_multi_stage_exchange_drains_brightness_idle_timer_and_orientation
             Command::SwitchCamera { use_front: false },
         ],
         "navigate_to(MultiStageExchange) must drive its screen_entered hook"
+    );
+    // The session that entry starts needs its first tick at the frame dwell,
+    // not at the end of the shell's idle sleep
+    // (`2026-10-02-exchange-first-tick-waits-for-idle-heartbeat`). The dwell
+    // is jittered, so only the whole-second floor is exact.
+    assert!(
+        matches!(
+            session_started,
+            [Command::ScheduleWakeup {
+                earliest_secs: 1,
+                earliest_millis: Some(_),
+                ..
+            }]
+        ),
+        "the new session reschedules the wakeup once, got {session_started:?}"
     );
 }
 

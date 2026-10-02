@@ -28,8 +28,9 @@ fn run_full_exchange(
     bob.process_scanned_qr(&ai.data);
 
     // Stages 2-6: cycle through DATA, VERIFY, CONFIRM, READY
-    // With 80-byte chunks, 32KB payloads need ~500+ rounds per side
-    for _ in 0..2000 {
+    // With 38-byte chunks, a 32KB payload is about 850 chunks per side,
+    // and one frame in four re-shows the opening frame.
+    for _ in 0..8000 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(aq) = &aq {
@@ -774,8 +775,8 @@ fn test_fail_qr_ignored_when_finalized() {
 fn test_adaptive_display_durations() {
     // Three chunks each, so the two frames that settle the layouts below
     // cannot complete the transfer.
-    let mut alice = MultiStageSession::new(vec![0xA1; 150]);
-    let mut bob = MultiStageSession::new(vec![0xB2; 150]);
+    let mut alice = MultiStageSession::new(vec![0xA1; 70]);
+    let mut bob = MultiStageSession::new(vec![0xB2; 70]);
 
     // With no peer heard yet the opening frame is a sweep frame: ~100ms
     // (±20% jitter: 80–120ms), one per layout.

@@ -35,6 +35,31 @@ pub const FAST_SWEEP_DWELL_MS: u32 = 60;
 /// than one read per `SWEEP_DWELL_MS` frame.
 pub const FAST_READER_READS: u8 = 30;
 
+/// Reads per [`READ_WINDOW`] the peer must report before chunks step up to
+/// QR version 7, and to version 8. Deliberately high: the count measures
+/// reads of version-6 frames, and a denser frame may not read at all in a
+/// direction that reads those (journal T11). The rig decides whether
+/// stepping up pays (design D4).
+pub const STEP_UP_TO_V7_READS: u8 = 20;
+pub const STEP_UP_TO_V8_READS: u8 = 40;
+
+/// Plaintext bytes per DATA chunk for a peer that reports `peer_reads`
+/// reads in its window.
+///
+/// A full chunk's frame is `50 + 1.5 × (bytes + 28) + ack` characters. The
+/// sizes leave room for a 5-character ACK field, which covers a peer
+/// sending up to 24 chunks: 154, 178 and 220 characters at most, within QR
+/// versions 6, 7 and 8.
+pub fn chunk_bytes_for(peer_reads: u8) -> usize {
+    if peer_reads >= STEP_UP_TO_V8_READS {
+        82
+    } else if peer_reads >= STEP_UP_TO_V7_READS {
+        54
+    } else {
+        38
+    }
+}
+
 /// Upper bound on reads kept, whatever the clock does.
 const MAX_READS_KEPT: usize = 256;
 

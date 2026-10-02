@@ -35,7 +35,7 @@ use zeroize::Zeroize;
 use super::accel_envelope;
 use super::chunker::{Chunker, ReassemblyBuffer};
 use super::commitment::Commitment;
-use super::link_trainer::LinkTrainer;
+use super::link_trainer::{self, LinkTrainer};
 use super::qr_codec::{self, Frame, StageQr};
 use super::training_header::TrainingHeader;
 use super::types::{
@@ -45,14 +45,6 @@ use super::types::{
 use crate::crypto::x3dh::X3DHKeyPair;
 use crate::crypto::{DoubleRatchetState, SymmetricKey};
 use crate::exchange::{key_order, ratchet_bootstrap};
-
-/// Maximum raw payload bytes per chunk (before transport encryption overhead).
-/// Transport encryption adds 12 (nonce) + 16 (Poly1305 tag) = 28 bytes overhead.
-///
-/// V4-optimized: 80 bytes → ~108 bytes encrypted → ~162 base45 chars.
-/// With ~44 chars DATA header → ~206 total chars → fits V10 QR at ECC-M (213 chars).
-/// Produces small, trivially decodable QR codes at 240p in ~9ms.
-const CHUNK_PAYLOAD_SIZE: usize = 80;
 
 /// ADR-071. A session past `Advertising` re-handshakes when its peer restarts.
 /// Two people never tap the same second, so whichever side scans first runs
@@ -401,6 +393,8 @@ pub struct MultiStageSession {
     /// Frames read that carry our own session id: this phone's code seen in
     /// a reflection or in the peer's preview. Dropped, never processed.
     own_frames_seen: u32,
+    /// Reads per window the bound peer reported in its latest header.
+    peer_reported_reads: u8,
     /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Source for
     /// every `Instant` this session stamps (`phase_entered_at`,
     /// `last_progress_at`, `fail_broadcast_until`,
@@ -499,6 +493,7 @@ impl MultiStageSession {
             accel_local_envelope: Vec::new(),
             trainer: LinkTrainer::starting_at(0),
             own_frames_seen: 0,
+            peer_reported_reads: 0,
             monotonic: SystemMonotonicClock::shared(),
         }
     }
@@ -1320,6 +1315,7 @@ impl MultiStageSession {
         // bound, any opening frame may be it.
         if self.peer_session_id.is_none_or(|peer| peer == *sender) {
             self.trainer.note_peer_frame(&header, self.monotonic.now());
+            self.peer_reported_reads = header.total_reads();
         }
 
         match parsed {
@@ -1385,7 +1381,7 @@ impl MultiStageSession {
         // better cameras, or binary QR mode).
         //
         // let ciphertext = self.commitment.ciphertext();
-        // if ciphertext.len() <= CHUNK_PAYLOAD_SIZE {
+        // if ciphertext.len() <= chunk size {
         //     return qr_codec::format_in2d_qr(...);
         // }
         qr_codec::format_ini2_qr_with_relay(
@@ -1745,7 +1741,13 @@ impl MultiStageSession {
 
     fn prepare_outbound_chunks(&mut self) {
         let ciphertext = self.commitment.ciphertext();
-        let chunker = Chunker::new(ciphertext, CHUNK_PAYLOAD_SIZE);
+        // Sized once, here, from the read rate the peer has reported so
+        // far: chunk indices and the ACK bitmap are only valid for one
+        // size, so it cannot change after DATA starts (design D4).
+        let chunker = Chunker::new(
+            ciphertext,
+            link_trainer::chunk_bytes_for(self.peer_reported_reads),
+        );
         let total = chunker.total_chunks();
         self.outbound_total = total;
 

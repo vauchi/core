@@ -253,7 +253,7 @@ impl ModeSelectionEngine {
 }
 
 /// Serialize mode name for use in item IDs.
-trait SerdeName {
+pub(crate) trait SerdeName {
     fn serde_name(self) -> &'static str;
 }
 
@@ -281,21 +281,6 @@ impl SerdeName for ExchangeMode {
 /// `pictogram.<group>.<name>` to their bundled `pictograms/<group>/<name>.svg`.
 pub(crate) fn mode_pictogram(mode: ExchangeMode) -> String {
     format!("pictogram.exchange.{}", mode.serde_name())
-}
-
-/// Opens each mode's own screens: the mode's pictogram beside its name.
-pub(crate) fn mode_card(mode: ExchangeMode, locale: Locale) -> Component {
-    Component::InfoPanel {
-        id: "exchange_mode".into(),
-        icon: None,
-        title: String::new(),
-        items: vec![InfoItem {
-            icon: Some(mode_pictogram(mode)),
-            title: get_string(locale, &format!("exchange.mode_name.{}", mode.serde_name())),
-            detail: String::new(),
-        }],
-        a11y: None,
-    }
 }
 
 /// One-line "what you do" instruction per mode, shown as the row subtitle.

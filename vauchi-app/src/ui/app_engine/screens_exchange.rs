@@ -28,11 +28,25 @@ impl AppEngine {
             AppScreen::DirectTransport => ExchangeMode::Cable,
             _ => return screen,
         };
-        let card = crate::ui::exchange::mode_selection::mode_card(
-            mode,
+        use crate::ui::exchange::mode_selection::{SerdeName, mode_pictogram};
+        let name = crate::i18n::get_string(
             self.render_context.resolved_locale(),
+            &format!("exchange.mode_name.{}", mode.serde_name()),
         );
-        screen.components.insert(0, card);
+        screen.components.insert(
+            0,
+            crate::ui::Component::InfoPanel {
+                id: "exchange_mode".into(),
+                icon: None,
+                title: String::new(),
+                items: vec![crate::ui::InfoItem {
+                    icon: Some(mode_pictogram(mode)),
+                    title: name,
+                    detail: String::new(),
+                }],
+                a11y: None,
+            },
+        );
         screen
     }
 

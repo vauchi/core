@@ -259,7 +259,11 @@ fn screen_catalog_exchange_picker_offers_qr_nfc_and_bluetooth_from_a_phone_capab
     let rows = picker_rows(entry);
 
     let hero = rows.first().expect("picker leads with a hero row");
-    assert_eq!(hero.icon_token.as_deref(), Some("qrcode"), "QR leads");
+    assert_eq!(
+        hero.icon_token.as_deref(),
+        Some("pictogram.exchange.glance"),
+        "QR leads"
+    );
     assert!(
         hero.subtitle
             .as_deref()
@@ -272,7 +276,11 @@ fn screen_catalog_exchange_picker_offers_qr_nfc_and_bluetooth_from_a_phone_capab
         .iter()
         .filter_map(|row| row.icon_token.as_deref())
         .collect();
-    for offered in ["qrcode", "nfc", "gesture"] {
+    for offered in [
+        "pictogram.exchange.glance",
+        "pictogram.exchange.hover",
+        "pictogram.exchange.tap_hover_shake",
+    ] {
         assert!(
             icons.contains(offered),
             "picker offers {offered}, got {icons:?}"
@@ -282,7 +290,7 @@ fn screen_catalog_exchange_picker_offers_qr_nfc_and_bluetooth_from_a_phone_capab
     // USB-gated Cable row may still read as unavailable.
     for row in rows
         .iter()
-        .filter(|row| row.icon_token.as_deref() != Some("cable"))
+        .filter(|row| row.icon_token.as_deref() != Some("pictogram.exchange.cable"))
     {
         assert!(
             !row.subtitle

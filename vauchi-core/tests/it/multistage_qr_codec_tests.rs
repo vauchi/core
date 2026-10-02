@@ -349,3 +349,28 @@ fn frame_length_sets_the_module_count_in_these_steps() {
         assert_eq!(code.width(), modules, "a {chars}-char frame");
     }
 }
+
+// @internal
+#[test]
+fn a_data_frame_acks_a_peer_sending_a_thousand_chunks() {
+    // 125 bitmap bytes are 188 characters, past what two decimal digits
+    // can count. At 38-byte chunks that is a 38 KB payload.
+    let ack_bitmap: Vec<u8> = (0..125u8).collect();
+
+    let frame = format_data_qr(&[7u8; 16], 999, 1000, &ack_bitmap, &[1, 2, 3, 4]);
+
+    let StageQr::Data {
+        chunk_idx,
+        chunk_total,
+        ack_bitmap: parsed_ack,
+        payload,
+        ..
+    } = parse_qr(&frame).expect("frame parses")
+    else {
+        panic!("not a DATA frame");
+    };
+    assert_eq!(chunk_idx, 999);
+    assert_eq!(chunk_total, 1000);
+    assert_eq!(parsed_ack, ack_bitmap);
+    assert_eq!(payload, vec![1, 2, 3, 4]);
+}

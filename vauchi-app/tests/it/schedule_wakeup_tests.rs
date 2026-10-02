@@ -458,3 +458,27 @@ fn navigation_without_a_live_session_does_not_reschedule_the_wakeup() {
         "no session went live, so the idle heartbeat stands"
     );
 }
+
+/// A retry rebuilds the session in place, with no navigation. By then the
+/// failed session is gone and the heartbeat is back on its idle interval, so
+/// the rebuilt session needs the reschedule as much as the first one did.
+// @internal
+#[test]
+fn rebuilding_an_exchange_in_place_reschedules_the_wakeup() {
+    let mut engine = engine_with_identity();
+    let _ = engine.on_wakeup();
+    let _ = engine.drain_pending_commands();
+
+    engine.ensure_multi_stage_session(vauchi_core::exchange::mode::ExchangeMode::Hover);
+
+    let wakeups = wakeups_in(engine.drain_pending_commands());
+    assert_eq!(wakeups.len(), 1, "one reschedule, got {wakeups:?}");
+    assert_eq!(wakeups[0].0, 1, "whole-second shells wake within a second");
+
+    engine.ensure_multi_stage_session(vauchi_core::exchange::mode::ExchangeMode::Hover);
+    assert_eq!(
+        wakeups_in(engine.drain_pending_commands()),
+        Vec::<(u32, Option<u32>)>::new(),
+        "a session that is already live is not rescheduled again"
+    );
+}

@@ -128,21 +128,24 @@ fn a_full_size_code_carries_no_placement_on_the_wire() {
 #[test]
 fn the_exchange_screen_draws_its_code_at_the_trainers_layout() {
     // Layout 0 is full size; 1–4 are 80 % in the four corners; 5–13 are
-    // 65 % on a 3 × 3 grid, row by row.
+    // 65 % on a 3 × 3 grid, row by row. Every placed code keeps 50 permille
+    // clear of the square's edges: with the image's own one-module border
+    // that is the four-module quiet zone a QR needs, whatever colour the
+    // screen is around the square.
     let expected = [
-        (1, placement(800, 0, 0)),
-        (2, placement(800, 200, 0)),
-        (3, placement(800, 0, 200)),
-        (4, placement(800, 200, 200)),
-        (5, placement(650, 0, 0)),
-        (6, placement(650, 175, 0)),
-        (7, placement(650, 350, 0)),
-        (8, placement(650, 0, 175)),
+        (1, placement(800, 50, 50)),
+        (2, placement(800, 150, 50)),
+        (3, placement(800, 50, 150)),
+        (4, placement(800, 150, 150)),
+        (5, placement(650, 50, 50)),
+        (6, placement(650, 175, 50)),
+        (7, placement(650, 300, 50)),
+        (8, placement(650, 50, 175)),
         (9, placement(650, 175, 175)),
-        (10, placement(650, 350, 175)),
-        (11, placement(650, 0, 350)),
-        (12, placement(650, 175, 350)),
-        (13, placement(650, 350, 350)),
+        (10, placement(650, 300, 175)),
+        (11, placement(650, 50, 300)),
+        (12, placement(650, 175, 300)),
+        (13, placement(650, 300, 300)),
     ];
     let mut engine = engine_on_hover();
 
@@ -179,6 +182,30 @@ fn the_saved_screen_keeps_the_code_where_it_was() {
 
     assert_eq!(
         own_code_placement(&surface),
-        Some(Some(placement(650, 175, 350)))
+        Some(Some(placement(650, 175, 300)))
     );
+}
+
+// @internal
+#[test]
+fn every_placed_code_keeps_a_quiet_zone_inside_the_square() {
+    let mut engine = engine_on_hover();
+
+    for layout in 1..14 {
+        assert!(engine.apply_multi_stage_qr_payload(&frame_at_layout(layout)));
+        let at = own_code_placement(&presented_surface(&mut engine))
+            .flatten()
+            .unwrap_or_else(|| panic!("layout {layout} has a placement"));
+        for edge in [
+            at.x(),
+            at.y(),
+            1000 - at.size() - at.x(),
+            1000 - at.size() - at.y(),
+        ] {
+            assert!(
+                edge >= 50,
+                "layout {layout} leaves {edge} permille at an edge"
+            );
+        }
+    }
 }

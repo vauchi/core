@@ -262,19 +262,16 @@ impl AppEngine {
         ),
         String,
     > {
+        // Core's gate, not the identity directly: it refuses in duress mode,
+        // where a link would hand the identity to the coercer (#469).
+        let initiator = self
+            .vauchi
+            .device_link_initiator()
+            .map_err(|e| e.to_string())?;
         let identity = self
             .vauchi
             .identity()
             .ok_or_else(|| "identity not initialized".to_string())?;
-        let registry = self
-            .vauchi
-            .storage()
-            .device()
-            .load_device_registry()
-            .map_err(|e| e.to_string())?
-            .unwrap_or_else(|| identity.initial_device_registry());
-        let initiator =
-            identity.create_device_link_initiator(registry, self.vauchi.clock().unix_seconds());
         let identity_id = hex::encode(identity.signing_public_key());
 
         let connect_timeout_ms = self.vauchi.config().relay.connect_timeout_ms;

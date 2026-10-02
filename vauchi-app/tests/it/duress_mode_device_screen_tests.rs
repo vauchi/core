@@ -8,7 +8,7 @@
 //! decision 2026-10-02).
 
 use vauchi_app::i18n::{Locale, get_string};
-use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
+use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::Vauchi;
 use vauchi_core::identity::DeviceInfo;
 

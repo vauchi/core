@@ -47,7 +47,7 @@ impl Vauchi {
         let current_device_id = identity.device_id();
 
         if let Some(registry) = self.storage.device().load_device_registry()? {
-            Ok(registry
+            let devices = registry
                 .all_devices()
                 .iter()
                 .enumerate()
@@ -57,8 +57,19 @@ impl Vauchi {
                     public_key_prefix: hex::encode(&device.device_id[..8]),
                     is_current: device.device_id == *current_device_id,
                     is_active: !device.revoked,
-                })
-                .collect())
+                });
+            // Duress mode reads as a single-device app: listing the owner's
+            // other devices would name them to the coercer (#469).
+            if self.in_duress_mode() {
+                return Ok(devices
+                    .filter(|d| d.is_current)
+                    .map(|d| DeviceInfo {
+                        device_index: 0,
+                        ..d
+                    })
+                    .collect());
+            }
+            Ok(devices.collect())
         } else {
             Ok(vec![DeviceInfo {
                 device_index: 0,
@@ -75,18 +86,7 @@ impl Vauchi {
     /// Returns QR ASCII art, a base64 data string, and the identity fingerprint
     /// for cross-device verification.
     pub fn generate_device_link(&self) -> VauchiResult<DeviceLinkResult> {
-        let identity = self
-            .identity
-            .as_ref()
-            .ok_or(VauchiError::IdentityNotInitialized)?;
-
-        let registry = self
-            .storage
-            .device()
-            .load_device_registry()?
-            .unwrap_or_else(|| identity.initial_device_registry());
-
-        let initiator = identity.create_device_link_initiator(registry, self.clock.unix_seconds());
+        let initiator = self.device_link_initiator()?;
         let qr = initiator.qr();
 
         Ok(DeviceLinkResult {
@@ -94,6 +94,31 @@ impl Vauchi {
             data_string: qr.to_data_string(),
             fingerprint: qr.identity_fingerprint(),
         })
+    }
+
+    /// Starts linking a new device to this identity. Every link path goes
+    /// through here, because a completed link hands the new device the
+    /// identity itself.
+    ///
+    /// Fails in duress mode with the same error any unavailable link gives:
+    /// linking would give the coercer's phone the real identity and every
+    /// future update from real contacts (#469, ADR-032).
+    pub fn device_link_initiator(&self) -> VauchiResult<crate::exchange::DeviceLinkInitiator> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        if self.in_duress_mode() {
+            return Err(VauchiError::InvalidState(
+                "device linking unavailable".into(),
+            ));
+        }
+        let registry = self
+            .storage
+            .device()
+            .load_device_registry()?
+            .unwrap_or_else(|| identity.initial_device_registry());
+        Ok(identity.create_device_link_initiator(registry, self.clock.unix_seconds()))
     }
 
     /// Revokes a device from the registry by index.
@@ -109,6 +134,16 @@ impl Vauchi {
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        // Duress mode lists only this device (see `list_devices`), so answer
+        // as a single-device registry would and never touch the real one.
+        if self.in_duress_mode() {
+            return Err(VauchiError::InvalidState(if device_index == 0 {
+                "Cannot revoke the current device".into()
+            } else {
+                format!("Invalid device index: {}", device_index)
+            }));
+        }
 
         let mut registry = self
             .storage

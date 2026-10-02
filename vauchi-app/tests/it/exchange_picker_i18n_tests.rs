@@ -113,12 +113,17 @@ fn mode_picker_renders_the_active_locale() {
     assert_translated("Glance hero detail", &de.hero_detail, &en.hero_detail);
     assert_translated("Link detail", &de.link_detail, &en.link_detail);
 
-    // Exemption: "Glance" is the product name for the mode and is
-    // deliberately identical in every locale, so it cannot be asserted
-    // as translated. Pinning it exactly is the point — a translated
-    // product name would be the defect.
-    assert_eq!(de.hero_label, "Glance");
-    assert_eq!(de.hero_label, en.hero_label);
+    // Mode names are translated per locale (#472 owner decision), so the
+    // hero carries the German catalogue's own name for Glance, whatever
+    // that name is.
+    assert_eq!(
+        de.hero_label,
+        vauchi_app::i18n::get_string(Locale::German, "exchange.mode_name.glance")
+    );
+    assert_eq!(
+        en.hero_label,
+        vauchi_app::i18n::get_string(Locale::English, "exchange.mode_name.glance")
+    );
 }
 
 // English stays exactly as before the threading (regression pin). English

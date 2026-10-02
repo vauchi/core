@@ -117,19 +117,28 @@ pub const SCREEN_ID: &str = "multi_stage_exchange";
 /// Where each link-training layout draws the code: 0 fills the square,
 /// 1–4 are 80 % of it in the four corners, 5–13 are 65 % on a 3 × 3 grid,
 /// row by row. An id outside the set draws full size.
+///
+/// A placed code stays [`QUIET_EDGE`] clear of the square's edges. The
+/// square is white, but the screen around it need not be: flush against
+/// the edge, a code on a dark screen has no quiet zone on that side.
 fn placement_for_layout(layout: u8) -> Option<QrPlacement> {
     let (size, columns, index) = match layout {
         1..=4 => (800, 2, layout - 1),
         5..=13 => (650, 3, layout - 5),
         _ => return None,
     };
-    let step = (1000 - size) / (columns - 1);
+    let step = (1000 - size - 2 * QUIET_EDGE) / (columns - 1);
     QrPlacement::new(
         size,
-        u16::from(index % columns as u8) * step,
-        u16::from(index / columns as u8) * step,
+        QUIET_EDGE + u16::from(index % columns as u8) * step,
+        QUIET_EDGE + u16::from(index / columns as u8) * step,
     )
 }
+
+/// Permille of the square kept clear around a placed code: about three
+/// modules of a 41-module code at 65 %. A shell's QR image may add its own
+/// border on top (Android's carries four modules).
+const QUIET_EDGE: u16 = 50;
 
 /// Engine for the multi-stage face-to-face exchange screen.
 ///

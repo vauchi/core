@@ -129,9 +129,8 @@ fn a_full_size_code_carries_no_placement_on_the_wire() {
 fn the_exchange_screen_draws_its_code_at_the_trainers_layout() {
     // Layout 0 is full size; 1–4 are 80 % in the four corners; 5–13 are
     // 65 % on a 3 × 3 grid, row by row. Every placed code keeps 50 permille
-    // clear of the square's edges: with the image's own one-module border
-    // that is the four-module quiet zone a QR needs, whatever colour the
-    // screen is around the square.
+    // clear of the square's edges, so it has a light border whatever colour
+    // the screen is around the square.
     let expected = [
         (1, placement(800, 50, 50)),
         (2, placement(800, 150, 50)),

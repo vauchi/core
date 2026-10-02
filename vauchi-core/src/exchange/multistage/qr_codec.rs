@@ -174,10 +174,10 @@ fn frame(prefix: &str, body: &str) -> String {
 
 /// Split a frame into its stage prefix and body.
 fn split_frame(raw: &str) -> Result<(&str, &str), QrCodecError> {
-    if raw.len() < PREFIX_LEN {
-        return Err(QrCodecError::UnknownPrefix);
-    }
-    Ok((&raw[..PREFIX_LEN], &raw[PREFIX_LEN..]))
+    // `split_at_checked`, not slicing: any QR a camera sees lands here, and
+    // slicing panics when byte 4 falls inside a multi-byte character.
+    raw.split_at_checked(PREFIX_LEN)
+        .ok_or(QrCodecError::UnknownPrefix)
 }
 
 /// Format an INIT stage QR string with optional relay metadata.

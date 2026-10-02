@@ -14,6 +14,28 @@ use crate::ui::{ActionResult, UserAction};
 use vauchi_core::api::Vauchi;
 
 impl AppEngine {
+    /// Every screen of a mode's own flow opens with that mode's pictogram
+    /// and name, so the mode is recognisable on every step (#473).
+    pub(super) fn apply_exchange_mode_overlay(
+        &self,
+        mut screen: crate::ui::ScreenModel,
+    ) -> crate::ui::ScreenModel {
+        use vauchi_core::exchange::mode::ExchangeMode;
+        let mode = match &self.screen {
+            AppScreen::BleExchange { mode } | AppScreen::MultiStageExchange { mode } => *mode,
+            AppScreen::NfcExchange => ExchangeMode::TapTap,
+            AppScreen::LinkExchange => ExchangeMode::Link,
+            AppScreen::DirectTransport => ExchangeMode::Cable,
+            _ => return screen,
+        };
+        let card = crate::ui::exchange::mode_selection::mode_card(
+            mode,
+            self.render_context.resolved_locale(),
+        );
+        screen.components.insert(0, card);
+        screen
+    }
+
     pub(super) fn create_exchange_engine(
         vauchi: &Vauchi,
         screen: &AppScreen,

@@ -174,7 +174,7 @@ impl ModeSelectionEngine {
                     requirement_token(*requirement)
                 ),
                 label: self.mode_name(mode),
-                icon: Some("lock".into()),
+                icon: Some(mode_pictogram(mode)),
                 detail: Some(get_string_with_args(
                     self.locale,
                     "exchange.picker.grant",
@@ -206,7 +206,7 @@ impl ModeSelectionEngine {
         ActionListItem {
             id: format!("mode:{}", mode.serde_name()),
             label: self.mode_name(mode),
-            icon: Some(mode_icon(mode).into()),
+            icon: Some(mode_pictogram(mode)),
             detail: Some(detail),
             a11y: None,
             info_key: None,
@@ -276,22 +276,25 @@ impl SerdeName for ExchangeMode {
     }
 }
 
-/// Semantic icon token for each mode. Frontends map these names to their
-/// native symbol set (Material on Android, SF Symbols on iOS/macOS);
-/// unknown tokens fall back to a generic glyph, so the list never breaks.
-fn mode_icon(mode: ExchangeMode) -> &'static str {
-    match mode {
-        ExchangeMode::Glance => "qrcode",
-        ExchangeMode::Hover => "nfc",
-        ExchangeMode::Bump => "bump",
-        ExchangeMode::Shake => "shake",
-        ExchangeMode::Magic => "sparkles",
-        ExchangeMode::TapTap => "tap",
-        ExchangeMode::TapHoverShake => "gesture",
-        ExchangeMode::Link => "link",
-        ExchangeMode::Cable => "cable",
-        // New core variants must add an icon token before shipping.
-        _ => "tag",
+/// The mode's own pictogram, the same wherever the mode appears so it stays
+/// recognisable when its name is translated (#473). Shells map
+/// `pictogram.<group>.<name>` to their bundled `pictograms/<group>/<name>.svg`.
+pub(crate) fn mode_pictogram(mode: ExchangeMode) -> String {
+    format!("pictogram.exchange.{}", mode.serde_name())
+}
+
+/// Opens each mode's own screens: the mode's pictogram beside its name.
+pub(crate) fn mode_card(mode: ExchangeMode, locale: Locale) -> Component {
+    Component::InfoPanel {
+        id: "exchange_mode".into(),
+        icon: None,
+        title: String::new(),
+        items: vec![InfoItem {
+            icon: Some(mode_pictogram(mode)),
+            title: get_string(locale, &format!("exchange.mode_name.{}", mode.serde_name())),
+            detail: String::new(),
+        }],
+        a11y: None,
     }
 }
 
@@ -604,7 +607,10 @@ mod tests {
             "hero detail should still include the instruction, got: {detail}"
         );
         // Recommendation no longer rides on the icon — that's the per-mode glyph.
-        assert_eq!(glance_item.icon.as_deref(), Some("qrcode"));
+        assert_eq!(
+            glance_item.icon.as_deref(),
+            Some("pictogram.exchange.glance")
+        );
     }
 
     // @internal
@@ -621,9 +627,11 @@ mod tests {
         for &mode in DISCLOSURE_ORDER {
             let item = find_mode_item(&screen, mode.serde_name())
                 .expect("every offered mode should be listed");
-            let icon = item.icon.as_deref().expect("every mode carries an icon");
-            assert_ne!(icon, "tag", "{:?} should have a dedicated icon", mode);
-            assert!(!icon.is_empty(), "{:?} icon must be non-empty", mode);
+            assert_eq!(
+                item.icon.as_deref(),
+                Some(mode_pictogram(mode).as_str()),
+                "{mode:?} shows its own pictogram"
+            );
         }
     }
 
@@ -782,7 +790,9 @@ mod tests {
         let grant = find_item_starting_with(&screen, "grant:glance:")
             .expect("denied Glance should render a grant affordance");
         assert_eq!(grant.id, "grant:glance:camera");
-        assert_eq!(grant.icon.as_deref(), Some("lock"));
+        // Still the Glance row, so still Glance's pictogram (#473); the detail
+        // line says what to grant.
+        assert_eq!(grant.icon.as_deref(), Some("pictogram.exchange.glance"));
         let detail = grant
             .detail
             .as_deref()

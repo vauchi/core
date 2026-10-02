@@ -646,6 +646,7 @@ impl AppEngine {
 impl WorkflowEngine for AppEngine {
     fn current_screen(&self) -> ScreenModel {
         let screen = self.engine.current_screen();
+        let screen = self.apply_exchange_mode_overlay(screen);
         let screen = self.apply_update_overlay(screen);
         let screen = self.apply_offline_overlay(screen);
         let screen = self.apply_sync_chrome_overlay(screen);

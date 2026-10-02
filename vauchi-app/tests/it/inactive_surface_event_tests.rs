@@ -9,8 +9,6 @@
 //! Refusing it turned every such race into a "Something went wrong" alert
 //! after an action that had succeeded (vauchi/private#438).
 
-#![cfg(feature = "testing")]
-
 use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
@@ -173,6 +171,12 @@ fn replaced_surface(commands: Vec<Command>) -> SurfaceSpec {
         .expect("the scan re-renders the surface")
 }
 
+/// A peer's FAIL frame for session id `[7; 16]`, as
+/// `qr_codec::format_fail_qr` writes it. A literal, because that module is
+/// public only under the `testing` feature and these tests must run in the
+/// standard suite.
+const PEER_FAIL_FRAME: &str = "FAIL:*0:*0:*0:*0:*0:*0:*0:*0";
+
 /// The scan that ends an exchange (here the peer's FAIL frame; on device
 /// the frame that finalizes) takes the camera off the surface it arrived
 /// on.
@@ -184,9 +188,7 @@ fn hover_ended_by_a_scan() -> (AppEngine, SurfaceSpec, SurfaceSpec) {
             .dispatch(Event::ValueChanged {
                 surface_id: scanning.surface_id.clone(),
                 binding_id: capture_binding(&scanning),
-                value: InputValue::Text(
-                    vauchi_core::exchange::multistage::qr_codec::format_fail_qr(&[7u8; 16]),
-                ),
+                value: InputValue::Text(PEER_FAIL_FRAME.to_string()),
             })
             .expect("the peer's frame is accepted"),
     );

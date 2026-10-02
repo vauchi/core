@@ -56,6 +56,7 @@ impl PresentationCoordinator {
     /// for it is a shell still catching up, not a malformed one. A pane
     /// still on screen but inactive is not left behind; it must be
     /// activated before it takes input.
+    #[cfg(feature = "network-rustls")]
     pub(crate) fn was_left_behind(&self, surface: &SurfaceId) -> bool {
         surface != &self.active_surface
             && surface != &self.primary_surface

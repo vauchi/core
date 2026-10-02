@@ -67,6 +67,7 @@ mod demo_presentation_tests;
 mod device_link_bridge_tests;
 mod device_link_live_device_tests;
 mod device_link_local_hosting_tests;
+mod device_link_pin_tests;
 mod device_link_two_machine_tests;
 mod device_linking_i18n_tests;
 mod device_linking_receiver_i18n_tests;

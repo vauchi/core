@@ -43,7 +43,7 @@ fn names(wb: &Vauchi) -> Vec<String> {
         .collect()
 }
 
-// @scenario: duress_mode :: The duress setup is invisible in duress mode
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
 // @internal
 #[test]
 fn duress_mode_lists_only_this_device() {
@@ -57,7 +57,7 @@ fn duress_mode_lists_only_this_device() {
     assert!(names(&wb).contains(&"RealLaptop".to_string()));
 }
 
-// @scenario: duress_mode :: The duress setup is invisible in duress mode
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
 // @internal
 #[test]
 fn duress_mode_cannot_create_a_device_link() {
@@ -70,7 +70,7 @@ fn duress_mode_cannot_create_a_device_link() {
     assert!(wb.device_link_initiator().is_ok());
 }
 
-// @scenario: duress_mode :: The duress setup is invisible in duress mode
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
 // @internal
 #[test]
 fn duress_mode_cannot_revoke_a_real_device() {
@@ -85,4 +85,24 @@ fn duress_mode_cannot_revoke_a_real_device() {
         .find(|d| d.device_name == "RealLaptop")
         .expect("the real laptop is still registered");
     assert!(laptop.is_active, "a duress session must not revoke it");
+}
+
+// Linking asks for the PIN again (owner decision 2026-10-02). It must accept
+// the PIN that opened this session, or a duress session would be told its
+// own PIN is wrong; and it must never switch the session's mode.
+// @scenario: duress_mode :: Duress mode looks identical to normal mode
+// @internal
+#[test]
+fn confirming_the_pin_accepts_only_the_pin_that_opened_the_session() {
+    let mut wb = in_duress_mode();
+    assert!(wb.confirm_session_password(DURESS_PIN).unwrap());
+    assert!(!wb.confirm_session_password(APP_PIN).unwrap());
+    assert!(!wb.confirm_session_password("wrong").unwrap());
+    assert_eq!(wb.auth_mode(), AuthMode::Duress);
+
+    assert_eq!(wb.authenticate(APP_PIN).unwrap(), AuthMode::Normal);
+    assert!(wb.confirm_session_password(APP_PIN).unwrap());
+    assert!(!wb.confirm_session_password(DURESS_PIN).unwrap());
+    assert!(!wb.confirm_session_password("wrong").unwrap());
+    assert_eq!(wb.auth_mode(), AuthMode::Normal);
 }

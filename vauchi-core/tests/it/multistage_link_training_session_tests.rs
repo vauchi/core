@@ -276,3 +276,135 @@ fn a_bystanders_frames_do_not_train_a_bound_session() {
     assert_eq!(header.total_reads(), reads_before);
     assert!(header.echo().all(|reads| reads.layout != 12));
 }
+
+/// Alice's DATA frames after she read Bob's opening frame carrying a header
+/// that reports `peer_reads` reads in his window.
+fn data_frame_lengths_for_a_peer_reporting(peer_reads: u8) -> Vec<usize> {
+    use vauchi_core::exchange::multistage::qr_codec::with_header;
+    use vauchi_core::exchange::multistage::training_header::TrainingHeader;
+
+    // 400 bytes: enough chunks that most frames carry a full one.
+    let mut alice = MultiStageSession::new(vec![0xA1; 400]);
+    let mut bob = MultiStageSession::new(card(0xB2));
+    alice.get_display_qr().expect("advertises");
+    let opening = bob.get_display_qr().expect("advertises");
+    let header = TrainingHeader::new(0, &[], peer_reads).expect("within range");
+    alice.process_scanned_qr(&with_header(&opening.data, &header).expect("takes a header"));
+
+    (0..80)
+        .filter_map(|_| alice.get_display_qr())
+        .filter(|frame| frame.data.starts_with("DAT3"))
+        .map(|frame| frame.data.len())
+        .collect()
+}
+
+// @internal
+#[test]
+fn a_link_with_no_read_rate_yet_sends_chunks_that_fit_qr_version_6() {
+    let lengths = data_frame_lengths_for_a_peer_reporting(0);
+
+    assert!(!lengths.is_empty(), "no DATA frames shown");
+    let longest = *lengths.iter().max().unwrap();
+    // 5 characters short of the version's 154: the ACK field is empty
+    // until the peer's chunk count is known, and may grow to 5.
+    assert_eq!(longest, 149);
+}
+
+// @internal
+#[test]
+fn data_frames_stay_in_qr_version_6_while_acking_a_24_chunk_peer() {
+    use vauchi_core::exchange::multistage::qr_codec::{StageQr, parse_qr};
+
+    let mut alice = MultiStageSession::new(vec![0xA1; 400]);
+    // 24 chunks of 38 bytes once sealed (870 + 24 + 16 = 910 bytes).
+    let mut bob = MultiStageSession::new(vec![0xB2; 870]);
+    let a_opening = alice.get_display_qr().expect("advertises");
+    let b_opening = bob.get_display_qr().expect("advertises");
+    alice.process_scanned_qr(&b_opening.data);
+    bob.process_scanned_qr(&a_opening.data);
+    // Alice learns Bob's chunk count from his first DATA frame.
+    let bob_data = (0..40)
+        .filter_map(|_| bob.get_display_qr())
+        .find(|frame| frame.data.starts_with("DAT3"))
+        .expect("bob shows DATA");
+    let Ok(StageQr::Data { chunk_total, .. }) = parse_qr(&bob_data.data) else {
+        panic!("not a DATA frame");
+    };
+    assert_eq!(chunk_total, 24, "precondition: a 24-chunk peer");
+    alice.process_scanned_qr(&bob_data.data);
+
+    let longest = (0..80)
+        .filter_map(|_| alice.get_display_qr())
+        .filter(|frame| frame.data.starts_with("DAT3"))
+        .map(|frame| frame.data.len())
+        .max()
+        .expect("alice shows DATA");
+
+    assert_eq!(
+        longest, 154,
+        "a full chunk with a 3-byte ACK fills version 6"
+    );
+}
+
+// @internal
+#[test]
+fn a_peer_that_reports_reading_fast_gets_denser_chunks() {
+    use vauchi_core::exchange::multistage::link_trainer::{
+        STEP_UP_TO_V7_READS, STEP_UP_TO_V8_READS,
+    };
+
+    let just_below = data_frame_lengths_for_a_peer_reporting(STEP_UP_TO_V7_READS - 1);
+    let version_7 = data_frame_lengths_for_a_peer_reporting(STEP_UP_TO_V7_READS);
+    let version_8 = data_frame_lengths_for_a_peer_reporting(STEP_UP_TO_V8_READS);
+
+    // Each 5 characters short of what its QR version holds (154, 178,
+    // 221), kept for the ACK field.
+    assert_eq!(*just_below.iter().max().unwrap(), 149);
+    assert_eq!(*version_7.iter().max().unwrap(), 173);
+    assert_eq!(*version_8.iter().max().unwrap(), 215);
+}
+
+// @internal
+#[test]
+fn the_chunk_size_does_not_change_once_data_has_started() {
+    let (_, mut alice, mut bob) = exchange(&EVERY_LAYOUT, &EVERY_LAYOUT, 2);
+    assert!(matches!(
+        alice.get_state(),
+        ProtocolState::Transferring { .. }
+    ));
+    let totals_seen = |session: &mut MultiStageSession| -> Vec<u16> {
+        use vauchi_core::exchange::multistage::qr_codec::{StageQr, parse_qr};
+        let mut totals: Vec<u16> = (0..40)
+            .filter_map(|_| session.get_display_qr())
+            .filter_map(|frame| match parse_qr(&frame.data) {
+                Ok(StageQr::Data { chunk_total, .. }) => Some(chunk_total),
+                _ => None,
+            })
+            .collect();
+        totals.dedup();
+        totals
+    };
+    let before = totals_seen(&mut alice);
+
+    // Bob now reports a saturated read rate on every frame.
+    for _ in 0..60 {
+        if let Some(frame) = bob.get_display_qr() {
+            for _ in 0..3 {
+                alice.process_scanned_qr(&frame.data);
+            }
+        }
+        let _ = alice
+            .get_display_qr()
+            .map(|f| bob.process_scanned_qr(&f.data));
+        if !matches!(alice.get_state(), ProtocolState::Transferring { .. }) {
+            break;
+        }
+    }
+
+    assert_eq!(before.len(), 1, "one chunk count per transfer: {before:?}");
+    let after = totals_seen(&mut alice);
+    assert!(
+        after.is_empty() || after == before,
+        "chunk count changed mid-transfer: {before:?} then {after:?}"
+    );
+}

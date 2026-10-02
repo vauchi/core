@@ -235,3 +235,15 @@ fn the_sweep_dwell_shortens_only_for_a_peer_that_reads_fast() {
     assert_eq!(FAST_SWEEP_DWELL_MS, 60);
     assert_eq!(SWEEP_DWELL_MS, 100);
 }
+
+// @internal
+#[test]
+fn the_chunk_size_steps_with_the_peers_reported_read_rate() {
+    assert_eq!(chunk_bytes_for(0), 38);
+    assert_eq!(chunk_bytes_for(STEP_UP_TO_V7_READS - 1), 38);
+    assert_eq!(chunk_bytes_for(STEP_UP_TO_V7_READS), 54);
+    assert_eq!(chunk_bytes_for(STEP_UP_TO_V8_READS - 1), 54);
+    assert_eq!(chunk_bytes_for(STEP_UP_TO_V8_READS), 82);
+    assert_eq!(chunk_bytes_for(MAX_READ_COUNT), 82);
+    assert_eq!(chunk_bytes_for(u8::MAX), 82);
+}

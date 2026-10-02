@@ -13,6 +13,7 @@ pub mod base45;
 pub mod chunker;
 pub mod commitment;
 pub mod crc16;
+pub mod link_trainer;
 pub mod qr_codec;
 pub mod session;
 pub mod training_header;

@@ -225,11 +225,10 @@ fn a_final_frame_from_another_session_changes_nothing() {
     );
 }
 
-// @internal
-#[test]
-fn a_session_still_transferring_takes_the_key_and_finalizes_on_the_next_read() {
-    // Bob holds all of Alice's chunks but has not seen her ACK for his
-    // own, so he is still Transferring when her final frame arrives.
+/// Bob holds all of Alice's chunks but has not seen her ACK for his own,
+/// so he is still Transferring; Alice has reached Verifying and shown her
+/// final frame.
+fn bob_still_transferring_with_all_of_alices_chunks() -> Staged {
     let mut alice = MultiStageSession::new(ALICE_CARD.to_vec());
     let mut bob = MultiStageSession::new(vec![0xB2; 400]);
     let ai = alice.get_display_qr().unwrap();
@@ -276,18 +275,63 @@ fn a_session_still_transferring_takes_the_key_and_finalizes_on_the_next_read() {
         bob.get_state()
     );
 
+    Staged {
+        alice,
+        bob,
+        alice_final,
+    }
+}
+
+// @internal
+#[test]
+fn a_final_frame_read_while_still_transferring_finalizes_once_the_card_opens() {
+    let Staged {
+        mut bob,
+        alice_final,
+        ..
+    } = bob_still_transferring_with_all_of_alices_chunks();
+
     bob.process_scanned_qr(&alice_final);
     assert_ne!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(bob.get_received_data(), None);
-    // Showing his next frame is when Bob opens the card with the kept key.
+    // Showing his next frame is when Bob opens the card with the kept key;
+    // the tag read with it completes the exchange without a second read.
     let _ = bob.get_display_qr();
-    assert_eq!(bob.get_state(), ProtocolState::Confirming);
+
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_received_data().as_deref(), Some(ALICE_CARD));
+}
+
+/// A peer about to re-handshake still shows final frames bound to its old
+/// partner (ADR-071). Such a tag, kept from before Confirming, must not
+/// fail the exchange once the card opens; it is dropped, and the peer's
+/// next final frame decides.
+// @internal
+#[test]
+fn a_tag_kept_from_before_confirming_that_does_not_match_is_dropped_not_fatal() {
+    let Staged {
+        alice,
+        mut bob,
+        alice_final,
+    } = bob_still_transferring_with_all_of_alices_chunks();
+    let bound_elsewhere = qr_codec::format_final_qr(
+        &alice.session_id(),
+        &reveal_key_of(&alice_final),
+        &final_tag(ALICE_CARD, alice.session_id(), [9u8; 16]),
+    );
+
+    bob.process_scanned_qr(&bound_elsewhere);
+    let _ = bob.get_display_qr();
+    assert_eq!(
+        bob.get_state(),
+        ProtocolState::Confirming,
+        "the card opened; the stale tag neither finalized nor failed"
+    );
 
     assert_eq!(
         bob.process_scanned_qr(&alice_final),
         ProtocolState::Finalized
     );
-    assert_eq!(bob.get_received_data().as_deref(), Some(ALICE_CARD));
 }
 
 // @internal

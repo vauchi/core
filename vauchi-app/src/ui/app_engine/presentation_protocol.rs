@@ -357,7 +357,8 @@ impl AppEngine {
         // companion (detail) pane shares the same selection as the
         // primary pane, since there is one active destination at a time.
         let selected_tab = self.current_tab_id(TabLayout::Desktop);
-        ContextualSurface::compose_revisioned(
+        let information = self.screen_information(&surface_id, screen);
+        let surface = ContextualSurface::compose_revisioned(
             surface_id,
             self.surface_revision,
             screen,
@@ -365,7 +366,36 @@ impl AppEngine {
             selected_tab,
             &self.t("nav.more"),
             &self.t("action_list.title"),
-        )
+        )?;
+        match information {
+            Some(body) => surface.with_information(
+                &self.t("context_bar.info"),
+                &self.t("context_bar.info_a11y"),
+                &body,
+            ),
+            None => Ok(surface),
+        }
+    }
+
+    /// What the info slot says about `screen`: `screen_info.<screen_id>`,
+    /// else `screen_info.<surface_id>`, in the active locale with the title
+    /// standing in for `{name}`; nothing while the person has help icons
+    /// off or the screen has no text yet (vauchi/private#479). A companion
+    /// pane carries its engine's own screen id (`contact_list`) under the
+    /// app's surface id (`contacts`), hence the second key.
+    fn screen_information(
+        &self,
+        surface_id: &SurfaceId,
+        screen: &crate::ui::ScreenModel,
+    ) -> Option<String> {
+        if !self.vauchi().config().show_help_icons {
+            return None;
+        }
+        let locale = self.render_context.resolved_locale();
+        [screen.screen_id.as_str(), surface_id.as_str()]
+            .into_iter()
+            .find_map(|id| crate::i18n::try_get_string(locale, &format!("screen_info.{id}")))
+            .map(|text| text.replace("{name}", &screen.title))
     }
 
     /// A heartbeat replaced what is on screen (a Link session completed or

@@ -132,6 +132,17 @@ pub fn get_string(locale: Locale, key: &str) -> String {
     format!("Missing: {}", key)
 }
 
+/// The string for `key`, or `None` where neither the locale nor English
+/// has one — for copy that is optional per screen, such as the context
+/// bar's information text, where "Missing: …" must never reach a person.
+pub fn try_get_string(locale: Locale, key: &str) -> Option<String> {
+    lookup_one(locale, key).or_else(|| {
+        (locale != Locale::English)
+            .then(|| lookup_one(Locale::English, key))
+            .flatten()
+    })
+}
+
 /// Single-key lookup — clones only the matched value, never a whole
 /// locale map. A store-loaded locale wins entirely (hit or miss),
 /// matching [`get_strings_for_locale`]'s fallback order; only an

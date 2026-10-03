@@ -19,9 +19,12 @@ fn engine_with_identity() -> AppEngine {
     AppEngine::new(vauchi)
 }
 
+/// The bar of the surface the person is on: the last one in the batch,
+/// after any companion pane's.
 fn context_bar(commands: &[Command]) -> (String, ContextBar) {
     commands
         .iter()
+        .rev()
         .find_map(|command| match command {
             Command::SetContextBar {
                 surface_id, bar, ..
@@ -39,6 +42,7 @@ fn present_commands(engine: &mut AppEngine) -> Vec<Command> {
 #[test]
 fn contacts_carries_an_info_action_whose_overlay_says_what_the_screen_is_for() {
     let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Contacts);
     let commands = present_commands(&mut engine);
     let (surface_id, bar) = context_bar(&commands);
 

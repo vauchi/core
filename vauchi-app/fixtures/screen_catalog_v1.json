@@ -381,6 +381,14 @@
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
               }
             }
           }
@@ -517,6 +525,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",
                 "accessibility_label": "Actions",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -1216,6 +1232,14 @@
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
               }
             }
           }
@@ -1655,6 +1679,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",
                 "accessibility_label": "Actions",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -2154,7 +2186,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_e6867483cb96a4cd",
+                    "id": "field_0fb0e96d866fc397",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2185,13 +2217,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:e6867483cb96a4cd",
+                    "id": "field_note:0fb0e96d866fc397",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:e6867483cb96a4cd",
+                          "id": "field_note:0fb0e96d866fc397",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2231,7 +2263,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_fb5bd8ccdf9f861b",
+                    "id": "field_e9be6d564ab5e82b",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2262,13 +2294,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:fb5bd8ccdf9f861b",
+                    "id": "field_note:e9be6d564ab5e82b",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:fb5bd8ccdf9f861b",
+                          "id": "field_note:e9be6d564ab5e82b",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2308,7 +2340,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_f39e2ef567a31538",
+                    "id": "field_2e1994652d99312e",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2339,13 +2371,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:f39e2ef567a31538",
+                    "id": "field_note:2e1994652d99312e",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:f39e2ef567a31538",
+                          "id": "field_note:2e1994652d99312e",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2579,6 +2611,14 @@
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
               }
             }
           }
@@ -2666,6 +2706,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",
                 "accessibility_label": "Actions",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -3211,6 +3259,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",
                 "accessibility_label": "Actions",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -3961,6 +4017,14 @@
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
               }
             }
           }
@@ -4499,10 +4563,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "EAEF 2046 627B 906F 391C 6AE0 C538 006E E989 C5DD DC76 6173 326F 4E5E 6344 74D4",
+                    "content": "476F A2E5 DD3A 3B64 0D0E F679 24AD 2BC3 3B96 1A64 F620 9089 1467 8D16 A81E DA76",
                     "style": "body",
                     "accessibility": {
-                      "label": "EAEF 2046 627B 906F 391C 6AE0 C538 006E E989 C5DD DC76 6173 326F 4E5E 6344 74D4",
+                      "label": "476F A2E5 DD3A 3B64 0D0E F679 24AD 2BC3 3B96 1A64 F620 9089 1467 8D16 A81E DA76",
                       "description": null
                     }
                   }
@@ -4521,10 +4585,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "D960 B1C5 07F0 AFCA 3837 9205 6E00 AFF5 2F6F 7494 38CF 7F00 161C C8B8 3A76 90C7",
+                    "content": "192B 39BE 0770 164C 4B9D 5891 C7A8 2DD2 C146 227C 6B4D C571 12B5 95E0 15A4 0931",
                     "style": "body",
                     "accessibility": {
-                      "label": "D960 B1C5 07F0 AFCA 3837 9205 6E00 AFF5 2F6F 7494 38CF 7F00 161C C8B8 3A76 90C7",
+                      "label": "192B 39BE 0770 164C 4B9D 5891 C7A8 2DD2 C146 227C 6B4D C571 12B5 95E0 15A4 0931",
                       "description": null
                     }
                   }
@@ -4559,6 +4623,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",
                 "accessibility_label": "Actions",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -4812,6 +4884,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",
                 "accessibility_label": "Actions",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -5397,7 +5477,15 @@
                 "shortcut": null
               },
               "primary": null,
-              "secondary": null
+              "secondary": null,
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              }
             }
           }
         },
@@ -6420,7 +6508,15 @@
                 "shortcut": null
               },
               "primary": null,
-              "secondary": null
+              "secondary": null,
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              }
             }
           }
         },
@@ -7248,7 +7344,15 @@
                 "shortcut": null
               },
               "primary": null,
-              "secondary": null
+              "secondary": null,
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              }
             }
           }
         },
@@ -7994,7 +8098,15 @@
                 "shortcut": null
               },
               "primary": null,
-              "secondary": null
+              "secondary": null,
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              }
             }
           }
         },
@@ -9054,6 +9166,14 @@
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
               }
             }
           }
@@ -9312,6 +9432,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",
                 "accessibility_label": "Actions",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -13130,7 +13258,15 @@
                 "enabled": true,
                 "shortcut": "activate_primary"
               },
-              "secondary": null
+              "secondary": null,
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              }
             }
           }
         },
@@ -13722,6 +13858,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",
                 "accessibility_label": "Actions",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -14413,6 +14557,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",
                 "accessibility_label": "Actions",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -15144,6 +15296,14 @@
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
               }
             }
           }
@@ -15461,6 +15621,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",
                 "accessibility_label": "Actions",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "About this screen",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -16249,7 +16417,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=n66iQSHMRwwwgrM-G4zo8YkEAVXOjQ_2KAmuYbfzzAw&n=tUzwwTdw9pc_UmRvulX9YqflnRDyVuX7CZnahaeH83A",
+                    "content": "vauchi://exchange?pk=HKN7bZY-Z8fgsPff_8kSUkXwTn68iScK0oYzLpXm42E&n=xbhhq6mi60HFUAyONit-Wravn7kVzqjBNsRC1KXT5Ik",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -16772,7 +16940,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,80,90,89,76,72,70,66,47,67,118,121,106,103,51,107,103,86,117,65,75,47,49,76,50,57,48,108,68,106,80,102,119,65,87,72,77,105,52,79,110,97,81,120,55,89,88,89,89,48,86,49,85,53,73,116,51,88,56,65,49,67,65,85,53,108,65,108,76,76,85,105,119,119,113,53,71,122,52,66,50,109,52,74,84,69,102,90,75,56,69,55,86,69,66,77,82,82,51,50,80,79,79,87,86,109,75,76,83,89,79,86,43,107,83,74,105,122,109,99,56,49,89,102,49,77,70,84,71,104,88,87,83,112,97,67,69,48,81,48,81,70,115,115,99,81,118,97,121,83,53,65,65,65,65,65,71,114,65,107,102,65,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,120,43,120,89,49,103,49,99,53,68,98,87,122,87,82,101,101,76,73,108,107,78,51,75,71,57,85,106,85,85,90,77,104,121,47,86,54,122,53,77,68,99,47,48,67,83,104,117,68,51,53,85,122,71,115,117,111,117,86,97,50,55,111,101,88,112,102,115,87,122,76,52,50,99,99,112,122,66,117,113,119,100,86,107,70],
+            "payload": [86,48,74,70,87,65,77,90,75,122,109,43,66,51,65,87,84,69,117,100,87,74,72,72,113,67,51,83,119,85,89,105,102,71,116,78,120,88,69,83,116,90,88,103,70,97,81,74,77,100,49,43,81,90,81,83,73,103,114,50,50,89,54,71,116,114,80,110,78,66,118,80,56,49,82,83,114,122,85,104,79,106,105,111,73,102,99,100,86,74,57,90,82,75,80,54,67,112,83,57,65,115,101,47,100,87,104,104,97,67,80,51,85,78,72,113,71,50,100,52,84,121,47,115,121,104,53,99,56,120,112,56,83,101,121,55,101,119,114,121,82,101,73,113,117,86,80,50,73,99,119,53,80,86,77,77,65,65,65,65,65,71,114,65,116,77,99,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,113,105,110,119,118,48,79,73,101,81,81,70,77,111,49,65,122,114,114,50,88,47,118,76,56,106,110,97,84,114,83,78,89,83,49,116,86,120,50,119,118,118,101,119,85,69,117,107,70,117,113,111,106,86,86,115,105,84,98,49,83,111,74,119,121,52,101,97,118,72,86,69,48,51,99,84,116,107,49,56,119,52,106,99,73],
             "is_initiator": true
           }
         }
@@ -16832,10 +17000,11 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI28+MV:E98Q6BKHMO1IU3-7J6NUB89QT2V890G5UJVY3S3JSZNAQD6-R9PMJNM7HFSC4T%81ZV%L0WFWBC0K5SDP99.U28DAHCOU0D5Q1Z6ACD7-TRLH3H7LRL11Vauchi User00"
+                      "INI30:0:0:009+UM*212N./PKMGPQD$-T2%CZVN8ADL3SWQCMR0.4L8YLLK3S1NEVUEK5J9LRNK4ZRT4OH3594FB37RL6N9O:8W7PFM+A35VDTS6P8C:SPE3/U7*PP4 EB/G11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
+                    "error_correction": "low",
                     "accessibility": {
                       "label": "own_qr",
                       "description": null
@@ -16850,7 +17019,7 @@
                     "children": [
                       {
                         "Qr": {
-                          "id": "surface.1.binding.0",
+                          "id": "surface.capture.peer_scan",
                           "payloads": [
                             ""
                           ],
@@ -17061,7 +17230,7 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 330
+            "earliest_millis": 119
           }
         }
       ]
@@ -17124,7 +17293,7 @@
                     "children": [
                       {
                         "Qr": {
-                          "id": "surface.1.binding.0",
+                          "id": "surface.capture.peer_scan",
                           "payloads": [
                             ""
                           ],
@@ -17535,7 +17704,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [217,96,177,197,7,240,175,202,56,55,146,5,110,0,175,245,47,111,116,148,56,207,127,0,22,28,200,184,58,118,144,199]
+            "payload": [25,43,57,190,7,112,22,76,75,157,88,145,199,168,45,210,193,70,34,124,107,77,197,113,18,181,149,224,21,164,9,49]
           }
         },
         {
@@ -17718,7 +17887,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [217,96,177,197,7,240,175,202,56,55,146,5,110,0,175,245,47,111,116,148,56,207,127,0,22,28,200,184,58,118,144,199]
+            "payload": [25,43,57,190,7,112,22,76,75,157,88,145,199,168,45,210,193,70,34,124,107,77,197,113,18,181,149,224,21,164,9,49]
           }
         },
         {
@@ -17901,7 +18070,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [217,96,177,197,7,240,175,202,56,55,146,5,110,0,175,245,47,111,116,148,56,207,127,0,22,28,200,184,58,118,144,199]
+            "payload": [25,43,57,190,7,112,22,76,75,157,88,145,199,168,45,210,193,70,34,124,107,77,197,113,18,181,149,224,21,164,9,49]
           }
         },
         {
@@ -20418,6 +20587,14 @@
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "Über diesen Bildschirm",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
               }
             }
           }
@@ -20857,6 +21034,14 @@
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Aktionen",
                 "accessibility_label": "Aktionen",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "Über diesen Bildschirm",
                 "icon_token": null,
                 "enabled": true,
                 "shortcut": null
@@ -21442,7 +21627,15 @@
                 "shortcut": null
               },
               "primary": null,
-              "secondary": null
+              "secondary": null,
+              "info": {
+                "interaction_id": "surface.1.context.presentation.info",
+                "label": "Info",
+                "accessibility_label": "Über diesen Bildschirm",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              }
             }
           }
         },

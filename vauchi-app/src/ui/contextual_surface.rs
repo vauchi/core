@@ -272,10 +272,13 @@ impl ContextualSurface {
     pub fn with_information(
         mut self,
         label: &str,
+        accessibility_label: &str,
         body: &str,
     ) -> Result<Self, ContextualSurfaceError> {
         let interaction_id = scoped_interaction(self.id_revision, INFO_INTERACTION_ID)?;
-        self.bar.info = Some(launcher_action(interaction_id.clone(), label));
+        let mut info = launcher_action(interaction_id.clone(), label);
+        info.accessibility_label = accessibility_label.to_owned();
+        self.bar.info = Some(info);
         self.info_interaction_id = Some(interaction_id);
         self.information_overlay = Some(OverlaySpec {
             kind: OverlayKind::Information,

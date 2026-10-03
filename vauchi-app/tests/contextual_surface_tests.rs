@@ -451,6 +451,7 @@ fn navigation_is_empty_when_the_app_offers_no_destinations() {
 fn an_information_action_opens_an_overlay_that_carries_text_not_actions() {
     let surface = contextual_surface()
         .with_information(
+            "Info",
             "About this screen",
             "Here are the people you have exchanged cards with.",
         )
@@ -461,7 +462,7 @@ fn an_information_action_opens_an_overlay_that_carries_text_not_actions() {
         .info
         .as_ref()
         .expect("the bar carries the info slot");
-    assert_eq!(info.label, "About this screen");
+    assert_eq!(info.label, "Info");
     assert_eq!(info.accessibility_label, "About this screen");
     assert_eq!(info.interaction_id.as_str(), "presentation.info");
 

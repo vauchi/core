@@ -38,7 +38,7 @@
 include:
   - project: 'vauchi/scripts'
     # Pin the commit because tags are not protected.
-    ref: 17d9f7d2be1a2076c9b768b31c8399c3ce6e598a
+    ref: 93ed835b8046a0698cf9c018bbc028504ba08b24
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -94,7 +94,10 @@ variables:
   # MUST match the include: ref above. The templates come from that ref and
   # the scripts this variable fetches at job runtime come from this one; two
   # different commits would mix template and script versions silently.
-  # Bumped 2026-09-26 to ci-templates-v2026.09.26 for the exact-zero release
+  # Bumped 2026-10-03 to 93ed835 (= ci-templates-v2026.10.05) so
+  # mutation:nightly collects cargo-mutants' own exit status instead of
+  # dying at the monitor's `wait` (vauchi/private#487, vauchi/scripts!601);
+  # before that, 2026-09-26 to ci-templates-v2026.09.26 for the exact-zero release
   # ratchet (ADR-066, vauchi/private#11); before that, 2026-09-25 so
   # allow-direct:check fails closed when ripgrep is missing or errors,
   # instead of reporting OK unscanned (vauchi/scripts!570); before that,
@@ -102,7 +105,7 @@ variables:
   # keeps the SHA form because tags here are not protected), the lint:typos
   # linux tag (vauchi/scripts!552) and retired_boundary_vocabulary
   # (vauchi/scripts!502).
-  VAUCHI_SCRIPTS_REF: "17d9f7d2be1a2076c9b768b31c8399c3ce6e598a"
+  VAUCHI_SCRIPTS_REF: "93ed835b8046a0698cf9c018bbc028504ba08b24"
   # cargo audit runs with --deny warnings; every entry here is an
   # advisory with no fix available to us, not one we chose to skip.
   #   RUSTSEC-2026-0192  ttf-parser unmaintained, reached through

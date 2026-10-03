@@ -291,7 +291,7 @@ proptest! {
     #[test]
     fn no_eight_characters_make_the_parser_panic(text in "\\PC{0,12}") {
         // Whatever a camera reads after a valid prefix is either a header or
-        // an error.
+        // an error. allow(zero_assertions): the property is that it returns.
         let _ = parse_frame(&format!("FAI3{text}"));
     }
 

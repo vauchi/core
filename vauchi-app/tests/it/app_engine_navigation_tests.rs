@@ -165,6 +165,32 @@ fn settings_toggle_persists_to_settings_flags() {
     );
 }
 
+// "Show help icons" governs the info action on every context bar
+// (vauchi/private#479), so it must survive a restart like the other
+// toggles; until now it flipped in the screen's own state only.
+// @internal
+#[test]
+fn show_help_icons_toggle_persists_to_settings_flags_and_config() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::SettingsAppearance);
+    assert!(
+        engine.vauchi().config().show_help_icons,
+        "help icons are on until the person turns them off"
+    );
+
+    let _ = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "appearance".into(),
+        item_id: "show_help_icons".into(),
+    });
+
+    assert!(!engine.vauchi().config().show_help_icons);
+    let flags = engine.vauchi().load_settings_flags().unwrap();
+    assert!(
+        !flags.show_help_icons,
+        "show_help_icons persisted to durable SettingsFlags"
+    );
+}
+
 // GDPR export action returns the serialized data via GdprExportComplete
 // (core performs export_all_data; the frontend persists the payload).
 // @internal

@@ -16,6 +16,7 @@ mod routing;
 const BACK_INTERACTION_ID: &str = "presentation.back";
 const NAVIGATION_INTERACTION_ID: &str = "presentation.navigation";
 const SECONDARY_INTERACTION_ID: &str = "presentation.secondary";
+const INFO_INTERACTION_ID: &str = "presentation.info";
 const NAVIGATION_ITEM_PREFIX: &str = "presentation.navigation.";
 const LEGACY_BACK_ACTION_ID: &str = "go_back";
 
@@ -47,12 +48,17 @@ pub enum ContextualSurfaceError {
 pub struct ContextualSurface {
     surface_id: SurfaceId,
     revision: u64,
+    /// `Some` when interaction ids are scoped to the revision.
+    id_revision: Option<u64>,
     bar: ContextBar,
     back_interaction_id: Option<InteractionId>,
     navigation_interaction_id: Option<InteractionId>,
     secondary_interaction_id: Option<InteractionId>,
+    info_interaction_id: Option<InteractionId>,
+    title: String,
     navigation_overlay: OverlaySpec,
     secondary_overlay: OverlaySpec,
+    information_overlay: Option<OverlaySpec>,
     navigation_spec: NavigationSpec,
     routes: HashMap<InteractionId, UserAction>,
 }
@@ -226,30 +232,58 @@ impl ContextualSurface {
         Ok(Self {
             surface_id,
             revision: revision.unwrap_or(0),
+            id_revision: revision,
             bar: ContextBar {
                 back,
                 navigation: navigation_action,
                 primary,
                 secondary,
+                info: None,
             },
             back_interaction_id,
             navigation_interaction_id,
             secondary_interaction_id,
+            info_interaction_id: None,
+            title: screen.title.clone(),
             navigation_overlay: OverlaySpec {
                 kind: OverlayKind::Navigation,
                 title: Some(navigation_label.to_owned()),
                 items: navigation_items,
+                body: None,
             },
             secondary_overlay: OverlaySpec {
                 kind: OverlayKind::ActionMenu,
                 title: Some(secondary_label.to_owned()),
                 items: secondary_items,
+                body: None,
             },
+            information_overlay: None,
             navigation_spec: NavigationSpec {
                 items: navigation_spec_items,
             },
             routes,
         })
+    }
+
+    /// Gives the bar its info slot (vauchi/private#479): `label` names the
+    /// action, `body` is what the overlay says about this surface, under
+    /// the surface's title. The slot's id is scoped to the revision like
+    /// the other launchers.
+    pub fn with_information(
+        mut self,
+        label: &str,
+        body: &str,
+    ) -> Result<Self, ContextualSurfaceError> {
+        let interaction_id = scoped_interaction(self.id_revision, INFO_INTERACTION_ID)?;
+        self.bar.info = Some(launcher_action(interaction_id.clone(), label));
+        self.info_interaction_id = Some(interaction_id);
+        self.information_overlay = Some(OverlaySpec {
+            kind: OverlayKind::Information,
+            title: Some(self.title.clone()),
+            items: Vec::new(),
+            body: Some(body.to_owned()),
+        });
+        Ok(self)
     }
 }
 
@@ -308,6 +342,7 @@ fn validate_not_reserved(id: &str) -> Result<(), ContextualSurfaceError> {
     if id == BACK_INTERACTION_ID
         || id == NAVIGATION_INTERACTION_ID
         || id == SECONDARY_INTERACTION_ID
+        || id == INFO_INTERACTION_ID
         || id.starts_with(NAVIGATION_ITEM_PREFIX)
     {
         Err(ContextualSurfaceError::ReservedInteractionId(id.to_owned()))

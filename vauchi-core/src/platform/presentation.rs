@@ -129,6 +129,11 @@ pub struct ContextBar {
     pub navigation: Option<ActionSpec>,
     pub primary: Option<ActionSpec>,
     pub secondary: Option<ActionSpec>,
+    /// Explains the surface: opens an `OverlayKind::Information` overlay.
+    /// Absent where Core has no text for the surface or the person turned
+    /// help off; omitted on the wire so older shells see the four slots.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub info: Option<ActionSpec>,
 }
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -138,6 +143,8 @@ pub struct ContextBar {
 pub enum OverlayKind {
     Navigation,
     ActionMenu,
+    /// Text about the surface, no actions beyond dismissing it.
+    Information,
 }
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -146,6 +153,9 @@ pub struct OverlaySpec {
     pub kind: OverlayKind,
     pub title: Option<String>,
     pub items: Vec<ActionSpec>,
+    /// Prose for an `Information` overlay; omitted on the wire otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
 }
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]

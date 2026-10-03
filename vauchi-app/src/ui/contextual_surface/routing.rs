@@ -68,6 +68,16 @@ impl ContextualSurface {
                             overlay: self.secondary_overlay.clone(),
                         },
                     ]))
+                } else if self.info_interaction_id.as_ref() == Some(&interaction_id)
+                    && let Some(overlay) = &self.information_overlay
+                {
+                    Ok(ContextualSurfaceRoute::Commands(vec![
+                        Command::PresentOverlay {
+                            surface_id: self.surface_id.clone(),
+                            revision: self.revision,
+                            overlay: overlay.clone(),
+                        },
+                    ]))
                 } else {
                     self.routes.get(&interaction_id).cloned().map_or_else(
                         || {

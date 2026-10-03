@@ -33,6 +33,7 @@ fn initial_bar() -> ContextBar {
             Some(StandardShortcut::ActivatePrimary),
         )),
         secondary: Some(action("more", "More actions", None)),
+        info: None,
     }
 }
 

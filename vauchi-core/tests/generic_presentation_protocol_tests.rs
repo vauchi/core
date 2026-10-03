@@ -51,6 +51,7 @@ fn test_context_bar_complete_roles_round_trip_without_domain_interpretation() {
                 Some(StandardShortcut::ActivatePrimary),
             )),
             secondary: Some(action("more", "More actions", "action.more", None)),
+            info: None,
         }),
     };
 
@@ -223,6 +224,7 @@ fn test_overlay_commands_preserve_navigation_and_action_menu_kinds() {
             kind: OverlayKind::Navigation,
             title: Some("Navigate".to_owned()),
             items: vec![action("contacts", "Contacts", "navigation.contacts", None)],
+            body: None,
         },
     };
     let action_menu = Command::PresentOverlay {
@@ -232,6 +234,7 @@ fn test_overlay_commands_preserve_navigation_and_action_menu_kinds() {
             kind: OverlayKind::ActionMenu,
             title: Some("More actions".to_owned()),
             items: vec![action("archive", "Archive", "action.archive", None)],
+            body: None,
         },
     };
 

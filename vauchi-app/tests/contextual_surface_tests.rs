@@ -490,6 +490,7 @@ fn an_information_action_opens_an_overlay_that_carries_text_not_actions() {
     );
 }
 
+// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
 #[test]
 fn without_information_the_bar_has_no_info_slot_and_its_id_is_unknown() {
     let surface = contextual_surface();
@@ -506,6 +507,7 @@ fn without_information_the_bar_has_no_info_slot_and_its_id_is_unknown() {
     );
 }
 
+// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
 #[test]
 fn a_screen_action_may_not_use_the_reserved_info_id() {
     let screen = ScreenModel::new(

@@ -961,7 +961,7 @@
   "error.validation": "Please check your input",
   "exchange.adding_contact": "Adding contact...",
   "exchange.assign.groups_label": "Groups",
-  "exchange.assign.subtitle": "Choose which groups the new contact will be in",
+  "exchange.assign.subtitle": "Groups decide what this new contact can see of your card",
   "exchange.assign.title": "Assign to Groups",
   "exchange.assign.toggle_hint": "Toggle to assign the new contact to this group.",
   "exchange.ble.exchanging_default_title": "Exchanging...",

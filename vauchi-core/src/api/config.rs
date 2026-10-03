@@ -77,6 +77,11 @@ pub struct VauchiConfig {
     /// (see `reduce_motion`). Default: false.
     pub large_touch: bool,
 
+    /// Draw the info action on every context bar and the help icons on
+    /// form fields (vauchi/private#479). Default: true; a person who knows
+    /// the app turns them off once.
+    pub show_help_icons: bool,
+
     /// New contact-card entries start Visible instead of the hidden default
     /// (2026-07-05-ungrouped-contacts-default-open, Decision 2). Self-seeded
     /// from `SettingsFlags`. Default: false.
@@ -100,6 +105,7 @@ impl Default for VauchiConfig {
             card_update_notifications: true,
             reduce_motion: false,
             large_touch: false,
+            show_help_icons: true,
             new_field_default_visible: false,
         }
     }
@@ -119,6 +125,7 @@ impl crate::types::SettingsFlags {
         self.card_update_notifications = config.card_update_notifications;
         self.reduce_motion = config.reduce_motion;
         self.large_touch = config.large_touch;
+        self.show_help_icons = config.show_help_icons;
         self.new_field_default_visible = config.new_field_default_visible;
     }
 }

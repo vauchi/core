@@ -49,6 +49,11 @@ pub struct SettingsFlags {
     /// Category-2 accessibility flag (see `reduce_motion`).
     #[serde(default)]
     pub large_touch: bool,
+    /// Info action on every context bar and help icons on form fields
+    /// (vauchi/private#479). Defaults to true; `default_true` keeps flags
+    /// stored before this field existed showing them.
+    #[serde(default = "default_true")]
+    pub show_help_icons: bool,
     /// One-time field-centric visibility grandfathering ran (or the install
     /// is fresh enough to never need it). `#[serde(default)]` = false is the
     /// trigger for installs that predate the model
@@ -75,6 +80,7 @@ impl Default for SettingsFlags {
             card_update_notifications: true,
             reduce_motion: false,
             large_touch: false,
+            show_help_icons: true,
             field_centric_visibility_migrated: false,
             new_field_default_visible: false,
             first_group_education_shown: false,

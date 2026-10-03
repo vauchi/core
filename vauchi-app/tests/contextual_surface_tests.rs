@@ -441,3 +441,85 @@ fn navigation_is_empty_when_the_app_offers_no_destinations() {
 
     assert!(set_navigation(&surface).items.is_empty());
 }
+
+/// The bar's fifth slot explains the surface (vauchi/private#479): a
+/// shell draws one more generic action and shows an overlay that carries
+/// text, never actions. Where Core has no text, the slot is absent and
+/// its id is unknown, so an older batch cannot be replayed into it.
+// @scenario: generic_presentation_protocol.feature :: Contextual controls expose four stable roles
+#[test]
+fn an_information_action_opens_an_overlay_that_carries_text_not_actions() {
+    let surface = contextual_surface()
+        .with_information(
+            "About this screen",
+            "Here are the people you have exchanged cards with.",
+        )
+        .expect("information attaches");
+
+    let info = surface
+        .context_bar()
+        .info
+        .as_ref()
+        .expect("the bar carries the info slot");
+    assert_eq!(info.label, "About this screen");
+    assert_eq!(info.accessibility_label, "About this screen");
+    assert_eq!(info.interaction_id.as_str(), "presentation.info");
+
+    let route = surface
+        .handle_event(Event::ActionActivated {
+            surface_id: self::surface(),
+            interaction_id: info.interaction_id.clone(),
+        })
+        .expect("info launcher");
+    let ContextualSurfaceRoute::Commands(commands) = route else {
+        panic!("the info launcher must emit overlay commands");
+    };
+    let Command::PresentOverlay { overlay, .. } = &commands[0] else {
+        panic!("the info launcher must present an overlay");
+    };
+    assert_eq!(overlay.kind, OverlayKind::Information);
+    assert_eq!(overlay.title.as_deref(), Some("Contacts"));
+    assert_eq!(
+        overlay.body.as_deref(),
+        Some("Here are the people you have exchanged cards with.")
+    );
+    assert!(
+        overlay.items.is_empty(),
+        "an information overlay offers no actions"
+    );
+}
+
+#[test]
+fn without_information_the_bar_has_no_info_slot_and_its_id_is_unknown() {
+    let surface = contextual_surface();
+
+    assert!(surface.context_bar().info.is_none());
+    assert!(
+        surface
+            .handle_event(Event::ActionActivated {
+                surface_id: self::surface(),
+                interaction_id: InteractionId::new("presentation.info").unwrap(),
+            })
+            .is_err(),
+        "an info activation on a surface without text must fail closed"
+    );
+}
+
+#[test]
+fn a_screen_action_may_not_use_the_reserved_info_id() {
+    let screen = ScreenModel::new(
+        "contacts",
+        "Contacts",
+        vec![],
+        vec![screen_action(
+            "presentation.info",
+            "Sneak",
+            ActionStyle::Secondary,
+        )],
+    );
+
+    assert!(
+        ContextualSurface::compose(surface(), &screen, &[], None, "Navigate", "More").is_err(),
+        "presentation.info is reserved for Core's own slot"
+    );
+}

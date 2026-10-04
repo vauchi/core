@@ -2186,7 +2186,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_10d284f43f256b48",
+                    "id": "field_2354bb005ac0221f",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2217,13 +2217,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:10d284f43f256b48",
+                    "id": "field_note:2354bb005ac0221f",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:10d284f43f256b48",
+                          "id": "field_note:2354bb005ac0221f",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2263,7 +2263,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_7457e8dc53be9b9b",
+                    "id": "field_acd961c8086b7e48",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2294,13 +2294,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:7457e8dc53be9b9b",
+                    "id": "field_note:acd961c8086b7e48",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:7457e8dc53be9b9b",
+                          "id": "field_note:acd961c8086b7e48",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2340,7 +2340,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_93587663c348a9a1",
+                    "id": "field_6cdd245f05865260",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2371,13 +2371,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:93587663c348a9a1",
+                    "id": "field_note:6cdd245f05865260",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:93587663c348a9a1",
+                          "id": "field_note:6cdd245f05865260",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4563,10 +4563,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "A9B3 2791 CBAF 013E C2D1 A5D4 CE8C 2CF6 753A ADC8 FD55 C05B D811 2C94 F3CA 50EF",
+                    "content": "F8E4 1737 E0B4 9F21 FECD A77A 3FF3 AE07 2FEC 465C 8C0D C091 412A DF3C 3D58 B3DA",
                     "style": "body",
                     "accessibility": {
-                      "label": "A9B3 2791 CBAF 013E C2D1 A5D4 CE8C 2CF6 753A ADC8 FD55 C05B D811 2C94 F3CA 50EF",
+                      "label": "F8E4 1737 E0B4 9F21 FECD A77A 3FF3 AE07 2FEC 465C 8C0D C091 412A DF3C 3D58 B3DA",
                       "description": null
                     }
                   }
@@ -4585,10 +4585,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "9C18 AD88 77BE E364 3425 2B10 FDA1 959B D2AC A251 7767 E55C 78A8 CDC2 7A88 116F",
+                    "content": "DDDD D34C 433D 8BD0 C208 8F52 A79B 1BBD 81CA 84FB 3498 1B41 FC19 04F1 F41B 82E6",
                     "style": "body",
                     "accessibility": {
-                      "label": "9C18 AD88 77BE E364 3425 2B10 FDA1 959B D2AC A251 7767 E55C 78A8 CDC2 7A88 116F",
+                      "label": "DDDD D34C 433D 8BD0 C208 8F52 A79B 1BBD 81CA 84FB 3498 1B41 FC19 04F1 F41B 82E6",
                       "description": null
                     }
                   }
@@ -6109,6 +6109,14 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
+                        "info": {
+                          "interaction_id": "surface.1.interaction.3",
+                          "label": "Info",
+                          "accessibility_label": "About Duress PIN",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
                         "controls": [],
                         "accessibility": {
                           "label": "Duress PIN",
@@ -6125,7 +6133,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.3",
+                          "interaction_id": "surface.1.interaction.4",
                           "label": "Decoy Contacts",
                           "accessibility_label": "Decoy Contacts",
                           "icon_token": null,
@@ -6149,7 +6157,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.4",
+                          "interaction_id": "surface.1.interaction.5",
                           "label": "Set Up New Device",
                           "accessibility_label": "Set Up New Device",
                           "icon_token": null,
@@ -6187,7 +6195,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.5",
+                          "interaction_id": "surface.1.interaction.6",
                           "label": "Backup reminders",
                           "accessibility_label": "Backup reminder frequency",
                           "icon_token": null,
@@ -6225,7 +6233,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.6",
+                          "interaction_id": "surface.1.interaction.7",
                           "label": "Relay URL",
                           "accessibility_label": "Relay URL",
                           "icon_token": null,
@@ -6263,7 +6271,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.7",
+                          "interaction_id": "surface.1.interaction.8",
                           "label": "Pending Updates",
                           "accessibility_label": "Pending Updates",
                           "icon_token": null,
@@ -6287,7 +6295,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.8",
+                          "interaction_id": "surface.1.interaction.9",
                           "label": "Failed Deliveries",
                           "accessibility_label": "Failed Deliveries",
                           "icon_token": null,
@@ -6325,7 +6333,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.9",
+                          "interaction_id": "surface.1.interaction.10",
                           "label": "What is Vauchi?",
                           "accessibility_label": "What is Vauchi?",
                           "icon_token": null,
@@ -6349,7 +6357,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.10",
+                          "interaction_id": "surface.1.interaction.11",
                           "label": "Support Development",
                           "accessibility_label": "Support Development",
                           "icon_token": null,
@@ -6373,7 +6381,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.11",
+                          "interaction_id": "surface.1.interaction.12",
                           "label": "Support",
                           "accessibility_label": "Support",
                           "icon_token": null,
@@ -6390,14 +6398,14 @@
                       {
                         "title": "Version",
                         "subtitle": null,
-                        "detail": "0.69.0",
+                        "detail": "0.70.0",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": null,
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.12",
+                          "interaction_id": "surface.1.interaction.13",
                           "label": "Version",
                           "accessibility_label": "Version",
                           "icon_token": null,
@@ -6465,7 +6473,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.13",
+                          "interaction_id": "surface.1.interaction.14",
                           "label": "Emergency Wipe",
                           "accessibility_label": "Emergency Wipe",
                           "icon_token": null,
@@ -8627,7 +8635,7 @@
                             },
                             {
                               "title": "About",
-                              "subtitle": "Vauchi 0.69.0 · core 0.69.0",
+                              "subtitle": "Vauchi 0.70.0 · core 0.70.0",
                               "detail": null,
                               "icon_token": null,
                               "image_data": null,
@@ -11577,6 +11585,14 @@
                         "enabled": true,
                         "activation": null,
                         "secondary_actions": [],
+                        "info": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "Info",
+                          "accessibility_label": "About mobile",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
                         "controls": [
                           {
                             "Toggle": {
@@ -11607,6 +11623,14 @@
                         "enabled": true,
                         "activation": null,
                         "secondary_actions": [],
+                        "info": {
+                          "interaction_id": "surface.1.interaction.2",
+                          "label": "Info",
+                          "accessibility_label": "About work",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
                         "controls": [
                           {
                             "Toggle": {
@@ -11637,6 +11661,14 @@
                         "enabled": true,
                         "activation": null,
                         "secondary_actions": [],
+                        "info": {
+                          "interaction_id": "surface.1.interaction.3",
+                          "label": "Info",
+                          "accessibility_label": "About homepage",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
                         "controls": [
                           {
                             "Toggle": {
@@ -11667,6 +11699,14 @@
                         "enabled": true,
                         "activation": null,
                         "secondary_actions": [],
+                        "info": {
+                          "interaction_id": "surface.1.interaction.4",
+                          "label": "Info",
+                          "accessibility_label": "About home",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
                         "controls": [
                           {
                             "Toggle": {
@@ -11697,6 +11737,14 @@
                         "enabled": true,
                         "activation": null,
                         "secondary_actions": [],
+                        "info": {
+                          "interaction_id": "surface.1.interaction.5",
+                          "label": "Info",
+                          "accessibility_label": "About birthday",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
                         "controls": [
                           {
                             "Toggle": {
@@ -11740,7 +11788,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.1",
+                          "interaction_id": "surface.1.interaction.6",
                           "label": "Annabella Byron",
                           "accessibility_label": "Contact: Annabella Byron",
                           "icon_token": null,
@@ -11764,7 +11812,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.2",
+                          "interaction_id": "surface.1.interaction.7",
                           "label": "Charles Babbage",
                           "accessibility_label": "Contact: Charles Babbage",
                           "icon_token": null,
@@ -16417,7 +16465,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=wFL2m6K0jSBK252svCQINH8FQot-NBX7BQTBqRRTzio&n=U7K31dYzvlxAIXux_T-_bRh5KAo_Qy4mGkC2C6_PIws",
+                    "content": "vauchi://exchange?pk=JGDOeXyZ3QXfNQ17qmqWdZ3gtPeqWhh3CahS9TxGjkU&n=utXrh0C-pXN6FJGWY-y8mXvSde_iOFD9XWgJvSeKot8",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -16940,7 +16988,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,79,99,71,75,50,73,100,55,55,106,90,68,81,108,75,120,68,57,111,90,87,98,48,113,121,105,85,88,100,110,53,86,120,52,113,77,51,67,101,111,103,82,98,47,87,108,77,51,79,75,79,68,118,102,106,86,86,119,90,80,74,102,49,69,52,43,117,56,90,71,98,66,111,81,52,107,101,67,80,80,121,119,51,80,90,84,66,88,53,109,110,69,67,108,114,66,99,66,85,103,86,102,87,75,76,78,111,66,83,117,84,114,47,72,82,70,76,122,86,49,57,114,50,121,85,105,73,116,103,75,68,74,53,56,69,122,100,115,73,109,103,109,72,107,67,51,109,70,110,66,65,65,65,65,65,71,114,65,48,114,65,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,68,101,52,117,75,97,72,87,70,112,78,71,82,100,70,77,70,43,119,108,85,107,114,68,102,76,120,100,100,97,115,87,57,73,55,57,121,55,82,87,72,89,65,98,75,84,47,68,85,72,82,89,116,51,82,85,102,81,43,97,97,104,99,100,65,120,53,119,100,73,73,78,47,118,121,102,67,50,55,83,86,120,118,78,119,72],
+            "payload": [86,48,74,70,87,65,80,100,51,100,78,77,81,122,50,76,48,77,73,73,106,49,75,110,109,120,117,57,103,99,113,69,43,122,83,89,71,48,72,56,71,81,84,120,57,66,117,67,53,110,72,50,120,85,69,87,84,51,107,111,81,56,88,76,109,110,78,52,116,113,112,120,57,98,75,67,79,99,121,108,119,115,105,111,85,80,105,86,83,97,115,110,109,105,104,99,76,84,84,51,111,50,49,84,98,65,113,57,111,53,106,116,100,48,53,112,73,114,90,76,54,107,51,70,116,43,109,105,79,117,86,106,53,69,97,85,50,69,57,80,66,118,105,54,117,77,79,105,52,48,79,47,117,87,107,83,65,65,65,65,65,71,114,67,87,72,119,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,65,104,114,121,110,49,100,98,84,67,118,116,69,108,51,106,114,47,55,51,111,43,79,66,106,54,57,67,76,47,88,66,81,111,53,104,83,77,119,56,113,67,87,71,65,118,50,86,72,112,71,107,110,43,51,55,102,85,52,70,68,109,77,112,86,54,80,117,87,88,81,75,113,71,65,77,110,52,97,113,84,74,79,81,85,69],
             "is_initiator": true
           }
         }
@@ -17000,7 +17048,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00$:DZ$3X-T/01+-A% QVAB$U5GE1-LE%85**DJU9LRPXQ1H 9E0OYLPY5V.28/JSY+A7EN707O88LPVA 9E%JBKLW896%OT30RVJ8:SCI7%H6AWARW8Q33PAF11Vauchi User00"
+                      "INI30:0:0:00PLN$MN8-0HKA%4O28T9C2CQI/ F.B0986GONY:K1UMM1G*MVF1V-.GLMN5$8TF0L%MQ06OJEC76OMM/VO42V R07TNZ+V/A9WWG0.KO4R8/G+P8.2T33UUSB11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17230,7 +17278,7 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 83
+            "earliest_millis": 94
           }
         }
       ]
@@ -17704,7 +17752,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [156,24,173,136,119,190,227,100,52,37,43,16,253,161,149,155,210,172,162,81,119,103,229,92,120,168,205,194,122,136,17,111]
+            "payload": [221,221,211,76,67,61,139,208,194,8,143,82,167,155,27,189,129,202,132,251,52,152,27,65,252,25,4,241,244,27,130,230]
           }
         },
         {
@@ -17887,7 +17935,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [156,24,173,136,119,190,227,100,52,37,43,16,253,161,149,155,210,172,162,81,119,103,229,92,120,168,205,194,122,136,17,111]
+            "payload": [221,221,211,76,67,61,139,208,194,8,143,82,167,155,27,189,129,202,132,251,52,152,27,65,252,25,4,241,244,27,130,230]
           }
         },
         {
@@ -18070,7 +18118,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [156,24,173,136,119,190,227,100,52,37,43,16,253,161,149,155,210,172,162,81,119,103,229,92,120,168,205,194,122,136,17,111]
+            "payload": [221,221,211,76,67,61,139,208,194,8,143,82,167,155,27,189,129,202,132,251,52,152,27,65,252,25,4,241,244,27,130,230]
           }
         },
         {

@@ -343,6 +343,90 @@ mod tests {
         }
     }
 
+    /// Opens `dir` with `open`, creates an identity, closes, reopens with
+    /// `reopen`, and reports whether the identity survived.
+    unsafe fn identity_survives_reopen(
+        dir: &std::path::Path,
+        open: unsafe fn(&std::path::Path) -> *mut VauchiApp,
+        reopen: unsafe fn(&std::path::Path) -> *mut VauchiApp,
+    ) -> bool {
+        // SAFETY: handles come from the vauchi_app_create_* constructors and
+        // are destroyed exactly once.
+        unsafe {
+            let first = open(dir);
+            assert!(!first.is_null(), "first open failed");
+            assert_eq!(vauchi_app_create_identity(first, std::ptr::null()), 0);
+            assert_eq!(vauchi_app_has_identity(first), 1);
+            vauchi_app_destroy(first);
+
+            let second = reopen(dir);
+            assert!(!second.is_null(), "reopen failed");
+            let survived = vauchi_app_has_identity(second) == 1;
+            vauchi_app_destroy(second);
+            survived
+        }
+    }
+
+    unsafe fn open_with_config(dir: &std::path::Path) -> *mut VauchiApp {
+        let dir_cstr = CString::new(dir.to_str().unwrap()).unwrap();
+        // SAFETY: valid C string, null relay URL.
+        unsafe { vauchi_app_create_with_config(dir_cstr.as_ptr(), std::ptr::null()) }
+    }
+
+    unsafe fn open_from_keyless_config(dir: &std::path::Path) -> *mut VauchiApp {
+        let dir_cstr = CString::new(dir.to_str().unwrap()).unwrap();
+        // SAFETY: valid C string, null relay URL; the config is consumed.
+        unsafe {
+            let config = vauchi_config_new(dir_cstr.as_ptr(), std::ptr::null());
+            vauchi_app_create_from_config(config)
+        }
+    }
+
+    unsafe fn open_with_keyring(dir: &std::path::Path) -> *mut VauchiApp {
+        let dir_cstr = CString::new(dir.to_str().unwrap()).unwrap();
+        // SAFETY: valid C string, null relay URL.
+        unsafe { vauchi_app_create_with_keyring(dir_cstr.as_ptr(), std::ptr::null()) }
+    }
+
+    // A persistent database opened with a key generated per launch cannot
+    // be read after a restart (vauchi/private#284).
+    #[test]
+    fn app_create_with_config_keeps_data_across_reopens() {
+        let dir = tempfile::tempdir().unwrap();
+        // SAFETY: test-local directory, constructors from this crate.
+        let survived =
+            unsafe { identity_survives_reopen(dir.path(), open_with_config, open_with_config) };
+        assert!(survived, "identity lost after reopening the same data dir");
+    }
+
+    #[test]
+    fn app_create_from_config_without_key_keeps_data_across_reopens() {
+        let dir = tempfile::tempdir().unwrap();
+        // SAFETY: test-local directory, constructors from this crate.
+        let survived = unsafe {
+            identity_survives_reopen(
+                dir.path(),
+                open_from_keyless_config,
+                open_from_keyless_config,
+            )
+        };
+        assert!(survived, "identity lost after reopening the same data dir");
+    }
+
+    // linux-qt falls back from create_with_keyring to create_with_config;
+    // both must read the same data (vauchi/private#284).
+    #[test]
+    fn app_create_with_config_reads_data_written_by_keyring_fallback() {
+        let dir = tempfile::tempdir().unwrap();
+        // SAFETY: test-local directory, constructors from this crate.
+        let survived =
+            unsafe { identity_survives_reopen(dir.path(), open_with_keyring, open_with_config) };
+        assert!(
+            survived,
+            "create_with_config cannot read what create_with_keyring wrote"
+        );
+    }
+
     #[test]
     fn app_create_with_config_null_dir_returns_null() {
         // SAFETY: Calling FFI with valid inputs from this test scope.

@@ -139,3 +139,28 @@ fn a_row_decodes_with_and_without_an_info_action() {
     assert_eq!(info.accessibility_label, "About Home address");
     assert_eq!(info.interaction_id.as_str(), "surface.7.interaction.3");
 }
+
+/// Core names the way out of an overlay (vauchi/private#479): shells draw
+/// a Close with this label instead of inventing one. A batch from an older
+/// Core has no such key and decodes as before.
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn an_overlay_decodes_with_and_without_a_close_label() {
+    let older = serde_json::json!({"kind": "information", "title": "Contacts", "items": []});
+    let overlay: vauchi_core::OverlaySpec =
+        serde_json::from_value(older).expect("an overlay without a close label decodes");
+    assert_eq!(overlay.close_label, None);
+    let encoded = serde_json::to_value(&overlay).expect("serialize overlay");
+    assert!(
+        encoded.get("close_label").is_none(),
+        "an absent close label is left off the wire: {encoded}"
+    );
+
+    let current = serde_json::json!({
+        "kind": "information", "title": "Contacts", "items": [],
+        "body": "Text.", "close_label": "Close"
+    });
+    let overlay: vauchi_core::OverlaySpec =
+        serde_json::from_value(current).expect("an overlay with a close label decodes");
+    assert_eq!(overlay.close_label.as_deref(), Some("Close"));
+}

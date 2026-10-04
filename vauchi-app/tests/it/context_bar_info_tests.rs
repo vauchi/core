@@ -73,6 +73,38 @@ fn contacts_carries_an_info_action_whose_overlay_says_what_the_screen_is_for() {
         "the body is screen_info.contact_list, got {body:?}"
     );
     assert!(overlay.items.is_empty());
+    assert_eq!(
+        overlay.close_label.as_deref(),
+        Some("Close"),
+        "Core names the way out, so no shell has to"
+    );
+}
+
+/// Every overlay Core composes carries the same Close label, so a shell
+/// that draws one never invents its own wording (vauchi/private#479).
+// @internal
+#[test]
+fn the_action_menu_and_the_navigation_overlay_carry_a_close_label() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Contacts);
+    let commands = present_commands(&mut engine);
+    let (surface_id, bar) = context_bar(&commands);
+    for launcher in [bar.secondary, bar.navigation].into_iter().flatten() {
+        let opened = engine
+            .dispatch(Event::ActionActivated {
+                surface_id: vauchi_core::SurfaceId::new(&surface_id).unwrap(),
+                interaction_id: launcher.interaction_id.clone(),
+            })
+            .expect("launcher activation");
+        let overlay = opened
+            .iter()
+            .find_map(|command| match command {
+                Command::PresentOverlay { overlay, .. } => Some(overlay),
+                _ => None,
+            })
+            .expect("the launcher opens an overlay");
+        assert_eq!(overlay.close_label.as_deref(), Some("Close"), "{overlay:?}");
+    }
 }
 
 // @internal

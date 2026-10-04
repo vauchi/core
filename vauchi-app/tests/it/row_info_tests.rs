@@ -96,6 +96,7 @@ fn a_group_entry_row_offers_info_that_says_who_sees_the_entry() {
         "the body is info.group_entry.body, got {body:?}"
     );
     assert!(overlay.items.is_empty());
+    assert_eq!(overlay.close_label.as_deref(), Some("Close"));
     assert!(
         !opened
             .iter()

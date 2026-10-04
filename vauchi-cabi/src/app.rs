@@ -78,7 +78,10 @@ pub unsafe extern "C" fn vauchi_app_create_with_relay(relay_url: *const c_char) 
 /// Create a new AppEngine with persistent storage and custom relay URL.
 ///
 /// Unlike `vauchi_app_create` (in-memory), this stores data on disk at
-/// `data_dir/vauchi.db`. Pass null for `relay_url` to use the default.
+/// `data_dir/vauchi.db`, encrypted with the file-backed key in `data_dir`
+/// that `vauchi_app_create_with_keyring` falls back to, so either
+/// constructor reopens the other's data. Pass null for `relay_url` to use
+/// the default.
 ///
 /// Returns null on initialization failure.
 ///
@@ -108,9 +111,9 @@ pub unsafe extern "C" fn vauchi_app_create_with_config(
             config = config.with_relay_url(url);
         }
 
-        let vauchi = match Vauchi::new(config) {
-            Ok(v) => v,
-            Err(_) => return std::ptr::null_mut(),
+        let vauchi = match open_with_file_fallback(&data_path, config) {
+            Some(v) => v,
+            None => return std::ptr::null_mut(),
         };
 
         Box::into_raw(Box::new(VauchiApp {

@@ -147,11 +147,17 @@ pub unsafe extern "C" fn vauchi_app_create_from_config(config: *mut CabiConfig) 
                 return std::ptr::null_mut();
             }
             let config = *Box::from_raw(config);
+            let data_dir = config.data_dir.clone();
+            let caller_supplied_key = config.storage_key.is_some();
             let vauchi_config = config.into_vauchi_config();
 
-            let vauchi = match Vauchi::new(vauchi_config) {
-                Ok(v) => v,
-                Err(_) => return std::ptr::null_mut(),
+            let vauchi = if caller_supplied_key {
+                Vauchi::new(vauchi_config).ok()
+            } else {
+                app::open_with_file_fallback(&data_dir, vauchi_config)
+            };
+            let Some(vauchi) = vauchi else {
+                return std::ptr::null_mut();
             };
 
             Box::into_raw(Box::new(VauchiApp {

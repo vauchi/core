@@ -447,6 +447,7 @@ fn every_frame_a_session_shows_fits_37_modules_at_the_level_it_names() {
 
 // What the status line can say about the link (plan §5, vauchi/private#450).
 
+// @internal
 #[test]
 fn a_session_that_has_read_no_peer_frame_is_looking_for_the_peer() {
     let clock = Arc::new(FakeMonotonicClock::new());
@@ -456,6 +457,7 @@ fn a_session_that_has_read_no_peer_frame_is_looking_for_the_peer() {
     assert_eq!(alice.link_feedback(), LinkFeedback::LookingForPeer);
 }
 
+// @internal
 #[test]
 fn a_session_is_reading_the_peer_while_its_frames_arrive_within_the_window() {
     let clock = Arc::new(FakeMonotonicClock::new());
@@ -493,6 +495,7 @@ fn read_old_format_for(
     }
 }
 
+// @internal
 #[test]
 fn only_old_format_frames_for_five_seconds_say_the_peer_needs_an_update() {
     let clock = Arc::new(FakeMonotonicClock::new());
@@ -534,6 +537,7 @@ fn only_old_format_frames_for_five_seconds_say_the_peer_needs_an_update() {
     );
 }
 
+// @internal
 #[test]
 fn old_format_frames_that_stop_arriving_leave_the_session_looking_for_the_peer() {
     let clock = Arc::new(FakeMonotonicClock::new());

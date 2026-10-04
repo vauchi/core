@@ -122,7 +122,10 @@ struct VauchiApp *vauchi_app_create_with_relay(const char *relay_url);
  * Create a new AppEngine with persistent storage and custom relay URL.
  *
  * Unlike `vauchi_app_create` (in-memory), this stores data on disk at
- * `data_dir/vauchi.db`. Pass null for `relay_url` to use the default.
+ * `data_dir/vauchi.db`, encrypted with the file-backed key in `data_dir`
+ * that `vauchi_app_create_with_keyring` falls back to, so either
+ * constructor reopens the other's data. Pass null for `relay_url` to use
+ * the default.
  *
  * Returns null on initialization failure.
  *

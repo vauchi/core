@@ -269,17 +269,7 @@ impl MultiStageMachine {
     /// ultrasonic proximity handshake. **No I/O.** The first
     /// [`advance`](Self::advance) emits the first QR frame.
     pub fn new_glance(local_card: Vec<u8>, now: u64) -> Self {
-        Self {
-            inner: MultiStageSession::new(local_card),
-            mode: MultiStageMode::Glance,
-            phase: MultiStagePhase::Preparing,
-            current_frame_started_at: None,
-            current_frame_duration: 0,
-            cancelled: false,
-            phase_entered_ms: now,
-            last_peer_frame_ms: now,
-            frame_stalled: false,
-        }
+        Self::with_mode(MultiStageMode::Glance, local_card, now)
     }
 
     /// Construct a Hover-mode machine — QR + ultrasonic proximity
@@ -288,17 +278,7 @@ impl MultiStageMachine {
     /// design); the listening window restarts on retry. T1.2b
     /// wires the audio command emission via `event_to_commands`.
     pub fn new_hover(local_card: Vec<u8>, now: u64) -> Self {
-        Self {
-            inner: MultiStageSession::new(local_card),
-            mode: MultiStageMode::Hover,
-            phase: MultiStagePhase::Preparing,
-            current_frame_started_at: None,
-            current_frame_duration: 0,
-            cancelled: false,
-            phase_entered_ms: now,
-            last_peer_frame_ms: now,
-            frame_stalled: false,
-        }
+        Self::with_mode(MultiStageMode::Hover, local_card, now)
     }
 
     /// Construct a TapHoverShake-mode machine — QR + ultrasonic audio
@@ -309,9 +289,13 @@ impl MultiStageMachine {
     /// (needs the envelope-over-transport protocol — see the TapHoverShake
     /// graduation plan P2.C / the accel-envelope ADR).
     pub fn new_tap_hover_shake(local_card: Vec<u8>, now: u64) -> Self {
+        Self::with_mode(MultiStageMode::TapHoverShake, local_card, now)
+    }
+
+    fn with_mode(mode: MultiStageMode, local_card: Vec<u8>, now: u64) -> Self {
         Self {
             inner: MultiStageSession::new(local_card),
-            mode: MultiStageMode::TapHoverShake,
+            mode,
             phase: MultiStagePhase::Preparing,
             current_frame_started_at: None,
             current_frame_duration: 0,

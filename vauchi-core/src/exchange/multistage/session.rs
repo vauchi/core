@@ -36,10 +36,11 @@ use super::accel_envelope;
 use super::chunker::{Chunker, ReassemblyBuffer};
 use super::commitment::Commitment;
 use super::link_trainer::{self, LinkTrainer};
-use super::qr_codec::{self, Frame, StageQr};
+use super::qr_codec::{self, Frame, QrCodecError, StageQr};
 use super::training_header::TrainingHeader;
 use super::types::{
-    AccelerometerProximityState, AudioProximityState, ChunkBitmap, ProtocolState, QrPayload,
+    AccelerometerProximityState, AudioProximityState, ChunkBitmap, LinkFeedback, ProtocolState,
+    QrPayload,
 };
 
 use crate::crypto::x3dh::X3DHKeyPair;
@@ -79,6 +80,11 @@ const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(60);
 /// honour its `timeout_ms` honestly). The check is invoked by the
 /// cycle thread via [`MultiStageSession::check_and_apply_audio_timeout`].
 const AUDIO_LISTEN_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How long frames in the retired format must keep arriving before the
+/// status says the other phone needs an update: long enough that a
+/// bystander's code glimpsed in passing is not read as the peer.
+pub const PEER_NEEDS_UPDATE_AFTER: Duration = Duration::from_secs(5);
 
 /// How long after `set_accel_proximity(Listening)` to wait for the shake
 /// to cross-correlate before transitioning to Failed (TapHoverShake P2.A).
@@ -377,6 +383,9 @@ pub struct MultiStageSession {
     own_frames_seen: u32,
     /// Reads per window the bound peer reported in its latest header.
     peer_reported_reads: u8,
+    /// When frames in the retired format were first and last read, while
+    /// they keep arriving inside the read window (`link_feedback`).
+    old_format_seen: Option<(Instant, Instant)>,
     /// The training state last written to the dev log: whether sweeping,
     /// and the settled layout.
     logged_training: Option<(bool, Option<u8>)>,
@@ -484,6 +493,7 @@ impl MultiStageSession {
             trainer: LinkTrainer::starting_at(0),
             own_frames_seen: 0,
             peer_reported_reads: 0,
+            old_format_seen: None,
             logged_training: None,
             monotonic: SystemMonotonicClock::shared(),
         }
@@ -495,6 +505,41 @@ impl MultiStageSession {
     pub fn with_start_layout(mut self, layout: u8) -> Self {
         self.trainer = LinkTrainer::starting_at(layout);
         self
+    }
+
+    /// What the status line can say about the link to the other phone.
+    pub fn link_feedback(&self) -> LinkFeedback {
+        let now = self.monotonic.now();
+        if self.trainer.is_reading_peer(now) {
+            return LinkFeedback::ReadingPeer;
+        }
+        let still_arriving = self
+            .old_format_seen
+            .filter(|(_, last)| now.saturating_duration_since(*last) < link_trainer::READ_WINDOW);
+        match still_arriving {
+            Some((first, last))
+                if last.saturating_duration_since(first) >= PEER_NEEDS_UPDATE_AFTER =>
+            {
+                LinkFeedback::PeerNeedsUpdate
+            }
+            _ => LinkFeedback::LookingForPeer,
+        }
+    }
+
+    /// A span of old-format frames starts over after a gap longer than the
+    /// read window, so one stray read long ago cannot age a later one into
+    /// a verdict.
+    fn note_old_format_frame(&mut self) {
+        let now = self.monotonic.now();
+        let first = match self.old_format_seen {
+            Some((first, last))
+                if now.saturating_duration_since(last) < link_trainer::READ_WINDOW =>
+            {
+                first
+            }
+            _ => now,
+        };
+        self.old_format_seen = Some((first, now));
     }
 
     /// The layout the peer last reported reading, for the next session on
@@ -1190,6 +1235,10 @@ impl MultiStageSession {
             stage: parsed,
         } = match qr_codec::parse_frame(raw) {
             Ok(frame) => frame,
+            Err(QrCodecError::OldFormat) => {
+                self.note_old_format_frame();
+                return self.state.clone();
+            }
             Err(_) => return self.state.clone(),
         };
         let sender = parsed.session_id();
@@ -1205,6 +1254,7 @@ impl MultiStageSession {
         if self.peer_session_id.is_none_or(|peer| peer == *sender) {
             self.trainer.note_peer_frame(&header, self.monotonic.now());
             self.peer_reported_reads = header.total_reads();
+            self.old_format_seen = None;
         }
 
         match parsed {

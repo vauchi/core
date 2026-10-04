@@ -47,6 +47,20 @@ pub enum ProtocolState {
     Failed(String),
 }
 
+/// What the exchange status can say about the link to the other phone,
+/// read from the frames this session has decoded (vauchi/private#450).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LinkFeedback {
+    /// No frame from the other phone inside the read window.
+    #[default]
+    LookingForPeer,
+    /// A frame from the other phone was read inside the window.
+    ReadingPeer,
+    /// Only frames in the retired format, for long enough to rule out a
+    /// bystander: the other phone runs a version this one cannot talk to.
+    PeerNeedsUpdate,
+}
+
 /// Audio-proximity verification state used by `MultiStageSession` when
 /// the active exchange mode is `Hover`. The ultrasonic handshake fires
 /// after both peers reach the QR-scanning phase; `Pending` is the

@@ -151,6 +151,13 @@ impl LinkTrainer {
         !self.held && self.fresh_layout(now).is_none()
     }
 
+    /// Whether a peer frame was read inside the window.
+    pub fn is_reading_peer(&self, now: Instant) -> bool {
+        self.reads
+            .iter()
+            .any(|(at, _)| now.saturating_duration_since(*at) < READ_WINDOW)
+    }
+
     /// Dwell for a frame shown while sweeping.
     pub fn sweep_dwell_ms(&self) -> u32 {
         if self.peer_reads_fast {

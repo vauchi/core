@@ -127,11 +127,8 @@ fn turning_help_icons_off_removes_the_info_slot_everywhere() {
 #[test]
 fn a_screen_without_a_description_offers_no_info_slot() {
     let mut engine = engine_with_identity();
-    engine.navigate_to(AppScreen::ActivityLog);
+    engine.navigate_to(AppScreen::Tags);
 
     let (_, bar) = context_bar(&present_commands(&mut engine));
-    assert!(
-        bar.info.is_none(),
-        "no screen_info.activity_log text: {bar:?}"
-    );
+    assert!(bar.info.is_none(), "no screen_info.tags text: {bar:?}");
 }

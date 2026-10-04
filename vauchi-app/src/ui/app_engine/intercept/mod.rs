@@ -16,7 +16,6 @@ mod settings;
 
 use super::AppEngine;
 use super::AppScreen;
-use crate::i18n::Locale;
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::info_content;
 
@@ -31,7 +30,9 @@ impl AppEngine {
         let UserAction::InfoRequested { key } = action else {
             return None;
         };
-        if let Some((title, body)) = info_content::resolve_info_key(key, Locale::English) {
+        if let Some((title, body)) =
+            info_content::resolve_info_key(key, self.render_context.resolved_locale())
+        {
             return Some(ActionResult::ShowInfoOverlay { title, body });
         }
         // Unknown key: refresh the current screen rather than silently swallowing the tap.

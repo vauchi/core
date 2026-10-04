@@ -565,6 +565,7 @@ impl AppEngine {
                 Box::new(
                     GroupDetailEngine::new(group_id.clone(), group_name, members)
                         .with_field_visibility(field_visibility)
+                        .with_help_icons(vauchi.config().show_help_icons)
                         .with_locale(render_context.resolved_locale()),
                 )
             }

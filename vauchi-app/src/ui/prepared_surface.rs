@@ -38,12 +38,23 @@ pub struct PreparedSurface {
 }
 
 impl PreparedSurface {
+    /// The projection in English: for tests and the demo. The app projects
+    /// with `from_screen_in` and the person's locale.
     pub fn from_screen(
         surface_id: SurfaceId,
         revision: u64,
         screen: &ScreenModel,
     ) -> Result<Self, PreparedSurfaceError> {
-        let mut projection = Projection::new(revision);
+        Self::from_screen_in(surface_id, revision, screen, crate::i18n::Locale::English)
+    }
+
+    pub fn from_screen_in(
+        surface_id: SurfaceId,
+        revision: u64,
+        screen: &ScreenModel,
+        locale: crate::i18n::Locale,
+    ) -> Result<Self, PreparedSurfaceError> {
+        let mut projection = Projection::new(revision, locale);
         let mut nodes = Vec::with_capacity(screen.components.len());
         for component in &screen.components {
             nodes.push(projection.component(component)?);

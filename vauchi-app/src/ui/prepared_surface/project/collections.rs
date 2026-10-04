@@ -63,6 +63,7 @@ impl Projection {
                 enabled: true,
                 activation: Some(activation),
                 secondary_actions,
+                info: None,
                 controls: Vec::new(),
                 accessibility: accessibility(&item.a11y, &item.name),
             });
@@ -103,6 +104,7 @@ impl Projection {
             if spoken.description.is_none() {
                 spoken.description = item.subtitle.clone();
             }
+            let info = self.item_info(item.info_key.as_deref(), &item.label)?;
             rows.push(PresentationRow {
                 title: item.label.clone(),
                 subtitle: item.subtitle.clone(),
@@ -114,6 +116,7 @@ impl Projection {
                 enabled: true,
                 activation: None,
                 secondary_actions: Vec::new(),
+                info,
                 // The row title already names the entry; the control's
                 // visible label stays empty, as for settings toggles.
                 controls: vec![PresentationNode::Toggle {
@@ -184,6 +187,7 @@ impl Projection {
                     Vec::new(),
                 ),
             };
+            let info = self.item_info(item.info_key.as_deref(), &item.label)?;
             rows.push(PresentationRow {
                 title: item.label.clone(),
                 subtitle: item.subtitle.clone(),
@@ -195,6 +199,7 @@ impl Projection {
                 enabled: true,
                 activation,
                 secondary_actions: Vec::new(),
+                info,
                 controls,
                 accessibility: accessibility(&item.a11y, &item.label),
             });
@@ -263,6 +268,7 @@ impl Projection {
                 enabled: true,
                 activation: Some(activation),
                 secondary_actions: Vec::new(),
+                info: None,
                 controls: Vec::new(),
                 accessibility: accessibility(&item.a11y, &item.label),
             });
@@ -331,6 +337,7 @@ impl Projection {
                 enabled: true,
                 activation: None,
                 secondary_actions: Vec::new(),
+                info: None,
                 controls: Vec::new(),
                 accessibility: accessibility(&field.a11y, &field.label),
             })

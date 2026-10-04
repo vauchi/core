@@ -60,8 +60,12 @@ impl AppEngine {
                 )
                 .current_screen()
             });
-        let prepared =
-            PreparedSurface::from_screen(surface_id.clone(), self.surface_revision, &model)?;
+        let prepared = PreparedSurface::from_screen_in(
+            surface_id.clone(),
+            self.surface_revision,
+            &model,
+            self.render_context.resolved_locale(),
+        )?;
         Ok(Some(ResponsiveCompanion {
             screen: companion_screen,
             surface_id,

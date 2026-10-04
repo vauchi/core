@@ -201,6 +201,12 @@ pub struct PresentationRow {
     pub enabled: bool,
     pub activation: Option<ActionSpec>,
     pub secondary_actions: Vec<ActionSpec>,
+    /// Explains the row's item: opens an `OverlayKind::Information` overlay
+    /// with text for it (vauchi/private#479). Absent where Core has no text
+    /// or the person turned help off; omitted on the wire so older shells
+    /// see the row they know.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub info: Option<ActionSpec>,
     pub controls: Vec<PresentationNode>,
     pub accessibility: AccessibilitySpec,
 }

@@ -48,6 +48,7 @@ pub struct GroupDetailEngine {
     pending_delete: bool,
     pending_grant: Option<String>,
     locale: Locale,
+    help_icons: bool,
 }
 
 impl GroupDetailEngine {
@@ -60,6 +61,7 @@ impl GroupDetailEngine {
             pending_delete: false,
             pending_grant: None,
             locale: Locale::English,
+            help_icons: false,
         }
     }
 
@@ -74,6 +76,13 @@ impl GroupDetailEngine {
 
     /// Set the render locale (defaults to English) — threaded from the
     /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-13).
+    /// Whether each entry row offers the "Who sees this entry" text
+    /// (vauchi/private#479), the "Show help icons" setting.
+    pub fn with_help_icons(mut self, enabled: bool) -> Self {
+        self.help_icons = enabled;
+        self
+    }
+
     pub fn with_locale(mut self, locale: Locale) -> Self {
         self.locale = locale;
         self
@@ -130,7 +139,7 @@ impl GroupDetailEngine {
                             hint: Some(self.entry_hint(f)),
                             role: None,
                         }),
-                        info_key: None,
+                        info_key: self.help_icons.then(|| "group_entry".into()),
                     })
                     .collect(),
                 a11y: Some(A11y {

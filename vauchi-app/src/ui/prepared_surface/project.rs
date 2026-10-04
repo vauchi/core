@@ -9,6 +9,7 @@ use vauchi_core::{
 };
 
 use super::PreparedSurfaceError;
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::{
     A11y, Field, IndicatorKind, InputType, PreviewVariant, SettingsItemKind, Status, TextStyle,
     UserAction,
@@ -74,17 +75,44 @@ pub(super) struct Projection {
     next_binding: u64,
     next_interaction: u64,
     revision: u64,
+    locale: Locale,
 }
 
 impl Projection {
-    pub(super) fn new(revision: u64) -> Self {
+    pub(super) fn new(revision: u64, locale: Locale) -> Self {
         Self {
             value_routes: HashMap::new(),
             interaction_routes: HashMap::new(),
             next_binding: 0,
             next_interaction: 0,
             revision,
+            locale,
         }
+    }
+
+    /// The info action of an item that names an `info_key`: labelled
+    /// "Info", named "About {name}" for assistive tech, routed to the key
+    /// (vauchi/private#479). `None` for an item without one.
+    pub(super) fn item_info(
+        &mut self,
+        info_key: Option<&str>,
+        name: &str,
+    ) -> Result<Option<ActionSpec>, PreparedSurfaceError> {
+        let Some(key) = info_key else {
+            return Ok(None);
+        };
+        let label = get_string(self.locale, "context_bar.info");
+        let spoken =
+            get_string_with_args(self.locale, "context_bar.info_item_a11y", &[("name", name)]);
+        self.action(
+            &label,
+            AccessibilitySpec::label(&spoken),
+            ActionTone::Standard,
+            UserAction::InfoRequested {
+                key: key.to_owned(),
+            },
+        )
+        .map(Some)
     }
 
     fn input(

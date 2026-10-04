@@ -316,8 +316,12 @@ impl AppEngine {
             SurfaceId::new(self.screen.screen_id()).map_err(ContextualSurfaceError::from)?;
         if &current_surface == requested_surface {
             let screen = self.current_screen();
-            let prepared =
-                PreparedSurface::from_screen(current_surface, self.surface_revision, &screen)?;
+            let prepared = PreparedSurface::from_screen_in(
+                current_surface,
+                self.surface_revision,
+                &screen,
+                self.render_context.resolved_locale(),
+            )?;
             return Ok((self.screen.clone(), screen, prepared));
         }
         if let Some(companion) = self.responsive_companion_surface()?
@@ -425,8 +429,12 @@ impl AppEngine {
     ) -> Result<Vec<Command>, AppPresentationError> {
         let surface_id =
             SurfaceId::new(self.screen.screen_id()).map_err(ContextualSurfaceError::from)?;
-        let prepared =
-            PreparedSurface::from_screen(surface_id.clone(), self.surface_revision, screen)?;
+        let prepared = PreparedSurface::from_screen_in(
+            surface_id.clone(),
+            self.surface_revision,
+            screen,
+            self.render_context.resolved_locale(),
+        )?;
         let contextual = self.contextual_surface_for_screen(surface_id.clone(), screen)?;
         let companion = self.responsive_companion_surface()?;
         let mut visible = vec![(surface_id.clone(), prepared, contextual)];
@@ -564,6 +572,21 @@ impl AppEngine {
         let screen = self.current_screen();
         let mut commands = self.surface_commands(&screen)?;
         commands.extend(self.offer_causal_undo(&result, cause.as_ref()));
+        // Text about an item is an information overlay on the surface it
+        // belongs to, like the bar's (vauchi/private#479); only without a
+        // surface does it fall back to the alert the reducer maps it to.
+        let result = match result {
+            ActionResult::ShowInfoOverlay { title, body } => {
+                match self.information_overlay_command(&title, &body) {
+                    Some(overlay) => {
+                        commands.push(overlay);
+                        return Ok(self.finish_batch(commands));
+                    }
+                    None => ActionResult::ShowInfoOverlay { title, body },
+                }
+            }
+            other => other,
+        };
         if !internally_consumed {
             super::result_commands::append_result_commands(result, &mut commands)
                 .map_err(|variant| AppPresentationError::UnresolvedActionResult { variant })?;
@@ -572,12 +595,35 @@ impl AppEngine {
         Ok(commands)
     }
 
+    fn information_overlay_command(&self, title: &str, body: &str) -> Option<Command> {
+        let (surface_id, _) = self.projected_visible_surface()?;
+        Some(Command::PresentOverlay {
+            surface_id,
+            revision: self.surface_revision,
+            overlay: vauchi_core::OverlaySpec {
+                kind: vauchi_core::OverlayKind::Information,
+                title: Some(title.to_owned()),
+                items: Vec::new(),
+                body: Some(body.to_owned()),
+            },
+        })
+    }
+
+    fn finish_batch(&mut self, mut commands: Vec<Command>) -> Vec<Command> {
+        commands.extend(self.drain_pending_commands());
+        commands
+    }
+
     fn projected_visible_surface(&self) -> Option<(SurfaceId, PreparedSurface)> {
         let surface_id = SurfaceId::new(self.screen.screen_id()).ok()?;
         let screen = self.current_screen();
-        let prepared =
-            PreparedSurface::from_screen(surface_id.clone(), self.surface_revision, &screen)
-                .ok()?;
+        let prepared = PreparedSurface::from_screen_in(
+            surface_id.clone(),
+            self.surface_revision,
+            &screen,
+            self.render_context.resolved_locale(),
+        )
+        .ok()?;
         Some((surface_id, prepared))
     }
 

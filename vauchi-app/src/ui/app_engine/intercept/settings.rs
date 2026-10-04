@@ -92,6 +92,11 @@ impl AppEngine {
                 }
                 "show_help_icons" => {
                     config.show_help_icons = !config.show_help_icons;
+                    // A group screen learns the setting when it is built
+                    // (vauchi/private#479); a cached one would keep the old
+                    // answer until the app restarts.
+                    self.engine_cache
+                        .retain(|screen, _| !matches!(screen, AppScreen::GroupDetail { .. }));
                 }
                 _ => {}
             }

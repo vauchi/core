@@ -197,6 +197,7 @@ impl Projection {
                 enabled: true,
                 activation: None,
                 secondary_actions: Vec::new(),
+                info: None,
                 controls: self.visibility_controls(field, mode, scopes)?,
                 accessibility: accessibility(&field.a11y, &field.label),
             });

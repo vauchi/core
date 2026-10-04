@@ -200,6 +200,7 @@ fn rows(contacts: &[Contact], locale: Locale) -> Vec<PresentationRow> {
                 enabled: true,
                 activation: None,
                 secondary_actions: Vec::new(),
+                info: None,
                 controls: Vec::new(),
                 accessibility: accessibility(&format!("{}, {status}", contact.display_name())),
             }

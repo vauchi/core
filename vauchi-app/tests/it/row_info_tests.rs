@@ -132,7 +132,7 @@ fn the_duress_pin_settings_row_opens_its_text_as_an_overlay() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Ada").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAdvanced);
 
     let (surface_id, rows) = surface_rows(&engine.initial_commands().expect("initial commands"));
     let duress = rows

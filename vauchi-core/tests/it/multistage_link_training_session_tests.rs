@@ -8,11 +8,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use vauchi_core::exchange::multistage::link_trainer::{ECHO_FRESH, SWEEP_DWELL_MS};
+use vauchi_core::exchange::multistage::link_trainer::{ECHO_FRESH, READ_WINDOW, SWEEP_DWELL_MS};
 use vauchi_core::exchange::multistage::qr_codec::parse_frame;
-use vauchi_core::exchange::multistage::session::MultiStageSession;
+use vauchi_core::exchange::multistage::session::{MultiStageSession, PEER_NEEDS_UPDATE_AFTER};
 use vauchi_core::exchange::multistage::training_header::LAYOUT_COUNT;
-use vauchi_core::exchange::multistage::types::{ProtocolState, QrPayload};
+use vauchi_core::exchange::multistage::types::{LinkFeedback, ProtocolState, QrPayload};
 use vauchi_core::monotonic::FakeMonotonicClock;
 
 fn card(tag: u8) -> Vec<u8> {
@@ -443,4 +443,114 @@ fn every_frame_a_session_shows_fits_37_modules_at_the_level_it_names() {
         ["DAT3", "FIN3", "INI3"],
         "the run showed every frame type"
     );
+}
+
+// What the status line can say about the link (plan §5, vauchi/private#450).
+
+#[test]
+fn a_session_that_has_read_no_peer_frame_is_looking_for_the_peer() {
+    let clock = Arc::new(FakeMonotonicClock::new());
+    let mut alice = MultiStageSession::new(card(0xA1)).with_monotonic(clock);
+    alice.get_display_qr();
+
+    assert_eq!(alice.link_feedback(), LinkFeedback::LookingForPeer);
+}
+
+#[test]
+fn a_session_is_reading_the_peer_while_its_frames_arrive_within_the_window() {
+    let clock = Arc::new(FakeMonotonicClock::new());
+    let mut alice = MultiStageSession::new(card(0xA1)).with_monotonic(clock.clone());
+    let mut bob = MultiStageSession::new(card(0xB2)).with_monotonic(clock.clone());
+    alice.get_display_qr();
+    let bob_frame = bob.get_display_qr().expect("bob shows a frame");
+
+    alice.process_scanned_qr(&bob_frame.data);
+    assert_eq!(alice.link_feedback(), LinkFeedback::ReadingPeer);
+
+    clock.advance(READ_WINDOW);
+    assert_eq!(
+        alice.link_feedback(),
+        LinkFeedback::LookingForPeer,
+        "a read older than the window no longer counts"
+    );
+}
+
+/// A camera reading the old phone's code twice a second for `span`.
+fn read_old_format_for(
+    alice: &mut MultiStageSession,
+    clock: &FakeMonotonicClock,
+    old_format: &str,
+    span: Duration,
+) {
+    let step = Duration::from_millis(500);
+    let mut elapsed = Duration::ZERO;
+    alice.process_scanned_qr(old_format);
+    while elapsed < span {
+        let next = step.min(span - elapsed);
+        clock.advance(next);
+        elapsed += next;
+        alice.process_scanned_qr(old_format);
+    }
+}
+
+#[test]
+fn only_old_format_frames_for_five_seconds_say_the_peer_needs_an_update() {
+    let clock = Arc::new(FakeMonotonicClock::new());
+    let mut alice = MultiStageSession::new(card(0xA1)).with_monotonic(clock.clone());
+    let mut bob = MultiStageSession::new(card(0xB2)).with_monotonic(clock.clone());
+    alice.get_display_qr();
+    let bob_frame = bob.get_display_qr().expect("bob shows a frame");
+    let old_format = format!("INI2{}", &bob_frame.data[12..]);
+
+    alice.process_scanned_qr(&old_format);
+    assert_eq!(
+        alice.link_feedback(),
+        LinkFeedback::LookingForPeer,
+        "one old frame could be a bystander"
+    );
+
+    read_old_format_for(
+        &mut alice,
+        &clock,
+        &old_format,
+        PEER_NEEDS_UPDATE_AFTER - Duration::from_millis(1),
+    );
+    assert_eq!(alice.link_feedback(), LinkFeedback::LookingForPeer);
+
+    clock.advance(Duration::from_millis(1));
+    alice.process_scanned_qr(&old_format);
+    assert_eq!(alice.link_feedback(), LinkFeedback::PeerNeedsUpdate);
+    assert_eq!(
+        alice.get_state(),
+        ProtocolState::Advertising,
+        "old frames never move the session"
+    );
+
+    alice.process_scanned_qr(&bob_frame.data);
+    assert_eq!(
+        alice.link_feedback(),
+        LinkFeedback::ReadingPeer,
+        "a current frame from the peer clears the verdict"
+    );
+}
+
+#[test]
+fn old_format_frames_that_stop_arriving_leave_the_session_looking_for_the_peer() {
+    let clock = Arc::new(FakeMonotonicClock::new());
+    let mut alice = MultiStageSession::new(card(0xA1)).with_monotonic(clock.clone());
+    let mut bob = MultiStageSession::new(card(0xB2)).with_monotonic(clock.clone());
+    alice.get_display_qr();
+    let bob_frame = bob.get_display_qr().expect("bob shows a frame");
+    let old_format = format!("INI2{}", &bob_frame.data[12..]);
+
+    read_old_format_for(&mut alice, &clock, &old_format, PEER_NEEDS_UPDATE_AFTER);
+    assert_eq!(alice.link_feedback(), LinkFeedback::PeerNeedsUpdate);
+
+    clock.advance(READ_WINDOW);
+    assert_eq!(alice.link_feedback(), LinkFeedback::LookingForPeer);
+
+    // Frames again after the gap: the span starts over, so one stray
+    // read long ago cannot age a later one into a verdict.
+    read_old_format_for(&mut alice, &clock, &old_format, READ_WINDOW);
+    assert_eq!(alice.link_feedback(), LinkFeedback::LookingForPeer);
 }

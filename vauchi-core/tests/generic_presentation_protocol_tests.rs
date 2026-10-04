@@ -225,6 +225,7 @@ fn test_overlay_commands_preserve_navigation_and_action_menu_kinds() {
             title: Some("Navigate".to_owned()),
             items: vec![action("contacts", "Contacts", "navigation.contacts", None)],
             body: None,
+            close_label: None,
         },
     };
     let action_menu = Command::PresentOverlay {
@@ -235,6 +236,7 @@ fn test_overlay_commands_preserve_navigation_and_action_menu_kinds() {
             title: Some("More actions".to_owned()),
             items: vec![action("archive", "Archive", "action.archive", None)],
             body: None,
+            close_label: None,
         },
     };
 

@@ -250,12 +250,14 @@ impl ContextualSurface {
                 title: Some(navigation_label.to_owned()),
                 items: navigation_items,
                 body: None,
+                close_label: None,
             },
             secondary_overlay: OverlaySpec {
                 kind: OverlayKind::ActionMenu,
                 title: Some(secondary_label.to_owned()),
                 items: secondary_items,
                 body: None,
+                close_label: None,
             },
             information_overlay: None,
             navigation_spec: NavigationSpec {
@@ -285,8 +287,21 @@ impl ContextualSurface {
             title: Some(self.title.clone()),
             items: Vec::new(),
             body: Some(body.to_owned()),
+            close_label: self.navigation_overlay.close_label.clone(),
         });
         Ok(self)
+    }
+
+    /// Names the way out of every overlay this surface can open
+    /// (vauchi/private#479). Called before `with_information`, whose
+    /// overlay takes the same label.
+    pub fn with_close_label(mut self, label: &str) -> Self {
+        self.navigation_overlay.close_label = Some(label.to_owned());
+        self.secondary_overlay.close_label = Some(label.to_owned());
+        if let Some(information) = self.information_overlay.as_mut() {
+            information.close_label = Some(label.to_owned());
+        }
+        self
     }
 }
 

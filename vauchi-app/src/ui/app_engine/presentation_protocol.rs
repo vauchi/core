@@ -370,7 +370,8 @@ impl AppEngine {
             selected_tab,
             &self.t("nav.more"),
             &self.t("action_list.title"),
-        )?;
+        )?
+        .with_close_label(&self.t("action.close"));
         match information {
             Some(body) => surface.with_information(
                 &self.t("context_bar.info"),
@@ -605,6 +606,7 @@ impl AppEngine {
                 title: Some(title.to_owned()),
                 items: Vec::new(),
                 body: Some(body.to_owned()),
+                close_label: Some(self.t("action.close")),
             },
         })
     }

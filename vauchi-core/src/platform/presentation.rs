@@ -156,6 +156,11 @@ pub struct OverlaySpec {
     /// Prose for an `Information` overlay; omitted on the wire otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<String>,
+    /// The visible and spoken label of the overlay's way out. A shell that
+    /// draws a Close uses it; dismissing still reports `OverlayDismissed`.
+    /// Omitted on the wire when absent, so older shells see nothing new.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub close_label: Option<String>,
 }
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]

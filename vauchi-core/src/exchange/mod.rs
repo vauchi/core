@@ -132,7 +132,7 @@ pub use x3dh::{X3DH, X3DHKeyPair};
 
 pub use multistage::session::{AccelStateError, AudioStateError, MultiStageSession};
 pub use multistage::types::{
-    AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
+    AccelerometerProximityState, AudioProximityState, LinkFeedback, ProtocolState, QrPayload,
 };
 
 pub use defaults::ExchangeDefaults;

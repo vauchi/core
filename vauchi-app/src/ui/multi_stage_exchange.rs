@@ -43,7 +43,7 @@
 
 use vauchi_core::Event;
 use vauchi_core::exchange::{
-    AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
+    AccelerometerProximityState, AudioProximityState, LinkFeedback, ProtocolState, QrPayload,
 };
 use vauchi_core::platform::{PresentationQrErrorCorrection, QrPlacement};
 
@@ -201,6 +201,10 @@ pub struct MultiStageExchangeEngine {
     /// a peer-engaged phase (`_private/docs/backlog/
     /// 2026-09-10-exchange-stall-and-ble-fallback-states/README.md`).
     stalled: bool,
+    /// Whether this phone reads the other one, pushed by the AppEngine
+    /// bridge from `MultiStageMachine::link_feedback` on the same ticks as
+    /// `stalled` (vauchi/private#450).
+    link_feedback: LinkFeedback,
     locale: Locale,
 }
 
@@ -227,6 +231,7 @@ impl MultiStageExchangeEngine {
             accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: false,
             stalled: false,
+            link_feedback: LinkFeedback::default(),
             locale: Locale::English,
         }
     }
@@ -270,6 +275,7 @@ impl MultiStageExchangeEngine {
             accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: true,
             stalled: false,
+            link_feedback: LinkFeedback::default(),
             locale: Locale::English,
         }
     }
@@ -297,6 +303,7 @@ impl MultiStageExchangeEngine {
             accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: true,
             stalled: false,
+            link_feedback: LinkFeedback::default(),
             locale: Locale::English,
         }
     }
@@ -434,6 +441,15 @@ impl MultiStageExchangeEngine {
             return;
         }
         self.stalled = stalled;
+    }
+
+    /// Drive what the status says about the link. No-op after cancel,
+    /// mirroring the other bridge setters.
+    pub fn set_link_feedback(&mut self, feedback: LinkFeedback) {
+        if self.cancelled {
+            return;
+        }
+        self.link_feedback = feedback;
     }
 
     // ── Internal helpers ───────────────────────────────────────────
@@ -707,9 +723,25 @@ impl MultiStageExchangeEngine {
                 }),
             }
         } else {
+            // The link's own line sits beside the progress: the user's
+            // "dots helped a lot" on the rig, as Core-prepared copy
+            // (vauchi/private#450). An old peer replaces the progress,
+            // which can never move.
+            let content = match self.link_feedback {
+                LinkFeedback::PeerNeedsUpdate => self.t("multi_stage.peer_needs_update"),
+                LinkFeedback::ReadingPeer => {
+                    format!("{progress} · {}", self.t("multi_stage.link_reading_peer"))
+                }
+                LinkFeedback::LookingForPeer => {
+                    format!(
+                        "{progress} · {}",
+                        self.t("multi_stage.link_looking_for_peer")
+                    )
+                }
+            };
             Component::Text {
                 id: EXCHANGE_STATUS_ID.into(),
-                content: progress,
+                content,
                 style: TextStyle::Body,
                 a11y: None,
             }
@@ -815,6 +847,7 @@ impl WorkflowEngine for MultiStageExchangeEngine {
             MultiStageUpdate::AudioProximity(state) => self.set_audio_proximity(state),
             MultiStageUpdate::AccelProximity(state) => self.set_accel_proximity(state),
             MultiStageUpdate::Stalled(stalled) => self.set_stalled(stalled),
+            MultiStageUpdate::LinkFeedback(feedback) => self.set_link_feedback(feedback),
         }
         true
     }

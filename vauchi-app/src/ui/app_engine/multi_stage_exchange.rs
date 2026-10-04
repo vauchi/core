@@ -43,6 +43,7 @@ use vauchi_core::Command;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::AccelerometerProximityState;
 use vauchi_core::exchange::AudioProximityState;
+use vauchi_core::exchange::LinkFeedback;
 use vauchi_core::exchange::mode::ExchangeMode;
 
 /// Exchange payload format version byte. Mirrors the constant in
@@ -157,16 +158,21 @@ impl AppEngine {
         // for ~1000× its window and deadlocked the exchange
         // (2026-06-03-multistage-qr-exchange-stalls-init-on-device).
         let now = self.vauchi.clock().unix_millis();
-        let (event, stalled) = match self.multi_stage_session.as_mut() {
+        let (event, stalled, link) = match self.multi_stage_session.as_mut() {
             Some(holder) => {
                 let event = holder.machine.advance(now);
-                (event, holder.machine.is_frame_stalled())
+                (
+                    event,
+                    holder.machine.is_frame_stalled(),
+                    holder.machine.link_feedback(),
+                )
             }
             None => return false,
         };
         let stalled_changed = self.apply_multi_stage_stalled(stalled);
+        let link_changed = self.apply_multi_stage_link_feedback(link);
         let event_changed = self.apply_multi_stage_event(event);
-        stalled_changed || event_changed
+        stalled_changed || link_changed || event_changed
     }
 
     /// Translate a frontend-emitted [`vauchi_core::Event`] into a
@@ -340,14 +346,15 @@ impl AppEngine {
         let event = self.forward_multi_stage_hardware_event(&vauchi_core::Event::QrScanned {
             data: qr.to_string(),
         });
-        let stalled = self
+        let (stalled, link) = self
             .multi_stage_session
             .as_ref()
-            .map(|h| h.machine.is_frame_stalled())
-            .unwrap_or(false);
+            .map(|h| (h.machine.is_frame_stalled(), h.machine.link_feedback()))
+            .unwrap_or_default();
         let stalled_changed = self.apply_multi_stage_stalled(stalled);
+        let link_changed = self.apply_multi_stage_link_feedback(link);
         let event_changed = self.apply_multi_stage_event(event);
-        stalled_changed || event_changed
+        stalled_changed || link_changed || event_changed
     }
 
     /// Drain any commands the machine emitted that aren't routed
@@ -722,6 +729,16 @@ impl AppEngine {
         self.engine
             .apply_update(crate::ui::EngineUpdate::MultiStage(
                 crate::ui::MultiStageUpdate::Stalled(stalled),
+            ))
+    }
+
+    /// Bridge: push `MultiStageMachine::link_feedback()` onto the active
+    /// engine's status line, on the same ticks as the stall flag
+    /// (vauchi/private#450).
+    pub fn apply_multi_stage_link_feedback(&mut self, feedback: LinkFeedback) -> bool {
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::MultiStage(
+                crate::ui::MultiStageUpdate::LinkFeedback(feedback),
             ))
     }
 

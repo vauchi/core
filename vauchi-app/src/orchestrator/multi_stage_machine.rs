@@ -65,7 +65,7 @@
 use vauchi_core::Command;
 use vauchi_core::Event;
 use vauchi_core::exchange::{
-    AccelerometerProximityState, AudioConfig, AudioProximityState, MultiStageSession,
+    AccelerometerProximityState, AudioConfig, AudioProximityState, LinkFeedback, MultiStageSession,
     ProtocolState, QrPayload, audio_modem,
 };
 
@@ -446,6 +446,13 @@ impl MultiStageMachine {
     /// frame clears this on the next `advance` / `handle_hardware_event`.
     pub fn is_frame_stalled(&self) -> bool {
         self.frame_stalled
+    }
+
+    /// What the status line says about the link to the other phone, from
+    /// the frames the inner session has decoded. Pushed onto the screen by
+    /// the AppEngine bridge beside [`Self::is_frame_stalled`].
+    pub fn link_feedback(&self) -> LinkFeedback {
+        self.inner.link_feedback()
     }
 
     /// One display-frame step. No deadline/progress bookkeeping — the

@@ -22,7 +22,7 @@ use super::exchange::success::ExchangeSuccessSummary;
 use super::fingerprint_verify::VerifyAction;
 use super::onboarding::OnboardingData;
 use vauchi_core::exchange::{
-    AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
+    AccelerometerProximityState, AudioProximityState, LinkFeedback, ProtocolState, QrPayload,
 };
 
 /// Salient typed state an engine exposes to `AppEngine`.
@@ -174,6 +174,10 @@ pub enum MultiStageUpdate {
     /// frame — see `_private/docs/backlog/
     /// 2026-09-10-exchange-stall-and-ble-fallback-states/README.md`.
     Stalled(bool),
+    /// Whether this phone reads the other one, or the other one needs an
+    /// update; from `MultiStageMachine::link_feedback` on the same ticks
+    /// as `Stalled` (vauchi/private#450).
+    LinkFeedback(LinkFeedback),
 }
 
 /// Cycle-thread bridge updates for the device-linking engine.
@@ -329,6 +333,7 @@ impl EngineUpdate {
                 MultiStageUpdate::AudioProximity(_) => "MultiStage::AudioProximity",
                 MultiStageUpdate::AccelProximity(_) => "MultiStage::AccelProximity",
                 MultiStageUpdate::Stalled(_) => "MultiStage::Stalled",
+                MultiStageUpdate::LinkFeedback(_) => "MultiStage::LinkFeedback",
             },
             Self::DeviceLink(u) => match u {
                 DeviceLinkUpdate::QrPending => "DeviceLink::QrPending",

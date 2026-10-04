@@ -331,16 +331,17 @@ fn test_e2e_grace_period_keeps_showing_the_final_frame() {
     assert_eq!(alice.get_state(), ProtocolState::Finalized);
     assert_eq!(bob.get_state(), ProtocolState::Finalized);
 
-    // After finalization the final frame is still displayed for a grace
-    // period so the peer can also finalize (C3 fix: prevents asymmetric
-    // failure). DATA may be interleaved while chunks are unacked; the
-    // guarantee is that the final frame keeps coming.
-    let final_frames = (0..50)
+    // After finalization the final frame is still displayed, as DONE, so
+    // the peer can also finalize (C3 fix: prevents asymmetric failure);
+    // a phone that already read its peer's DONE shows BOTH instead (design
+    // D6). DATA may be interleaved while chunks are unacked; the guarantee
+    // is that an ending frame keeps coming.
+    let ending_frames = (0..50)
         .filter_map(|_| alice.get_display_qr())
-        .filter(|qr| qr.data.starts_with("FIN3"))
+        .filter(|qr| qr.data.starts_with("DON3") || qr.data.starts_with("BTH3"))
         .count();
     assert!(
-        final_frames > 0,
+        ending_frames > 0,
         "Grace period must keep showing the final frame so the peer can finalize"
     );
 
@@ -513,7 +514,8 @@ fn test_atomicity_without_peer_finalization_frame_no_finalize() {
     let mut withheld = 0;
     for _ in 0..500 {
         if let Some(aq) = alice.get_display_qr() {
-            if aq.data.starts_with("FIN3") {
+            // Once saved, Alice shows her final frame as DONE (design D6).
+            if aq.data.starts_with("FIN3") || aq.data.starts_with("DON3") {
                 withheld += 1;
             } else {
                 bob.process_scanned_qr(&aq.data);

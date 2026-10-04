@@ -85,21 +85,26 @@ fn two_party_glance_reaches_completed_through_the_wrapper() {
 
     let (alice, bob, ticks) = drive_two_party_glance(alice_card, bob_card, 4000);
 
-    // Success is `Finalized` — the contact-creating transition. (The
-    // later `Finalized → Completed` hop fires only after a wall-clock
-    // grace period this fast in-memory loop never advances, so we do not
-    // require it here.) Reaching `Finalized` through the wrapper proves
-    // the COMBO/RDYY finalization the device stalled at is sound with
-    // clean frame delivery — i.e. the on-device "Almost done" stall is a
-    // delivery-rate issue, not a core-logic bug.
+    // Success is `Finalized` — the contact-creating transition. A phone
+    // that reads its peer's BOTH stops at once and surfaces `Completed`;
+    // the one showing BOTH lingers 3 s of wall clock (design D6), which
+    // this fast loop may not reach, so it may still be `Finalized`.
+    for (who, machine) in [("Alice", &alice), ("Bob", &bob)] {
+        assert!(
+            matches!(
+                machine.phase(),
+                MultiStagePhase::Finalized { .. } | MultiStagePhase::Completed
+            ),
+            "{who} must finalize through the wrapper; stuck at {:?} after {ticks} ticks",
+            machine.phase(),
+        );
+    }
     assert!(
-        matches!(alice.phase(), MultiStagePhase::Finalized { .. }),
-        "Alice must finalize through the wrapper; stuck at {:?} after {ticks} ticks",
+        [&alice, &bob]
+            .iter()
+            .any(|m| m.phase() == MultiStagePhase::Completed),
+        "neither side read the other's BOTH and completed after {ticks} ticks: {:?}, {:?}",
         alice.phase(),
-    );
-    assert!(
-        matches!(bob.phase(), MultiStagePhase::Finalized { .. }),
-        "Bob must finalize through the wrapper; stuck at {:?} after {ticks} ticks",
         bob.phase(),
     );
 }
@@ -158,13 +163,20 @@ fn asymmetric_camera_glance_still_finalizes_both_sides() {
     // Bob 5× lossier — Pixel-vs-S7-class asymmetry.
     let (alice, bob, ticks) = drive_asymmetric_glance(alice_card, bob_card, 5, 8000);
 
+    // `Completed` once a side has read its peer's BOTH (design D6).
     assert!(
-        matches!(alice.phase(), MultiStagePhase::Finalized { .. }),
+        matches!(
+            alice.phase(),
+            MultiStagePhase::Finalized { .. } | MultiStagePhase::Completed
+        ),
         "Alice (fast) must finalize despite the slow peer; stuck at {:?} after {ticks} ticks",
         alice.phase(),
     );
     assert!(
-        matches!(bob.phase(), MultiStagePhase::Finalized { .. }),
+        matches!(
+            bob.phase(),
+            MultiStagePhase::Finalized { .. } | MultiStagePhase::Completed
+        ),
         "Bob (slow) must finalize; stuck at {:?} after {ticks} ticks — \
          the device 'Almost done' stall (COMBO decoded but never finalizes)",
         bob.phase(),
@@ -257,20 +269,28 @@ fn finalized_machine_exposes_combo_for_broadcast_seed() {
     let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
     let (alice, bob, ticks) = drive_two_party_glance(alice_card, bob_card, 4000);
 
+    // A saved session shows its final frame as DONE (design D6); `Completed`
+    // means it has also read the peer's BOTH, and the seed is unchanged.
     assert!(
-        matches!(alice.phase(), MultiStagePhase::Finalized { .. }),
+        matches!(
+            alice.phase(),
+            MultiStagePhase::Finalized { .. } | MultiStagePhase::Completed
+        ),
         "precondition: Alice must be Finalized after {ticks} ticks, got {:?}",
         alice.phase(),
     );
     let seed = alice.finalization_qr();
     assert!(
-        seed.data.starts_with("FIN3"),
+        seed.data.starts_with("DON3"),
         "the broadcast seed must be the final frame, got prefix {:?}",
         &seed.data[..seed.data.len().min(4)],
     );
-    if matches!(bob.phase(), MultiStagePhase::Finalized { .. }) {
+    if matches!(
+        bob.phase(),
+        MultiStagePhase::Finalized { .. } | MultiStagePhase::Completed
+    ) {
         assert!(
-            bob.finalization_qr().data.starts_with("FIN3"),
+            bob.finalization_qr().data.starts_with("DON3"),
             "the slow peer's broadcast seed must also be the final frame",
         );
     }

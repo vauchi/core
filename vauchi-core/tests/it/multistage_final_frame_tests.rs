@@ -388,7 +388,7 @@ fn from_verifying_on_a_session_shows_only_data_shake_and_final_frames() {
     assert!(
         shown
             .iter()
-            .all(|p| ["FIN3", "DAT3", "SHK3"].contains(&p.as_str())),
+            .all(|p| ["FIN3", "DON3", "DAT3", "SHK3"].contains(&p.as_str())),
         "{shown:?}"
     );
 }

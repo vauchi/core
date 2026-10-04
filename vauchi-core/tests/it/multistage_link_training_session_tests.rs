@@ -203,22 +203,46 @@ fn two_sessions_settle_on_layouts_each_camera_reads_and_complete() {
 // @internal
 #[test]
 fn a_finalized_session_keeps_its_code_where_it_was() {
-    let alice_camera = ReadsLayouts(&[7]);
-    let bob_camera = ReadsLayouts(&[2]);
-    let (outcome, _, _) = exchange(&alice_camera, &bob_camera, 1500);
-    let finalized = outcome.finalized_at_tick.expect("did not finalize");
+    // Each phone's camera goes blind once it has saved, so the first to
+    // save never reads its peer's BOTH and keeps showing DONE long after
+    // every echo has gone stale: the case where the code must not move.
+    let readable: [&[u8]; 2] = [&[2], &[7]];
+    let clock = Arc::new(FakeMonotonicClock::new());
+    let mut phones = [
+        MultiStageSession::new(card(0xA1)).with_monotonic(clock.clone()),
+        MultiStageSession::new(card(0xB2)).with_monotonic(clock.clone()),
+    ];
+    let mut layouts_after_saving: [Vec<u8>; 2] = [Vec::new(), Vec::new()];
 
-    // Long past the point an echo would have gone stale.
+    for _ in 0..1500 {
+        let frames = [phones[0].get_display_qr(), phones[1].get_display_qr()];
+        for (me, frame) in frames.iter().enumerate() {
+            let peer = 1 - me;
+            let Some(frame) = frame else { continue };
+            if phones[me].get_state() == ProtocolState::Finalized {
+                layouts_after_saving[me].push(frame.layout);
+            }
+            if phones[peer].get_state() != ProtocolState::Finalized
+                && readable[me].contains(&frame.layout)
+            {
+                phones[peer].process_scanned_qr(&frame.data);
+            }
+        }
+        clock.advance(Duration::from_millis(u64::from(SWEEP_DWELL_MS)));
+    }
+
     let stale_after = usize::try_from(ECHO_FRESH.as_millis() / u128::from(SWEEP_DWELL_MS)).unwrap();
-    let late = finalized + 3 * stale_after;
-    assert!(late + 20 < outcome.alice_layouts.len(), "run long enough");
-
+    let first_to_save = if layouts_after_saving[0].len() >= layouts_after_saving[1].len() {
+        0
+    } else {
+        1
+    };
+    let shown = &layouts_after_saving[first_to_save];
+    assert!(shown.len() > 3 * stale_after + 20, "run long enough");
     assert!(
-        outcome.alice_layouts[late..late + 20]
-            .iter()
-            .all(|l| *l == 2)
+        shown.iter().all(|l| *l == readable[first_to_save][0]),
+        "phone {first_to_save} moved its code after saving: {shown:?}"
     );
-    assert!(outcome.bob_layouts[late..late + 20].iter().all(|l| *l == 7));
 }
 
 // @internal
@@ -420,9 +444,10 @@ fn every_frame_a_session_shows_fits_37_modules_at_the_level_it_names() {
             assert_eq!(frame.error_correction, "L", "{}", &frame.data[..4]);
             let code = qrcode::QrCode::with_error_correction_level(&frame.data, qrcode::EcLevel::L)
                 .expect("frame encodes");
-            assert_eq!(
-                code.width(),
-                37,
+            // No frame is denser than the 37-module frames the link trained
+            // on; BOTH, the session id alone, is smaller still.
+            assert!(
+                code.width() <= 37,
                 "a {}-char {} frame: {}",
                 frame.data.len(),
                 &frame.data[..4],
@@ -440,7 +465,7 @@ fn every_frame_a_session_shows_fits_37_modules_at_the_level_it_names() {
 
     assert_eq!(
         seen.into_iter().collect::<Vec<_>>(),
-        ["DAT3", "FIN3", "INI3"],
+        ["BTH3", "DAT3", "DON3", "FIN3", "INI3"],
         "the run showed every frame type"
     );
 }

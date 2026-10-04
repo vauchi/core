@@ -211,25 +211,27 @@ fn finalized_before_session_ended_shows_success_with_qr_broadcast() {
     // and the status asking them to keep facing — instead of parking
     // on "Almost done" for the whole grace window
     // (2026-07-01-hover-exchange-completion-latency).
+    //
+    // The grace screen keeps the exchange layout, camera included, so the
+    // code stays where the peer last read it and DONE / BOTH can be read
+    // (design D6, owner 2026-10-04). Only the status changes.
     let mut engine = engine_with_qr(ProtocolState::Finalized, "GRACE-QR");
     engine.set_finalized("Alice".into());
     let screen = engine.current_screen();
 
-    let success_detail = screen.components.iter().find_map(|c| match c {
-        Component::StatusIndicator {
-            title,
-            status: Status::Success,
-            detail,
-            ..
-        } if title == "Exchange Complete" => Some(detail.clone()),
+    assert_eq!(
+        status_text(&screen),
+        Some("Exchange Complete · Exchanged with Alice"),
+        "Finalized before session end must already show success"
+    );
+    let status_a11y = side_column(&screen).iter().find_map(|c| match c {
+        Component::Text { id, a11y, .. } if id == EXCHANGE_STATUS_ID => a11y.clone(),
         _ => None,
     });
     assert_eq!(
-        success_detail,
-        Some(Some(
-            "Keep screens facing each other until the other phone finishes".to_string()
-        )),
-        "Finalized before session end must already show success, asking the user to hold"
+        status_a11y.and_then(|a| a.hint),
+        Some("Keep screens facing each other until the other phone finishes".to_string()),
+        "the hold-position ask stays with the status"
     );
 
     // The peer's camera must always see the QR: FIRST component on a
@@ -260,28 +262,18 @@ fn finalized_before_session_ended_shows_success_with_qr_broadcast() {
         "the grace screen must not scroll — the QR must stay visible"
     );
 
+    let preview = screen.components.iter().find_map(|c| match c {
+        Component::Row { id, items } if id == EXCHANGE_PREVIEW_ROW_ID => items.first(),
+        _ => None,
+    });
     assert!(
-        !screen.components.iter().any(|c| matches!(
-            c,
-            Component::QrCode {
-                mode: QrMode::Scan,
-                ..
-            }
-        )),
-        "post-Finalized scans are no-ops — the camera must be dropped"
+        matches!(
+            preview,
+            Some(Component::QrCode { id, mode: QrMode::Scan, .. }) if id == COMPONENT_ID_PEER_SCAN
+        ),
+        "the camera stays on so DONE and BOTH can be read, got {preview:?}"
     );
     assert_eq!(action_ids(&screen), vec![DONE_ACTION_ID]);
-    let done_style = screen
-        .contextual_actions
-        .iter()
-        .find(|a| a.id == DONE_ACTION_ID)
-        .map(|a| a.style.clone());
-    assert_eq!(
-        done_style,
-        Some(ActionStyle::Secondary),
-        "Done tears the broadcast down early — de-emphasize it while \
-         the caption asks the user to hold position"
-    );
 }
 
 // @internal

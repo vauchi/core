@@ -368,6 +368,22 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
+    /// A contact was blocked on another device (ADR-056; owner-level, #295).
+    ContactBlocked {
+        /// ID of the blocked contact.
+        contact_id: String,
+        /// Timestamp of blocking.
+        timestamp: u64,
+    },
+
+    /// A contact was unblocked on another device.
+    ContactUnblocked {
+        /// ID of the unblocked contact.
+        contact_id: String,
+        /// Timestamp of unblocking.
+        timestamp: u64,
+    },
+
     /// Own contact-card field with its stable identity.
     ///
     /// New linked-device writes use this form so per-contact visibility
@@ -421,6 +437,8 @@ impl SyncItem {
             SyncItem::ContactUnarchived { timestamp, .. } => *timestamp,
             SyncItem::ContactIgnored { timestamp, .. } => *timestamp,
             SyncItem::ContactUnignored { timestamp, .. } => *timestamp,
+            SyncItem::ContactBlocked { timestamp, .. } => *timestamp,
+            SyncItem::ContactUnblocked { timestamp, .. } => *timestamp,
         }
     }
 

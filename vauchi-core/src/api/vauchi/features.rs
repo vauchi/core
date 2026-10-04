@@ -302,6 +302,10 @@ impl Vauchi {
         self.events.dispatch(VauchiEvent::ContactBlocked {
             contact_id: id.to_string(),
         });
+        self.record_sync_item(crate::sync::SyncItem::ContactBlocked {
+            contact_id: id.to_string(),
+            timestamp: self.now_timestamp(),
+        });
         Ok(())
     }
 
@@ -316,6 +320,10 @@ impl Vauchi {
         self.storage.contacts().save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactUnblocked {
             contact_id: id.to_string(),
+        });
+        self.record_sync_item(crate::sync::SyncItem::ContactUnblocked {
+            contact_id: id.to_string(),
+            timestamp: self.now_timestamp(),
         });
         Ok(())
     }

@@ -773,6 +773,12 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::ContactUnignored { contact_id, .. } => {
                 format!("ignore:{}", contact_id)
             }
+            SyncItem::ContactBlocked { contact_id, .. } => {
+                format!("block:{}", contact_id)
+            }
+            SyncItem::ContactUnblocked { contact_id, .. } => {
+                format!("block:{}", contact_id)
+            }
         }
     }
 

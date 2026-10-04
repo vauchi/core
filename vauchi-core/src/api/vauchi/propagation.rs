@@ -948,6 +948,30 @@ impl Vauchi {
                         None => Ok(()), // Contact not found, skip
                     }
                 }
+                SyncItem::ContactBlocked { ref contact_id, .. } => {
+                    match self.storage.contacts().load_contact(contact_id)? {
+                        Some(mut contact) => {
+                            contact.block();
+                            self.storage
+                                .contacts()
+                                .save_contact(&contact)
+                                .map_err(|e| e.into())
+                        }
+                        None => Ok(()), // Contact not found, skip
+                    }
+                }
+                SyncItem::ContactUnblocked { ref contact_id, .. } => {
+                    match self.storage.contacts().load_contact(contact_id)? {
+                        Some(mut contact) => {
+                            contact.unblock();
+                            self.storage
+                                .contacts()
+                                .save_contact(&contact)
+                                .map_err(|e| e.into())
+                        }
+                        None => Ok(()), // Contact not found, skip
+                    }
+                }
             };
 
             if result.is_ok() {
@@ -1073,6 +1097,12 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
             contact_id: contact_id.clone(),
         }),
         SyncItem::ContactUnignored { contact_id, .. } => Some(VauchiEvent::ContactUnignored {
+            contact_id: contact_id.clone(),
+        }),
+        SyncItem::ContactBlocked { contact_id, .. } => Some(VauchiEvent::ContactBlocked {
+            contact_id: contact_id.clone(),
+        }),
+        SyncItem::ContactUnblocked { contact_id, .. } => Some(VauchiEvent::ContactUnblocked {
             contact_id: contact_id.clone(),
         }),
         // No mapped invalidation event (no affected_screens entry today).

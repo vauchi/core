@@ -396,6 +396,7 @@ mod tests {
 
     // A persistent database opened with a key generated per launch cannot
     // be read after a restart (vauchi/private#284).
+    // @internal
     #[test]
     fn app_create_with_config_keeps_data_across_reopens() {
         let dir = tempfile::tempdir().unwrap();
@@ -405,6 +406,7 @@ mod tests {
         assert!(survived, "identity lost after reopening the same data dir");
     }
 
+    // @internal
     #[test]
     fn app_create_from_config_without_key_keeps_data_across_reopens() {
         let dir = tempfile::tempdir().unwrap();
@@ -421,6 +423,7 @@ mod tests {
 
     // linux-qt falls back from create_with_keyring to create_with_config;
     // both must read the same data (vauchi/private#284).
+    // @internal
     #[test]
     fn app_create_with_config_reads_data_written_by_keyring_fallback() {
         let dir = tempfile::tempdir().unwrap();
@@ -455,28 +458,6 @@ mod tests {
                 "app engine with config + relay URL should create successfully"
             );
             vauchi_app_destroy(handle);
-        }
-    }
-
-    #[test]
-    fn app_create_with_config_persists_across_reopens() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let dir = tempfile::tempdir().unwrap();
-            let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
-
-            // First open — create and complete onboarding
-            let handle = vauchi_app_create_with_config(dir_cstr.as_ptr(), std::ptr::null());
-            assert!(!handle.is_null());
-            vauchi_app_destroy(handle);
-
-            // Second open — should succeed (db file exists)
-            let handle2 = vauchi_app_create_with_config(dir_cstr.as_ptr(), std::ptr::null());
-            assert!(
-                !handle2.is_null(),
-                "reopening with same data_dir should succeed"
-            );
-            vauchi_app_destroy(handle2);
         }
     }
 

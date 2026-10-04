@@ -94,6 +94,7 @@ mod consent_status_tests;
 mod consent_storage_tests;
 mod consolidation_pinning_tests;
 mod contact_backup_tests;
+mod contact_block_sync_tests;
 mod contact_card_bio_tests;
 mod contact_card_coverage_tests;
 mod contact_card_field_tests;

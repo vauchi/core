@@ -27,6 +27,7 @@
 //! | Proptest input generators | `strategies::*_strategy` (names, emails, phones, urls, ids) |
 //! | Sharer→recipient share + deliver | [`two_recipient::add_recipient`], [`two_recipient::deliver`] |
 //! | `AppEngine` onboarding / PIN drive | [`app_engine_helpers::drive_onboarding`], [`app_engine_helpers::enter_pin`] |
+//! | A linked sibling and its pending sync journal | [`device_sync::link_tablet`], [`device_sync::journal_for_tablet`] |
 //! | A sealed card-update envelope | [`card_update::seal_update`], [`card_update::seal_update_default`] |
 //! | A relay HTTP response stub | [`mock_relay::CannedResponse`] (feature `network-http`) |
 //! | Contact-count / card-field assertions | [`helpers::assert_contact_count`], [`helpers::assert_card_has_field`] |

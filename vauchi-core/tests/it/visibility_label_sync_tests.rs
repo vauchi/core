@@ -13,12 +13,10 @@
 use std::collections::HashSet;
 
 use vauchi_core::Vauchi;
-use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::contact::GroupManager;
-use vauchi_core::crypto::SigningKeyPair;
-use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
 use vauchi_core::sync::{GroupSyncData, SyncItem};
 
+use crate::common::device_sync::{journal_for_tablet, link_tablet};
 use crate::common::two_recipient::add_recipient;
 
 // =============================================================================
@@ -49,41 +47,6 @@ fn tiny_png() -> Vec<u8> {
 
 /// Registers a sibling device so `record_sync_item` has someone to
 /// journal for; returns the registry and the sibling's id.
-fn link_tablet(vauchi: &Vauchi, seed: [u8; 32]) -> (DeviceRegistry, [u8; 32]) {
-    let signing = SigningKeyPair::from_seed(&seed);
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
-        &signing,
-    );
-    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
-    let tablet_id = *tablet.device_id();
-    registry
-        .add_device_unsigned(tablet.to_registered(&seed))
-        .unwrap();
-    vauchi
-        .storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
-    (registry, tablet_id)
-}
-
-/// The sync items journaled for the sibling registered by `link_tablet`.
-fn journal_for_tablet(
-    vauchi: &Vauchi,
-    registry: DeviceRegistry,
-    tablet_id: &[u8; 32],
-) -> Vec<SyncItem> {
-    DeviceSyncOrchestrator::load(
-        vauchi.storage(),
-        vauchi.identity().unwrap().create_device_info(0),
-        registry,
-    )
-    .unwrap()
-    .pending_for_device(tablet_id)
-    .to_vec()
-}
-
 // @scenario: device_management :: Group presentation changes sync to linked devices
 // @scenario: sync_updates :: Group presentation state converges across linked devices
 #[test]

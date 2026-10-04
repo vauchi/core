@@ -558,46 +558,14 @@ impl MultiStageExchangeEngine {
         }
     }
 
-    /// Success chrome with the own-QR broadcast retained — shown from
-    /// `Finalized` until `session_ended` (grace expiry drops the strip).
-    ///
-    /// Mirrors `build_active_screen`'s pinned-QR contract: QR FIRST on a
-    /// fixed (non-scrolling) layout so the peer's camera always sees it —
-    /// appended below a scrollable summary it lands below the fold exactly
-    /// when the peer needs it. The rich success summary is deferred to
-    /// `session_ended` for the same reason. The camera is omitted
-    /// (post-Finalized scans are no-ops), and Done is styled Secondary:
-    /// it tears the broadcast down early while the caption asks the user
-    /// to hold position.
+    /// Shown from `Finalized` until `session_ended`: the exchange layout,
+    /// camera included, so the code stays where the peer last read it and
+    /// DONE / BOTH can be read (design D6, owner 2026-10-04). Only the
+    /// status and the buttons change. The rich summary waits for
+    /// `session_ended`: a fixed layout cannot scroll to the code.
     fn build_finalized_broadcast_screen(&self, title: String) -> ScreenModel {
-        let mut components: Vec<Component> = Vec::new();
-        if let Some(data) = &self.current_qr_data {
-            components.push(Component::QrCode {
-                id: COMPONENT_ID_OWN_QR.into(),
-                data: data.clone(),
-                // Animated-QR frame carrier (ADR-044 Am2a C2a); see module doc.
-                frames: vec![data.clone()],
-                mode: QrMode::Display,
-                // No caption: a line above the code shrank it below what
-                // the peer's camera read, so the peer never finished
-                // (issue #315). The hold-position ask rides on the status.
-                label: None,
-                scan_quality: None,
-                placement: placement_for_layout(self.current_qr_layout),
-                error_correction: self.current_qr_error_correction,
-                a11y: None,
-            });
-        }
-        components.push(Component::StatusIndicator {
-            id: COMPONENT_ID_STATUS.into(),
-            icon: Some("checkmark.circle".into()),
-            title: self.t("exchange.terminal.complete"),
-            detail: Some(self.t("multi_stage.qr_broadcast_label")),
-            status: Status::Success,
-            status_label: self.t(Status::Success.label_key()),
-            a11y: None,
-        });
-        let detail = self
+        let complete = self.t("exchange.terminal.complete");
+        let peer = self
             .peer_name
             .as_ref()
             .map(|name| {
@@ -608,33 +576,57 @@ impl MultiStageExchangeEngine {
                 )
             })
             .unwrap_or_else(|| self.t("multi_stage.exchange_complete_detail"));
-        components.push(Component::Text {
-            a11y: None,
-            id: COMPONENT_ID_PEER_NAME.into(),
-            content: detail,
+        let status = Component::Text {
+            id: EXCHANGE_STATUS_ID.into(),
+            content: format!("{complete} · {peer}"),
             style: TextStyle::Body,
-        });
+            a11y: Some(A11y {
+                label: Some(complete),
+                hint: Some(self.t("multi_stage.qr_broadcast_label")),
+                role: None,
+            }),
+        };
+        let done = self.list_button(DONE_ACTION_ID, self.t("action.done"));
+        self.build_exchange_layout(title, status, vec![done])
+    }
 
-        let mut screen = ScreenModel::new(
-            SCREEN_ID,
-            title,
-            components,
-            vec![ScreenAction {
-                id: DONE_ACTION_ID.into(),
-                label: self.t("action.done"),
-                style: ActionStyle::Secondary,
-                enabled: true,
-                a11y: Some(A11y::labeled(self.t("action.done"))),
-            }],
-        );
-        screen.layout = ScreenLayout::Fixed;
-        screen
+    fn list_button(&self, id: &str, label: String) -> ActionListItem {
+        ActionListItem {
+            id: id.into(),
+            label: label.clone(),
+            icon: None,
+            detail: None,
+            a11y: Some(A11y::labeled(label)),
+            info_key: None,
+        }
     }
 
     /// Active rendering — both QR (own card display) and camera
     /// (peer scan) are composed; the status indicator narrates the
     /// current `ProtocolState`.
     fn build_active_screen(&self, title: String) -> ScreenModel {
+        let switch_camera_label = if self.use_front_camera {
+            self.t("multi_stage.use_rear_camera_button")
+        } else {
+            self.t("multi_stage.use_front_camera_button")
+        };
+        let buttons = vec![
+            self.list_button(SWITCH_CAMERA_ACTION_ID, switch_camera_label),
+            self.list_button(CANCEL_ACTION_ID, self.t("action.cancel")),
+        ];
+        let status = self.active_status();
+        self.build_exchange_layout(title, status, buttons)
+    }
+
+    /// The own code, then the camera beside a side column holding the
+    /// status and the buttons, on a fixed layout. Shared by the active and
+    /// the finalized screens so the code never moves between them.
+    fn build_exchange_layout(
+        &self,
+        title: String,
+        status: Component,
+        buttons: Vec<ActionListItem>,
+    ) -> ScreenModel {
         let mut components: Vec<Component> = Vec::new();
 
         // Own QR — pinned at the TOP of a fixed (non-scrolling) layout.
@@ -678,37 +670,34 @@ impl MultiStageExchangeEngine {
             error_correction: None,
             a11y: None,
         };
-        let switch_camera_label = if self.use_front_camera {
-            self.t("multi_stage.use_rear_camera_button")
-        } else {
-            self.t("multi_stage.use_front_camera_button")
-        };
-        let buttons = Component::ButtonList {
-            id: EXCHANGE_ACTIONS_ID.into(),
+        components.push(Component::Row {
+            id: EXCHANGE_PREVIEW_ROW_ID.into(),
             items: vec![
-                ActionListItem {
-                    id: SWITCH_CAMERA_ACTION_ID.into(),
-                    label: switch_camera_label.clone(),
-                    icon: None,
-                    detail: None,
-                    a11y: Some(A11y::labeled(switch_camera_label)),
-                    info_key: None,
-                },
-                ActionListItem {
-                    id: CANCEL_ACTION_ID.into(),
-                    label: self.t("action.cancel"),
-                    icon: None,
-                    detail: None,
-                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
-                    info_key: None,
+                scan,
+                Component::Column {
+                    id: EXCHANGE_SIDE_COLUMN_ID.into(),
+                    items: vec![
+                        status,
+                        Component::ButtonList {
+                            id: EXCHANGE_ACTIONS_ID.into(),
+                            items: buttons,
+                        },
+                    ],
                 },
             ],
-        };
-        // The status ("Show this", then the live progress) shares the
-        // preview's height with the buttons rather than captioning the QR,
-        // which cost the preview a line on a compact screen.
+        });
+
+        let mut screen = ScreenModel::new(SCREEN_ID, title, components, Vec::new());
+        screen.layout = ScreenLayout::Fixed;
+        screen
+    }
+
+    /// The status beside the preview ("Show this", then the live
+    /// progress), rather than a caption on the QR, which cost the preview
+    /// a line on a compact screen.
+    fn active_status(&self) -> Component {
         let progress = own_qr_label(&self.state, self.locale);
-        let status = if self.stalled {
+        if self.stalled {
             // Keeps the progress visible through the existing
             // transferring-progress strings rather than a new locale key.
             let stalled_title = self.t("exchange.stalled_title");
@@ -745,21 +734,7 @@ impl MultiStageExchangeEngine {
                 style: TextStyle::Body,
                 a11y: None,
             }
-        };
-        components.push(Component::Row {
-            id: EXCHANGE_PREVIEW_ROW_ID.into(),
-            items: vec![
-                scan,
-                Component::Column {
-                    id: EXCHANGE_SIDE_COLUMN_ID.into(),
-                    items: vec![status, buttons],
-                },
-            ],
-        });
-
-        let mut screen = ScreenModel::new(SCREEN_ID, title, components, Vec::new());
-        screen.layout = ScreenLayout::Fixed;
-        screen
+        }
     }
 
     fn build_success_screen(&self, title: String) -> ScreenModel {

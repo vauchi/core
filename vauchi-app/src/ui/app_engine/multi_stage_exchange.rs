@@ -276,13 +276,13 @@ impl AppEngine {
             }
             MultiStageEvent::Finalized { peer_name } => {
                 // Seed the success-screen broadcast with the final frame
-                // *before* any Finalized screen builds. That screen is a single
-                // frozen frame (`build_finalized_broadcast_screen`); without this
-                // it inherits whatever `current_qr_data` last held — a stale DATA
-                // chunk — and a peer still waiting scans DATA forever, timing
-                // out with no contact (device-proven half-exchange, 2026-07-25
-                // Pixel↔Samsung Hover). The final frame is the only one the
-                // trailing peer needs to finalize.
+                // *before* any Finalized screen builds. The first build reads
+                // `current_qr_data`; without this it shows whatever that last
+                // held — a stale DATA chunk — until the next frame tick, and a
+                // peer still waiting can lock onto DATA and time out with no
+                // contact (device-proven half-exchange, 2026-07-25
+                // Pixel↔Samsung Hover). The final frame (DONE once saved) is
+                // the only one the trailing peer needs to finalize.
                 if let Some(final_frame) = self
                     .multi_stage_session
                     .as_ref()

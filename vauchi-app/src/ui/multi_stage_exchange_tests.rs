@@ -252,7 +252,7 @@ fn active_screen_shows_the_status_beside_the_preview_not_above_the_qr() {
     assert!(matches!(
         side_column(&screen).first(),
         Some(Component::Text { id, content, .. })
-            if id == EXCHANGE_STATUS_ID && content == "Show this"
+            if id == EXCHANGE_STATUS_ID && content == "Show this · Looking for the other phone"
     ));
 }
 
@@ -978,6 +978,54 @@ fn status_text(screen: &ScreenModel) -> Option<&str> {
     })
 }
 
+// Link feedback (plan §5 of vauchi/private#450): the status says whether
+// this phone is reading the other one, pushed by the AppEngine bridge via
+// `set_link_feedback` beside the progress.
+
+// @internal
+#[test]
+fn the_status_says_this_phone_is_looking_for_the_other_until_a_frame_is_read() {
+    let engine = transferring_engine();
+    assert_eq!(
+        status_text(&engine.current_screen()),
+        Some("Sending 1/3 · Receiving 2/3 · Looking for the other phone")
+    );
+}
+
+// @internal
+#[test]
+fn the_status_says_this_phone_is_reading_the_other() {
+    let mut engine = transferring_engine();
+    engine.set_link_feedback(LinkFeedback::ReadingPeer);
+    assert_eq!(
+        status_text(&engine.current_screen()),
+        Some("Sending 1/3 · Receiving 2/3 · Reading the other phone")
+    );
+}
+
+// @internal
+#[test]
+fn the_status_says_the_other_phone_needs_an_update_in_place_of_the_progress() {
+    let mut engine = engine_with_state(ProtocolState::Advertising);
+    engine.set_link_feedback(LinkFeedback::PeerNeedsUpdate);
+    assert_eq!(
+        status_text(&engine.current_screen()),
+        Some("The other phone needs an update")
+    );
+}
+
+// @internal
+#[test]
+fn a_stalled_status_keeps_its_own_wording() {
+    let mut engine = transferring_engine();
+    engine.set_link_feedback(LinkFeedback::ReadingPeer);
+    engine.set_stalled(true);
+    assert_eq!(
+        status_text(&engine.current_screen()),
+        Some("Taking longer than expected · Sending 1/3 · Receiving 2/3")
+    );
+}
+
 // A banner inserted above the QR pushed the scanner off the fixed layout on
 // a phone-sized viewport, where it was disposed and never came back — so the
 // stall could not clear (vauchi/private#9, runs E3/E6/E8).
@@ -1023,7 +1071,7 @@ fn clearing_stall_restores_the_plain_progress_caption() {
 
     assert_eq!(
         status_text(&engine.current_screen()),
-        Some("Sending 1/3 · Receiving 2/3")
+        Some("Sending 1/3 · Receiving 2/3 · Looking for the other phone")
     );
 }
 

@@ -900,78 +900,32 @@ impl Vauchi {
                     ref contact_id,
                     timestamp,
                     ..
-                } => match self.storage.contacts().load_contact(contact_id)? {
-                    Some(mut contact) => {
-                        contact.archive(timestamp);
-                        self.storage
-                            .contacts()
-                            .save_contact(&contact)
-                            .map_err(|e| e.into())
-                    }
-                    None => Ok(()), // Contact not found, skip
-                },
-                SyncItem::ContactUnarchived { ref contact_id, .. } => {
-                    match self.storage.contacts().load_contact(contact_id)? {
-                        Some(mut contact) => {
-                            contact.unarchive();
-                            self.storage
-                                .contacts()
-                                .save_contact(&contact)
-                                .map_err(|e| e.into())
-                        }
-                        None => Ok(()), // Contact not found, skip
-                    }
-                }
+                } => self.save_if_present(self.storage.contacts().load_contact(contact_id)?, |c| {
+                    c.archive(timestamp)
+                }),
+                SyncItem::ContactUnarchived { ref contact_id, .. } => self
+                    .save_if_present(self.storage.contacts().load_contact(contact_id)?, |c| {
+                        c.unarchive()
+                    }),
                 SyncItem::ContactIgnored {
                     ref contact_id,
                     timestamp,
                     ..
-                } => match self.storage.contacts().load_contact(contact_id)? {
-                    Some(mut contact) => {
-                        contact.ignore(timestamp);
-                        self.storage
-                            .contacts()
-                            .save_contact(&contact)
-                            .map_err(|e| e.into())
-                    }
-                    None => Ok(()), // Contact not found, skip
-                },
-                SyncItem::ContactUnignored { ref contact_id, .. } => {
-                    match self.storage.contacts().load_contact(contact_id)? {
-                        Some(mut contact) => {
-                            contact.unignore();
-                            self.storage
-                                .contacts()
-                                .save_contact(&contact)
-                                .map_err(|e| e.into())
-                        }
-                        None => Ok(()), // Contact not found, skip
-                    }
-                }
-                SyncItem::ContactBlocked { ref contact_id, .. } => {
-                    match self.storage.contacts().load_contact(contact_id)? {
-                        Some(mut contact) => {
-                            contact.block();
-                            self.storage
-                                .contacts()
-                                .save_contact(&contact)
-                                .map_err(|e| e.into())
-                        }
-                        None => Ok(()), // Contact not found, skip
-                    }
-                }
-                SyncItem::ContactUnblocked { ref contact_id, .. } => {
-                    match self.storage.contacts().load_contact(contact_id)? {
-                        Some(mut contact) => {
-                            contact.unblock();
-                            self.storage
-                                .contacts()
-                                .save_contact(&contact)
-                                .map_err(|e| e.into())
-                        }
-                        None => Ok(()), // Contact not found, skip
-                    }
-                }
+                } => self.save_if_present(self.storage.contacts().load_contact(contact_id)?, |c| {
+                    c.ignore(timestamp)
+                }),
+                SyncItem::ContactUnignored { ref contact_id, .. } => self
+                    .save_if_present(self.storage.contacts().load_contact(contact_id)?, |c| {
+                        c.unignore()
+                    }),
+                SyncItem::ContactBlocked { ref contact_id, .. } => self
+                    .save_if_present(self.storage.contacts().load_contact(contact_id)?, |c| {
+                        c.block()
+                    }),
+                SyncItem::ContactUnblocked { ref contact_id, .. } => self
+                    .save_if_present(self.storage.contacts().load_contact(contact_id)?, |c| {
+                        c.unblock()
+                    }),
             };
 
             if result.is_ok() {
@@ -983,6 +937,24 @@ impl Vauchi {
         }
 
         Ok(applied)
+    }
+
+    /// A flag change for a contact this device never stored is skipped, not
+    /// fatal, so one stale item never fails the batch (pinned by the
+    /// `*_for_unknown_contact_is_skipped_not_fatal` tests).
+    fn save_if_present(
+        &self,
+        contact: Option<crate::contact::Contact>,
+        change: impl FnOnce(&mut crate::contact::Contact),
+    ) -> VauchiResult<()> {
+        let Some(mut contact) = contact else {
+            return Ok(());
+        };
+        change(&mut contact);
+        self.storage
+            .contacts()
+            .save_contact(&contact)
+            .map_err(|e| e.into())
     }
 }
 

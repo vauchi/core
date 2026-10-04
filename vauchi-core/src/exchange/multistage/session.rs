@@ -2051,6 +2051,11 @@ impl MultiStageSession {
             return self.state.clone();
         }
         let state = self.handle_final(sender, reveal_key, tag);
+        if !self.peer_saved {
+            // Dev instrumentation (dev-logging only; no PII): times the
+            // DONE / BOTH ending on the rig (design D6).
+            tracing::info!("[MSX] ending: peer saved (DONE read)");
+        }
         self.peer_saved = true;
         state
     }
@@ -2058,7 +2063,11 @@ impl MultiStageSession {
     /// The peer's BOTH ends this phone's display only once this phone has
     /// saved; before that it can only be a stray or forged frame.
     fn handle_both(&mut self, sender: [u8; 16]) -> ProtocolState {
-        if self.peer_session_id == Some(sender) && matches!(self.state, ProtocolState::Finalized) {
+        if self.peer_session_id == Some(sender)
+            && matches!(self.state, ProtocolState::Finalized)
+            && !self.peer_showed_both
+        {
+            tracing::info!("[MSX] ending: BOTH read, stopping");
             self.peer_showed_both = true;
         }
         self.state.clone()

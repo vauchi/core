@@ -301,7 +301,12 @@ impl AppEngine {
                 }
                 state_applied
             }
-            MultiStageEvent::Completed => self.apply_multi_stage_session_ended(),
+            MultiStageEvent::Completed => {
+                // Dev instrumentation (dev-logging only; no PII): the end of
+                // the DONE / BOTH ending, or of the 60 s grace (design D6).
+                tracing::info!("[MSX] ending: session ended");
+                self.apply_multi_stage_session_ended()
+            }
             MultiStageEvent::Failed { reason } => {
                 self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Failed(reason))
             }

@@ -13,6 +13,8 @@
 //! - `INIT<sid:24><pk:48><eph:48><ch:48><display_name>`
 //! - `DATA<sid:24><idx:3>/<total:3><ack_len:2><ack:variable><crc:3><payload>`
 //! - `FIN3<header:8><sid:24><rk:48><tag:48>`
+//! - `DON3<header:8><sid:24><rk:48><tag:48>`, the final frame once saved
+//! - `BTH3<header:8><sid:24>`
 //!
 //! All binary fields are base45-encoded (fixed-width for known-size inputs).
 //! The only non-positional field is `display_name` at the tail of INIT,
@@ -80,6 +82,17 @@ pub enum StageQr {
         reveal_key: [u8; 32],
         tag: [u8; 32],
     },
+    /// DONE: the final frame shown by a phone that has saved. A peer that
+    /// has not saved reads it as the final frame; a saved peer learns that
+    /// both have (design D6).
+    Done {
+        session_id: [u8; 16],
+        reveal_key: [u8; 32],
+        tag: [u8; 32],
+    },
+    /// BOTH: shown by a saved phone that read its peer's DONE. The reader
+    /// stops at once (design D6). Unkeyed by owner decision 2026-10-04.
+    Both { session_id: [u8; 16] },
     /// INIT with embedded data: for small payloads (1 chunk), includes the
     /// raw commitment ciphertext. Eliminates the DATA phase entirely.
     /// Peer goes directly from Advertising → has all data in one scan.
@@ -122,6 +135,8 @@ impl StageQr {
             Self::Init { session_id, .. }
             | Self::Data { session_id, .. }
             | Self::Final { session_id, .. }
+            | Self::Done { session_id, .. }
+            | Self::Both { session_id }
             | Self::Inid { session_id, .. }
             | Self::Fail { session_id }
             | Self::Shake { session_id, .. } => session_id,
@@ -151,7 +166,9 @@ const FLAG_HAS_RELAY_URL: u8 = 0x01;
 
 /// Stage prefixes (4 chars each).
 const PREFIX_LEN: usize = 4;
-const PREFIXES: [&str; 6] = ["INI3", "IN3D", "DAT3", "FIN3", "FAI3", "SHK3"];
+const PREFIXES: [&str; 8] = [
+    "INI3", "IN3D", "DAT3", "FIN3", "DON3", "BTH3", "FAI3", "SHK3",
+];
 
 fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> {
     let bytes = base45::decode(encoded)?;
@@ -378,14 +395,26 @@ pub fn format_data_qr(
 /// Format a final frame: `FIN3<header:8><sid:24><rk:48><tag:48>`, 132
 /// characters, the density of the opening frame.
 pub fn format_final_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
-    frame(
-        "FIN3",
-        &format!(
-            "{sid}{rk}{tag}",
-            sid = base45::encode(session_id),
-            rk = base45::encode(reveal_key),
-            tag = base45::encode(tag),
-        ),
+    frame("FIN3", &final_body(session_id, reveal_key, tag))
+}
+
+/// Format a DONE frame: the final frame's body under `DON3`, shown once
+/// the sender has saved.
+pub fn format_done_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
+    frame("DON3", &final_body(session_id, reveal_key, tag))
+}
+
+/// Format a BOTH frame: `BTH3<header:8><sid:24>`.
+pub fn format_both_qr(session_id: &[u8; 16]) -> String {
+    frame("BTH3", &base45::encode(session_id))
+}
+
+fn final_body(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
+    format!(
+        "{sid}{rk}{tag}",
+        sid = base45::encode(session_id),
+        rk = base45::encode(reveal_key),
+        tag = base45::encode(tag),
     )
 }
 
@@ -433,7 +462,17 @@ pub fn parse_frame(raw: &str) -> Result<Frame, QrCodecError> {
         "INI3" => parse_ini2(body),
         "IN3D" => parse_in2d(body),
         "DAT3" => parse_data(body),
-        "FIN3" => parse_final(body),
+        "FIN3" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Final {
+            session_id,
+            reveal_key,
+            tag,
+        }),
+        "DON3" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Done {
+            session_id,
+            reveal_key,
+            tag,
+        }),
+        "BTH3" => parse_session_id_only(body).map(|session_id| StageQr::Both { session_id }),
         "FAI3" => parse_fail(body),
         "SHK3" => parse_shake(body),
         _ => Err(QrCodecError::UnknownPrefix),
@@ -584,26 +623,24 @@ fn parse_data(body: &str) -> Result<StageQr, QrCodecError> {
     })
 }
 
-fn parse_final(body: &str) -> Result<StageQr, QrCodecError> {
+type FinalBody = ([u8; 16], [u8; 32], [u8; 32]);
+
+fn parse_final_body(body: &str) -> Result<FinalBody, QrCodecError> {
     let mut pos = 0;
     let sid = take(body, &mut pos, SID_LEN)?;
     let rk = take(body, &mut pos, F32_LEN)?;
     let tag = take(body, &mut pos, F32_LEN)?;
 
-    Ok(StageQr::Final {
-        session_id: decode_fixed(sid)?,
-        reveal_key: decode_fixed(rk)?,
-        tag: decode_fixed(tag)?,
-    })
+    Ok((decode_fixed(sid)?, decode_fixed(rk)?, decode_fixed(tag)?))
+}
+
+fn parse_session_id_only(body: &str) -> Result<[u8; 16], QrCodecError> {
+    let mut pos = 0;
+    decode_fixed(take(body, &mut pos, SID_LEN)?)
 }
 
 fn parse_fail(body: &str) -> Result<StageQr, QrCodecError> {
-    let mut pos = 0;
-    let sid = take(body, &mut pos, SID_LEN)?;
-
-    Ok(StageQr::Fail {
-        session_id: decode_fixed(sid)?,
-    })
+    parse_session_id_only(body).map(|session_id| StageQr::Fail { session_id })
 }
 
 fn parse_shake(body: &str) -> Result<StageQr, QrCodecError> {

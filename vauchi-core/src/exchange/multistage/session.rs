@@ -70,6 +70,10 @@ const HKDF_INFO: &[u8] = b"vauchi-multistage-v1";
 /// background.
 const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(60);
 
+/// How long a saved phone shows BOTH, so its peer can read it and stop too
+/// (design D6, maintainer 2026-10-01).
+pub const BOTH_LINGER: Duration = Duration::from_secs(3);
+
 /// How long after `set_audio_proximity(Listening)` to wait for an
 /// audio response before the cycle thread transitions the inner
 /// state to Failed (Phase 1.C.7 of the Hover graduation plan). Mirror
@@ -286,6 +290,12 @@ pub struct MultiStageSession {
     /// read, applied once it can be: read before the card was opened, or in
     /// Confirming while a shake was still recording.
     kept_peer_final_tag: Option<KeptFinalTag>,
+    /// The peer showed DONE: it has saved.
+    peer_saved: bool,
+    /// When this phone first showed BOTH; it stops `BOTH_LINGER` later.
+    both_shown_at: Option<Instant>,
+    /// The peer showed BOTH after this phone saved: stop at once.
+    peer_showed_both: bool,
 
     state: ProtocolState,
 
@@ -472,6 +482,9 @@ impl MultiStageSession {
             transport_decrypt_failures: 0,
             peer_reveal_key: None,
             kept_peer_final_tag: None,
+            peer_saved: false,
+            both_shown_at: None,
+            peer_showed_both: false,
             state: ProtocolState::Idle,
             received_data: None,
             init_qr_cache: None,
@@ -1200,12 +1213,20 @@ impl MultiStageSession {
             // enum for the shells' bindings.
             ProtocolState::Complete | ProtocolState::RetryReady => Some(self.final_frame_qr()),
             ProtocolState::Finalized => {
-                // Keep showing the final frame for a grace period so the
-                // peer can read it and finalize too.
+                // Show DONE until the peer says it saved too, then BOTH for
+                // a short linger (design D6). The grace period stays the
+                // ceiling for a peer that never answers.
                 let now = self.monotonic.now();
                 let entered = *self.phase_entered_at.get_or_insert(now);
-                if now.duration_since(entered) > FINALIZED_GRACE_DURATION {
+                if self.peer_showed_both || now.duration_since(entered) > FINALIZED_GRACE_DURATION {
                     return None;
+                }
+                if self.peer_saved {
+                    let shown_at = *self.both_shown_at.get_or_insert(now);
+                    if now.duration_since(shown_at) >= BOTH_LINGER {
+                        return None;
+                    }
+                    return Some(self.both_frame_qr());
                 }
                 // Also interleave DATA if peer hasn't ACK'd all chunks.
                 let all_acked = self
@@ -1278,6 +1299,12 @@ impl MultiStageSession {
                 reveal_key,
                 tag,
             } => self.handle_final(session_id, reveal_key, tag),
+            StageQr::Done {
+                session_id,
+                reveal_key,
+                tag,
+            } => self.handle_done(session_id, reveal_key, tag),
+            StageQr::Both { session_id } => self.handle_both(session_id),
             StageQr::Inid {
                 session_id,
                 ephemeral,
@@ -1987,14 +2014,54 @@ impl MultiStageSession {
 
     /// The final frame: our reveal key and the tag confirming our card and
     /// both session ids.
+    /// The final frame, or DONE once this phone has saved (design D6).
     fn final_frame_qr(&self) -> QrPayload {
         let tag = self.final_tag(&self.compute_card_hash(&self.local_card));
+        let reveal_key = self.commitment.reveal_key();
+        let data = if matches!(self.state, ProtocolState::Finalized) {
+            qr_codec::format_done_qr(&self.session_id, reveal_key, &tag)
+        } else {
+            qr_codec::format_final_qr(&self.session_id, reveal_key, &tag)
+        };
         QrPayload {
-            data: qr_codec::format_final_qr(&self.session_id, self.commitment.reveal_key(), &tag),
+            data,
             error_correction: FRAME_ERROR_CORRECTION.to_string(),
             display_duration_ms: jittered(DISPLAY_MS_FINAL),
             layout: 0,
         }
+    }
+
+    fn both_frame_qr(&self) -> QrPayload {
+        QrPayload {
+            data: qr_codec::format_both_qr(&self.session_id),
+            error_correction: FRAME_ERROR_CORRECTION.to_string(),
+            display_duration_ms: jittered(DISPLAY_MS_FINAL),
+            layout: 0,
+        }
+    }
+
+    /// The peer's DONE: its final frame, and word that it has saved.
+    fn handle_done(
+        &mut self,
+        sender: [u8; 16],
+        reveal_key: [u8; 32],
+        tag: [u8; 32],
+    ) -> ProtocolState {
+        if self.peer_session_id != Some(sender) {
+            return self.state.clone();
+        }
+        let state = self.handle_final(sender, reveal_key, tag);
+        self.peer_saved = true;
+        state
+    }
+
+    /// The peer's BOTH ends this phone's display only once this phone has
+    /// saved; before that it can only be a stray or forged frame.
+    fn handle_both(&mut self, sender: [u8; 16]) -> ProtocolState {
+        if self.peer_session_id == Some(sender) && matches!(self.state, ProtocolState::Finalized) {
+            self.peer_showed_both = true;
+        }
+        self.state.clone()
     }
 
     /// The final frame for this session, independent of the display cycle

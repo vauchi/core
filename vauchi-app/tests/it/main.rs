@@ -174,6 +174,7 @@ mod render_context_tests;
 #[path = "../responsive_presentation_tests.rs"]
 mod responsive_presentation_tests;
 mod result_routing_wiring_tests;
+mod row_info_tests;
 mod settings_canvas_tests;
 mod settings_link_routing_tests;
 mod settings_parity_tests;

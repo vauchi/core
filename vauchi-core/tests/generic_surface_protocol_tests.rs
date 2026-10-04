@@ -104,3 +104,38 @@ fn atomic_surface_revision_survives_the_wire_round_trip() {
 fn presentation_identifiers_reject_control_characters() {
     assert!(BindingId::new("profile\nname").is_err());
 }
+
+/// A row may carry an info action beside its controls (vauchi/private#479).
+/// A batch from an older Core has no such key and decodes as before; a row
+/// without one is sent without the key, so older shells see nothing new.
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn a_row_decodes_with_and_without_an_info_action() {
+    let without = serde_json::json!({
+        "title": "Home address", "subtitle": null, "detail": null, "icon_token": null,
+        "image_data": null, "fallback_text": null, "selected": false, "enabled": true,
+        "activation": null, "secondary_actions": [], "controls": [],
+        "accessibility": {"label": "Home address", "description": null}
+    });
+    let row: vauchi_core::PresentationRow =
+        serde_json::from_value(without.clone()).expect("a row without info decodes");
+    assert_eq!(row.info, None);
+    let encoded = serde_json::to_value(&row).expect("serialize row");
+    assert!(
+        encoded.get("info").is_none(),
+        "an absent info action is left off the wire: {encoded}"
+    );
+
+    let mut with = without;
+    with["info"] = serde_json::json!({
+        "interaction_id": "surface.7.interaction.3", "label": "Info",
+        "accessibility_label": "About Home address", "icon_token": null,
+        "enabled": true, "shortcut": null
+    });
+    let row: vauchi_core::PresentationRow =
+        serde_json::from_value(with).expect("a row with info decodes");
+    let info = row.info.expect("the info action");
+    assert_eq!(info.label, "Info");
+    assert_eq!(info.accessibility_label, "About Home address");
+    assert_eq!(info.interaction_id.as_str(), "surface.7.interaction.3");
+}

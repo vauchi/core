@@ -141,6 +141,7 @@ mod tags_screen_tests;
 mod transport_readiness_wiring_tests;
 // Needs `FakeClock`, behind `vauchi-core/testing`. Gated so plain
 // `cargo clippy --all-targets` (no testing feature) still compiles.
+mod contact_list_reach_tests;
 mod context_bar_info_tests;
 mod context_bar_overlay_toggle_tests;
 mod inactive_surface_event_tests;

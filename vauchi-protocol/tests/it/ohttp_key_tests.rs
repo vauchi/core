@@ -7,8 +7,9 @@
 
 use proptest::prelude::*;
 use vauchi_protocol::ohttp_key::{
-    IntermediateCert, MAX_KEY_CONFIG_BYTES, MAX_RECORD_BYTES, RECORD_VERSION, SignedKeyConfig,
-    SignedKeyConfigError, WINDOW_SECONDS, key_id_for_window, window_of,
+    INTERMEDIATE_CERT_BYTES, IntermediateCert, MAX_KEY_CONFIG_BYTES, MAX_RECORD_BYTES,
+    RECORD_VERSION, SignedKeyConfig, SignedKeyConfigError, WINDOW_SECONDS, key_id_for_window,
+    window_of,
 };
 
 fn sample() -> SignedKeyConfig {
@@ -31,6 +32,37 @@ fn a_record_round_trips() {
     let record = sample();
 
     assert_eq!(SignedKeyConfig::decode(&record.encode()), Ok(record));
+}
+
+/// The gateway reads its certificate from a file the owner writes after
+/// the anchor ceremony; the same 112 bytes sit at the record's tail.
+// @internal
+#[test]
+fn an_intermediate_certificate_round_trips_alone() {
+    let cert = sample().intermediate;
+
+    let encoded = cert.encode();
+
+    assert_eq!(encoded.len(), INTERMEDIATE_CERT_BYTES);
+    assert_eq!(IntermediateCert::decode(&encoded), Ok(cert));
+    assert!(sample().encode().ends_with(&encoded));
+}
+
+// @internal
+#[test]
+fn an_intermediate_certificate_of_the_wrong_length_is_rejected() {
+    let encoded = sample().intermediate.encode();
+
+    assert_eq!(
+        IntermediateCert::decode(&encoded[..INTERMEDIATE_CERT_BYTES - 1]),
+        Err(SignedKeyConfigError::Truncated)
+    );
+    let mut long = encoded.clone();
+    long.push(0);
+    assert_eq!(
+        IntermediateCert::decode(&long),
+        Err(SignedKeyConfigError::TrailingBytes)
+    );
 }
 
 // @internal

@@ -31,7 +31,10 @@ pub const MAX_KEY_CONFIG_BYTES: usize = 512;
 const SIGNATURE_BYTES: usize = 64;
 const PUBLIC_KEY_BYTES: usize = 32;
 const FIXED_HEAD: usize = 1 + 8 + 2;
-const FIXED_TAIL: usize = SIGNATURE_BYTES + PUBLIC_KEY_BYTES + 8 + 8 + SIGNATURE_BYTES;
+/// An encoded [`IntermediateCert`]: public key, not_before, not_after,
+/// anchor signature.
+pub const INTERMEDIATE_CERT_BYTES: usize = PUBLIC_KEY_BYTES + 8 + 8 + SIGNATURE_BYTES;
+const FIXED_TAIL: usize = SIGNATURE_BYTES + INTERMEDIATE_CERT_BYTES;
 
 /// Upper bound on an encoded record, checked before parsing (DC-01).
 pub const MAX_RECORD_BYTES: usize = FIXED_HEAD + MAX_KEY_CONFIG_BYTES + FIXED_TAIL;
@@ -75,6 +78,35 @@ impl IntermediateCert {
         message.extend_from_slice(&not_before.to_be_bytes());
         message.extend_from_slice(&not_after.to_be_bytes());
         message
+    }
+
+    /// The certificate's fixed-length encoding, as written after the anchor
+    /// ceremony and as carried at the tail of every [`SignedKeyConfig`].
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(INTERMEDIATE_CERT_BYTES);
+        out.extend_from_slice(&self.public_key);
+        out.extend_from_slice(&self.not_before.to_be_bytes());
+        out.extend_from_slice(&self.not_after.to_be_bytes());
+        out.extend_from_slice(&self.anchor_signature);
+        out
+    }
+
+    pub fn decode(bytes: &[u8]) -> Result<Self, SignedKeyConfigError> {
+        let mut reader = Reader(bytes);
+        let cert = Self::read(&mut reader)?;
+        if !reader.0.is_empty() {
+            return Err(SignedKeyConfigError::TrailingBytes);
+        }
+        Ok(cert)
+    }
+
+    fn read(reader: &mut Reader<'_>) -> Result<Self, SignedKeyConfigError> {
+        Ok(Self {
+            public_key: reader.take::<PUBLIC_KEY_BYTES>()?,
+            not_before: u64::from_be_bytes(reader.take::<8>()?),
+            not_after: u64::from_be_bytes(reader.take::<8>()?),
+            anchor_signature: reader.take::<SIGNATURE_BYTES>()?,
+        })
     }
 }
 
@@ -126,10 +158,7 @@ impl SignedKeyConfig {
         out.extend_from_slice(&len.to_be_bytes());
         out.extend_from_slice(&self.key_config);
         out.extend_from_slice(&self.signature);
-        out.extend_from_slice(&self.intermediate.public_key);
-        out.extend_from_slice(&self.intermediate.not_before.to_be_bytes());
-        out.extend_from_slice(&self.intermediate.not_after.to_be_bytes());
-        out.extend_from_slice(&self.intermediate.anchor_signature);
+        out.extend_from_slice(&self.intermediate.encode());
         out
     }
 
@@ -152,10 +181,7 @@ impl SignedKeyConfig {
         }
         let key_config = reader.take_slice(key_config_len)?.to_vec();
         let signature = reader.take::<SIGNATURE_BYTES>()?;
-        let public_key = reader.take::<PUBLIC_KEY_BYTES>()?;
-        let not_before = u64::from_be_bytes(reader.take::<8>()?);
-        let not_after = u64::from_be_bytes(reader.take::<8>()?);
-        let anchor_signature = reader.take::<SIGNATURE_BYTES>()?;
+        let intermediate = IntermediateCert::read(&mut reader)?;
         if !reader.0.is_empty() {
             return Err(SignedKeyConfigError::TrailingBytes);
         }
@@ -163,12 +189,7 @@ impl SignedKeyConfig {
             window,
             key_config,
             signature,
-            intermediate: IntermediateCert {
-                public_key,
-                not_before,
-                not_after,
-                anchor_signature,
-            },
+            intermediate,
         })
     }
 }

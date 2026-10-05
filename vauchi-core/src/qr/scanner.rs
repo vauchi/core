@@ -8,13 +8,17 @@
 //! rxing fast → rqrr → rxing tryHarder, gated by a fast sharpness check
 //! that skips expensive fallbacks on blurry frames.
 //!
-//! Only the first detected QR grid per frame is decoded.
+//! Every code a tier finds in the frame is reported: facing the other
+//! phone, a camera can see the peer's code and a reflection of its own,
+//! and keeping only the first dropped the peer's whenever the reflection
+//! came first (vauchi/private#450).
 //!
 //! Diagnostic variants (preprocessing-config wrapper, YOLO-based pipeline)
 //! remain in `crate::diagnostic` behind the `diagnostic-scanner` and
 //! `diagnostic-yolo` features.
 
 use image::GrayImage;
+use rxing::multi::MultipleBarcodeReader;
 use serde::{Deserialize, Serialize};
 
 /// Which scanner pipeline to use for decoding.
@@ -31,10 +35,13 @@ pub enum ScannerBackend {
 }
 
 /// Result of a single QR scan attempt with timing breakdown.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ScanResult {
-    /// Decoded QR content, or None if decode failed.
+    /// The first code decoded, or None if decode failed.
     pub decoded: Option<String>,
+    /// Every distinct code decoded in the frame, in the order found;
+    /// `decoded` is its first entry.
+    pub decoded_all: Vec<String>,
     /// Total scan time in microseconds.
     pub total_us: u64,
     /// Time spent on preprocessing in microseconds (0 for raw).
@@ -45,6 +52,28 @@ pub struct ScanResult {
     pub frame_skipped: bool,
     /// Laplacian variance (sharpness metric). 0.0 if not computed.
     pub laplacian_variance: f32,
+}
+
+impl ScanResult {
+    /// A result carrying `codes`, duplicates dropped, first one first.
+    fn with_codes(codes: impl IntoIterator<Item = String>, decode_us: u64) -> Self {
+        let mut decoded_all: Vec<String> = Vec::new();
+        for code in codes {
+            if !decoded_all.contains(&code) {
+                decoded_all.push(code);
+            }
+        }
+        Self {
+            decoded: decoded_all.first().cloned(),
+            decoded_all,
+            decode_us,
+            ..Self::default()
+        }
+    }
+
+    fn found_any(&self) -> bool {
+        !self.decoded_all.is_empty()
+    }
 }
 
 /// Minimum Laplacian variance for Tier 2+3 fallback decoders.
@@ -60,7 +89,7 @@ pub struct ScanResult {
 /// cheaper than a missed QR decode.
 const SHARPNESS_GATE_THRESHOLD: f32 = 15.0;
 
-/// Decode a QR code from a grayscale (Y-plane) image.
+/// Decode the QR codes in a grayscale (Y-plane) image.
 ///
 /// The `luma_data` must contain exactly `width * height` bytes of 8-bit
 /// grayscale pixel data (e.g., the Y-plane from a YUV camera frame).
@@ -75,12 +104,8 @@ pub fn scan_qr_from_luma(
     let expected = (width as usize) * (height as usize);
     if luma_data.len() != expected {
         return ScanResult {
-            decoded: None,
             total_us: total_start.elapsed().as_micros() as u64,
-            preprocessing_us: 0,
-            decode_us: 0,
-            frame_skipped: false,
-            laplacian_variance: 0.0,
+            ..ScanResult::default()
         };
     }
 
@@ -98,9 +123,8 @@ pub fn scan_qr_from_luma(
         }
         ScannerBackend::RqrrPreprocessed => {
             // Opt 1: Pass owned Vec directly to rxing (avoids second clone).
-            // rxing::detect_in_luma_with_hints takes Vec<u8> by value.
-            let fast = decode_rxing_fast(luma_data.to_vec(), width, height);
-            if fast.decoded.is_some() {
+            let fast = decode_rxing(luma_data.to_vec(), width, height, false);
+            if fast.found_any() {
                 return ScanResult {
                     total_us: total_start.elapsed().as_micros() as u64,
                     preprocessing_us: 0,
@@ -113,12 +137,11 @@ pub fn scan_qr_from_luma(
             let sharpness = fast_laplacian_variance(luma_data, width, height);
             if sharpness < SHARPNESS_GATE_THRESHOLD {
                 return ScanResult {
-                    decoded: None,
                     total_us: total_start.elapsed().as_micros() as u64,
-                    preprocessing_us: 0,
                     decode_us: fast.decode_us,
                     frame_skipped: true,
                     laplacian_variance: sharpness,
+                    ..ScanResult::default()
                 };
             }
 
@@ -126,7 +149,7 @@ pub fn scan_qr_from_luma(
             let img = GrayImage::from_raw(width, height, luma_data.to_vec())
                 .expect("dims verified above");
             let rqrr = decode_rqrr(img);
-            if rqrr.decoded.is_some() {
+            if rqrr.found_any() {
                 return ScanResult {
                     total_us: total_start.elapsed().as_micros() as u64,
                     preprocessing_us: 0,
@@ -136,7 +159,7 @@ pub fn scan_qr_from_luma(
             }
 
             // Tier 3: rxing tryHarder (sub-pixel refinement, V20+ support)
-            let hard = decode_rxing_try_harder(luma_data.to_vec(), width, height);
+            let hard = decode_rxing(luma_data.to_vec(), width, height, true);
             ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
                 preprocessing_us: 0,
@@ -149,12 +172,8 @@ pub fn scan_qr_from_luma(
             // YOLO detection requires a pre-loaded detector session.
             // Callers should use scan_qr_yolo() instead.
             ScanResult {
-                decoded: None,
                 total_us: total_start.elapsed().as_micros() as u64,
-                preprocessing_us: 0,
-                decode_us: 0,
-                frame_skipped: false,
-                laplacian_variance: 0.0,
+                ..ScanResult::default()
             }
         }
     }
@@ -180,7 +199,7 @@ pub fn scan_qr_from_luma_with_config(
 ///
 /// The detector locates QR code regions in the frame, crops each one with
 /// padding, and feeds the cropped patch to rqrr for decoding. Returns the
-/// first successfully decoded QR content.
+/// codes of the first patch that decodes.
 #[cfg(feature = "diagnostic-yolo")]
 pub fn scan_qr_yolo(
     detector: &mut crate::diagnostic::yolo_detector::YoloDetector,
@@ -194,12 +213,8 @@ pub fn scan_qr_yolo(
     let expected = (width as usize) * (height as usize);
     if luma_data.len() != expected {
         return ScanResult {
-            decoded: None,
             total_us: total_start.elapsed().as_micros() as u64,
-            preprocessing_us: 0,
-            decode_us: 0,
-            frame_skipped: false,
-            laplacian_variance: 0.0,
+            ..ScanResult::default()
         };
     }
     let img = GrayImage::from_raw(width, height, luma_data.to_vec()).expect("dims verified above");
@@ -209,12 +224,9 @@ pub fn scan_qr_yolo(
         Ok(d) => d,
         Err(_) => {
             return ScanResult {
-                decoded: None,
                 total_us: total_start.elapsed().as_micros() as u64,
                 preprocessing_us: detect_start.elapsed().as_micros() as u64,
-                decode_us: 0,
-                frame_skipped: false,
-                laplacian_variance: 0.0,
+                ..ScanResult::default()
             };
         }
     };
@@ -222,12 +234,9 @@ pub fn scan_qr_yolo(
 
     if detections.is_empty() {
         return ScanResult {
-            decoded: None,
             total_us: total_start.elapsed().as_micros() as u64,
             preprocessing_us: detection_us,
-            decode_us: 0,
-            frame_skipped: false,
-            laplacian_variance: 0.0,
+            ..ScanResult::default()
         };
     }
 
@@ -236,7 +245,7 @@ pub fn scan_qr_yolo(
         let patch = crate::diagnostic::yolo_detector::crop_detection(&img, det, 0.15);
 
         let rqrr_result = decode_rqrr(patch.clone());
-        if rqrr_result.decoded.is_some() {
+        if rqrr_result.found_any() {
             return ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
                 preprocessing_us: detection_us,
@@ -247,8 +256,8 @@ pub fn scan_qr_yolo(
 
         // Fallback: rxing with tryHarder (handles V20+, perspective)
         let (pw, ph) = patch.dimensions();
-        let rxing_result = decode_rxing_try_harder(patch.into_raw(), pw, ph);
-        if rxing_result.decoded.is_some() {
+        let rxing_result = decode_rxing(patch.into_raw(), pw, ph, true);
+        if rxing_result.found_any() {
             return ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
                 preprocessing_us: detection_us,
@@ -259,100 +268,47 @@ pub fn scan_qr_yolo(
     }
 
     ScanResult {
-        decoded: None,
         total_us: total_start.elapsed().as_micros() as u64,
         preprocessing_us: detection_us,
         decode_us: decode_start.elapsed().as_micros() as u64,
-        frame_skipped: false,
-        laplacian_variance: 0.0,
+        ..ScanResult::default()
     }
 }
 
-/// Decode a QR code from a grayscale image using rqrr (fast, simple).
+/// Decode every QR grid rqrr finds in a grayscale image (fast, simple).
 fn decode_rqrr(img: GrayImage) -> ScanResult {
     let decode_start = std::time::Instant::now();
     let mut prepared = rqrr::PreparedImage::prepare(img);
-    let grids = prepared.detect_grids();
-    let decoded = grids.first().and_then(|g| {
-        let (_, content) = g.decode().ok()?;
-        Some(content)
-    });
-    let decode_us = decode_start.elapsed().as_micros() as u64;
-
-    ScanResult {
-        decoded,
-        total_us: 0, // set by caller
-        preprocessing_us: 0,
-        decode_us,
-        frame_skipped: false,
-        laplacian_variance: 0.0,
-    }
+    let codes: Vec<String> = prepared
+        .detect_grids()
+        .iter()
+        .filter_map(|grid| grid.decode().ok().map(|(_, content)| content))
+        .collect();
+    ScanResult::with_codes(codes, decode_start.elapsed().as_micros() as u64)
 }
 
-/// Fast rxing decode without tryHarder — optimized for clean, simple QR
-/// codes like animated V4 frames. ~10ms on 480p.
+/// Decode every QR code in the frame with rxing's QR multi reader, which
+/// finds all finder-pattern sets in one pass over the binarized frame.
+/// `try_harder` adds sub-pixel refinement (V20+ support) at a higher cost;
+/// without it, ~10ms on 480p for clean codes like the exchange frames.
 ///
 /// Takes owned `Vec<u8>` to avoid a second clone — rxing consumes the buffer.
-fn decode_rxing_fast(luma: Vec<u8>, width: u32, height: u32) -> ScanResult {
+fn decode_rxing(luma: Vec<u8>, width: u32, height: u32, try_harder: bool) -> ScanResult {
     let decode_start = std::time::Instant::now();
 
-    let mut hints = rxing::DecodeHints {
-        TryHarder: Some(false),
+    let hints = rxing::DecodeHints {
+        TryHarder: Some(try_harder),
         ..Default::default()
     };
+    let mut bitmap = rxing::BinaryBitmap::new(rxing::common::HybridBinarizer::new(
+        rxing::Luma8LuminanceSource::new(luma, width, height),
+    ));
+    let codes: Vec<String> = rxing::multi::qrcode::QRCodeMultiReader::new()
+        .decode_multiple_with_hints(&mut bitmap, &hints)
+        .map(|results| results.iter().map(|r| r.getText().to_string()).collect())
+        .unwrap_or_default();
 
-    let decoded = rxing::helpers::detect_in_luma_with_hints(
-        luma,
-        width,
-        height,
-        Some(rxing::BarcodeFormat::QR_CODE),
-        &mut hints,
-    )
-    .ok()
-    .map(|r| r.getText().to_string());
-
-    let decode_us = decode_start.elapsed().as_micros() as u64;
-    ScanResult {
-        decoded,
-        total_us: 0,
-        preprocessing_us: 0,
-        decode_us,
-        frame_skipped: false,
-        laplacian_variance: 0.0,
-    }
-}
-
-/// Decode a QR code using rxing with tryHarder hints.
-///
-/// Takes owned `Vec<u8>` to avoid a second clone — rxing consumes the buffer.
-fn decode_rxing_try_harder(luma: Vec<u8>, width: u32, height: u32) -> ScanResult {
-    let decode_start = std::time::Instant::now();
-
-    let mut hints = rxing::DecodeHints {
-        TryHarder: Some(true),
-        ..Default::default()
-    };
-
-    let decoded = rxing::helpers::detect_in_luma_with_hints(
-        luma,
-        width,
-        height,
-        Some(rxing::BarcodeFormat::QR_CODE),
-        &mut hints,
-    )
-    .ok()
-    .map(|r| r.getText().to_string());
-
-    let decode_us = decode_start.elapsed().as_micros() as u64;
-
-    ScanResult {
-        decoded,
-        total_us: 0,
-        preprocessing_us: 0,
-        decode_us,
-        frame_skipped: false,
-        laplacian_variance: 0.0,
-    }
+    ScanResult::with_codes(codes, decode_start.elapsed().as_micros() as u64)
 }
 
 /// Fast Laplacian variance on subsampled data — ~15x cheaper than full resolution.

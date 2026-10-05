@@ -412,7 +412,12 @@ pub enum MobileScannerBackend {
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileScanResult {
+    /// The first code decoded; `decoded_all` holds every code in the frame.
     pub decoded: Option<String>,
+    /// Every distinct code in the frame, in the order found. A camera
+    /// facing the other phone can see its code and this phone's own
+    /// reflection at once (vauchi/private#450).
+    pub decoded_all: Vec<String>,
     pub total_us: u64,
     pub preprocessing_us: u64,
     pub decode_us: u64,
@@ -452,14 +457,20 @@ pub fn scan_qr(
         MobileScannerBackend::RqrrRaw => ScannerBackend::RqrrRaw,
         MobileScannerBackend::RqrrPreprocessed => ScannerBackend::RqrrPreprocessed,
     };
-    let result = scan_qr_from_luma(rust_backend, &luma_data, width, height);
-    MobileScanResult {
-        decoded: result.decoded,
-        total_us: result.total_us,
-        preprocessing_us: result.preprocessing_us,
-        decode_us: result.decode_us,
-        frame_skipped: result.frame_skipped,
-        laplacian_variance: result.laplacian_variance,
+    scan_qr_from_luma(rust_backend, &luma_data, width, height).into()
+}
+
+impl From<vauchi_core::qr::scanner::ScanResult> for MobileScanResult {
+    fn from(result: vauchi_core::qr::scanner::ScanResult) -> Self {
+        Self {
+            decoded: result.decoded,
+            decoded_all: result.decoded_all,
+            total_us: result.total_us,
+            preprocessing_us: result.preprocessing_us,
+            decode_us: result.decode_us,
+            frame_skipped: result.frame_skipped,
+            laplacian_variance: result.laplacian_variance,
+        }
     }
 }
 
@@ -491,16 +502,7 @@ pub fn diagnostic_scan_qr_with_config(
         apply_unsharp: config.apply_unsharp,
         apply_threshold: config.apply_threshold,
     };
-    let result =
-        scan_qr_from_luma_with_config(rust_backend, &luma_data, width, height, &rust_config);
-    MobileScanResult {
-        decoded: result.decoded,
-        total_us: result.total_us,
-        preprocessing_us: result.preprocessing_us,
-        decode_us: result.decode_us,
-        frame_skipped: result.frame_skipped,
-        laplacian_variance: result.laplacian_variance,
-    }
+    scan_qr_from_luma_with_config(rust_backend, &luma_data, width, height, &rust_config).into()
 }
 
 // === YOLO Scanner (gated behind diagnostic-yolo) ===
@@ -540,23 +542,8 @@ pub fn diagnostic_scan_qr_yolo(
     let mut guard = YOLO_DETECTOR.lock().unwrap();
     match guard.as_mut() {
         Some(detector) => {
-            let result = scan_qr_yolo(detector, &luma_data, width, height, confidence_threshold);
-            MobileScanResult {
-                decoded: result.decoded,
-                total_us: result.total_us,
-                preprocessing_us: result.preprocessing_us,
-                decode_us: result.decode_us,
-                frame_skipped: result.frame_skipped,
-                laplacian_variance: result.laplacian_variance,
-            }
+            scan_qr_yolo(detector, &luma_data, width, height, confidence_threshold).into()
         }
-        None => MobileScanResult {
-            decoded: None,
-            total_us: 0,
-            preprocessing_us: 0,
-            decode_us: 0,
-            frame_skipped: false,
-            laplacian_variance: 0.0,
-        },
+        None => vauchi_core::qr::scanner::ScanResult::default().into(),
     }
 }

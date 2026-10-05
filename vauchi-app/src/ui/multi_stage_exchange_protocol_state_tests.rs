@@ -221,7 +221,7 @@ fn finalized_before_session_ended_shows_success_with_qr_broadcast() {
 
     assert_eq!(
         status_text(&screen),
-        Some("Exchange Complete · Exchanged with Alice"),
+        Some("Saved on this phone · Exchanged with Alice"),
         "Finalized before session end must already show success"
     );
     let status_a11y = side_column(&screen).iter().find_map(|c| match c {
@@ -447,5 +447,101 @@ fn own_qr_label_maps_every_protocol_state() {
     assert_eq!(
         own_qr_label(&ProtocolState::Failed("boom".into()), Locale::English),
         "Exchange failed",
+    );
+}
+
+// "Saved" until the other phone's DONE or BOTH says it saved too
+// (plan 5.3, owner 2026-10-05). The final screen keeps the answer, so a
+// grace that ran out unconfirmed is not shown as a confirmed exchange.
+
+fn texts(screen: &ScreenModel) -> Vec<String> {
+    screen
+        .components
+        .iter()
+        .filter_map(|c| match c {
+            Component::Text { content, .. } => Some(content.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+// @internal
+#[test]
+fn the_grace_status_says_confirmed_once_the_other_phone_has_saved() {
+    let mut engine = engine_with_qr(ProtocolState::Finalized, "GRACE-QR");
+    engine.set_finalized("Alice".into());
+
+    engine.set_peer_confirmed(true);
+
+    assert_eq!(
+        status_text(&engine.current_screen()),
+        Some("Confirmed on both phones · Exchanged with Alice")
+    );
+}
+
+// @internal
+#[test]
+fn the_final_screen_says_confirmed_on_both_phones() {
+    let mut engine = engine_with_state(ProtocolState::Finalized);
+    engine.set_finalized("Alice".into());
+    engine.set_peer_confirmed(true);
+    engine.set_session_ended();
+
+    let shown = texts(&engine.current_screen());
+    assert!(
+        shown.iter().any(|t| t == "Confirmed on both phones"),
+        "{shown:?}"
+    );
+}
+
+// @internal
+#[test]
+fn an_unconfirmed_final_screen_says_the_other_phone_may_not_have_finished() {
+    let mut engine = engine_with_state(ProtocolState::Finalized);
+    engine.set_finalized("Alice".into());
+    engine.set_session_ended();
+
+    let shown = texts(&engine.current_screen());
+    assert!(
+        shown.iter().any(|t| t
+            == "Saved on this phone. The other phone may not have finished; check it shows you."),
+        "{shown:?}"
+    );
+    assert!(
+        !shown.iter().any(|t| t == "Confirmed on both phones"),
+        "{shown:?}"
+    );
+}
+
+// @internal
+#[test]
+fn the_rich_final_screen_carries_the_confirmation_under_its_status() {
+    let mut engine = engine_with_state(ProtocolState::Finalized);
+    engine.set_finalized("Bob".into());
+    engine.set_success_summary(crate::ui::exchange::success::ExchangeSuccessSummary {
+        peer_name: "Bob".into(),
+        received_fields: vec![("email".into(), "Email".into(), "bob@example.com".into())],
+        my_visible_fields: vec!["Phone".into()],
+        group_names: Vec::new(),
+        is_reconnection: false,
+    });
+    engine.set_peer_confirmed(true);
+    engine.set_session_ended();
+
+    let screen = engine.current_screen();
+    assert!(
+        matches!(
+            screen.components.first(),
+            Some(Component::StatusIndicator { .. })
+        ),
+        "the success status stays first"
+    );
+    assert!(
+        matches!(
+            screen.components.get(1),
+            Some(Component::Text { content, .. }) if content == "Confirmed on both phones"
+        ),
+        "the confirmation sits right under the status, got {:?}",
+        screen.components.get(1)
     );
 }

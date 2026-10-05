@@ -10,5 +10,6 @@
 
 pub mod escrow;
 pub mod messages;
+pub mod ohttp_key;
 pub mod v2;
 pub use messages::*;

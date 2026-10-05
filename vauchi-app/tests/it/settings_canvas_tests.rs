@@ -174,7 +174,6 @@ fn privacy_section_keeps_the_toggles_next_to_your_data() {
         ids(items),
         vec![
             "privacy",
-            "suppress_presence",
             "delivery_receipts",
             "new_field_default",
             "card_update",
@@ -190,13 +189,6 @@ fn privacy_section_keeps_the_toggles_next_to_your_data() {
     );
     assert_eq!(your_data.kind, SettingsItemKind::Link { detail: None });
 
-    let presence = row(items, "suppress_presence");
-    assert_eq!(presence.label, "Hide when I'm online");
-    assert_eq!(
-        presence.subtitle.as_deref(),
-        Some("Contacts can't tell when your device is online")
-    );
-    assert_eq!(presence.kind, SettingsItemKind::Toggle { enabled: false });
     for toggle in [
         "delivery_receipts",
         "new_field_default",
@@ -343,7 +335,7 @@ fn a_privacy_toggle_flips_in_place_on_the_main_screen() {
 
     let result = engine.handle_action(UserAction::SettingsToggled {
         component_id: "privacy".into(),
-        item_id: "suppress_presence".into(),
+        item_id: "card_update".into(),
     });
 
     let ActionResult::UpdateScreen(screen) = result else {
@@ -351,8 +343,8 @@ fn a_privacy_toggle_flips_in_place_on_the_main_screen() {
     };
     let (_, items) = group(&screen.components, "privacy");
     assert_eq!(
-        row(items, "suppress_presence").kind,
-        SettingsItemKind::Toggle { enabled: true }
+        row(items, "card_update").kind,
+        SettingsItemKind::Toggle { enabled: false }
     );
 }
 

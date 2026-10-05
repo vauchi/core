@@ -146,12 +146,12 @@ fn settings_toggle_persists_to_settings_flags() {
 
     let _ = engine.handle_action(UserAction::SettingsToggled {
         component_id: "privacy".into(),
-        item_id: "suppress_presence".into(),
+        item_id: "delivery_receipts".into(),
     });
     let flags = engine.vauchi().load_settings_flags().unwrap();
     assert!(
-        flags.suppress_presence,
-        "suppress_presence persisted to durable SettingsFlags"
+        !flags.delivery_receipts_enabled,
+        "delivery_receipts persisted to durable SettingsFlags"
     );
 
     let _ = engine.handle_action(UserAction::SettingsToggled {

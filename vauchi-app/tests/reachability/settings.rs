@@ -19,7 +19,6 @@ fn config() -> SettingsConfig {
     SettingsConfig {
         display_name: "Sample User".into(),
         delivery_receipts_enabled: true,
-        suppress_presence: false,
         new_field_default_visible: false,
         contact_added_notifications: true,
         card_update_notifications: true,

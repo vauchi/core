@@ -215,7 +215,6 @@ impl AppEngine {
                 let config = SettingsConfig {
                     display_name,
                     delivery_receipts_enabled: vauchi.config().delivery_receipts_enabled,
-                    suppress_presence: vauchi.config().suppress_presence,
                     new_field_default_visible: vauchi.config().new_field_default_visible,
                     contact_added_notifications: vauchi.config().contact_added_notifications,
                     card_update_notifications: vauchi.config().card_update_notifications,

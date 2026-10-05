@@ -8,7 +8,6 @@ fn sample_config() -> SettingsConfig {
     SettingsConfig {
         display_name: "Alice".into(),
         delivery_receipts_enabled: true,
-        suppress_presence: false,
         new_field_default_visible: false,
         contact_added_notifications: false,
         card_update_notifications: true,
@@ -124,29 +123,6 @@ fn settings_toggle_card_update_notifications() {
                 !find_toggle(&screen, "privacy", "card_update"),
                 "card_update disabled after toggle"
             );
-        }
-        other => panic!("Expected UpdateScreen, got {other:?}"),
-    }
-}
-
-// @internal
-// @internal
-#[test]
-fn settings_toggle_suppress_presence() {
-    let mut engine = SettingsEngine::new(sample_config());
-
-    let screen = engine.current_screen();
-    let suppress = find_toggle(&screen, "privacy", "suppress_presence");
-    assert!(!suppress, "suppress_presence should start disabled");
-
-    let result = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "privacy".into(),
-        item_id: "suppress_presence".into(),
-    });
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            let toggled = find_toggle(&screen, "privacy", "suppress_presence");
-            assert!(toggled, "suppress_presence should be enabled after toggle");
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
     }

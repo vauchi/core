@@ -344,7 +344,7 @@ fn a_privacy_toggle_flips_in_place_on_the_main_screen() {
     let (_, items) = group(&screen.components, "privacy");
     assert_eq!(
         row(items, "card_update").kind,
-        SettingsItemKind::Toggle { enabled: false }
+        SettingsItemKind::Toggle { enabled: true }
     );
 }
 

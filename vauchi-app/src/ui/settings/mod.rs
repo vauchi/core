@@ -16,7 +16,6 @@ mod groups;
 pub struct SettingsConfig {
     pub display_name: String,
     pub delivery_receipts_enabled: bool,
-    pub suppress_presence: bool,
     /// New contact-card entries start Visible (Decision 2,
     /// 2026-07-05-ungrouped-contacts-default-open). Default off = hidden.
     #[serde(default)]
@@ -206,9 +205,6 @@ impl SettingsEngine {
         match (component_id, item_id) {
             ("privacy", "delivery_receipts") => {
                 config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
-            }
-            ("privacy", "suppress_presence") => {
-                config.suppress_presence = !config.suppress_presence;
             }
             ("privacy", "new_field_default") => {
                 config.new_field_default_visible = !config.new_field_default_visible;

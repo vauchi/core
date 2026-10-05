@@ -58,36 +58,6 @@ fn settings_toggle_persists_after_navigate_away_and_back() {
 
 // @internal
 #[test]
-fn settings_toggle_suppress_presence_persists() {
-    let mut vauchi = Vauchi::in_memory().unwrap();
-    vauchi.create_identity("Alice").unwrap();
-    let mut engine = AppEngine::new(vauchi);
-
-    let screen = engine.navigate_to(AppScreen::Settings);
-    assert!(
-        !find_settings_toggle(&screen, "privacy", "suppress_presence"),
-        "suppress_presence should default to disabled"
-    );
-
-    // Intermediate step: toggle on — persistence asserted after navigate-away-and-back
-    let _ = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "privacy".into(),
-        item_id: "suppress_presence".into(),
-    });
-
-    engine.navigate_to(AppScreen::MyInfo);
-    engine.invalidate_screen(&AppScreen::Settings);
-
-    // Navigate back — should still be on
-    let restored = engine.navigate_to(AppScreen::Settings);
-    assert!(
-        find_settings_toggle(&restored, "privacy", "suppress_presence"),
-        "suppress_presence toggle should persist after navigating away and back"
-    );
-}
-
-// @internal
-#[test]
 fn settings_emergency_wipe_navigates_to_shred() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();

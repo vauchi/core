@@ -2186,7 +2186,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_cb475c6bc5803749",
+                    "id": "field_84925f439149a295",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2217,13 +2217,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:cb475c6bc5803749",
+                    "id": "field_note:84925f439149a295",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:cb475c6bc5803749",
+                          "id": "field_note:84925f439149a295",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2263,7 +2263,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_a9f68a69a0461bf3",
+                    "id": "field_ab73a76a6b75eb60",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2294,13 +2294,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:a9f68a69a0461bf3",
+                    "id": "field_note:ab73a76a6b75eb60",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:a9f68a69a0461bf3",
+                          "id": "field_note:ab73a76a6b75eb60",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2340,7 +2340,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_b3007dd640304834",
+                    "id": "field_2d01b3629e8b56e4",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2371,13 +2371,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:b3007dd640304834",
+                    "id": "field_note:2d01b3629e8b56e4",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:b3007dd640304834",
+                          "id": "field_note:2d01b3629e8b56e4",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4563,10 +4563,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "E84F 9081 1495 DCF1 B119 79EC 615E BE81 3F75 BE0A 8484 3EBF B68D 45EE 1805 2E35",
+                    "content": "3A44 A4CC 1A0C 7D3C 4A25 7F3A 5629 DDBF 02D0 E2B8 91F7 B068 59A0 0621 29B7 68EB",
                     "style": "body",
                     "accessibility": {
-                      "label": "E84F 9081 1495 DCF1 B119 79EC 615E BE81 3F75 BE0A 8484 3EBF B68D 45EE 1805 2E35",
+                      "label": "3A44 A4CC 1A0C 7D3C 4A25 7F3A 5629 DDBF 02D0 E2B8 91F7 B068 59A0 0621 29B7 68EB",
                       "description": null
                     }
                   }
@@ -4585,10 +4585,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "0593 1578 429A A286 7FE0 0DD0 6E79 7436 148A 5F1F 0267 045A BDE5 9B8E ECC9 DE69",
+                    "content": "91E9 86ED AF94 E897 66B7 580F A601 6B79 4EA6 CFAD 3751 689C A0E6 A9F0 F8C7 5D09",
                     "style": "body",
                     "accessibility": {
-                      "label": "0593 1578 429A A286 7FE0 0DD0 6E79 7436 148A 5F1F 0267 045A BDE5 9B8E ECC9 DE69",
+                      "label": "91E9 86ED AF94 E897 66B7 580F A601 6B79 4EA6 CFAD 3751 689C A0E6 A9F0 F8C7 5D09",
                       "description": null
                     }
                   }
@@ -5167,36 +5167,6 @@
                         }
                       },
                       {
-                        "title": "Hide when I'm online",
-                        "subtitle": "Contacts can't tell when your device is online",
-                        "detail": null,
-                        "icon_token": null,
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [
-                          {
-                            "Toggle": {
-                              "binding_id": "surface.1.binding.0",
-                              "label": "",
-                              "value": false,
-                              "enabled": true,
-                              "accessibility": {
-                                "label": "Hide when I'm online toggle",
-                                "description": "Contacts can't tell when your device is online"
-                              }
-                            }
-                          }
-                        ],
-                        "accessibility": {
-                          "label": "Hide when I'm online toggle",
-                          "description": "Contacts can't tell when your device is online"
-                        }
-                      },
-                      {
                         "title": "Delivery Receipts",
                         "subtitle": "When enabled, notifies senders when their messages are delivered",
                         "detail": null,
@@ -5210,7 +5180,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.0",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -5240,7 +5210,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.2",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -5270,7 +5240,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.3",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -5300,7 +5270,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.4",
+                              "binding_id": "surface.1.binding.3",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -5735,36 +5705,6 @@
                         }
                       },
                       {
-                        "title": "Hide when I'm online",
-                        "subtitle": "Contacts can't tell when your device is online",
-                        "detail": null,
-                        "icon_token": null,
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [
-                          {
-                            "Toggle": {
-                              "binding_id": "surface.1.binding.0",
-                              "label": "",
-                              "value": false,
-                              "enabled": true,
-                              "accessibility": {
-                                "label": "Hide when I'm online toggle",
-                                "description": "Contacts can't tell when your device is online"
-                              }
-                            }
-                          }
-                        ],
-                        "accessibility": {
-                          "label": "Hide when I'm online toggle",
-                          "description": "Contacts can't tell when your device is online"
-                        }
-                      },
-                      {
                         "title": "Delivery Receipts",
                         "subtitle": "When enabled, notifies senders when their messages are delivered",
                         "detail": null,
@@ -5778,7 +5718,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.0",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -5808,7 +5748,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.2",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -5838,7 +5778,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.3",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -5868,7 +5808,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.4",
+                              "binding_id": "surface.1.binding.3",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -6406,7 +6346,7 @@
                       {
                         "title": "Version",
                         "subtitle": null,
-                        "detail": "0.70.0",
+                        "detail": "0.71.0",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": null,
@@ -6858,36 +6798,6 @@
                         }
                       },
                       {
-                        "title": "Hide when I'm online",
-                        "subtitle": "Contacts can't tell when your device is online",
-                        "detail": null,
-                        "icon_token": null,
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [
-                          {
-                            "Toggle": {
-                              "binding_id": "surface.1.binding.0",
-                              "label": "",
-                              "value": false,
-                              "enabled": true,
-                              "accessibility": {
-                                "label": "Hide when I'm online toggle",
-                                "description": "Contacts can't tell when your device is online"
-                              }
-                            }
-                          }
-                        ],
-                        "accessibility": {
-                          "label": "Hide when I'm online toggle",
-                          "description": "Contacts can't tell when your device is online"
-                        }
-                      },
-                      {
                         "title": "Delivery Receipts",
                         "subtitle": "When enabled, notifies senders when their messages are delivered",
                         "detail": null,
@@ -6901,7 +6811,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.0",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -6931,7 +6841,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.2",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -6961,7 +6871,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.3",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -6991,7 +6901,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.4",
+                              "binding_id": "surface.1.binding.3",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -7702,36 +7612,6 @@
                         }
                       },
                       {
-                        "title": "Hide when I'm online",
-                        "subtitle": "Contacts can't tell when your device is online",
-                        "detail": null,
-                        "icon_token": null,
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [
-                          {
-                            "Toggle": {
-                              "binding_id": "surface.1.binding.0",
-                              "label": "",
-                              "value": false,
-                              "enabled": true,
-                              "accessibility": {
-                                "label": "Hide when I'm online toggle",
-                                "description": "Contacts can't tell when your device is online"
-                              }
-                            }
-                          }
-                        ],
-                        "accessibility": {
-                          "label": "Hide when I'm online toggle",
-                          "description": "Contacts can't tell when your device is online"
-                        }
-                      },
-                      {
                         "title": "Delivery Receipts",
                         "subtitle": "When enabled, notifies senders when their messages are delivered",
                         "detail": null,
@@ -7745,7 +7625,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.0",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -7775,7 +7655,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.2",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -7805,7 +7685,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.3",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -7835,7 +7715,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.4",
+                              "binding_id": "surface.1.binding.3",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -8659,7 +8539,7 @@
                             },
                             {
                               "title": "About",
-                              "subtitle": "Vauchi 0.70.0 · core 0.70.0",
+                              "subtitle": "Vauchi 0.71.0 · core 0.71.0",
                               "detail": null,
                               "icon_token": null,
                               "image_data": null,
@@ -16593,7 +16473,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=4XjpgZZrgGJa5GXRAF_x0gmLxhUkmLeBoMBU7VIKcHw&n=OmKqjh2iplaNDSwWUqudrnDiqcGaZGdM7ujGD0iodFg",
+                    "content": "vauchi://exchange?pk=LS1H8NizSSWpx9j-HYlh8FKr9LXmJNWKo04bg79kbmA&n=8Mbj5iKztwDE5gXo6yCVWq6Q00EEmuTOHookmVYQ0yE",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17116,7 +16996,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,77,70,107,120,86,52,81,112,113,105,104,110,47,103,68,100,66,117,101,88,81,50,70,73,112,102,72,119,74,110,66,70,113,57,53,90,117,79,55,77,110,101,97,87,78,66,76,86,79,103,73,88,112,115,102,90,117,56,83,81,48,52,76,116,99,109,54,83,68,77,101,104,84,69,57,74,87,121,114,81,72,56,100,84,90,50,65,105,82,98,109,110,90,114,101,109,74,73,66,54,116,74,70,81,75,80,105,87,66,122,117,67,100,115,109,47,115,81,48,106,88,112,111,87,101,115,74,109,51,55,51,111,88,115,78,74,56,77,118,117,87,82,52,65,98,99,116,114,88,99,65,65,65,65,65,71,114,67,90,119,73,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,112,113,88,122,71,68,83,111,106,97,100,57,115,105,80,121,114,55,84,74,77,102,57,86,112,71,110,73,55,79,77,51,80,97,80,90,110,86,88,49,110,69,108,56,104,55,87,48,75,66,55,117,55,47,110,100,109,53,88,88,49,48,43,72,49,89,115,57,52,113,119,82,77,120,68,72,43,67,90,97,47,122,86,52,73],
+            "payload": [86,48,74,70,87,65,79,82,54,89,98,116,114,53,84,111,108,50,97,51,87,65,43,109,65,87,116,53,84,113,98,80,114,84,100,82,97,74,121,103,53,113,110,119,43,77,100,100,67,84,117,55,102,56,86,116,113,79,101,120,66,47,83,54,48,65,114,117,116,52,72,68,99,120,72,120,107,122,53,84,69,56,108,54,99,103,122,49,120,55,74,66,85,56,77,75,117,113,108,117,86,120,76,82,113,110,65,73,48,81,89,56,88,75,87,106,112,73,79,67,56,114,47,68,111,97,109,116,69,54,79,54,116,75,118,76,109,78,117,70,80,118,101,112,115,51,53,71,86,81,103,74,47,78,57,106,65,65,65,65,65,71,114,67,57,98,56,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,50,56,122,106,116,70,81,122,84,67,120,77,85,57,78,108,84,103,67,78,77,47,89,88,90,90,55,73,110,72,89,88,71,47,52,76,81,104,83,86,85,88,80,108,76,113,78,114,114,121,69,84,87,106,55,101,99,102,72,104,117,109,118,54,108,119,105,98,74,77,115,87,103,77,53,86,107,67,51,120,89,54,98,48,79],
             "is_initiator": true
           }
         }
@@ -17176,7 +17056,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00$IS0TPXKJ2-P7PEIIRQRGS/IA*9%EO-:5+6BMK8UQR0BH5TD$48LCV.CUK8B9XS46S-U332B*EWZWDU:1I:P.8J-ULSO5ZQH8XCTO9640JIMUNR.BK7.7Y.F11Vauchi User00"
+                      "INI30:0:0:00+92$U54D8$NH7I7121BJLF/3LZHX93Q%2$J13AP*/2+-HBT1P4FXBTU678AACEMMEVV/AFT1D1IKUHVDQKG3PJM740-QSSCOMCHSSC$D6PUBBJ6-Z7+SJ6U411Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17216,10 +17096,10 @@
                             {
                               "Text": {
                                 "id": "exchange_status",
-                                "content": "Show this",
+                                "content": "Show this · Looking for the other phone",
                                 "style": "body",
                                 "accessibility": {
-                                  "label": "Show this",
+                                  "label": "Show this · Looking for the other phone",
                                   "description": null
                                 }
                               }
@@ -17406,7 +17286,7 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 81
+            "earliest_millis": 98
           }
         }
       ]
@@ -17490,10 +17370,10 @@
                             {
                               "Text": {
                                 "id": "exchange_status",
-                                "content": "Show this",
+                                "content": "Show this · Looking for the other phone",
                                 "style": "body",
                                 "accessibility": {
-                                  "label": "Show this",
+                                  "label": "Show this · Looking for the other phone",
                                   "description": null
                                 }
                               }
@@ -17880,7 +17760,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [5,147,21,120,66,154,162,134,127,224,13,208,110,121,116,54,20,138,95,31,2,103,4,90,189,229,155,142,236,201,222,105]
+            "payload": [145,233,134,237,175,148,232,151,102,183,88,15,166,1,107,121,78,166,207,173,55,81,104,156,160,230,169,240,248,199,93,9]
           }
         },
         {
@@ -18063,7 +17943,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [5,147,21,120,66,154,162,134,127,224,13,208,110,121,116,54,20,138,95,31,2,103,4,90,189,229,155,142,236,201,222,105]
+            "payload": [145,233,134,237,175,148,232,151,102,183,88,15,166,1,107,121,78,166,207,173,55,81,104,156,160,230,169,240,248,199,93,9]
           }
         },
         {
@@ -18246,7 +18126,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [5,147,21,120,66,154,162,134,127,224,13,208,110,121,116,54,20,138,95,31,2,103,4,90,189,229,155,142,236,201,222,105]
+            "payload": [145,233,134,237,175,148,232,151,102,183,88,15,166,1,107,121,78,166,207,173,55,81,104,156,160,230,169,240,248,199,93,9]
           }
         },
         {
@@ -21485,36 +21365,6 @@
                         }
                       },
                       {
-                        "title": "Verbergen, wann ich online bin",
-                        "subtitle": "Kontakte sehen nicht, wann dein Gerät online ist",
-                        "detail": null,
-                        "icon_token": null,
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [
-                          {
-                            "Toggle": {
-                              "binding_id": "surface.1.binding.0",
-                              "label": "",
-                              "value": false,
-                              "enabled": true,
-                              "accessibility": {
-                                "label": "Schalter: Verbergen, wann ich online bin",
-                                "description": "Kontakte sehen nicht, wann dein Gerät online ist"
-                              }
-                            }
-                          }
-                        ],
-                        "accessibility": {
-                          "label": "Schalter: Verbergen, wann ich online bin",
-                          "description": "Kontakte sehen nicht, wann dein Gerät online ist"
-                        }
-                      },
-                      {
                         "title": "Zustellbestätigungen",
                         "subtitle": "Wenn aktiviert, werden Absender benachrichtigt, wenn ihre Nachrichten zugestellt wurden",
                         "detail": null,
@@ -21528,7 +21378,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.0",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -21558,7 +21408,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.2",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -21588,7 +21438,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.3",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -21618,7 +21468,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.4",
+                              "binding_id": "surface.1.binding.3",
                               "label": "",
                               "value": false,
                               "enabled": true,

@@ -70,9 +70,6 @@ impl AppEngine {
                 "delivery_receipts" => {
                     config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
                 }
-                "suppress_presence" => {
-                    config.suppress_presence = !config.suppress_presence;
-                }
                 "new_field_default" => {
                     config.new_field_default_visible = !config.new_field_default_visible;
                 }

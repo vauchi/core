@@ -159,13 +159,6 @@ impl SettingsEngine {
                     None,
                 ),
                 self.toggle_row(
-                    "suppress_presence",
-                    "settings.suppress_presence",
-                    self.config.suppress_presence,
-                    self.t("settings.suppress_presence_a11y"),
-                    "settings.suppress_presence_hint",
-                ),
-                self.toggle_row(
                     "delivery_receipts",
                     "settings.delivery_receipts",
                     self.config.delivery_receipts_enabled,

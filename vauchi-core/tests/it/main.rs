@@ -346,6 +346,7 @@ mod nfc_card_payload_tests;
 mod nfc_handshake_tests;
 mod offline_queue_tests;
 mod ohttp_key_cache_tests;
+mod ohttp_key_trust_tests;
 mod ohttp_probe_tests;
 mod onboarding_api_tests;
 mod onboarding_engine_proptest;

@@ -299,3 +299,66 @@ fn test_propagate_skips_blocked_contacts() {
         "Unblocked Carol should have pending updates"
     );
 }
+
+/// The owed own-card repropagation pass (run each sync tick after an edit)
+/// sends the full visible card; a blocked contact must get none of it. The
+/// six-device RG-15 certification caught this pass leaking edits to a
+/// contact every Alice device held as blocked.
+// @scenario: release_privacy_multidevice_certification :: Only blocking ends long-lived contact continuity
+#[test]
+fn owed_repropagation_skips_blocked_contacts() {
+    let mut alice = create_test_vauchi();
+    alice.create_identity("Alice").unwrap();
+    let mut ids = Vec::new();
+    for name in ["Bob", "Carol"] {
+        let shared = SymmetricKey::generate();
+        let contact = Contact::from_exchange(
+            *Identity::create(name, 0).signing_public_key(),
+            ContactCard::new(name),
+            shared.clone(),
+            0,
+        );
+        let id = contact.id().to_string();
+        alice.add_contact(contact).unwrap();
+        alice
+            .create_ratchet_as_initiator(&id, &shared, *X3DHKeyPair::generate().public_key())
+            .unwrap();
+        ids.push(id);
+    }
+    let (bob_id, carol_id) = (&ids[0], &ids[1]);
+    alice
+        .add_own_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@company.com",
+            0,
+        ))
+        .unwrap();
+    let work_id = alice.own_card().unwrap().unwrap().fields()[0]
+        .id()
+        .to_string();
+    alice.set_own_field_public(&work_id).unwrap();
+    alice.block_contact(bob_id).unwrap();
+    let pending = |id: &str| {
+        alice
+            .storage()
+            .pending()
+            .get_pending_updates(id)
+            .unwrap()
+            .len()
+    };
+    let (bob_before, carol_before) = (pending(bob_id), pending(carol_id));
+
+    alice.mark_own_card_repropagate().unwrap();
+    alice.run_owed_repropagation().unwrap();
+
+    assert_eq!(
+        pending(bob_id),
+        bob_before,
+        "blocked Bob must be sent nothing"
+    );
+    assert!(
+        pending(carol_id) > carol_before,
+        "unblocked Carol is repropagated to (positive control)"
+    );
+}

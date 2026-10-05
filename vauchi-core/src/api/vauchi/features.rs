@@ -618,6 +618,12 @@ impl Vauchi {
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
 
+        // Ok, not ContactBlocked: nothing is owed to a blocked contact, so the
+        // owed-repropagation pass must not count it as a failure and retry (ADR-056).
+        if contact.is_blocked() {
+            return Ok(());
+        }
+
         // Legacy peers need their original session; device-aware peers can
         // bootstrap pair sessions from the verified registry below.
         if self

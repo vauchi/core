@@ -88,6 +88,7 @@ pub mod http_adapter;
 pub mod http_transport;
 #[cfg(feature = "network-http")]
 pub mod ohttp_client;
+pub mod ohttp_key_trust;
 #[cfg(feature = "network-http")]
 pub mod ohttp_probe;
 pub mod pinning;

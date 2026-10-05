@@ -1097,3 +1097,8 @@ pub(crate) fn alert_event(
         },
     }
 }
+
+// INLINE_TEST_REQUIRED: decode_versioned_payload is private to this module.
+#[cfg(test)]
+#[path = "card_update_decode_tests.rs"]
+mod decode_tests;

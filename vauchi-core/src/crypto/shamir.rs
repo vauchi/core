@@ -648,4 +648,17 @@ mod tests {
         assert_eq!(debug, "Share { index: 1, value: \"[REDACTED]\" }");
         assert!(!debug.contains("171"));
     }
+
+    // @internal
+    #[test]
+    fn ten_is_the_highest_threshold_reconstruct_accepts() {
+        let secret = [0x5Au8; 32];
+        let shares = split(&secret, 10, 10).unwrap();
+
+        assert_eq!(reconstruct(&shares, 10).unwrap(), secret);
+        assert!(matches!(
+            reconstruct(&shares, 11),
+            Err(ShamirError::ThresholdTooHigh(11))
+        ));
+    }
 }

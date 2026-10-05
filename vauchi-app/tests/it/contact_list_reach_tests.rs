@@ -9,7 +9,7 @@
 //! search. Core now draws both with primitives every shell already renders:
 //! a search input above the list and a row that shows the next contacts.
 
-use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
+use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::Vauchi;
 use vauchi_core::{
     BindingId, Command, Event, InputValue, InteractionId, PresentationNode, SurfaceId,
@@ -98,7 +98,7 @@ fn a_list_longer_than_its_window_offers_the_next_contacts() {
         .into_iter()
         .find(|(title, _)| title.starts_with("Show contacts"))
         .expect("a row shows the contacts past the first 200");
-    assert_eq!(title, "Show contacts 201–250");
+    assert_eq!(title, "Show contacts 51–250");
 
     let commands = engine
         .dispatch(Event::ActionActivated {

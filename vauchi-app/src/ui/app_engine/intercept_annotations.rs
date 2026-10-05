@@ -282,27 +282,37 @@ impl AppEngine {
                 self.apply_contact_facets(query);
                 Some(ActionResult::UpdateScreen(self.engine.current_screen()))
             }
-            UserAction::SearchChanged { query, .. } => {
-                let faceting = matches!(
-                    self.engine.engine_output(),
-                    Some(crate::ui::EngineOutput::ContactList {
-                        any_facet: true,
-                        ..
-                    })
-                );
-                if !faceting {
-                    return None;
-                }
-                let _ = self
-                    .engine
-                    .apply_update(crate::ui::EngineUpdate::ContactList(
-                        crate::ui::ContactListUpdate::SearchQuery(query.clone()),
-                    ));
-                self.apply_contact_facets(query.clone());
-                Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+            UserAction::SearchChanged { query, .. } => self.intercept_contact_search(query),
+            // The search input above the list (vauchi/private#482) reports
+            // typing as a text change; faceting treats it as the search.
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == crate::ui::contact_list::CONTACT_SEARCH_ID => {
+                self.intercept_contact_search(value)
             }
             _ => None,
         }
+    }
+
+    fn intercept_contact_search(&mut self, query: &str) -> Option<ActionResult> {
+        let faceting = matches!(
+            self.engine.engine_output(),
+            Some(crate::ui::EngineOutput::ContactList {
+                any_facet: true,
+                ..
+            })
+        );
+        if !faceting {
+            return None;
+        }
+        let _ = self
+            .engine
+            .apply_update(crate::ui::EngineUpdate::ContactList(
+                crate::ui::ContactListUpdate::SearchQuery(query.to_owned()),
+            ));
+        self.apply_contact_facets(query.to_owned());
+        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
     /// Recompute the faceted result set for the contact list's current facet

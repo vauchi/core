@@ -44,6 +44,16 @@ impl From<Item> for IndexedItem {
 /// (`2026-06-11-contacts-list-eager-render-anr` Track B).
 const DEFAULT_LIST_WINDOW: usize = 200;
 
+/// The text input above the list; the shell reports typing as a value
+/// change on its binding, which reaches the engine as a `TextChanged`.
+pub(crate) const CONTACT_SEARCH_ID: &str = "contact_search";
+
+/// The rows that move the 200-row window (vauchi/private#482). A shell
+/// draws them like any action list; no paging protocol is needed.
+const CONTACT_WINDOW_ID: &str = "contacts_window";
+const WINDOW_PREVIOUS: &str = "previous";
+const WINDOW_NEXT: &str = "next";
+
 /// Contact list engine — full contact list with search and group filtering.
 #[derive(Clone, Debug)]
 pub struct ContactListEngine {
@@ -160,6 +170,60 @@ impl ContactListEngine {
     pub fn set_faceted_ids(&mut self, ids: Option<Vec<String>>) {
         self.faceted_ids = ids;
         self.window_offset = 0;
+    }
+
+    fn search_input(&self) -> Component {
+        Component::TextInput {
+            id: CONTACT_SEARCH_ID.into(),
+            label: self.t("contacts.search"),
+            value: self.search_query.clone(),
+            placeholder: None,
+            max_length: None,
+            validation_error: None,
+            input_type: InputType::Text,
+            a11y: None,
+            info_key: None,
+        }
+    }
+
+    /// One row per neighbouring window, labelled with the contacts that
+    /// window shows; `None` when every contact fits in one window. Windows
+    /// stay a full 200 rows, so the last one overlaps the one before it.
+    fn window_rows(&self, total: usize, offset: usize) -> Option<Component> {
+        if total == 0 {
+            return None;
+        }
+        let range = |start: usize| {
+            let end = (start + DEFAULT_LIST_WINDOW).min(total);
+            crate::i18n::get_string_with_args(
+                self.locale,
+                "contacts.show_range",
+                &[("from", &(start + 1).to_string()), ("to", &end.to_string())],
+            )
+        };
+        let mut items = Vec::new();
+        if let Some(start) = previous_window(offset) {
+            items.push(window_item(WINDOW_PREVIOUS, range(start)));
+        }
+        if let Some(start) = next_window(offset, total) {
+            items.push(window_item(WINDOW_NEXT, range(start)));
+        }
+        (!items.is_empty()).then(|| Component::ActionList {
+            id: CONTACT_WINDOW_ID.into(),
+            items,
+        })
+    }
+
+    fn move_window(&mut self, item_id: &str) {
+        let total = self.filtered_contacts().len();
+        let target = match item_id {
+            WINDOW_PREVIOUS => previous_window(self.window_offset),
+            WINDOW_NEXT => next_window(self.window_offset, total),
+            _ => None,
+        };
+        if let Some(offset) = target {
+            self.window_offset = offset;
+        }
     }
 
     fn search_facets_toggle(&self) -> Component {
@@ -330,7 +394,8 @@ impl WorkflowEngine for ContactListEngine {
             } else {
                 (&filtered[..], 0, 0, 0)
             };
-            vec![
+            let mut components = vec![
+                self.search_input(),
                 self.search_facets_toggle(),
                 Component::List {
                     id: "contacts".into(),
@@ -340,7 +405,11 @@ impl WorkflowEngine for ContactListEngine {
                     offset,
                     window,
                 },
-            ]
+            ];
+            if let Some(rows) = self.window_rows(total_count, offset) {
+                components.push(rows);
+            }
+            components
         };
 
         // Archived contacts link
@@ -431,6 +500,20 @@ impl WorkflowEngine for ContactListEngine {
                 self.set_search_query(query);
                 ActionResult::UpdateScreen(self.current_screen())
             }
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == CONTACT_SEARCH_ID => {
+                self.set_search_query(value);
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ListItemSelected {
+                component_id,
+                item_id,
+            } if component_id == CONTACT_WINDOW_ID => {
+                self.move_window(&item_id);
+                ActionResult::UpdateScreen(self.current_screen())
+            }
             UserAction::ItemToggled {
                 component_id,
                 item_id,
@@ -504,6 +587,28 @@ fn contact_action_kind_from(kind: ListItemActionKind) -> Option<ContactActionKin
         ListItemActionKind::Undelete => Some(ContactActionKind::Undelete),
         ListItemActionKind::Custom => None,
     }
+}
+
+fn window_item(id: &str, label: String) -> ActionListItem {
+    ActionListItem {
+        id: id.into(),
+        label,
+        icon: None,
+        detail: None,
+        a11y: None,
+        info_key: None,
+    }
+}
+
+fn previous_window(offset: usize) -> Option<usize> {
+    (offset > 0).then(|| offset.saturating_sub(DEFAULT_LIST_WINDOW))
+}
+
+/// The next full window's start, clamped like the list itself to the last
+/// full window; `None` once the last contact is already shown.
+fn next_window(offset: usize, total: usize) -> Option<usize> {
+    let last = total.saturating_sub(DEFAULT_LIST_WINDOW);
+    (offset < last).then(|| (offset + DEFAULT_LIST_WINDOW).min(last))
 }
 
 // INLINE_TEST_REQUIRED: tests exercise the private `contact_action_kind_from`

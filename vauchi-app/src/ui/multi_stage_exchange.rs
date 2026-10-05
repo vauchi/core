@@ -59,6 +59,7 @@ use camera_gate::CameraGate;
 mod terminal_screens;
 
 pub(crate) use crate::ui::multi_stage_status::own_qr_label;
+use crate::ui::multi_stage_status::{saved_label, with_confirmation};
 
 // ── Action IDs ─────────────────────────────────────────────────────
 
@@ -205,6 +206,9 @@ pub struct MultiStageExchangeEngine {
     /// bridge from `MultiStageMachine::link_feedback` on the same ticks as
     /// `stalled` (vauchi/private#450).
     link_feedback: LinkFeedback,
+    /// The other phone said it saved too (DONE or BOTH read); pushed with
+    /// `link_feedback` (plan 5.3).
+    peer_confirmed: bool,
     locale: Locale,
 }
 
@@ -232,6 +236,7 @@ impl MultiStageExchangeEngine {
             is_hover_mode: false,
             stalled: false,
             link_feedback: LinkFeedback::default(),
+            peer_confirmed: false,
             locale: Locale::English,
         }
     }
@@ -276,6 +281,7 @@ impl MultiStageExchangeEngine {
             is_hover_mode: true,
             stalled: false,
             link_feedback: LinkFeedback::default(),
+            peer_confirmed: false,
             locale: Locale::English,
         }
     }
@@ -304,6 +310,7 @@ impl MultiStageExchangeEngine {
             is_hover_mode: true,
             stalled: false,
             link_feedback: LinkFeedback::default(),
+            peer_confirmed: false,
             locale: Locale::English,
         }
     }
@@ -452,6 +459,12 @@ impl MultiStageExchangeEngine {
         self.link_feedback = feedback;
     }
 
+    pub fn set_peer_confirmed(&mut self, confirmed: bool) {
+        if !self.cancelled {
+            self.peer_confirmed = confirmed;
+        }
+    }
+
     // ── Internal helpers ───────────────────────────────────────────
 
     fn build_screen(&self) -> ScreenModel {
@@ -541,7 +554,11 @@ impl MultiStageExchangeEngine {
             ProtocolState::Finalized | ProtocolState::Complete | ProtocolState::RetryReady
                 if self.session_ended =>
             {
-                self.build_success_screen(title)
+                with_confirmation(
+                    self.build_success_screen(title),
+                    self.peer_confirmed,
+                    self.locale,
+                )
             }
             // Finalized before the grace expires: the contact IS already
             // persisted (persist fires on the Finalized event), and the
@@ -564,7 +581,7 @@ impl MultiStageExchangeEngine {
     /// status and the buttons change. The rich summary waits for
     /// `session_ended`: a fixed layout cannot scroll to the code.
     fn build_finalized_broadcast_screen(&self, title: String) -> ScreenModel {
-        let complete = self.t("exchange.terminal.complete");
+        let complete = saved_label(self.peer_confirmed, self.locale);
         let peer = self
             .peer_name
             .as_ref()
@@ -823,6 +840,7 @@ impl WorkflowEngine for MultiStageExchangeEngine {
             MultiStageUpdate::AccelProximity(state) => self.set_accel_proximity(state),
             MultiStageUpdate::Stalled(stalled) => self.set_stalled(stalled),
             MultiStageUpdate::LinkFeedback(feedback) => self.set_link_feedback(feedback),
+            MultiStageUpdate::PeerConfirmed(confirmed) => self.set_peer_confirmed(confirmed),
         }
         true
     }

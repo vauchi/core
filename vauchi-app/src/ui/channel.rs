@@ -178,6 +178,9 @@ pub enum MultiStageUpdate {
     /// update; from `MultiStageMachine::link_feedback` on the same ticks
     /// as `Stalled` (vauchi/private#450).
     LinkFeedback(LinkFeedback),
+    /// The other phone said it saved too; from
+    /// `MultiStageMachine::peer_confirmed` on the same ticks (plan 5.3).
+    PeerConfirmed(bool),
 }
 
 /// Cycle-thread bridge updates for the device-linking engine.
@@ -334,6 +337,7 @@ impl EngineUpdate {
                 MultiStageUpdate::AccelProximity(_) => "MultiStage::AccelProximity",
                 MultiStageUpdate::Stalled(_) => "MultiStage::Stalled",
                 MultiStageUpdate::LinkFeedback(_) => "MultiStage::LinkFeedback",
+                MultiStageUpdate::PeerConfirmed(_) => "MultiStage::PeerConfirmed",
             },
             Self::DeviceLink(u) => match u {
                 DeviceLinkUpdate::QrPending => "DeviceLink::QrPending",

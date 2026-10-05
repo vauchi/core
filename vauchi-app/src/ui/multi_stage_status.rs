@@ -11,6 +11,46 @@
 use vauchi_core::exchange::ProtocolState;
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
+use crate::ui::{Component, ScreenModel, TextStyle};
+
+/// How far a saved exchange is confirmed (plan 5.3, design D6): "saved"
+/// here until the other phone's DONE or BOTH says it saved too.
+pub(crate) fn saved_label(peer_confirmed: bool, locale: Locale) -> String {
+    if peer_confirmed {
+        get_string(locale, "multi_stage.confirmed_on_both")
+    } else {
+        get_string(locale, "multi_stage.saved_on_this_phone")
+    }
+}
+
+/// The final screen's confirmation, right under its status indicator: a
+/// grace that ran out unconfirmed must not read as a confirmed exchange.
+pub(crate) fn with_confirmation(
+    mut screen: ScreenModel,
+    peer_confirmed: bool,
+    locale: Locale,
+) -> ScreenModel {
+    let content = if peer_confirmed {
+        get_string(locale, "multi_stage.confirmed_on_both")
+    } else {
+        get_string(locale, "multi_stage.unconfirmed_detail")
+    };
+    let under_status = screen
+        .components
+        .iter()
+        .position(|c| matches!(c, Component::StatusIndicator { .. }))
+        .map_or(0, |at| at + 1);
+    screen.components.insert(
+        under_status,
+        Component::Text {
+            id: "exchange_confirmation".into(),
+            content,
+            style: TextStyle::Body,
+            a11y: None,
+        },
+    );
+    screen
+}
 
 /// The own-QR caption, which doubles as the exchange status.
 ///

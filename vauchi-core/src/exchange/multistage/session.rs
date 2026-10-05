@@ -520,6 +520,13 @@ impl MultiStageSession {
         self
     }
 
+    /// Whether the other phone has said it saved too: this phone read its
+    /// DONE or its BOTH (design D6). Until then a saved exchange is saved
+    /// here only.
+    pub fn peer_confirmed(&self) -> bool {
+        self.peer_saved || self.peer_showed_both
+    }
+
     /// What the status line can say about the link to the other phone.
     pub fn link_feedback(&self) -> LinkFeedback {
         let now = self.monotonic.now();

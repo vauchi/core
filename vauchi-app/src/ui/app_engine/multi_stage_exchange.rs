@@ -170,7 +170,8 @@ impl AppEngine {
             None => return false,
         };
         let stalled_changed = self.apply_multi_stage_stalled(stalled);
-        let link_changed = self.apply_multi_stage_link_feedback(link);
+        let link_changed =
+            self.apply_multi_stage_link_feedback(link) | self.apply_multi_stage_peer_confirmed();
         let event_changed = self.apply_multi_stage_event(event);
         stalled_changed || link_changed || event_changed
     }
@@ -357,7 +358,8 @@ impl AppEngine {
             .map(|h| (h.machine.is_frame_stalled(), h.machine.link_feedback()))
             .unwrap_or_default();
         let stalled_changed = self.apply_multi_stage_stalled(stalled);
-        let link_changed = self.apply_multi_stage_link_feedback(link);
+        let link_changed =
+            self.apply_multi_stage_link_feedback(link) | self.apply_multi_stage_peer_confirmed();
         let event_changed = self.apply_multi_stage_event(event);
         stalled_changed || link_changed || event_changed
     }
@@ -744,6 +746,20 @@ impl AppEngine {
         self.engine
             .apply_update(crate::ui::EngineUpdate::MultiStage(
                 crate::ui::MultiStageUpdate::LinkFeedback(feedback),
+            ))
+    }
+
+    /// Bridge: push `MultiStageMachine::peer_confirmed()` with the link
+    /// feedback, before the tick's event, so the final screen built on
+    /// `Completed` already knows how the exchange ended (plan 5.3).
+    fn apply_multi_stage_peer_confirmed(&mut self) -> bool {
+        let confirmed = self
+            .multi_stage_session
+            .as_ref()
+            .is_some_and(|h| h.machine.peer_confirmed());
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::MultiStage(
+                crate::ui::MultiStageUpdate::PeerConfirmed(confirmed),
             ))
     }
 

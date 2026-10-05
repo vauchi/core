@@ -439,6 +439,11 @@ impl MultiStageMachine {
         self.inner.link_feedback()
     }
 
+    /// Whether the other phone has confirmed it saved too (design D6).
+    pub fn peer_confirmed(&self) -> bool {
+        self.inner.peer_confirmed()
+    }
+
     /// One display-frame step. No deadline/progress bookkeeping — the
     /// public [`advance`](Self::advance) wraps this with the per-step
     /// stall deadline and phase-progress stamping.

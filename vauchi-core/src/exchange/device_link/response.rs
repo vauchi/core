@@ -121,68 +121,36 @@ impl DeviceLinkResponse {
     }
 
     /// Deserializes a response from bytes.
+    ///
+    /// Every field is read through a bounds-checked cursor, so a short or
+    /// lying length prefix is refused instead of slicing past the end. The
+    /// trailing sync payload is optional: missing or cut short, it decodes
+    /// as empty (older formats did not carry it).
     pub fn from_bytes(data: &[u8]) -> Result<Self, ExchangeError> {
-        if data.len() < 32 + 4 + 4 + 4 {
-            return Err(ExchangeError::InvalidQRFormat);
-        }
+        let mut reader = ByteReader::new(data);
 
-        let master_seed: [u8; 32] = data[..32]
+        let master_seed: [u8; 32] = reader
+            .take(32)?
             .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
-
-        let name_len = u32::from_le_bytes(
-            data[32..36]
-                .try_into()
-                .map_err(|_| ExchangeError::InvalidQRFormat)?,
-        ) as usize;
-
-        if data.len() < 32 + 4 + name_len + 4 + 4 {
-            return Err(ExchangeError::InvalidQRFormat);
-        }
-
-        let display_name = String::from_utf8(data[36..36 + name_len].to_vec())
+        let name_len = reader.u32_le()? as usize;
+        let display_name = String::from_utf8(reader.take(name_len)?.to_vec())
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
-
-        let offset = 36 + name_len;
-        let device_index = u32::from_le_bytes(
-            data[offset..offset + 4]
-                .try_into()
-                .map_err(|_| ExchangeError::InvalidQRFormat)?,
-        );
-
-        let registry_len = u32::from_le_bytes(
-            data[offset + 4..offset + 8]
-                .try_into()
-                .map_err(|_| ExchangeError::InvalidQRFormat)?,
-        ) as usize;
-
-        if data.len() < offset + 8 + registry_len {
-            return Err(ExchangeError::InvalidQRFormat);
-        }
-
-        let registry_json = String::from_utf8(data[offset + 8..offset + 8 + registry_len].to_vec())
+        let device_index = reader.u32_le()?;
+        let registry_len = reader.u32_le()? as usize;
+        let registry_json = String::from_utf8(reader.take(registry_len)?.to_vec())
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
-
         let registry = DeviceRegistry::from_json(&registry_json)
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        // Parse sync payload (optional, may be empty or missing in older formats)
-        let sync_offset = offset + 8 + registry_len;
-        let sync_payload_json = if data.len() >= sync_offset + 4 {
-            let sync_len = u32::from_le_bytes(
-                data[sync_offset..sync_offset + 4]
-                    .try_into()
-                    .map_err(|_| ExchangeError::InvalidQRFormat)?,
-            ) as usize;
-
-            if data.len() >= sync_offset + 4 + sync_len {
-                String::from_utf8(data[sync_offset + 4..sync_offset + 4 + sync_len].to_vec())
-                    .map_err(|_| ExchangeError::InvalidQRFormat)?
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
+        let sync_payload_json = match reader.u32_le() {
+            Ok(sync_len) => match reader.take(sync_len as usize) {
+                Ok(bytes) => {
+                    String::from_utf8(bytes.to_vec()).map_err(|_| ExchangeError::InvalidQRFormat)?
+                }
+                Err(_) => String::new(),
+            },
+            Err(_) => String::new(),
         };
 
         Ok(DeviceLinkResponse {
@@ -212,5 +180,38 @@ impl DeviceLinkResponse {
 impl Drop for DeviceLinkResponse {
     fn drop(&mut self) {
         self.master_seed.zeroize();
+    }
+}
+
+/// Reads fields front to back, refusing any read past the end.
+struct ByteReader<'a> {
+    data: &'a [u8],
+    at: usize,
+}
+
+impl<'a> ByteReader<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, at: 0 }
+    }
+
+    fn take(&mut self, len: usize) -> Result<&'a [u8], ExchangeError> {
+        let end = self
+            .at
+            .checked_add(len)
+            .ok_or(ExchangeError::InvalidQRFormat)?;
+        let bytes = self
+            .data
+            .get(self.at..end)
+            .ok_or(ExchangeError::InvalidQRFormat)?;
+        self.at = end;
+        Ok(bytes)
+    }
+
+    fn u32_le(&mut self) -> Result<u32, ExchangeError> {
+        let bytes: [u8; 4] = self
+            .take(4)?
+            .try_into()
+            .map_err(|_| ExchangeError::InvalidQRFormat)?;
+        Ok(u32::from_le_bytes(bytes))
     }
 }

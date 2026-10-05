@@ -77,6 +77,7 @@ mod ble_integration_tests;
 mod ble_payload_tests;
 mod ble_proptest;
 mod block_contact_api_tests;
+mod blocked_reexchange_tests;
 mod both_initiator_ratchet_tests;
 mod capability_tests;
 mod card_revocation_tests;

@@ -432,7 +432,7 @@ fn the_chunk_size_does_not_change_once_data_has_started() {
 
 // @internal
 #[test]
-fn every_frame_a_session_shows_fits_37_modules_at_the_level_it_names() {
+fn every_frame_a_session_shows_fits_the_module_count_the_design_names() {
     let mut alice = MultiStageSession::new(vec![0xA1; 400]);
     let mut bob = MultiStageSession::new(vec![0xB2; 400]);
     let mut seen = std::collections::BTreeSet::new();
@@ -444,10 +444,19 @@ fn every_frame_a_session_shows_fits_37_modules_at_the_level_it_names() {
             assert_eq!(frame.error_correction, "L", "{}", &frame.data[..4]);
             let code = qrcode::QrCode::with_error_correction_level(&frame.data, qrcode::EcLevel::L)
                 .expect("frame encodes");
-            // No frame is denser than the 37-module frames the link trained
-            // on; BOTH, the session id alone, is smaller still.
+            // The opening frame carries the display name as text: its
+            // lowercase letters leave alphanumeric mode, and depending on
+            // the random session id around them the frame needs 41 modules
+            // about once in 125 sessions (plan 1.2 allows 41). Every other
+            // frame stays within the 37 the chunk sizes are cut for; BOTH,
+            // the session id alone, is smaller still.
+            let limit = if frame.data.starts_with("INI3") {
+                41
+            } else {
+                37
+            };
             assert!(
-                code.width() <= 37,
+                code.width() <= limit,
                 "a {}-char {} frame: {}",
                 frame.data.len(),
                 &frame.data[..4],

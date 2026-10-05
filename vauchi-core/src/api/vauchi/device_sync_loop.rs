@@ -289,6 +289,11 @@ mod tests {
             fingerprint_verified: false,
             visibility_rules_json: visibility_rules,
             recovery_trusted: false,
+            blocked: false,
+            hidden: false,
+            favorite: false,
+            archived_at: None,
+            ignored_at: None,
         }
     }
 

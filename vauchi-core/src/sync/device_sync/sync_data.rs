@@ -44,6 +44,21 @@ pub struct ContactSyncData {
     /// Whether this contact is trusted for recovery.
     #[serde(default)]
     pub recovery_trusted: bool,
+    /// Whether this contact is blocked (ADR-056; owner-level, #295).
+    #[serde(default)]
+    pub blocked: bool,
+    /// Whether this contact is hidden from the main contact list.
+    #[serde(default)]
+    pub hidden: bool,
+    /// Whether this contact is a favorite.
+    #[serde(default)]
+    pub favorite: bool,
+    /// When this contact was archived (None = not archived).
+    #[serde(default)]
+    pub archived_at: Option<u64>,
+    /// When this contact was ignored (None = not ignored, ADR-072).
+    #[serde(default)]
+    pub ignored_at: Option<u64>,
 }
 
 impl ContactSyncData {
@@ -73,6 +88,11 @@ impl ContactSyncData {
             fingerprint_verified: ex.fingerprint_verified,
             visibility_rules_json,
             recovery_trusted: ex.recovery_trusted,
+            blocked: contact.is_blocked(),
+            hidden: contact.is_hidden(),
+            favorite: contact.is_favorite(),
+            archived_at: contact.archived_at(),
+            ignored_at: contact.ignored_at(),
         }
     }
 
@@ -102,6 +122,17 @@ impl ContactSyncData {
         // contact synced), the flag falls back to default
         #[allow(clippy::let_underscore_must_use)]
         let _ = contact.set_recovery_trusted(self.recovery_trusted);
+        if self.blocked {
+            contact.block();
+        }
+        contact.set_hidden(self.hidden);
+        contact.set_favorite(self.favorite);
+        if let Some(at) = self.archived_at {
+            contact.archive(at);
+        }
+        if let Some(at) = self.ignored_at {
+            contact.ignore(at);
+        }
         Ok(contact)
     }
 }

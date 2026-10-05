@@ -125,6 +125,11 @@ fn contact_sync_data_public_key_is_base64_string() {
         fingerprint_verified: false,
         visibility_rules_json: "{}".to_string(),
         recovery_trusted: false,
+        blocked: false,
+        hidden: false,
+        favorite: false,
+        archived_at: None,
+        ignored_at: None,
     };
     let json: serde_json::Value =
         serde_json::from_str(&serde_json::to_string(&data).unwrap()).unwrap();

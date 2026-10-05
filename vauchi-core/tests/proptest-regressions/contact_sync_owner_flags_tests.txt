@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 1e70f3e4c43132916fa7109531e14b87300bb9933c7b5aa414a78aa31ef4c6fb # shrinks to flags = OwnerFlags { blocked: false, hidden: false, favorite: true, archived_at: None, ignored_at: None }

@@ -86,6 +86,22 @@ impl Vauchi {
         })
     }
 
+    /// Upsert the card of a contact established via an in-person exchange,
+    /// without (re)keying the channel. A contact the owner blocked stays
+    /// blocked: the re-exchange is rejected before anything is written
+    /// (ADR-056, #295), and the caller reports an ordinary failure.
+    pub fn save_exchanged_card(&self, contact: &Contact) -> VauchiResult<()> {
+        let blocked = self
+            .storage
+            .contacts()
+            .load_contact(contact.id())?
+            .is_some_and(|stored| stored.is_blocked());
+        if blocked {
+            return Err(VauchiError::ContactBlocked(contact.id().to_string()));
+        }
+        self.update_contact(contact)
+    }
+
     /// Persist a contact established (or re-established) via an in-person
     /// exchange: upsert the card and (re)key the channel.
     ///
@@ -104,7 +120,7 @@ impl Vauchi {
         ratchet: &DoubleRatchetState,
         is_initiator: bool,
     ) -> VauchiResult<()> {
-        self.update_contact(contact)?;
+        self.save_exchanged_card(contact)?;
         self.save_exchange_ratchet(contact.id(), ratchet, is_initiator)?;
         // Bootstrap card-update sync to the freshly-exchanged contact. The
         // initiator's first send establishes the responder's Double-Ratchet

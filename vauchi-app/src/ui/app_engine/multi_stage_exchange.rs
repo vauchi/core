@@ -502,7 +502,7 @@ impl AppEngine {
             }
             // No session ratchet at completion — upsert the card alone; the
             // channel can't be (re)keyed without the session.
-            None => self.vauchi.update_contact(&contact),
+            None => self.vauchi.save_exchanged_card(&contact),
         };
         if let Err(e) = persisted {
             tracing::warn!("multi-stage: failed to persist exchanged contact: {e}");

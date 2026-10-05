@@ -6,3 +6,4 @@
 
 mod contract_relay_consumer_tests;
 mod escrow_tests;
+mod ohttp_key_tests;

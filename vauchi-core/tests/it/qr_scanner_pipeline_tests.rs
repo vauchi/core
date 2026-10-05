@@ -206,3 +206,73 @@ fn timing_invariant_total_us_geq_decode_us() {
         "total time must include decode time"
     );
 }
+
+// ============================================================
+// Every code in the frame (vauchi/private#450)
+// ============================================================
+//
+// Facing the other phone, a camera can see the peer's code and a
+// reflection of its own. Keeping only the first code dropped the peer's
+// whenever the reflection won (plan: "android: the analyzer returns one
+// code per camera frame").
+
+/// Two images on one white canvas, side by side with a gap.
+fn side_by_side(left: &GrayImage, right: &GrayImage) -> GrayImage {
+    let gap = 40;
+    let (lw, lh) = left.dimensions();
+    let (rw, rh) = right.dimensions();
+    let mut canvas = GrayImage::from_pixel(lw + gap + rw, lh.max(rh), image::Luma([255u8]));
+    image::imageops::replace(&mut canvas, left, 0, 0);
+    image::imageops::replace(&mut canvas, right, i64::from(lw + gap), 0);
+    canvas
+}
+
+fn sorted(mut codes: Vec<String>) -> Vec<String> {
+    codes.sort();
+    codes
+}
+
+// @internal
+#[test]
+fn a_frame_with_two_codes_reports_both() {
+    let frame = side_by_side(
+        &generate_qr_image("PEER-FRAME-0001", 6),
+        &generate_qr_image("OWN-REFLECTION-0002", 6),
+    );
+    let (w, h) = frame.dimensions();
+    for backend in [ScannerBackend::RqrrRaw, ScannerBackend::RqrrPreprocessed] {
+        let result = scan_qr_from_luma(backend, frame.as_raw(), w, h);
+        assert_eq!(
+            sorted(result.decoded_all.clone()),
+            ["OWN-REFLECTION-0002", "PEER-FRAME-0001"],
+            "{backend:?} must report every code in the frame"
+        );
+        assert_eq!(
+            result.decoded.as_deref(),
+            result.decoded_all.first().map(String::as_str),
+            "{backend:?}: `decoded` stays the first of them"
+        );
+    }
+}
+
+// @internal
+#[test]
+fn a_frame_with_one_code_reports_it_once() {
+    let img = generate_qr_image("ONLY-ONE", 8);
+    let (w, h) = img.dimensions();
+    for backend in [ScannerBackend::RqrrRaw, ScannerBackend::RqrrPreprocessed] {
+        let result = scan_qr_from_luma(backend, img.as_raw(), w, h);
+        assert_eq!(result.decoded_all, ["ONLY-ONE"], "{backend:?}");
+    }
+}
+
+// @internal
+#[test]
+fn a_frame_without_a_code_reports_none() {
+    let garbage: Vec<u8> = (0..200 * 200).map(|i| ((i * 37 + 7) % 256) as u8).collect();
+    for backend in [ScannerBackend::RqrrRaw, ScannerBackend::RqrrPreprocessed] {
+        let result = scan_qr_from_luma(backend, &garbage, 200, 200);
+        assert_eq!(result.decoded_all, Vec::<String>::new(), "{backend:?}");
+        assert_eq!(result.decoded, None, "{backend:?}");
+    }
+}

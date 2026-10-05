@@ -117,6 +117,7 @@ mod contact_merge_tests;
 mod contact_relay_metadata_tests;
 mod contact_relay_storage_tests;
 mod contact_statistics_tests;
+mod contact_sync_owner_flags_tests;
 mod contact_tests;
 mod contact_visibility_engine_tests;
 mod contact_visibility_tests;

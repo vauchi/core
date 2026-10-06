@@ -141,6 +141,28 @@ fn own_card_edit_sets_repropagate_marker() {
     );
 }
 
+// @scenario: visibility_control :: An own-card edit is repropagated to contacts
+#[test]
+fn saving_the_own_card_owes_repropagation_only_when_it_changed() {
+    let (wb, _bob) = alice_with_ratcheted_bob();
+    let owed = |wb: &Vauchi| {
+        wb.storage()
+            .ux()
+            .load_own_card_repropagate()
+            .unwrap()
+            .needs_repropagate
+    };
+    let mut card = wb.own_card().unwrap().unwrap();
+
+    assert!(wb.update_own_card(&card).unwrap().is_empty());
+    assert!(!owed(&wb), "an unchanged save owes nothing");
+
+    card.add_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+    assert_eq!(wb.update_own_card(&card).unwrap(), ["work"]);
+    assert!(owed(&wb), "a changed save is repropagated");
+}
+
 /// A card change received from a linked device changes the owner's peer-facing
 /// state just as a local edit does, so it must schedule downstream propagation.
 // @scenario: sync_updates :: Linked-device card update reaches contacts

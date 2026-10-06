@@ -129,3 +129,27 @@ fn test_audit_log() {
         .log_audit_event("consent_change", None)
         .unwrap();
 }
+
+// A database opened before the consent migration has no consent table (#60).
+// @internal
+#[test]
+fn a_database_without_the_consent_table_lists_no_consent() {
+    let storage = test_storage();
+    storage
+        .consent()
+        .execute_consent_upsert("c1", "analytics", true, 1000)
+        .unwrap();
+    storage
+        .connection()
+        .execute_batch("DROP TABLE consent_records")
+        .unwrap();
+
+    assert!(storage.consent().list_consent_records().unwrap().is_empty());
+    assert!(
+        storage
+            .consent()
+            .list_consent_records_with_version()
+            .unwrap()
+            .is_empty()
+    );
+}

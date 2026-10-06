@@ -627,10 +627,8 @@ impl MultiStageExchangeEngine {
         } else {
             self.t("multi_stage.use_front_camera_button")
         };
-        let buttons = vec![
-            self.list_button(SWITCH_CAMERA_ACTION_ID, switch_camera_label),
-            self.list_button(CANCEL_ACTION_ID, self.t("action.cancel")),
-        ];
+        // No Cancel: Back in the title row ends the exchange (#534).
+        let buttons = vec![self.list_button(SWITCH_CAMERA_ACTION_ID, switch_camera_label)];
         let status = self.active_status();
         self.build_exchange_layout(title, status, buttons)
     }

@@ -217,7 +217,7 @@ fn active_screen_groups_preview_and_actions_in_row() {
         .iter()
         .map(|i| i.id.as_str())
         .collect();
-    assert_eq!(button_ids, vec![SWITCH_CAMERA_ACTION_ID, CANCEL_ACTION_ID]);
+    assert_eq!(button_ids, vec![SWITCH_CAMERA_ACTION_ID]);
 }
 
 /// The column beside the camera preview: status text, then the buttons.

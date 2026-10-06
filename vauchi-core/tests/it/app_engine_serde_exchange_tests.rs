@@ -327,8 +327,9 @@ fn multi_stage_exchange_navigates_to_engine_idle_screen() {
     });
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "multi_stage_exchange");
-    // Initial screen must show the active chrome with cancel + switch
-    // camera, not the success or failed terminal screens.
+    // Initial screen must show the active chrome with the camera switch,
+    // not the success or failed terminal screens. Back ends the exchange,
+    // so there is no Cancel button (#534).
     // The active screen's switch/cancel buttons live inside the preview
     // `Row`'s `ActionList` (so they sit beside the camera preview).
     let mut ids: Vec<String> = screen
@@ -338,7 +339,7 @@ fn multi_stage_exchange_navigates_to_engine_idle_screen() {
         .collect();
     collect_row_action_ids(&screen.components, &mut ids);
     let action_ids: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
-    assert!(action_ids.contains(&"cancel"));
+    assert!(!action_ids.contains(&"cancel"));
     assert!(action_ids.contains(&"switch_camera"));
     assert!(!action_ids.contains(&"done"));
     assert!(!action_ids.contains(&"retry"));

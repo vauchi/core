@@ -38,7 +38,7 @@
 include:
   - project: 'vauchi/scripts'
     # Pin the commit because tags are not protected.
-    ref: 096923a0dee8a1fb5e50203f381e9a7d23bd88b2
+    ref: 727e40461d67f8c1e212a86a53bae9e560c60959
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -94,7 +94,10 @@ variables:
   # MUST match the include: ref above. The templates come from that ref and
   # the scripts this variable fetches at job runtime come from this one; two
   # different commits would mix template and script versions silently.
-  # Bumped 2026-10-05 to 096923a (= ci-templates-v2026.10.07) so
+  # Bumped 2026-10-06 to 727e404 (= ci-templates-v2026.10.08): the push
+  # helper is pushgateway-push.sh, HTTPS only, no ssh fallback
+  # (vauchi/private#470, vauchi/scripts!607); before that,
+  # 2026-10-05 to 096923a (= ci-templates-v2026.10.07) so
   # coverage:workspace fetches common.sh and its metrics reach the
   # Pushgateway (vauchi/private#520, vauchi/scripts!603); before that,
   # 2026-10-05 to 8e307d9 (= ci-templates-v2026.10.06) so a
@@ -111,7 +114,7 @@ variables:
   # keeps the SHA form because tags here are not protected), the lint:typos
   # linux tag (vauchi/scripts!552) and retired_boundary_vocabulary
   # (vauchi/scripts!502).
-  VAUCHI_SCRIPTS_REF: "096923a0dee8a1fb5e50203f381e9a7d23bd88b2"
+  VAUCHI_SCRIPTS_REF: "727e40461d67f8c1e212a86a53bae9e560c60959"
   # cargo audit runs with --deny warnings; every entry here is an
   # advisory with no fix available to us, not one we chose to skip.
   #   RUSTSEC-2026-0192  ttf-parser unmaintained, reached through

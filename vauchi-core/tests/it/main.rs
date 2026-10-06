@@ -349,6 +349,7 @@ mod nfc_apdu_protocol_tests;
 mod nfc_card_payload_tests;
 mod nfc_handshake_tests;
 mod offline_queue_tests;
+mod ohttp_anchor_rollover_trust_tests;
 mod ohttp_key_cache_tests;
 mod ohttp_key_trust_tests;
 mod ohttp_probe_tests;

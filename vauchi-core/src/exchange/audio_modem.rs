@@ -367,12 +367,11 @@ mod tests {
         }
 
         let start = find_preamble(&samples, sample_rate).unwrap();
-        // Should find preamble somewhere around the 1000-sample mark (after the silence)
-        // Allow some tolerance due to windowing
+
+        let one_window = (sample_rate * 0.01) as usize;
         assert!(
-            start < 1500,
-            "Preamble should be found near start of signal, got {}",
-            start
+            (1000 - one_window..=1000).contains(&start),
+            "the preamble starts at 1000, found {start}"
         );
     }
 

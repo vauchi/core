@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 67] = [
+const MIGRATIONS: [Migration; 68] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -607,7 +607,25 @@ const MIGRATIONS: [Migration; 67] = [
         name: "contact_ignore",
         action: MigrationAction::Sql(MIGRATION_V67_CONTACT_IGNORE),
     },
+    Migration {
+        version: 68,
+        name: "ohttp_held_key",
+        action: MigrationAction::Sql(MIGRATION_V68_OHTTP_HELD_KEY),
+    },
 ];
+
+/// Migration v68: the signed OHTTP key held per relay (#288).
+///
+/// The window the key belongs to is what decides when to fetch again and
+/// which records to refuse as older, so it is kept beside the key, apart
+/// from the unsigned `ohttp_key_cache` that a stale-key rejection clears.
+const MIGRATION_V68_OHTTP_HELD_KEY: &str = "
+    CREATE TABLE IF NOT EXISTS ohttp_held_key (
+        relay_url TEXT PRIMARY KEY,
+        window INTEGER NOT NULL,
+        key_config BLOB NOT NULL
+    );
+";
 
 /// Migration v67: per-contact ignore flag (ADR-072).
 ///

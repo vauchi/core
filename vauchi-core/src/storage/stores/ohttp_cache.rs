@@ -7,6 +7,8 @@
 //! Part of problem record `2026-06-09-storage-per-domain-store-boundaries` (Phase 1).
 
 use crate::clock::Clock;
+#[cfg(feature = "network-rustls")]
+use crate::network::ohttp_key_trust::HeldOhttpKey;
 use rusqlite::{Connection, params};
 use std::sync::Arc;
 
@@ -61,6 +63,47 @@ impl OhttpCacheStore<'_> {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
+    /// Keep `held` as the signed key for `relay_url` (#288), replacing the
+    /// one held before.
+    #[cfg(feature = "network-rustls")]
+    pub fn save_held_ohttp_key(
+        &self,
+        relay_url: &str,
+        held: &HeldOhttpKey,
+    ) -> Result<(), StorageError> {
+        let window = i64::try_from(held.window)
+            .map_err(|_| StorageError::Serialization("OHTTP key window out of range".into()))?;
+        self.conn.execute(
+            "INSERT OR REPLACE INTO ohttp_held_key (relay_url, window, key_config) \
+             VALUES (?1, ?2, ?3)",
+            params![relay_url, window, held.key_config],
+        )?;
+        Ok(())
+    }
+
+    /// The signed key held for `relay_url`, if any.
+    #[cfg(feature = "network-rustls")]
+    pub fn load_held_ohttp_key(
+        &self,
+        relay_url: &str,
+    ) -> Result<Option<HeldOhttpKey>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT window, key_config FROM ohttp_held_key WHERE relay_url = ?1",
+            params![relay_url],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?)),
+        );
+        match result {
+            Ok((window, key_config)) => Ok(Some(HeldOhttpKey {
+                window: u64::try_from(window).map_err(|_| {
+                    StorageError::Serialization("OHTTP key window out of range".into())
+                })?,
+                key_config,
+            })),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
     /// Remove the cached OHTTP key for a relay URL.
     ///
     /// No-op if no entry exists for this relay.

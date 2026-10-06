@@ -203,7 +203,15 @@ impl AppEngine {
             event,
             Event::PresentationEnvironmentChanged { .. } | Event::SurfaceActivated { .. }
         ) {
-            return Ok(self.presentation_coordinator.handle_event(event)?);
+            let before = self.current_screen();
+            let mut commands = self.presentation_coordinator.handle_event(event)?;
+            // A window crossing the short threshold changes a fixed exchange
+            // screen (#513); any other screen must not be sent again, or a
+            // resize would drop its pending Undo.
+            if self.current_screen() != before {
+                commands.extend(self.initial_commands()?);
+            }
+            return Ok(commands);
         }
 
         if !matches!(

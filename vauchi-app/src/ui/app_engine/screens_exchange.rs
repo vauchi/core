@@ -28,6 +28,11 @@ impl AppEngine {
             AppScreen::DirectTransport => ExchangeMode::Cable,
             _ => return screen,
         };
+        if self.presentation_coordinator.is_short()
+            && screen.layout == crate::ui::ScreenLayout::Fixed
+        {
+            return compact_exchange_screen(screen);
+        }
         use crate::ui::exchange::mode_selection::{SerdeName, mode_pictogram};
         let name = crate::i18n::get_string(
             self.render_context.resolved_locale(),
@@ -49,7 +54,30 @@ impl AppEngine {
         );
         screen
     }
+}
 
+/// A short window's exchange screen: no mode row, and the heading over the
+/// own code becomes its spoken label, so the camera under the code keeps a
+/// usable size (#513). The title still names the mode.
+fn compact_exchange_screen(mut screen: crate::ui::ScreenModel) -> crate::ui::ScreenModel {
+    for component in &mut screen.components {
+        if let crate::ui::Component::QrCode {
+            mode: crate::ui::QrMode::Display,
+            label,
+            a11y,
+            ..
+        } = component
+            && let Some(heading) = label.take()
+        {
+            a11y.get_or_insert_with(Default::default)
+                .label
+                .get_or_insert(heading);
+        }
+    }
+    screen
+}
+
+impl AppEngine {
     pub(super) fn create_exchange_engine(
         vauchi: &Vauchi,
         screen: &AppScreen,

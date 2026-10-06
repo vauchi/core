@@ -26,6 +26,7 @@ pub struct PresentationCoordinator {
     detail_surface: Option<SurfaceId>,
     active_surface: SurfaceId,
     window_class: Option<WindowClass>,
+    available_height: Option<u32>,
     left_behind: Vec<SurfaceId>,
 }
 
@@ -36,6 +37,7 @@ impl PresentationCoordinator {
             primary_surface,
             detail_surface: None,
             window_class: None,
+            available_height: None,
             left_behind: Vec::new(),
         }
     }
@@ -123,9 +125,12 @@ impl PresentationCoordinator {
     ) -> Result<Vec<Command>, PresentationCoordinatorError> {
         match event {
             Event::PresentationEnvironmentChanged {
-                available_width, ..
+                available_width,
+                available_height,
+                ..
             } => {
                 self.window_class = Some(classify_width(self.window_class, available_width));
+                self.available_height = Some(available_height);
             }
             Event::SurfaceActivated { surface_id } => {
                 if !self.surface_is_visible(&surface_id)? {
@@ -139,6 +144,14 @@ impl PresentationCoordinator {
         Ok(vec![Command::SetPresentationProfile {
             profile: self.profile()?,
         }])
+    }
+
+    /// Whether the window is too short for a fixed screen's full layout.
+    /// Unknown until the shell reports its environment, and then not short.
+    #[cfg(feature = "network-rustls")]
+    pub(crate) fn is_short(&self) -> bool {
+        self.available_height
+            .is_some_and(|height| height < SHORT_WINDOW_HEIGHT)
     }
 
     fn profile(&self) -> Result<PresentationProfile, PresentationCoordinatorError> {
@@ -171,6 +184,12 @@ impl PresentationCoordinator {
                     || profile.detail_surface.as_ref() == Some(surface_id))))
     }
 }
+
+/// Below this height, in logical units, an exchange screen's code, its
+/// heading, the mode row and a usable camera do not all fit. An iPhone SE
+/// (667 pt screen) is below it: its Glance camera was 0 pt tall (#513).
+#[cfg(feature = "network-rustls")]
+const SHORT_WINDOW_HEIGHT: u32 = 720;
 
 /// Collapse lags expansion by this many logical units, so a window resting
 /// near a threshold (scrollbar toggling, edge drag) does not flip layouts

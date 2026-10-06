@@ -483,6 +483,7 @@ mod uri_builder_tests;
 mod usb_device_link_tests;
 mod usb_exchange_session_tests;
 mod validation_error_resolution_tests;
+mod vauchi_ohttp_anchor_rollover_tests;
 mod vauchi_signed_ohttp_key_tests;
 mod vauchi_sync_http_tests;
 mod vcard_import_tests;

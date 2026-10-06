@@ -10,7 +10,11 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use ed25519_dalek::{Signer, SigningKey};
-use vauchi_protocol::ohttp_key::{IntermediateCert, SignedKeyConfig, key_id_for_window};
+use sha2::{Digest, Sha256};
+use vauchi_protocol::ohttp_key::{
+    AnchorRollover, IntermediateCert, SignedKeyConfig, backup_commitment_message,
+    encode_rollover_chain, key_id_for_window,
+};
 
 use super::mock_relay::CannedResponse;
 
@@ -37,6 +41,26 @@ impl SignedGateway {
 
     pub fn anchor(&self) -> [u8; 32] {
         self.anchor.verifying_key().to_bytes()
+    }
+
+    /// What a client holds to accept this gateway's anchor as the backup
+    /// of another (decision 0.13).
+    pub fn commitment(&self) -> [u8; 32] {
+        Sha256::digest(backup_commitment_message(&self.anchor())).into()
+    }
+
+    /// The rollover record in which this gateway's anchor takes over and
+    /// commits to `next` as its own backup.
+    pub fn takeover(&self, next: [u8; 32]) -> AnchorRollover {
+        let new_anchor = self.anchor();
+        AnchorRollover {
+            new_anchor,
+            next_commitment: next,
+            signature: self
+                .anchor
+                .sign(&AnchorRollover::signing_message(&new_anchor, &next))
+                .to_bytes(),
+        }
     }
 
     /// The OHTTP key config this gateway serves for `window`.
@@ -111,5 +135,17 @@ pub fn signed_response(body: Vec<u8>) -> CannedResponse {
             "application/vnd.vauchi.ohttp-key-signed".into(),
         )],
         body,
+    }
+}
+
+/// `GET /v2/ohttp-anchor-rollover` answering with `chain`.
+pub fn rollover_response(chain: &[AnchorRollover]) -> CannedResponse {
+    CannedResponse {
+        status: 200,
+        headers: vec![(
+            "Content-Type".into(),
+            "application/vnd.vauchi.ohttp-anchor-rollover".into(),
+        )],
+        body: encode_rollover_chain(chain),
     }
 }

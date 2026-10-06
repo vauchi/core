@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Small API edges a mutation shard found untested: the pending update
-//! count across contacts and the pre-signed error texts
-//! (vauchi/private#522).
+//! count across contacts, the pre-signed error texts and the time a
+//! revocation is stamped with (vauchi/private#522).
 
 use super::common::device_sync::create_test_contact;
 use super::common::helpers::create_vauchi_with_identity;
@@ -59,4 +59,37 @@ fn pre_signed_errors_name_what_failed() {
         PreSignedError::IoError("z".into()).to_string(),
         "I/O error: z"
     );
+}
+
+// @internal
+#[test]
+fn a_revocation_is_stamped_with_the_app_clock() {
+    use std::time::{Duration, SystemTime};
+    use vauchi_core::clock::FakeClock;
+    use vauchi_core::identity::DeviceInfo;
+
+    const NOW: u64 = 1_700_000_000;
+    let seed = [9u8; 32];
+    let clock = FakeClock::new(SystemTime::UNIX_EPOCH + Duration::from_secs(NOW)).shared();
+    let mut wb = vauchi_core::Vauchi::in_memory_with_clock(clock).unwrap();
+    wb.create_identity("Alice").unwrap();
+    let mut registry = wb.identity().unwrap().initial_device_registry();
+    let laptop = DeviceInfo::derive(&seed, 1, "Laptop".into(), 0).to_registered(&seed);
+    let laptop_id = laptop.device_id;
+    registry.add_device_unsigned(laptop).unwrap();
+    wb.storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+
+    wb.revoke_device(1).unwrap();
+
+    let saved = wb
+        .storage()
+        .device()
+        .load_device_registry()
+        .unwrap()
+        .unwrap();
+    let revoked = saved.find_device(&laptop_id).unwrap();
+    assert_eq!(revoked.revoked_at, Some(NOW));
 }

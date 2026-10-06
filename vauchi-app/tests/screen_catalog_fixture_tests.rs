@@ -11,7 +11,10 @@ use screen_catalog::{
     replaced_surface_ids,
 };
 use vauchi_app::ui::{ScreenCatalogEntry, ScreenCatalogFixture};
-use vauchi_core::{Command, PresentationNode, PresentationRow};
+use vauchi_core::{
+    Command, PresentationNode, PresentationQrErrorCorrection, PresentationQrPurpose,
+    PresentationRow,
+};
 
 const REQUIRED_CODE_IDS: [&str; 52] = [
     "onboarding",
@@ -352,4 +355,44 @@ fn screen_catalog_my_info_rows_carry_a_realistic_visibility_mix() {
     .map(|(label, chip)| (label.to_owned(), chip.to_owned()))
     .collect();
     assert_eq!(visibility, expected);
+}
+
+fn display_qr(nodes: &[PresentationNode]) -> Option<&PresentationNode> {
+    nodes.iter().find_map(|node| match node {
+        PresentationNode::Qr {
+            purpose: PresentationQrPurpose::Display,
+            ..
+        } => Some(node),
+        PresentationNode::Group { children, .. } => display_qr(children),
+        _ => None,
+    })
+}
+
+// A captured exchange screen otherwise shows no frame read yet: the code
+// fills its square at the default level, so no shell's catalog test would
+// see the placement and level a trained link sends (#450).
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn screen_catalog_a_trained_exchange_draws_its_code_placed_at_level_low() {
+    let catalog = checked_in_catalog();
+    let entry = catalog
+        .screens
+        .iter()
+        .find(|entry| entry.code_id == "multi_stage_exchange-hover-placed")
+        .expect("multi_stage_exchange-hover-placed recorded");
+    let surface = replaced_surface(&entry.commands, entry_surface_id(entry));
+
+    let Some(PresentationNode::Qr {
+        placement,
+        error_correction,
+        ..
+    }) = display_qr(&surface.nodes)
+    else {
+        panic!("the trained exchange shows its own code");
+    };
+    assert_eq!(
+        placement.map(|p| (p.size(), p.x(), p.y())),
+        Some((650, 175, 175))
+    );
+    assert_eq!(*error_correction, Some(PresentationQrErrorCorrection::Low));
 }

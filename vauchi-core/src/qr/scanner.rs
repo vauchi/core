@@ -71,7 +71,7 @@ impl ScanResult {
         }
     }
 
-    fn found_any(&self) -> bool {
+    pub(crate) fn found_any(&self) -> bool {
         !self.decoded_all.is_empty()
     }
 }
@@ -103,10 +103,7 @@ pub fn scan_qr_from_luma(
 
     let expected = (width as usize) * (height as usize);
     if luma_data.len() != expected {
-        return ScanResult {
-            total_us: total_start.elapsed().as_micros() as u64,
-            ..ScanResult::default()
-        };
+        return ScanResult::default();
     }
 
     match backend {
@@ -117,7 +114,6 @@ pub fn scan_qr_from_luma(
             let result = decode_rqrr(img);
             ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
-                preprocessing_us: 0,
                 ..result
             }
         }
@@ -127,7 +123,6 @@ pub fn scan_qr_from_luma(
             if fast.found_any() {
                 return ScanResult {
                     total_us: total_start.elapsed().as_micros() as u64,
-                    preprocessing_us: 0,
                     ..fast
                 };
             }
@@ -145,26 +140,20 @@ pub fn scan_qr_from_luma(
                 };
             }
 
-            // Tier 2: rqrr (different finder-pattern algorithm)
+            // Tier 2: rqrr (different finder-pattern algorithm), then
+            // Tier 3: rxing tryHarder (sub-pixel refinement, V20+ support).
             let img = GrayImage::from_raw(width, height, luma_data.to_vec())
                 .expect("dims verified above");
             let rqrr = decode_rqrr(img);
-            if rqrr.found_any() {
-                return ScanResult {
-                    total_us: total_start.elapsed().as_micros() as u64,
-                    preprocessing_us: 0,
-                    laplacian_variance: sharpness,
-                    ..rqrr
-                };
-            }
-
-            // Tier 3: rxing tryHarder (sub-pixel refinement, V20+ support)
-            let hard = decode_rxing(luma_data.to_vec(), width, height, true);
+            let decoded = if rqrr.found_any() {
+                rqrr
+            } else {
+                decode_rxing(luma_data.to_vec(), width, height, true)
+            };
             ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
-                preprocessing_us: 0,
                 laplacian_variance: sharpness,
-                ..hard
+                ..decoded
             }
         }
         #[cfg(feature = "diagnostic-yolo")]
@@ -195,88 +184,11 @@ pub fn scan_qr_from_luma_with_config(
     scan_qr_from_luma(backend, luma_data, width, height)
 }
 
-/// Scan a QR code using YOLO detection → crop → rqrr decode pipeline.
-///
-/// The detector locates QR code regions in the frame, crops each one with
-/// padding, and feeds the cropped patch to rqrr for decoding. Returns the
-/// codes of the first patch that decodes.
 #[cfg(feature = "diagnostic-yolo")]
-pub fn scan_qr_yolo(
-    detector: &mut crate::diagnostic::yolo_detector::YoloDetector,
-    luma_data: &[u8],
-    width: u32,
-    height: u32,
-    confidence_threshold: f32,
-) -> ScanResult {
-    let total_start = std::time::Instant::now();
-
-    let expected = (width as usize) * (height as usize);
-    if luma_data.len() != expected {
-        return ScanResult {
-            total_us: total_start.elapsed().as_micros() as u64,
-            ..ScanResult::default()
-        };
-    }
-    let img = GrayImage::from_raw(width, height, luma_data.to_vec()).expect("dims verified above");
-
-    let detect_start = std::time::Instant::now();
-    let detections = match detector.detect(&img, confidence_threshold) {
-        Ok(d) => d,
-        Err(_) => {
-            return ScanResult {
-                total_us: total_start.elapsed().as_micros() as u64,
-                preprocessing_us: detect_start.elapsed().as_micros() as u64,
-                ..ScanResult::default()
-            };
-        }
-    };
-    let detection_us = detect_start.elapsed().as_micros() as u64;
-
-    if detections.is_empty() {
-        return ScanResult {
-            total_us: total_start.elapsed().as_micros() as u64,
-            preprocessing_us: detection_us,
-            ..ScanResult::default()
-        };
-    }
-
-    let decode_start = std::time::Instant::now();
-    for det in &detections {
-        let patch = crate::diagnostic::yolo_detector::crop_detection(&img, det, 0.15);
-
-        let rqrr_result = decode_rqrr(patch.clone());
-        if rqrr_result.found_any() {
-            return ScanResult {
-                total_us: total_start.elapsed().as_micros() as u64,
-                preprocessing_us: detection_us,
-                decode_us: decode_start.elapsed().as_micros() as u64,
-                ..rqrr_result
-            };
-        }
-
-        // Fallback: rxing with tryHarder (handles V20+, perspective)
-        let (pw, ph) = patch.dimensions();
-        let rxing_result = decode_rxing(patch.into_raw(), pw, ph, true);
-        if rxing_result.found_any() {
-            return ScanResult {
-                total_us: total_start.elapsed().as_micros() as u64,
-                preprocessing_us: detection_us,
-                decode_us: decode_start.elapsed().as_micros() as u64,
-                ..rxing_result
-            };
-        }
-    }
-
-    ScanResult {
-        total_us: total_start.elapsed().as_micros() as u64,
-        preprocessing_us: detection_us,
-        decode_us: decode_start.elapsed().as_micros() as u64,
-        ..ScanResult::default()
-    }
-}
+pub use crate::diagnostic::yolo_scan::scan_qr_yolo;
 
 /// Decode every QR grid rqrr finds in a grayscale image (fast, simple).
-fn decode_rqrr(img: GrayImage) -> ScanResult {
+pub(crate) fn decode_rqrr(img: GrayImage) -> ScanResult {
     let decode_start = std::time::Instant::now();
     let mut prepared = rqrr::PreparedImage::prepare(img);
     let codes: Vec<String> = prepared
@@ -293,7 +205,7 @@ fn decode_rqrr(img: GrayImage) -> ScanResult {
 /// without it, ~10ms on 480p for clean codes like the exchange frames.
 ///
 /// Takes owned `Vec<u8>` to avoid a second clone — rxing consumes the buffer.
-fn decode_rxing(luma: Vec<u8>, width: u32, height: u32, try_harder: bool) -> ScanResult {
+pub(crate) fn decode_rxing(luma: Vec<u8>, width: u32, height: u32, try_harder: bool) -> ScanResult {
     let decode_start = std::time::Instant::now();
 
     let hints = rxing::DecodeHints {

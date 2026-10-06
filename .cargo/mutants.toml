@@ -6,7 +6,23 @@
 # See: https://mutants.rs/config-file.html
 
 # Exclude test infrastructure, generated code, and benchmarks from mutation
-exclude_globs = ["tests/**", "benches/**", "fuzz/**"]
+# The diagnostic scanner and YOLO pipeline compile only with the
+# diagnostic-scanner / diagnostic-yolo features, which the mutation build
+# (`--features testing`) does not enable; every mutant there would read
+# as missed without ever being compiled (vauchi/private#522).
+exclude_globs = [
+    "tests/**",
+    "benches/**",
+    "fuzz/**",
+    "vauchi-core/src/diagnostic/yolo_scan.rs",
+    "vauchi-core/src/diagnostic/debug_session.rs",
+    "vauchi-core/src/diagnostic/log_event.rs",
+    "vauchi-core/src/diagnostic/preprocess.rs",
+    "vauchi-core/src/diagnostic/report.rs",
+    "vauchi-core/src/diagnostic/snapshot.rs",
+    "vauchi-core/src/diagnostic/tuner.rs",
+    "vauchi-core/src/diagnostic/yolo_detector.rs",
+]
 
 # Mutants we never expect to catch.
 #
@@ -59,6 +75,11 @@ exclude_re = [
     # no birthday with or without the guard) (vauchi/private#522).
     "vauchi-core/src/contact_card/vcard_import\\.rs:707:27: replace && with \\|\\| in normalize_date$",
     "vauchi-core/src/contact_card/vcard_import\\.rs:712:51: replace >= with < in normalize_date$",
+
+    # find_preamble's Goertzel power is a float sum over sampled audio; it
+    # never lands exactly on the 0.05 threshold, so `>` and `>=` pick the
+    # same window (vauchi/private#522).
+    "vauchi-core/src/exchange/audio_modem\\.rs:181:18: replace > with >= in find_preamble$",
 ]
 
 # Allow 1.5x the normal test timeout per mutant

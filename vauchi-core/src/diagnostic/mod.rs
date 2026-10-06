@@ -13,7 +13,7 @@ pub mod exchange_debug;
 pub(crate) mod exchange_debug;
 
 // Development/benchmark modules (gated behind diagnostic-scanner):
-// tuner, report, snapshot, debug_session, log_event, preprocess, yolo_detector.
+// tuner, report, snapshot, debug_session, log_event, preprocess, yolo_detector, yolo_scan.
 // All are used only by the QR scanner benchmark harness (QrTuner UI,
 // QR throughput tester, camera config sweeper, device profiling reports).
 // Must never ship in production binaries.
@@ -31,6 +31,8 @@ pub mod snapshot;
 pub mod tuner;
 #[cfg(feature = "diagnostic-yolo")]
 pub mod yolo_detector;
+#[cfg(feature = "diagnostic-yolo")]
+pub mod yolo_scan;
 
 #[cfg(feature = "diagnostic-scanner")]
 pub use debug_session::DebugSession;

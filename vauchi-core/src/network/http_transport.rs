@@ -622,9 +622,6 @@ impl HttpTransport {
                     Err(response_error("exchange_complete", &err_msg))
                 }
             }
-            Err(NetworkError::InvalidMessage(ref msg)) if msg.contains("not yet claimed") => {
-                Ok(None)
-            }
             Err(e) => Err(e),
         }
     }

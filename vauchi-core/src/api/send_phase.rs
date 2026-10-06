@@ -571,14 +571,13 @@ impl<'a, T: Transport> SendPhase<'a, T> {
     fn update_connection_state(&mut self, rng: &dyn crate::rng::SecureRng) {
         let new_state = self.relay.connection().state();
         if new_state != self.last_connection_state {
-            let was_disconnected =
-                !matches!(self.last_connection_state, ConnectionState::Connected);
             self.last_connection_state = new_state.clone();
             self.events.dispatch(VauchiEvent::ConnectionStateChanged {
                 state: new_state.clone(),
             });
 
-            if was_disconnected && new_state == ConnectionState::Connected {
+            // A changed state that is Connected was not Connected before.
+            if new_state == ConnectionState::Connected {
                 self.on_connectivity_restored(rng);
             }
         }

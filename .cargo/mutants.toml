@@ -91,6 +91,11 @@ exclude_re = [
     # fast_laplacian_variance uses only the squared mean, so summing the
     # negated Laplacian gives the same variance (vauchi/private#522).
     "vauchi-core/src/qr/scanner\\.rs:255:17: replace \\+= with -= in fast_laplacian_variance$",
+
+    # MockBLEVerifier and MockBLETransport are test doubles that ship in src
+    # for downstream tests; a mutant there changes the double, not the
+    # product (vauchi/private#522).
+    "vauchi-core/src/exchange/ble\\.rs:[0-9]+:[0-9]+: .*MockBLE(Verifier|Transport)>?::",
 ]
 
 # Allow 1.5x the normal test timeout per mutant

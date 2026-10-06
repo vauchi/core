@@ -10,7 +10,7 @@
 //! suited for contact card sync (not real-time chat).
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -23,7 +23,10 @@ use vauchi_protocol::v2::{
 };
 
 use super::error::NetworkError;
+use super::ohttp_key_trust::{HeldOhttpKey, accept_signed_key};
+use crate::clock::Clock;
 use crate::version::{APP_COMPAT_VERSION, VersionPolicy};
+use vauchi_protocol::ohttp_key::{MAX_RECORD_BYTES, SignedKeyConfig};
 
 /// Default retry delay when the server doesn't specify Retry-After.
 const DEFAULT_RATE_LIMIT_RETRY_SECS: u64 = 10;
@@ -182,6 +185,16 @@ pub struct HttpTransport {
     /// `2026-04-17-ohttp-allow-direct-fallback`) defines the expected
     /// steady-state value as zero.
     direct_fallback_count: AtomicU64,
+    /// Set when the relay has an OHTTP anchor (#288): a refetched key is
+    /// then taken only from a signed record that chains to it.
+    signed: Mutex<Option<SignedOhttp>>,
+}
+
+/// What an anchored transport needs to accept the next signed key.
+struct SignedOhttp {
+    anchor: [u8; 32],
+    held: HeldOhttpKey,
+    clock: Arc<dyn Clock>,
 }
 
 impl HttpTransport {
@@ -197,6 +210,7 @@ impl HttpTransport {
             ohttp: RwLock::new(None),
             last_version_policy: Mutex::new(None),
             direct_fallback_count: AtomicU64::new(0),
+            signed: Mutex::new(None),
         }
     }
 
@@ -219,12 +233,45 @@ impl HttpTransport {
         *self.ohttp_slot() = Some(client);
     }
 
+    /// Install `held`, a key already accepted under `anchor` (#288), and
+    /// from now on refetch keys only as signed records chaining to
+    /// `anchor`, checked against `clock` — never `/v2/ohttp-key`.
+    pub fn set_signed_ohttp(
+        &mut self,
+        anchor: [u8; 32],
+        held: HeldOhttpKey,
+        clock: Arc<dyn Clock>,
+    ) -> Result<(), NetworkError> {
+        let client = OhttpClient::new(held.key_config.clone())?;
+        *self.ohttp_slot() = Some(client);
+        *self.signed_slot() = Some(SignedOhttp {
+            anchor,
+            held,
+            clock,
+        });
+        Ok(())
+    }
+
+    /// The signed key this transport holds, if it is anchored.
+    pub fn held_ohttp_key(&self) -> Option<HeldOhttpKey> {
+        self.signed_slot()
+            .as_ref()
+            .map(|signed| signed.held.clone())
+    }
+
     /// Remove the OHTTP client, reverting to direct HTTP requests.
     ///
     /// Use when key bootstrap fails during rotation and the transport needs
     /// to fall back to re-fetching the key before re-enabling OHTTP.
     pub fn clear_ohttp(&mut self) {
         *self.ohttp_slot() = None;
+        *self.signed_slot() = None;
+    }
+
+    fn signed_slot(&self) -> std::sync::MutexGuard<'_, Option<SignedOhttp>> {
+        self.signed
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// Returns whether OHTTP encryption is active.
@@ -283,8 +330,36 @@ impl HttpTransport {
     /// bootstrap step before OHTTP can be activated.
     /// Returns the raw encoded key config bytes (RFC 9458).
     pub fn fetch_ohttp_key(&self) -> Result<Vec<u8>, NetworkError> {
+        self.fetch_key_body(
+            "/v2/ohttp-key",
+            "application/ohttp-keys",
+            MAX_OHTTP_KEY_RESPONSE_BYTES,
+        )
+    }
+
+    /// Fetch the gateway's signed key record (#288). Like the key, it is a
+    /// bootstrap fetch outside OHTTP; the record is decoded here and
+    /// verified by the caller against the relay's anchor.
+    pub fn fetch_signed_ohttp_key(&self) -> Result<SignedKeyConfig, NetworkError> {
+        let body = self.fetch_key_body(
+            "/v2/ohttp-key-signed",
+            "application/vnd.vauchi.ohttp-key-signed",
+            MAX_RECORD_BYTES,
+        )?;
+        SignedKeyConfig::decode(&body)
+            .map_err(|e| NetworkError::InvalidMessage(format!("signed OHTTP key record: {e}")))
+    }
+
+    /// GET `path` and return its body, refusing any other content type, an
+    /// empty body, and anything over `max_bytes` (DC-04).
+    fn fetch_key_body(
+        &self,
+        path: &str,
+        content_type_expected: &str,
+        max_bytes: usize,
+    ) -> Result<Vec<u8>, NetworkError> {
         let agent = self.agent.as_ref().map_err(|e| e.clone())?;
-        let url = format!("{}/v2/ohttp-key", self.config.relay_url);
+        let url = format!("{}{path}", self.config.relay_url);
         let resp = agent
             .get(&url)
             .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())
@@ -300,26 +375,26 @@ impl HttpTransport {
             .and_then(|value| value.to_str().ok())
             .and_then(|value| value.split(';').next())
             .map(str::trim);
-        if !content_type.is_some_and(|value| value.eq_ignore_ascii_case("application/ohttp-keys")) {
-            return Err(NetworkError::InvalidMessage(
-                "OHTTP key response must use application/ohttp-keys".into(),
-            ));
+        if !content_type.is_some_and(|value| value.eq_ignore_ascii_case(content_type_expected)) {
+            return Err(NetworkError::InvalidMessage(format!(
+                "OHTTP key response must use {content_type_expected}"
+            )));
         }
 
         let mut response_body = resp.into_body();
         let body = response_body
             .with_config()
-            .limit((MAX_OHTTP_KEY_RESPONSE_BYTES + 1) as u64)
+            .limit((max_bytes + 1) as u64)
             .read_to_vec()
             .map_err(|error| match error {
                 ureq::Error::BodyExceedsLimit(_) => NetworkError::InvalidMessage(format!(
-                    "OHTTP key response exceeds {MAX_OHTTP_KEY_RESPONSE_BYTES} bytes"
+                    "OHTTP key response exceeds {max_bytes} bytes"
                 )),
                 other => NetworkError::ConnectionFailed(other.to_string()),
             })?;
-        if body.len() > MAX_OHTTP_KEY_RESPONSE_BYTES {
+        if body.len() > max_bytes {
             return Err(NetworkError::InvalidMessage(format!(
-                "OHTTP key response exceeds {MAX_OHTTP_KEY_RESPONSE_BYTES} bytes"
+                "OHTTP key response exceeds {max_bytes} bytes"
             )));
         }
         if body.is_empty() {
@@ -766,8 +841,27 @@ impl HttpTransport {
         }
     }
 
-    /// Fetch a fresh gateway key and install it.
+    /// Fetch a fresh gateway key and install it. An anchored transport
+    /// takes it only from a signed record its anchor accepts; on refusal it
+    /// keeps the key it holds (#288: this path used to install whatever
+    /// `/v2/ohttp-key` returned).
     fn refresh_ohttp_key(&self) -> Result<(), NetworkError> {
+        let anchored = self
+            .signed_slot()
+            .as_ref()
+            .map(|signed| (signed.anchor, signed.held.clone(), signed.clock.clone()));
+        if let Some((anchor, held, clock)) = anchored {
+            let record = self.fetch_signed_ohttp_key()?;
+            let accepted =
+                accept_signed_key(&record, &anchor, clock.unix_seconds(), Some(&held))
+                    .map_err(|rejection| NetworkError::InvalidMessage(rejection.to_string()))?;
+            let client = OhttpClient::new(accepted.key_config.clone())?;
+            *self.ohttp_slot() = Some(client);
+            if let Some(signed) = self.signed_slot().as_mut() {
+                signed.held = accepted;
+            }
+            return Ok(());
+        }
         let key = self.fetch_ohttp_key()?;
         let client = OhttpClient::new(key)?;
         *self.ohttp_slot() = Some(client);

@@ -88,6 +88,9 @@ exclude_re = [
     # scan_qr_from_luma_with_config compiles only with diagnostic-scanner,
     # which the mutation build does not enable (vauchi/private#522).
     "vauchi-core/src/qr/scanner\\.rs:[0-9]+:[0-9]+: replace scan_qr_from_luma_with_config ",
+    # fast_laplacian_variance uses only the squared mean, so summing the
+    # negated Laplacian gives the same variance (vauchi/private#522).
+    "vauchi-core/src/qr/scanner\\.rs:255:17: replace \\+= with -= in fast_laplacian_variance$",
 ]
 
 # Allow 1.5x the normal test timeout per mutant

@@ -8,7 +8,7 @@
 
 use crate::clock::Clock;
 #[cfg(feature = "network-rustls")]
-use crate::network::ohttp_key_trust::HeldOhttpKey;
+use crate::network::ohttp_key_trust::{HeldOhttpKey, OhttpAnchor};
 use rusqlite::{Connection, params};
 use std::sync::Arc;
 
@@ -102,6 +102,55 @@ impl OhttpCacheStore<'_> {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
+    }
+
+    /// Keep `reached`, the anchor followed from `configured` through
+    /// `relay_url`'s rollover chain (#288 decision 0.13).
+    #[cfg(feature = "network-rustls")]
+    pub fn save_followed_anchor(
+        &self,
+        relay_url: &str,
+        configured: &[u8; 32],
+        reached: &OhttpAnchor,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO ohttp_followed_anchor \
+             (relay_url, configured_anchor, anchor, backup_commitment) \
+             VALUES (?1, ?2, ?3, ?4)",
+            params![
+                relay_url,
+                configured.as_slice(),
+                reached.anchor.as_slice(),
+                reached.backup_commitment.as_slice()
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// The anchor followed from `configured` for `relay_url`, if any; one
+    /// reached from another configured anchor does not count.
+    #[cfg(feature = "network-rustls")]
+    pub fn load_followed_anchor(
+        &self,
+        relay_url: &str,
+        configured: &[u8; 32],
+    ) -> Result<Option<OhttpAnchor>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT anchor, backup_commitment FROM ohttp_followed_anchor \
+             WHERE relay_url = ?1 AND configured_anchor = ?2",
+            params![relay_url, configured.as_slice()],
+            |row| Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Vec<u8>>(1)?)),
+        );
+        let (anchor, backup_commitment) = match result {
+            Ok(row) => row,
+            Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+            Err(e) => return Err(StorageError::Database(e)),
+        };
+        let malformed = || StorageError::Serialization("followed OHTTP anchor malformed".into());
+        Ok(Some(OhttpAnchor {
+            anchor: anchor.try_into().map_err(|_| malformed())?,
+            backup_commitment: backup_commitment.try_into().map_err(|_| malformed())?,
+        }))
     }
 
     /// Remove the cached OHTTP key for a relay URL.

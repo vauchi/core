@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 68] = [
+const MIGRATIONS: [Migration; 69] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -612,7 +612,26 @@ const MIGRATIONS: [Migration; 68] = [
         name: "ohttp_held_key",
         action: MigrationAction::Sql(MIGRATION_V68_OHTTP_HELD_KEY),
     },
+    Migration {
+        version: 69,
+        name: "ohttp_followed_anchor",
+        action: MigrationAction::Sql(MIGRATION_V69_OHTTP_FOLLOWED_ANCHOR),
+    },
 ];
+
+/// Migration v69: the OHTTP anchor a client reached by following its
+/// relay's rollover chain (#288 decision 0.13).
+///
+/// Kept beside the configured anchor it was reached from, so configuring
+/// another anchor starts from that one rather than inheriting the rollover.
+const MIGRATION_V69_OHTTP_FOLLOWED_ANCHOR: &str = "
+    CREATE TABLE IF NOT EXISTS ohttp_followed_anchor (
+        relay_url TEXT PRIMARY KEY,
+        configured_anchor BLOB NOT NULL,
+        anchor BLOB NOT NULL,
+        backup_commitment BLOB NOT NULL
+    );
+";
 
 /// Migration v68: the signed OHTTP key held per relay (#288).
 ///

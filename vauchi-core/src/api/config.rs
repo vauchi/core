@@ -145,13 +145,23 @@ impl VauchiConfig {
     pub fn with_relay_url(mut self, url: impl Into<String>) -> Self {
         self.relay.server_url = url.into();
         self.relay.ohttp_anchor = None;
+        self.relay.ohttp_backup_commitment = None;
         self
     }
 
-    /// Sets the relay server URL together with its OHTTP trust anchor.
+    /// Sets the relay server URL together with its OHTTP trust anchor. Clears
+    /// any backup commitment: it belonged to the previous anchor.
     pub fn with_relay(mut self, url: impl Into<String>, ohttp_anchor: [u8; 32]) -> Self {
         self.relay.server_url = url.into();
         self.relay.ohttp_anchor = Some(ohttp_anchor);
+        self.relay.ohttp_backup_commitment = None;
+        self
+    }
+
+    /// Sets the commitment to the backup anchor that may replace the relay's
+    /// OHTTP trust anchor (decision 0.13). Set after [`Self::with_relay`].
+    pub fn with_ohttp_backup_commitment(mut self, commitment: [u8; 32]) -> Self {
+        self.relay.ohttp_backup_commitment = Some(commitment);
         self
     }
 
@@ -272,6 +282,13 @@ pub struct RelayConfig {
     /// `None` (default) means Vauchi's anchor for the production relay and
     /// no anchor for any other relay — see [`Self::ohttp_trust_anchor`].
     pub ohttp_anchor: Option<[u8; 32]>,
+
+    /// Commitment to the backup anchor that may replace `ohttp_anchor`
+    /// through the relay's rollover chain (#288 decision 0.13). `None`
+    /// (default) means Vauchi's for the production relay and none for any
+    /// other — see [`Self::ohttp_trust_anchor`]; without one, no rollover
+    /// is followed.
+    pub ohttp_backup_commitment: Option<[u8; 32]>,
 }
 
 /// SPKI SHA-256 pin for relay.vauchi.app leaf certificate.
@@ -342,6 +359,7 @@ impl Default for RelayConfig {
             pin_config_verify_key: None, // disabled until relay signs pin-config
             ohttp_relay_url: None,       // derived from server_url (see ohttp_endpoint)
             ohttp_anchor: None,          // production resolves to PROD_OHTTP_ANCHOR
+            ohttp_backup_commitment: None,
         }
     }
 }
@@ -356,6 +374,9 @@ pub(crate) const DEFAULT_RELAY_URL: &str = "https://relay.vauchi.app";
 /// the first ceremony (`runbooks/2026-10-06-ohttp-anchor-ceremony.md` §2)
 /// has created it; set it then, test first, like an SPKI pin.
 pub(crate) const PROD_OHTTP_ANCHOR: Option<[u8; 32]> = None;
+/// The commitment to the backup of [`PROD_OHTTP_ANCHOR`], created in the
+/// same ceremony (decision 0.13) and set with it.
+pub(crate) const PROD_OHTTP_BACKUP_COMMITMENT: Option<[u8; 32]> = None;
 
 /// Production OHTTP relay (IP-stripping hop, ADR-037) the client sends
 /// OHTTP traffic to when the data relay is `relay.vauchi.app`.
@@ -427,6 +448,17 @@ impl RelayConfig {
                 .then_some(PROD_OHTTP_ANCHOR)
                 .flatten()
         })
+    }
+
+    /// The commitment to the backup of [`Self::ohttp_trust_anchor`],
+    /// resolved the same way: none for a relay whose anchor has no backup.
+    pub fn ohttp_backup_commitment(&self) -> Option<[u8; 32]> {
+        if self.ohttp_anchor.is_some() {
+            return self.ohttp_backup_commitment;
+        }
+        is_production_relay(&self.server_url)
+            .then_some(PROD_OHTTP_BACKUP_COMMITMENT)
+            .flatten()
     }
 
     /// The OHTTP endpoint this configuration sends to — the base URL for

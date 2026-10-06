@@ -26,7 +26,10 @@ use super::error::NetworkError;
 use super::ohttp_key_trust::{HeldOhttpKey, accept_signed_key};
 use crate::clock::Clock;
 use crate::version::{APP_COMPAT_VERSION, VersionPolicy};
-use vauchi_protocol::ohttp_key::{MAX_RECORD_BYTES, SignedKeyConfig};
+use vauchi_protocol::ohttp_key::{
+    AnchorRollover, MAX_RECORD_BYTES, MAX_ROLLOVER_CHAIN, ROLLOVER_BYTES, SignedKeyConfig,
+    decode_rollover_chain,
+};
 
 /// Default retry delay when the server doesn't specify Retry-After.
 const DEFAULT_RATE_LIMIT_RETRY_SECS: u64 = 10;
@@ -348,6 +351,18 @@ impl HttpTransport {
         )?;
         SignedKeyConfig::decode(&body)
             .map_err(|e| NetworkError::InvalidMessage(format!("signed OHTTP key record: {e}")))
+    }
+
+    /// GET the relay's anchor rollover chain (#288 decision 0.13); 404
+    /// ("no rollover") surfaces as an error like any other failure.
+    pub fn fetch_anchor_rollover(&self) -> Result<Vec<AnchorRollover>, NetworkError> {
+        let body = self.fetch_key_body(
+            "/v2/ohttp-anchor-rollover",
+            "application/vnd.vauchi.ohttp-anchor-rollover",
+            1 + MAX_ROLLOVER_CHAIN * ROLLOVER_BYTES,
+        )?;
+        decode_rollover_chain(&body)
+            .map_err(|e| NetworkError::InvalidMessage(format!("OHTTP anchor rollover: {e}")))
     }
 
     /// GET `path` and return its body, refusing any other content type, an

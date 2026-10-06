@@ -43,7 +43,9 @@ use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::send_phase::SendPhase;
 use crate::contact::Contact;
-use crate::network::ohttp_key_trust::{HeldOhttpKey, accept_signed_key};
+use crate::network::ohttp_key_trust::{
+    HeldOhttpKey, OhttpAnchor, OhttpKeyRejection, accept_anchor_rollover, accept_signed_key,
+};
 use crate::network::{
     AckStatus, Acknowledgment, HttpTransport, HttpTransportAdapter, HttpTransportConfig,
     MessagePayload, OhttpClient, PinnedCertificate, RelayClient, Transport, TransportConfig,
@@ -820,11 +822,19 @@ impl Vauchi {
         if !(self.config.ohttp.allow_direct || self.distinct_ohttp_route().is_some()) {
             return Err(ohttp_route_error());
         }
-        let record = self
-            .create_bootstrap_transport_direct()
+        let transport = self.create_bootstrap_transport_direct();
+        let record = transport
             .fetch_signed_ohttp_key()
             .map_err(VauchiError::Network)?;
-        let accepted = accept_signed_key(&record, anchor, now, held).map_err(|rejection| {
+        let trusted = self.trusted_ohttp_anchor(relay_url, anchor)?;
+        let accepted = match accept_signed_key(&record, &trusted.anchor, now, held) {
+            Err(OhttpKeyRejection::IntermediateSignature) => self
+                .follow_anchor_rollover(relay_url, anchor, &trusted, &transport)
+                .ok_or(OhttpKeyRejection::IntermediateSignature)
+                .and_then(|reached| accept_signed_key(&record, &reached, now, held)),
+            outcome => outcome,
+        }
+        .map_err(|rejection| {
             VauchiError::Network(crate::network::NetworkError::InvalidMessage(
                 rejection.to_string(),
             ))
@@ -834,6 +844,57 @@ impl Vauchi {
             .ohttp_cache()
             .save_held_ohttp_key(relay_url, &accepted)?;
         Ok(accepted)
+    }
+
+    /// The anchor `relay_url`'s records must chain to: the one followed
+    /// from `configured` through a rollover, else `configured` with the
+    /// backup commitment configured beside it (an all-zero commitment, which
+    /// no key hashes to, when there is none).
+    fn trusted_ohttp_anchor(
+        &self,
+        relay_url: &str,
+        configured: &[u8; 32],
+    ) -> VauchiResult<OhttpAnchor> {
+        if let Some(followed) = self
+            .storage
+            .ohttp_cache()
+            .load_followed_anchor(relay_url, configured)?
+        {
+            return Ok(followed);
+        }
+        Ok(OhttpAnchor {
+            anchor: *configured,
+            backup_commitment: self
+                .config
+                .relay
+                .ohttp_backup_commitment()
+                .unwrap_or_default(),
+        })
+    }
+
+    /// Follow `relay_url`'s rollover chain from `trusted` (decision 0.13)
+    /// and keep the anchor reached. `None` when there is no backup to
+    /// follow to, no chain, or the chain does not lead anywhere new.
+    fn follow_anchor_rollover(
+        &self,
+        relay_url: &str,
+        configured: &[u8; 32],
+        trusted: &OhttpAnchor,
+        transport: &crate::network::HttpTransport,
+    ) -> Option<[u8; 32]> {
+        if trusted.backup_commitment == [0; 32] {
+            return None;
+        }
+        let chain = transport.fetch_anchor_rollover().ok()?;
+        let reached = accept_anchor_rollover(trusted, &chain).ok()?;
+        if reached.anchor == trusted.anchor {
+            return None;
+        }
+        self.storage
+            .ohttp_cache()
+            .save_followed_anchor(relay_url, configured, &reached)
+            .ok()?;
+        Some(reached.anchor)
     }
 
     /// The held signed key for the OHTTP endpoint, while the gateway still

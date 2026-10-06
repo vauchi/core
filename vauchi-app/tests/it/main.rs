@@ -147,6 +147,8 @@ mod context_bar_overlay_toggle_tests;
 mod inactive_surface_event_tests;
 mod lock_screen_navigation_tests;
 #[cfg(feature = "testing")]
+mod multi_stage_layout_memory_tests;
+#[cfg(feature = "testing")]
 mod multi_stage_persist_reciprocity_tests;
 #[cfg(feature = "testing")]
 mod multi_stage_poll_cadence_tests;

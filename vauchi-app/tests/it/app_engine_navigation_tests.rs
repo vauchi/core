@@ -325,7 +325,7 @@ fn can_go_back_reflects_nav_history_state() {
         "fresh engine on MyInfo with empty history cannot go back"
     );
 
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAdvanced);
     assert!(
         engine.can_go_back(),
         "after navigating forward, a back step exists"
@@ -434,7 +434,7 @@ fn can_go_back_false_after_set_initial_screen() {
         "set_initial_screen must not pollute nav_history / can_go_back"
     );
 
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAdvanced);
     assert!(
         engine.can_go_back(),
         "forward nav after bootstrap enables back"

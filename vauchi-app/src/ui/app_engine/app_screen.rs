@@ -159,19 +159,20 @@ impl AppScreen {
     /// point where pressing back should exit the app rather than pop
     /// `nav_history`. Drives `AppEngine::can_go_back`.
     ///
-    /// The set is `Onboarding` plus the four bottom-nav tab screens
-    /// (`MyInfo`, `Contacts`, `Exchange`, `Groups`). Onboarding is a root
-    /// because it's the fresh-install entry; the tab screens are roots
-    /// because the bottom-nav lands there directly and the Android Material
-    /// norm is that tab roots are back-stoppers. The fifth bottom-nav slot
-    /// is the `more` bucket from [`Self::nav_tab_id`], which is a tab id
-    /// rather than a screen, so nothing here can match it.
-    /// `Settings` is **not** a root: it is reached via the top-bar gear,
-    /// which pushes onto history, so back must return to the prior screen.
+    /// The set is `Onboarding` plus the five tab-bar destinations (see
+    /// [`Self::nav_tab_id`]): the tab bar lands on them directly, and the
+    /// Android Material norm is that tab roots are back-stoppers. Screens
+    /// reached from a tab, such as Groups from Contacts, are not roots, so
+    /// they offer Back (#534).
     pub fn is_root(&self) -> bool {
         matches!(
             self,
-            Self::Onboarding | Self::MyInfo | Self::Contacts | Self::Exchange | Self::Groups
+            Self::Onboarding
+                | Self::MyInfo
+                | Self::Contacts
+                | Self::Exchange
+                | Self::DeviceManagement
+                | Self::Settings
         )
     }
 

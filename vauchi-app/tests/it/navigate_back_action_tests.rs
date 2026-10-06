@@ -29,12 +29,12 @@ fn engine_with_identity() -> AppEngine {
 fn navigate_back_action_matches_navigate_back() {
     // Reference: forward to a sub-screen, then pop directly.
     let mut reference = engine_with_identity();
-    reference.navigate_to(AppScreen::Settings);
+    reference.navigate_to(AppScreen::SettingsAdvanced);
     let expected = reference.navigate_back().screen_id;
 
     // Under test: same forward nav, then the typed action.
     let mut engine = engine_with_identity();
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAdvanced);
     let result = engine.handle_action(UserAction::NavigateBack);
 
     match result {
@@ -86,7 +86,7 @@ fn navigate_back_at_root_returns_perform_native_back() {
 #[test]
 fn sub_screen_renders_go_back_nav_action_at_front() {
     let mut engine = engine_with_identity();
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAdvanced);
 
     let sub = engine.current_screen();
     let first = sub
@@ -112,11 +112,11 @@ fn sub_screen_renders_go_back_nav_action_at_front() {
 #[test]
 fn go_back_action_matches_navigate_back() {
     let mut reference = engine_with_identity();
-    reference.navigate_to(AppScreen::Settings);
+    reference.navigate_to(AppScreen::SettingsAdvanced);
     let expected = reference.navigate_back().screen_id;
 
     let mut engine = engine_with_identity();
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::SettingsAdvanced);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "go_back".to_string(),
     });

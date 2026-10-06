@@ -157,14 +157,9 @@ pub fn scan_qr_from_luma(
             }
         }
         #[cfg(feature = "diagnostic-yolo")]
-        ScannerBackend::YoloRqrr => {
-            // YOLO detection requires a pre-loaded detector session.
-            // Callers should use scan_qr_yolo() instead.
-            ScanResult {
-                total_us: total_start.elapsed().as_micros() as u64,
-                ..ScanResult::default()
-            }
-        }
+        // YOLO detection needs a pre-loaded detector session, which only
+        // scan_qr_yolo() takes, so this backend decodes nothing here.
+        ScannerBackend::YoloRqrr => ScanResult::default(),
     }
 }
 

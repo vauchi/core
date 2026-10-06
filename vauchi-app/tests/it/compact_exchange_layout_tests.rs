@@ -13,11 +13,12 @@ use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::platform::{
-    Command, InputMode, MotionPreference, PresentationNode, PresentationQrPurpose, SurfaceSpec,
+    Command, InputMode, MotionPreference, PresentationNode, PresentationQrPurpose,
+    PresentationQrSize, SurfaceSpec,
 };
 
-const IPHONE_SE_HEIGHT: u32 = 647;
-const PIXEL_3A_HEIGHT: u32 = 760;
+const SHORT_WINDOW_HEIGHT: u32 = 647;
+const TALL_WINDOW_HEIGHT: u32 = 760;
 
 fn environment(available_height: u32) -> Event {
     Event::PresentationEnvironmentChanged {
@@ -79,21 +80,35 @@ fn own_code_labels(nodes: &[PresentationNode]) -> Option<(Option<String>, String
     })
 }
 
+fn own_code_size(nodes: &[PresentationNode]) -> Option<Option<PresentationQrSize>> {
+    nodes.iter().find_map(|node| match node {
+        PresentationNode::Qr {
+            purpose: PresentationQrPurpose::Display,
+            size,
+            ..
+        } => Some(*size),
+        PresentationNode::Group { children, .. } => own_code_size(children),
+        _ => None,
+    })
+}
+
 // @internal
 #[test]
 fn a_tall_screen_keeps_the_mode_row_and_the_heading_over_the_code() {
-    let surface = presented(&mut engine_on_glance(PIXEL_3A_HEIGHT));
+    let surface = presented(&mut engine_on_glance(TALL_WINDOW_HEIGHT));
 
     assert!(shows_mode_row(&surface));
     let (heading, spoken) = own_code_labels(&surface.nodes).expect("the own code is shown");
     assert_eq!(heading.as_deref(), Some("Show this to exchange"));
     assert!(!spoken.is_empty());
+    assert_eq!(own_code_size(&surface.nodes), Some(None));
+    assert!(surface.subtitle.is_some());
 }
 
 // @internal
 #[test]
 fn a_short_screen_leaves_out_the_mode_row_and_the_heading_over_the_code() {
-    let surface = presented(&mut engine_on_glance(IPHONE_SE_HEIGHT));
+    let surface = presented(&mut engine_on_glance(SHORT_WINDOW_HEIGHT));
 
     assert!(!shows_mode_row(&surface));
     let (heading, spoken) = own_code_labels(&surface.nodes).expect("the own code is shown");
@@ -101,14 +116,30 @@ fn a_short_screen_leaves_out_the_mode_row_and_the_heading_over_the_code() {
     assert_eq!(spoken, "Show this to exchange");
 }
 
+// Even without the mode row and the heading, a 320 pt code leaves an SE's
+// camera 6 x 11 pt in its 474 pt surface (rig, 2026-10-06). Glance's code
+// is a small bootstrap code read at arm's length, so it can be drawn
+// smaller; the subtitle gives way too.
+// @internal
+#[test]
+fn a_short_screen_asks_for_a_compact_code_and_drops_the_subtitle() {
+    let surface = presented(&mut engine_on_glance(SHORT_WINDOW_HEIGHT));
+
+    assert_eq!(
+        own_code_size(&surface.nodes),
+        Some(Some(PresentationQrSize::Compact))
+    );
+    assert_eq!(surface.subtitle, None);
+}
+
 // @internal
 #[test]
 fn a_screen_that_becomes_short_gets_the_compact_exchange_screen() {
-    let mut engine = engine_on_glance(PIXEL_3A_HEIGHT);
+    let mut engine = engine_on_glance(TALL_WINDOW_HEIGHT);
     let _ = presented(&mut engine);
 
     let commands = engine
-        .dispatch(environment(IPHONE_SE_HEIGHT))
+        .dispatch(environment(SHORT_WINDOW_HEIGHT))
         .expect("environment accepted");
 
     let surface = replaced_surface(commands).expect("the exchange screen is sent again");

@@ -287,6 +287,17 @@ const OHTTP_PROD_SPKI_PIN: [u8; 32] = [
     0x24, 0xb5, 0x3d, 0x78, 0xb7, 0x74, 0x99, 0x08, 0xfe, 0xe4, 0xbd, 0x87, 0x7b, 0x41, 0xb0, 0x2c,
 ];
 
+/// SPKI SHA-256 pin of the dedicated OHTTP host (affectionate-raman-vps,
+/// #30), pinned alongside the current one so `ohttp.vauchi.app` can move
+/// there once enough clients carry it. The key was generated on the host by
+/// `infra/ansible/playbooks/ohttp-tls-key.yml` and is not served yet, so the
+/// `openssl s_client` recipe above cannot reproduce it until the cutover.
+/// Drop `OHTTP_PROD_SPKI_PIN` one release after the cutover.
+const OHTTP_DEDICATED_HOST_SPKI_PIN: [u8; 32] = [
+    0x1b, 0x6b, 0xd4, 0x2c, 0x2d, 0x5c, 0x11, 0xac, 0x88, 0xd5, 0x5a, 0x97, 0x9a, 0xf7, 0xb9, 0x7f,
+    0xe8, 0x3a, 0xa3, 0x03, 0x79, 0x55, 0x80, 0x3f, 0x08, 0x19, 0x16, 0xdf, 0xe4, 0x31, 0x6d, 0x5d,
+];
+
 impl Default for RelayConfig {
     /// Production relay configuration with SPKI certificate pinning.
     ///
@@ -304,7 +315,10 @@ impl Default for RelayConfig {
             max_retries: 5,
             proxy: ProxyConfig::None,
             pinned_certs: vec![PinnedCertificate::new(RELAY_PROD_SPKI_PIN)],
-            ohttp_pinned_certs: vec![PinnedCertificate::new(OHTTP_PROD_SPKI_PIN)],
+            ohttp_pinned_certs: vec![
+                PinnedCertificate::new(OHTTP_PROD_SPKI_PIN),
+                PinnedCertificate::new(OHTTP_DEDICATED_HOST_SPKI_PIN),
+            ],
             pin_ttl_secs: 86_400,        // 24 hours
             pin_config_verify_key: None, // disabled until relay signs pin-config
             ohttp_relay_url: None,       // derived from server_url (see ohttp_endpoint)

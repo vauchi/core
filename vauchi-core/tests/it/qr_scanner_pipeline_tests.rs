@@ -346,3 +346,57 @@ fn a_faint_frame_is_skipped_with_the_sharpness_it_measured() {
         result.laplacian_variance
     );
 }
+
+fn frame(width: u32, height: u32, brighter: impl Fn(u32, u32) -> bool) -> Vec<u8> {
+    (0..height)
+        .flat_map(|y| (0..width).map(move |x| (x, y)))
+        .map(|(x, y)| if brighter(x, y) { 129 } else { 128 })
+        .collect()
+}
+
+fn sharpness_of(width: u32, height: u32, luma: &[u8]) -> f32 {
+    scan_qr_from_luma(ScannerBackend::RqrrPreprocessed, luma, width, height).laplacian_variance
+}
+
+// Sampled every 4 px (4..=192), the 200×200 grid holds 2304 points: 144
+// dots (Laplacian 4) and 576 dot neighbours (-1), counting those beside the
+// dots on row and column 0, which lie off the grid. The mean is 0, so the
+// variance is (144·16 + 576) / 2304 = 1.25.
+// @internal
+#[test]
+fn sharpness_is_the_laplacian_variance_over_a_four_pixel_grid() {
+    let dots = frame(200, 200, |x, y| x % 16 == 0 && y % 16 == 0);
+
+    assert_eq!(sharpness_of(200, 200, &dots), 1.25);
+}
+
+// Without the off-grid dots on row and column 0, the dots on 192 lose the
+// neighbour that would sit on 196: 552 neighbours, a sum of 24, and a mean
+// that no longer cancels.
+// @internal
+#[test]
+fn sharpness_subtracts_the_squared_mean_laplacian() {
+    let dots = frame(200, 200, |x, y| {
+        x > 0 && y > 0 && x % 16 == 0 && y % 16 == 0
+    });
+    let expected = 2856.0 / 2304.0 - (24.0f64 / 2304.0).powi(2);
+
+    let sharpness = f64::from(sharpness_of(200, 200, &dots));
+
+    assert!(
+        (sharpness - expected).abs() < 1e-6,
+        "{sharpness} != {expected}"
+    );
+}
+
+// @internal
+#[test]
+fn a_frame_narrower_than_twelve_pixels_measures_no_sharpness() {
+    let column = |x: u32, y: u32| x == 4 && y % 8 == 0;
+    let row = |x: u32, y: u32| y == 4 && x % 8 == 0;
+
+    assert_eq!(sharpness_of(11, 200, &frame(11, 200, column)), 0.0);
+    assert_eq!(sharpness_of(200, 11, &frame(200, 11, row)), 0.0);
+    assert!(sharpness_of(12, 200, &frame(12, 200, column)) > 0.0);
+    assert!(sharpness_of(200, 12, &frame(200, 12, row)) > 0.0);
+}

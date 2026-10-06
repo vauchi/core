@@ -498,6 +498,7 @@ impl RecoveryEngine {
                     scan_quality: None,
                     placement: None,
                     error_correction: None,
+                    size: None,
                     a11y: Some(A11y {
                         label: Some(self.t("recovery.claim_qr_a11y_label")),
                         hint: Some(self.t("recovery.claim_qr_a11y_hint")),

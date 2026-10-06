@@ -258,6 +258,7 @@ impl BleExchangeEngine {
                 scan_quality: None,
                 placement: None,
                 error_correction: None,
+                size: None,
                 a11y: None,
             });
         }
@@ -273,6 +274,7 @@ impl BleExchangeEngine {
                     scan_quality: None,
                     placement: None,
                     error_correction: None,
+                    size: None,
                     a11y: None,
                 });
                 actions.push(ScreenAction {

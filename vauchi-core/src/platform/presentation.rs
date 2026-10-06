@@ -74,8 +74,9 @@ pub use effects::{
 pub use surface::{
     AccessibilitySpec, ChoiceOption, InputValue, PresentationAxis, PresentationImageShape,
     PresentationInputKind, PresentationListStyle, PresentationNode, PresentationPaging,
-    PresentationQrErrorCorrection, PresentationQrPurpose, PresentationRow, PresentationTextStyle,
-    PresentationTokens, PresentationTone, QrPlacement, SurfaceLayout, SurfaceSpec,
+    PresentationQrErrorCorrection, PresentationQrPurpose, PresentationQrSize, PresentationRow,
+    PresentationTextStyle, PresentationTokens, PresentationTone, QrPlacement, SurfaceLayout,
+    SurfaceSpec,
 };
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]

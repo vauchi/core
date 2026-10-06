@@ -232,6 +232,9 @@ pub enum Component {
         /// leaves it to the shell.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         error_correction: Option<vauchi_core::platform::PresentationQrErrorCorrection>,
+        /// The size of a `Display` code's square; `None` is standard.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        size: Option<vauchi_core::platform::PresentationQrSize>,
         #[serde(default)]
         a11y: Option<A11y>,
     },

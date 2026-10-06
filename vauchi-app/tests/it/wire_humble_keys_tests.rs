@@ -372,6 +372,7 @@ fn all_components() -> Vec<Component> {
             scan_quality: None,
             placement: None,
             error_correction: None,
+            size: None,
             a11y: None,
         },
         Component::InlineConfirm {

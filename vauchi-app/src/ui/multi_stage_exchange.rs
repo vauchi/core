@@ -666,6 +666,7 @@ impl MultiStageExchangeEngine {
                 scan_quality: None,
                 placement: placement_for_layout(self.current_qr_layout),
                 error_correction: self.current_qr_error_correction,
+                size: None,
                 a11y: None,
             });
         }
@@ -685,6 +686,7 @@ impl MultiStageExchangeEngine {
             scan_quality: Some(self.scan_quality_tracker.quality()),
             placement: None,
             error_correction: None,
+            size: None,
             a11y: None,
         };
         components.push(Component::Row {

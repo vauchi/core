@@ -261,6 +261,7 @@ impl DeviceReplacementEngine {
                     scan_quality: None,
                     placement: None,
                     error_correction: None,
+                    size: None,
                     a11y: Some(A11y {
                         label: Some(self.t("device.transfer_qr_a11y")),
                         hint: Some(self.t("device.transfer_qr_hint")),

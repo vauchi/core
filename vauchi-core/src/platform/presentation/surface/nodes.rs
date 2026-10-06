@@ -153,6 +153,18 @@ pub enum PresentationQrErrorCorrection {
     Medium,
 }
 
+/// How large a shell draws a display code's square. `Compact` is for a
+/// short window, where the standard square would leave the camera beside
+/// it no room; each shell maps it to its own smaller size.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum PresentationQrSize {
+    Standard,
+    Compact,
+}
+
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -305,6 +317,9 @@ pub enum PresentationNode {
         /// leaves it to the shell, which draws at medium.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         error_correction: Option<PresentationQrErrorCorrection>,
+        /// The size of a display code's square. Absent means standard.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        size: Option<PresentationQrSize>,
         accessibility: AccessibilitySpec,
     },
     Confirmation {

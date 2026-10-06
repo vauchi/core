@@ -31,7 +31,13 @@ impl AppEngine {
         if self.presentation_coordinator.is_short()
             && screen.layout == crate::ui::ScreenLayout::Fixed
         {
-            return compact_exchange_screen(screen);
+            let glance = matches!(
+                self.screen,
+                AppScreen::BleExchange {
+                    mode: ExchangeMode::Glance
+                }
+            );
+            return compact_exchange_screen(screen, glance);
         }
         use crate::ui::exchange::mode_selection::{SerdeName, mode_pictogram};
         let name = crate::i18n::get_string(
@@ -58,20 +64,33 @@ impl AppEngine {
 
 /// A short window's exchange screen: no mode row, and the heading over the
 /// own code becomes its spoken label, so the camera under the code keeps a
-/// usable size (#513). The title still names the mode.
-fn compact_exchange_screen(mut screen: crate::ui::ScreenModel) -> crate::ui::ScreenModel {
+/// usable size (#513). The title still names the mode. Glance also drops
+/// its subtitle and asks for a compact code: its bootstrap code is small and
+/// read at arm's length, unlike Hover's dense frames read at 7 cm.
+fn compact_exchange_screen(
+    mut screen: crate::ui::ScreenModel,
+    glance: bool,
+) -> crate::ui::ScreenModel {
+    if glance {
+        screen.subtitle = None;
+    }
     for component in &mut screen.components {
         if let crate::ui::Component::QrCode {
             mode: crate::ui::QrMode::Display,
             label,
             a11y,
+            size,
             ..
         } = component
-            && let Some(heading) = label.take()
         {
-            a11y.get_or_insert_with(Default::default)
-                .label
-                .get_or_insert(heading);
+            if let Some(heading) = label.take() {
+                a11y.get_or_insert_with(Default::default)
+                    .label
+                    .get_or_insert(heading);
+            }
+            if glance {
+                *size = Some(vauchi_core::platform::PresentationQrSize::Compact);
+            }
         }
     }
     screen

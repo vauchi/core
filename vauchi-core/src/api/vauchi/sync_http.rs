@@ -43,6 +43,7 @@ use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::send_phase::SendPhase;
 use crate::contact::Contact;
+use crate::network::ohttp_key_trust::{HeldOhttpKey, accept_signed_key};
 use crate::network::{
     AckStatus, Acknowledgment, HttpTransport, HttpTransportAdapter, HttpTransportConfig,
     MessagePayload, OhttpClient, PinnedCertificate, RelayClient, Transport, TransportConfig,
@@ -96,7 +97,14 @@ impl Vauchi {
             let relay_url = self.http_relay_url();
             #[allow(clippy::let_underscore_must_use)]
             let _ = self.storage.ohttp_cache().clear_ohttp_key(&relay_url);
-            let key_bytes = self.resolve_ohttp_key(&relay_url)?;
+            let key_bytes = match self.config.relay.ohttp_trust_anchor() {
+                // The held key was just refused: only a new signed record helps.
+                Some(anchor) => {
+                    self.resolve_signed_ohttp_key(&relay_url, &anchor, true)?
+                        .key_config
+                }
+                None => self.resolve_ohttp_key(&relay_url)?,
+            };
             let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
             self.ohttp_key = Some(client);
 
@@ -744,6 +752,11 @@ impl Vauchi {
     /// The bundled key eliminates the need for a direct HTTPS connection
     /// to the relay on first use, preventing client IP leakage.
     fn resolve_ohttp_key(&self, relay_url: &str) -> VauchiResult<Vec<u8>> {
+        if let Some(anchor) = self.config.relay.ohttp_trust_anchor() {
+            return Ok(self
+                .resolve_signed_ohttp_key(relay_url, &anchor, false)?
+                .key_config);
+        }
         // 1. Try loading from cache — use if still within TTL
         if let Some((cached_bytes, fetched_at)) =
             self.storage.ohttp_cache().load_ohttp_key(relay_url)?
@@ -783,6 +796,73 @@ impl Vauchi {
                     .into(),
             ),
         ))
+    }
+
+    /// The key of a relay with an OHTTP anchor (#288): only ever from a
+    /// signed record that chains to `anchor`, never cached unsigned bytes or
+    /// the bundled key. The held key is reused within its window; a new
+    /// window (or `refetch`, after a rejection) fetches the next record, and
+    /// a failed fetch falls back to a held key the gateway still accepts.
+    fn resolve_signed_ohttp_key(
+        &self,
+        relay_url: &str,
+        anchor: &[u8; 32],
+        refetch: bool,
+    ) -> VauchiResult<HeldOhttpKey> {
+        let now = self.clock.unix_seconds();
+        let current = vauchi_protocol::ohttp_key::window_of(now);
+        let held = self.storage.ohttp_cache().load_held_ohttp_key(relay_url)?;
+        if !refetch && let Some(held) = held.as_ref().filter(|held| held.window == current) {
+            return Ok(held.clone());
+        }
+        match self.fetch_signed_ohttp_key(relay_url, anchor, now, held.as_ref()) {
+            Ok(accepted) => Ok(accepted),
+            Err(e) => held
+                .filter(|held| gateway_still_holds(held.window, current))
+                .ok_or(e),
+        }
+    }
+
+    /// Fetch the relay's signed record and accept it under `anchor`; keep
+    /// the accepted key as the relay's held key.
+    fn fetch_signed_ohttp_key(
+        &self,
+        relay_url: &str,
+        anchor: &[u8; 32],
+        now: u64,
+        held: Option<&HeldOhttpKey>,
+    ) -> VauchiResult<HeldOhttpKey> {
+        // The same rule as the unsigned fetch: never straight to the data
+        // relay, which would see the client's IP.
+        if !(self.config.ohttp.allow_direct || self.distinct_ohttp_route().is_some()) {
+            return Err(ohttp_route_error());
+        }
+        let record = self
+            .create_bootstrap_transport_direct()
+            .fetch_signed_ohttp_key()
+            .map_err(VauchiError::Network)?;
+        let accepted = accept_signed_key(&record, anchor, now, held).map_err(|rejection| {
+            VauchiError::Network(crate::network::NetworkError::InvalidMessage(
+                rejection.to_string(),
+            ))
+        })?;
+        OhttpClient::new(accepted.key_config.clone()).map_err(VauchiError::Network)?;
+        self.storage
+            .ohttp_cache()
+            .save_held_ohttp_key(relay_url, &accepted)?;
+        Ok(accepted)
+    }
+
+    /// The held signed key for the OHTTP endpoint, while the gateway still
+    /// accepts it.
+    fn usable_held_ohttp_key(&self) -> Option<HeldOhttpKey> {
+        let current = vauchi_protocol::ohttp_key::window_of(self.clock.unix_seconds());
+        self.storage
+            .ohttp_cache()
+            .load_held_ohttp_key(&self.http_relay_url())
+            .ok()
+            .flatten()
+            .filter(|held| gateway_still_holds(held.window, current))
     }
 
     /// Check whether a cached OHTTP key is still within its TTL.
@@ -960,8 +1040,22 @@ impl Vauchi {
             pinned_certs,
         });
 
-        if route_valid && let Some(client) = self.offline_ohttp_client() {
-            transport.set_ohttp(client);
+        if route_valid {
+            match self.config.relay.ohttp_trust_anchor() {
+                // An anchored relay's transport carries its held signed key or
+                // none, and refetches only signed keys (#288).
+                Some(anchor) => {
+                    if let Some(held) = self.usable_held_ohttp_key() {
+                        #[allow(clippy::let_underscore_must_use)]
+                        let _ = transport.set_signed_ohttp(anchor, held, self.clock.clone());
+                    }
+                }
+                None => {
+                    if let Some(client) = self.offline_ohttp_client() {
+                        transport.set_ohttp(client);
+                    }
+                }
+            }
         }
 
         transport
@@ -1088,6 +1182,11 @@ fn http_origin(url: &str) -> Option<Origin> {
         return None;
     }
     Some(parsed.origin())
+}
+
+/// The gateway holds the previous, current and next window's keys.
+fn gateway_still_holds(window: u64, current: u64) -> bool {
+    window.saturating_add(1) >= current && window <= current.saturating_add(1)
 }
 
 fn ohttp_route_error() -> VauchiError {

@@ -579,3 +579,26 @@ fn test_sync_gate_ordering() {
         );
     }
 }
+
+/// #288 plan 6.7: no gateway key is compiled in. A key goes stale within
+/// days of a build, and any key the client did not fetch and verify is one
+/// it cannot vouch for — so before a fetch, a transport carries none.
+// @internal
+#[test]
+fn before_any_fetch_a_transport_carries_no_gateway_key() {
+    let application_relay = MockRelay::start();
+    let outer_relay = MockRelay::start();
+    let (custom, _dir) = vauchi_with_split_relays(&application_relay, &outer_relay);
+    let production = Vauchi::in_memory().expect("in-memory Vauchi");
+
+    assert!(
+        !custom
+            .build_relay_transport(&application_relay.url(), 1_000)
+            .has_ohttp()
+    );
+    assert!(
+        !production
+            .build_relay_transport("https://relay.vauchi.app", 1_000)
+            .has_ohttp()
+    );
+}

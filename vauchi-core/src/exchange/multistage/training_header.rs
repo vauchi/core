@@ -57,8 +57,8 @@ impl TrainingHeader {
         }
         let mut slots = [None; ECHO_SLOTS];
         for (slot, reads) in slots.iter_mut().zip(echo) {
-            let in_range = reads.layout < LAYOUT_COUNT
-                && (1..=MAX_READ_COUNT).contains(&reads.count);
+            let in_range =
+                reads.layout < LAYOUT_COUNT && (1..=MAX_READ_COUNT).contains(&reads.count);
             if !in_range {
                 return Err(QrCodecError::InvalidHeader);
             }

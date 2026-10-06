@@ -106,10 +106,12 @@ exclude_re = [
     "vauchi-core/src/api/sync/device_orchestrator\\.rs:930:37: replace > with >= in build_device_sync_envelopes$",
 
     # SendPhase::sync paths that only a storage fault reaches: mark_delivered
-    # fails only when SQLite does, and a timed-out update is found again only
-    # if clearing it after the send failed (the send path clears it on
-    # success). No test hook injects either fault (vauchi/private#522).
+    # and load_contact fail only when SQLite does, and a timed-out update is
+    # found again only if clearing it after the send failed (the send path
+    # clears it on success). No test hook injects these faults
+    # (vauchi/private#522).
     "vauchi-core/src/api/send_phase\\.rs:150:25: delete match arm Err\\(e\\) in SendPhase<'a, T>::sync$",
+    "vauchi-core/src/api/send_phase\\.rs:236:39: replace \\+= with [-*]= in SendPhase<'a, T>::sync$",
     "vauchi-core/src/api/send_phase\\.rs:186:75: replace \\+ with [-*] in SendPhase<'a, T>::sync$",
 
     # duress_settings.created_at / updated_at are written but never read by

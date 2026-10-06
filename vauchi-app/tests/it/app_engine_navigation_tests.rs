@@ -397,16 +397,29 @@ fn can_go_back_false_at_every_root_screen() {
         AppScreen::MyInfo,
         AppScreen::Contacts,
         AppScreen::Exchange,
-        AppScreen::Groups,
+        AppScreen::DeviceManagement,
+        AppScreen::Settings,
     ] {
         let mut engine = engine_with_identity();
-        engine.navigate_to(AppScreen::Settings);
+        engine.navigate_to(AppScreen::SettingsAdvanced);
         engine.navigate_to(root.clone());
         assert!(
             !engine.can_go_back(),
             "root {root:?} must not offer back with non-empty history"
         );
     }
+}
+
+// Groups is reached from Contacts, not from the tab bar, so it offers Back
+// to Contacts like any other screen below a tab (#534).
+// @internal
+#[test]
+fn groups_reached_from_contacts_offers_back() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Contacts);
+    engine.navigate_to(AppScreen::Groups);
+
+    assert!(engine.can_go_back());
 }
 
 // @internal

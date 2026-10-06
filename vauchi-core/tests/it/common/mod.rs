@@ -56,5 +56,8 @@ pub mod field_validation_helpers;
 #[cfg(feature = "network-http")]
 #[allow(dead_code)]
 pub mod mock_relay;
+#[cfg(feature = "network-http")]
+#[allow(dead_code)]
+pub mod signed_gateway;
 #[allow(dead_code)]
 pub mod two_recipient;

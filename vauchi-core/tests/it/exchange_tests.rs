@@ -556,3 +556,25 @@ fn test_encrypted_exchange_message_roundtrip() {
     assert_eq!(restored.ephemeral_public_key, original.ephemeral_public_key);
     assert_eq!(restored.ciphertext, original.ciphertext);
 }
+
+// @internal
+#[test]
+fn a_ble_payload_keeps_the_time_it_was_generated_at() {
+    let alice = Identity::create("Alice", 0);
+    let ephemeral = X3DHKeyPair::generate();
+
+    let payload = vauchi_core::exchange::ExchangeBle::generate(&alice, &ephemeral, 1_234_567);
+
+    assert_eq!(payload.timestamp(), 1_234_567);
+}
+
+// @internal
+#[test]
+fn an_exchange_id_debugs_as_its_hex() {
+    let id = vauchi_core::exchange::ExchangeId::from_bytes([0xab; 32]);
+
+    assert_eq!(
+        format!("{id:?}"),
+        format!("ExchangeId({})", "ab".repeat(32))
+    );
+}

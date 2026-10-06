@@ -406,6 +406,7 @@ mod registry_activation_send_gate_tests;
 mod registry_activation_sibling_sync_tests;
 mod registry_activation_state_tests;
 mod registry_activation_store_tests;
+mod registry_broadcast_signature_tests;
 mod rekey_all_columns_tests;
 mod rekey_coverage_tests;
 mod rekey_self_heal_tests;

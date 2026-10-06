@@ -1035,3 +1035,13 @@ fn test_phone_with_letters_to_uri_returns_none() {
         "Phone with letters should not produce a tel: URI"
     );
 }
+
+// Seven digits wrapped in fourteen parentheses: 80% phone characters only
+// when closing parentheses count.
+// @internal
+#[test]
+fn closing_parentheses_count_as_phone_characters() {
+    let field = ContactField::new(FieldType::Custom, "note", "(1)(2)(3)(4)(5)(6)(7)", 0);
+
+    assert_eq!(field.detect_value_type(), Some(FieldType::Phone));
+}

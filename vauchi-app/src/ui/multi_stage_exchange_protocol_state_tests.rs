@@ -33,10 +33,8 @@ fn idle_emits_show_this_label_with_peer_scanner() {
         own_qr_label(&ProtocolState::Idle, Locale::English),
         "Show this"
     );
-    assert_eq!(
-        action_ids(&screen),
-        vec![SWITCH_CAMERA_ACTION_ID, CANCEL_ACTION_ID]
-    );
+    // Back in the title row ends the exchange, so no Cancel button (#534).
+    assert_eq!(action_ids(&screen), vec![SWITCH_CAMERA_ACTION_ID]);
 }
 
 // @internal
@@ -166,10 +164,10 @@ fn complete_before_session_ended_keeps_active_chrome() {
         own_qr_label(&ProtocolState::Complete, Locale::English),
         "Almost done"
     );
-    // Still active — switch_camera + cancel.
+    // Still active — switch_camera only; Back ends the exchange.
     assert_eq!(
         action_ids(&engine.current_screen()),
-        vec![SWITCH_CAMERA_ACTION_ID, CANCEL_ACTION_ID],
+        vec![SWITCH_CAMERA_ACTION_ID],
     );
 }
 

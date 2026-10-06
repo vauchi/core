@@ -194,10 +194,12 @@ fn a_different_configured_anchor_does_not_inherit_the_rollover() {
         .open_original()
         .connect()
         .expect("follow the rollover");
+    // Past the windows in which the key held from that connect still serves.
+    stack.clock.advance(Duration::from_secs(2 * DAY));
     let other = SignedGateway::new(0x11);
     stack
         .outer
-        .queue("ohttp-key-signed", stack.backup.response(today));
+        .queue("ohttp-key-signed", stack.backup.response(today + 2));
     stack.outer.queue(
         "ohttp-anchor-rollover",
         rollover_response(&[stack.backup.takeover(stack.next.commitment())]),

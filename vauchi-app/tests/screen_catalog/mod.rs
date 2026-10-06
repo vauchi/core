@@ -10,6 +10,7 @@ pub mod seed;
 use vauchi_app::ui::{
     AppEngine, AppScreen, FormDialogType, RenderContext, ScreenCatalogEntry, ScreenCatalogFixture,
 };
+use vauchi_core::exchange::QrPayload;
 use vauchi_core::exchange::capability::types::{BiometricType, DeviceCapabilities, Platform};
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::types::AudioCapability;
@@ -188,6 +189,25 @@ impl<'a> Recorder<'a> {
         self.record_current(code_id);
     }
 
+    /// A Hover exchange after the link trainer settled on the centre
+    /// layout at level L, so shells see a placed code (#450).
+    fn record_trained_exchange(&mut self) {
+        self.engine.navigate_to(AppScreen::MultiStageExchange {
+            mode: ExchangeMode::Hover,
+        });
+        let trained_frame = QrPayload {
+            data: "TRAINED-FRAME".into(),
+            error_correction: "L".into(),
+            display_duration_ms: 100,
+            layout: 9,
+        };
+        assert!(
+            self.engine.apply_multi_stage_qr_payload(&trained_frame),
+            "the Hover exchange takes the trained frame"
+        );
+        self.record_current("multi_stage_exchange-hover-placed");
+    }
+
     /// Activate the row carrying `icon_token` on `surface_id` the way a
     /// shell relays a tap: through the surface's minted interaction id.
     fn activate_row(&mut self, surface_id: &str, icon_token: &str) {
@@ -296,6 +316,7 @@ fn record_seeded(world: SeededWorld, locale: &'static str, screens: &mut Vec<Scr
             &format!("multi_stage_exchange-{variant}"),
         );
     }
+    recorder.record_trained_exchange();
     for (mode, variant) in [
         (ExchangeMode::Magic, "magic"),
         (ExchangeMode::Bump, "bump"),

@@ -165,19 +165,16 @@ fn engine_on_hover(available_height: u32) -> AppEngine {
     engine
 }
 
-// Hover's code at 320 pt still covered the camera on the iPhone SE and the
-// Samsung S7 after the context bar was retired (rig, 2026-10-06). On a
-// short window it asks for the compact square too; a tall one keeps the
-// standard square its dense frames were tuned at (#534).
+// Hover keeps the standard square even on a short window: at the compact
+// square a Samsung S7's front camera, 8 cm away, decoded none of an iPhone
+// SE's frames (0 of 5 exchanges), while the standard square completed 3 of
+// 3 in the same placement (rig, 2026-10-06, #534).
 // @internal
 #[test]
-fn hover_on_a_short_screen_asks_for_a_compact_code() {
+fn hover_keeps_the_standard_code_on_a_short_screen() {
     let short = presented(&mut engine_on_hover(SHORT_WINDOW_HEIGHT));
     let tall = presented(&mut engine_on_hover(TALL_WINDOW_HEIGHT));
 
-    assert_eq!(
-        own_code_size(&short.nodes),
-        Some(Some(PresentationQrSize::Compact))
-    );
+    assert_eq!(own_code_size(&short.nodes), Some(None));
     assert_eq!(own_code_size(&tall.nodes), Some(None));
 }

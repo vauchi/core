@@ -247,3 +247,40 @@ fn sync_reports_progress_counting_up_to_the_total() {
 
     assert_eq!(*progress.lock().unwrap(), [(1, 2), (2, 2)]);
 }
+
+// @internal
+#[test]
+fn a_device_with_a_sibling_builds_envelopes_for_its_pending_changes() {
+    let seed = [0x42u8; 32];
+    let phone = create_test_device(&seed, 0, "Phone");
+    let mut registry = create_test_registry(&seed, &phone);
+    let storage = create_test_storage();
+    let identity =
+        vauchi_core::Identity::from_device_link(seed, "Alice".into(), 0, "Phone".into(), 0);
+    let lone = registry.clone();
+    storage.device().save_device_registry(&lone).unwrap();
+    assert!(
+        build_device_sync_envelopes(&identity, &storage)
+            .unwrap()
+            .is_empty()
+    );
+
+    registry
+        .add_device_unsigned(create_test_device(&seed, 1, "Laptop").to_registered(&seed))
+        .unwrap();
+    storage.device().save_device_registry(&registry).unwrap();
+    DeviceSyncOrchestrator::new(&storage, phone, registry)
+        .record_local_change(SyncItem::CardUpdated {
+            field_label: "phone".to_string(),
+            new_value: "+41 79".to_string(),
+            timestamp: 1000,
+        })
+        .unwrap();
+
+    assert_eq!(
+        build_device_sync_envelopes(&identity, &storage)
+            .unwrap()
+            .len(),
+        1
+    );
+}

@@ -466,3 +466,41 @@ fn test_sync_grouped_excludes_not_ready_failed() {
     assert_eq!(relay.len(), 1);
     assert_eq!(relay[0].id, "u1");
 }
+
+// @internal
+#[test]
+fn the_last_attempt_is_the_latest_update_that_was_retried() {
+    use vauchi_core::storage::{PendingUpdate, UpdateStatus};
+    let storage = create_test_storage();
+    for (id, retry_count, created_at) in [("tried", 1, 500), ("fresh", 0, 900)] {
+        storage
+            .pending()
+            .queue_update(&PendingUpdate {
+                id: id.into(),
+                contact_id: "contact-1".into(),
+                update_type: "card_delta".into(),
+                payload: vec![1],
+                created_at,
+                retry_count,
+                status: UpdateStatus::Pending,
+                target_relay_url: None,
+                target_device_id: None,
+            })
+            .unwrap();
+    }
+
+    let state = SyncManager::new(&storage)
+        .get_sync_state("contact-1")
+        .unwrap();
+
+    assert!(
+        matches!(
+            state,
+            SyncState::Pending {
+                queued_count: 2,
+                last_attempt: Some(500)
+            }
+        ),
+        "{state:?}"
+    );
+}

@@ -167,3 +167,48 @@ fn delta_version_floor_is_tracked_per_peer_device() {
         "the stored Email must be A2's accepted v1 field"
     );
 }
+
+fn card_with_email(email: &str) -> ContactCard {
+    let mut card = ContactCard::new("Bob");
+    card.add_field(ContactField::new(FieldType::Email, "Email", email, 0))
+        .unwrap();
+    card
+}
+
+// An unversioned (v0) delta skips the floor check and must not lower the
+// floor either, or a reordered older delta would slip in behind it.
+// @scenario: sync_updates :: A multi-device sender's versions are floored per device
+#[test]
+fn an_unversioned_delta_leaves_the_floor_where_it_was() {
+    let (alice_wb, bob_wb, _, bob_contact_id, alice_contact_id) = setup_exchange_with_ratchets();
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+    let base = ContactCard::new("Bob");
+    let deliver = |card: &ContactCard, version| {
+        let ciphertext = create_valid_update_versioned(
+            &bob_wb,
+            &alice_signing_pk,
+            &alice_contact_id,
+            &base,
+            card,
+            version,
+        );
+        process_single_card_update(
+            alice_wb.identity().unwrap(),
+            alice_wb.storage(),
+            &bob_contact_id,
+            &ciphertext,
+        )
+    };
+
+    deliver(&card_with_email("v2@x.com"), 2).expect("v2 applies");
+    deliver(&card_with_email("v0@x.com"), 0).expect("v0 applies");
+    let stale = deliver(&card_with_email("v1@x.com"), 1);
+
+    assert!(
+        matches!(
+            stale,
+            Err(CardUpdateError::StaleVersion { delta: 1, last: 2 })
+        ),
+        "{stale:?}"
+    );
+}

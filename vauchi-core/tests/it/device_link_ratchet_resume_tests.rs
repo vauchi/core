@@ -155,3 +155,62 @@ fn forged_peer_registry_in_owner_sync_is_rejected_atomically() {
         "failed registry verification must roll back the full sync"
     );
 }
+
+// @internal
+#[test]
+fn owner_sync_replaces_an_older_peer_registry_with_the_newer_one() {
+    let (alice, alice_registry) = identity_and_registry([40u8; 32], "Alice", 0);
+    let bob_seed = [50u8; 32];
+    let bob = SigningKeyPair::from_seed(&bob_seed);
+    let bob_pk = *bob.public_key().as_bytes();
+    let contact =
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), SymmetricKey::generate(), 1);
+    let contact_id = contact.id().to_string();
+    let mut bob_registry = DeviceRegistry::new(
+        DeviceInfo::derive(&bob_seed, 0, "Phone".into(), 1).to_registered(&bob_seed),
+        &bob,
+    );
+    let older = RegistryBroadcast::new(&bob_registry, &bob, 1);
+    bob_registry
+        .add_device(
+            DeviceInfo::derive(&bob_seed, 1, "Laptop".into(), 1).to_registered(&bob_seed),
+            &bob,
+        )
+        .unwrap();
+    let newer = RegistryBroadcast::new(&bob_registry, &bob, 2);
+    assert!(newer.version() > older.version());
+
+    let source_storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    source_storage.contacts().save_contact(&contact).unwrap();
+    let mut payload = DeviceSyncOrchestrator::new(
+        &source_storage,
+        alice.create_device_info(1),
+        alice_registry.clone(),
+    )
+    .create_full_sync_payload(DeviceLinkIntent::AddDevice)
+    .unwrap();
+    payload
+        .contact_device_registries
+        .push(vauchi_core::sync::ContactDeviceRegistrySyncData {
+            contact_id: contact_id.clone(),
+            broadcast_json: newer.to_json(),
+        });
+    let target_storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    target_storage.contacts().save_contact(&contact).unwrap();
+    target_storage
+        .device()
+        .save_contact_device_registry(&contact_id, &older, &bob_pk, u64::MAX)
+        .unwrap();
+    let mut target =
+        DeviceSyncOrchestrator::new(&target_storage, alice.create_device_info(1), alice_registry);
+
+    target.apply_full_sync(payload).unwrap();
+
+    let stored = target_storage
+        .device()
+        .load_contact_device_registry(&contact_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.version(), newer.version());
+    assert_eq!(stored.active_device_count(), 2);
+}

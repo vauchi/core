@@ -737,3 +737,40 @@ proptest! {
         prop_assert!(recovering.recover_guardian_backup("00", &[a, b]).is_err());
     }
 }
+
+/// Recovery accepts up to twice the largest guardian count in responses
+/// (10 guardians × 2) and refuses more before opening any of them.
+// @scenario: backup_format_versioning :: Guardian recovery tolerates one bad response
+#[test]
+fn recovery_accepts_twenty_responses_and_refuses_twenty_one() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+    let (backup_hex, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+    let honest: Vec<Vec<u8>> = (0..2)
+        .map(|i| {
+            guardians[i]
+                .respond_to_recovery(&sealed_shares[i], &recovering_pk)
+                .unwrap()
+        })
+        .collect();
+    let padded_to = |len: usize| -> Vec<Vec<u8>> {
+        let mut responses = vec![vec![0xFF]; len - honest.len()];
+        responses.extend(honest.iter().cloned());
+        responses
+    };
+
+    let at_cap = recovering.recover_guardian_backup(&backup_hex, &padded_to(20));
+    let over_cap = recovering.recover_guardian_backup(&backup_hex, &padded_to(21));
+
+    assert_eq!(
+        at_cap.unwrap().sections.identity.display_name,
+        "Alice Smith"
+    );
+    assert!(over_cap.is_err());
+}

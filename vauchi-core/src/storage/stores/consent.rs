@@ -74,7 +74,7 @@ impl ConsentStore<'_> {
         ) {
             Ok(stmt) => stmt,
             Err(rusqlite::Error::SqliteFailure(err, _))
-                if err.code == rusqlite::ffi::ErrorCode::Unknown || err.extended_code == 1 =>
+                if err.code == rusqlite::ffi::ErrorCode::Unknown =>
             {
                 return Ok(Vec::new());
             }
@@ -127,7 +127,7 @@ impl ConsentStore<'_> {
         ) {
             Ok(stmt) => stmt,
             Err(rusqlite::Error::SqliteFailure(err, _))
-                if err.code == rusqlite::ffi::ErrorCode::Unknown || err.extended_code == 1 =>
+                if err.code == rusqlite::ffi::ErrorCode::Unknown =>
             {
                 return Ok(Vec::new());
             }

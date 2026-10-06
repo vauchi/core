@@ -377,3 +377,23 @@ fn test_hard_shred_sends_purge_and_revocations() {
         "SMK must be absent from SecureStorage after hard shred"
     );
 }
+
+// A WAL-mode database has no rollback journal; a sidecar file that was
+// never created is not a failed wipe.
+// @scenario: privacy_compliance :: Hard shred sends purge and revocations
+// @internal
+#[test]
+fn hard_shred_destroys_a_database_without_a_journal_file() {
+    let (dir, storage, secure_storage, identity) = setup_shred_env();
+    assert!(!dir.path().join("vauchi.db-journal").exists());
+    DeletionManager::new(&storage)
+        .schedule_deletion_with_execute_at(1000, 999)
+        .unwrap();
+    let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+
+    let report = manager
+        .hard_shred(ShredToken::from_created_at(1000), None, None)
+        .unwrap();
+
+    assert!(report.sqlite_destroyed);
+}

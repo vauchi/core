@@ -200,3 +200,26 @@ fn test_mastodon_handles() {
         "https://mastodon.social/@alice@fosstodon.org"
     );
 }
+
+// @internal
+#[test]
+fn search_matches_either_the_id_or_the_display_name() {
+    let mut registry = SocialNetworkRegistry::new();
+    registry.add(SocialNetwork::new(
+        "x",
+        "Formerly Twitter",
+        "https://x.com/{username}",
+    ));
+
+    let ids = |query: &str| -> Vec<String> {
+        registry
+            .search(query)
+            .iter()
+            .map(|n| n.id().to_string())
+            .collect()
+    };
+
+    assert_eq!(ids("x"), ["x"], "the id alone matches");
+    assert_eq!(ids("formerly"), ["x"], "the display name alone matches");
+    assert!(ids("mastodon").is_empty());
+}

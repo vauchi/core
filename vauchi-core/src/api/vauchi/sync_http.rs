@@ -1112,6 +1112,30 @@ fn merge_pins(target: &mut Vec<PinnedCertificate>, source: &[PinnedCertificate])
 mod tests {
     use super::*;
 
+    // @internal
+    #[test]
+    fn a_cycle_fires_the_milestones_for_what_it_moved() {
+        let moments = |received, sent| -> Vec<crate::types::AhaMomentType> {
+            let mut vauchi = Vauchi::in_memory().unwrap();
+            vauchi.create_identity("Alice").unwrap();
+            vauchi
+                .trigger_sync_aha_moments(received, sent)
+                .into_iter()
+                .map(|m| m.moment_type)
+                .collect()
+        };
+
+        assert!(moments(0, 0).is_empty());
+        assert_eq!(
+            moments(0, 2),
+            [crate::types::AhaMomentType::FirstOutboundDelivered]
+        );
+        assert_eq!(
+            moments(3, 0),
+            [crate::types::AhaMomentType::FirstUpdateReceived]
+        );
+    }
+
     // The CLI's default relay is `wss://relay.vauchi.app`; the OHTTP outer
     // hop is derived as `https://ohttp.vauchi.app`. The distinct-origin
     // check must compare the two as HTTP origins instead of rejecting the

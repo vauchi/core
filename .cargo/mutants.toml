@@ -46,6 +46,19 @@ exclude_re = [
     # count for any pixel is the same with either sign — colors
     # match exactly.
     "vauchi-core/src/avatar/mod\\.rs:63:29: replace \\+ with -",
+
+    # consent.rs:77 swallows the "no such table" prepare error (code
+    # Unknown / extended 1, pre-migration #60). Widening it to every prepare
+    # error needs a prepare that fails some other way, which an in-memory
+    # SQLite with the migrated schema never does (vauchi/private#522).
+    "vauchi-core/src/storage/stores/consent\\.rs:77:20: replace match guard .* with true in ConsentStore<'_>::list_consent_records$",
+
+    # normalize_date's two format guards: loosening either only reformats a
+    # value that is not a date, and the birthday validation that follows
+    # drops it either way (probed 2026-10-06: "1990051a" and "--0515" import
+    # no birthday with or without the guard) (vauchi/private#522).
+    "vauchi-core/src/contact_card/vcard_import\\.rs:707:27: replace && with \\|\\| in normalize_date$",
+    "vauchi-core/src/contact_card/vcard_import\\.rs:712:51: replace >= with < in normalize_date$",
 ]
 
 # Allow 1.5x the normal test timeout per mutant

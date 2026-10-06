@@ -989,3 +989,97 @@ fn test_authenticated_local_device_id_wins_over_stored_device_info() {
         )),
     );
 }
+
+// @internal
+#[test]
+fn sync_contact_counts_every_update_the_relay_accepts() {
+    let storage = create_test_storage();
+    let shared = SymmetricKey::generate();
+    let contact = Contact::from_exchange([0x33u8; 32], ContactCard::new("Peer"), shared.clone(), 0);
+    let contact_id = contact.id().to_string();
+    storage.contacts().save_contact(&contact).unwrap();
+    storage
+        .device()
+        .save_device_info(&[0x55; 32], 0, "Local", 0)
+        .unwrap();
+    let peer_dh = X3DHKeyPair::generate();
+    let ratchet = DoubleRatchetState::initialize_initiator(&shared, *peer_dh.public_key()).unwrap();
+    storage
+        .ratchets()
+        .save_ratchet_state_for_device(&contact_id, &[0x44; 32], &ratchet, true)
+        .unwrap();
+    queue_ratchet_update(&storage, &contact_id, &shared, "card_delta", None);
+    queue_ratchet_update(&storage, &contact_id, &shared, "handshake_ack", None);
+
+    let mut controller = SendPhase::new(
+        create_test_relay(),
+        &storage,
+        SyncConfig::default(),
+        Arc::new(EventDispatcher::new()),
+    );
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+    let result = controller.sync_contact(&contact_id).unwrap();
+
+    assert_eq!(result.sent, 2);
+}
+
+// @internal
+#[test]
+fn an_orchestrator_with_nothing_pending_builds_no_envelopes() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+    let device = create_test_device(&master_seed, 0, "Test Device");
+    let registry = create_test_registry(&master_seed, &device);
+    let orchestrator = DeviceSyncOrchestrator::new(&storage, device, registry);
+    let identity = vauchi_core::Identity::create("Alice", 0);
+
+    let envelopes = orchestrator.build_outbound_envelopes(&identity).unwrap();
+
+    assert!(envelopes.is_empty(), "{} envelopes", envelopes.len());
+}
+
+// @internal
+#[test]
+fn reconnecting_reports_a_retry_that_ran_out_of_attempts() {
+    use std::sync::Mutex;
+    use vauchi_core::storage::RetryEntry;
+
+    let storage = create_test_storage();
+    storage
+        .retries()
+        .create_retry_entry(&RetryEntry {
+            message_id: "m1".into(),
+            recipient_id: "bob".into(),
+            payload: vec![1],
+            attempt: 3,
+            next_retry: 0,
+            created_at: 0,
+            max_attempts: 3,
+        })
+        .unwrap();
+    let events = Arc::new(EventDispatcher::new());
+    let statuses = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&statuses);
+    events.on_event(move |event| {
+        if let VauchiEvent::DeliveryStatusUpdate { status, .. } = event {
+            sink.lock().unwrap().push(status);
+        }
+    });
+
+    let mut controller = SendPhase::new(
+        create_test_relay(),
+        &storage,
+        SyncConfig::default(),
+        Arc::clone(&events),
+    );
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+
+    assert_eq!(
+        statuses.lock().unwrap().as_slice(),
+        ["Retry tick: 0 rescheduled, 1 expired"]
+    );
+}

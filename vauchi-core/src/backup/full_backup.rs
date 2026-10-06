@@ -736,4 +736,34 @@ mod tests {
             Err(BackupError::TooLarge)
         ));
     }
+
+    // @internal
+    #[test]
+    fn a_guardian_header_of_exactly_the_header_length_is_long_enough() {
+        let mut header = vec![GUARDIAN_BACKUP_VERSION, 2, 3];
+        header.resize(GUARDIAN_BACKUP_HEADER_LENGTH, 0x11);
+
+        let metadata = guardian_backup_metadata(&header).unwrap();
+        assert_eq!((metadata.threshold(), metadata.count()), (2, 3));
+        assert!(matches!(
+            guardian_backup_metadata(&header[..header.len() - 1]),
+            Err(BackupError::TooShort)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn a_guardian_backup_of_exactly_the_size_ceiling_is_not_too_large() {
+        let mut at_ceiling = vec![0u8; MAX_GUARDIAN_BACKUP_BYTES];
+        at_ceiling[0] = GUARDIAN_BACKUP_VERSION;
+        at_ceiling[1] = 2;
+        at_ceiling[2] = 3;
+        assert!(guardian_backup_metadata(&at_ceiling).is_ok());
+
+        at_ceiling.push(0);
+        assert!(matches!(
+            guardian_backup_metadata(&at_ceiling),
+            Err(BackupError::TooLarge)
+        ));
+    }
 }

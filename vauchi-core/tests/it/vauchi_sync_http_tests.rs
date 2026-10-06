@@ -501,11 +501,10 @@ fn test_connect_never_caches_malformed_fetched_ohttp_key() {
         },
     );
     let dir = tempfile::tempdir().expect("temp dir");
-    let mut config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
         .with_storage_key(SymmetricKey::generate())
         .with_relay_url(application_relay.url())
         .with_ohttp_relay_url(outer_relay.url());
-    config.ohttp.bundled_gateway_key = None;
     let mut vauchi = Vauchi::new(config).expect("create Vauchi");
     vauchi
         .create_identity("Test User")
@@ -517,7 +516,7 @@ fn test_connect_never_caches_malformed_fetched_ohttp_key() {
 
     assert_eq!(
         error.to_string(),
-        "network error: Connection failed: no OHTTP key available: cache expired, no bundled key, fetch failed/disabled"
+        "network error: Connection failed: no OHTTP key available: cache expired, fetch failed/disabled"
     );
     assert!(
         vauchi

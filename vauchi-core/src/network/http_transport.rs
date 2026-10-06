@@ -226,9 +226,9 @@ impl HttpTransport {
     /// When set, all data requests are encrypted via OHTTP. Call with a fresh
     /// client when the gateway key rotates (HTTP 400 on stale key).
     ///
-    /// TODO(OHTTP-03): The caller that fetches the OHTTP gateway key should
-    /// validate the `Key-Fingerprint` response header against a pinned value
-    /// before passing the key here.
+    /// The key is installed unverified. For a relay with an OHTTP anchor use
+    /// [`Self::set_signed_ohttp`], which also keeps every refetch signed
+    /// (#288).
     pub fn set_ohttp(&mut self, client: OhttpClient) {
         *self.ohttp_slot() = Some(client);
     }

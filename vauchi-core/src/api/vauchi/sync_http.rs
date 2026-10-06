@@ -91,7 +91,7 @@ impl Vauchi {
         // send-phase swallow).
         let first = self.sync_inner();
         if should_refetch_key_and_retry(&first) {
-            // Key is stale — evict cache, re-resolve (bundled or direct), retry
+            // Key is stale — evict cache, re-resolve (fetch), retry
             // once. best-effort: if clear fails the next sync cycle hits the
             // same stale-key error and retries this same path.
             let relay_url = self.http_relay_url();
@@ -281,7 +281,7 @@ impl Vauchi {
     /// # Flow
     ///
     /// 1. Check identity exists (fail with `IdentityNotInitialized` if not).
-    /// 2. Resolve OHTTP key: cached → bundled → direct fetch (if `allow_direct`).
+    /// 2. Resolve OHTTP key: cached → fetch (signed for an anchored relay).
     /// 3. Validate key via `OhttpClient::new()`.
     /// 4. Store in `self.ohttp_key`.
     ///
@@ -294,7 +294,7 @@ impl Vauchi {
             return Err(VauchiError::IdentityNotInitialized);
         }
 
-        // 2. Obtain OHTTP key bytes (cached → bundled → direct fetch)
+        // 2. Obtain OHTTP key bytes (cached → fetch)
         let relay_url = self.distinct_ohttp_route().ok_or_else(ohttp_route_error)?;
         let key_bytes = self.resolve_ohttp_key(&relay_url)?;
 
@@ -742,15 +742,10 @@ impl Vauchi {
         self.last_sync_unix_seconds = Some(self.clock.unix_seconds());
     }
 
-    /// Resolve the OHTTP key: cached → bundled → direct fetch (if allowed).
-    ///
-    /// Priority order:
-    /// 1. Storage cache (if within TTL)
-    /// 2. Bundled key from `OhttpConfig::bundled_gateway_key`
-    /// 3. Direct fetch from relay (only if `allow_direct` is true)
-    ///
-    /// The bundled key eliminates the need for a direct HTTPS connection
-    /// to the relay on first use, preventing client IP leakage.
+    /// Resolve the OHTTP key: the relay's signed key when it has an anchor
+    /// (#288); otherwise the storage cache within its TTL, else a fetch
+    /// through the outer relay (or directly when `allow_direct`). No key is
+    /// compiled in (plan 6.7).
     fn resolve_ohttp_key(&self, relay_url: &str) -> VauchiResult<Vec<u8>> {
         if let Some(anchor) = self.config.relay.ohttp_trust_anchor() {
             return Ok(self
@@ -770,10 +765,8 @@ impl Vauchi {
 
         // 2. Fetch the live key when permitted: allow_direct (dev), or the
         //    OHTTP endpoint is a distinct IP-stripping relay (so the fetch
-        //    doesn't leak IP to the data relay). Preferring the fetched key
-        //    over the stale bundle survives gateway key rotation (problem
-        //    2026-05-25-relay-ohttp-forward-hop-502); on failure/not-permitted
-        //    fall through to the bundled offline bootstrap.
+        //    doesn't leak IP to the data relay; problem
+        //    2026-05-25-relay-ohttp-forward-hop-502).
         let via_ohttp_relay = self.distinct_ohttp_route().is_some();
         if (self.config.ohttp.allow_direct || via_ohttp_relay)
             && let Ok(fetched) = self.fetch_and_cache_ohttp_key(relay_url)
@@ -781,26 +774,16 @@ impl Vauchi {
             return Ok(fetched);
         }
 
-        // 3. Bundled key — offline/last-resort bootstrap (no network).
-        if let Some(ref bundled) = self.config.ohttp.bundled_gateway_key {
-            // Validate the bundled key before using it — skip if corrupt
-            if OhttpClient::new(bundled.clone()).is_ok() {
-                return Ok(bundled.clone());
-            }
-            // Invalid bundled key — fall through to error
-        }
-
         Err(VauchiError::Network(
             crate::network::NetworkError::ConnectionFailed(
-                "no OHTTP key available: cache expired, no bundled key, fetch failed/disabled"
-                    .into(),
+                "no OHTTP key available: cache expired, fetch failed/disabled".into(),
             ),
         ))
     }
 
     /// The key of a relay with an OHTTP anchor (#288): only ever from a
-    /// signed record that chains to `anchor`, never cached unsigned bytes or
-    /// the bundled key. The held key is reused within its window; a new
+    /// signed record that chains to `anchor`, never cached unsigned bytes.
+    /// The held key is reused within its window; a new
     /// window (or `refetch`, after a rejection) fetches the next record, and
     /// a failed fetch falls back to a held key the gateway still accepts.
     fn resolve_signed_ohttp_key(
@@ -958,9 +941,9 @@ impl Vauchi {
     /// This is the documented exception to the "all relay traffic flows
     /// through OHTTP" rule — see the §Bootstrap Exceptions section of
     /// `docs/docs/developers/threat-model.md`. The caller's IP is visible
-    /// to the relay for these requests. In production, bundled keys
-    /// (`OhttpConfig::bundled_gateway_key`) eliminate the OHTTP-key fetch
-    /// entirely; pin-config refresh remains the infrequent exception.
+    /// to whatever this transport targets: in production the outer relay
+    /// (`ohttp.vauchi.app`), never the data relay. The gateway key is fetched
+    /// this way, as is the infrequent pin-config refresh.
     ///
     /// Uses only bundled pins (not `resolve_pins`) to avoid circular
     /// dependency: pin-config fetch must not depend on cached pins
@@ -1011,8 +994,9 @@ impl Vauchi {
     /// send OHTTP straight to the application relay. The application-relay URL
     /// parameter is retained for patch-compatible Rust consumers and checked
     /// against the configured application origin. Construction performs
-    /// no network I/O: it uses the in-memory key, a fresh validated
-    /// storage-cache entry, or the validated bundled key. Without one, action
+    /// no network I/O: it uses the relay's held signed key when it has an
+    /// anchor, otherwise the in-memory key or a fresh validated storage-cache
+    /// entry. Without one, action
     /// methods return their existing fail-closed error before sending a request.
     pub fn build_relay_transport(
         &self,
@@ -1070,18 +1054,13 @@ impl Vauchi {
         }
 
         let endpoint = self.http_relay_url();
-        if let Ok(Some((bytes, fetched_at))) = self.storage.ohttp_cache().load_ohttp_key(&endpoint)
-            && self.is_ohttp_key_fresh(fetched_at)
-            && let Ok(client) = OhttpClient::new(bytes)
-        {
-            return Some(client);
-        }
-
-        self.config
-            .ohttp
-            .bundled_gateway_key
-            .clone()
-            .and_then(|bytes| OhttpClient::new(bytes).ok())
+        self.storage
+            .ohttp_cache()
+            .load_ohttp_key(&endpoint)
+            .ok()
+            .flatten()
+            .filter(|(_, fetched_at)| self.is_ohttp_key_fresh(*fetched_at))
+            .and_then(|(bytes, _)| OhttpClient::new(bytes).ok())
     }
 
     /// OHTTP-relay base URL for `/v2/ohttp` + the `/v2/ohttp-key` bootstrap,

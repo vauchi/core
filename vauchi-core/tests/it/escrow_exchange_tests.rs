@@ -204,10 +204,10 @@ fn run_escrow_command_ignores_non_escrow_commands() {
 /// An action family with NO resolvable OHTTP key must send nothing at all.
 ///
 /// This is the state the rest of the RG-8 lane does not reach. Every other
-/// action oracle resolves a bundled or cached gateway key, so the transport
+/// action oracle resolves a cached gateway key, so the transport
 /// takes the OHTTP branch and a dynamic `allow_direct` would be invisible.
 /// Here all three sources are empty — no in-memory key (never connected), no
-/// cache entry, and `bundled_gateway_key: None` — so `offline_ohttp_client()`
+/// cache entry, and no key compiled in — so `offline_ohttp_client()`
 /// yields `None` and `allow_direct` alone decides whether anything is sent.
 ///
 /// The load-bearing assertion is on the OUTER relay, not the application
@@ -226,12 +226,11 @@ fn escrow_sends_nothing_when_no_ohttp_key_resolves() {
     let outer_relay = MockRelay::start();
 
     let dir = tempfile::tempdir().expect("temp dir");
-    let mut config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+    // No key is compiled in, and connect() is never called, so nothing can
+    // populate the in-memory field or the storage cache.
+    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
         .with_relay_url(application_relay.url())
         .with_ohttp_relay_url(outer_relay.url());
-    // No bundled key, and connect() is never called, so nothing can populate
-    // the in-memory field or the storage cache.
-    config.ohttp.bundled_gateway_key = None;
 
     let mut wb = VauchiBuilder::new()
         .config(config)

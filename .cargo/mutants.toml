@@ -101,6 +101,10 @@ exclude_re = [
     # just its own device the orchestrator addresses no sibling and sends to
     # none, so `> 1` and `>= 1` both report 0 (vauchi/private#522).
     "vauchi-core/src/api/vauchi/device_sync_loop\\.rs:123:45: replace > with >= in Vauchi::run_device_sync_send$",
+
+    # duress_settings.created_at / updated_at are written but never read by
+    # any API, so the time stamped there is unobservable (vauchi/private#522).
+    "vauchi-core/src/storage/stores/duress\\.rs:[0-9]+:[0-9]+: replace DuressStore<'_>::now_secs -> u64 with ",
 ]
 
 # Allow 1.5x the normal test timeout per mutant

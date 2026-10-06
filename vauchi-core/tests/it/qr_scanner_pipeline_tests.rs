@@ -276,3 +276,52 @@ fn a_frame_without_a_code_reports_none() {
         assert_eq!(result.decoded, None, "{backend:?}");
     }
 }
+
+fn stripes() -> Vec<u8> {
+    (0..200 * 200)
+        .map(|i| if (i / 17) % 2 == 0 { 0 } else { 255 })
+        .collect()
+}
+
+// @internal
+#[test]
+fn sharp_garbage_passes_the_gate_and_reports_its_sharpness_and_time() {
+    let result = scan_qr_from_luma(ScannerBackend::RqrrPreprocessed, &stripes(), 200, 200);
+
+    assert!(result.decoded.is_none());
+    assert!(!result.frame_skipped);
+    assert!(
+        result.laplacian_variance >= 15.0,
+        "{}",
+        result.laplacian_variance
+    );
+    assert!(result.total_us > 0);
+    assert!(result.total_us >= result.decode_us);
+}
+
+// @internal
+#[test]
+fn a_skipped_frame_still_reports_the_fast_tier_it_ran() {
+    let blurry = vec![128u8; 200 * 200];
+
+    let result = scan_qr_from_luma(ScannerBackend::RqrrPreprocessed, &blurry, 200, 200);
+
+    assert!(result.frame_skipped);
+    assert!(result.decode_us > 0);
+    assert!(result.total_us >= result.decode_us);
+}
+
+// @internal
+#[test]
+fn a_decoded_frame_reports_its_decode_and_total_time() {
+    let img = generate_qr_image("TIMED", 8);
+    let (w, h) = img.dimensions();
+
+    for backend in [ScannerBackend::RqrrRaw, ScannerBackend::RqrrPreprocessed] {
+        let result = scan_qr_from_luma(backend, img.as_raw(), w, h);
+        assert_eq!(result.decoded.as_deref(), Some("TIMED"), "{backend:?}");
+        assert!(result.decode_us > 0, "{backend:?}");
+        assert!(result.total_us >= result.decode_us, "{backend:?}");
+        assert_eq!(result.preprocessing_us, 0, "{backend:?}");
+    }
+}

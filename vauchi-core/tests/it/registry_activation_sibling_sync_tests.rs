@@ -386,3 +386,46 @@ fn contact_activation_changed_item_merges_without_regressing_local_state() {
         "acked version merges as max"
     );
 }
+
+// @scenario: multi_device_sync :: A joining device inherits activation state via full sync
+// @internal
+#[test]
+fn full_sync_transfers_activation_state_without_an_outstanding_push() {
+    use crate::common::device_sync::{
+        create_test_contact, create_test_device, create_test_registry, create_test_storage,
+    };
+    use vauchi_core::api::sync::DeviceSyncOrchestrator;
+    use vauchi_core::sync::DeviceLinkIntent;
+
+    let master_seed = [0x44u8; 32];
+    let a1 = create_test_storage();
+    let bob = create_test_contact("Bob");
+    let bob_id = bob.id().to_string();
+    a1.contacts().save_contact(&bob).unwrap();
+    let mut tracker = ActivationTracker::new();
+    tracker.record_peer_registry(7);
+    assert!(tracker.outstanding_push().is_none());
+    a1.registry_activation()
+        .save_activation(&bob_id, &tracker)
+        .unwrap();
+    let a1_device = create_test_device(&master_seed, 0, "Device A");
+    let a1_registry = create_test_registry(&master_seed, &a1_device);
+    let payload = DeviceSyncOrchestrator::new(&a1, a1_device, a1_registry)
+        .create_full_sync_payload(DeviceLinkIntent::AddDevice)
+        .unwrap();
+    let a2 = create_test_storage();
+    let a2_device = create_test_device(&master_seed, 1, "Device B");
+    let a2_registry = create_test_registry(&master_seed, &a2_device);
+
+    DeviceSyncOrchestrator::new(&a2, a2_device, a2_registry)
+        .apply_full_sync(payload)
+        .unwrap();
+
+    let inherited = a2
+        .registry_activation()
+        .load_activation(&bob_id)
+        .unwrap()
+        .expect("activation state transfers with the full sync");
+    assert_eq!(inherited.peer_version_held(), Some(7));
+    assert!(inherited.outstanding_push().is_none());
+}

@@ -15,6 +15,7 @@ use vauchi_core::network::{MockTransport, RelayClientConfig, TransportConfig};
 use vauchi_core::storage::{PendingUpdate, UpdateStatus};
 use vauchi_core::sync::SyncItem;
 use vauchi_core::*;
+use vauchi_core::{Contact, ContactCard, ImportSource};
 
 fn create_test_storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
@@ -283,4 +284,182 @@ fn a_device_with_a_sibling_builds_envelopes_for_its_pending_changes() {
             .len(),
         1
     );
+}
+
+fn sync_once(controller: &mut SendPhase<'_, MockTransport>) -> SyncResult {
+    controller
+        .sync(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap()
+}
+
+// @internal
+#[test]
+fn sync_counts_every_update_it_cannot_send_as_failed() {
+    let storage = create_test_storage();
+    let (mut controller, contact_id, _) = controller_with_one_contact(&storage);
+    let imported = Contact::from_import(
+        "imported".into(),
+        ContactCard::new("Imported"),
+        ImportSource::VcardFile,
+        None,
+        0,
+    );
+    storage.contacts().save_contact(&imported).unwrap();
+    let queue = |id: &str, contact: &str, payload: &[u8]| {
+        storage
+            .pending()
+            .queue_update(&PendingUpdate {
+                id: id.into(),
+                ..pending(contact, payload.to_vec())
+            })
+            .unwrap();
+    };
+    queue("no-contact", "ghost", b"x");
+    queue("no-key", "imported", b"x");
+    queue("garbled", &contact_id, b"not a ratchet message");
+
+    let result = sync_once(&mut controller);
+
+    assert_eq!((result.sent, result.failed), (0, 3));
+    assert_eq!(result.errors.len(), 3);
+}
+
+// @internal
+#[test]
+fn a_refused_send_is_failed_and_its_retry_count_goes_up() {
+    let storage = create_test_storage();
+    let (mut controller, contact_id, shared) = controller_with_one_contact(&storage);
+    queue_sendable_update(&storage, &contact_id, &shared);
+    controller
+        .relay_mut()
+        .connection_mut()
+        .transport_mut()
+        .inject_send_error(vauchi_core::network::NetworkError::SendFailed(
+            "refused".into(),
+        ));
+
+    let result = sync_once(&mut controller);
+
+    assert_eq!((result.sent, result.failed), (0, 1));
+    let update = storage
+        .pending()
+        .get_pending_update("update")
+        .unwrap()
+        .unwrap();
+    assert_eq!(update.retry_count, 1);
+}
+
+// @internal
+#[test]
+fn a_batch_size_caps_the_updates_sent_per_cycle_and_zero_means_no_cap() {
+    for (batch_size, expected_sent) in [(Some(1), 1), (Some(0), 2), (None, 2)] {
+        let storage = create_test_storage();
+        let (_, contact_id, shared) = controller_with_one_contact(&storage);
+        queue_sendable_update_as(&storage, &contact_id, &shared, "first");
+        queue_sendable_update_as(&storage, &contact_id, &shared, "second");
+        let mut controller = SendPhase::new(
+            create_test_relay(),
+            &storage,
+            SyncConfig {
+                batch_size,
+                ..SyncConfig::default()
+            },
+            Arc::new(EventDispatcher::new()),
+        );
+        controller
+            .connect(&vauchi_core::rng::OsSecureRng::new())
+            .unwrap();
+
+        assert_eq!(
+            sync_once(&mut controller).sent,
+            expected_sent,
+            "{batch_size:?}"
+        );
+    }
+}
+
+fn controller_over(
+    storage: &Storage,
+    transport: MockTransport,
+    ack_timeout_ms: u64,
+) -> SendPhase<'_, MockTransport> {
+    let relay = RelayClient::new(
+        transport,
+        RelayClientConfig {
+            ack_timeout_ms,
+            ..Default::default()
+        },
+        "test-identity".into(),
+    );
+    let mut controller = SendPhase::new(
+        relay,
+        storage,
+        SyncConfig::default(),
+        Arc::new(EventDispatcher::new()),
+    );
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+    controller
+}
+
+// @internal
+#[test]
+fn the_next_sync_counts_the_acknowledgment_of_a_sent_update() {
+    let storage = create_test_storage();
+    let (_, contact_id, shared) = controller_with_one_contact(&storage);
+    queue_sendable_update(&storage, &contact_id, &shared);
+    let mut transport = MockTransport::new();
+    transport.set_auto_ack(true);
+    let mut controller = controller_over(&storage, transport, 30_000);
+
+    let first = sync_once(&mut controller);
+    let second = sync_once(&mut controller);
+
+    assert_eq!((first.sent, first.acknowledged), (1, 0));
+    assert_eq!((second.acknowledged, second.timed_out), (1, 0));
+    assert!(second.errors.is_empty(), "{:?}", second.errors);
+}
+
+// @internal
+#[test]
+fn the_next_sync_counts_an_unacknowledged_send_as_timed_out() {
+    let storage = create_test_storage();
+    let (_, contact_id, shared) = controller_with_one_contact(&storage);
+    queue_sendable_update(&storage, &contact_id, &shared);
+    let mut controller = controller_over(&storage, MockTransport::new(), 0);
+
+    assert_eq!(sync_once(&mut controller).sent, 1);
+    let second = sync_once(&mut controller);
+
+    assert_eq!((second.acknowledged, second.timed_out), (0, 1));
+}
+
+// A registry handshake addressed to a device keeps the anonymous sender token
+// but still stamps this device as origin, which needs the local device info.
+// @internal
+#[test]
+fn a_device_routed_handshake_without_local_device_info_fails() {
+    let storage = create_test_storage();
+    let shared = SymmetricKey::generate();
+    let contact = Contact::from_exchange([0x33u8; 32], ContactCard::new("Peer"), shared.clone(), 0);
+    let contact_id = contact.id().to_string();
+    storage.contacts().save_contact(&contact).unwrap();
+    let peer_dh = X3DHKeyPair::generate();
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared, *peer_dh.public_key()).unwrap();
+    let msg = ratchet.encrypt(b"payload").unwrap();
+    storage
+        .pending()
+        .queue_update(&PendingUpdate {
+            update_type: vauchi_core::api::sync::REGISTRY_HANDSHAKE_UPDATE_TYPE.into(),
+            target_device_id: Some([0x44; 32]),
+            ..pending(&contact_id, serde_json::to_vec(&msg).unwrap())
+        })
+        .unwrap();
+    let mut controller = controller_over(&storage, MockTransport::new(), 30_000);
+
+    let result = sync_once(&mut controller);
+
+    assert_eq!((result.sent, result.failed), (0, 1));
 }

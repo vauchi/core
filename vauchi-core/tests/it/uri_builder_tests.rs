@@ -1045,3 +1045,31 @@ fn closing_parentheses_count_as_phone_characters() {
 
     assert_eq!(field.detect_value_type(), Some(FieldType::Phone));
 }
+
+// Each value is seven digits plus fourteen copies of one separator: a
+// phone only if that separator counts as a phone character.
+// @internal
+#[test]
+fn every_phone_separator_counts_as_a_phone_character() {
+    for separator in [' ', '-', '(', ')', '+', '.'] {
+        let value: String = (1..=7)
+            .map(|digit| format!("{separator}{separator}{digit}"))
+            .collect();
+        let field = ContactField::new(FieldType::Custom, "note", &value, 0);
+
+        assert_eq!(
+            field.detect_value_type(),
+            Some(FieldType::Phone),
+            "{value:?}"
+        );
+    }
+}
+
+// Seven digits in twenty-one characters is a third phone characters.
+// @internal
+#[test]
+fn a_value_under_eighty_percent_phone_characters_is_not_a_phone() {
+    let field = ContactField::new(FieldType::Custom, "note", "1234567abcdefghijklmn", 0);
+
+    assert_eq!(field.detect_value_type(), None);
+}

@@ -397,3 +397,27 @@ fn hard_shred_destroys_a_database_without_a_journal_file() {
 
     assert!(report.sqlite_destroyed);
 }
+
+fn hard_shred_with_extra_dir(name: &str) -> bool {
+    let (dir, storage, secure_storage, identity) = setup_shred_env();
+    std::fs::create_dir(dir.path().join(name)).unwrap();
+    DeletionManager::new(&storage)
+        .schedule_deletion_with_execute_at(1000, 999)
+        .unwrap();
+    let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+
+    manager
+        .hard_shred(ShredToken::from_created_at(1000), None, None)
+        .unwrap()
+        .sqlite_destroyed
+}
+
+// A sidecar that cannot be overwritten is a failed wipe; a backup-looking
+// entry that is not a pre-migration backup is none of the shred's business.
+// @scenario: privacy_compliance :: Hard shred sends purge and revocations
+// @internal
+#[test]
+fn the_database_wipe_reports_only_its_own_failures() {
+    assert!(!hard_shred_with_extra_dir("vauchi.db-journal"));
+    assert!(hard_shred_with_extra_dir("notes.bak"));
+}

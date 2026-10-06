@@ -46,6 +46,8 @@ pub struct MockTransport {
     receive_queue: VecDeque<MessageEnvelope>,
     /// Error to inject on next operation.
     inject_error: Option<NetworkError>,
+    /// Error to inject on the next send only, leaving receives untouched.
+    send_error: Option<NetworkError>,
     /// Whether to auto-acknowledge messages.
     auto_ack: bool,
 }
@@ -65,6 +67,7 @@ impl MockTransport {
             sent_raw: Vec::new(),
             receive_queue: VecDeque::new(),
             inject_error: None,
+            send_error: None,
             auto_ack: false,
         }
     }
@@ -87,6 +90,12 @@ impl MockTransport {
     /// Injects an error to be returned on the next operation.
     pub fn inject_error(&mut self, error: NetworkError) {
         self.inject_error = Some(error);
+    }
+
+    /// Injects an error for the next send (or raw send) only, so a sync
+    /// cycle's receive step still succeeds.
+    pub fn inject_send_error(&mut self, error: NetworkError) {
+        self.send_error = Some(error);
     }
 
     /// Enables auto-acknowledgment mode (generates acks for sent messages).
@@ -136,6 +145,9 @@ impl Transport for MockTransport {
 
     fn send(&mut self, message: &MessageEnvelope) -> TransportResult<()> {
         self.check_error()?;
+        if let Some(err) = self.send_error.take() {
+            return Err(err);
+        }
 
         if self.state != ConnectionState::Connected {
             return Err(NetworkError::NotConnected);
@@ -177,6 +189,9 @@ impl Transport for MockTransport {
 
     fn send_raw(&mut self, data: &[u8]) -> TransportResult<()> {
         self.check_error()?;
+        if let Some(err) = self.send_error.take() {
+            return Err(err);
+        }
         if self.state != ConnectionState::Connected {
             return Err(NetworkError::NotConnected);
         }

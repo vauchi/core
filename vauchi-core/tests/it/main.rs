@@ -315,6 +315,7 @@ mod multistage_crc16_tests;
 mod multistage_e2e_tests;
 mod multistage_ending_tests;
 mod multistage_final_frame_tests;
+mod multistage_link_trainer_proptest;
 mod multistage_link_trainer_tests;
 mod multistage_link_training_session_tests;
 mod multistage_lossy_link_tests;

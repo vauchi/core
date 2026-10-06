@@ -307,6 +307,7 @@ fn a_skipped_frame_still_reports_the_fast_tier_it_ran() {
     let result = scan_qr_from_luma(ScannerBackend::RqrrPreprocessed, &blurry, 200, 200);
 
     assert!(result.frame_skipped);
+    assert_eq!(result.laplacian_variance, 0.0);
     assert!(result.decode_us > 0);
     assert!(result.total_us >= result.decode_us);
 }
@@ -324,4 +325,24 @@ fn a_decoded_frame_reports_its_decode_and_total_time() {
         assert!(result.total_us >= result.decode_us, "{backend:?}");
         assert_eq!(result.preprocessing_us, 0, "{backend:?}");
     }
+}
+
+// @internal
+#[test]
+fn a_faint_frame_is_skipped_with_the_sharpness_it_measured() {
+    let faint_dots: Vec<u8> = (0..200 * 200)
+        .map(|i| {
+            let (x, y) = (i % 200, i / 200);
+            if x % 16 == 0 && y % 16 == 0 { 129 } else { 128 }
+        })
+        .collect();
+
+    let result = scan_qr_from_luma(ScannerBackend::RqrrPreprocessed, &faint_dots, 200, 200);
+
+    assert!(result.frame_skipped);
+    assert!(
+        result.laplacian_variance > 0.0 && result.laplacian_variance < 15.0,
+        "{}",
+        result.laplacian_variance
+    );
 }

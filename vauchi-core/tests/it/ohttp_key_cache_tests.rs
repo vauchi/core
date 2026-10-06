@@ -120,3 +120,83 @@ fn test_ohttp_cache_clear_does_not_affect_other_relays() {
         "relay-a key must be absent after clear_ohttp_key"
     );
 }
+
+// ── Held signed key per relay (#288 plan 6.3) ───────────────────────
+
+use vauchi_core::network::ohttp_key_trust::HeldOhttpKey;
+
+fn held(window: u64, body: u8) -> HeldOhttpKey {
+    HeldOhttpKey {
+        window,
+        key_config: vec![body; 41],
+    }
+}
+
+// @internal
+#[test]
+fn a_held_key_is_kept_per_relay_with_its_window() {
+    let storage = open_storage();
+    let store = storage.ohttp_cache();
+
+    store
+        .save_held_ohttp_key("https://one.example", &held(20_367, 1))
+        .unwrap();
+    store
+        .save_held_ohttp_key("https://two.example", &held(20_366, 2))
+        .unwrap();
+
+    assert_eq!(
+        store.load_held_ohttp_key("https://one.example").unwrap(),
+        Some(held(20_367, 1))
+    );
+    assert_eq!(
+        store.load_held_ohttp_key("https://two.example").unwrap(),
+        Some(held(20_366, 2))
+    );
+    assert_eq!(
+        store.load_held_ohttp_key("https://three.example").unwrap(),
+        None
+    );
+}
+
+// @internal
+#[test]
+fn a_newer_held_key_replaces_the_old_one() {
+    let storage = open_storage();
+    let store = storage.ohttp_cache();
+    store
+        .save_held_ohttp_key("https://one.example", &held(20_367, 1))
+        .unwrap();
+
+    store
+        .save_held_ohttp_key("https://one.example", &held(20_368, 3))
+        .unwrap();
+
+    assert_eq!(
+        store.load_held_ohttp_key("https://one.example").unwrap(),
+        Some(held(20_368, 3))
+    );
+}
+
+/// The held key and the unsigned cache are separate: clearing the cache
+/// after a stale-key rejection must not forget which window the client
+/// already holds, or an older record could be accepted again.
+// @internal
+#[test]
+fn clearing_the_unsigned_cache_keeps_the_held_key() {
+    let storage = open_storage();
+    let store = storage.ohttp_cache();
+    store
+        .save_held_ohttp_key("https://one.example", &held(20_367, 1))
+        .unwrap();
+    store
+        .save_ohttp_key("https://one.example", &[9, 9])
+        .unwrap();
+
+    store.clear_ohttp_key("https://one.example").unwrap();
+
+    assert_eq!(
+        store.load_held_ohttp_key("https://one.example").unwrap(),
+        Some(held(20_367, 1))
+    );
+}

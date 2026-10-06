@@ -254,3 +254,31 @@ fn test_serde_roundtrip_avatar_preference() {
         );
     }
 }
+
+// @internal
+#[test]
+fn a_shared_avatar_preference_needs_that_avatar_to_exist() {
+    let (wb, cid) = setup_with_contact();
+    wb.storage()
+        .contacts()
+        .add_shared_avatar(&cid, "known-hash", &[1, 2, 3], false)
+        .unwrap();
+    let shared = |hash: &str| AvatarPreference::SharedAvatar {
+        hash: hash.to_string(),
+    };
+
+    let unknown = wb.set_avatar_preference(&cid, shared("unknown-hash"));
+    wb.set_avatar_preference(&cid, shared("known-hash"))
+        .unwrap();
+
+    assert!(
+        matches!(unknown, Err(VauchiError::InvalidState(_))),
+        "{unknown:?}"
+    );
+    assert_eq!(
+        wb.get_contact_display_options(&cid)
+            .unwrap()
+            .active_avatar_preference,
+        shared("known-hash")
+    );
+}

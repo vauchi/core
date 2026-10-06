@@ -132,7 +132,12 @@ fn test_sync_too_soon_returns_too_soon() {
 fn test_disconnect_clears_ohttp_state() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Test User").unwrap();
+    vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
+    assert!(vauchi.has_ohttp_key());
+
     vauchi.disconnect();
+
+    assert!(!vauchi.has_ohttp_key());
     let result = vauchi.sync().unwrap();
     assert!(
         matches!(result, VauchiSyncOutcome::NotConnected),

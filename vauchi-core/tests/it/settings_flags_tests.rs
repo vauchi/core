@@ -155,3 +155,46 @@ fn card_update_notification_defaults_on_and_toggle_off_persists() {
         );
     }
 }
+
+// @internal
+#[test]
+fn merging_config_toggles_takes_every_toggle_and_keeps_other_flags() {
+    let vauchi = Vauchi::in_memory().unwrap();
+    let mut flags = vauchi.load_settings_flags().unwrap();
+    flags.field_centric_visibility_migrated = true;
+    let mut config = VauchiConfig::default();
+    config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
+    config.suppress_presence = !config.suppress_presence;
+    config.contact_added_notifications = !config.contact_added_notifications;
+    config.card_update_notifications = !config.card_update_notifications;
+    config.reduce_motion = !config.reduce_motion;
+    config.large_touch = !config.large_touch;
+    config.show_help_icons = !config.show_help_icons;
+    config.new_field_default_visible = !config.new_field_default_visible;
+
+    flags.merge_config_toggles(&config);
+
+    assert_eq!(
+        [
+            flags.delivery_receipts_enabled,
+            flags.suppress_presence,
+            flags.contact_added_notifications,
+            flags.card_update_notifications,
+            flags.reduce_motion,
+            flags.large_touch,
+            flags.show_help_icons,
+            flags.new_field_default_visible,
+        ],
+        [
+            config.delivery_receipts_enabled,
+            config.suppress_presence,
+            config.contact_added_notifications,
+            config.card_update_notifications,
+            config.reduce_motion,
+            config.large_touch,
+            config.show_help_icons,
+            config.new_field_default_visible,
+        ]
+    );
+    assert!(flags.field_centric_visibility_migrated);
+}

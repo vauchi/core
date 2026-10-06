@@ -453,4 +453,49 @@ mod tests {
         let card: ContactCard = serde_json::from_str(card_json).unwrap();
         assert_eq!(card.display_name(), "Alice Updated");
     }
+
+    // @internal
+    #[test]
+    fn a_queued_change_is_sent_to_the_sibling_device() {
+        use crate::api::send_phase::SendPhase;
+        use crate::api::{EventDispatcher, SyncConfig};
+        use crate::network::{MockTransport, RelayClient, RelayClientConfig};
+
+        let mut owner = Vauchi::in_memory().unwrap();
+        owner.create_identity("Bob").unwrap();
+        let identity = owner.identity().unwrap();
+        let sibling_seed = [0x33u8; 32];
+        let sibling = DeviceInfo::derive(&sibling_seed, 1, "Bob tablet".into(), NOW);
+        let mut registry = identity.initial_device_registry();
+        registry
+            .add_device_unsigned(sibling.to_registered(&sibling_seed))
+            .unwrap();
+        owner
+            .storage()
+            .device()
+            .save_device_registry(&registry)
+            .unwrap();
+        let alice = contact_sync_data(0xAA, "Alice").to_contact().unwrap();
+        let alice_id = alice.id().to_string();
+        owner.storage().contacts().save_contact(&alice).unwrap();
+        owner
+            .record_received_contact_card_update(&alice_id)
+            .unwrap();
+        let relay = RelayClient::new(
+            MockTransport::new(),
+            RelayClientConfig::default(),
+            "bob".into(),
+        );
+        let mut ctrl = SendPhase::new(
+            relay,
+            owner.storage(),
+            SyncConfig::default(),
+            std::sync::Arc::new(EventDispatcher::new()),
+        );
+        ctrl.connect(&crate::rng::OsSecureRng::new()).unwrap();
+
+        let sent = owner.run_device_sync_send(&mut ctrl, identity).unwrap();
+
+        assert_eq!(sent, 1);
+    }
 }

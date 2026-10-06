@@ -1509,6 +1509,30 @@ mod tests {
     // last_sync_unix_seconds (humble-UI follow-up to ios!472)
     // =========================================================================
 
+    // @internal
+    #[test]
+    fn a_sync_soon_after_an_exchange_waits_out_the_post_exchange_delay() {
+        use crate::monotonic::{FakeMonotonicClock, MonotonicClock};
+        use std::sync::Arc;
+
+        let fake = Arc::new(FakeMonotonicClock::new());
+        let mut v = Vauchi::in_memory().unwrap().with_monotonic(fake.clone());
+        v.config.sync.sync_interval_ms = 1_000;
+        v.config.sync.sync_interval_jitter_percent = 0;
+        v.config.sync.post_exchange_delay_min_ms = 300_000;
+        v.config.sync.post_exchange_delay_max_ms = 300_000;
+        let exchanged_at = fake.now();
+        v.set_post_exchange_delay();
+        fake.advance(Duration::from_secs(10));
+
+        v.update_timing_after_sync();
+
+        assert_eq!(
+            v.next_sync_allowed,
+            Some(exchanged_at + Duration::from_secs(300))
+        );
+    }
+
     // @scenario: ohttp_sync :: last_sync_time records wall-clock on success
     #[test]
     fn last_sync_time_records_wall_clock_via_update_timing() {

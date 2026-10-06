@@ -67,7 +67,7 @@ exclude_re = [
     # pre-migration #60). Widening it to every prepare error needs a prepare
     # that fails some other way, which an in-memory SQLite never does
     # (vauchi/private#522).
-    "vauchi-core/src/storage/stores/consent\\.rs:77:20: replace match guard .* with true in ConsentStore<'_>::list_consent_records$",
+    "vauchi-core/src/storage/stores/consent\\.rs:(77|130):20: replace match guard .* with true in ConsentStore<'_>::list_consent_records(_with_version)?$",
 
     # normalize_date's two format guards: loosening either only reformats a
     # value that is not a date, and the birthday validation that follows

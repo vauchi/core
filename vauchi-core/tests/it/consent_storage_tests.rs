@@ -153,3 +153,28 @@ fn a_database_without_the_consent_table_lists_no_consent() {
             .is_empty()
     );
 }
+
+// @internal
+#[test]
+fn versioned_consent_records_keep_whether_consent_was_granted() {
+    let storage = test_storage();
+    let consent = storage.consent();
+    consent
+        .execute_consent_upsert_with_version("c1", "analytics", true, 1000, "v2")
+        .unwrap();
+    consent
+        .execute_consent_upsert_with_version("c2", "marketing", false, 2000, "v2")
+        .unwrap();
+
+    let granted: Vec<(String, bool)> = consent
+        .list_consent_records_with_version()
+        .unwrap()
+        .into_iter()
+        .map(|(_, kind, granted, _, _)| (kind, granted))
+        .collect();
+
+    assert_eq!(
+        granted,
+        [("analytics".into(), true), ("marketing".into(), false)]
+    );
+}

@@ -10,7 +10,11 @@
 //! through [`accept_signed_key`]; there is no unverified fallback.
 
 use ed25519_dalek::{Signature, VerifyingKey};
-use vauchi_protocol::ohttp_key::{IntermediateCert, SignedKeyConfig, key_id_for_window, window_of};
+use sha2::{Digest, Sha256};
+use vauchi_protocol::ohttp_key::{
+    AnchorRollover, IntermediateCert, SignedKeyConfig, backup_commitment_message,
+    key_id_for_window, window_of,
+};
 
 /// The gateway key a client holds, and the window it belongs to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,4 +123,62 @@ fn verify_intermediate(
 fn verify(key: &VerifyingKey, message: &[u8], signature: &[u8; 64]) -> Option<()> {
     key.verify_strict(message, &Signature::from_bytes(signature))
         .ok()
+}
+
+/// A relay's trust anchor and the commitment to the backup that may replace
+/// it (decision 0.13).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OhttpAnchor {
+    pub anchor: [u8; 32],
+    pub backup_commitment: [u8; 32],
+}
+
+/// Why a rollover chain was refused; `step` is the record's index.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum RolloverRejection {
+    #[error("OHTTP anchor rollover step {step} names a key the client never committed to")]
+    NotTheCommittedBackup { step: usize },
+    #[error("OHTTP anchor rollover step {step} is not signed by its new anchor")]
+    BadSignature { step: usize },
+}
+
+/// The commitment a client holds to a backup anchor:
+/// `SHA-256("vauchi-ohttp-backup-anchor-v1" || backup)`.
+pub fn backup_commitment(backup_anchor: &[u8; 32]) -> [u8; 32] {
+    Sha256::digest(backup_commitment_message(backup_anchor)).into()
+}
+
+/// Follow `chain` (oldest first, as the relay serves it) from `held`.
+/// Records up to the one that installed `held.anchor` are skipped; every
+/// later one must name the committed backup and be signed by it, or the
+/// whole chain is refused and `held` stays. The retired anchor signs
+/// nothing, so losing it does not strand the client and stealing it does
+/// not let the thief choose the successor.
+pub fn accept_anchor_rollover(
+    held: &OhttpAnchor,
+    chain: &[AnchorRollover],
+) -> Result<OhttpAnchor, RolloverRejection> {
+    let start = chain
+        .iter()
+        .rposition(|rollover| rollover.new_anchor == held.anchor)
+        .map_or(0, |installed| installed + 1);
+    let mut current = held.clone();
+    for (step, rollover) in chain.iter().enumerate().skip(start) {
+        if backup_commitment(&rollover.new_anchor) != current.backup_commitment {
+            return Err(RolloverRejection::NotTheCommittedBackup { step });
+        }
+        let new_anchor = VerifyingKey::from_bytes(&rollover.new_anchor)
+            .map_err(|_| RolloverRejection::BadSignature { step })?;
+        verify(
+            &new_anchor,
+            &AnchorRollover::signing_message(&rollover.new_anchor, &rollover.next_commitment),
+            &rollover.signature,
+        )
+        .ok_or(RolloverRejection::BadSignature { step })?;
+        current = OhttpAnchor {
+            anchor: rollover.new_anchor,
+            backup_commitment: rollover.next_commitment,
+        };
+    }
+    Ok(current)
 }

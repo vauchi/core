@@ -169,3 +169,88 @@ fn default_relay_config_has_24h_pin_ttl() {
         "Default pin TTL must be 24 hours"
     );
 }
+
+// ── OHTTP trust anchor (#288, decisions 0.6 and 0.9) ────────────────
+
+const ANCHOR: [u8; 32] = [0x5a; 32];
+const OTHER_ANCHOR: [u8; 32] = [0xa5; 32];
+
+/// A relay's anchor travels with its URL (0.9): the gateway key of that
+/// relay is accepted only under that anchor.
+// @internal
+#[test]
+fn a_relay_set_with_its_anchor_resolves_to_that_anchor() {
+    let config = VauchiConfig::default().with_relay("https://relay.self.example", ANCHOR);
+
+    assert_eq!(config.relay.server_url, "https://relay.self.example");
+    assert_eq!(config.relay.ohttp_trust_anchor(), Some(ANCHOR));
+}
+
+/// Without an anchor a custom relay has none, and its gateway key cannot be
+/// accepted — never one borrowed from elsewhere.
+// @internal
+#[test]
+fn a_custom_relay_without_an_anchor_has_none() {
+    let config = VauchiConfig::default().with_relay_url("https://relay.self.example");
+
+    assert_eq!(config.relay.ohttp_trust_anchor(), None);
+}
+
+/// Switching relays must not carry the previous relay's anchor over to the
+/// new one: that would make the new relay's keys verify against a key its
+/// operator never held.
+// @internal
+#[test]
+fn changing_the_relay_url_drops_the_previous_relays_anchor() {
+    let config = VauchiConfig::default()
+        .with_relay("https://relay.one.example", ANCHOR)
+        .with_relay_url("https://relay.two.example");
+
+    assert_eq!(config.relay.ohttp_trust_anchor(), None);
+}
+
+// @internal
+#[test]
+fn setting_a_relay_again_replaces_its_anchor() {
+    let config = VauchiConfig::default()
+        .with_relay("https://relay.one.example", ANCHOR)
+        .with_relay("https://relay.two.example", OTHER_ANCHOR);
+
+    assert_eq!(config.relay.ohttp_trust_anchor(), Some(OTHER_ANCHOR));
+}
+
+/// Only the exact production host may fall back to Vauchi's anchor; a
+/// lookalike host is a custom relay like any other.
+// @internal
+#[test]
+fn a_lookalike_of_the_production_host_gets_no_anchor() {
+    for url in [
+        "https://relay.vauchi.app.evil.example",
+        "https://evil.example/relay.vauchi.app",
+        "https://xrelay.vauchi.app",
+    ] {
+        let config = VauchiConfig::default().with_relay_url(url);
+
+        assert_eq!(config.relay.ohttp_trust_anchor(), None, "{url}");
+    }
+}
+
+/// An explicit anchor also wins for the production host: e2e and local
+/// stacks point a production-shaped URL at a test gateway.
+// @internal
+#[test]
+fn an_explicit_anchor_wins_for_the_production_host_too() {
+    let config = VauchiConfig::default().with_relay("https://relay.vauchi.app", ANCHOR);
+
+    assert_eq!(config.relay.ohttp_trust_anchor(), Some(ANCHOR));
+}
+
+// @internal
+#[test]
+fn the_default_relay_config_names_no_explicit_anchor() {
+    assert_eq!(RelayConfig::default().ohttp_anchor, None);
+    assert_eq!(
+        RelayConfig::unpinned("https://relay.self.example".into()).ohttp_anchor,
+        None
+    );
+}

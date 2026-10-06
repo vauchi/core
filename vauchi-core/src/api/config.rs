@@ -702,6 +702,26 @@ mod tests {
         );
     }
 
+    /// #30 cutover: clients must trust the dedicated OHTTP host's key before
+    /// `ohttp.vauchi.app` moves to it. The pin is the SPKI the
+    /// `ohttp-tls-key.yml` play printed on affectionate-raman-vps (2026-10-06).
+    // @scenario: pinning :: production default pins the OHTTP host distinctly
+    #[test]
+    fn default_relay_config_pins_the_dedicated_ohttp_host_before_cutover() {
+        assert_eq!(
+            hex::encode(OHTTP_DEDICATED_HOST_SPKI_PIN),
+            "1b6bd42c2d5c11ac88d55a979af7b97fe83aa3037955803f081916dfe4316d5d"
+        );
+        assert_ne!(OHTTP_DEDICATED_HOST_SPKI_PIN, OHTTP_PROD_SPKI_PIN);
+        assert_ne!(OHTTP_DEDICATED_HOST_SPKI_PIN, RELAY_PROD_SPKI_PIN);
+        assert!(
+            !RelayConfig::default()
+                .pinned_certs
+                .contains(&PinnedCertificate::new(OHTTP_DEDICATED_HOST_SPKI_PIN)),
+            "the OHTTP host's key must never pin the data relay"
+        );
+    }
+
     // @scenario: pinning :: production default pins the OHTTP host distinctly
     #[test]
     fn default_relay_config_pins_ohttp_host_with_distinct_key() {
@@ -712,8 +732,11 @@ mod tests {
         let cfg = RelayConfig::default();
         assert_eq!(
             cfg.ohttp_pinned_certs,
-            vec![PinnedCertificate::new(OHTTP_PROD_SPKI_PIN)],
-            "default config must pin the OHTTP-relay host's SPKI",
+            vec![
+                PinnedCertificate::new(OHTTP_PROD_SPKI_PIN),
+                PinnedCertificate::new(OHTTP_DEDICATED_HOST_SPKI_PIN),
+            ],
+            "default config must pin the OHTTP-relay host's SPKI, current and dedicated",
         );
         // A copy-paste of the relay pin would silently reintroduce the bug.
         assert_ne!(

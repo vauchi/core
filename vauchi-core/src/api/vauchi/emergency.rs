@@ -413,6 +413,8 @@ impl Vauchi {
         }
         self.storage.ux().save_relay_url(trimmed)?;
         self.config.relay.server_url = trimmed.to_string();
+        // The anchor belonged to the previous relay (#288, decision 0.9).
+        self.config.relay.ohttp_anchor = None;
         Ok(())
     }
 

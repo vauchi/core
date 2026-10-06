@@ -345,8 +345,10 @@ impl Vauchi {
         // Seed the persisted relay URL, but only when the caller left the
         // built-in default — an explicit `with_relay_url` (desktop
         // `--relay-url` / resolved file) must win over the stored value
-        // (mobile-relay-url-editor-noop).
+        // (mobile-relay-url-editor-noop), and so must a relay set together
+        // with its OHTTP anchor (#288).
         if config.relay.server_url == crate::api::config::DEFAULT_RELAY_URL
+            && config.relay.ohttp_anchor.is_none()
             && let Ok(Some(url)) = storage.ux().load_relay_url()
         {
             config.relay.server_url = url;

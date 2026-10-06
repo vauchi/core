@@ -51,9 +51,10 @@ impl VauchiBuilder {
         self
     }
 
-    /// Sets the relay URL.
+    /// Sets the relay URL, clearing any OHTTP trust anchor (see
+    /// [`VauchiConfig::with_relay_url`]).
     pub fn relay_url(mut self, url: impl Into<String>) -> Self {
-        self.config.relay.server_url = url.into();
+        self.config = self.config.with_relay_url(url);
         self
     }
 

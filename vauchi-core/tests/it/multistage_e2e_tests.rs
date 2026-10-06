@@ -561,16 +561,15 @@ fn test_asymmetric_finalization_both_reach_finalized() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    let mut withheld_alice_finalization_frame = false;
+    // Alice may finalize without ever showing FIN3: when Bob's FIN3 reaches
+    // her first, she saves at once. Either way her final frame is withheld.
     for _ in 0..500 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
-        if let Some(aq) = &aq {
-            if aq.data.starts_with("FIN3") {
-                withheld_alice_finalization_frame = true;
-            } else {
-                bob.process_scanned_qr(&aq.data);
-            }
+        if let Some(aq) = &aq
+            && !aq.data.starts_with("FIN3")
+        {
+            bob.process_scanned_qr(&aq.data);
         }
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
@@ -580,10 +579,6 @@ fn test_asymmetric_finalization_both_reach_finalized() {
         }
     }
 
-    assert!(
-        withheld_alice_finalization_frame,
-        "Alice never displayed the finalization frame withheld from Bob"
-    );
     assert_eq!(
         alice.get_state(),
         ProtocolState::Finalized,

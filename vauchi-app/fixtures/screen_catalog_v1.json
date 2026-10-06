@@ -2218,7 +2218,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_747bc405d75b7f55",
+                    "id": "field_adc8ab123b8d443b",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2249,13 +2249,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:747bc405d75b7f55",
+                    "id": "field_note:adc8ab123b8d443b",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:747bc405d75b7f55",
+                          "id": "field_note:adc8ab123b8d443b",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2295,7 +2295,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_cecb9b979c874207",
+                    "id": "field_d72860642dbb6858",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2326,13 +2326,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:cecb9b979c874207",
+                    "id": "field_note:d72860642dbb6858",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:cecb9b979c874207",
+                          "id": "field_note:d72860642dbb6858",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2372,7 +2372,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_c83f47eb24f4bab9",
+                    "id": "field_b113636f79848883",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2403,13 +2403,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:c83f47eb24f4bab9",
+                    "id": "field_note:b113636f79848883",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:c83f47eb24f4bab9",
+                          "id": "field_note:b113636f79848883",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4643,10 +4643,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "0A02 32DB F411 479A 025B 69F5 BD8A 559C 4292 3169 0971 31A3 B55A 368E 062B 93C1",
+                    "content": "4BEC EDCC 78BC 4406 081A 5841 E1D5 ADE5 793F CEE2 38E2 F89F 95FA 6D8D BB2A 6599",
                     "style": "body",
                     "accessibility": {
-                      "label": "0A02 32DB F411 479A 025B 69F5 BD8A 559C 4292 3169 0971 31A3 B55A 368E 062B 93C1",
+                      "label": "4BEC EDCC 78BC 4406 081A 5841 E1D5 ADE5 793F CEE2 38E2 F89F 95FA 6D8D BB2A 6599",
                       "description": null
                     }
                   }
@@ -4665,10 +4665,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "7E7B E4C3 D1BC E3C0 D517 FE93 CD32 37B6 0412 830F 0E56 ADFF 71EB F793 F958 2567",
+                    "content": "1C2B 5EF7 452A 6462 B34D 5178 E1BD 02F1 7E94 D77D 6D16 911C 5F67 24FC 8930 1DB0",
                     "style": "body",
                     "accessibility": {
-                      "label": "7E7B E4C3 D1BC E3C0 D517 FE93 CD32 37B6 0412 830F 0E56 ADFF 71EB F793 F958 2567",
+                      "label": "1C2B 5EF7 452A 6462 B34D 5178 E1BD 02F1 7E94 D77D 6D16 911C 5F67 24FC 8930 1DB0",
                       "description": null
                     }
                   }
@@ -6426,7 +6426,7 @@
                       {
                         "title": "Version",
                         "subtitle": null,
-                        "detail": "0.71.0",
+                        "detail": "0.72.0",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": null,
@@ -8619,7 +8619,7 @@
                             },
                             {
                               "title": "About",
-                              "subtitle": "Vauchi 0.71.0 · core 0.71.0",
+                              "subtitle": "Vauchi 0.72.0 · core 0.72.0",
                               "detail": null,
                               "icon_token": null,
                               "image_data": null,
@@ -16601,7 +16601,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=zQGe7bl-tcc8ywQCOe5R8FAKsrvZTDzOWFggNw1VdSI&n=Wyr3Wc7HLOYR-OkxinNAluLU480wTBTX7TjkmL0_zUs",
+                    "content": "vauchi://exchange?pk=_tbeh8fFAOVMmXXp-VyN5eu9NuGa0msr75qyIYil0g8&n=YNnSi_zMQz2OTs08V7LiNZJ6zjBdp0CHC5vECPbvESs",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17124,7 +17124,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,78,43,101,43,84,68,48,98,122,106,119,78,85,88,47,112,80,78,77,106,101,50,66,66,75,68,68,119,53,87,114,102,57,120,54,47,101,84,43,86,103,108,90,49,120,76,73,72,102,70,52,76,112,67,71,54,43,115,121,103,86,84,116,108,120,55,119,78,115,97,101,97,56,66,115,118,120,69,80,47,57,85,66,109,111,68,67,85,116,122,107,112,70,117,68,119,53,120,79,113,85,54,121,113,75,52,76,53,86,52,48,120,116,115,70,66,111,117,118,50,121,121,77,108,79,49,100,100,71,71,87,107,89,86,114,103,71,50,86,77,78,117,71,73,73,49,108,101,82,111,65,65,65,65,65,71,114,68,74,115,69,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,119,121,111,84,76,77,108,48,89,76,70,71,56,49,77,90,68,88,110,81,73,100,76,109,101,116,66,99,104,110,75,119,85,53,84,68,99,82,114,79,109,114,87,50,102,118,76,88,108,122,79,54,98,75,66,111,110,112,97,83,78,51,57,67,97,90,107,89,88,98,54,77,101,51,69,66,88,55,107,49,105,69,82,115,69],
+            "payload": [86,48,74,70,87,65,77,99,75,49,55,51,82,83,112,107,89,114,78,78,85,88,106,104,118,81,76,120,102,112,84,88,102,87,48,87,107,82,120,102,90,121,84,56,105,84,65,100,115,67,99,122,114,85,116,52,82,56,49,101,47,89,111,87,120,120,115,97,67,106,75,73,89,43,98,75,106,53,113,85,111,90,84,54,43,75,122,105,81,119,116,79,81,88,113,88,82,101,77,73,49,101,74,86,117,71,106,52,67,52,86,107,112,113,82,55,51,107,52,54,43,73,114,48,121,51,82,110,65,51,89,55,85,104,76,109,54,119,110,50,100,122,83,115,50,68,79,82,53,66,51,83,109,78,52,56,65,65,65,65,65,71,114,69,101,68,103,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,108,122,66,100,101,67,72,99,80,116,73,66,82,52,112,43,79,57,66,68,54,84,52,84,48,101,77,57,81,56,79,114,73,103,85,74,74,84,113,75,76,70,111,113,104,56,74,85,90,99,72,53,52,109,112,112,102,112,78,50,83,83,116,118,50,102,69,115,105,74,50,86,117,116,80,78,99,109,43,67,72,104,117,89,77],
             "is_initiator": true
           }
         }
@@ -17184,7 +17184,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00K2M%6HLOR05NPTLZ+BXJ84IUH+2R6A2DRBF9L9OUU0ZHULDI519X0T:LV0NAS2FXGQ97FF2D90K6PIJ*DLSF18BYP6FE4GD569TE5PO.O51N DEOMU6BH0L211Vauchi User00"
+                      "INI30:0:0:00VT3/SG9JJJ82R8725GA.P:Z9395PJSM:DK%A35CH49D$DWGDW8D7WIF1R%SCU2HHF3*/V83GJQSBW5BGTFY5EWNF$B0.RYST1L2FSA.:GTRHV-GY2ADTL.7T11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17414,7 +17414,7 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 113
+            "earliest_millis": 107
           }
         }
       ]
@@ -17701,6 +17701,272 @@
       ]
     },
     {
+      "code_id": "multi_stage_exchange-hover-placed",
+      "title": "Exchange",
+      "locale": "en",
+      "commands": [
+        {
+          "ReplaceSurface": {
+            "surface": {
+              "surface_id": "multi_stage_exchange",
+              "revision": 1,
+              "title": "Exchange",
+              "subtitle": null,
+              "accessibility_label": "Exchange",
+              "layout": "fixed",
+              "tokens": {
+                "spacing_small": 8,
+                "spacing_medium": 16,
+                "spacing_large": 24,
+                "corner_radius": 12,
+                "minimum_target_size": 48
+              },
+              "nodes": [
+                {
+                  "Group": {
+                    "id": "exchange_mode",
+                    "label": null,
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Status": {
+                          "id": null,
+                          "title": "Hover",
+                          "detail": null,
+                          "icon_token": "pictogram.exchange.hover",
+                          "badge": null,
+                          "tone": "neutral",
+                          "activation": null,
+                          "accessibility": {
+                            "label": "Hover",
+                            "description": null
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Qr": {
+                    "id": "surface.1.own_qr",
+                    "payloads": [
+                      "TRAINED-FRAME"
+                    ],
+                    "purpose": "display",
+                    "label": null,
+                    "placement": {
+                      "size": 650,
+                      "x": 175,
+                      "y": 175
+                    },
+                    "error_correction": "low",
+                    "accessibility": {
+                      "label": "own_qr",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "exchange_preview_row",
+                    "label": null,
+                    "axis": "horizontal",
+                    "children": [
+                      {
+                        "Qr": {
+                          "id": "surface.capture.peer_scan",
+                          "payloads": [
+                            ""
+                          ],
+                          "purpose": "capture",
+                          "label": "Scan their code",
+                          "accessibility": {
+                            "label": "Scan their code",
+                            "description": null
+                          }
+                        }
+                      },
+                      {
+                        "Group": {
+                          "id": "exchange_side_column",
+                          "label": null,
+                          "axis": "vertical",
+                          "children": [
+                            {
+                              "Text": {
+                                "id": "exchange_status",
+                                "content": "Show this · Looking for the other phone",
+                                "style": "body",
+                                "accessibility": {
+                                  "label": "Show this · Looking for the other phone",
+                                  "description": null
+                                }
+                              }
+                            },
+                            {
+                              "List": {
+                                "id": "exchange_actions",
+                                "label": null,
+                                "rows": [
+                                  {
+                                    "title": "Use Rear Camera",
+                                    "subtitle": null,
+                                    "detail": null,
+                                    "icon_token": null,
+                                    "image_data": null,
+                                    "fallback_text": null,
+                                    "selected": false,
+                                    "enabled": true,
+                                    "activation": {
+                                      "interaction_id": "surface.1.interaction.0",
+                                      "label": "Use Rear Camera",
+                                      "accessibility_label": "Use Rear Camera",
+                                      "icon_token": null,
+                                      "enabled": true,
+                                      "shortcut": null
+                                    },
+                                    "secondary_actions": [],
+                                    "controls": [],
+                                    "accessibility": {
+                                      "label": "Use Rear Camera",
+                                      "description": null
+                                    }
+                                  },
+                                  {
+                                    "title": "Cancel",
+                                    "subtitle": null,
+                                    "detail": null,
+                                    "icon_token": null,
+                                    "image_data": null,
+                                    "fallback_text": null,
+                                    "selected": false,
+                                    "enabled": true,
+                                    "activation": {
+                                      "interaction_id": "surface.1.interaction.1",
+                                      "label": "Cancel",
+                                      "accessibility_label": "Cancel",
+                                      "icon_token": null,
+                                      "enabled": true,
+                                      "shortcut": null
+                                    },
+                                    "secondary_actions": [],
+                                    "controls": [],
+                                    "accessibility": {
+                                      "label": "Cancel",
+                                      "description": null
+                                    }
+                                  }
+                                ],
+                                "searchable": false,
+                                "paging": null,
+                                "accessibility": {
+                                  "label": "",
+                                  "description": null
+                                },
+                                "style": "buttons"
+                              }
+                            }
+                          ],
+                          "accessibility": {
+                            "label": "exchange_side_column",
+                            "description": null
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "exchange_preview_row",
+                      "description": null
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "SetContextBar": {
+            "surface_id": "multi_stage_exchange",
+            "revision": 1,
+            "bar": {
+              "back": {
+                "interaction_id": "surface.1.context.presentation.back",
+                "label": "Back",
+                "accessibility_label": "Back",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": "back"
+              },
+              "navigation": {
+                "interaction_id": "surface.1.context.presentation.navigation",
+                "label": "More",
+                "accessibility_label": "More",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "primary": null,
+              "secondary": null
+            }
+          }
+        },
+        {
+          "SetNavigation": {
+            "surface_id": "multi_stage_exchange",
+            "revision": 1,
+            "navigation": {
+              "items": [
+                {
+                  "interaction_id": "surface.1.context.presentation.navigation.contacts",
+                  "label": "Contacts",
+                  "accessibility_label": "Contacts",
+                  "icon_token": "person.2",
+                  "selected": false,
+                  "badge_count": 0
+                },
+                {
+                  "interaction_id": "surface.1.context.presentation.navigation.my_info",
+                  "label": "My Card",
+                  "accessibility_label": "My Card",
+                  "icon_token": "person.crop.rectangle",
+                  "selected": false,
+                  "badge_count": 0
+                },
+                {
+                  "interaction_id": "surface.1.context.presentation.navigation.exchange",
+                  "label": "Exchange",
+                  "accessibility_label": "Exchange",
+                  "icon_token": "qrcode",
+                  "selected": true,
+                  "badge_count": 0
+                },
+                {
+                  "interaction_id": "surface.1.context.presentation.navigation.device_management",
+                  "label": "Devices",
+                  "accessibility_label": "Devices",
+                  "icon_token": "laptopcomputer",
+                  "selected": false,
+                  "badge_count": 0
+                },
+                {
+                  "interaction_id": "surface.1.context.presentation.navigation.settings",
+                  "label": "Settings",
+                  "accessibility_label": "Settings",
+                  "icon_token": "gearshape",
+                  "selected": false,
+                  "badge_count": 0
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "code_id": "ble_exchange-magic",
       "title": "Searching nearby...",
       "locale": "en",
@@ -17888,7 +18154,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [126,123,228,195,209,188,227,192,213,23,254,147,205,50,55,182,4,18,131,15,14,86,173,255,113,235,247,147,249,88,37,103]
+            "payload": [28,43,94,247,69,42,100,98,179,77,81,120,225,189,2,241,126,148,215,125,109,22,145,28,95,103,36,252,137,48,29,176]
           }
         },
         {
@@ -18071,7 +18337,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [126,123,228,195,209,188,227,192,213,23,254,147,205,50,55,182,4,18,131,15,14,86,173,255,113,235,247,147,249,88,37,103]
+            "payload": [28,43,94,247,69,42,100,98,179,77,81,120,225,189,2,241,126,148,215,125,109,22,145,28,95,103,36,252,137,48,29,176]
           }
         },
         {
@@ -18254,7 +18520,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [126,123,228,195,209,188,227,192,213,23,254,147,205,50,55,182,4,18,131,15,14,86,173,255,113,235,247,147,249,88,37,103]
+            "payload": [28,43,94,247,69,42,100,98,179,77,81,120,225,189,2,241,126,148,215,125,109,22,145,28,95,103,36,252,137,48,29,176]
           }
         },
         {

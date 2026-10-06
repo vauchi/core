@@ -218,6 +218,9 @@ pub struct AppEngine {
     /// removes the parallel cycle-thread bridge in PlatformAppEngine
     /// to avoid double-driving the active engine on mobile.
     multi_stage_session: Option<multi_stage_exchange::MultiStageHolder>,
+    /// The layout the last exchange's peer read, for the next exchange's
+    /// first sweep (#450). In memory only.
+    last_good_qr_layout: Option<u8>,
     /// Engine-owned BLE handshake machine (slice 32m T2.2b). Built
     /// on `Event::BleConnected` (or PlatformAppEngine on BLE-eligible
     /// screen entry), torn down by `cancel_ble_handshake_session`.
@@ -522,6 +525,7 @@ impl AppEngine {
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_responder: None,
             multi_stage_session: None,
+            last_good_qr_layout: None,
             ble_handshake_session: None,
             pending_ble_terminal_invalidation: false,
             glance_display_nonce: None,

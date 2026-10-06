@@ -126,6 +126,10 @@ impl AppEngine {
             // maps to the Glance constructor — no proximity handshake.
             _ => MultiStageMachine::new_glance(payload, now),
         };
+        let machine = match self.last_good_qr_layout {
+            Some(layout) => machine.with_start_layout(layout),
+            None => machine,
+        };
         self.multi_stage_session = Some(MultiStageHolder {
             machine,
             last_frame_ms: None,
@@ -161,6 +165,9 @@ impl AppEngine {
         let (event, stalled, link) = match self.multi_stage_session.as_mut() {
             Some(holder) => {
                 let event = holder.machine.advance(now);
+                if let Some(layout) = holder.machine.last_good_layout() {
+                    self.last_good_qr_layout = Some(layout);
+                }
                 (
                     event,
                     holder.machine.is_frame_stalled(),

@@ -69,6 +69,8 @@ use vauchi_core::exchange::{
     ProtocolState, QrPayload, audio_modem,
 };
 
+#[path = "multi_stage_machine_link_layout.rs"]
+mod link_layout;
 #[path = "multi_stage_machine_peer_name.rs"]
 mod peer_name;
 

@@ -213,3 +213,125 @@ impl<'a> Reader<'a> {
         Ok(out)
     }
 }
+
+// ── Anchor rollover (#288 plan 1.5, decision 0.13) ──────────────────
+
+/// Current rollover record version.
+pub const ROLLOVER_VERSION: u8 = 1;
+/// `version | new_anchor | next_commitment | signature`.
+pub const ROLLOVER_BYTES: usize = 1 + PUBLIC_KEY_BYTES + 32 + SIGNATURE_BYTES;
+/// Rollovers a relay serves at most; more is not a chain a client walks.
+pub const MAX_ROLLOVER_CHAIN: usize = 16;
+
+const ROLLOVER_DOMAIN: &[u8] = b"vauchi-ohttp-anchor-rollover-v1";
+const BACKUP_COMMITMENT_DOMAIN: &[u8] = b"vauchi-ohttp-backup-anchor-v1";
+
+/// A relay's anchor handing over to its pre-committed backup. Valid only if
+/// `new_anchor` hashes to the commitment the client holds and `new_anchor`
+/// signed it; `next_commitment` then names the following backup. The
+/// retired anchor signs nothing, so a lost anchor can still be replaced and
+/// a stolen one cannot pick its successor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnchorRollover {
+    pub new_anchor: [u8; 32],
+    pub next_commitment: [u8; 32],
+    pub signature: [u8; 64],
+}
+
+/// Why bytes are not a rollover record or chain.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum RolloverError {
+    #[error("rollover is truncated")]
+    Truncated,
+    #[error("rollover has trailing bytes")]
+    TrailingBytes,
+    #[error("unknown rollover version {0}")]
+    UnknownVersion(u8),
+    #[error("rollover chain is empty")]
+    EmptyChain,
+    #[error("rollover chain of {0} is over the {MAX_ROLLOVER_CHAIN}-record bound")]
+    ChainTooLong(usize),
+}
+
+/// The bytes whose SHA-256 is the commitment to a backup anchor. Hashing is
+/// left to core and the relay: this crate carries no crypto.
+pub fn backup_commitment_message(backup_anchor: &[u8; 32]) -> Vec<u8> {
+    let mut message = Vec::with_capacity(BACKUP_COMMITMENT_DOMAIN.len() + PUBLIC_KEY_BYTES);
+    message.extend_from_slice(BACKUP_COMMITMENT_DOMAIN);
+    message.extend_from_slice(backup_anchor);
+    message
+}
+
+impl AnchorRollover {
+    /// The bytes `new_anchor` signs.
+    pub fn signing_message(new_anchor: &[u8; 32], next_commitment: &[u8; 32]) -> Vec<u8> {
+        let mut message = Vec::with_capacity(ROLLOVER_DOMAIN.len() + 2 * PUBLIC_KEY_BYTES);
+        message.extend_from_slice(ROLLOVER_DOMAIN);
+        message.extend_from_slice(new_anchor);
+        message.extend_from_slice(next_commitment);
+        message
+    }
+
+    pub fn encode(&self) -> [u8; ROLLOVER_BYTES] {
+        let mut out = [0u8; ROLLOVER_BYTES];
+        out[0] = ROLLOVER_VERSION;
+        out[1..33].copy_from_slice(&self.new_anchor);
+        out[33..65].copy_from_slice(&self.next_commitment);
+        out[65..].copy_from_slice(&self.signature);
+        out
+    }
+
+    pub fn decode(bytes: &[u8]) -> Result<Self, RolloverError> {
+        match bytes.len().cmp(&ROLLOVER_BYTES) {
+            std::cmp::Ordering::Less => return Err(RolloverError::Truncated),
+            std::cmp::Ordering::Greater => return Err(RolloverError::TrailingBytes),
+            std::cmp::Ordering::Equal => {}
+        }
+        if bytes[0] != ROLLOVER_VERSION {
+            return Err(RolloverError::UnknownVersion(bytes[0]));
+        }
+        let mut new_anchor = [0u8; 32];
+        let mut next_commitment = [0u8; 32];
+        let mut signature = [0u8; 64];
+        new_anchor.copy_from_slice(&bytes[1..33]);
+        next_commitment.copy_from_slice(&bytes[33..65]);
+        signature.copy_from_slice(&bytes[65..]);
+        Ok(Self {
+            new_anchor,
+            next_commitment,
+            signature,
+        })
+    }
+}
+
+/// `count | records`, oldest first. A chain longer than 255 records cannot
+/// be encoded, and one over [`MAX_ROLLOVER_CHAIN`] is refused on decode.
+pub fn encode_rollover_chain(chain: &[AnchorRollover]) -> Vec<u8> {
+    let count = u8::try_from(chain.len()).unwrap_or(u8::MAX);
+    let mut out = Vec::with_capacity(1 + usize::from(count) * ROLLOVER_BYTES);
+    out.push(count);
+    for rollover in chain.iter().take(usize::from(count)) {
+        out.extend_from_slice(&rollover.encode());
+    }
+    out
+}
+
+pub fn decode_rollover_chain(bytes: &[u8]) -> Result<Vec<AnchorRollover>, RolloverError> {
+    let (&count, records) = bytes.split_first().ok_or(RolloverError::Truncated)?;
+    let count = usize::from(count);
+    if count == 0 {
+        return Err(RolloverError::EmptyChain);
+    }
+    if count > MAX_ROLLOVER_CHAIN {
+        return Err(RolloverError::ChainTooLong(count));
+    }
+    match records.len().cmp(&(count * ROLLOVER_BYTES)) {
+        std::cmp::Ordering::Less => return Err(RolloverError::Truncated),
+        std::cmp::Ordering::Greater => return Err(RolloverError::TrailingBytes),
+        std::cmp::Ordering::Equal => {}
+    }
+    records
+        .chunks_exact(ROLLOVER_BYTES)
+        .map(AnchorRollover::decode)
+        .collect()
+}

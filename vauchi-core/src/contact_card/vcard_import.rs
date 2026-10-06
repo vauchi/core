@@ -703,13 +703,6 @@ fn decode_photo_base64(b64: &str) -> Option<Vec<u8>> {
 fn normalize_date(value: &str) -> String {
     let trimmed = value.trim();
 
-    if trimmed.len() == 10
-        && trimmed.as_bytes().get(4) == Some(&b'-')
-        && trimmed.as_bytes().get(7) == Some(&b'-')
-    {
-        return trimmed.to_string();
-    }
-
     // YYYYMMDD (compact)
     if trimmed.len() == 8 && trimmed.chars().all(|c| c.is_ascii_digit()) {
         return format!("{}-{}-{}", &trimmed[0..4], &trimmed[4..6], &trimmed[6..8]);

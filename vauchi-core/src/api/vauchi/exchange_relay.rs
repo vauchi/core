@@ -83,12 +83,6 @@ impl RelayExchangeOffer {
     pub fn sas_key_material(&self) -> &[u8; 32] {
         &self.sas_key_material
     }
-
-    /// Returns our identity key embedded in the offer.
-    #[cfg(any(test, feature = "testing"))]
-    pub fn our_identity_key(&self) -> &[u8; 32] {
-        &self.our_identity_key
-    }
 }
 
 /// Result of a completed relay exchange (claim or complete side).

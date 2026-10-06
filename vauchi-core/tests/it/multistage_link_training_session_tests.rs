@@ -301,6 +301,34 @@ fn a_bystanders_frames_do_not_train_a_bound_session() {
     assert!(header.echo().all(|reads| reads.layout != 12));
 }
 
+// A neighbouring exchange's echo must not steer a bound session's code:
+// the availability defence the threat model names (#450 plan 8.1).
+// @internal
+#[test]
+fn a_bystanders_echo_does_not_move_a_bound_sessions_code() {
+    let (_, mut alice, _bob) = exchange(&EVERY_LAYOUT, &EVERY_LAYOUT, 2);
+    assert!(alice.peer_session_id().is_some(), "precondition: bound");
+    let alice_layout = alice.get_display_qr().unwrap().layout;
+    let steered_to = (alice_layout + 5) % LAYOUT_COUNT;
+    let mut bystander = MultiStageSession::new(card(0xCC));
+    let mut third = MultiStageSession::new(card(0xDD)).with_start_layout(steered_to);
+    for _ in 0..5 {
+        bystander.process_scanned_qr(&third.get_display_qr().unwrap().data);
+    }
+    let foreign = bystander.get_display_qr().expect("advertises");
+    let foreign_echo = parse_frame(&foreign.data).unwrap().header;
+    assert!(
+        foreign_echo.echo().any(|reads| reads.layout == steered_to),
+        "precondition: the bystander echoes layout {steered_to}"
+    );
+
+    for _ in 0..5 {
+        alice.process_scanned_qr(&foreign.data);
+    }
+
+    assert_eq!(alice.get_display_qr().unwrap().layout, alice_layout);
+}
+
 /// Alice's DATA frames after she read Bob's opening frame carrying a header
 /// that reports `peer_reads` reads in his window.
 fn data_frame_lengths_for_a_peer_reporting(peer_reads: u8) -> Vec<usize> {

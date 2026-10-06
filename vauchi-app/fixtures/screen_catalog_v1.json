@@ -2218,7 +2218,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_adc8ab123b8d443b",
+                    "id": "field_fb7e9135b3fd9a4c",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2249,13 +2249,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:adc8ab123b8d443b",
+                    "id": "field_note:fb7e9135b3fd9a4c",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:adc8ab123b8d443b",
+                          "id": "field_note:fb7e9135b3fd9a4c",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2295,7 +2295,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_d72860642dbb6858",
+                    "id": "field_005c11a802dd92d7",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2326,13 +2326,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:d72860642dbb6858",
+                    "id": "field_note:005c11a802dd92d7",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:d72860642dbb6858",
+                          "id": "field_note:005c11a802dd92d7",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2372,7 +2372,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_b113636f79848883",
+                    "id": "field_c87a110ae3dc3847",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2403,13 +2403,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:b113636f79848883",
+                    "id": "field_note:c87a110ae3dc3847",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:b113636f79848883",
+                          "id": "field_note:c87a110ae3dc3847",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -4643,10 +4643,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "4BEC EDCC 78BC 4406 081A 5841 E1D5 ADE5 793F CEE2 38E2 F89F 95FA 6D8D BB2A 6599",
+                    "content": "D6AB DF24 B91B 9CFC 47FD FDB6 B29C 03C0 778A C85C 412E 819B C464 E410 A363 1C4C",
                     "style": "body",
                     "accessibility": {
-                      "label": "4BEC EDCC 78BC 4406 081A 5841 E1D5 ADE5 793F CEE2 38E2 F89F 95FA 6D8D BB2A 6599",
+                      "label": "D6AB DF24 B91B 9CFC 47FD FDB6 B29C 03C0 778A C85C 412E 819B C464 E410 A363 1C4C",
                       "description": null
                     }
                   }
@@ -4665,10 +4665,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "1C2B 5EF7 452A 6462 B34D 5178 E1BD 02F1 7E94 D77D 6D16 911C 5F67 24FC 8930 1DB0",
+                    "content": "B3E4 5852 26BB 7537 901F 0A4F 96EF C970 F8F4 E454 3026 8411 1F44 05C7 243E 8B29",
                     "style": "body",
                     "accessibility": {
-                      "label": "1C2B 5EF7 452A 6462 B34D 5178 E1BD 02F1 7E94 D77D 6D16 911C 5F67 24FC 8930 1DB0",
+                      "label": "B3E4 5852 26BB 7537 901F 0A4F 96EF C970 F8F4 E454 3026 8411 1F44 05C7 243E 8B29",
                       "description": null
                     }
                   }
@@ -5518,14 +5518,7 @@
             "surface_id": "settings",
             "revision": 1,
             "bar": {
-              "back": {
-                "interaction_id": "surface.1.context.presentation.back",
-                "label": "Back",
-                "accessibility_label": "Back",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": "back"
-              },
+              "back": null,
               "navigation": {
                 "interaction_id": "surface.1.context.presentation.navigation",
                 "label": "More",
@@ -6426,7 +6419,7 @@
                       {
                         "title": "Version",
                         "subtitle": null,
-                        "detail": "0.72.0",
+                        "detail": "0.73.0",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": null,
@@ -8619,7 +8612,7 @@
                             },
                             {
                               "title": "About",
-                              "subtitle": "Vauchi 0.72.0 · core 0.72.0",
+                              "subtitle": "Vauchi 0.73.0 · core 0.73.0",
                               "detail": null,
                               "icon_token": null,
                               "image_data": null,
@@ -9404,14 +9397,7 @@
             "surface_id": "device_management",
             "revision": 1,
             "bar": {
-              "back": {
-                "interaction_id": "surface.1.context.presentation.back",
-                "label": "Back",
-                "accessibility_label": "Back",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": "back"
-              },
+              "back": null,
               "navigation": {
                 "interaction_id": "surface.1.context.presentation.navigation",
                 "label": "More",
@@ -11326,7 +11312,14 @@
             "surface_id": "groups",
             "revision": 1,
             "bar": {
-              "back": null,
+              "back": {
+                "interaction_id": "surface.1.context.presentation.back",
+                "label": "Back",
+                "accessibility_label": "Back",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": "back"
+              },
               "navigation": {
                 "interaction_id": "surface.1.context.presentation.navigation",
                 "label": "More",
@@ -16601,7 +16594,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=_tbeh8fFAOVMmXXp-VyN5eu9NuGa0msr75qyIYil0g8&n=YNnSi_zMQz2OTs08V7LiNZJ6zjBdp0CHC5vECPbvESs",
+                    "content": "vauchi://exchange?pk=AHGGHuCQmW6_KQLnlASRT1At8PLveWn_m8QmVIBvfWI&n=5R95gygEqgbY4JZfc9HI_8R3EmNShzSGD0yQoRyCl8g",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17124,7 +17117,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,77,99,75,49,55,51,82,83,112,107,89,114,78,78,85,88,106,104,118,81,76,120,102,112,84,88,102,87,48,87,107,82,120,102,90,121,84,56,105,84,65,100,115,67,99,122,114,85,116,52,82,56,49,101,47,89,111,87,120,120,115,97,67,106,75,73,89,43,98,75,106,53,113,85,111,90,84,54,43,75,122,105,81,119,116,79,81,88,113,88,82,101,77,73,49,101,74,86,117,71,106,52,67,52,86,107,112,113,82,55,51,107,52,54,43,73,114,48,121,51,82,110,65,51,89,55,85,104,76,109,54,119,110,50,100,122,83,115,50,68,79,82,53,66,51,83,109,78,52,56,65,65,65,65,65,71,114,69,101,68,103,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,108,122,66,100,101,67,72,99,80,116,73,66,82,52,112,43,79,57,66,68,54,84,52,84,48,101,77,57,81,56,79,114,73,103,85,74,74,84,113,75,76,70,111,113,104,56,74,85,90,99,72,53,52,109,112,112,102,112,78,50,83,83,116,118,50,102,69,115,105,74,50,86,117,116,80,78,99,109,43,67,72,104,117,89,77],
+            "payload": [86,48,74,70,87,65,79,122,53,70,104,83,74,114,116,49,78,53,65,102,67,107,43,87,55,56,108,119,43,80,84,107,86,68,65,109,104,66,69,102,82,65,88,72,74,68,54,76,75,88,122,108,68,104,84,73,121,116,54,53,85,111,106,118,73,83,107,56,119,112,77,74,84,84,48,98,73,88,87,118,79,103,51,51,109,102,50,108,99,80,74,86,54,104,97,108,116,79,50,99,72,100,79,47,122,78,114,114,79,81,74,87,53,81,98,85,84,106,102,85,88,85,97,113,77,122,108,82,52,107,90,82,104,55,47,76,69,90,55,86,70,75,114,81,48,109,109,104,106,88,120,76,78,90,56,107,65,65,65,65,65,71,114,70,69,77,65,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,56,51,47,106,112,73,120,68,79,111,90,69,99,74,88,67,71,90,113,48,98,86,117,114,117,117,49,88,80,52,81,52,51,72,68,55,77,66,70,86,47,76,89,122,100,54,105,101,74,68,118,118,82,115,104,100,77,111,56,99,107,122,49,122,69,113,70,52,121,114,71,110,71,122,119,107,118,66,90,76,88,43,83,48,79],
             "is_initiator": true
           }
         }
@@ -17184,7 +17177,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00VT3/SG9JJJ82R8725GA.P:Z9395PJSM:DK%A35CH49D$DWGDW8D7WIF1R%SCU2HHF3*/V83GJQSBW5BGTFY5EWNF$B0.RYST1L2FSA.:GTRHV-GY2ADTL.7T11Vauchi User00"
+                      "INI30:0:0:00NY5ZVHTTA-71XSI/IB8VO /UP9BL+2RAH20AZSAQJ9*J5O.7YX12L46WGCNC7GP/DF%-UXE4O1F699JDCCIR28CRO47M2M$D%T39Y9RE86.7TX51X2O7W-6Q11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17258,30 +17251,6 @@
                                     "controls": [],
                                     "accessibility": {
                                       "label": "Use Front Camera",
-                                      "description": null
-                                    }
-                                  },
-                                  {
-                                    "title": "Cancel",
-                                    "subtitle": null,
-                                    "detail": null,
-                                    "icon_token": null,
-                                    "image_data": null,
-                                    "fallback_text": null,
-                                    "selected": false,
-                                    "enabled": true,
-                                    "activation": {
-                                      "interaction_id": "surface.1.interaction.1",
-                                      "label": "Cancel",
-                                      "accessibility_label": "Cancel",
-                                      "icon_token": null,
-                                      "enabled": true,
-                                      "shortcut": null
-                                    },
-                                    "secondary_actions": [],
-                                    "controls": [],
-                                    "accessibility": {
-                                      "label": "Cancel",
                                       "description": null
                                     }
                                   }
@@ -17414,7 +17383,7 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 107
+            "earliest_millis": 105
           }
         }
       ]
@@ -17532,30 +17501,6 @@
                                     "controls": [],
                                     "accessibility": {
                                       "label": "Use Rear Camera",
-                                      "description": null
-                                    }
-                                  },
-                                  {
-                                    "title": "Cancel",
-                                    "subtitle": null,
-                                    "detail": null,
-                                    "icon_token": null,
-                                    "image_data": null,
-                                    "fallback_text": null,
-                                    "selected": false,
-                                    "enabled": true,
-                                    "activation": {
-                                      "interaction_id": "surface.1.interaction.1",
-                                      "label": "Cancel",
-                                      "accessibility_label": "Cancel",
-                                      "icon_token": null,
-                                      "enabled": true,
-                                      "shortcut": null
-                                    },
-                                    "secondary_actions": [],
-                                    "controls": [],
-                                    "accessibility": {
-                                      "label": "Cancel",
                                       "description": null
                                     }
                                   }
@@ -17833,30 +17778,6 @@
                                     "controls": [],
                                     "accessibility": {
                                       "label": "Use Rear Camera",
-                                      "description": null
-                                    }
-                                  },
-                                  {
-                                    "title": "Cancel",
-                                    "subtitle": null,
-                                    "detail": null,
-                                    "icon_token": null,
-                                    "image_data": null,
-                                    "fallback_text": null,
-                                    "selected": false,
-                                    "enabled": true,
-                                    "activation": {
-                                      "interaction_id": "surface.1.interaction.1",
-                                      "label": "Cancel",
-                                      "accessibility_label": "Cancel",
-                                      "icon_token": null,
-                                      "enabled": true,
-                                      "shortcut": null
-                                    },
-                                    "secondary_actions": [],
-                                    "controls": [],
-                                    "accessibility": {
-                                      "label": "Cancel",
                                       "description": null
                                     }
                                   }
@@ -18154,7 +18075,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [28,43,94,247,69,42,100,98,179,77,81,120,225,189,2,241,126,148,215,125,109,22,145,28,95,103,36,252,137,48,29,176]
+            "payload": [179,228,88,82,38,187,117,55,144,31,10,79,150,239,201,112,248,244,228,84,48,38,132,17,31,68,5,199,36,62,139,41]
           }
         },
         {
@@ -18337,7 +18258,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [28,43,94,247,69,42,100,98,179,77,81,120,225,189,2,241,126,148,215,125,109,22,145,28,95,103,36,252,137,48,29,176]
+            "payload": [179,228,88,82,38,187,117,55,144,31,10,79,150,239,201,112,248,244,228,84,48,38,132,17,31,68,5,199,36,62,139,41]
           }
         },
         {
@@ -18520,7 +18441,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [28,43,94,247,69,42,100,98,179,77,81,120,225,189,2,241,126,148,215,125,109,22,145,28,95,103,36,252,137,48,29,176]
+            "payload": [179,228,88,82,38,187,117,55,144,31,10,79,150,239,201,112,248,244,228,84,48,38,132,17,31,68,5,199,36,62,139,41]
           }
         },
         {
@@ -22046,14 +21967,7 @@
             "surface_id": "settings",
             "revision": 1,
             "bar": {
-              "back": {
-                "interaction_id": "surface.1.context.presentation.back",
-                "label": "Zurück",
-                "accessibility_label": "Zurück",
-                "icon_token": null,
-                "enabled": true,
-                "shortcut": "back"
-              },
+              "back": null,
               "navigation": {
                 "interaction_id": "surface.1.context.presentation.navigation",
                 "label": "Mehr",

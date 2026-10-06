@@ -583,9 +583,9 @@ fn test_sender_index_multiple_contacts() {
 #[test]
 fn test_sender_index_stale_detection() {
     let contacts: Vec<Contact> = vec![];
-    let past_epoch = 1;
+    let past_epoch = 7;
     let index = SenderIndex::build(&contacts, past_epoch);
-    assert!(index.is_stale(0), "Index built for epoch 1 should be stale");
+    assert!(index.is_stale(0), "Index built for epoch 7 should be stale");
     assert_eq!(index.epoch(), past_epoch);
 }
 

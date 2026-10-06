@@ -754,7 +754,8 @@ mod tests {
     // @internal
     #[test]
     fn a_guardian_backup_of_exactly_the_size_ceiling_is_not_too_large() {
-        let mut at_ceiling = vec![0u8; MAX_GUARDIAN_BACKUP_BYTES];
+        let thirty_two_mib = 32 * 1024 * 1024;
+        let mut at_ceiling = vec![0u8; thirty_two_mib];
         at_ceiling[0] = GUARDIAN_BACKUP_VERSION;
         at_ceiling[1] = 2;
         at_ceiling[2] = 3;

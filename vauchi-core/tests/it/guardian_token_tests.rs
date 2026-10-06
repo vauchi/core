@@ -120,4 +120,13 @@ fn test_domain_separation() {
         !pk.verify(&raw_data, &sig),
         "raw concatenation without domain prefix must not verify (domain separation enforced)"
     );
+    let tagged: Vec<u8> = [b"vauchi-recovery-guardian-v1".as_slice(), &raw_data]
+        .concat()
+        .into_iter()
+        .chain(token.created_at().to_le_bytes())
+        .collect();
+    assert!(
+        pk.verify(&tagged, &sig),
+        "the exposed signature covers domain || designator || guardian || created_at"
+    );
 }

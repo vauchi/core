@@ -43,13 +43,20 @@ fn pending(contact_id: &str, payload: Vec<u8>) -> PendingUpdate {
 }
 
 fn queue_sendable_update(storage: &Storage, contact_id: &str, shared: &SymmetricKey) {
+    queue_sendable_update_as(storage, contact_id, shared, "update");
+}
+
+fn queue_sendable_update_as(storage: &Storage, contact_id: &str, shared: &SymmetricKey, id: &str) {
     let peer_dh = X3DHKeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(shared, *peer_dh.public_key()).unwrap();
     let msg = ratchet.encrypt(b"payload").unwrap();
     storage
         .pending()
-        .queue_update(&pending(contact_id, serde_json::to_vec(&msg).unwrap()))
+        .queue_update(&PendingUpdate {
+            id: id.into(),
+            ..pending(contact_id, serde_json::to_vec(&msg).unwrap())
+        })
         .unwrap();
 }
 
@@ -110,6 +117,13 @@ fn reconnecting_reports_retries_only_when_some_ran() {
 fn controller_with_one_contact(
     storage: &Storage,
 ) -> (SendPhase<'_, MockTransport>, String, SymmetricKey) {
+    controller_reporting_to(storage, Arc::new(EventDispatcher::new()))
+}
+
+fn controller_reporting_to(
+    storage: &Storage,
+    events: Arc<EventDispatcher>,
+) -> (SendPhase<'_, MockTransport>, String, SymmetricKey) {
     let shared = SymmetricKey::generate();
     let contact = Contact::from_exchange([0x33u8; 32], ContactCard::new("Peer"), shared.clone(), 0);
     let contact_id = contact.id().to_string();
@@ -124,12 +138,8 @@ fn controller_with_one_contact(
         .ratchets()
         .save_ratchet_state_for_device(&contact_id, &[0x44; 32], &ratchet, true)
         .unwrap();
-    let mut controller = SendPhase::new(
-        create_test_relay(),
-        storage,
-        SyncConfig::default(),
-        Arc::new(EventDispatcher::new()),
-    );
+    let mut controller =
+        SendPhase::new(create_test_relay(), storage, SyncConfig::default(), events);
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
@@ -209,4 +219,31 @@ fn a_pending_change_is_sealed_for_the_device_it_is_addressed_to() {
         .decrypt_from_device(phone.exchange_public_key(), &ciphertext)
         .expect("only the addressed device's key opens it");
     assert!(String::from_utf8_lossy(&plaintext).contains("+41 79"));
+}
+
+// @internal
+#[test]
+fn sync_reports_progress_counting_up_to_the_total() {
+    use std::sync::Mutex;
+    let storage = create_test_storage();
+    let events = Arc::new(EventDispatcher::new());
+    let progress = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&progress);
+    events.on_event(move |event| {
+        if let VauchiEvent::SyncProgress {
+            total, processed, ..
+        } = event
+        {
+            sink.lock().unwrap().push((processed, total));
+        }
+    });
+    let (mut controller, contact_id, shared) = controller_reporting_to(&storage, events);
+    queue_sendable_update_as(&storage, &contact_id, &shared, "first");
+    queue_sendable_update_as(&storage, &contact_id, &shared, "second");
+
+    controller
+        .sync(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+
+    assert_eq!(*progress.lock().unwrap(), [(1, 2), (2, 2)]);
 }

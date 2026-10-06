@@ -271,3 +271,15 @@ fn group_contacts_by_relay() {
     assert!(alice_relay.contains(&"Carol"));
     assert!(groups.get("https://dave.relay").unwrap().contains(&"Dave"));
 }
+
+// @internal
+#[test]
+fn the_manager_counts_every_configured_relay() {
+    let config = MultiRelayConfig::builder()
+        .primary_relay("https://home.relay")
+        .add_relay("https://backup.relay")
+        .build()
+        .unwrap();
+
+    assert_eq!(MultiRelayManager::new(config).relay_count(), 2);
+}

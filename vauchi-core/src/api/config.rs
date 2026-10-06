@@ -139,9 +139,19 @@ impl VauchiConfig {
         }
     }
 
-    /// Sets the relay server URL.
+    /// Sets the relay server URL. Clears any OHTTP trust anchor: it belonged
+    /// to the previous relay (decision 0.9); use [`Self::with_relay`] to set
+    /// the new relay's.
     pub fn with_relay_url(mut self, url: impl Into<String>) -> Self {
         self.relay.server_url = url.into();
+        self.relay.ohttp_anchor = None;
+        self
+    }
+
+    /// Sets the relay server URL together with its OHTTP trust anchor.
+    pub fn with_relay(mut self, url: impl Into<String>, ohttp_anchor: [u8; 32]) -> Self {
+        self.relay.server_url = url.into();
+        self.relay.ohttp_anchor = Some(ohttp_anchor);
         self
     }
 
@@ -253,6 +263,15 @@ pub struct RelayConfig {
     /// does not serve `/v2/ohttp` and leaks client IP (problem
     /// 2026-05-25-relay-ohttp-forward-hop-502).
     pub ohttp_relay_url: Option<String>,
+
+    /// Ed25519 trust anchor of `server_url`'s OHTTP gateway (#288,
+    /// decisions 0.6 and 0.9): its gateway keys are accepted only through a
+    /// chain signed by this key. Set together with the URL through
+    /// [`VauchiConfig::with_relay`]; a new URL alone clears it.
+    ///
+    /// `None` (default) means Vauchi's anchor for the production relay and
+    /// no anchor for any other relay — see [`Self::ohttp_trust_anchor`].
+    pub ohttp_anchor: Option<[u8; 32]>,
 }
 
 /// SPKI SHA-256 pin for relay.vauchi.app leaf certificate.
@@ -322,6 +341,7 @@ impl Default for RelayConfig {
             pin_ttl_secs: 86_400,        // 24 hours
             pin_config_verify_key: None, // disabled until relay signs pin-config
             ohttp_relay_url: None,       // derived from server_url (see ohttp_endpoint)
+            ohttp_anchor: None,          // production resolves to PROD_OHTTP_ANCHOR
         }
     }
 }
@@ -332,6 +352,11 @@ pub(crate) const PROD_RELAY_HOST: &str = "relay.vauchi.app";
 /// startup seed guard (a persisted relay URL is applied only when config
 /// still holds this default, so an explicit `with_relay_url` override wins).
 pub(crate) const DEFAULT_RELAY_URL: &str = "https://relay.vauchi.app";
+/// Vauchi's OHTTP trust anchor for the production relay (#288). `None` until
+/// the first ceremony (`runbooks/2026-10-06-ohttp-anchor-ceremony.md` §2)
+/// has created it; set it then, test first, like an SPKI pin.
+pub(crate) const PROD_OHTTP_ANCHOR: Option<[u8; 32]> = None;
+
 /// Production OHTTP relay (IP-stripping hop, ADR-037) the client sends
 /// OHTTP traffic to when the data relay is `relay.vauchi.app`.
 pub(crate) const PROD_OHTTP_RELAY_URL: &str = "https://ohttp.vauchi.app";
@@ -391,6 +416,17 @@ impl RelayConfig {
             ohttp_pinned_certs: Vec::new(),
             ..Default::default()
         }
+    }
+
+    /// The anchor `server_url`'s gateway keys must chain to: the configured
+    /// one, else Vauchi's for the exact production host, else none — a
+    /// relay without an anchor gets no OHTTP key accepted (decision 0.9).
+    pub fn ohttp_trust_anchor(&self) -> Option<[u8; 32]> {
+        self.ohttp_anchor.or_else(|| {
+            is_production_relay(&self.server_url)
+                .then_some(PROD_OHTTP_ANCHOR)
+                .flatten()
+        })
     }
 
     /// The OHTTP endpoint this configuration sends to — the base URL for

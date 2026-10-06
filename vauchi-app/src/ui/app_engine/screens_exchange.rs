@@ -64,10 +64,11 @@ impl AppEngine {
 
 /// A short window's exchange screen: no mode row, and the heading over the
 /// own code becomes its spoken label, so the camera under the code keeps a
-/// usable size (#513). The title still names the mode, and the own code
-/// asks for the compact square: at 320 pt Hover's code pushed the tab bar
-/// off an iPhone SE and covered the camera on a Samsung S7 (#534). Glance
-/// also drops its subtitle.
+/// usable size (#513). The title still names the mode. Glance also drops
+/// its subtitle and asks for a compact code: its bootstrap code is small and
+/// read at arm's length. Hover keeps the standard square, because a Samsung
+/// S7's front camera at 8 cm could not read an iPhone SE's compact one
+/// (rig, #534).
 fn compact_exchange_screen(
     mut screen: crate::ui::ScreenModel,
     glance: bool,
@@ -89,7 +90,9 @@ fn compact_exchange_screen(
                     .label
                     .get_or_insert(heading);
             }
-            *size = Some(vauchi_core::platform::PresentationQrSize::Compact);
+            if glance {
+                *size = Some(vauchi_core::platform::PresentationQrSize::Compact);
+            }
         }
     }
     screen

@@ -57,11 +57,8 @@ pub fn pad(plaintext: &[u8]) -> Vec<u8> {
 
     padded.extend_from_slice(plaintext);
 
-    let padding_len = target_size - needed;
-    if padding_len > 0 {
-        padded.resize(target_size, 0);
-        random_fill(&mut padded[needed..]);
-    }
+    padded.resize(target_size, 0);
+    random_fill(&mut padded[needed..]);
 
     padded
 }

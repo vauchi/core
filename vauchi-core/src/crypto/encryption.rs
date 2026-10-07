@@ -185,7 +185,6 @@ pub fn decrypt(key: &SymmetricKey, ciphertext: &[u8]) -> Result<Vec<u8>, Encrypt
     }
 
     match ciphertext[0] {
-        ALG_TAG_XCHACHA20_AD => Err(EncryptionError::DecryptionFailed), // Requires AD
         ALG_TAG_XCHACHA20 => decrypt_xchacha20(key, &ciphertext[1..]),
         _ => Err(EncryptionError::DecryptionFailed),
     }

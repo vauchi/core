@@ -114,6 +114,19 @@ exclude_re = [
     "vauchi-core/src/api/send_phase\\.rs:236:39: replace \\+= with [-*]= in SendPhase<'a, T>::sync$",
     "vauchi-core/src/api/send_phase\\.rs:186:75: replace \\+ with [-*] in SendPhase<'a, T>::sync$",
 
+    # Crypto (vauchi/private#522):
+    # - is_valid_bucket_size accepts 4096 by equality already, and 4096 is a
+    #   multiple of the 256-byte overflow alignment, so `>` and `>=` agree.
+    # - The reduced Argon2 memory cost exists only under `test-kdf`, which the
+    #   mutation build (`--features testing`) does not enable.
+    # - DoubleRatchetState's Drop zeroizes the root key; freed memory is not
+    #   observable from a safe test. Its compile-time zeroize contract is still
+    #   open (zeroize_contract_tests lists why; tracked in
+    #   problems/2026-07-05-prose-rules-to-deterministic-lints/).
+    "vauchi-core/src/crypto/padding\\.rs:95:17: replace > with >= in is_valid_bucket_size$",
+    "vauchi-core/src/crypto/password_kdf\\.rs:31:41: replace \\* with [+/]$",
+    "vauchi-core/src/crypto/ratchet\\.rs:[0-9]+:[0-9]+: replace <impl Drop for DoubleRatchetState>::drop with \\(\\)$",
+
     # duress_settings.created_at / updated_at are written but never read by
     # any API, so the time stamped there is unobservable (vauchi/private#522).
     "vauchi-core/src/storage/stores/duress\\.rs:[0-9]+:[0-9]+: replace DuressStore<'_>::now_secs -> u64 with ",

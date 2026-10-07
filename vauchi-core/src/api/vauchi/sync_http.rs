@@ -1049,6 +1049,27 @@ impl Vauchi {
         }
     }
 
+    /// [`Self::build_relay_transport`] for a one-off relay action (an
+    /// exchange, escrow, a guardian or device-link request), which can be
+    /// the first thing a client does: on an anchored relay with no usable
+    /// held key, the signed key is fetched first (#288). Without it the
+    /// transport has no OHTTP route and the action fails before sending.
+    pub fn build_action_relay_transport(
+        &self,
+        application_relay_url: &str,
+        timeout_ms: u64,
+    ) -> HttpTransport {
+        if let Some(anchor) = self.config.relay.ohttp_trust_anchor()
+            && self.usable_held_ohttp_key().is_none()
+        {
+            // A failed fetch leaves the transport without a key, and the
+            // action reports the same fail-closed error as before.
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.resolve_signed_ohttp_key(&self.http_relay_url(), &anchor, false);
+        }
+        self.build_relay_transport(application_relay_url, timeout_ms)
+    }
+
     /// Build a fail-closed `HttpTransport` for application relay actions.
     ///
     /// The outer endpoint is derived internally so callers cannot accidentally

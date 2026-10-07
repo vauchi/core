@@ -380,13 +380,6 @@ impl NfcHandshakeSession {
     }
 }
 
-impl Drop for NfcHandshakeSession {
-    fn drop(&mut self) {
-        // SymmetricKey has ZeroizeOnDrop; clear our Option explicitly
-        self.shared_key = None;
-    }
-}
-
 /// Verifies a peer offer/ack: not expired, and carries a valid Ed25519
 /// signature. Single choke point for both handshake entry points — the
 /// signature is what authenticates each ephemeral key to its identity.
@@ -535,6 +528,30 @@ mod tests {
         assert_eq!(
             build_hkdf_info(&a_id, &a_eph, &b_id, &b_eph, &eid),
             build_hkdf_info(&b_id, &b_eph, &a_id, &a_eph, &eid),
+        );
+    }
+
+    // The info string is the wire contract: the domain tag, then the lower
+    // (identity || ephemeral) pair, the higher pair, and the exchange id.
+    // @internal
+    #[test]
+    fn hkdf_info_puts_the_lower_pair_first() {
+        let (low_id, low_eph) = ([1u8; 32], [2u8; 32]);
+        let (high_id, high_eph) = ([3u8; 32], [4u8; 32]);
+        let eid = [9u8; 32];
+        let expected = [
+            NFC_HANDSHAKE_INFO,
+            &low_id,
+            &low_eph,
+            &high_id,
+            &high_eph,
+            &eid,
+        ]
+        .concat();
+
+        assert_eq!(
+            build_hkdf_info(&high_id, &high_eph, &low_id, &low_eph, &eid),
+            expected
         );
     }
 

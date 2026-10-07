@@ -545,17 +545,6 @@ impl ExchangeSession {
         }
     }
 
-    /// Returns the exchange payload data string for sending over a direct transport.
-    ///
-    /// Only available in `AwaitingDirectPayload` state. The returned string
-    /// is the same format as QR data (base64-encoded, signed).
-    pub fn our_exchange_payload(&self) -> Option<String> {
-        match &self.state {
-            ExchangeState::AwaitingDirectPayload { our_qr } => Some(our_qr.to_data_string()),
-            _ => None,
-        }
-    }
-
     /// Returns the current state.
     pub fn state(&self) -> &ExchangeState {
         &self.state
@@ -564,19 +553,6 @@ impl ExchangeSession {
     /// Returns `true` if the exchange completed successfully.
     pub fn is_complete(&self) -> bool {
         matches!(self.state, ExchangeState::Complete { .. })
-    }
-
-    /// Returns `true` if the exchange failed.
-    pub fn is_failed(&self) -> bool {
-        matches!(self.state, ExchangeState::Failed { .. })
-    }
-
-    /// Returns the failure reason, if the session is in `Failed` state.
-    pub fn failure_reason(&self) -> Option<&ExchangeError> {
-        match &self.state {
-            ExchangeState::Failed { error } => Some(error),
-            _ => None,
-        }
     }
 
     /// Extracts the completed contact, consuming the `Complete` state.

@@ -774,3 +774,96 @@ fn recovery_accepts_twenty_responses_and_refuses_twenty_one() {
     );
     assert!(over_cap.is_err());
 }
+
+/// Recovery keeps one more distinct response than the guardian count, so a
+/// wrong-but-valid share per guardian still leaves room for the honest pair.
+// @scenario: backup_format_versioning :: Guardian recovery tolerates one bad response
+#[test]
+fn recovery_finds_the_honest_shares_among_wrong_and_repeated_ones() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+    let (backup_hex, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+    let mut recovering = Vauchi::in_memory().unwrap();
+    recovering.create_identity("Alice Recovered").unwrap();
+    let recovering_pk = signing_pk(&recovering);
+    let recipient = recovering
+        .identity()
+        .unwrap()
+        .signing_keypair()
+        .public_key()
+        .to_x25519()
+        .unwrap();
+    let wrong = |i: usize| {
+        let secret = guardians[i]
+            .identity()
+            .unwrap()
+            .signing_keypair()
+            .to_x25519_secret();
+        let mut bytes = open_share_for_guardian(&sealed_shares[i], &secret)
+            .unwrap()
+            .to_bytes();
+        let last = bytes.len() - 1;
+        bytes[last] ^= 0x80;
+        seal_share_for_guardian(&BackupKeyShard::from_bytes(&bytes).unwrap(), &recipient).unwrap()
+    };
+    let honest = |i: usize| {
+        guardians[i]
+            .respond_to_recovery(&sealed_shares[i], &recovering_pk)
+            .unwrap()
+    };
+
+    let recovered = |responses: &[Vec<u8>]| {
+        recovering
+            .recover_guardian_backup(&backup_hex, responses)
+            .map(|envelope| envelope.sections.identity.display_name)
+    };
+
+    assert_eq!(
+        recovered(&[wrong(0), wrong(1), honest(0), honest(1)]).unwrap(),
+        "Alice Smith"
+    );
+    assert_eq!(
+        recovered(&[honest(0), honest(0), honest(0), honest(0), honest(1)]).unwrap(),
+        "Alice Smith",
+        "repeats of one response count once"
+    );
+    assert_eq!(
+        recovered(&[wrong(0), honest(0), honest(1)]).unwrap(),
+        "Alice Smith",
+        "a wrong share does not hide the honest one at its index"
+    );
+    assert!(
+        recovered(&[wrong(0), wrong(1), wrong(2)]).is_err(),
+        "every combination tried, none authenticates"
+    );
+}
+
+// @internal
+#[test]
+fn each_guardian_share_carries_its_own_nonzero_index() {
+    let alice = setup_vauchi_with_data();
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+    let (_, sealed_shares) = alice
+        .export_guardian_backup_with_shards(&guardian_pks, 2)
+        .unwrap();
+
+    let mut indices: Vec<u8> = guardians
+        .iter()
+        .zip(&sealed_shares)
+        .map(|(guardian, sealed)| {
+            let secret = guardian
+                .identity()
+                .unwrap()
+                .signing_keypair()
+                .to_x25519_secret();
+            open_share_for_guardian(sealed, &secret).unwrap().index()
+        })
+        .collect();
+    indices.sort();
+
+    assert_eq!(indices, [1, 2, 3]);
+}

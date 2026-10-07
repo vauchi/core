@@ -767,4 +767,61 @@ mod tests {
             Err(BackupError::TooLarge)
         ));
     }
+
+    // @internal
+    #[test]
+    fn uncompressed_backup_bytes_pass_through_up_to_the_limit() {
+        let at_limit = vec![b'{'; 8];
+
+        assert_eq!(
+            decompress_backup_with_limit(&at_limit, 8).unwrap(),
+            at_limit
+        );
+        assert!(matches!(
+            decompress_backup_with_limit(&[b'{'; 9], 8),
+            Err(BackupError::TooLarge)
+        ));
+        assert_eq!(
+            decompress_backup_with_limit(&[], 8).unwrap(),
+            Vec::<u8>::new()
+        );
+    }
+
+    // The input-size shortcut applies only to uncompressed bytes: a zlib
+    // stream larger than the limit may still inflate to something within it.
+    // @internal
+    #[test]
+    fn a_compressed_backup_is_judged_by_its_inflated_size() {
+        let small = compress_backup(b"ab").unwrap();
+        assert!(small.len() > 4);
+        let exactly_eight = compress_backup(&[7u8; 8]).unwrap();
+
+        assert_eq!(decompress_backup_with_limit(&small, 4).unwrap(), b"ab");
+        assert_eq!(
+            decompress_backup_with_limit(&exactly_eight, 8).unwrap(),
+            [7u8; 8]
+        );
+    }
+
+    // @internal
+    #[test]
+    fn a_full_backup_may_inflate_to_more_than_a_mebibyte() {
+        let two_mib = vec![b' '; 2 * 1024 * 1024];
+        let compressed = compress_backup(&two_mib).unwrap();
+
+        assert_eq!(decompress_backup(&compressed).unwrap().len(), two_mib.len());
+    }
+
+    // @internal
+    #[test]
+    fn backup_hex_up_to_twice_the_byte_limit_decodes() {
+        assert_eq!(
+            decode_backup_hex_with_limit("0a0b", 2).unwrap(),
+            [0x0a, 0x0b]
+        );
+        assert!(matches!(
+            decode_backup_hex_with_limit("0a0b0c", 2),
+            Err(BackupError::TooLarge)
+        ));
+    }
 }

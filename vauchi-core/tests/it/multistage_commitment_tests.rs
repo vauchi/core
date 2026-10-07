@@ -169,3 +169,29 @@ fn test_commitment_with_context_decryption_unchanged() {
     let decrypted = commitment.open().unwrap();
     assert_eq!(decrypted, plaintext);
 }
+
+// A received ciphertext must carry at least a nonce and a tag (40 bytes);
+// anything shorter is refused rather than split, and an empty payload is
+// exactly that long.
+// @internal
+#[test]
+fn opening_needs_at_least_a_nonce_and_a_tag() {
+    use vauchi_core::exchange::multistage::commitment::CommitmentError;
+
+    let empty = Commitment::create(b"").unwrap();
+    assert_eq!(empty.ciphertext().len(), 40);
+    assert_eq!(
+        Commitment::open_with_key(empty.reveal_key(), empty.ciphertext()).unwrap(),
+        b""
+    );
+
+    for len in [0, 8, 23, 39] {
+        assert!(
+            matches!(
+                Commitment::open_with_key(&[7u8; 32], &vec![0u8; len]),
+                Err(CommitmentError::DecryptionFailed)
+            ),
+            "{len} bytes"
+        );
+    }
+}

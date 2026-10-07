@@ -155,6 +155,9 @@ exclude_re = [
     # Commitment's Drop zeroizes the reveal key; freed memory is not
     # observable from a safe test.
     "vauchi-core/src/exchange/multistage/commitment\\.rs:[0-9]+:[0-9]+: replace <impl Drop for Commitment>::drop with \\(\\)$",
+    # get_display_qr compares the training summary only to decide whether to
+    # write a dev-logging line; it changes no frame.
+    "vauchi-core/src/exchange/multistage/session\\.rs:1064:33: replace != with == in MultiStageSession::get_display_qr$",
 
     # duress_settings.created_at / updated_at are written but never read by
     # any API, so the time stamped there is unobservable (vauchi/private#522).

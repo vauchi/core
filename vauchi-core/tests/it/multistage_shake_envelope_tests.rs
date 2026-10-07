@@ -292,3 +292,134 @@ fn a_settled_session_reports_the_layout_it_keeps_showing() {
     assert_eq!(settled, 7);
     assert_eq!(alice.get_display_qr().unwrap().layout, settled);
 }
+
+/// Alice in Confirming with a transport key and the shake stage listening,
+/// but no samples recorded yet; Bob is her bound peer.
+fn alice_listening_without_samples() -> (MultiStageSession, MultiStageSession) {
+    let mut alice = MultiStageSession::new(b"name:Alice".to_vec());
+    let mut bob = MultiStageSession::new(b"name:Bob".to_vec());
+    alice
+        .set_accel_proximity(AccelerometerProximityState::Listening)
+        .unwrap();
+    for _ in 0..2000 {
+        if let Some(aq) = alice.get_display_qr() {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = bob.get_display_qr() {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if alice.get_state() == ProtocolState::Confirming && alice.get_transport_key().is_some() {
+            return (alice, bob);
+        }
+    }
+    panic!("Alice never reached Confirming with a transport_key");
+}
+
+// Listening is not enough to send or judge a shake: with nothing recorded
+// there is no envelope to seal and nothing to correlate a peer's against.
+// @internal
+#[test]
+fn a_listening_session_with_no_samples_neither_sends_nor_judges_a_shake() {
+    let (mut alice, bob) = alice_listening_without_samples();
+    assert_eq!(alice.accel_envelope_len(), 0);
+
+    for _ in 0..14 {
+        if let Some(p) = alice.get_display_qr() {
+            assert!(!matches!(parse_qr(&p.data), Ok(StageQr::Shake { .. })));
+        }
+    }
+    alice.process_scanned_qr(&peer_shake_qr(&bob, &shake_impulse()));
+
+    assert_eq!(
+        alice.accel_proximity(),
+        AccelerometerProximityState::Listening
+    );
+}
+
+// @internal
+#[test]
+fn the_shake_envelope_grows_by_the_samples_recorded_while_listening() {
+    let (mut alice, _bob) = alice_listening_without_samples();
+
+    alice.record_accel_envelope_samples(&shake_impulse());
+    alice.record_accel_envelope_samples(&[1.0, 2.0, 3.0]);
+
+    assert_eq!(alice.accel_envelope_len(), shake_impulse().len() + 3);
+}
+
+// Each listening stage gives up exactly when its timeout has elapsed:
+// 5 seconds for audio, 8 for the accelerometer.
+// @internal
+#[test]
+fn listening_stages_time_out_exactly_at_their_limit() {
+    use std::sync::Arc;
+    use std::time::Duration;
+    use vauchi_core::exchange::multistage::types::AudioProximityState;
+    use vauchi_core::monotonic::{FakeMonotonicClock, MonotonicClock};
+
+    let clock = Arc::new(FakeMonotonicClock::new());
+    let mut session = MultiStageSession::new(b"name:Alice".to_vec()).with_monotonic(clock.clone());
+    let started = clock.now();
+    session
+        .set_audio_proximity(AudioProximityState::Listening)
+        .unwrap();
+    session
+        .set_accel_proximity(AccelerometerProximityState::Listening)
+        .unwrap();
+
+    let audio_limit = started + Duration::from_secs(5);
+    assert!(
+        !session
+            .check_and_apply_audio_timeout(audio_limit - Duration::from_millis(1))
+            .unwrap()
+    );
+    assert!(session.check_and_apply_audio_timeout(audio_limit).unwrap());
+
+    let accel_limit = started + Duration::from_secs(8);
+    assert!(
+        !session
+            .check_and_apply_accel_timeout(accel_limit - Duration::from_millis(1))
+            .unwrap()
+    );
+    assert!(session.check_and_apply_accel_timeout(accel_limit).unwrap());
+}
+
+// INID (INIT with the whole payload) is no longer sent, but a peer that sends
+// one still completes Stage 1 and delivers its whole payload in a single
+// frame; we then only have our own chunks left to send.
+// @internal
+#[test]
+fn a_received_inid_frame_delivers_the_peer_payload_in_one_read() {
+    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::multistage::commitment::Commitment;
+    use vauchi_core::exchange::multistage::qr_codec::format_in2d_qr;
+
+    let mut bob = MultiStageSession::new(b"name:Bob".to_vec());
+    bob.get_display_qr().unwrap();
+    let peer_sid = [5u8; 16];
+    let commitment = Commitment::create(b"name:Peer").unwrap();
+    let inid = format_in2d_qr(
+        &peer_sid,
+        X3DHKeyPair::generate().public_key(),
+        commitment.hash(),
+        "Peer",
+        None,
+        commitment.ciphertext(),
+    );
+
+    bob.process_scanned_qr(&inid);
+
+    assert_eq!(bob.peer_session_id(), Some(peer_sid));
+    assert!(
+        matches!(
+            bob.get_state(),
+            ProtocolState::Transferring {
+                chunks_received: 1,
+                peer_chunks_total: 1,
+                ..
+            }
+        ),
+        "{:?}",
+        bob.get_state()
+    );
+}

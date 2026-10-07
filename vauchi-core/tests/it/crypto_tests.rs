@@ -355,3 +355,57 @@ fn test_encrypt_empty_data() {
         "Empty data roundtrip should work"
     );
 }
+
+// @internal
+#[test]
+fn chain_and_message_key_debug_show_the_generation_and_redact_the_key() {
+    let chain = vauchi_core::crypto::ChainKey::with_generation([0xAB; 32], 7);
+    let (message_key, _) = chain.ratchet().unwrap();
+
+    for text in [format!("{chain:?}"), format!("{message_key:?}")] {
+        assert!(text.contains("[REDACTED]"), "{text}");
+        assert!(text.contains("generation: 7"), "{text}");
+        assert!(!text.contains("171"), "the key byte 0xAB leaked: {text}");
+    }
+}
+
+// @internal
+#[test]
+fn skipping_from_a_later_generation_derives_only_the_gap() {
+    let chain = vauchi_core::crypto::ChainKey::with_generation([0x11; 32], 5);
+
+    let (skipped, next) = chain.skip_to(8).unwrap();
+
+    assert_eq!(skipped.len(), 3);
+    assert_eq!(
+        skipped
+            .iter()
+            .map(|key| key.generation())
+            .collect::<Vec<_>>(),
+        [5, 6, 7]
+    );
+    assert_eq!(next.generation(), 8);
+}
+
+// @internal
+#[test]
+fn public_keys_are_equal_exactly_when_their_bytes_are() {
+    let alice = SigningKeyPair::generate().public_key();
+    let bob = SigningKeyPair::generate().public_key();
+
+    assert_eq!(
+        alice,
+        vauchi_core::crypto::PublicKey::from_bytes(*alice.as_bytes())
+    );
+    assert_ne!(alice, bob);
+}
+
+// @internal
+#[test]
+fn an_empty_message_unpads_from_a_bare_length_prefix() {
+    assert_eq!(
+        vauchi_core::crypto::padding::unpad(&[0, 0, 0, 0]),
+        Some(Vec::new())
+    );
+    assert_eq!(vauchi_core::crypto::padding::unpad(&[0, 0, 0]), None);
+}

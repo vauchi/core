@@ -449,3 +449,107 @@ fn test_ratchet_deserialize_accepts_current_and_legacy_version() {
     serialized_v0.version = 0;
     DoubleRatchetState::deserialize(serialized_v0).expect("expected success");
 }
+
+/// Alice and Bob after `rounds` full exchanges (Alice → Bob, Bob → Alice),
+/// so both have stepped the DH ratchet `rounds` times each way.
+fn pair_after_rounds(rounds: usize) -> (DoubleRatchetState, DoubleRatchetState) {
+    let (mut alice, mut bob) = create_test_pair();
+    for _ in 0..rounds {
+        let ping = alice.encrypt(b"ping").unwrap();
+        bob.decrypt(&ping).unwrap();
+        let pong = bob.encrypt(b"pong").unwrap();
+        alice.decrypt(&pong).unwrap();
+    }
+    (alice, bob)
+}
+
+// The AEAD binds the whole header, including fields the key derivation does
+// not read, so a relay cannot rewrite them undetected.
+// @internal
+#[test]
+fn a_message_with_an_edited_header_does_not_decrypt() {
+    let (mut alice, mut bob) = pair_after_rounds(1);
+    let message = alice.encrypt(b"bound").unwrap();
+    let mut edited = message.clone();
+    edited.previous_chain_length += 1;
+
+    assert!(bob.decrypt(&edited).is_err());
+    assert_eq!(bob.decrypt(&message).unwrap(), b"bound");
+}
+
+// A message held back while both sides stepped the DH ratchet still decrypts
+// with the key skipped for its own generation.
+// @internal
+#[test]
+fn a_late_message_from_an_earlier_generation_still_decrypts() {
+    let (mut alice, mut bob) = pair_after_rounds(2);
+    let delivered = alice.encrypt(b"first").unwrap();
+    let held_back = alice.encrypt(b"held back").unwrap();
+    bob.decrypt(&delivered).unwrap();
+    let reply = bob.encrypt(b"reply").unwrap();
+    alice.decrypt(&reply).unwrap();
+    let next_generation = alice.encrypt(b"next").unwrap();
+    assert!(next_generation.dh_generation > held_back.dh_generation);
+
+    assert_eq!(bob.decrypt(&next_generation).unwrap(), b"next");
+    assert_eq!(bob.decrypt(&held_back).unwrap(), b"held back");
+}
+
+// @internal
+#[test]
+fn skipping_counts_only_the_messages_after_the_last_received() {
+    let (mut alice, mut bob) = create_test_pair();
+    let messages: Vec<_> = (0..1011).map(|_| alice.encrypt(b"m").unwrap()).collect();
+    for message in &messages[..10] {
+        bob.decrypt(message).unwrap();
+    }
+
+    let thousand_later = bob.decrypt(&messages[1010]);
+
+    assert_eq!(thousand_later.unwrap(), b"m");
+}
+
+// @internal
+#[test]
+fn the_serialized_state_records_counts_and_generation() {
+    let (mut alice, mut bob) = pair_after_rounds(2);
+    for _ in 0..3 {
+        let message = alice.encrypt(b"m").unwrap();
+        bob.decrypt(&message).unwrap();
+    }
+
+    let serialized = bob.serialize();
+
+    assert_eq!(serialized.recv_message_count, 3);
+    assert_eq!(bob.dh_generation(), serialized.dh_generation);
+    assert!(bob.dh_generation() > 1, "{}", bob.dh_generation());
+}
+
+// @internal
+#[test]
+fn a_saved_state_from_before_versioning_loads_as_version_one() {
+    let (alice, _) = create_test_pair();
+    let mut json = serde_json::to_value(alice.serialize()).unwrap();
+    json.as_object_mut().unwrap().remove("version");
+
+    let state: vauchi_core::crypto::ratchet::SerializedRatchetState =
+        serde_json::from_value(json).unwrap();
+
+    assert_eq!(state.version, 1);
+}
+
+// Debug output reaches logs and panics, so it must carry counters only.
+// @internal
+#[test]
+fn ratchet_debug_output_shows_counters_and_no_key_material() {
+    let (alice, _) = pair_after_rounds(1);
+    let serialized = alice.serialize();
+
+    for text in [format!("{alice:?}"), format!("{serialized:?}")] {
+        assert!(text.contains("dh_generation"), "{text}");
+        assert!(text.contains("send_message_count"), "{text}");
+        for secret in ["root_key", "send_chain", "recv_chain"] {
+            assert!(!text.contains(secret), "{secret} in {text}");
+        }
+    }
+}

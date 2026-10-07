@@ -142,6 +142,10 @@ exclude_re = [
     "vauchi-core/src/backup/full_backup\\.rs:[0-9]+:[0-9]+: replace > with (==|>=) in export_(full|guardian)_backup$",
     "vauchi-core/src/backup/full_backup\\.rs:[0-9]+:[0-9]+: replace \\* with [+/] in decompress_backup_with_limit$",
     "vauchi-core/src/backup/full_backup\\.rs:[0-9]+:[0-9]+: replace <impl Drop for FullBackupIdentityData>::drop with \\(\\)$",
+    # - advance_combination's `item_count < len` guard: with item_count ==
+    #   len the only combination is the first, and the loop finds no position
+    #   to advance, so `<` and `<=` both return false.
+    "vauchi-core/src/backup/guardian_recovery\\.rs:71:41: replace < with <= in advance_combination$",
 
     # Exchange session (vauchi/private#522): handle_ignored_event lists each
     # ignored platform event with its reason, then a catch-all; every arm,

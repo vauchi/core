@@ -337,11 +337,7 @@ impl DoubleRatchetState {
         if their_dh_changed {
             // Skip any remaining messages in current receiving chain (previous DH generation)
             if self.recv_chain.is_some() {
-                let prev_gen = if self.dh_generation > 0 {
-                    self.dh_generation - 1
-                } else {
-                    0
-                };
+                let prev_gen = self.dh_generation.saturating_sub(1);
                 self.skip_messages_for_gen(message.previous_chain_length, prev_gen)?;
             }
 

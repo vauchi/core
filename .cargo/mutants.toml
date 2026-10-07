@@ -127,6 +127,22 @@ exclude_re = [
     "vauchi-core/src/crypto/password_kdf\\.rs:31:41: replace \\* with [+/]$",
     "vauchi-core/src/crypto/ratchet\\.rs:[0-9]+:[0-9]+: replace <impl Drop for DoubleRatchetState>::drop with \\(\\)$",
 
+    # Backup (vauchi/private#522):
+    # - Export-side size limits need a serialized backup within a byte of
+    #   32 MiB (contact export, and full/guardian output after compression)
+    #   or 64 MiB (full/guardian JSON), which the export API cannot build to
+    #   the byte. The contact export's output check can never fire after its
+    #   plaintext check, since the output is exactly plaintext + 58 bytes.
+    #   The import-side limits are pinned by backup_boundary_tests.
+    # - The decompression buffer's initial capacity only sizes an allocation.
+    # - FullBackupIdentityData's Drop zeroizes the seed; freed memory is not
+    #   observable from a safe test.
+    "vauchi-core/src/backup/contact_backup\\.rs:3[24]:[0-9]+: replace [*+] with [-+*/]$",
+    "vauchi-core/src/backup/contact_backup\\.rs:[0-9]+:[0-9]+: replace [->/+*=]+ with [-=>/+*]+ in export_contact_backup$",
+    "vauchi-core/src/backup/full_backup\\.rs:[0-9]+:[0-9]+: replace > with (==|>=) in export_(full|guardian)_backup$",
+    "vauchi-core/src/backup/full_backup\\.rs:[0-9]+:[0-9]+: replace \\* with [+/] in decompress_backup_with_limit$",
+    "vauchi-core/src/backup/full_backup\\.rs:[0-9]+:[0-9]+: replace <impl Drop for FullBackupIdentityData>::drop with \\(\\)$",
+
     # duress_settings.created_at / updated_at are written but never read by
     # any API, so the time stamped there is unobservable (vauchi/private#522).
     "vauchi-core/src/storage/stores/duress\\.rs:[0-9]+:[0-9]+: replace DuressStore<'_>::now_secs -> u64 with ",

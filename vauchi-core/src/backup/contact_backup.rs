@@ -390,11 +390,8 @@ pub fn import_contact_backup(data: &[u8], password: &str) -> Result<Vec<Contact>
 
 /// Import v1: Argon2id + XChaCha20-Poly1305.
 fn import_v1(data: &[u8], password: &str) -> Result<Vec<Contact>, BackupError> {
-    if data.len() < 16 {
-        return Err(BackupError::TooShort);
-    }
-
-    // SAFETY: guarded by `data.len() < 16` check above — slice is exactly 16 bytes.
+    // import_contact_backup refused inputs under 1 + 16 bytes, so after the
+    // version byte at least the 16 salt bytes remain.
     let salt: [u8; 16] = data[..16]
         .try_into()
         .expect("salt slice is exactly 16 bytes");

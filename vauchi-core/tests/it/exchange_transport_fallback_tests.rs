@@ -117,3 +117,29 @@ fn set_device_capabilities_is_accessible() {
         "session should remain in AwaitingBleConnection after setting capabilities"
     );
 }
+
+// A denied permission leaves the transport as unusable as missing hardware.
+// @internal
+#[test]
+fn ble_permission_denied_with_camera_falls_back_to_qr() {
+    let caps = DeviceCapabilities {
+        has_ble: true,
+        has_camera: true,
+        ..Default::default()
+    };
+    let mut session = ble_session_with_caps("Alice", caps);
+    session.emit_initial_commands();
+    let _ = session.drain_commands();
+
+    session
+        .apply_hardware_event(Event::PermissionDenied {
+            transport: "BLE".into(),
+        })
+        .unwrap();
+
+    let cmds = session.drain_commands();
+    assert!(
+        cmds.iter().any(|c| matches!(c, Command::QrDisplay { .. })),
+        "{cmds:?}"
+    );
+}

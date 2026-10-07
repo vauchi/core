@@ -364,3 +364,82 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
         "after both key_ack and card data arrive, should emit Phase 3 commands"
     );
 }
+
+fn written_to(cmds: &[Command], characteristic: &str) -> Vec<u8> {
+    cmds.iter()
+        .find_map(|c| match c {
+            Command::BleWriteCharacteristic { uuid, data, .. } if uuid == characteristic => {
+                Some(data.clone())
+            }
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("no write to {characteristic}: {cmds:?}"))
+}
+
+fn notified(session: &mut ExchangeSession, characteristic: &str, data: Vec<u8>) {
+    session
+        .apply_hardware_event(Event::BleCharacteristicNotified {
+            device_id: "peer".into(),
+            direction: BleLinkDirection::Inbound,
+            uuid: characteristic.into(),
+            data,
+        })
+        .unwrap();
+}
+
+// The responder's session, not just its handshake, buffers the initiator's
+// commitment and card in either order and answers with the reveal.
+// @internal
+#[test]
+fn a_responder_session_answers_phase_three_with_the_reveal() {
+    let mut initiator = ble_session("Alice");
+    let mut responder = ble_session("Bob");
+    initiator
+        .apply_hardware_event(Event::BleDeviceDiscovered {
+            id: "bob-device".into(),
+            rssi: -30,
+            adv_data: vec![],
+        })
+        .unwrap();
+    initiator
+        .apply_hardware_event(Event::BleConnected {
+            device_id: "bob-device".into(),
+            direction: BleLinkDirection::Outbound,
+        })
+        .unwrap();
+    let key_offer = written_to(&initiator.drain_commands(), CHAR_HANDSHAKE_WRITE);
+    let (key_ack, bob_card) = responder
+        .ble_handshake_mut()
+        .unwrap()
+        .process_key_offer(
+            &key_offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .unwrap();
+    notified(&mut initiator, CHAR_HANDSHAKE_NOTIFY, key_ack);
+    notified(&mut initiator, CHAR_DATA_NOTIFY, bob_card);
+    let phase3 = initiator.drain_commands();
+
+    notified(
+        &mut responder,
+        CHAR_DATA_WRITE,
+        written_to(&phase3, CHAR_DATA_WRITE),
+    );
+    assert!(
+        responder.drain_commands().is_empty(),
+        "the card alone is buffered"
+    );
+    notified(
+        &mut responder,
+        CHAR_HANDSHAKE_WRITE,
+        written_to(&phase3, CHAR_HANDSHAKE_WRITE),
+    );
+    let reveal = written_to(&responder.drain_commands(), CHAR_HANDSHAKE_NOTIFY);
+    notified(&mut initiator, CHAR_HANDSHAKE_NOTIFY, reveal);
+
+    assert!(
+        matches!(initiator.state(), ExchangeState::Complete { .. }),
+        "{:?}",
+        initiator.state()
+    );
+}

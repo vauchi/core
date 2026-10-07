@@ -234,6 +234,7 @@ mod exchange_reciprocity_integration_tests;
 mod exchange_relay_wiring_tests;
 mod exchange_session_debug_tests;
 mod exchange_session_proptest;
+mod exchange_session_state_tests;
 mod exchange_session_tests;
 mod exchange_start_ephemeral_mismatch_tests;
 mod exchange_tests;

@@ -236,3 +236,29 @@ fn an_offline_transport_carries_the_held_key_or_none() {
             .has_ohttp()
     );
 }
+
+/// An exchange can be the first thing a client does on an anchored relay
+/// (a TUI starting a Link right after creating its identity): with no
+/// held key yet, it must fetch the signed record before it posts, not
+/// set out without an OHTTP route.
+// @internal
+#[test]
+fn a_first_exchange_fetches_the_signed_key_before_posting() {
+    let stack = Stack::new();
+    stack
+        .outer
+        .queue("ohttp-key-signed", stack.gateway.response(stack.today()));
+    let vauchi = stack.open(stack.gateway.anchor());
+
+    let _ = vauchi.start_relay_exchange(None);
+
+    assert_eq!(
+        stack.outer_paths().first().map(String::as_str),
+        Some("/v2/ohttp-key-signed")
+    );
+    assert!(
+        stack.outer_paths().contains(&"/v2/ohttp".to_string()),
+        "the offer goes out through OHTTP: {:?}",
+        stack.outer_paths()
+    );
+}

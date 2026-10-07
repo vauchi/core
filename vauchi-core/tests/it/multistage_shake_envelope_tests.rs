@@ -12,6 +12,9 @@
 //! Security-review acceptance criteria realised here: F2 (reflection
 //! rejection, CC-14), F5 (drop before `transport_key`), F8 (advisory — never
 //! gates completion).
+//!
+//! The same bound pair also checks the hover handshake's audio-response
+//! verification and the link layout a settled session reports.
 
 use vauchi_core::exchange::multistage::accel_envelope::seal_envelope;
 use vauchi_core::exchange::multistage::qr_codec::{StageQr, format_shake_qr, parse_qr};
@@ -240,4 +243,52 @@ fn no_shake_emitted_without_recording() {
         alice.accel_proximity(),
         AccelerometerProximityState::Pending
     );
+}
+
+// The hover handshake's audio response must equal the peer's session id;
+// before Stage 1 binds a peer there is nothing to compare against.
+// @internal
+#[test]
+fn an_audio_response_verifies_only_as_the_bound_peer_s_session_id() {
+    let fresh = MultiStageSession::new(b"name:Alice".to_vec());
+    assert_eq!(fresh.verify_audio_response(&[0u8; 16]), None);
+
+    let (alice, bob) = drive_to_transport_key(b"name:Alice".to_vec(), b"name:Bob".to_vec());
+    let bob_id = bob.session_id();
+    let mut wrong = bob_id;
+    wrong[15] ^= 1;
+
+    assert_eq!(alice.verify_audio_response(&bob_id), Some(true));
+    assert_eq!(alice.verify_audio_response(&wrong), Some(false));
+    assert_eq!(alice.verify_audio_response(&bob_id[..15]), Some(false));
+    assert_eq!(
+        alice.verify_audio_response(&alice.session_id()),
+        Some(false)
+    );
+}
+
+// The layout the peer last read is what a settled session keeps showing,
+// and what the next session on this device starts from.
+// @internal
+#[test]
+fn a_settled_session_reports_the_layout_it_keeps_showing() {
+    let mut alice = MultiStageSession::new(b"name:Alice".to_vec()).with_start_layout(7);
+    let mut bob = MultiStageSession::new(b"name:Bob".to_vec()).with_start_layout(7);
+    assert_eq!(alice.last_good_layout(), None);
+
+    for _ in 0..2000 {
+        if let Some(aq) = alice.get_display_qr() {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = bob.get_display_qr() {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if alice.get_transport_key().is_some() {
+            break;
+        }
+    }
+
+    let settled = alice.last_good_layout().expect("bob echoed a layout");
+    assert_eq!(settled, 7);
+    assert_eq!(alice.get_display_qr().unwrap().layout, settled);
 }

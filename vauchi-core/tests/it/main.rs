@@ -74,6 +74,7 @@ mod backup_recovery_engine_tests;
 mod backup_reminder_tests;
 mod ble_chunking_tests;
 mod ble_exchange_tests;
+mod ble_handshake_edge_tests;
 mod ble_handshake_tests;
 mod ble_integration_tests;
 mod ble_payload_tests;

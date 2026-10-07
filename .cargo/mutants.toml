@@ -143,6 +143,12 @@ exclude_re = [
     "vauchi-core/src/backup/full_backup\\.rs:[0-9]+:[0-9]+: replace \\* with [+/] in decompress_backup_with_limit$",
     "vauchi-core/src/backup/full_backup\\.rs:[0-9]+:[0-9]+: replace <impl Drop for FullBackupIdentityData>::drop with \\(\\)$",
 
+    # Exchange session (vauchi/private#522): handle_ignored_event lists each
+    # ignored platform event with its reason, then a catch-all; every arm,
+    # the catch-all included, does nothing and returns Ok, so deleting an arm
+    # or the whole body changes no behaviour.
+    "vauchi-core/src/exchange/session\\.rs:[0-9]+:[0-9]+: (delete match arm .* in|replace) ExchangeSession::handle_ignored_event",
+
     # duress_settings.created_at / updated_at are written but never read by
     # any API, so the time stamped there is unobservable (vauchi/private#522).
     "vauchi-core/src/storage/stores/duress\\.rs:[0-9]+:[0-9]+: replace DuressStore<'_>::now_secs -> u64 with ",

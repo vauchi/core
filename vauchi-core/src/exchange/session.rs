@@ -698,21 +698,6 @@ impl ExchangeSession {
         self.qr().map(|_| self.our_x3dh.secret_bytes())
     }
 
-    /// Returns the NFC handshake session (only for NFC transport).
-    pub fn nfc_handshake(&self) -> Option<&NfcHandshakeSession> {
-        self.nfc_handshake.as_ref()
-    }
-
-    /// Returns mutable access to the NFC handshake session.
-    pub fn nfc_handshake_mut(&mut self) -> Option<&mut NfcHandshakeSession> {
-        self.nfc_handshake.as_mut()
-    }
-
-    /// Returns the BLE encrypted handshake session (only for BLE transport).
-    pub fn ble_handshake(&self) -> Option<&BleHandshakeSession> {
-        self.ble_handshake.as_ref()
-    }
-
     /// Returns mutable access to the BLE encrypted handshake session.
     pub fn ble_handshake_mut(&mut self) -> Option<&mut BleHandshakeSession> {
         self.ble_handshake.as_mut()

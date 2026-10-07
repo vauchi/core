@@ -119,6 +119,16 @@ fn a_voucher_reads_a_token_tail_only_when_version_two_carries_one() {
             "{extra} length-prefix bytes"
         );
     }
+
+    let mut empty_token = v2_without_token;
+    empty_token.extend_from_slice(&0u32.to_le_bytes());
+    assert!(
+        matches!(
+            RecoveryVoucher::from_bytes(&empty_token),
+            Err(RecoveryError::SerializationError(_))
+        ),
+        "a complete length prefix hands the declared token to its parser"
+    );
 }
 
 fn proof_with_vouchers(new: &[u8; 32], count: usize) -> RecoveryProof {

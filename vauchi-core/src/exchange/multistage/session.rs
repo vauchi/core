@@ -2289,3 +2289,21 @@ impl Drop for MultiStageSession {
         self.clear_sensitive();
     }
 }
+
+// INLINE_TEST_REQUIRED: jittered is private and its range is not observable
+// through one display command.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Both ends of the ±20% window are reachable: over 2000 draws the chance
+    // of missing either one of the 121 values is about 1e-7.
+    // @internal
+    #[test]
+    fn display_jitter_spans_twenty_percent_either_side() {
+        let draws: Vec<u32> = (0..2000).map(|_| jittered(300)).collect();
+
+        assert_eq!(draws.iter().min(), Some(&240));
+        assert_eq!(draws.iter().max(), Some(&360));
+    }
+}

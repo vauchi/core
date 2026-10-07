@@ -462,3 +462,30 @@ proptest! {
         prop_assert!(restored.verify_crc16());
     }
 }
+
+// @internal
+#[test]
+fn a_key_offer_carries_the_session_s_own_keys() {
+    let identity = make_test_identity();
+    let mut session = NfcHandshakeSession::new_initiator(&identity, "Alice".into());
+
+    let offer = session.create_key_offer(&identity, 1_700_000_000).unwrap();
+    let parsed = ExchangeNfc::from_bytes(&offer).unwrap();
+
+    assert_eq!(parsed.exchange_key(), session.our_exchange_key());
+    assert_eq!(parsed.identity_key(), session.our_identity_key());
+    assert_eq!(session.our_identity_key(), identity.signing_public_key());
+}
+
+// @internal
+#[test]
+fn a_truncated_key_offer_is_refused() {
+    let identity = make_test_identity();
+    let mut session = NfcHandshakeSession::new_initiator(&identity, "Alice".into());
+    let offer = session.create_key_offer(&identity, 1_700_000_000).unwrap();
+
+    assert!(matches!(
+        ExchangeNfc::from_bytes(&offer[..offer.len() - 1]),
+        Err(ExchangeError::InvalidNfcFormat)
+    ));
+}

@@ -561,3 +561,29 @@ fn an_acked_chunk_is_not_shown_while_others_are_outstanding() {
         "both outstanding chunks must get airtime"
     );
 }
+
+/// Cancelling wipes the session's keys, and a cancelled session is not one a
+/// restarted peer can pull back: only a failure from a mismatch is
+/// resettable (ADR-071), never one the user chose.
+// @internal
+#[test]
+fn a_cancelled_session_holds_no_keys_and_ignores_a_restarted_peer() {
+    let (mut ahead, _gone, clock) = session_stranded_in_verifying();
+    assert!(ahead.get_transport_key().is_some(), "precondition: keyed");
+
+    ahead.cancel();
+
+    assert!(ahead.get_transport_key().is_none());
+    let mut restarted =
+        MultiStageSession::new(three_chunk_card(0xCC)).with_monotonic(clock.clone());
+    let init = restarted.get_display_qr().expect("advertises");
+    clock.advance(std::time::Duration::from_secs(6));
+    for _ in 0..40 {
+        ahead.process_scanned_qr(&init.data);
+    }
+    assert!(
+        matches!(ahead.get_state(), ProtocolState::Failed(ref why) if why == "cancelled"),
+        "{:?}",
+        ahead.get_state()
+    );
+}

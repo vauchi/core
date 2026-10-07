@@ -166,6 +166,11 @@ exclude_re = [
     # chunk with an empty payload, which chunking never produces; dropping
     # one would only count a decrypt failure.
     "vauchi-core/src/exchange/multistage/session\\.rs:1965:29: replace < with <= in MultiStageSession::transport_decrypt$",
+    # note_dropped_frame only counts drops to rate-limit a dev-logging line.
+    # MultiStageSession's Drop calls clear_sensitive, which cancel() tests
+    # observably; after drop the wiped memory is not.
+    "vauchi-core/src/exchange/multistage/session\\.rs:[0-9]+:[0-9]+: (replace|replace .* in) MultiStageSession::note_dropped_frame",
+    "vauchi-core/src/exchange/multistage/session\\.rs:[0-9]+:[0-9]+: replace <impl Drop for MultiStageSession>::drop with \\(\\)$",
 
     # duress_settings.created_at / updated_at are written but never read by
     # any API, so the time stamped there is unobservable (vauchi/private#522).

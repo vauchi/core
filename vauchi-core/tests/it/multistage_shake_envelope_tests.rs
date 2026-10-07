@@ -17,7 +17,9 @@
 //! verification and the link layout a settled session reports.
 
 use vauchi_core::exchange::multistage::accel_envelope::seal_envelope;
-use vauchi_core::exchange::multistage::qr_codec::{StageQr, format_shake_qr, parse_qr};
+use vauchi_core::exchange::multistage::qr_codec::{
+    StageQr, format_ini2_qr_with_relay, format_shake_qr, parse_qr,
+};
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::{AccelerometerProximityState, ProtocolState};
 
@@ -422,4 +424,97 @@ fn a_received_inid_frame_delivers_the_peer_payload_in_one_read() {
         "{:?}",
         bob.get_state()
     );
+}
+
+/// Runs an exchange where Alice advertises `https://alice.relay` and Bob
+/// reads her first INIT with its relay URL replaced by `bob_sees` (or as
+/// sent, when `None`). Returns Bob's state once he fails, finalizes, or the
+/// exchange stops moving.
+fn exchange_with_relay_seen_by_bob(bob_sees: Option<&str>) -> ProtocolState {
+    let mut alice = MultiStageSession::new_with_relay(
+        b"name:Alice".to_vec(),
+        Some("https://alice.relay".into()),
+    );
+    let mut bob = MultiStageSession::new(b"name:Bob".to_vec());
+    let alice_init = alice.get_display_qr().unwrap().data;
+    let bob_init = bob.get_display_qr().unwrap().data;
+    let seen = match (parse_qr(&alice_init), bob_sees) {
+        (
+            Ok(StageQr::Init {
+                session_id,
+                ephemeral,
+                commitment_hash,
+                display_name,
+                ..
+            }),
+            Some(url),
+        ) => format_ini2_qr_with_relay(
+            &session_id,
+            &ephemeral,
+            &commitment_hash,
+            &display_name,
+            Some(url),
+        ),
+        _ => alice_init,
+    };
+    bob.process_scanned_qr(&seen);
+    alice.process_scanned_qr(&bob_init);
+
+    for _ in 0..2000 {
+        if let Some(bq) = bob.get_display_qr() {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if let Some(aq) = alice.get_display_qr() {
+            if matches!(parse_qr(&aq.data), Ok(StageQr::Init { .. })) {
+                continue; // Bob keeps the relay URL he first read
+            }
+            bob.process_scanned_qr(&aq.data);
+        }
+        if matches!(
+            bob.get_state(),
+            ProtocolState::Failed(_) | ProtocolState::Finalized
+        ) {
+            break;
+        }
+    }
+    bob.get_state()
+}
+
+// T1.7: the commitment binds the advertised relay URL, so a relay URL
+// rewritten in transit makes the peer's commitment fail to verify.
+// @internal
+#[test]
+fn a_relay_url_rewritten_in_transit_fails_the_commitment() {
+    assert_eq!(
+        exchange_with_relay_seen_by_bob(None),
+        ProtocolState::Finalized
+    );
+    assert!(
+        matches!(
+            exchange_with_relay_seen_by_bob(Some("https://evil.relay")),
+            ProtocolState::Failed(_)
+        ),
+        "a swapped relay URL must not verify"
+    );
+}
+
+// A DATA chunk shorter than its 12-byte nonce plus 16-byte tag is counted as
+// a failed decrypt, not split and read past its end.
+// @internal
+#[test]
+fn a_data_chunk_shorter_than_nonce_and_tag_counts_as_a_decrypt_failure() {
+    use vauchi_core::exchange::multistage::qr_codec::format_data_qr;
+
+    let (alice, mut bob) = drive_to_transport_key(b"name:Alice".to_vec(), b"name:Bob".to_vec());
+    let before = bob.transport_decrypt_failure_count();
+
+    bob.process_scanned_qr(&format_data_qr(
+        &alice.session_id(),
+        0,
+        1,
+        &[],
+        &[1, 2, 3, 4, 5],
+    ));
+
+    assert_eq!(bob.transport_decrypt_failure_count(), before + 1);
 }

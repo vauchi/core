@@ -158,6 +158,14 @@ exclude_re = [
     # get_display_qr compares the training summary only to decide whether to
     # write a dev-logging line; it changes no frame.
     "vauchi-core/src/exchange/multistage/session\\.rs:1064:33: replace != with == in MultiStageSession::get_display_qr$",
+    # update_transfer_state's unacked/missing index lists and handle_done's
+    # first-read check only feed dev-logging lines.
+    "vauchi-core/src/exchange/multistage/session\\.rs:(1879|1888):17: delete ! in MultiStageSession::update_transfer_state$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:2061:12: delete ! in MultiStageSession::handle_done$",
+    # transport_decrypt `< 28` vs `<= 28` differs only for a well-formed
+    # chunk with an empty payload, which chunking never produces; dropping
+    # one would only count a decrypt failure.
+    "vauchi-core/src/exchange/multistage/session\\.rs:1965:29: replace < with <= in MultiStageSession::transport_decrypt$",
 
     # duress_settings.created_at / updated_at are written but never read by
     # any API, so the time stamped there is unobservable (vauchi/private#522).

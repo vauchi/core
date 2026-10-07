@@ -1030,3 +1030,76 @@ fn compute_exchange_id(identity_key: &[u8; 32], ephemeral_key: &[u8; 32]) -> [u8
     out.copy_from_slice(d.as_ref());
     out
 }
+
+// INLINE_TEST_REQUIRED: build_aad, compute_exchange_id and derive_session_key
+// are private, and both peers compute them alike, so a consistently wrong
+// layout still lets an exchange complete; only these tests pin the wire
+// contract.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // @internal
+    #[test]
+    fn aad_is_sender_then_receiver_then_big_endian_timestamp() {
+        let aad = build_aad(&[1u8; 32], &[2u8; 32], 0x0102_0304_0506_0708);
+
+        assert_eq!(
+            aad,
+            [[1u8; 32].as_slice(), &[2u8; 32], &[1, 2, 3, 4, 5, 6, 7, 8]].concat()
+        );
+    }
+
+    // @internal
+    #[test]
+    fn exchange_id_is_the_hash_of_identity_then_ephemeral() {
+        let expected: [u8; 32] = Sha256::digest([[3u8; 32], [4u8; 32]].concat()).into();
+
+        assert_eq!(compute_exchange_id(&[3u8; 32], &[4u8; 32]), expected);
+    }
+
+    // Salt is the two nonces in ascending order and info the two exchange
+    // keys in ascending order, whichever side computes it.
+    // @internal
+    #[test]
+    fn session_key_sorts_nonces_and_exchange_keys_ascending() {
+        let our_identity = X3DHKeyPair::generate();
+        let their_exchange = X3DHKeyPair::generate();
+        let our_ephemeral = X3DHKeyPair::generate();
+        let their_ephemeral = X3DHKeyPair::generate();
+        let (low_nonce, high_nonce) = ([1u8; NONCE_SIZE], [2u8; NONCE_SIZE]);
+        let our_exchange_pub = [6u8; 32];
+
+        let key = derive_session_key(&SessionKeyParams {
+            our_identity: &our_identity,
+            their_exchange_pub: their_exchange.public_key(),
+            our_ephemeral: &our_ephemeral,
+            their_ephemeral: their_ephemeral.public_key(),
+            our_exchange_pub: &our_exchange_pub,
+            our_nonce: &high_nonce,
+            their_nonce: &low_nonce,
+        })
+        .unwrap();
+
+        let ikm = [
+            *our_identity
+                .diffie_hellman(their_exchange.public_key())
+                .unwrap(),
+            *our_ephemeral
+                .diffie_hellman(their_ephemeral.public_key())
+                .unwrap(),
+        ]
+        .concat();
+        let salt = [low_nonce, high_nonce].concat();
+        let their_pub = their_exchange.public_key();
+        let (first, second) = if their_pub.as_slice() <= our_exchange_pub.as_slice() {
+            (their_pub.as_slice(), our_exchange_pub.as_slice())
+        } else {
+            (our_exchange_pub.as_slice(), their_pub.as_slice())
+        };
+        let info = [BLE_HANDSHAKE_INFO, first, second].concat();
+        let expected = HKDF::derive_key(Some(&salt), &ikm, &info);
+
+        assert_eq!(key.as_bytes(), &*expected);
+    }
+}

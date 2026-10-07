@@ -107,3 +107,26 @@ fn a_reset_returns_to_idle_with_fresh_ephemeral_keys() {
     let second = alice.create_key_offer().unwrap();
     assert_ne!(first, second);
 }
+
+// The ack carries the responder's own timestamp; it is accepted while no
+// more than 60 seconds old, independently of the initiator's session age.
+// @internal
+#[test]
+fn an_ack_is_fresh_for_sixty_seconds_after_the_responder_stamped_it() {
+    let ack_age = |age: u64| {
+        let alice_id = Identity::create("Alice", 0);
+        let bob_id = Identity::create("Bob", 0);
+        let mut alice =
+            BleHandshakeSession::new_initiator(&alice_id, card(&alice_id, "Alice"), T0 + age);
+        let mut bob = BleHandshakeSession::new_responder(&bob_id, card(&bob_id, "Bob"), T0);
+        let offer = alice.create_key_offer().unwrap();
+        let (ack, card) = bob.process_key_offer(&offer, T0 + age).unwrap();
+        alice.process_key_ack(&ack, &card, T0 + age)
+    };
+
+    assert!(ack_age(EXPIRY_SECS).is_ok());
+    assert!(matches!(
+        ack_age(EXPIRY_SECS + 1),
+        Err(ExchangeError::BleExpired)
+    ));
+}

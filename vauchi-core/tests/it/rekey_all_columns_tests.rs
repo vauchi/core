@@ -176,6 +176,7 @@ fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
             b"{\"reduce_motion\":true}",
         ),
         ("ux_state", "relay_url_encrypted", b"https://relay.example"),
+        ("ux_state", "relay_anchor_encrypted", &[0x5a; 32]),
         (
             "ux_state",
             "own_card_repropagate_encrypted",
@@ -539,8 +540,9 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
           aha_tracker_json_encrypted, demo_contact_json_encrypted, \
           onboarding_progress_encrypted, backup_reminder_encrypted, updated_at, \
           settings_flags_encrypted, relay_url_encrypted, \
-          own_card_repropagate_encrypted, exchange_defaults_encrypted) \
-         VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+          own_card_repropagate_encrypted, exchange_defaults_encrypted, \
+          relay_anchor_encrypted) \
+         VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             enc("ux_state", "aha_tracker_json_encrypted"),
             enc("ux_state", "demo_contact_json_encrypted"),
@@ -551,6 +553,7 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
             enc("ux_state", "relay_url_encrypted"),
             enc("ux_state", "own_card_repropagate_encrypted"),
             enc("ux_state", "exchange_defaults_encrypted"),
+            enc("ux_state", "relay_anchor_encrypted"),
         ],
     )
     .unwrap();
@@ -759,6 +762,7 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         ("ux_state", "relay_url_encrypted"),
         ("ux_state", "own_card_repropagate_encrypted"),
         ("ux_state", "exchange_defaults_encrypted"),
+        ("ux_state", "relay_anchor_encrypted"),
     ] {
         check_one(table, col, "id = 1", id_eq_1);
     }

@@ -137,7 +137,10 @@ git_quiet clone -q --branch "$branch" "$T/remotes/cli.git" "$T/check-cli" || fai
 grep -q 'tag = "v0.70.0", version = "=0.70.0"' "$T/check-cli/Cargo.toml" || fail "cli's Cargo.toml must pin v0.70.0"
 grep -q '# lock updated' "$T/check-cli/Cargo.lock" || fail "cli's Cargo.lock must be committed with the bump"
 [ "$(git -C "$T/check-cli" log -1 --format=%ae)" = bot@example.invalid ] || fail "the commit must be authored by the bot identity"
-grep -q "cargo update -p vauchi-core -p vauchi-app" "$T/log" || fail "cargo update must name the Core crates"
+grep -q "cargo update --workspace (in cli)" "$T/log" || fail "cargo update must re-resolve the bumped manifest"
+# e2e locks relay's vauchi-protocol beside its own (#558): a -p by name is
+# ambiguous there, and the bump is only the manifest change anyway.
+grep -q "cargo update.* -p " "$T/log" && fail "cargo update must not name crates"
 [ "$(grep -c '^POST .*vauchi%2Fcli/merge_requests' "$T/log")" -eq 1 ] || fail "cli must get exactly one MR"
 grep '^POST .*vauchi%2Fcli/merge_requests' "$T/log" | grep -q '"source_branch": *"chore/bump-core-0.70.0"' \
     || fail "cli's MR must come from the bump branch"

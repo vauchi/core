@@ -314,6 +314,7 @@ mod migration_tests;
 mod migration_v37_test;
 mod migration_v67_test;
 mod migration_v70_test;
+mod migration_v71_test;
 mod monotonic_tests;
 mod multi_device_delivery_tests;
 mod multi_relay_integration_tests;

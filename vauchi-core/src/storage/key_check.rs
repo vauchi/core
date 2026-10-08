@@ -21,11 +21,8 @@ const KEY_CHECK_LABEL: &[u8] = b"vauchi storage key check";
 const MAX_SEALED_LEN: usize = 256;
 
 fn check_key(storage_key: &SymmetricKey) -> SymmetricKey {
-    SymmetricKey::from_bytes(*HKDF::derive_key(
-        None,
-        storage_key.as_bytes(),
-        KEY_CHECK_INFO,
-    ))
+    let derived = HKDF::derive_key(None, storage_key.as_bytes(), KEY_CHECK_INFO);
+    SymmetricKey::from_bytes(*derived)
 }
 
 fn opens(storage_key: &SymmetricKey, sealed: &[u8]) -> bool {

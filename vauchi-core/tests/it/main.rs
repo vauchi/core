@@ -26,6 +26,7 @@ mod accessibility_tests;
 mod activity_log_storage_tests;
 mod aha_moments_integration_tests;
 mod animated_qr_transport_tests;
+mod anonymous_sender_epoch_tests;
 mod anonymous_sender_tests;
 mod api_config_tests;
 mod api_contact_display_name_edit_tests;

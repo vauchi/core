@@ -372,3 +372,25 @@ fn test_claim_exchange_with_identity_fails_at_network() {
         "expected network error, got identity error: {err}"
     );
 }
+
+// The SAS both users compare is HMAC-SHA256(shared secret, domain || lower
+// identity || higher identity), its first four bytes taken mod 1_000_000.
+// @internal
+#[test]
+fn the_sas_is_the_hmac_of_the_identities_in_ascending_order() {
+    use hmac::{Hmac, Mac};
+
+    let secret = [7u8; 32];
+    let (low, high) = ([1u8; 32], [2u8; 32]);
+    let mut mac = Hmac::<sha2::Sha256>::new_from_slice(&secret).unwrap();
+    mac.update(b"vauchi-relay-exchange-sas-v1");
+    mac.update(&low);
+    mac.update(&high);
+    let tag = mac.finalize().into_bytes();
+    let v = u32::from_be_bytes([tag[0], tag[1], tag[2], tag[3]]) % 1_000_000;
+
+    assert_eq!(
+        derive_sas(&secret, &high, &low),
+        format!("{:03}-{:03}", v / 1000, v % 1000)
+    );
+}

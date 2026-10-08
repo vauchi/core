@@ -380,3 +380,65 @@ proptest! {
         prop_assert_ne!(t_a, t_b);
     }
 }
+
+// Registration covers yesterday as well as today, for clock skew, and never
+// tomorrow; every batch is padded to 256 so its size reveals no count.
+// @internal
+#[test]
+fn registration_covers_yesterday_and_pads_every_batch_to_256() {
+    let master_seed = [0xBBu8; 32];
+    let device_id = [0x11u8; 32];
+    let contact = [0x22u8; 32];
+    let day = 19804u64;
+    let register = |contacts: &[[u8; 32]]| {
+        batch_register_tokens_with_device_sync(
+            &vauchi_core::rng::OsSecureRng::new(),
+            contacts,
+            &TEST_PUBKEY,
+            &master_seed,
+            &device_id,
+            day,
+            0,
+        )
+    };
+    let tokens: Vec<String> = register(&[contact]).concat();
+
+    for d in [day - 1, day] {
+        assert!(tokens.contains(&token_hex(&compute_self_token(&master_seed, d))));
+        assert!(tokens.contains(&token_hex(&compute_mailbox_token(
+            &contact,
+            &TEST_PUBKEY,
+            d
+        ))));
+        assert!(tokens.contains(&token_hex(&compute_device_mailbox_token(
+            &contact,
+            &TEST_PUBKEY,
+            &device_id,
+            d,
+        ))));
+    }
+    assert!(!tokens.contains(&token_hex(&compute_self_token(&master_seed, day + 1))));
+    assert!(!tokens.contains(&token_hex(&compute_mailbox_token(
+        &contact,
+        &TEST_PUBKEY,
+        day + 1
+    ))));
+
+    let many: Vec<[u8; 32]> = (0..100u8).map(|i| [i; 32]).collect();
+    let batches = register(&many);
+    assert!(batches.len() > 1);
+    assert!(
+        batches.iter().all(|b| b.len() == 256),
+        "{:?}",
+        batches.iter().map(Vec::len).collect::<Vec<_>>()
+    );
+}
+
+// @internal
+#[test]
+fn the_day_epoch_counts_whole_utc_days() {
+    use vauchi_core::network::mailbox_token::current_day_epoch;
+
+    assert_eq!(current_day_epoch(5 * 86_400 - 1), 4);
+    assert_eq!(current_day_epoch(5 * 86_400), 5);
+}

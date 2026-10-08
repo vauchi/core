@@ -177,6 +177,9 @@ exclude_re = [
     # accept_signed_key's `unwrap_or(!expected)` is the fallback for an empty
     # KeyConfig, which the decoder never produces.
     "vauchi-core/src/network/ohttp_key_trust\\.rs:76:62: delete ! in accept_signed_key$",
+    # verify_with_freshness's `now > timestamp &&` only guards the
+    # subtraction; at now == timestamp the age is 0, never over the limit.
+    "vauchi-core/src/identity/device\\.rs:726:21: replace > with >= in RegistryBroadcast::verify_with_freshness$",
 
     # duress_settings.created_at / updated_at are written but never read by
     # any API, so the time stamped there is unobservable (vauchi/private#522).

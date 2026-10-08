@@ -229,3 +229,37 @@ fn recovery_responses_name_themselves_and_carry_a_reminder_time() {
     assert_eq!(later.remind_at(), Some(5));
     assert_eq!(RecoveryResponse::Accept.remind_at(), None);
 }
+
+// A response arriving from a shell is one of three decisions, and only a
+// reminder carries a time (vauchi/private#538).
+// @internal
+#[test]
+fn a_recovery_response_parses_only_from_a_known_decision() {
+    assert_eq!(
+        RecoveryResponse::parse("accept", None),
+        Some(RecoveryResponse::Accept)
+    );
+    assert_eq!(
+        RecoveryResponse::parse("reject", None),
+        Some(RecoveryResponse::Reject)
+    );
+    assert_eq!(
+        RecoveryResponse::parse("remind_me_later", Some(5)),
+        Some(RecoveryResponse::RemindMeLater { remind_at: 5 })
+    );
+
+    for (name, remind_at) in [
+        ("accepted", None),
+        ("", None),
+        ("ACCEPT", None),
+        ("accept", Some(5)),
+        ("reject", Some(5)),
+        ("remind_me_later", None),
+    ] {
+        assert_eq!(
+            RecoveryResponse::parse(name, remind_at),
+            None,
+            "{name:?} {remind_at:?}"
+        );
+    }
+}

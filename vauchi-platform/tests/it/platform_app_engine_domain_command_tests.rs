@@ -3193,3 +3193,25 @@ fn clearing_pin_when_already_disabled_is_idempotent() {
         })
         .expect("idempotent clear");
 }
+
+// A response the shell spells wrong is refused, not stored as text
+// (vauchi/private#538).
+// @internal
+#[test]
+fn save_recovery_response_refuses_an_unknown_decision() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    for (response, remind_at) in [("accepted", None), ("remind_me_later", None)] {
+        let result = engine.dispatch_domain_command(DomainCommand::SaveRecoveryResponse {
+            claim_id: "claim-x".into(),
+            contact_id: "contact-x".into(),
+            response: response.into(),
+            remind_at,
+        });
+
+        assert!(
+            matches!(result, Err(MobileError::InvalidInput { .. })),
+            "{response:?} {remind_at:?}: {result:?}"
+        );
+    }
+}

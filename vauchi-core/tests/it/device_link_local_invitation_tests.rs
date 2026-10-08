@@ -63,6 +63,10 @@ fn a_rendezvous_outside_the_local_network_is_refused() {
         "8.8.8.8:80",
         "100.64.0.1:8080",
         "[2001:db8::1]:443",
+        // Global, but its second byte matches the fe80::/10 mask.
+        "[2a00:8000::1]:443",
+        // Deprecated site-local: shares fe80::/10's first byte only.
+        "[fec0::1]:443",
     ] {
         assert!(
             DeviceLinkJoinInvitation::parse_url(&invitation_with_local(hostile)).is_err(),
@@ -114,4 +118,24 @@ fn an_empty_local_param_means_no_local_rendezvous() {
     let parsed = DeviceLinkJoinInvitation::parse_url(&invitation_with_local(""))
         .expect("an empty local param is not malformed");
     assert_eq!(parsed.local_rendezvous, None);
+}
+
+// An invitation carrying the longest relay URL a relay may have still fits
+// the invitation's own bounds.
+// @internal
+#[test]
+fn an_invitation_with_a_maximum_length_relay_url_round_trips() {
+    let prefix = "https://relay.example/";
+    let relay = format!("{prefix}{}", "a".repeat(1024 - prefix.len()));
+    let url = DeviceLinkJoinInvitation {
+        qr_data: "qr-payload".to_string(),
+        broker_code: "123456".to_string(),
+        relay_url: Some(relay.clone()),
+        local_rendezvous: None,
+    }
+    .to_url();
+
+    let parsed = DeviceLinkJoinInvitation::parse_url(&url).expect("invitation parses");
+
+    assert_eq!(parsed.relay_url, Some(relay));
 }

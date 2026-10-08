@@ -20054,6 +20054,22 @@
                       "description": "https://relay.example.com"
                     }
                   }
+                },
+                {
+                  "Input": {
+                    "binding_id": "surface.1.relay_anchor",
+                    "label": "OHTTP anchor",
+                    "value": "",
+                    "placeholder": "64 hex characters from the relay's operator",
+                    "input_kind": "text",
+                    "max_length": 64,
+                    "validation_error": null,
+                    "enabled": true,
+                    "accessibility": {
+                      "label": "OHTTP anchor input",
+                      "description": "64 hex characters from the relay's operator"
+                    }
+                  }
                 }
               ]
             }

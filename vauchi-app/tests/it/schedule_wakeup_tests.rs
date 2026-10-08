@@ -484,3 +484,47 @@ fn rebuilding_an_exchange_in_place_reschedules_the_wakeup() {
         "a session that is already live is not rescheduled again"
     );
 }
+
+fn delay_millis_on_the_wire(command: &Command) -> Option<u64> {
+    serde_json::to_value(command).ok()?["ScheduleWakeup"]["delay_millis"].as_u64()
+}
+
+// Five shells turned these fields into a delay three different ways
+// (android ignored the deadline, iOS added its own interval guard); Core
+// sends the one delay they all use (vauchi/private#548).
+// @internal
+#[test]
+fn schedule_wakeup_carries_the_delay_the_shell_waits() {
+    let cases = [
+        ((30, 90, 30, None), 30_000),
+        ((1, 1, 1, Some(300)), 300),
+        ((5, 2, 1, None), 2_000),
+        ((1, 1, 1, Some(5_000)), 1_000),
+    ];
+    for ((earliest, deadline, interval, millis), expected) in cases {
+        let command = Command::schedule_wakeup(earliest, deadline, interval, millis);
+        assert_eq!(
+            delay_millis_on_the_wire(&command),
+            Some(expected),
+            "earliest {earliest}s, deadline {deadline}s, millis {millis:?}",
+        );
+    }
+}
+
+proptest::proptest! {
+    // The delay is the earliest moment (sub-second when given), never past
+    // the deadline.
+    // @internal
+    #[test]
+    fn schedule_wakeup_delay_is_the_earliest_capped_at_the_deadline(
+        earliest in 0u32..100_000,
+        deadline in 0u32..100_000,
+        interval in 0u32..100_000,
+        millis in proptest::option::of(0u32..10_000_000),
+    ) {
+        let command = Command::schedule_wakeup(earliest, deadline, interval, millis);
+        let earliest_ms = millis.map_or(u64::from(earliest) * 1000, u64::from);
+        let expected = earliest_ms.min(u64::from(deadline) * 1000);
+        proptest::prop_assert_eq!(delay_millis_on_the_wire(&command), Some(expected));
+    }
+}

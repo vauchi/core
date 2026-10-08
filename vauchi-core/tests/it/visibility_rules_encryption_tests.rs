@@ -197,19 +197,6 @@ fn test_visibility_rules_stored_encrypted_not_plaintext() {
         !blob_str.contains("secret-phone-field"),
         "Encrypted blob must not contain plaintext field names"
     );
-
-    // visibility_rules_json (legacy column) should be NULL
-    let legacy: Option<String> = raw_conn
-        .query_row(
-            "SELECT visibility_rules_json FROM contacts WHERE id = ?1",
-            [contact.id()],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert!(
-        legacy.is_none(),
-        "Legacy visibility_rules_json should be NULL after v18"
-    );
 }
 
 // === List/Search Tests ===

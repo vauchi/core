@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 71] = [
+const MIGRATIONS: [Migration; 72] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -627,7 +627,40 @@ const MIGRATIONS: [Migration; 71] = [
         name: "drop_device_info_plaintext",
         action: MigrationAction::Sql(MIGRATION_V71_DROP_DEVICE_INFO_PLAINTEXT),
     },
+    Migration {
+        version: 72,
+        name: "drop_label_and_contact_plaintext",
+        action: MigrationAction::Sql(MIGRATION_V72_DROP_LABEL_AND_CONTACT_PLAINTEXT),
+    },
 ];
+
+/// Migration v72: visibility labels and contacts keep only their encrypted
+/// columns (vauchi/private#535).
+///
+/// `visibility_labels.name` is UNIQUE, which SQLite cannot drop in place, so
+/// the table is rebuilt; nothing references it by foreign key.
+const MIGRATION_V72_DROP_LABEL_AND_CONTACT_PLAINTEXT: &str = "
+    CREATE TABLE visibility_labels_v72 (
+        id TEXT PRIMARY KEY,
+        name_encrypted BLOB,
+        name_hmac BLOB,
+        contacts_json_encrypted BLOB,
+        visible_fields_json_encrypted BLOB,
+        display_name_override_encrypted BLOB,
+        bio_override_encrypted BLOB,
+        avatar_override_encrypted BLOB,
+        created_at INTEGER NOT NULL,
+        modified_at INTEGER NOT NULL
+    );
+    INSERT INTO visibility_labels_v72
+        SELECT id, name_encrypted, name_hmac, contacts_json_encrypted,
+               visible_fields_json_encrypted, display_name_override_encrypted,
+               bio_override_encrypted, avatar_override_encrypted, created_at, modified_at
+        FROM visibility_labels;
+    DROP TABLE visibility_labels;
+    ALTER TABLE visibility_labels_v72 RENAME TO visibility_labels;
+    ALTER TABLE contacts DROP COLUMN visibility_rules_json;
+";
 
 /// Migration v71: drop the plaintext copies of the device id, index and
 /// creation time that `device_info_encrypted` already holds

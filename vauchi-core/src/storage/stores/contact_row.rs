@@ -17,7 +17,7 @@ use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::types::ExchangeTransport;
 
 /// Columns `ContactRow::from_row` reads, for every contact SELECT.
-pub(super) const CONTACT_COLUMNS: &str = "id, public_key, display_name, card_encrypted, shared_key_encrypted, visibility_rules_json, visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted, exchange_transport, has_recovered, card_updated_at, relay_url, trust_metrics, contact_kind, import_source, imported_at, original_uid, deleted_at, archived, archived_at, ignored, ignored_at, reciprocity, confirmation_channel";
+pub(super) const CONTACT_COLUMNS: &str = "id, public_key, display_name, card_encrypted, shared_key_encrypted, visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted, exchange_transport, has_recovered, card_updated_at, relay_url, trust_metrics, contact_kind, import_source, imported_at, original_uid, deleted_at, archived, archived_at, ignored, ignored_at, reciprocity, confirmation_channel";
 
 /// Internal struct for database row data.
 #[allow(dead_code)] // Fields are used via destructuring in row_to_contact
@@ -27,7 +27,6 @@ pub(super) struct ContactRow {
     pub display_name: String,
     pub card_encrypted: Vec<u8>,
     pub shared_key_encrypted: Vec<u8>,
-    pub visibility_rules_json: Option<String>,
     pub visibility_rules_encrypted: Option<Vec<u8>>,
     pub exchange_timestamp: i64,
     pub fingerprint_verified: i32,
@@ -63,7 +62,6 @@ impl ContactRow {
             display_name: row.get("display_name")?,
             card_encrypted: row.get("card_encrypted")?,
             shared_key_encrypted: row.get("shared_key_encrypted")?,
-            visibility_rules_json: row.get("visibility_rules_json")?,
             visibility_rules_encrypted: row.get("visibility_rules_encrypted")?,
             exchange_timestamp: row.get("exchange_timestamp")?,
             fingerprint_verified: row.get("fingerprint_verified")?,
@@ -220,7 +218,6 @@ impl ContactStore<'_> {
             display_name,
             card_encrypted,
             shared_key_encrypted,
-            visibility_rules_json: None,
             visibility_rules_encrypted,
             exchange_timestamp,
             fingerprint_verified,
@@ -357,14 +354,11 @@ impl ContactStore<'_> {
             .try_into()
             .map_err(|_| StorageError::Encryption("Invalid public key length".into()))?;
 
-        // Parse visibility rules — prefer encrypted column, fall back to legacy plaintext
         let visibility_rules = if let Some(encrypted) = row.visibility_rules_encrypted {
             let json_bytes = crate::crypto::decrypt(self.key, &encrypted)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
             let json = String::from_utf8(json_bytes)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?;
-            serde_json::from_str(&json).map_err(|e| StorageError::Serialization(e.to_string()))?
-        } else if let Some(json) = row.visibility_rules_json {
             serde_json::from_str(&json).map_err(|e| StorageError::Serialization(e.to_string()))?
         } else {
             crate::contact::VisibilityRules::new()

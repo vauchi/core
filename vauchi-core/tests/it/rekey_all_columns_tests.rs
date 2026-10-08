@@ -387,13 +387,12 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     let label_name_plain = fx("visibility_labels", "name_encrypted");
     conn.execute(
         "INSERT INTO visibility_labels \
-         (id, name, contacts_json, visible_fields_json, contacts_json_encrypted, \
+         (id, contacts_json_encrypted, \
           visible_fields_json_encrypted, name_encrypted, name_hmac, \
           display_name_override_encrypted, created_at, modified_at) \
-         VALUES (?1, ?2, '[]', '[]', ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             LABEL_ID,
-            "Family",
             enc("visibility_labels", "contacts_json_encrypted"),
             enc("visibility_labels", "visible_fields_json_encrypted"),
             enc("visibility_labels", "name_encrypted"),

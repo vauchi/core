@@ -383,7 +383,7 @@ fn test_rekey_preserves_label_display_name_override() {
     let contacts_enc = vauchi_core::crypto::encrypt(&key1, b"[]").unwrap();
     let override_enc = vauchi_core::crypto::encrypt(&key1, b"Custom Label").unwrap();
     storage.connection().execute(
-        "INSERT INTO visibility_labels (id, name, contacts_json, visible_fields_json, contacts_json_encrypted, display_name_override_encrypted, created_at, modified_at) VALUES ('l1', 'test', '[]', '[]', ?1, ?2, 1000, 1000)",
+        "INSERT INTO visibility_labels (id, contacts_json_encrypted, display_name_override_encrypted, created_at, modified_at) VALUES ('l1', ?1, ?2, 1000, 1000)",
         rusqlite::params![contacts_enc, override_enc],
     ).unwrap();
 
@@ -412,7 +412,7 @@ fn test_rekey_preserves_label_bio_and_avatar_overrides() {
     let bio_enc = vauchi_core::crypto::encrypt(&key1, b"Group bio").unwrap();
     let avatar_enc = vauchi_core::crypto::encrypt(&key1, b"avatar-webp-bytes").unwrap();
     storage.connection().execute(
-        "INSERT INTO visibility_labels (id, name, contacts_json, visible_fields_json, contacts_json_encrypted, bio_override_encrypted, avatar_override_encrypted, created_at, modified_at) VALUES ('l1', 'test', '[]', '[]', ?1, ?2, ?3, 1000, 1000)",
+        "INSERT INTO visibility_labels (id, contacts_json_encrypted, bio_override_encrypted, avatar_override_encrypted, created_at, modified_at) VALUES ('l1', ?1, ?2, ?3, 1000, 1000)",
         rusqlite::params![contacts_enc, bio_enc, avatar_enc],
     ).unwrap();
 

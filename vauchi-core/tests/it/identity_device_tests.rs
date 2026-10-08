@@ -116,6 +116,7 @@ fn test_max_devices_limit() {
 }
 
 // @scenario: device_management :: Unlink a device remotely
+// @scenario: device_management :: Lost device revocation
 // @internal
 #[test]
 fn test_revoke_device() {
@@ -327,6 +328,7 @@ fn test_registry_broadcast_contains_active_devices() {
 
 /// Test registry broadcast excludes revoked devices
 // @scenario: device_management :: Unlinked device data wiped
+// @scenario: device_management :: Lost device revocation
 // @internal
 #[test]
 fn test_registry_broadcast_excludes_revoked() {

@@ -11,7 +11,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use vauchi_core::api::{Vauchi, VauchiConfig, VauchiError};
+use vauchi_core::api::{ShredManager, Vauchi, VauchiConfig, VauchiError, widget_panic_shred};
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{ShreddingMasterKey, SymmetricKey};
 use vauchi_core::identity::Identity;
@@ -233,4 +233,72 @@ fn a_stored_key_of_the_wrong_length_is_refused_not_replaced() {
         secure.load_key(BOOTSTRAP_KEY_NAME).unwrap(),
         Some(vec![7u8; 16])
     );
+}
+
+/// Secure storage holding an SMK and a bootstrap key, as a crash between
+/// the SMK move and the bootstrap delete leaves it.
+fn keys_with_leftover_bootstrap() -> MemoryKeyStorage {
+    let secure = MemoryKeyStorage::new();
+    let smk = Identity::create("Alice", 0).derive_smk();
+    secure.save_key(SMK_KEY_NAME, smk.as_bytes()).unwrap();
+    secure
+        .save_key(BOOTSTRAP_KEY_NAME, SymmetricKey::generate().as_bytes())
+        .unwrap();
+    secure
+}
+
+// @internal
+#[test]
+fn every_shred_deletes_the_bootstrap_key() {
+    type Shred = fn(&Storage, &MemoryKeyStorage, &Identity, &Path);
+    let shreds: [(&str, Shred); 2] = [
+        ("panic", |storage, secure, identity, dir| {
+            ShredManager::new(storage, secure, identity, dir)
+                .panic_shred(None, None)
+                .unwrap();
+        }),
+        ("widget", |_, secure, _, dir| {
+            widget_panic_shred(dir, secure).unwrap();
+        }),
+    ];
+    for (name, shred) in shreds {
+        let dir = tempfile::tempdir().unwrap();
+        let storage =
+            Storage::open(dir.path().join("vauchi.db"), SymmetricKey::generate()).unwrap();
+        let secure = keys_with_leftover_bootstrap();
+        let identity = Identity::create("Alice", 0);
+
+        shred(&storage, &secure, &identity, dir.path());
+
+        assert!(
+            !secure.has_key(BOOTSTRAP_KEY_NAME).unwrap(),
+            "{name} shred left the bootstrap key"
+        );
+        assert!(
+            !secure.has_key(SMK_KEY_NAME).unwrap(),
+            "{name} shred left the SMK"
+        );
+    }
+}
+
+// @internal
+#[test]
+fn a_shred_is_not_verified_clear_while_a_bootstrap_key_remains() {
+    let dir = tempfile::tempdir().unwrap();
+    let data_dir = dir.path().join("data");
+    std::fs::create_dir_all(&data_dir).unwrap();
+    let storage = Storage::open(data_dir.join("vauchi.db"), SymmetricKey::generate()).unwrap();
+    let secure = keys_with_leftover_bootstrap();
+    let identity = Identity::create("Alice", 0);
+    let manager = ShredManager::new(&storage, &secure, &identity, &data_dir);
+    manager.panic_shred(None, None).unwrap();
+    assert!(manager.verify_shred().all_clear);
+
+    secure
+        .save_key(BOOTSTRAP_KEY_NAME, SymmetricKey::generate().as_bytes())
+        .unwrap();
+
+    let verification = manager.verify_shred();
+    assert!(!verification.bootstrap_key_absent);
+    assert!(!verification.all_clear);
 }

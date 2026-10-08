@@ -508,9 +508,7 @@ pub struct DeviceRevocationCertificate {
     reason: String,
     /// Timestamp when revoked.
     revoked_at: u64,
-    /// Certificate expiry timestamp (#82). Defaults to 90 days after revocation.
-    /// Old certificates without this field deserialize to 0 (treated as no expiry).
-    #[serde(default)]
+    /// Certificate expiry timestamp (#82): 90 days after revocation.
     expires_at: u64,
     /// Signature over the certificate by the identity signing key.
     #[serde(with = "signature_serde")]
@@ -557,20 +555,15 @@ impl DeviceRevocationCertificate {
     }
 
     /// Returns the certificate expiry timestamp (#82).
-    /// Returns 0 for legacy certificates without an expiry field.
     pub fn expires_at(&self) -> u64 {
         self.expires_at
     }
 
     /// Returns true if this certificate has expired (#82).
-    /// Legacy certificates (expires_at == 0) are treated as non-expiring.
     ///
     /// `now` is the comparison instant in Unix-epoch seconds, sourced from
     /// the caller's [`Clock`](crate::clock::Clock).
     pub fn is_expired(&self, now: u64) -> bool {
-        if self.expires_at == 0 {
-            return false; // Legacy cert without expiry
-        }
         now > self.expires_at
     }
 

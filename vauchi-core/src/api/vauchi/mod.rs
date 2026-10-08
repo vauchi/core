@@ -26,6 +26,7 @@ mod import;
 mod merge;
 mod ohttp_key_error;
 mod onboarding;
+mod personal_data;
 mod places;
 mod propagation;
 mod propagation_cek;

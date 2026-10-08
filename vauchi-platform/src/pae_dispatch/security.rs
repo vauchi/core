@@ -19,11 +19,14 @@ impl PlatformAppEngine {
     ) -> Result<DomainCommandResult, MobileError> {
         match command {
             DomainCommand::ExportGdprData => {
-                let storage = engine.vauchi().storage();
+                // Follows the active auth mode, like every other read.
                 let export =
-                    vauchi_core::api::export_all_data(storage).map_err(|e| MobileError::Other {
-                        detail: e.to_string(),
-                    })?;
+                    engine
+                        .vauchi()
+                        .export_personal_data()
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
                 let json_data =
                     serde_json::to_string_pretty(&export).map_err(|e| MobileError::Other {
                         detail: e.to_string(),

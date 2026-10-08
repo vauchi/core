@@ -9,6 +9,7 @@
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
+use crate::contact::Contact;
 use crate::storage::{DeviceStore, Storage};
 
 /// Complete GDPR data export.
@@ -85,11 +86,23 @@ pub struct GdprRecoveryConfig {
 ///
 /// Returns a structured export containing all personal data stored locally.
 /// Raw cryptographic keys are excluded — only public identifiers are included.
+///
+/// Reads the storage it is given. Callers holding a [`crate::Vauchi`] use
+/// `Vauchi::export_personal_data`, which follows the active auth mode.
 pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::StorageError> {
+    let contacts = storage.contacts().list_contacts()?;
+    export_for_contacts(storage, &contacts, true)
+}
+
+/// The export built around a given contact list. The decoy profile passes
+/// its decoy contacts and no audit log (ADR-032).
+pub(crate) fn export_for_contacts(
+    storage: &Storage,
+    contacts: &[Contact],
+    include_audit_log: bool,
+) -> Result<GdprExport, crate::storage::StorageError> {
     let now = storage.clock().unix_seconds();
 
-    // Export contacts
-    let contacts = storage.contacts().list_contacts()?;
     let gdpr_contacts: Vec<GdprContact> = contacts
         .iter()
         .map(|c| {
@@ -148,19 +161,23 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
 
     // Export audit log (Art 15 — access to all personal data)
     // Filter sensitive key material from details before export (#21)
-    let audit_log = storage
-        .consent()
-        .list_audit_log()?
-        .into_iter()
-        .map(|(event_type, details, timestamp)| {
-            let filtered_details = details.map(|d| filter_audit_details(&d));
-            serde_json::json!({
-                "event_type": event_type,
-                "details": filtered_details,
-                "timestamp": timestamp,
+    let audit_log = if !include_audit_log {
+        Vec::new()
+    } else {
+        storage
+            .consent()
+            .list_audit_log()?
+            .into_iter()
+            .map(|(event_type, details, timestamp)| {
+                let filtered_details = details.map(|d| filter_audit_details(&d));
+                serde_json::json!({
+                    "event_type": event_type,
+                    "details": filtered_details,
+                    "timestamp": timestamp,
+                })
             })
-        })
-        .collect();
+            .collect()
+    };
 
     // Log the export event itself
     storage

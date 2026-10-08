@@ -402,23 +402,21 @@ impl AppEngine {
             }
         };
         match choice {
-            Some(GdprChoice::Export) => {
-                match vauchi_core::api::export_all_data(self.vauchi.storage()) {
-                    Ok(export) => match serde_json::to_string_pretty(&export) {
-                        Ok(json) => ActionResult::GdprExportComplete { json },
-                        Err(_) => ActionResult::ShowToast {
-                            message: self.t("privacy.export_failed_serialize"),
-                            undo_action_id: None,
-                            undo_label: None,
-                        },
-                    },
+            Some(GdprChoice::Export) => match self.vauchi.export_personal_data() {
+                Ok(export) => match serde_json::to_string_pretty(&export) {
+                    Ok(json) => ActionResult::GdprExportComplete { json },
                     Err(_) => ActionResult::ShowToast {
-                        message: self.t("privacy.export_failed_read"),
+                        message: self.t("privacy.export_failed_serialize"),
                         undo_action_id: None,
                         undo_label: None,
                     },
-                }
-            }
+                },
+                Err(_) => ActionResult::ShowToast {
+                    message: self.t("privacy.export_failed_read"),
+                    undo_action_id: None,
+                    undo_label: None,
+                },
+            },
             Some(GdprChoice::Delete) => {
                 match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
                     .schedule_deletion()

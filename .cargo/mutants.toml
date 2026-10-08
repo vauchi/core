@@ -193,6 +193,9 @@ exclude_re = [
     "vauchi-core/src/exchange/device_link/invitation\\.rs:96:22: replace > with >= in DeviceLinkJoinInvitation::parse_url$",
     "vauchi-core/src/exchange/device_link/invitation\\.rs:(179|201):20: replace > with (==|>=) in decode_(relay_url|local_rendezvous)$",
     "vauchi-core/src/exchange/device_link/invitation\\.rs:282:20: replace \\| with \\^ in hex_pair_to_byte$",
+    # PasswordStrength::from_score is only reached through validate_password,
+    # which returns early below score 3, so the 0-2 arms are unreachable.
+    "vauchi-core/src/identity/password\\.rs:[0-9]+:[0-9]+: delete match arm [012] in PasswordStrength::from_score$",
 
     # duress_settings.created_at / updated_at are written but never read by
     # any API, so the time stamped there is unobservable (vauchi/private#522).

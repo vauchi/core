@@ -333,4 +333,92 @@ mod tests {
             "strong passphrase without patterns should be accepted"
         );
     }
+
+    // Distinct letters with no blocklisted word or full sequence, cut to
+    // length, so only the length band varies.
+    const FILLER: &str = "mqkzpwrtjvbhlgfdsyxc";
+
+    // @internal
+    #[test]
+    fn length_bands_step_at_8_12_16_and_20_characters() {
+        for (len, band) in [
+            (7, 0),
+            (8, 1),
+            (11, 1),
+            (12, 2),
+            (15, 2),
+            (16, 3),
+            (19, 3),
+            (20, 4),
+        ] {
+            assert_eq!(
+                analyze(&FILLER[..len]).length_score,
+                band,
+                "{len} characters"
+            );
+        }
+    }
+
+    // A short password containing a full sequence loses two points, not
+    // just the cap at Fair that long ones get.
+    // @internal
+    #[test]
+    fn a_pattern_costs_a_short_password_two_points() {
+        assert_eq!(analyze("zxcvbnm1").score, 0);
+        assert_eq!(analyze("mqkzpwr1").score, 2);
+    }
+
+    // Patterns only count once the password reaches the 8-character minimum.
+    // @internal
+    #[test]
+    fn repeats_and_sequences_count_from_eight_characters() {
+        assert!(!has_repeated_chars("aaaaaaa"));
+        assert!(has_repeated_chars("aaaaaaaa"));
+        assert!(!has_repeated_chars("aaaaaaab"));
+        assert!(!has_sequential("zxcvbnm"));
+        assert!(has_sequential("zxcvbnmq"));
+        assert!(!has_sequential("mnbvcxz"));
+        assert!(has_sequential("mnbvcxzq"));
+    }
+
+    // @internal
+    #[test]
+    fn eight_characters_scoring_three_is_the_weakest_accepted_password() {
+        assert!(matches!(
+            validate_password("Ab1xQ9mz"),
+            Ok(PasswordStrength::Strong)
+        ));
+        assert!(matches!(
+            validate_password("Ab1!xQ9#"),
+            Ok(PasswordStrength::VeryStrong)
+        ));
+        assert!(validate_password("Ab1!xQ9").is_err());
+        assert!(validate_password("abxzqmkp").is_err());
+    }
+
+    // @internal
+    #[test]
+    fn feedback_names_exactly_what_is_wrong() {
+        let says = |password: &str, advice: &str| password_feedback(password).contains(advice);
+
+        assert_eq!(password_feedback("Ab1!xQ9#rT"), "");
+        assert!(says("aB3", "Use at least 8 characters."));
+        assert!(!says("abxzqmkp", "Use at least 8 characters."));
+        assert!(says("abxzqmkp", "Use a longer passphrase"));
+        assert!(!says(&"a".repeat(16), "Use a longer passphrase"));
+        assert!(says("aB3", "Add symbols."));
+        assert!(says("abxzEFGH", "Add digits, symbols."));
+        assert!(says("ABXZQMKP", "Mix letters, numbers, and symbols."));
+        assert!(says("1234", "Mix letters, numbers, and symbols."));
+        assert!(!says("Ab1!", "Add "));
+        assert!(says(
+            "password",
+            "Avoid common words and keyboard patterns."
+        ));
+        assert!(says("aaaaaaaa", "Avoid repeated characters."));
+        assert!(says(
+            "zxcvbnm1",
+            "Avoid sequential characters like 123 or abc."
+        ));
+    }
 }

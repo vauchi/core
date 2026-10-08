@@ -103,9 +103,14 @@ impl PlatformAppEngine {
                 response,
                 remind_at,
             } => {
+                let decision = vauchi_core::recovery::RecoveryResponse::parse(&response, remind_at)
+                    .ok_or_else(|| MobileError::InvalidInput {
+                        field: "response".into(),
+                        detail: "expected accept, reject, or remind_me_later with a time".into(),
+                    })?;
                 engine
                     .vauchi()
-                    .save_recovery_response_action(&claim_id, &contact_id, &response, remind_at)
+                    .save_recovery_response_action(&claim_id, &contact_id, &decision)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;

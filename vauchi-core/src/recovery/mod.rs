@@ -108,6 +108,20 @@ pub enum RecoveryResponse {
 }
 
 impl RecoveryResponse {
+    /// Parses a decision named by a shell: `accept` and `reject` carry no
+    /// time, `remind_me_later` must. Anything else is `None`, so an unknown
+    /// or mistyped decision is refused at the boundary rather than stored.
+    pub fn parse(name: &str, remind_at: Option<u64>) -> Option<Self> {
+        match (name, remind_at) {
+            ("accept", None) => Some(RecoveryResponse::Accept),
+            ("reject", None) => Some(RecoveryResponse::Reject),
+            ("remind_me_later", Some(remind_at)) => {
+                Some(RecoveryResponse::RemindMeLater { remind_at })
+            }
+            _ => None,
+        }
+    }
+
     /// Returns a string representation suitable for storage.
     pub fn as_str(&self) -> &'static str {
         match self {

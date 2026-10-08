@@ -19,7 +19,8 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::identity::Identity;
 use vauchi_core::recovery::{
-    RecoveryClaim, RecoveryProof, RecoverySettings, RecoveryVoucher, VerificationResult,
+    RecoveryClaim, RecoveryProof, RecoveryResponse, RecoverySettings, RecoveryVoucher,
+    VerificationResult,
 };
 
 fn vauchi_with_identity(name: &str) -> Vauchi {
@@ -225,7 +226,7 @@ fn add_recovery_voucher_accumulates_across_helpers() {
 fn save_recovery_response_action_persists_to_storage() {
     let wb = vauchi_with_identity("Alice");
 
-    wb.save_recovery_response_action("claim-id-1", "contact-id-1", "accept", None)
+    wb.save_recovery_response_action("claim-id-1", "contact-id-1", &RecoveryResponse::Accept)
         .unwrap();
 
     let row = wb
@@ -247,8 +248,12 @@ fn save_recovery_response_action_records_remind_at() {
     let wb = vauchi_with_identity("Alice");
     let remind = 1_700_000_000u64;
 
-    wb.save_recovery_response_action("claim-2", "contact-2", "remind_me_later", Some(remind))
-        .unwrap();
+    wb.save_recovery_response_action(
+        "claim-2",
+        "contact-2",
+        &RecoveryResponse::RemindMeLater { remind_at: remind },
+    )
+    .unwrap();
 
     let (contact_id, response, remind_at) = wb
         .storage()

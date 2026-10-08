@@ -306,17 +306,19 @@ impl Vauchi {
         Ok(voucher)
     }
 
-    /// Saves a recovery response (accept, reject, or remind_me_later).
+    /// Saves a recovery response (accept, reject, or remind me later).
     pub fn save_recovery_response_action(
         &self,
         claim_id: &str,
         contact_id: &str,
-        response: &str,
-        remind_at: Option<u64>,
+        response: &crate::recovery::RecoveryResponse,
     ) -> VauchiResult<()> {
-        self.storage
-            .recovery()
-            .save_recovery_response(claim_id, contact_id, response, remind_at)?;
+        self.storage.recovery().save_recovery_response(
+            claim_id,
+            contact_id,
+            response.as_str(),
+            response.remind_at(),
+        )?;
         Ok(())
     }
 

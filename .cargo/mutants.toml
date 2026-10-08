@@ -162,6 +162,24 @@ exclude_re = [
     # get_display_qr compares the training summary only to decide whether to
     # write a dev-logging line; it changes no frame.
     "vauchi-core/src/exchange/multistage/session\\.rs:1064:33: replace != with == in MultiStageSession::get_display_qr$",
+    # Multistage frame scheduling (owner decision on vauchi/private#550): how
+    # often each frame type is shown per state, the Finalized linger timers,
+    # the chunk-order shuffle and the rehandshake cooldown tune liveness on
+    # real camera links, not correctness or security; a lossless pair still
+    # completes under any of these, and the lossy-link tests guard the
+    # device-proven stalls they were tuned for.
+    "vauchi-core/src/exchange/multistage/session\\.rs:1095:32: replace == with != in MultiStageSession::next_stage_frame$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:113[7]:36: replace \\+= with [-*]= in MultiStageSession::next_stage_frame$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:1141:36: replace \\+= with \\*= in MultiStageSession::next_stage_frame$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:1180:48: replace % with / in MultiStageSession::next_stage_frame$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:1180:52: replace < with (<=|==|>) in MultiStageSession::next_stage_frame$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:1205:43: replace == with != in MultiStageSession::next_stage_frame$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:1228:73: replace > with >= in MultiStageSession::next_stage_frame$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:1244:48: replace % with [+/] in MultiStageSession::next_stage_frame$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:1246:20: delete ! in MultiStageSession::next_stage_frame$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:1246:40: replace < with (<=|==|>) in MultiStageSession::next_stage_frame$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:1798:53: replace \\+ with [-*] in MultiStageSession::get_data_chunk_qr$",
+    "vauchi-core/src/exchange/multistage/session\\.rs:2192:52: replace < with (<=|==|>) in MultiStageSession::peer_restart_warrants_rehandshake$",
     # update_transfer_state's unacked/missing index lists and handle_done's
     # first-read check only feed dev-logging lines.
     "vauchi-core/src/exchange/multistage/session\\.rs:(1879|1888):17: delete ! in MultiStageSession::update_transfer_state$",

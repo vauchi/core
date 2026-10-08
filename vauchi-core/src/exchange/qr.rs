@@ -35,14 +35,8 @@ use crate::text::normalize_text;
 /// v3: Added relay URL for per-contact routing (Noise pubkey removed pre-launch, ADR-037)
 const PROTOCOL_VERSION: u8 = 3;
 
-/// QR code expiration time in seconds.
-///
-/// Production default: 300s (5 minutes).
-/// With `test-timings` feature: 5s (for fast e2e tests).
-#[cfg(not(feature = "test-timings"))]
+/// QR code expiration time in seconds: 5 minutes.
 const QR_EXPIRY_SECONDS: u64 = 300;
-#[cfg(feature = "test-timings")]
-const QR_EXPIRY_SECONDS: u64 = 5;
 
 /// QR code magic bytes to identify Vauchi QR codes.
 const MAGIC: &[u8; 4] = b"WBEX";

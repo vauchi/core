@@ -38,8 +38,8 @@ use vauchi_core::exchange::DeviceLinkInitiator;
 use vauchi_core::identity::{DeviceRegistry, Identity};
 use vauchi_core::network::NetworkError;
 
-// Completed links run every step at NOW so they fit inside any QR window,
-// including the 5 s one under `vauchi-core/test-timings` (vauchi/private#577).
+// Completed links run every step at NOW: the tests are about both machines
+// agreeing, and the expiry deadline has its own tests (vauchi/private#577).
 const NOW: u64 = 1_800_000_000;
 const TIMEOUT_SECS: u64 = 300;
 

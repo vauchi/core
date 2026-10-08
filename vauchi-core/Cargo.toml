@@ -34,8 +34,6 @@ secure-storage-windows = ["secure-storage", "keyring/windows-native"]
 audio-cpal = ["cpal"]
 # Enable this feature to expose internal modules for integration tests
 testing = []
-# Shorten protocol timeouts for fast e2e/integration tests (QR expiry: 300s → 5s)
-test-timings = []
 # Reduces Argon2id KDF cost parameters for faster test execution (~5x speedup).
 # MUST NOT be enabled in production builds — only for test/dev profiles.
 test-kdf = []

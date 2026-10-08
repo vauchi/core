@@ -32,7 +32,6 @@ fn spread_across_the_range(codes: &[String]) -> bool {
 }
 
 // @internal
-#[cfg(not(feature = "test-timings"))]
 #[test]
 fn a_link_qr_expires_exactly_five_minutes_after_it_was_made() {
     let qr = DeviceLinkQR::generate_with_timestamp(&Identity::create("Alice", 0), T0);

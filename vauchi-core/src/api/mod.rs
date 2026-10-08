@@ -86,6 +86,11 @@ pub mod gdpr;
 mod gdpr;
 
 #[cfg(feature = "testing")]
+pub mod heirloom;
+#[cfg(not(feature = "testing"))]
+mod heirloom;
+
+#[cfg(feature = "testing")]
 pub mod pre_signed;
 #[cfg(not(feature = "testing"))]
 mod pre_signed;
@@ -120,6 +125,11 @@ pub use consent::{ConsentManager, ConsentRecord, ConsentStatus, ConsentType};
 pub use gdpr::{
     GDPR_EXPORT_VERSION, GDPR_SALT_LEN, GdprExport, export_all_data, export_encrypted,
     import_encrypted,
+};
+
+// Paper heirloom (private#363)
+pub use heirloom::{
+    HeirloomBook, HeirloomContact, HeirloomField, HeirloomText, render_heirloom_html,
 };
 
 // Pre-signed shred messages

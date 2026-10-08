@@ -122,9 +122,8 @@ fn test_load_or_generate_backup_password_not_legacy() {
     let dir = TempDir::new().unwrap();
     let password = local_keys::load_or_generate_backup_password(dir.path()).unwrap();
     assert_ne!(
-        password,
-        local_keys::LEGACY_BACKUP_PASSWORD,
-        "New installations must not use legacy password"
+        password, "vauchi-local-storage",
+        "New installations must not use the old hardcoded password"
     );
 }
 
@@ -201,15 +200,5 @@ fn test_keychain_key_name_is_valid_hex_suffix() {
     assert!(
         suffix.chars().all(|c| c.is_ascii_hexdigit()),
         "Suffix must be valid hex, got: {suffix}"
-    );
-}
-
-// @internal
-#[test]
-fn test_legacy_backup_password_constant() {
-    assert_eq!(
-        local_keys::LEGACY_BACKUP_PASSWORD,
-        "vauchi-local-storage",
-        "Legacy constant must match historical value"
     );
 }

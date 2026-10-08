@@ -61,8 +61,6 @@ impl FieldNoteStore<'_> {
     ///
     /// Returns a `HashMap<field_id, plaintext_note>`. Returns an empty map if
     /// the contact has no field notes.
-    /// Self-healing: legacy plaintext rows are returned as-is — the next save
-    /// will encrypt them properly.
     pub fn load_contact_field_notes(
         &self,
         contact_id: &str,

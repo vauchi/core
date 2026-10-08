@@ -14,12 +14,6 @@ use crate::crypto::SymmetricKey;
 use crate::storage::StorageError;
 use std::path::Path;
 
-/// Legacy hardcoded backup password used before per-installation passwords.
-///
-/// Retained for migration: frontends should check for this value and
-/// prompt migration to a generated password.
-pub const LEGACY_BACKUP_PASSWORD: &str = "vauchi-local-storage";
-
 /// Loads or generates a fallback encryption key for file-based storage.
 ///
 /// When OS keychain is unavailable, this provides a filesystem-backed

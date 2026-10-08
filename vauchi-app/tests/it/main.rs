@@ -176,6 +176,7 @@ mod recovery_claim_review_i18n_tests;
 mod recovery_help_i18n_tests;
 mod recovery_screen_tests;
 mod recovery_status_i18n_tests;
+mod relay_editor_anchor_tests;
 mod render_context_tests;
 #[path = "../responsive_presentation_tests.rs"]
 mod responsive_presentation_tests;

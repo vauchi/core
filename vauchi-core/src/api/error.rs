@@ -157,6 +157,13 @@ mod tests {
 
     // @internal
     #[test]
+    fn a_database_refusing_the_key_is_unreadable_storage() {
+        let err = VauchiError::Storage(StorageError::WrongKey);
+        assert!(err.is_unreadable_storage());
+    }
+
+    // @internal
+    #[test]
     fn corrupt_stored_bytes_are_unreadable_storage() {
         let err = VauchiError::Storage(StorageError::InvalidData("truncated row".into()));
         assert!(err.is_unreadable_storage());

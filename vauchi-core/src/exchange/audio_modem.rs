@@ -178,15 +178,9 @@ pub fn find_preamble(samples: &[f32], sample_rate: f32) -> Result<usize, Proximi
         let chunk = &samples[start..start + window_size];
         let power = goertzel(chunk, preamble_freq, sample_rate);
 
+        // The first window carrying the tone marks the start, to within one
+        // window (vauchi/private#531).
         if power > threshold {
-            // Found preamble, scan back to find exact start
-            let scan_start = start.saturating_sub(window_size);
-            for i in scan_start..start {
-                let mini_chunk = &samples[i..i.min(i + window_size / 4).min(samples.len())];
-                if goertzel(mini_chunk, preamble_freq, sample_rate) > threshold / 2.0 {
-                    return Ok(i);
-                }
-            }
             return Ok(start);
         }
     }

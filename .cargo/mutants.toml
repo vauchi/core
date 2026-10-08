@@ -79,7 +79,11 @@ exclude_re = [
     # find_preamble's Goertzel power is a float sum over sampled audio; it
     # never lands exactly on the 0.05 threshold, so `>` and `>=` pick the
     # same window (vauchi/private#522).
-    "vauchi-core/src/exchange/audio_modem\\.rs:181:18: replace > with >= in find_preamble$",
+    "vauchi-core/src/exchange/audio_modem\\.rs:183:18: replace > with >= in find_preamble$",
+    # The scan's half-window step only sets how finely the coarse start is
+    # found; any step up to a window keeps it within the one-window contract
+    # test_preamble_detection pins (vauchi/private#531).
+    "vauchi-core/src/exchange/audio_modem\\.rs:177:85: replace / with [%*] in find_preamble$",
 
     # The sharpness gate compares a float variance with 15.0; a frame never
     # lands exactly on it, so `<` and `<=` skip the same frames

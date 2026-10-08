@@ -274,6 +274,7 @@ mod guardian_adversarial_tests;
 mod guardian_identity_key_contract_tests;
 mod guardian_token_proptest;
 mod guardian_token_tests;
+mod heirloom_tests;
 mod help_engine_tests;
 mod hidden_contact_tests;
 mod http_adapter_truncation_tests;

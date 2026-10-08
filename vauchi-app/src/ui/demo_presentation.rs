@@ -240,6 +240,13 @@ fn result_effects(result: ActionResult) -> Result<Vec<Command>, String> {
                 data: json.into_bytes(),
             },
         }],
+        ActionResult::HeirloomExportComplete { html } => vec![Command::ExportFile {
+            file: ExportFileSpec {
+                suggested_name: "vauchi-heirloom.html".into(),
+                mime_type: "text/html".into(),
+                data: html.into_bytes(),
+            },
+        }],
         ActionResult::WipeComplete => vec![Command::ResetApplication],
         ActionResult::Commands { commands } => commands,
         unresolved => {

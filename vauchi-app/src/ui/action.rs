@@ -271,6 +271,11 @@ pub enum ActionResult {
     GdprExportComplete {
         json: String,
     },
+    /// The paper heirloom document is rendered: hand the HTML to the user
+    /// as a file (private#363).
+    HeirloomExportComplete {
+        html: String,
+    },
     /// All data has been wiped — frontend should reset to initial state.
     WipeComplete,
     /// App layer should start the device-link join (responder) machine with

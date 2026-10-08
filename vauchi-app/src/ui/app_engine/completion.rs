@@ -417,6 +417,23 @@ impl AppEngine {
                     undo_label: None,
                 },
             },
+            Some(GdprChoice::Heirloom) => match self.vauchi.heirloom_book() {
+                Ok(book) => {
+                    let text = vauchi_core::api::HeirloomText {
+                        document_title: self.t("heirloom.document_title"),
+                        exchanged_on: self.t("heirloom.exchanged_on"),
+                        met_at: self.t("heirloom.met_at"),
+                    };
+                    ActionResult::HeirloomExportComplete {
+                        html: vauchi_core::api::render_heirloom_html(&book, &text),
+                    }
+                }
+                Err(_) => ActionResult::ShowToast {
+                    message: self.t("privacy.heirloom.failed"),
+                    undo_action_id: None,
+                    undo_label: None,
+                },
+            },
             Some(GdprChoice::Delete) => {
                 match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
                     .schedule_deletion()

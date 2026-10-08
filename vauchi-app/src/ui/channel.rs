@@ -481,6 +481,8 @@ pub enum GdprChoice {
     CancelDeletion,
     Execute,
     Shred,
+    /// The paper heirloom: a printable, plaintext contact book (private#363).
+    Heirloom,
 }
 
 /// Typed form-dialog submission, one variant per [`FormDialogType`].

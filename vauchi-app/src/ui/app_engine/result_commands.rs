@@ -44,6 +44,13 @@ pub(super) fn append_result_commands(
                 data: json.into_bytes(),
             },
         }),
+        ActionResult::HeirloomExportComplete { html } => commands.push(Command::ExportFile {
+            file: ExportFileSpec {
+                suggested_name: "vauchi-heirloom.html".into(),
+                mime_type: "text/html".into(),
+                data: html.into_bytes(),
+            },
+        }),
         ActionResult::WipeComplete => commands.push(Command::ResetApplication),
         ActionResult::Commands {
             commands: result_commands,
@@ -134,5 +141,28 @@ mod tests {
         .expect_err("an internal result must not disappear at the reducer boundary");
 
         assert_eq!(error, "ValidationError");
+    }
+
+    // @scenario: paper_heirloom :: Export my contacts as a printable document
+    #[test]
+    fn heirloom_result_becomes_an_html_file_export() {
+        let mut commands = Vec::new();
+
+        append_result_commands(
+            ActionResult::HeirloomExportComplete {
+                html: "<!DOCTYPE html>".into(),
+            },
+            &mut commands,
+        )
+        .unwrap();
+
+        match commands.as_slice() {
+            [Command::ExportFile { file }] => {
+                assert_eq!(file.suggested_name, "vauchi-heirloom.html");
+                assert_eq!(file.mime_type, "text/html");
+                assert_eq!(file.data, b"<!DOCTYPE html>");
+            }
+            other => panic!("expected one ExportFile, got {other:?}"),
+        }
     }
 }

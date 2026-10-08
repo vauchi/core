@@ -70,6 +70,8 @@ pub struct GdprEngine {
 enum GdprStep {
     /// Main privacy settings screen.
     Overview,
+    /// Plaintext warning before the paper heirloom export (private#363).
+    ConfirmHeirloom,
     /// Deletion confirmation screen showing what will be deleted.
     ConfirmDelete,
     /// Consent-management screen — per-type grant toggles.
@@ -183,13 +185,22 @@ impl GdprEngine {
                 },
             ],
             contextual_actions: {
-                let mut actions = vec![ScreenAction {
-                    id: "export".into(),
-                    label: self.t("privacy.export_data"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("privacy.export_data"))),
-                }];
+                let mut actions = vec![
+                    ScreenAction {
+                        id: "export".into(),
+                        label: self.t("privacy.export_data"),
+                        style: ActionStyle::Primary,
+                        enabled: true,
+                        a11y: Some(A11y::labeled(self.t("privacy.export_data"))),
+                    },
+                    ScreenAction {
+                        id: "heirloom".into(),
+                        label: self.t("privacy.heirloom.action"),
+                        style: ActionStyle::Secondary,
+                        enabled: true,
+                        a11y: Some(A11y::labeled(self.t("privacy.heirloom.action"))),
+                    },
+                ];
                 if self.deletion_scheduled {
                     actions.push(ScreenAction {
                         id: "cancel_deletion".into(),
@@ -400,6 +411,45 @@ impl GdprEngine {
         }
     }
 
+    /// The export leaves the encryption envelope, so nothing is written
+    /// until the person confirms the warning (private#363).
+    fn build_confirm_heirloom(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "confirm_heirloom".into(),
+            title: self.t("privacy.heirloom.title"),
+            subtitle: Some(self.t("privacy.heirloom.subtitle")),
+            components: vec![Component::InfoPanel {
+                id: "heirloom_warning".into(),
+                icon: Some("warning".into()),
+                title: self.t("privacy.heirloom.warning_title"),
+                items: vec![InfoItem {
+                    icon: Some("warning".into()),
+                    title: self.t("privacy.heirloom.warning_title"),
+                    detail: self.t("privacy.heirloom.warning_detail"),
+                }],
+                a11y: None,
+            }],
+            contextual_actions: vec![
+                ScreenAction {
+                    id: "confirm_heirloom".into(),
+                    label: self.t("privacy.heirloom.confirm"),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("privacy.heirloom.confirm"))),
+                },
+                ScreenAction {
+                    id: "cancel".into(),
+                    label: self.t("action.cancel"),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
+                },
+            ],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
     fn build_confirm_shred(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "confirm_panic_shred".into(),
@@ -444,6 +494,7 @@ impl GdprEngine {
             GdprStep::ManageConsent => self.build_consent(),
             GdprStep::ConfirmExecute => self.build_confirm_execute(),
             GdprStep::ConfirmShred => self.build_confirm_shred(),
+            GdprStep::ConfirmHeirloom => self.build_confirm_heirloom(),
         }
     }
 }
@@ -460,6 +511,20 @@ impl WorkflowEngine for GdprEngine {
                 if action_id == "export" =>
             {
                 self.last_action = Some("export".into());
+                ActionResult::Complete
+            }
+            // Overview: the heirloom first shows its plaintext warning
+            (GdprStep::Overview, UserAction::ActionPressed { action_id })
+                if action_id == "heirloom" =>
+            {
+                self.step = GdprStep::ConfirmHeirloom;
+                ActionResult::NavigateTo(self.build_screen())
+            }
+            // Heirloom warning: confirming triggers the export
+            (GdprStep::ConfirmHeirloom, UserAction::ActionPressed { action_id })
+                if action_id == "confirm_heirloom" =>
+            {
+                self.last_action = Some("heirloom".into());
                 ActionResult::Complete
             }
             // Overview: cancel a scheduled deletion (routing performs it)
@@ -513,7 +578,10 @@ impl WorkflowEngine for GdprEngine {
             }
             // Any confirmation screen: cancel goes back to overview
             (
-                GdprStep::ConfirmDelete | GdprStep::ConfirmExecute | GdprStep::ConfirmShred,
+                GdprStep::ConfirmDelete
+                | GdprStep::ConfirmExecute
+                | GdprStep::ConfirmShred
+                | GdprStep::ConfirmHeirloom,
                 UserAction::ActionPressed { action_id },
             ) if action_id == "cancel" => {
                 self.step = GdprStep::Overview;
@@ -569,6 +637,7 @@ impl WorkflowEngine for GdprEngine {
             Some("cancel_deletion") => GdprChoice::CancelDeletion,
             Some("execute") => GdprChoice::Execute,
             Some("shred") => GdprChoice::Shred,
+            Some("heirloom") => GdprChoice::Heirloom,
             _ => return None,
         };
         Some(crate::ui::EngineOutput::Gdpr(choice))

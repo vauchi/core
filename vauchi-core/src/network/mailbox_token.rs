@@ -257,17 +257,6 @@ fn padded_registration_batches(
         batches.push(batch);
     }
 
-    if batches.is_empty() {
-        // Edge case: no contacts, no days — generate padding-only batch
-        let mut batch = Vec::new();
-        while batch.len() < 256 {
-            let mut random_token = [0u8; 32];
-            rng.fill_bytes(&mut random_token);
-            batch.push(token_hex(&MailboxToken::from_bytes(random_token)));
-        }
-        batches.push(batch);
-    }
-
     batches
 }
 

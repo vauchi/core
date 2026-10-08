@@ -190,9 +190,13 @@ exclude_re = [
     # pre-screen before decoding, and input at or past them fails the same
     # decode/validation with the same UnsupportedUrl; hex_pair_to_byte's high
     # and low nibbles never overlap, so `|` and `^` agree.
-    "vauchi-core/src/exchange/device_link/invitation\\.rs:96:22: replace > with >= in DeviceLinkJoinInvitation::parse_url$",
-    "vauchi-core/src/exchange/device_link/invitation\\.rs:(179|201):20: replace > with (==|>=) in decode_(relay_url|local_rendezvous)$",
-    "vauchi-core/src/exchange/device_link/invitation\\.rs:282:20: replace \\| with \\^ in hex_pair_to_byte$",
+    "vauchi-core/src/exchange/device_link/invitation\\.rs:97:22: replace > with >= in DeviceLinkJoinInvitation::parse_url$",
+    "vauchi-core/src/exchange/device_link/invitation\\.rs:(180|202):20: replace > with (==|>=) in decode_(relay_url|local_rendezvous)$",
+    "vauchi-core/src/exchange/device_link/invitation\\.rs:283:20: replace \\| with \\^ in hex_pair_to_byte$",
+    # DeviceLinkRequest::from_bytes's first length check only pre-screens:
+    # lowering it lets input reach the second check, which still requires
+    # the full 4 + name + 32 + 8 bytes.
+    "vauchi-core/src/exchange/device_link/request\\.rs:51:32: replace \\+ with - in DeviceLinkRequest::from_bytes$",
     # PasswordStrength::from_score is only reached through validate_password,
     # which returns early below score 3, so the 0-2 arms are unreachable.
     "vauchi-core/src/identity/password\\.rs:[0-9]+:[0-9]+: delete match arm [012] in PasswordStrength::from_score$",

@@ -21,7 +21,8 @@ use std::net::{IpAddr, SocketAddr};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD as B64};
 
 const MAX_INVITATION_URL_LENGTH: usize = 8 * 1024;
-const MAX_ENCODED_RELAY_LENGTH: usize = (crate::relay_url::MAX_URL_LENGTH * 4).div_ceil(3) * 3;
+/// Unpadded base64 of the longest relay URL `validate_relay_url` accepts.
+const MAX_ENCODED_RELAY_LENGTH: usize = crate::relay_url::MAX_URL_LENGTH.div_ceil(3) * 4;
 /// `[ipv6]:port` at its longest is well under this; bounded before decode.
 const MAX_ENCODED_LOCAL_LENGTH: usize = 128;
 

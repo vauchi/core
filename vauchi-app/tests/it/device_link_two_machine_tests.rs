@@ -38,6 +38,8 @@ use vauchi_core::exchange::DeviceLinkInitiator;
 use vauchi_core::identity::{DeviceRegistry, Identity};
 use vauchi_core::network::NetworkError;
 
+// Completed links run every step at NOW so they fit inside any QR window,
+// including the 5 s one under `vauchi-core/test-timings` (vauchi/private#577).
 const NOW: u64 = 1_800_000_000;
 const TIMEOUT_SECS: u64 = 300;
 
@@ -161,13 +163,13 @@ fn both_machines_complete_a_link_and_show_the_same_confirmation_code() {
         DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
             .expect("a freshly minted invitation must parse");
 
-    let joiner_code = match joiner.advance(&broker, NOW + 1) {
+    let joiner_code = match joiner.advance(&broker, NOW) {
         ResponderEvent::RequestPosted { confirmation_code } => confirmation_code,
         other => panic!("expected RequestPosted, got {other:?}"),
     };
 
     // 3. The host picks the request up and shows its own code.
-    let host_code = match host.advance(&broker, NOW + 2) {
+    let host_code = match host.advance(&broker, NOW) {
         InitiatorEvent::ConfirmationRequired {
             confirmation_code, ..
         } => confirmation_code,
@@ -182,8 +184,8 @@ fn both_machines_complete_a_link_and_show_the_same_confirmation_code() {
     );
 
     // 4. The user confirms on the host, which releases the response.
-    let _ = host.confirm_manual(host_code, NOW + 3);
-    let completed = host.advance(&broker, NOW + 4);
+    let _ = host.confirm_manual(host_code, NOW);
+    let completed = host.advance(&broker, NOW);
     assert!(
         matches!(completed, InitiatorEvent::Completed { .. }),
         "expected Completed after confirmation, got {completed:?}"
@@ -191,7 +193,7 @@ fn both_machines_complete_a_link_and_show_the_same_confirmation_code() {
     assert_eq!(host.phase(), InitiatorPhase::Completed);
 
     // 5. The joiner collects the response it can actually decrypt.
-    let ready = joiner.advance(&broker, NOW + 5);
+    let ready = joiner.advance(&broker, NOW);
     assert!(
         matches!(ready, ResponderEvent::ResponseReady),
         "the joiner must decrypt the host's response, got {ready:?}"
@@ -242,12 +244,12 @@ fn both_machines_complete_a_link_over_a_local_rendezvous() {
     let mut joiner =
         DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
             .expect("invitation parses");
-    let joiner_code = match joiner.advance(&joiner_broker, NOW + 1) {
+    let joiner_code = match joiner.advance(&joiner_broker, NOW) {
         ResponderEvent::RequestPosted { confirmation_code } => confirmation_code,
         other => panic!("expected RequestPosted over the local rendezvous, got {other:?}"),
     };
 
-    let host_code = match host.advance(&host_broker, NOW + 2) {
+    let host_code = match host.advance(&host_broker, NOW) {
         InitiatorEvent::ConfirmationRequired {
             confirmation_code, ..
         } => confirmation_code,
@@ -255,14 +257,14 @@ fn both_machines_complete_a_link_over_a_local_rendezvous() {
     };
     assert_eq!(host_code, joiner_code, "the codes must agree off-relay too");
 
-    let _ = host.confirm_manual(host_code, NOW + 3);
-    let completed = host.advance(&host_broker, NOW + 4);
+    let _ = host.confirm_manual(host_code, NOW);
+    let completed = host.advance(&host_broker, NOW);
     assert!(
         matches!(completed, InitiatorEvent::Completed { .. }),
         "expected Completed with no relay involved, got {completed:?}"
     );
 
-    let ready = joiner.advance(&joiner_broker, NOW + 5);
+    let ready = joiner.advance(&joiner_broker, NOW);
     assert!(
         matches!(ready, ResponderEvent::ResponseReady),
         "the joiner must decrypt the response off-relay, got {ready:?}"
@@ -337,12 +339,12 @@ fn both_machines_complete_a_link_over_a_socket_with_no_relay() {
     let mut joiner =
         DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
             .expect("invitation parses");
-    let joiner_code = match joiner.advance(&joiner_broker, NOW + 1) {
+    let joiner_code = match joiner.advance(&joiner_broker, NOW) {
         ResponderEvent::RequestPosted { confirmation_code } => confirmation_code,
         other => panic!("expected RequestPosted over the socket, got {other:?}"),
     };
 
-    let host_code = match host.advance(&host_broker, NOW + 2) {
+    let host_code = match host.advance(&host_broker, NOW) {
         InitiatorEvent::ConfirmationRequired {
             confirmation_code, ..
         } => confirmation_code,
@@ -353,14 +355,14 @@ fn both_machines_complete_a_link_over_a_socket_with_no_relay() {
         "the codes must agree across a transport, not just in-process"
     );
 
-    let _ = host.confirm_manual(host_code, NOW + 3);
-    let completed = host.advance(&host_broker, NOW + 4);
+    let _ = host.confirm_manual(host_code, NOW);
+    let completed = host.advance(&host_broker, NOW);
     assert!(
         matches!(completed, InitiatorEvent::Completed { .. }),
         "expected Completed over the socket, got {completed:?}"
     );
 
-    let ready = joiner.advance(&joiner_broker, NOW + 5);
+    let ready = joiner.advance(&joiner_broker, NOW);
     assert!(
         matches!(ready, ResponderEvent::ResponseReady),
         "the joiner must decrypt the response received over the socket, got {ready:?}"

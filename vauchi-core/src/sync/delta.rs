@@ -87,9 +87,9 @@ pub struct CardDelta {
     pub timestamp: u64,
     /// List of field changes.
     pub changes: Vec<FieldChange>,
-    /// Random nonce for replay attack detection (32 bytes).
-    /// Defaults to all zeros when deserializing legacy deltas without a nonce.
-    #[serde(default = "default_nonce", with = "nonce_serde")]
+    /// Random nonce for replay attack detection (32 bytes). Required, and
+    /// never all-zero (vauchi/private#568).
+    #[serde(with = "nonce_serde")]
     pub nonce: [u8; 32],
     /// Ed25519 signature of the delta (64 bytes).
     #[serde(with = "signature_serde")]
@@ -118,11 +118,6 @@ pub enum FieldChange {
     Removed { field_id: String },
     /// The display name was changed.
     DisplayNameChanged { new_name: String },
-}
-
-/// Returns a zero nonce for deserializing legacy deltas without a nonce field.
-fn default_nonce() -> [u8; 32] {
-    [0u8; 32]
 }
 
 impl CardDelta {
@@ -722,9 +717,13 @@ mod nonce_serde {
         let s = String::deserialize(deserializer)?;
         let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &s)
             .map_err(serde::de::Error::custom)?;
-        bytes
+        let nonce: [u8; 32] = bytes
             .try_into()
-            .map_err(|_| serde::de::Error::custom("invalid nonce length"))
+            .map_err(|_| serde::de::Error::custom("invalid nonce length"))?;
+        if nonce == [0u8; 32] {
+            return Err(serde::de::Error::custom("all-zero nonce"));
+        }
+        Ok(nonce)
     }
 }
 

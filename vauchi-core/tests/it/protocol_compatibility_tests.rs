@@ -84,6 +84,7 @@ const CARD_DELTA_ADDED_V1: &str = r#"{
             }
         }
     ],
+    "nonce": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo=",
     "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
 }"#;
 
@@ -99,6 +100,7 @@ const CARD_DELTA_MODIFIED_V1: &str = r#"{
             }
         }
     ],
+    "nonce": "CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws=",
     "signature": "EREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREQ=="
 }"#;
 
@@ -113,6 +115,7 @@ const CARD_DELTA_REMOVED_V1: &str = r#"{
             }
         }
     ],
+    "nonce": "DAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw=",
     "signature": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIg=="
 }"#;
 
@@ -127,6 +130,7 @@ const CARD_DELTA_NAME_CHANGED_V1: &str = r#"{
             }
         }
     ],
+    "nonce": "DQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0=",
     "signature": "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMw=="
 }"#;
 
@@ -296,6 +300,8 @@ fn test_card_delta_added_compatibility_v1() {
     let delta: CardDelta = serde_json::from_str(CARD_DELTA_ADDED_V1)
         .expect("Failed to deserialize CardDelta Added V1");
 
+    assert_eq!(delta.nonce, [0x0a; 32]);
+
     assert_eq!(delta.version, 1);
     assert_eq!(delta.timestamp, 1700000000);
     assert_eq!(delta.changes.len(), 1);
@@ -316,6 +322,8 @@ fn test_card_delta_modified_compatibility_v1() {
 
     let delta: CardDelta = serde_json::from_str(CARD_DELTA_MODIFIED_V1)
         .expect("Failed to deserialize CardDelta Modified V1");
+
+    assert_eq!(delta.nonce, [0x0b; 32]);
 
     assert_eq!(delta.version, 2);
     assert_eq!(delta.changes.len(), 1);
@@ -340,6 +348,8 @@ fn test_card_delta_removed_compatibility_v1() {
     let delta: CardDelta = serde_json::from_str(CARD_DELTA_REMOVED_V1)
         .expect("Failed to deserialize CardDelta Removed V1");
 
+    assert_eq!(delta.nonce, [0x0c; 32]);
+
     assert_eq!(delta.version, 3);
 
     match &delta.changes[0] {
@@ -357,6 +367,8 @@ fn test_card_delta_display_name_changed_compatibility_v1() {
 
     let delta: CardDelta = serde_json::from_str(CARD_DELTA_NAME_CHANGED_V1)
         .expect("Failed to deserialize CardDelta DisplayNameChanged V1");
+
+    assert_eq!(delta.nonce, [0x0d; 32]);
 
     assert_eq!(delta.version, 4);
 

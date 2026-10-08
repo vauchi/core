@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 73] = [
+const MIGRATIONS: [Migration; 74] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -636,6 +636,11 @@ const MIGRATIONS: [Migration; 73] = [
         version: 73,
         name: "drop_contact_display_name",
         action: MigrationAction::Sql(MIGRATION_V73_DROP_CONTACT_DISPLAY_NAME),
+    },
+    Migration {
+        version: 74,
+        name: "relay_anchor",
+        action: MigrationAction::Sql(MIGRATION_V74_RELAY_ANCHOR),
     },
 ];
 
@@ -1198,6 +1203,11 @@ const MIGRATION_V53_SETTINGS_FLAGS: &str =
 /// Migration v54: persisted relay URL singleton column on ux_state
 /// (mobile-relay-url-editor-noop).
 const MIGRATION_V54_RELAY_URL: &str = "ALTER TABLE ux_state ADD COLUMN relay_url_encrypted BLOB;";
+
+/// Migration v74: the persisted relay's OHTTP trust anchor, next to its URL
+/// (#288, plan 6.1).
+const MIGRATION_V74_RELAY_ANCHOR: &str =
+    "ALTER TABLE ux_state ADD COLUMN relay_anchor_encrypted BLOB;";
 
 // Durable "own card changed → repropagate to contacts" marker (+ failed-attempt
 // counter for backoff). Decoupled from device-sync `SyncItem::CardUpdated`.

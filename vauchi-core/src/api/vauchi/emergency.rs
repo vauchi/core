@@ -400,21 +400,39 @@ impl Vauchi {
         &mut self.config
     }
 
-    /// Sets the relay server URL, updating the live config and persisting it
-    /// durably so it survives a restart (seeded back into config on the next
-    /// launch). The relay transport is built at startup, so a change takes
-    /// effect on the next launch — matching the existing desktop behaviour.
+    /// Sets the relay server URL without an OHTTP anchor: only Vauchi's
+    /// production relay, whose anchor ships in the build, is accepted. See
+    /// [`Self::set_relay`].
     pub fn set_relay_url(&mut self, url: &str) -> VauchiResult<()> {
+        self.set_relay(url, None)
+    }
+
+    /// Sets the relay server URL together with its OHTTP trust anchor,
+    /// updating the live config and persisting both durably so they survive
+    /// a restart (seeded back into config on the next launch). A relay other
+    /// than Vauchi's production relay is refused without its anchor (#288,
+    /// decision 0.9). The relay transport is built at startup, so a change
+    /// takes effect on the next launch — matching the existing desktop
+    /// behaviour.
+    pub fn set_relay(&mut self, url: &str, ohttp_anchor: Option<[u8; 32]>) -> VauchiResult<()> {
         let trimmed = url.trim();
         if trimmed.is_empty() {
             return Err(VauchiError::InvalidState(
                 "Relay URL cannot be empty".into(),
             ));
         }
-        self.storage.ux().save_relay_url(trimmed)?;
+        if ohttp_anchor.is_none() && !crate::api::config::is_production_relay(trimmed) {
+            return Err(VauchiError::InvalidState(
+                "A custom relay needs its OHTTP anchor".into(),
+            ));
+        }
+        self.storage
+            .ux()
+            .save_relay(trimmed, ohttp_anchor.as_ref())?;
         self.config.relay.server_url = trimmed.to_string();
-        // The anchor belonged to the previous relay (#288, decision 0.9).
-        self.config.relay.ohttp_anchor = None;
+        self.config.relay.ohttp_anchor = ohttp_anchor;
+        // The commitment belonged to the previous relay's anchor.
+        self.config.relay.ohttp_backup_commitment = None;
         Ok(())
     }
 

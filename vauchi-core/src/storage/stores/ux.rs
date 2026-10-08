@@ -377,18 +377,48 @@ impl UxStore<'_> {
         }
     }
 
-    /// Saves the persisted relay URL (encrypted).
-    pub fn save_relay_url(&self, url: &str) -> Result<(), StorageError> {
-        let encrypted = crate::crypto::encrypt(self.key, url.as_bytes())
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+    /// Saves the persisted relay URL with its OHTTP trust anchor (encrypted).
+    /// Both are written together, so a relay never keeps another's anchor.
+    pub fn save_relay(
+        &self,
+        url: &str,
+        ohttp_anchor: Option<&[u8; 32]>,
+    ) -> Result<(), StorageError> {
+        let encrypt = |plain: &[u8]| {
+            crate::crypto::encrypt(self.key, plain)
+                .map_err(|e| StorageError::Encryption(e.to_string()))
+        };
+        let url_encrypted = encrypt(url.as_bytes())?;
+        let anchor_encrypted = ohttp_anchor.map(|anchor| encrypt(anchor)).transpose()?;
         let now = self.now_secs();
         self.conn.execute(
-            "INSERT OR REPLACE INTO ux_state (id, relay_url_encrypted, updated_at)
-             VALUES (1, ?1, ?2)
-             ON CONFLICT(id) DO UPDATE SET relay_url_encrypted = ?1, updated_at = ?2",
-            params![encrypted, now as i64],
+            "INSERT OR REPLACE INTO ux_state (id, relay_url_encrypted, relay_anchor_encrypted, updated_at)
+             VALUES (1, ?1, ?2, ?3)
+             ON CONFLICT(id) DO UPDATE SET relay_url_encrypted = ?1, relay_anchor_encrypted = ?2, updated_at = ?3",
+            params![url_encrypted, anchor_encrypted, now as i64],
         )?;
         Ok(())
+    }
+
+    /// Loads the persisted relay's OHTTP trust anchor (decrypted), if any.
+    pub fn load_relay_anchor(&self) -> Result<Option<[u8; 32]>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT relay_anchor_encrypted FROM ux_state WHERE id = 1",
+            [],
+            |row| row.get::<_, Option<Vec<u8>>>(0),
+        );
+        match result {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
+                let decrypted = crate::crypto::decrypt(self.key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let anchor = <[u8; 32]>::try_from(decrypted.as_slice()).map_err(|_| {
+                    StorageError::Serialization("relay anchor is not 32 bytes".into())
+                })?;
+                Ok(Some(anchor))
+            }
+            Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
     }
 
     /// Loads the persisted relay URL (decrypted), if any.

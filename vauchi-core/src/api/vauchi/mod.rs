@@ -354,6 +354,7 @@ impl Vauchi {
             && let Ok(Some(url)) = storage.ux().load_relay_url()
         {
             config.relay.server_url = url;
+            config.relay.ohttp_anchor = storage.ux().load_relay_anchor().ok().flatten();
         }
 
         let events = Arc::new(EventDispatcher::new());

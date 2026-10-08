@@ -69,9 +69,17 @@ impl AppEngine {
             FormDialogType::EditRelayUrl { .. } => match input {
                 // Persist durably via core so the change survives a restart on
                 // every frontend (mobile had no Backend, so this was a no-op).
-                Some(FormInput::EditRelayUrl { url }) => {
-                    let result = self.vauchi.set_relay_url(&url);
-                    self.form_saved(result)
+                Some(FormInput::EditRelayUrl { url, anchor }) => {
+                    match relay_anchor_input(&url, &anchor) {
+                        Ok(anchor) => {
+                            let result = self.vauchi.set_relay(&url, anchor);
+                            self.form_saved(result)
+                        }
+                        Err(message_key) => ActionResult::ValidationError {
+                            component_id: "relay_anchor".into(),
+                            message: self.t(message_key),
+                        },
+                    }
                 }
                 _ => self.form_saved(Ok::<(), std::convert::Infallible>(())),
             },
@@ -360,4 +368,21 @@ impl AppEngine {
         let result = self.vauchi.rename_group(group_id, name.trim());
         self.form_saved(result)
     }
+}
+
+/// The relay editor's anchor input, parsed where it enters (DC-01): 64 hex
+/// characters, or empty for Vauchi's relay only (#288, decision 0.9). A
+/// refusal is the locale key of the inline message on the anchor input.
+fn relay_anchor_input(url: &str, anchor: &str) -> Result<Option<[u8; 32]>, &'static str> {
+    let anchor = anchor.trim();
+    if anchor.is_empty() {
+        return if vauchi_core::api::RelayConfig::requires_ohttp_anchor(url.trim()) {
+            Err("validation.relay_anchor_required")
+        } else {
+            Ok(None)
+        };
+    }
+    let mut bytes = [0u8; 32];
+    hex::decode_to_slice(anchor, &mut bytes).map_err(|_| "validation.relay_anchor_format")?;
+    Ok(Some(bytes))
 }

@@ -421,7 +421,7 @@ impl Vauchi {
                 "Relay URL cannot be empty".into(),
             ));
         }
-        if ohttp_anchor.is_none() && !crate::api::config::is_production_relay(trimmed) {
+        if ohttp_anchor.is_none() && crate::api::RelayConfig::requires_ohttp_anchor(trimmed) {
             return Err(VauchiError::InvalidState(
                 "A custom relay needs its OHTTP anchor".into(),
             ));

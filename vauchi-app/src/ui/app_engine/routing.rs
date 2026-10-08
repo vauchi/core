@@ -89,9 +89,13 @@ impl AppEngine {
             (FormDialogType::EditName { current_name }, FormInput::EditName { name }) => {
                 name != *current_name
             }
-            (FormDialogType::EditRelayUrl { current_url }, FormInput::EditRelayUrl { url }) => {
-                url != *current_url
-            }
+            (
+                FormDialogType::EditRelayUrl {
+                    current_url,
+                    current_anchor,
+                },
+                FormInput::EditRelayUrl { url, anchor },
+            ) => url != *current_url || anchor != *current_anchor,
             (FormDialogType::CreateGroup, FormInput::CreateGroup { name }) => !name.is_empty(),
             (FormDialogType::NamePlace { .. }, FormInput::NamePlace { name }) => {
                 !name.trim().is_empty()

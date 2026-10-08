@@ -201,9 +201,14 @@ impl AppEngine {
                     return Some(ActionResult::NavigateTo(screen));
                 }
                 "relay_url" => {
-                    let current_url = self.vauchi.config().relay.server_url.clone();
+                    let relay = &self.vauchi.config().relay;
+                    let current_url = relay.server_url.clone();
+                    let current_anchor = relay.ohttp_anchor.map(hex::encode).unwrap_or_default();
                     let screen = self.navigate_to(AppScreen::FormDialog {
-                        dialog_type: FormDialogType::EditRelayUrl { current_url },
+                        dialog_type: FormDialogType::EditRelayUrl {
+                            current_url,
+                            current_anchor,
+                        },
                     });
                     return Some(ActionResult::NavigateTo(screen));
                 }

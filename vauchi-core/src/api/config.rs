@@ -446,6 +446,13 @@ impl RelayConfig {
         }
     }
 
+    /// Whether a relay at `server_url` must be given its OHTTP anchor: every
+    /// relay but Vauchi's production one, whose anchor ships in the build
+    /// (decision 0.9).
+    pub fn requires_ohttp_anchor(server_url: &str) -> bool {
+        !is_production_relay(server_url)
+    }
+
     /// The anchor `server_url`'s gateway keys must chain to: the configured
     /// one, else Vauchi's for the exact production host, else none — a
     /// relay without an anchor gets no OHTTP key accepted (decision 0.9).

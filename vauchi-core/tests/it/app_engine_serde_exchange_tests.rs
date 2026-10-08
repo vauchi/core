@@ -103,6 +103,7 @@ fn form_dialog_type_serde_roundtrip() {
         },
         FormDialogType::EditRelayUrl {
             current_url: "https://relay.example.com".into(),
+            current_anchor: "5a".repeat(32),
         },
     ];
     for variant in &variants {

@@ -31,6 +31,9 @@ pub enum FormDialogType {
     },
     EditRelayUrl {
         current_url: String,
+        /// Hex of the configured anchor; empty for Vauchi's relay, whose
+        /// anchor ships in the build (#288).
+        current_anchor: String,
     },
     CreateGroup,
     RenameGroup {
@@ -102,8 +105,14 @@ impl FormDialogEngine {
             FormDialogType::EditName { current_name } => {
                 vec![("display_name".into(), current_name.clone())]
             }
-            FormDialogType::EditRelayUrl { current_url } => {
-                vec![("relay_url".into(), current_url.clone())]
+            FormDialogType::EditRelayUrl {
+                current_url,
+                current_anchor,
+            } => {
+                vec![
+                    ("relay_url".into(), current_url.clone()),
+                    ("relay_anchor".into(), current_anchor.clone()),
+                ]
             }
             FormDialogType::CreateGroup => {
                 vec![("group_name".into(), String::new())]
@@ -178,8 +187,12 @@ impl FormDialogEngine {
             FormDialogType::EditName { current_name } => {
                 self.get_value("display_name") != current_name.as_str()
             }
-            FormDialogType::EditRelayUrl { current_url } => {
+            FormDialogType::EditRelayUrl {
+                current_url,
+                current_anchor,
+            } => {
                 self.get_value("relay_url") != current_url.as_str()
+                    || self.get_value("relay_anchor") != current_anchor.as_str()
             }
             FormDialogType::CreateGroup => !self.get_value("group_name").is_empty(),
             FormDialogType::RenameGroup { current_name, .. } => {
@@ -541,21 +554,38 @@ impl FormDialogEngine {
             screen_id: "form_edit_relay_url".into(),
             title: self.t("form.edit_relay_url_title"),
             subtitle: None,
-            components: vec![Component::TextInput {
-                id: "relay_url".into(),
-                label: self.t("settings.relay_url"),
-                value: self.get_value("relay_url").into(),
-                placeholder: Some(self.t("settings.relay_placeholder")),
-                max_length: Some(200),
-                validation_error: None,
-                input_type: InputType::Text,
-                a11y: Some(A11y {
-                    label: Some(self.t("form.relay_url_input_a11y")),
-                    hint: Some(self.t("settings.relay_placeholder")),
-                    role: Some(AccessibilityRole::TextField),
-                }),
-                info_key: None,
-            }],
+            components: vec![
+                Component::TextInput {
+                    id: "relay_url".into(),
+                    label: self.t("settings.relay_url"),
+                    value: self.get_value("relay_url").into(),
+                    placeholder: Some(self.t("settings.relay_placeholder")),
+                    max_length: Some(200),
+                    validation_error: None,
+                    input_type: InputType::Text,
+                    a11y: Some(A11y {
+                        label: Some(self.t("form.relay_url_input_a11y")),
+                        hint: Some(self.t("settings.relay_placeholder")),
+                        role: Some(AccessibilityRole::TextField),
+                    }),
+                    info_key: None,
+                },
+                Component::TextInput {
+                    id: "relay_anchor".into(),
+                    label: self.t("settings.relay_anchor"),
+                    value: self.get_value("relay_anchor").into(),
+                    placeholder: Some(self.t("settings.relay_anchor_placeholder")),
+                    max_length: Some(64),
+                    validation_error: None,
+                    input_type: InputType::Text,
+                    a11y: Some(A11y {
+                        label: Some(self.t("form.relay_anchor_input_a11y")),
+                        hint: Some(self.t("settings.relay_anchor_placeholder")),
+                        role: Some(AccessibilityRole::TextField),
+                    }),
+                    info_key: None,
+                },
+            ],
             contextual_actions: vec![
                 ScreenAction {
                     id: "submit".into(),
@@ -781,6 +811,7 @@ impl WorkflowEngine for FormDialogEngine {
             },
             FormDialogType::EditRelayUrl { .. } => FormInput::EditRelayUrl {
                 url: self.get_value("relay_url").to_string(),
+                anchor: self.get_value("relay_anchor").to_string(),
             },
             FormDialogType::CreateGroup => FormInput::CreateGroup {
                 name: self.get_value("group_name").to_string(),

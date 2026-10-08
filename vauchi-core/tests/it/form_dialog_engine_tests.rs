@@ -594,6 +594,7 @@ fn form_dialog_edit_name_engine_output() {
 fn form_dialog_edit_relay_url_screen_id() {
     let engine = FormDialogEngine::new(FormDialogType::EditRelayUrl {
         current_url: "https://relay.vauchi.app".into(),
+        current_anchor: String::new(),
     });
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "form_edit_relay_url");
@@ -604,15 +605,21 @@ fn form_dialog_edit_relay_url_screen_id() {
 fn form_dialog_edit_relay_url_engine_output() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditRelayUrl {
         current_url: "https://relay.vauchi.app".into(),
+        current_anchor: String::new(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "relay_url".into(),
         value: "https://custom.relay.example".into(),
     });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "relay_anchor".into(),
+        value: "5a".repeat(32),
+    });
     assert_eq!(
         engine.engine_output(),
         Some(EngineOutput::Form(FormInput::EditRelayUrl {
-            url: "https://custom.relay.example".into()
+            url: "https://custom.relay.example".into(),
+            anchor: "5a".repeat(32),
         }))
     );
 }

@@ -515,6 +515,7 @@ pub enum FormInput {
     },
     EditRelayUrl {
         url: String,
+        anchor: String,
     },
 }
 

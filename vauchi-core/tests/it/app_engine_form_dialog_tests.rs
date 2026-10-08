@@ -107,7 +107,8 @@ fn form_dialog_submit_navigates_back() {
     engine.navigate_to(AppScreen::MyInfo);
     engine.navigate_to(AppScreen::FormDialog {
         dialog_type: FormDialogType::EditRelayUrl {
-            current_url: "https://old.relay".into(),
+            current_url: "https://relay.vauchi.app".into(),
+            current_anchor: String::new(),
         },
     });
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -396,6 +397,7 @@ fn form_dialog_edit_relay_url_navigates_back() {
     engine.navigate_to(AppScreen::FormDialog {
         dialog_type: FormDialogType::EditRelayUrl {
             current_url: "https://relay.vauchi.app".into(),
+            current_anchor: String::new(),
         },
     });
 
@@ -403,12 +405,15 @@ fn form_dialog_edit_relay_url_navigates_back() {
         component_id: "relay_url".into(),
         value: "https://custom.relay.example.com".into(),
     });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "relay_anchor".into(),
+        value: "5a".repeat(32),
+    });
 
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "submit".into(),
     });
 
-    // EditRelayUrl is TUI-specific config — AppEngine just navigates back
     assert!(
         matches!(result, ActionResult::NavigateTo(_)),
         "EditRelayUrl submit should navigate back, got {result:?}"

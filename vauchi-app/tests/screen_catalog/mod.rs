@@ -352,6 +352,7 @@ fn record_seeded(world: SeededWorld, locale: &'static str, screens: &mut Vec<Scr
         (
             FormDialogType::EditRelayUrl {
                 current_url: "https://relay.example.org".to_owned(),
+                current_anchor: String::new(),
             },
             "edit_relay_url",
         ),

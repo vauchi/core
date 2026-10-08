@@ -347,7 +347,7 @@ fn test_start_exchange_with_identity_fails_at_network() {
     // OHTTP key; once it could, the exchange genuinely succeeded and the
     // assertion below started failing.
     vauchi
-        .set_relay_url("http://127.0.0.1:1")
+        .set_relay("http://127.0.0.1:1", Some([0x5a; 32]))
         .expect("relay url accepted");
     let result = vauchi.start_relay_exchange(Some(300));
     assert!(result.is_err());

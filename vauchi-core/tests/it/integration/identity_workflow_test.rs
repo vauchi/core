@@ -196,57 +196,6 @@ fn test_three_device_key_derivation() {
     assert_eq!(device2.device_index(), 2);
 }
 
-/// Test: Device revocation certificate creation and verification
-///
-/// Tests that revocation certificates are properly created, signed,
-/// and can be verified.
-// @internal
-#[test]
-fn test_device_revocation_certificate_workflow() {
-    use vauchi_core::SigningKeyPair;
-    use vauchi_core::identity::{DeviceInfo, DeviceRegistry, DeviceRevocationCertificate};
-
-    let master_seed = [0x42u8; 32];
-    let signing_key = SigningKeyPair::from_seed(&master_seed);
-
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Phone".to_string(), 0);
-    let device1 = DeviceInfo::derive(&master_seed, 1, "Lost Device".to_string(), 0);
-
-    let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
-    registry
-        .add_device(device1.to_registered(&master_seed), &signing_key)
-        .unwrap();
-
-    assert_eq!(registry.active_count(), 2);
-
-    let now = 1_700_000_000_u64;
-    let certificate = DeviceRevocationCertificate::create(
-        device1.device_id(),
-        "Device was lost".to_string(),
-        &signing_key,
-        now,
-    );
-
-    assert!(certificate.verify(&signing_key.public_key()));
-    assert_eq!(certificate.device_id(), device1.device_id());
-    assert_eq!(certificate.reason(), "Device was lost");
-
-    // `revoked_at` is stamped verbatim from the `now` argument.
-    assert_eq!(certificate.revoked_at(), now);
-
-    let json = certificate.to_json();
-    let restored = DeviceRevocationCertificate::from_json(&json).unwrap();
-    assert!(restored.verify(&signing_key.public_key()));
-
-    registry
-        .apply_revocation(&certificate, &signing_key.public_key())
-        .unwrap();
-
-    assert_eq!(registry.active_count(), 1);
-    let revoked = registry.find_device(device1.device_id()).unwrap();
-    assert!(!revoked.is_active());
-}
-
 /// Test: Registry broadcast for contacts
 ///
 /// Tests that a registry broadcast correctly includes only active devices

@@ -201,7 +201,7 @@ exclude_re = [
     "vauchi-core/src/network/ohttp_key_trust\\.rs:76:62: delete ! in accept_signed_key$",
     # verify_with_freshness's `now > timestamp &&` only guards the
     # subtraction; at now == timestamp the age is 0, never over the limit.
-    "vauchi-core/src/identity/device\\.rs:719:21: replace > with >= in RegistryBroadcast::verify_with_freshness$",
+    "vauchi-core/src/identity/device\\.rs:583:21: replace > with >= in RegistryBroadcast::verify_with_freshness$",
     # import_backup_v2's minimum length (93 bytes, the smallest real backup,
     # pinned by identity_backup_parse_tests): these mutants only lower it, and
     # anything shorter then fails authenticated decryption anyway.

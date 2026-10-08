@@ -519,13 +519,21 @@ lint:semver:
     # current + baseline rustdoc. The old manual `cargo +nightly doc`
     # JSON was rejected by the --current-rustdoc file-loader once the
     # nightly rustdoc format reached v60 (2026-07-02); dropping it removes
-    # both the format-mismatch failure and the /tmp worktree dance.
+    # the format-mismatch failure.
     - cargo binstall cargo-semver-checks --no-confirm --force 2>/dev/null || command -v cargo-semver-checks >/dev/null 2>&1 || cargo install cargo-semver-checks
     # rustdoc JSON is nightly-only; semver-checks invokes nightly itself.
     - rustup toolchain install nightly --profile minimal --component rustdoc 2>/dev/null || true
     - git fetch origin main
-    - cargo semver-checks check-release -p vauchi-protocol --baseline-rev origin/main
-    - cargo semver-checks check-release -p vauchi-core --baseline-rev origin/main
+    # Not --baseline-rev: since 0.51.0 it extracts the rev as an archive and
+    # rejects the repo-root locales/themes symlinks (../locales) as pointing
+    # outside the tree. A worktree checks the symlinks out as plain links.
+    - BASELINE="$(mktemp -d)/core"
+    # Shell runners keep .git across jobs; drop worktrees a failed run left.
+    - git worktree prune
+    - git worktree add -f --detach "$BASELINE" origin/main
+    - cargo semver-checks check-release -p vauchi-protocol --baseline-root "$BASELINE"
+    - cargo semver-checks check-release -p vauchi-core --baseline-root "$BASELINE"
+    - git worktree remove --force "$BASELINE"
     # vauchi-platform: include_bytes! references sibling themes/ repo —
     # skipped until themes are vendored or a similar workaround is applied
 

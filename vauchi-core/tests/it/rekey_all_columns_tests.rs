@@ -409,8 +409,8 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     let dev_id_blob: Vec<u8> = vec![0xABu8; 32];
     conn.execute(
         "INSERT OR REPLACE INTO device_info \
-         (id, device_id, device_index, device_name, device_info_encrypted, created_at) \
-         VALUES (1, ?1, 0, 'test-device', ?2, ?3)",
+         (id, device_id, device_index, device_info_encrypted, created_at) \
+         VALUES (1, ?1, 0, ?2, ?3)",
         params![
             dev_id_blob,
             enc("device_info", "device_info_encrypted"),
@@ -422,8 +422,8 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     // ── version_vector (singleton) ────────────────────────────
     conn.execute(
         "INSERT OR REPLACE INTO version_vector \
-         (id, vector_json, vector_json_encrypted, updated_at) \
-         VALUES (1, '', ?1, ?2)",
+         (id, vector_json_encrypted, updated_at) \
+         VALUES (1, ?1, ?2)",
         params![enc("version_vector", "vector_json_encrypted"), now],
     )
     .unwrap();
@@ -544,12 +544,12 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     // ── ux_state (singleton) ─────────────────────────────────
     conn.execute(
         "INSERT OR REPLACE INTO ux_state \
-         (id, aha_tracker_json, demo_contact_json, \
+         (id, \
           aha_tracker_json_encrypted, demo_contact_json_encrypted, \
           onboarding_progress_encrypted, backup_reminder_encrypted, updated_at, \
           settings_flags_encrypted, relay_url_encrypted, \
           own_card_repropagate_encrypted, exchange_defaults_encrypted) \
-         VALUES (1, '', '', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+         VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             enc("ux_state", "aha_tracker_json_encrypted"),
             enc("ux_state", "demo_contact_json_encrypted"),

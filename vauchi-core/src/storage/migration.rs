@@ -17,7 +17,7 @@
 //! - Down-migrations are rarely tested and often broken in production
 //! - Vauchi's data is encrypted at rest — reversing encryption migrations
 //!   would require the original key, making rollback unsafe
-//! - SQLite has no DROP COLUMN, making schema reversal impractical
+//! - A dropped column's data is gone, so there is nothing to reverse to
 //!
 //! If a migration fails, the transaction is rolled back atomically.
 //! If a deployed migration needs reversal, a new forward migration should
@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 69] = [
+const MIGRATIONS: [Migration; 70] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -617,7 +617,21 @@ const MIGRATIONS: [Migration; 69] = [
         name: "ohttp_followed_anchor",
         action: MigrationAction::Sql(MIGRATION_V69_OHTTP_FOLLOWED_ANCHOR),
     },
+    Migration {
+        version: 70,
+        name: "drop_emptied_plaintext_columns",
+        action: MigrationAction::Sql(MIGRATION_V70_DROP_EMPTIED_PLAINTEXT_COLUMNS),
+    },
 ];
+
+/// Migration v70: drop the plaintext columns that v14/v15 emptied when
+/// they moved the data into the `*_encrypted` columns (vauchi/private#535).
+const MIGRATION_V70_DROP_EMPTIED_PLAINTEXT_COLUMNS: &str = "
+    ALTER TABLE device_info DROP COLUMN device_name;
+    ALTER TABLE version_vector DROP COLUMN vector_json;
+    ALTER TABLE ux_state DROP COLUMN aha_tracker_json;
+    ALTER TABLE ux_state DROP COLUMN demo_contact_json;
+";
 
 /// Migration v69: the OHTTP anchor a client reached by following its
 /// relay's rollover chain (#288 decision 0.13).

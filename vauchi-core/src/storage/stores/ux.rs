@@ -52,9 +52,9 @@ impl UxStore<'_> {
         let now = self.now_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json, aha_tracker_json_encrypted, updated_at)
-             VALUES (1, '', ?1, ?2)
-             ON CONFLICT(id) DO UPDATE SET aha_tracker_json = '', aha_tracker_json_encrypted = ?1, updated_at = ?2",
+            "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json_encrypted, updated_at)
+             VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET aha_tracker_json_encrypted = ?1, updated_at = ?2",
             params![encrypted, now as i64],
         )?;
 
@@ -102,9 +102,9 @@ impl UxStore<'_> {
         let now = self.now_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO ux_state (id, demo_contact_json, demo_contact_json_encrypted, updated_at)
-             VALUES (1, '', ?1, ?2)
-             ON CONFLICT(id) DO UPDATE SET demo_contact_json = '', demo_contact_json_encrypted = ?1, updated_at = ?2",
+            "INSERT OR REPLACE INTO ux_state (id, demo_contact_json_encrypted, updated_at)
+             VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET demo_contact_json_encrypted = ?1, updated_at = ?2",
             params![encrypted, now as i64],
         )?;
 
@@ -465,11 +465,11 @@ impl UxStore<'_> {
         // Use INSERT ... ON CONFLICT UPDATE to preserve other columns
         // (e.g. onboarding_progress_encrypted) that are not part of this save.
         self.conn.execute(
-            "INSERT INTO ux_state (id, aha_tracker_json, aha_tracker_json_encrypted, demo_contact_json, demo_contact_json_encrypted, updated_at)
-             VALUES (1, '', ?1, '', ?2, ?3)
+            "INSERT INTO ux_state (id, aha_tracker_json_encrypted, demo_contact_json_encrypted, updated_at)
+             VALUES (1, ?1, ?2, ?3)
              ON CONFLICT(id) DO UPDATE SET
-               aha_tracker_json = '', aha_tracker_json_encrypted = ?1,
-               demo_contact_json = '', demo_contact_json_encrypted = ?2,
+               aha_tracker_json_encrypted = ?1,
+               demo_contact_json_encrypted = ?2,
                updated_at = ?3",
             params![aha_encrypted, demo_encrypted, now as i64],
         )?;

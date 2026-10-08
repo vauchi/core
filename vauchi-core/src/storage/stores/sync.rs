@@ -167,8 +167,8 @@ impl SyncStore<'_> {
         let now = self.now_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO version_vector (id, vector_json, vector_json_encrypted, updated_at)
-             VALUES (1, '', ?1, ?2)",
+            "INSERT OR REPLACE INTO version_vector (id, vector_json_encrypted, updated_at)
+             VALUES (1, ?1, ?2)",
             params![encrypted, now as i64],
         )?;
         Ok(())

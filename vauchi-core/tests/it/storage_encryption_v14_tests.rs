@@ -145,15 +145,6 @@ fn test_device_info_stored_as_encrypted_blob() {
 
     let blob = result.expect("Encrypted blob should exist");
     assert!(!blob.is_empty());
-
-    let name: String = raw_conn
-        .query_row(
-            "SELECT device_name FROM device_info WHERE id = 1",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert_eq!(name, "", "Plaintext device_name should be cleared");
 }
 
 // === Version Vector Encryption ===
@@ -201,16 +192,6 @@ fn test_version_vector_stored_as_encrypted_blob() {
 
     let blob = result.expect("Encrypted blob should exist");
     assert!(!blob.is_empty());
-
-    // Plaintext should be cleared
-    let json: String = raw_conn
-        .query_row(
-            "SELECT vector_json FROM version_vector WHERE id = 1",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert_eq!(json, "", "Plaintext vector_json should be cleared");
 }
 
 // === Contact Sync Timestamps Encryption ===

@@ -325,7 +325,7 @@ fn test_rekey_preserves_onboarding_progress() {
     let progress_enc = vauchi_core::crypto::encrypt(&key1, b"{\"step\":\"backup\"}").unwrap();
     // ux_state may already have a row from migrations
     storage.connection().execute(
-        "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json, demo_contact_json, onboarding_progress_encrypted, updated_at) VALUES (1, '', '', ?1, 1000)",
+        "INSERT OR REPLACE INTO ux_state (id, onboarding_progress_encrypted, updated_at) VALUES (1, ?1, 1000)",
         [&progress_enc],
     ).unwrap();
 
@@ -354,7 +354,7 @@ fn test_rekey_preserves_relay_url() {
     storage
         .connection()
         .execute(
-            "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json, demo_contact_json, relay_url_encrypted, updated_at) VALUES (1, '', '', ?1, 1000)",
+            "INSERT OR REPLACE INTO ux_state (id, relay_url_encrypted, updated_at) VALUES (1, ?1, 1000)",
             [&url_enc],
         )
         .unwrap();

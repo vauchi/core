@@ -67,8 +67,8 @@ impl DeviceStore<'_> {
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO device_info (id, device_id, device_index, device_name, created_at, device_info_encrypted)
-             VALUES (1, ?1, ?2, '', ?3, ?4)",
+            "INSERT OR REPLACE INTO device_info (id, device_id, device_index, created_at, device_info_encrypted)
+             VALUES (1, ?1, ?2, ?3, ?4)",
             params![
                 device_id.as_slice(),
                 device_index as i32,

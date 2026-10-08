@@ -189,29 +189,14 @@ fn test_ux_state_encrypted_in_db() {
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
 
-    type UxStateRow = (
-        Option<String>,
-        Option<Vec<u8>>,
-        Option<String>,
-        Option<Vec<u8>>,
-    );
-    let (aha_plain, aha_enc, demo_plain, demo_enc): UxStateRow = raw_conn
+    let (aha_enc, demo_enc): (Option<Vec<u8>>, Option<Vec<u8>>) = raw_conn
         .query_row(
-            "SELECT aha_tracker_json, aha_tracker_json_encrypted, demo_contact_json, demo_contact_json_encrypted FROM ux_state WHERE id = 1",
+            "SELECT aha_tracker_json_encrypted, demo_contact_json_encrypted FROM ux_state WHERE id = 1",
             [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .unwrap();
 
-    // Plaintext columns should be cleared
-    assert!(
-        aha_plain.is_none_or(|s| s.is_empty()),
-        "plaintext aha_tracker_json should be cleared"
-    );
-    assert!(
-        demo_plain.is_none_or(|s| s.is_empty()),
-        "plaintext demo_contact_json should be cleared"
-    );
     assert!(
         aha_enc.is_some() && !aha_enc.unwrap().is_empty(),
         "aha_tracker_json_encrypted should have data"

@@ -18,6 +18,9 @@ pub use storage::widget_panic_shred;
 
 /// Key name for the Shredding Master Key in SecureStorage.
 const SMK_KEY_NAME: &str = "smk";
+/// Secure-storage name of the key the database is under before an identity
+/// exists (vauchi/private#580).
+pub(crate) const BOOTSTRAP_KEY_NAME: &str = "storage_bootstrap";
 
 /// Trait for sending relay purge requests during shred operations.
 ///
@@ -86,7 +89,8 @@ pub struct ShredReport {
     pub relay_purge_sent: bool,
     /// Number of linked devices notified.
     pub devices_notified: usize,
-    /// Whether SMK was destroyed from SecureStorage.
+    /// Whether the SMK and the storage bootstrap key were destroyed from
+    /// SecureStorage — every key there that opens the database.
     pub smk_destroyed: bool,
     /// Whether the identity backup file was securely deleted.
     pub identity_file_destroyed: bool,
@@ -105,6 +109,9 @@ pub struct ShredReport {
 pub struct ShredVerification {
     /// Whether SMK is absent from SecureStorage (expected: true after shred).
     pub smk_absent: bool,
+    /// Whether the storage bootstrap key is absent from SecureStorage
+    /// (expected: true after shred).
+    pub bootstrap_key_absent: bool,
     /// Whether the database file is absent (expected: true after shred).
     pub database_absent: bool,
     /// Whether the data directory is absent (expected: true after shred).

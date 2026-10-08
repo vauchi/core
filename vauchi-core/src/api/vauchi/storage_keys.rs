@@ -20,7 +20,7 @@ use crate::storage::{SecureStorage, Storage, StorageError};
 use super::super::{VauchiError, VauchiResult};
 use super::SMK_KEY_NAME;
 
-pub(super) const BOOTSTRAP_KEY_NAME: &str = "storage_bootstrap";
+use crate::api::shred::BOOTSTRAP_KEY_NAME;
 
 fn load_key(secure: &dyn SecureStorage, name: &str) -> VauchiResult<Option<[u8; 32]>> {
     let Some(bytes) = secure.load_key(name).map_err(|e| {

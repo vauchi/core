@@ -12,7 +12,7 @@ use std::path::Path;
 use crate::api::pre_signed::PreSignedShredMessages;
 use crate::storage::secure::SecureStorage;
 
-use super::{SMK_KEY_NAME, ShredError, ShredReport};
+use super::{BOOTSTRAP_KEY_NAME, SMK_KEY_NAME, ShredError, ShredReport};
 
 /// Public entry point for secure file overwrite, callable from other modules.
 pub(crate) fn secure_overwrite_file_public(path: &Path) -> Result<(), std::io::Error> {
@@ -57,6 +57,14 @@ pub(super) fn secure_overwrite_file(path: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+/// Deletes every key in secure storage that opens the database; true when
+/// both deletes succeeded.
+pub(super) fn destroy_storage_keys(secure_storage: &dyn SecureStorage) -> bool {
+    let smk = secure_storage.secure_delete_key(SMK_KEY_NAME).is_ok();
+    let bootstrap = secure_storage.secure_delete_key(BOOTSTRAP_KEY_NAME).is_ok();
+    smk && bootstrap
+}
+
 /// Panic shred callable from a widget without full Vauchi initialization.
 ///
 /// This is the core API for iOS/Android home screen widgets that need to
@@ -85,7 +93,7 @@ pub fn widget_panic_shred(
     // ── Phase B: Destroy all key material ──
 
     // 1. Destroy SMK from SecureStorage
-    report.smk_destroyed = secure_storage.secure_delete_key(SMK_KEY_NAME).is_ok();
+    report.smk_destroyed = destroy_storage_keys(secure_storage);
 
     // 2. Secure-delete identity backup file
     let identity_path = data_dir.join("identity.json");

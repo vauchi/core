@@ -20,10 +20,10 @@ use crate::identity::Identity;
 use crate::storage::secure::SecureStorage;
 use crate::storage::{DeletionState, Storage};
 
-use super::storage::secure_overwrite_file;
+use super::storage::{destroy_storage_keys, secure_overwrite_file};
 use super::{
-    PurgeSender, RevocationSender, SMK_KEY_NAME, ShredError, ShredReport, ShredToken,
-    ShredVerification,
+    BOOTSTRAP_KEY_NAME, PurgeSender, RevocationSender, SMK_KEY_NAME, ShredError, ShredReport,
+    ShredToken, ShredVerification,
 };
 
 /// Orchestrates cryptographic shredding of all identity data.
@@ -269,14 +269,24 @@ impl<'a> ShredManager<'a> {
             .map(|k| k.is_none())
             .unwrap_or(true);
 
+        let bootstrap_key_absent = self
+            .secure_storage
+            .load_key(BOOTSTRAP_KEY_NAME)
+            .map(|k| k.is_none())
+            .unwrap_or(true);
         let database_absent = !self.data_dir.join("vauchi.db").exists();
         let data_dir_absent = !self.data_dir.exists();
         let pre_signed_absent = !PreSignedShredMessages::file_path(&self.data_dir).exists();
 
-        let all_clear = smk_absent && database_absent && pre_signed_absent && data_dir_absent;
+        let all_clear = smk_absent
+            && bootstrap_key_absent
+            && database_absent
+            && pre_signed_absent
+            && data_dir_absent;
 
         ShredVerification {
             smk_absent,
+            bootstrap_key_absent,
             database_absent,
             data_dir_absent,
             pre_signed_absent,
@@ -287,7 +297,7 @@ impl<'a> ShredManager<'a> {
     // ── Internal helpers ──
 
     fn destroy_smk(&self) -> bool {
-        self.secure_storage.secure_delete_key(SMK_KEY_NAME).is_ok()
+        destroy_storage_keys(self.secure_storage)
     }
 
     fn secure_delete_identity_file(&self) -> bool {

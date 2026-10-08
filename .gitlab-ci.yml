@@ -382,9 +382,12 @@ lint:cross-cutting-blocking:
     # drift from locales, or a build without a checkout ships stale copy.
     # An MR only has to carry exactly the revision it names: a locales merge
     # stales every open MR at once, and sync:vendor-locales refreshes main
-    # (#432). Main and tags still require locales HEAD.
+    # (#432). The locales-triggered pipeline is that merge arriving on main,
+    # so it gets the same check while sync:vendor-locales opens the refresh
+    # (private#557). Main pushes and tags still require locales HEAD.
     - |
-      if [ "${CI_PIPELINE_SOURCE}" = "merge_request_event" ]; then
+      if [ "${CI_PIPELINE_SOURCE}" = "merge_request_event" ] \
+        || { [ "${CI_PIPELINE_SOURCE}" = "pipeline" ] && [ "${CONTENT_TRIGGER_REPO:-}" = "locales" ]; }; then
         if [ "$(git -C ../locales rev-parse --is-shallow-repository)" = true ]; then
           git -C ../locales fetch --quiet --unshallow origin main
         fi

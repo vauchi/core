@@ -16,6 +16,9 @@
 //!   `execute_deletion` -> `confirm_execute_deletion` (`confirm_execute`
 //!   / `cancel`).
 //!
+//! Both states also offer `heirloom` -> `confirm_heirloom` (`confirm_heirloom`
+//! / `cancel`), the paper heirloom export (private#363).
+//!
 //! The `consent_actions` `ActionList` rows (`view_data` / `manage_consent`)
 //! are `ListItemSelected` pass-throughs and are not walked here.
 
@@ -24,6 +27,8 @@ use vauchi_app::ui::{GdprEngine, WorkflowEngine};
 
 const HANDLED_DEFAULT: &[&str] = &[
     "export",
+    "heirloom",
+    "confirm_heirloom",
     "delete",
     "panic_shred",
     "confirm_delete",
@@ -33,6 +38,8 @@ const HANDLED_DEFAULT: &[&str] = &[
 
 const HANDLED_SCHEDULED: &[&str] = &[
     "export",
+    "heirloom",
+    "confirm_heirloom",
     "cancel_deletion",
     "execute_deletion",
     "panic_shred",

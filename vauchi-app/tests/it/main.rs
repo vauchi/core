@@ -109,6 +109,7 @@ mod gdpr_i18n_tests;
 mod group_delete_tests;
 mod group_detail_screen_tests;
 mod groups_screen_tests;
+mod heirloom_privacy_tests;
 mod help_canvas_tests;
 mod help_engine_wiring_tests;
 mod humble_surface_contract_tests;

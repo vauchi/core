@@ -245,6 +245,45 @@ fn an_explicit_anchor_wins_for_the_production_host_too() {
     assert_eq!(config.relay.ohttp_trust_anchor(), Some(ANCHOR));
 }
 
+/// Vauchi's OHTTP trust anchor and the commitment to its backup, created
+/// in the first anchor ceremony (2026-10-08, runbook
+/// 2026-10-06-ohttp-anchor-ceremony §2). The production relay's signed key
+/// record verifies under this anchor; a client released without them would
+/// take no signed key from production, and without the commitment could
+/// not follow a rollover.
+// @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users
+#[test]
+fn the_production_relay_carries_vauchis_anchor_and_backup_commitment() {
+    let config = VauchiConfig::default();
+
+    assert_eq!(
+        config
+            .relay
+            .ohttp_trust_anchor()
+            .map(hex::encode)
+            .as_deref(),
+        Some("b049502a53371a91a4e29c32dec08d2fb62ebfb17f23fece3306cdef755b1abe")
+    );
+    assert_eq!(
+        config
+            .relay
+            .ohttp_backup_commitment()
+            .map(hex::encode)
+            .as_deref(),
+        Some("47cb7feaec43837b15fd2248e5c6423f7c8ffd28ed1f0fc0f77d8f6993e9ef45")
+    );
+}
+
+/// A lookalike host gets neither: the production commitment belongs to the
+/// production anchor only.
+// @internal
+#[test]
+fn a_lookalike_of_the_production_host_gets_no_backup_commitment() {
+    let config = VauchiConfig::default().with_relay_url("https://relay.vauchi.app.evil.example");
+
+    assert_eq!(config.relay.ohttp_backup_commitment(), None);
+}
+
 // @internal
 #[test]
 fn the_default_relay_config_names_no_explicit_anchor() {

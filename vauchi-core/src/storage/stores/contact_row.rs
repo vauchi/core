@@ -16,6 +16,9 @@ use crate::exchange::TrustMetrics;
 use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::types::ExchangeTransport;
 
+/// Columns `ContactRow::from_row` reads, for every contact SELECT.
+pub(super) const CONTACT_COLUMNS: &str = "id, public_key, display_name, card_encrypted, shared_key_encrypted, visibility_rules_json, visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted, exchange_transport, has_recovered, card_updated_at, relay_url, trust_metrics, contact_kind, import_source, imported_at, original_uid, deleted_at, archived, archived_at, ignored, ignored_at, reciprocity, confirmation_channel";
+
 /// Internal struct for database row data.
 #[allow(dead_code)] // Fields are used via destructuring in row_to_contact
 pub(super) struct ContactRow {
@@ -50,6 +53,44 @@ pub(super) struct ContactRow {
     pub ignored_at: Option<i64>,
     pub reciprocity: Option<String>,
     pub confirmation_channel: Option<String>,
+}
+
+impl ContactRow {
+    pub(super) fn from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
+            id: row.get("id")?,
+            public_key: row.get("public_key")?,
+            display_name: row.get("display_name")?,
+            card_encrypted: row.get("card_encrypted")?,
+            shared_key_encrypted: row.get("shared_key_encrypted")?,
+            visibility_rules_json: row.get("visibility_rules_json")?,
+            visibility_rules_encrypted: row.get("visibility_rules_encrypted")?,
+            exchange_timestamp: row.get("exchange_timestamp")?,
+            fingerprint_verified: row.get("fingerprint_verified")?,
+            blocked: row.get("blocked")?,
+            hidden: row.get("hidden")?,
+            favorite: row.get("favorite")?,
+            recovery_trusted: row.get("recovery_trusted")?,
+            proposal_trusted: row.get("proposal_trusted")?,
+            cek_encrypted: row.get("cek_encrypted")?,
+            exchange_transport: row.get("exchange_transport")?,
+            has_recovered: row.get("has_recovered")?,
+            card_updated_at: row.get("card_updated_at")?,
+            relay_url: row.get("relay_url")?,
+            trust_metrics: row.get("trust_metrics")?,
+            contact_kind: row.get("contact_kind")?,
+            import_source: row.get("import_source")?,
+            imported_at: row.get("imported_at")?,
+            original_uid: row.get("original_uid")?,
+            deleted_at: row.get("deleted_at")?,
+            archived: row.get("archived")?,
+            archived_at: row.get("archived_at")?,
+            ignored: row.get("ignored")?,
+            ignored_at: row.get("ignored_at")?,
+            reciprocity: row.get("reciprocity")?,
+            confirmation_channel: row.get("confirmation_channel")?,
+        })
+    }
 }
 
 impl ContactStore<'_> {

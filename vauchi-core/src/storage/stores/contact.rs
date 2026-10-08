@@ -16,7 +16,7 @@ use rusqlite::{Connection, params};
 use super::super::{Storage, StorageError};
 use crate::clock::Clock;
 
-use super::contact_row::ContactRow;
+use super::contact_row::{CONTACT_COLUMNS, ContactRow};
 use crate::contact::Contact;
 
 /// Scoped persistence view for the contact domain.
@@ -133,53 +133,11 @@ impl ContactStore<'_> {
     }
     /// Loads a contact by ID.
     pub fn load_contact(&self, id: &str) -> Result<Option<Contact>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
-                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at, ignored, ignored_at,
-                    reciprocity, confirmation_channel
-             FROM contacts WHERE id = ?1",
-        )?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {CONTACT_COLUMNS} FROM contacts WHERE id = ?1"
+        ))?;
 
-        let result = stmt.query_row(params![id], |row| {
-            Ok(ContactRow {
-                id: row.get(0)?,
-                public_key: row.get(1)?,
-                display_name: row.get(2)?,
-                card_encrypted: row.get(3)?,
-                shared_key_encrypted: row.get(4)?,
-                visibility_rules_json: row.get(5)?,
-                visibility_rules_encrypted: row.get(6)?,
-                exchange_timestamp: row.get(7)?,
-                fingerprint_verified: row.get(8)?,
-                blocked: row.get(9)?,
-                hidden: row.get(10)?,
-                favorite: row.get(11)?,
-                recovery_trusted: row.get(12)?,
-                proposal_trusted: row.get(13)?,
-                cek_encrypted: row.get(14)?,
-                exchange_transport: row.get(15)?,
-                has_recovered: row.get(16)?,
-                card_updated_at: row.get(17)?,
-                relay_url: row.get(18)?,
-                trust_metrics: row.get(19)?,
-                contact_kind: row.get(20)?,
-                import_source: row.get(21)?,
-                imported_at: row.get(22)?,
-                original_uid: row.get(23)?,
-                deleted_at: row.get(24)?,
-                archived: row.get(25)?,
-                archived_at: row.get(26)?,
-                ignored: row.get(27)?,
-                ignored_at: row.get(28)?,
-                reciprocity: row.get(29)?,
-                confirmation_channel: row.get(30)?,
-            })
-        });
+        let result = stmt.query_row(params![id], ContactRow::from_row);
 
         match result {
             Ok(row) => Ok(Some(self.row_to_contact(row)?)),
@@ -189,55 +147,13 @@ impl ContactStore<'_> {
     }
     /// Lists all contacts, excluding soft-deleted and archived contacts.
     pub fn list_contacts(&self) -> Result<Vec<Contact>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
-                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at, ignored, ignored_at,
-                    reciprocity, confirmation_channel
-             FROM contacts
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {CONTACT_COLUMNS} FROM contacts
              WHERE deleted_at IS NULL AND archived = 0
-             ORDER BY display_name",
-        )?;
+             ORDER BY display_name"
+        ))?;
 
-        let rows = stmt.query_map([], |row| {
-            Ok(ContactRow {
-                id: row.get(0)?,
-                public_key: row.get(1)?,
-                display_name: row.get(2)?,
-                card_encrypted: row.get(3)?,
-                shared_key_encrypted: row.get(4)?,
-                visibility_rules_json: row.get(5)?,
-                visibility_rules_encrypted: row.get(6)?,
-                exchange_timestamp: row.get(7)?,
-                fingerprint_verified: row.get(8)?,
-                blocked: row.get(9)?,
-                hidden: row.get(10)?,
-                favorite: row.get(11)?,
-                recovery_trusted: row.get(12)?,
-                proposal_trusted: row.get(13)?,
-                cek_encrypted: row.get(14)?,
-                exchange_transport: row.get(15)?,
-                has_recovered: row.get(16)?,
-                card_updated_at: row.get(17)?,
-                relay_url: row.get(18)?,
-                trust_metrics: row.get(19)?,
-                contact_kind: row.get(20)?,
-                import_source: row.get(21)?,
-                imported_at: row.get(22)?,
-                original_uid: row.get(23)?,
-                deleted_at: row.get(24)?,
-                archived: row.get(25)?,
-                archived_at: row.get(26)?,
-                ignored: row.get(27)?,
-                ignored_at: row.get(28)?,
-                reciprocity: row.get(29)?,
-                confirmation_channel: row.get(30)?,
-            })
-        })?;
+        let rows = stmt.query_map([], ContactRow::from_row)?;
 
         let mut contacts = Vec::new();
         let mut row_count = 0usize;
@@ -290,56 +206,14 @@ impl ContactStore<'_> {
             return Ok(Vec::new());
         }
 
-        let mut stmt = self.conn.prepare(
-            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
-                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at, ignored, ignored_at,
-                    reciprocity, confirmation_channel
-             FROM contacts
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {CONTACT_COLUMNS} FROM contacts
              WHERE deleted_at IS NULL AND archived = 0
              ORDER BY display_name
-             LIMIT ?1 OFFSET ?2",
-        )?;
+             LIMIT ?1 OFFSET ?2"
+        ))?;
 
-        let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
-            Ok(ContactRow {
-                id: row.get(0)?,
-                public_key: row.get(1)?,
-                display_name: row.get(2)?,
-                card_encrypted: row.get(3)?,
-                shared_key_encrypted: row.get(4)?,
-                visibility_rules_json: row.get(5)?,
-                visibility_rules_encrypted: row.get(6)?,
-                exchange_timestamp: row.get(7)?,
-                fingerprint_verified: row.get(8)?,
-                blocked: row.get(9)?,
-                hidden: row.get(10)?,
-                favorite: row.get(11)?,
-                recovery_trusted: row.get(12)?,
-                proposal_trusted: row.get(13)?,
-                cek_encrypted: row.get(14)?,
-                exchange_transport: row.get(15)?,
-                has_recovered: row.get(16)?,
-                card_updated_at: row.get(17)?,
-                relay_url: row.get(18)?,
-                trust_metrics: row.get(19)?,
-                contact_kind: row.get(20)?,
-                import_source: row.get(21)?,
-                imported_at: row.get(22)?,
-                original_uid: row.get(23)?,
-                deleted_at: row.get(24)?,
-                archived: row.get(25)?,
-                archived_at: row.get(26)?,
-                ignored: row.get(27)?,
-                ignored_at: row.get(28)?,
-                reciprocity: row.get(29)?,
-                confirmation_channel: row.get(30)?,
-            })
-        })?;
+        let rows = stmt.query_map(params![limit as i64, offset as i64], ContactRow::from_row)?;
 
         let mut contacts = Vec::new();
         for row_result in rows {
@@ -367,56 +241,14 @@ impl ContactStore<'_> {
         let query_lower = query.to_lowercase();
 
         // Part 1: SQL search for legacy contacts (non-empty display_name)
-        let mut stmt = self.conn.prepare(
-            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
-                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at, ignored, ignored_at,
-                    reciprocity, confirmation_channel
-             FROM contacts
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {CONTACT_COLUMNS} FROM contacts
              WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
                AND deleted_at IS NULL AND archived = 0
-             ORDER BY display_name",
-        )?;
+             ORDER BY display_name"
+        ))?;
 
-        let rows = stmt.query_map(params![pattern], |row| {
-            Ok(ContactRow {
-                id: row.get(0)?,
-                public_key: row.get(1)?,
-                display_name: row.get(2)?,
-                card_encrypted: row.get(3)?,
-                shared_key_encrypted: row.get(4)?,
-                visibility_rules_json: row.get(5)?,
-                visibility_rules_encrypted: row.get(6)?,
-                exchange_timestamp: row.get(7)?,
-                fingerprint_verified: row.get(8)?,
-                blocked: row.get(9)?,
-                hidden: row.get(10)?,
-                favorite: row.get(11)?,
-                recovery_trusted: row.get(12)?,
-                proposal_trusted: row.get(13)?,
-                cek_encrypted: row.get(14)?,
-                exchange_transport: row.get(15)?,
-                has_recovered: row.get(16)?,
-                card_updated_at: row.get(17)?,
-                relay_url: row.get(18)?,
-                trust_metrics: row.get(19)?,
-                contact_kind: row.get(20)?,
-                import_source: row.get(21)?,
-                imported_at: row.get(22)?,
-                original_uid: row.get(23)?,
-                deleted_at: row.get(24)?,
-                archived: row.get(25)?,
-                archived_at: row.get(26)?,
-                ignored: row.get(27)?,
-                ignored_at: row.get(28)?,
-                reciprocity: row.get(29)?,
-                confirmation_channel: row.get(30)?,
-            })
-        })?;
+        let rows = stmt.query_map(params![pattern], ContactRow::from_row)?;
 
         let mut contacts = Vec::new();
         for row_result in rows {
@@ -425,54 +257,12 @@ impl ContactStore<'_> {
         }
 
         // Part 2: In-memory search for CEK-protected contacts (empty display_name)
-        let mut cek_stmt = self.conn.prepare(
-            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
-                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at, ignored, ignored_at,
-                    reciprocity, confirmation_channel
-             FROM contacts
-             WHERE display_name = '' AND deleted_at IS NULL AND archived = 0",
-        )?;
+        let mut cek_stmt = self.conn.prepare(&format!(
+            "SELECT {CONTACT_COLUMNS} FROM contacts
+             WHERE display_name = '' AND deleted_at IS NULL AND archived = 0"
+        ))?;
 
-        let cek_rows = cek_stmt.query_map([], |row| {
-            Ok(ContactRow {
-                id: row.get(0)?,
-                public_key: row.get(1)?,
-                display_name: row.get(2)?,
-                card_encrypted: row.get(3)?,
-                shared_key_encrypted: row.get(4)?,
-                visibility_rules_json: row.get(5)?,
-                visibility_rules_encrypted: row.get(6)?,
-                exchange_timestamp: row.get(7)?,
-                fingerprint_verified: row.get(8)?,
-                blocked: row.get(9)?,
-                hidden: row.get(10)?,
-                favorite: row.get(11)?,
-                recovery_trusted: row.get(12)?,
-                proposal_trusted: row.get(13)?,
-                cek_encrypted: row.get(14)?,
-                exchange_transport: row.get(15)?,
-                has_recovered: row.get(16)?,
-                card_updated_at: row.get(17)?,
-                relay_url: row.get(18)?,
-                trust_metrics: row.get(19)?,
-                contact_kind: row.get(20)?,
-                import_source: row.get(21)?,
-                imported_at: row.get(22)?,
-                original_uid: row.get(23)?,
-                deleted_at: row.get(24)?,
-                archived: row.get(25)?,
-                archived_at: row.get(26)?,
-                ignored: row.get(27)?,
-                ignored_at: row.get(28)?,
-                reciprocity: row.get(29)?,
-                confirmation_channel: row.get(30)?,
-            })
-        })?;
+        let cek_rows = cek_stmt.query_map([], ContactRow::from_row)?;
 
         for row_result in cek_rows {
             let row = row_result?;
@@ -492,55 +282,13 @@ impl ContactStore<'_> {
     }
     /// Lists contacts that are archived (but not soft-deleted).
     pub fn list_archived_contacts(&self) -> Result<Vec<Contact>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
-                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at, ignored, ignored_at,
-                    reciprocity, confirmation_channel
-             FROM contacts
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {CONTACT_COLUMNS} FROM contacts
              WHERE archived = 1 AND deleted_at IS NULL
-             ORDER BY display_name",
-        )?;
+             ORDER BY display_name"
+        ))?;
 
-        let rows = stmt.query_map([], |row| {
-            Ok(ContactRow {
-                id: row.get(0)?,
-                public_key: row.get(1)?,
-                display_name: row.get(2)?,
-                card_encrypted: row.get(3)?,
-                shared_key_encrypted: row.get(4)?,
-                visibility_rules_json: row.get(5)?,
-                visibility_rules_encrypted: row.get(6)?,
-                exchange_timestamp: row.get(7)?,
-                fingerprint_verified: row.get(8)?,
-                blocked: row.get(9)?,
-                hidden: row.get(10)?,
-                favorite: row.get(11)?,
-                recovery_trusted: row.get(12)?,
-                proposal_trusted: row.get(13)?,
-                cek_encrypted: row.get(14)?,
-                exchange_transport: row.get(15)?,
-                has_recovered: row.get(16)?,
-                card_updated_at: row.get(17)?,
-                relay_url: row.get(18)?,
-                trust_metrics: row.get(19)?,
-                contact_kind: row.get(20)?,
-                import_source: row.get(21)?,
-                imported_at: row.get(22)?,
-                original_uid: row.get(23)?,
-                deleted_at: row.get(24)?,
-                archived: row.get(25)?,
-                archived_at: row.get(26)?,
-                ignored: row.get(27)?,
-                ignored_at: row.get(28)?,
-                reciprocity: row.get(29)?,
-                confirmation_channel: row.get(30)?,
-            })
-        })?;
+        let rows = stmt.query_map([], ContactRow::from_row)?;
 
         let mut contacts = Vec::new();
         for row_result in rows {
@@ -591,54 +339,12 @@ impl ContactStore<'_> {
         &self,
         reciprocity: &str,
     ) -> Result<Vec<Contact>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
-                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at, ignored, ignored_at,
-                    reciprocity, confirmation_channel
-             FROM contacts
-             WHERE reciprocity = ?1 AND deleted_at IS NULL",
-        )?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {CONTACT_COLUMNS} FROM contacts
+             WHERE reciprocity = ?1 AND deleted_at IS NULL"
+        ))?;
 
-        let rows = stmt.query_map(params![reciprocity], |row| {
-            Ok(ContactRow {
-                id: row.get(0)?,
-                public_key: row.get(1)?,
-                display_name: row.get(2)?,
-                card_encrypted: row.get(3)?,
-                shared_key_encrypted: row.get(4)?,
-                visibility_rules_json: row.get(5)?,
-                visibility_rules_encrypted: row.get(6)?,
-                exchange_timestamp: row.get(7)?,
-                fingerprint_verified: row.get(8)?,
-                blocked: row.get(9)?,
-                hidden: row.get(10)?,
-                favorite: row.get(11)?,
-                recovery_trusted: row.get(12)?,
-                proposal_trusted: row.get(13)?,
-                cek_encrypted: row.get(14)?,
-                exchange_transport: row.get(15)?,
-                has_recovered: row.get(16)?,
-                card_updated_at: row.get(17)?,
-                relay_url: row.get(18)?,
-                trust_metrics: row.get(19)?,
-                contact_kind: row.get(20)?,
-                import_source: row.get(21)?,
-                imported_at: row.get(22)?,
-                original_uid: row.get(23)?,
-                deleted_at: row.get(24)?,
-                archived: row.get(25)?,
-                archived_at: row.get(26)?,
-                ignored: row.get(27)?,
-                ignored_at: row.get(28)?,
-                reciprocity: row.get(29)?,
-                confirmation_channel: row.get(30)?,
-            })
-        })?;
+        let rows = stmt.query_map(params![reciprocity], ContactRow::from_row)?;
 
         let mut contacts = Vec::new();
         for row_result in rows {

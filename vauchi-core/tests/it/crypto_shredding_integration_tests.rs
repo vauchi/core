@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use vauchi_core::crypto::{decrypt, encrypt};
 use vauchi_core::identity::Identity;
-use vauchi_core::storage::{MemoryKeyStorage, SecureStorage, Storage};
+use vauchi_core::storage::{MemoryKeyStorage, SecureStorage, Storage, StorageError};
 
 const SMK_KEY_NAME: &str = "smk";
 
@@ -233,16 +233,9 @@ fn test_storage_keyed_by_sek() {
     let different_identity = Identity::create("Alice", 0);
     let different_sek = different_identity.derive_smk().derive_sek();
 
-    // Opening with wrong key: encrypted data cannot be decrypted
-    let storage2 = Storage::open(&db_path, different_sek).unwrap();
-    let loaded2 = storage2.identity().load_identity();
-
-    // Must either error or return None — never return the original data
-    match loaded2 {
-        Err(_) => {}   // decryption failure — correct
-        Ok(None) => {} // no data found — correct
-        Ok(Some((data, _))) => {
-            assert_ne!(data, backup_data, "Wrong SEK must not produce correct data");
-        }
-    }
+    drop(storage);
+    assert!(matches!(
+        Storage::open(&db_path, different_sek),
+        Err(StorageError::WrongKey)
+    ));
 }

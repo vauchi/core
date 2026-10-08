@@ -323,12 +323,12 @@ impl Storage {
             self.rekey_exchange_location(old_key, &new_key)?;
             report(&mut completed, "exchange_location");
 
-            Ok(())
-        })();
+            super::key_check::rewrite(&self.conn, &new_key)
+        })()
+        .and_then(|()| self.commit());
 
         match result {
             Ok(()) => {
-                self.conn.execute_batch("COMMIT")?;
                 self.encryption_key = new_key;
                 Ok(())
             }

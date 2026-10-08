@@ -14,7 +14,7 @@ use std::sync::Arc;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{ShreddingMasterKey, SymmetricKey};
 use vauchi_core::identity::Identity;
-use vauchi_core::storage::{MemoryKeyStorage, SecureStorage, Storage};
+use vauchi_core::storage::{MemoryKeyStorage, SecureStorage, Storage, StorageError};
 
 const SMK_KEY_NAME: &str = "smk";
 
@@ -202,12 +202,10 @@ fn test_after_migration_old_key_cannot_decrypt() {
         storage.rekey(sek).unwrap();
     }
 
-    let old_storage = Storage::open(&db_path, old_key).unwrap();
-    match old_storage.contacts().load_own_card() {
-        Ok(None) => {} // Plaintext fallback returns empty string
-        Ok(Some(_)) => panic!("Old key should not decrypt after migration"),
-        Err(_) => {} // Decryption error — expected
-    }
+    assert!(matches!(
+        Storage::open(&db_path, old_key),
+        Err(StorageError::WrongKey)
+    ));
 }
 
 // === SMK Destruction After Migration ===
@@ -233,13 +231,10 @@ fn test_smk_destruction_makes_data_irrecoverable() {
     secure.secure_delete_key(SMK_KEY_NAME).unwrap();
     assert!(!secure.has_key(SMK_KEY_NAME).unwrap());
 
-    // Without SMK, we can't derive SEK → can't decrypt
-    let random_storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
-    match random_storage.contacts().load_own_card() {
-        Ok(None) => {} // Plaintext fallback returns empty
-        Ok(Some(_)) => panic!("Should not be able to decrypt without SMK"),
-        Err(_) => {} // Expected: decryption error
-    }
+    assert!(matches!(
+        Storage::open(&db_path, SymmetricKey::generate()),
+        Err(StorageError::WrongKey)
+    ));
 }
 
 // === Vauchi-Level Integration ===

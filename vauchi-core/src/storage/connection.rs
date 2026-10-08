@@ -9,8 +9,8 @@ use std::path::Path;
 
 use crate::crypto::SymmetricKey;
 
-use super::migration;
 use super::{Storage, StorageError};
+use super::{key_check, migration};
 
 impl Storage {
     /// Opens or creates a storage database at the given path.
@@ -44,6 +44,7 @@ impl Storage {
         }
 
         Self::configure_pragmas(&conn)?;
+        key_check::verify(&conn, &encryption_key)?;
         let storage = Storage {
             conn,
             encryption_key,
@@ -131,7 +132,8 @@ impl Storage {
             migrations,
             self.db_path.as_deref(),
             self.clock.unix_seconds(),
-        )
+        )?;
+        key_check::record_if_missing(&self.conn, &self.encryption_key)
     }
 
     /// Returns the current schema version.

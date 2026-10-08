@@ -11,7 +11,7 @@ use vauchi_core::contact::Group;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};
 use vauchi_core::identity::{DeviceRegistry, RegisteredDevice};
-use vauchi_core::storage::Storage;
+use vauchi_core::storage::{Storage, StorageError};
 use vauchi_core::sync::InterDeviceSyncState;
 
 fn open_storage() -> (tempfile::TempDir, Storage) {
@@ -450,16 +450,11 @@ fn test_rekey_old_key_cannot_decrypt() {
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key.clone()).unwrap();
 
-    // Open a fresh storage with the OLD key — should fail to decrypt
     let db_path = dir.path().join("vauchi.db");
-    let old_storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
-    let result = old_storage.contacts().load_own_card();
-    // Either returns None (empty card_json) or an error (decryption failed)
-    match result {
-        Ok(None) => {} // Empty plaintext fallback, encrypted column can't be decrypted
-        Ok(Some(_)) => panic!("Should not be able to decrypt with wrong key"),
-        Err(_) => {} // Expected: decryption error
-    }
+    assert!(matches!(
+        Storage::open(&db_path, SymmetricKey::generate()),
+        Err(StorageError::WrongKey)
+    ));
 
     // But with the correct new key, it works
     let correct_storage = Storage::open(&db_path, new_key).unwrap();

@@ -168,15 +168,16 @@ fn test_existing_database_permissions_preserved() {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("test.db");
 
+    let key = SymmetricKey::generate();
     {
-        let _storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
+        let _storage = Storage::open(&db_path, key.clone()).unwrap();
     }
 
     // Manually widen permissions (simulate user choice)
     std::fs::set_permissions(&db_path, std::fs::Permissions::from_mode(0o644)).unwrap();
 
     // Reopen — should NOT reset permissions
-    let _storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
+    let _storage = Storage::open(&db_path, key).unwrap();
 
     let perms = std::fs::metadata(&db_path).unwrap().permissions();
     let mode = perms.mode() & 0o777;

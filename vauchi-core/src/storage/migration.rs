@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 74] = [
+const MIGRATIONS: [Migration; 75] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -642,7 +642,21 @@ const MIGRATIONS: [Migration; 74] = [
         name: "relay_anchor",
         action: MigrationAction::Sql(MIGRATION_V74_RELAY_ANCHOR),
     },
+    Migration {
+        version: 75,
+        name: "storage_key_check",
+        action: MigrationAction::Sql(MIGRATION_V75_STORAGE_KEY_CHECK),
+    },
 ];
+
+/// Migration v75: one row proving which key the data is encrypted with
+/// (vauchi/private#580).
+const MIGRATION_V75_STORAGE_KEY_CHECK: &str = "
+    CREATE TABLE IF NOT EXISTS key_check (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        sealed_label BLOB NOT NULL
+    );
+";
 
 /// Migration v73: contacts no longer keep a plaintext display name; the
 /// name lives only in the encrypted card (vauchi/private#570).

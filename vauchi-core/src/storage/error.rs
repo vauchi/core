@@ -75,6 +75,10 @@ pub enum StorageError {
 
     #[error("Queue full: {0}")]
     QueueFull(String),
+
+    /// The key does not open this database's data (vauchi/private#580).
+    #[error("The storage key does not open this database")]
+    WrongKey,
 }
 
 impl From<rusqlite::Error> for StorageError {

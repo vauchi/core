@@ -9,6 +9,7 @@
 
 mod connection;
 mod device;
+mod key_check;
 
 mod contact_row;
 

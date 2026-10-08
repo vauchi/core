@@ -454,18 +454,12 @@ fn test_rekey_makes_old_key_ciphertexts_unreadable() {
 
     storage.rekey(new_key.clone()).unwrap();
 
-    // Drop and re-open with old key — must not be able to read data
     drop(storage);
-    let old_storage = vauchi_core::storage::Storage::open(&db_path, old_key).unwrap();
-    let result = old_storage.contacts().load_own_card();
-    match result {
-        Ok(None) => {} // Data indecipherable, returns None
-        Ok(Some(_)) => panic!("Old key should NOT be able to decrypt after rekey"),
-        Err(_) => {} // Decryption error, as expected
-    }
+    assert!(matches!(
+        vauchi_core::storage::Storage::open(&db_path, old_key),
+        Err(vauchi_core::storage::StorageError::WrongKey)
+    ));
 
-    // Re-open with new key — must succeed
-    drop(old_storage);
     let new_storage = vauchi_core::storage::Storage::open(&db_path, new_key).unwrap();
     let loaded = new_storage
         .contacts()

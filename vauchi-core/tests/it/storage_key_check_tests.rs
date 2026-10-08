@@ -14,7 +14,7 @@ use vauchi_core::crypto::{SymmetricKey, encrypt};
 use vauchi_core::storage::migration::{MigrationRunner, all_migrations};
 use vauchi_core::storage::{Storage, StorageError};
 
-const LAST_VERSION_WITHOUT_KEY_CHECK: u32 = 73;
+const LAST_VERSION_WITHOUT_KEY_CHECK: u32 = 74;
 
 fn assert_wrong_key(result: Result<Storage, StorageError>) {
     match result {

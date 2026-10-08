@@ -169,3 +169,181 @@ fn nfc_failed_roundtrips_through_mobile_enum() {
         }
     );
 }
+
+/// One sample of every `MobileEvent` variant. The exhaustive match in
+/// `variant_name` has no wildcard arm, so a new variant does not compile
+/// until it has a sample here.
+fn every_mobile_event() -> Vec<MobileEvent> {
+    use vauchi_platform::MobileBleLinkDirection::{Inbound, Outbound};
+    vec![
+        MobileEvent::QrScanned {
+            data: "vauchi://q".into(),
+        },
+        MobileEvent::LocalNetworkAddressChanged {
+            address: Some("192.0.2.7".into()),
+        },
+        MobileEvent::LocalNetworkAddressChanged { address: None },
+        MobileEvent::BleDeviceDiscovered {
+            id: "d1".into(),
+            rssi: -61,
+            adv_data: vec![0, 255, 7],
+        },
+        MobileEvent::BleConnected {
+            device_id: "d1".into(),
+            direction: Outbound,
+        },
+        MobileEvent::BleCharacteristicRead {
+            device_id: "d1".into(),
+            direction: Inbound,
+            uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890".into(),
+            data: vec![1, 2, 3],
+        },
+        MobileEvent::BleCharacteristicNotified {
+            device_id: "d1".into(),
+            direction: Outbound,
+            uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567891".into(),
+            data: vec![],
+        },
+        MobileEvent::BleDisconnected {
+            device_id: "d1".into(),
+            direction: Inbound,
+            reason: "gone".into(),
+        },
+        MobileEvent::NfcDataReceived {
+            data: vec![0xca, 0xfe],
+        },
+        MobileEvent::NfcApduReceived {
+            bytes: vec![0x00, 0xa4, 0x04, 0x00],
+        },
+        MobileEvent::NfcFailed {
+            reason: "tag lost".into(),
+        },
+        MobileEvent::AudioSamplesRecorded {
+            samples: vec![0.0, -0.5, 0.25],
+            sample_rate: 44_100,
+        },
+        MobileEvent::AccelerometerData {
+            timestamp_ms: 1_700_000_000_000,
+            x_milli_g: -12,
+            y_milli_g: 980,
+            z_milli_g: 3,
+        },
+        MobileEvent::ImpactDetected {
+            timestamp_ms: 42,
+            magnitude_milli_g: 2_500,
+        },
+        MobileEvent::RelayEscrowReady {
+            gate_hash: vec![9; 32],
+        },
+        MobileEvent::RelayEscrowBlobReceived {
+            gate_hash: vec![8; 32],
+            blob: vec![1, 0, 1],
+        },
+        MobileEvent::RelayEscrowFailed {
+            gate_hash: vec![7; 32],
+            reason: "timeout".into(),
+        },
+        MobileEvent::LinkShared,
+        MobileEvent::LinkOpened {
+            peer_public_key: vec![5; 32],
+        },
+        MobileEvent::DirectPayloadReceived { data: vec![4, 4] },
+        MobileEvent::DirectCardReceived {
+            ciphertext: vec![3, 3, 3],
+        },
+        MobileEvent::ImageReceived {
+            data: vec![0x52, 0x49, 0x46, 0x46],
+        },
+        MobileEvent::ImagePickCancelled,
+        MobileEvent::FilePickedFromUser {
+            bytes: vec![0x7b, 0x7d],
+            filename: "backup.vauchi".into(),
+        },
+        MobileEvent::FilePickCancelledByUser,
+        MobileEvent::BiometricUnlockSucceeded,
+        MobileEvent::HardwareError {
+            transport: "ble".into(),
+            error: "radio off".into(),
+        },
+        MobileEvent::HardwareUnavailable {
+            transport: "nfc".into(),
+        },
+        MobileEvent::PermissionDenied {
+            transport: "camera".into(),
+        },
+        MobileEvent::LocationResult {
+            latitude: 47.3769,
+            longitude: 8.5417,
+            accuracy_meters: Some(12.5),
+        },
+        MobileEvent::LocationResult {
+            latitude: -33.9,
+            longitude: 151.2,
+            accuracy_meters: None,
+        },
+    ]
+}
+
+fn variant_name(event: &MobileEvent) -> &'static str {
+    match event {
+        MobileEvent::QrScanned { .. } => "QrScanned",
+        MobileEvent::LocalNetworkAddressChanged { .. } => "LocalNetworkAddressChanged",
+        MobileEvent::BleDeviceDiscovered { .. } => "BleDeviceDiscovered",
+        MobileEvent::BleConnected { .. } => "BleConnected",
+        MobileEvent::BleCharacteristicRead { .. } => "BleCharacteristicRead",
+        MobileEvent::BleCharacteristicNotified { .. } => "BleCharacteristicNotified",
+        MobileEvent::BleDisconnected { .. } => "BleDisconnected",
+        MobileEvent::NfcDataReceived { .. } => "NfcDataReceived",
+        MobileEvent::NfcApduReceived { .. } => "NfcApduReceived",
+        MobileEvent::NfcFailed { .. } => "NfcFailed",
+        MobileEvent::AudioSamplesRecorded { .. } => "AudioSamplesRecorded",
+        MobileEvent::AccelerometerData { .. } => "AccelerometerData",
+        MobileEvent::ImpactDetected { .. } => "ImpactDetected",
+        MobileEvent::RelayEscrowReady { .. } => "RelayEscrowReady",
+        MobileEvent::RelayEscrowBlobReceived { .. } => "RelayEscrowBlobReceived",
+        MobileEvent::RelayEscrowFailed { .. } => "RelayEscrowFailed",
+        MobileEvent::LinkShared => "LinkShared",
+        MobileEvent::LinkOpened { .. } => "LinkOpened",
+        MobileEvent::DirectPayloadReceived { .. } => "DirectPayloadReceived",
+        MobileEvent::DirectCardReceived { .. } => "DirectCardReceived",
+        MobileEvent::ImageReceived { .. } => "ImageReceived",
+        MobileEvent::ImagePickCancelled => "ImagePickCancelled",
+        MobileEvent::FilePickedFromUser { .. } => "FilePickedFromUser",
+        MobileEvent::FilePickCancelledByUser => "FilePickCancelledByUser",
+        MobileEvent::BiometricUnlockSucceeded => "BiometricUnlockSucceeded",
+        MobileEvent::HardwareError { .. } => "HardwareError",
+        MobileEvent::HardwareUnavailable { .. } => "HardwareUnavailable",
+        MobileEvent::PermissionDenied { .. } => "PermissionDenied",
+        MobileEvent::LocationResult { .. } => "LocationResult",
+    }
+}
+
+// android, iOS and macOS hand-mirrored this JSON per variant; they move
+// to `hardware_event_json` (vauchi/private#547), so the codec carries the
+// contract for every variant, not a sample of two.
+// @internal
+#[test]
+fn hardware_event_json_carries_every_mobile_event_through_the_canonical_reader() {
+    let events = every_mobile_event();
+    let covered: std::collections::BTreeSet<_> = events.iter().map(variant_name).collect();
+    assert_eq!(
+        covered.len(),
+        29,
+        "a sample for each MobileEvent variant: {covered:?}"
+    );
+
+    for mobile in events {
+        let name = variant_name(&mobile);
+        let expected: Event = mobile.clone().into();
+
+        let json = vauchi_platform::hardware_event_json(mobile);
+        let parsed = vauchi_core::event_from_json(&json)
+            .unwrap_or_else(|e| panic!("{name}: canonical reader rejects {json}: {e:?}"));
+
+        assert_eq!(
+            serde_json::to_value(&parsed).expect("serialize parsed"),
+            serde_json::to_value(&expected).expect("serialize expected"),
+            "{name}: codec output differs from the typed conversion",
+        );
+    }
+}

@@ -614,3 +614,56 @@ fn test_find_device_by_prefix_empty_prefix_returns_first_active() {
         "Empty prefix should match the first active device"
     );
 }
+
+fn edited(
+    certificate: &DeviceRevocationCertificate,
+    field: &str,
+    value: serde_json::Value,
+) -> DeviceRevocationCertificate {
+    let mut json = serde_json::to_value(certificate).unwrap();
+    json[field] = value;
+    serde_json::from_value(json).unwrap()
+}
+
+// A revocation certificate verifies only under the signing identity and
+// only with every field as signed.
+// @internal
+#[test]
+fn a_revocation_certificate_rejects_other_keys_and_edited_fields() {
+    let signing_key = test_signing_keypair();
+    let certificate =
+        DeviceRevocationCertificate::create(&[7u8; 32], "stolen".into(), &signing_key, 1_000);
+
+    assert!(certificate.verify(&signing_key.public_key()));
+    assert!(!certificate.verify(&SigningKeyPair::generate().public_key()));
+    let other = serde_json::to_value(DeviceRevocationCertificate::create(
+        &[8u8; 32],
+        "lost".into(),
+        &signing_key,
+        2_000,
+    ))
+    .unwrap();
+    for field in ["device_id", "reason", "revoked_at", "expires_at"] {
+        assert!(
+            !edited(&certificate, field, other[field].clone()).verify(&signing_key.public_key()),
+            "{field} edited after signing"
+        );
+    }
+}
+
+// Certificates are valid for 90 days after revocation; legacy ones without
+// an expiry never lapse.
+// @internal
+#[test]
+fn a_revocation_certificate_expires_ninety_days_after_it_was_made() {
+    let signing_key = test_signing_keypair();
+    let certificate =
+        DeviceRevocationCertificate::create(&[7u8; 32], "stolen".into(), &signing_key, 1_000);
+    let expiry = 1_000 + 90 * 24 * 3600;
+
+    assert_eq!(certificate.expires_at(), expiry);
+    assert!(!certificate.is_expired(expiry));
+    assert!(certificate.is_expired(expiry + 1));
+    let legacy = edited(&certificate, "expires_at", serde_json::json!(0));
+    assert!(!legacy.is_expired(u64::MAX));
+}

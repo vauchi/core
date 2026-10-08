@@ -370,13 +370,20 @@ pub(crate) const PROD_RELAY_HOST: &str = "relay.vauchi.app";
 /// startup seed guard (a persisted relay URL is applied only when config
 /// still holds this default, so an explicit `with_relay_url` override wins).
 pub(crate) const DEFAULT_RELAY_URL: &str = "https://relay.vauchi.app";
-/// Vauchi's OHTTP trust anchor for the production relay (#288). `None` until
-/// the first ceremony (`runbooks/2026-10-06-ohttp-anchor-ceremony.md` §2)
-/// has created it; set it then, test first, like an SPKI pin.
-pub(crate) const PROD_OHTTP_ANCHOR: Option<[u8; 32]> = None;
+/// Vauchi's OHTTP trust anchor for the production relay (#288), created in
+/// the first ceremony on 2026-10-08 (`runbooks/2026-10-06-ohttp-anchor-
+/// ceremony.md` §2). Changes only through a rollover (§7) or a release,
+/// test first, like an SPKI pin.
+pub(crate) const PROD_OHTTP_ANCHOR: Option<[u8; 32]> = Some([
+    0xb0, 0x49, 0x50, 0x2a, 0x53, 0x37, 0x1a, 0x91, 0xa4, 0xe2, 0x9c, 0x32, 0xde, 0xc0, 0x8d, 0x2f,
+    0xb6, 0x2e, 0xbf, 0xb1, 0x7f, 0x23, 0xfe, 0xce, 0x33, 0x06, 0xcd, 0xef, 0x75, 0x5b, 0x1a, 0xbe,
+]);
 /// The commitment to the backup of [`PROD_OHTTP_ANCHOR`], created in the
 /// same ceremony (decision 0.13) and set with it.
-pub(crate) const PROD_OHTTP_BACKUP_COMMITMENT: Option<[u8; 32]> = None;
+pub(crate) const PROD_OHTTP_BACKUP_COMMITMENT: Option<[u8; 32]> = Some([
+    0x47, 0xcb, 0x7f, 0xea, 0xec, 0x43, 0x83, 0x7b, 0x15, 0xfd, 0x22, 0x48, 0xe5, 0xc6, 0x42, 0x3f,
+    0x7c, 0x8f, 0xfd, 0x28, 0xed, 0x1f, 0x0f, 0xc0, 0xf7, 0x7d, 0x8f, 0x69, 0x93, 0xe9, 0xef, 0x45,
+]);
 
 /// Production OHTTP relay (IP-stripping hop, ADR-037) the client sends
 /// OHTTP traffic to when the data relay is `relay.vauchi.app`.

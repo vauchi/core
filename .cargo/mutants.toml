@@ -174,6 +174,9 @@ exclude_re = [
     # BleHandshakeSession's Drop zeroizes its secrets; freed memory is not
     # observable from a safe test.
     "vauchi-core/src/exchange/ble_handshake\\.rs:[0-9]+:[0-9]+: replace <impl Drop for BleHandshakeSession>::drop with \\(\\)$",
+    # accept_signed_key's `unwrap_or(!expected)` is the fallback for an empty
+    # KeyConfig, which the decoder never produces.
+    "vauchi-core/src/network/ohttp_key_trust\\.rs:76:62: delete ! in accept_signed_key$",
 
     # duress_settings.created_at / updated_at are written but never read by
     # any API, so the time stamped there is unobservable (vauchi/private#522).

@@ -84,21 +84,13 @@ impl DeviceStore<'_> {
     #[allow(clippy::type_complexity)]
     pub fn load_device_info(&self) -> Result<Option<([u8; 32], u32, String, u64)>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT device_info_encrypted, device_id, device_index, device_name, created_at FROM device_info WHERE id = 1",
+            "SELECT device_info_encrypted FROM device_info WHERE id = 1",
             [],
-            |row| {
-                Ok((
-                    row.get::<_, Option<Vec<u8>>>(0)?,
-                    row.get::<_, Vec<u8>>(1)?,
-                    row.get::<_, i32>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, i64>(4)?,
-                ))
-            },
+            |row| row.get::<_, Option<Vec<u8>>>(0),
         );
 
         match result {
-            Ok((Some(encrypted), _, _, _, _)) if !encrypted.is_empty() => {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
                 let decrypted = crate::crypto::decrypt(self.key, &encrypted)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json: serde_json::Value = serde_json::from_slice(&decrypted)
@@ -112,20 +104,6 @@ impl DeviceStore<'_> {
                 let device_name = json["device_name"].as_str().unwrap_or("").to_string();
                 let created_at = json["created_at"].as_u64().unwrap_or(0);
                 Ok(Some((device_id, device_index, device_name, created_at)))
-            }
-            Ok((_, device_id_vec, device_index, device_name, created_at))
-                if !device_name.is_empty() =>
-            {
-                // Plaintext fallback for pre-v14 data
-                let device_id: [u8; 32] = device_id_vec
-                    .try_into()
-                    .map_err(|_| StorageError::Encryption("Invalid device ID length".into()))?;
-                Ok(Some((
-                    device_id,
-                    device_index as u32,
-                    device_name,
-                    created_at as u64,
-                )))
             }
             Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),

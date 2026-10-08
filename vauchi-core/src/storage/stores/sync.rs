@@ -177,27 +177,18 @@ impl SyncStore<'_> {
     /// Loads the local version vector (decrypted).
     pub fn load_version_vector(&self) -> Result<Option<VersionVector>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT vector_json_encrypted, vector_json FROM version_vector WHERE id = 1",
+            "SELECT vector_json_encrypted FROM version_vector WHERE id = 1",
             [],
-            |row| {
-                let encrypted: Option<Vec<u8>> = row.get(0)?;
-                let plaintext: String = row.get(1)?;
-                Ok((encrypted, plaintext))
-            },
+            |row| row.get::<_, Option<Vec<u8>>>(0),
         );
 
         match result {
-            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
                 let decrypted = crate::crypto::decrypt(self.key, &encrypted)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let vector = VersionVector::from_json(&json)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                Ok(Some(vector))
-            }
-            Ok((_, plaintext)) if !plaintext.is_empty() => {
-                let vector = VersionVector::from_json(&plaintext)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some(vector))
             }

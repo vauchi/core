@@ -170,6 +170,29 @@ fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
             b"{\"step\":\"backup\"}",
         ),
         ("ux_state", "backup_reminder_encrypted", b"{\"days\":7}"),
+        (
+            "ux_state",
+            "settings_flags_encrypted",
+            b"{\"reduce_motion\":true}",
+        ),
+        ("ux_state", "relay_url_encrypted", b"https://relay.example"),
+        (
+            "ux_state",
+            "own_card_repropagate_encrypted",
+            b"{\"needs\":true}",
+        ),
+        (
+            "ux_state",
+            "exchange_defaults_encrypted",
+            b"{\"mode\":\"qr\"}",
+        ),
+        (
+            "contacts",
+            "exchange_location_encrypted",
+            b"{\"place\":\"cafe\"}",
+        ),
+        ("tags", "name_encrypted", b"climbing"),
+        ("places", "data_encrypted", b"{\"name\":\"Home\"}"),
         ("audit_log", "details_encrypted", b"audit-details"),
         (
             "duress_settings",
@@ -238,8 +261,8 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
          (id, public_key, display_name, card_encrypted, shared_key_encrypted, \
           personal_notes_encrypted, avatar_encrypted, cek_encrypted, \
           visibility_rules_encrypted, nickname_encrypted, custom_avatar_encrypted, \
-          exchange_timestamp, contact_kind) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'exchanged')",
+          exchange_timestamp, contact_kind, exchange_location_encrypted) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'exchanged', ?13)",
         params![
             CONTACT_ID,
             CONTACT_PK,
@@ -253,6 +276,7 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
             enc("contacts", "nickname_encrypted"),
             enc("contacts", "custom_avatar_encrypted"),
             now,
+            enc("contacts", "exchange_location_encrypted"),
         ],
     )
     .unwrap();
@@ -522,15 +546,33 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
         "INSERT OR REPLACE INTO ux_state \
          (id, aha_tracker_json, demo_contact_json, \
           aha_tracker_json_encrypted, demo_contact_json_encrypted, \
-          onboarding_progress_encrypted, backup_reminder_encrypted, updated_at) \
-         VALUES (1, '', '', ?1, ?2, ?3, ?4, ?5)",
+          onboarding_progress_encrypted, backup_reminder_encrypted, updated_at, \
+          settings_flags_encrypted, relay_url_encrypted, \
+          own_card_repropagate_encrypted, exchange_defaults_encrypted) \
+         VALUES (1, '', '', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             enc("ux_state", "aha_tracker_json_encrypted"),
             enc("ux_state", "demo_contact_json_encrypted"),
             enc("ux_state", "onboarding_progress_encrypted"),
             enc("ux_state", "backup_reminder_encrypted"),
             now,
+            enc("ux_state", "settings_flags_encrypted"),
+            enc("ux_state", "relay_url_encrypted"),
+            enc("ux_state", "own_card_repropagate_encrypted"),
+            enc("ux_state", "exchange_defaults_encrypted"),
         ],
+    )
+    .unwrap();
+
+    // ── tags and places (keyed by id) ────────────────────────
+    conn.execute(
+        "INSERT INTO tags (id, name_encrypted, created_at) VALUES ('t1', ?1, ?2)",
+        params![enc("tags", "name_encrypted"), now],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO places (id, data_encrypted, created_at) VALUES ('p1', ?1, ?2)",
+        params![enc("places", "data_encrypted"), now],
     )
     .unwrap();
 
@@ -636,7 +678,7 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     let id_eq_1: &[&dyn rusqlite::ToSql] = &[];
     let by_contact: &[&dyn rusqlite::ToSql] = &[&CONTACT_ID];
 
-    // ── contacts (8 columns, keyed by id) ────────────────────
+    // ── contacts (9 columns, keyed by id) ────────────────────
     for col in [
         "card_encrypted",
         "shared_key_encrypted",
@@ -646,9 +688,14 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         "visibility_rules_encrypted",
         "nickname_encrypted",
         "custom_avatar_encrypted",
+        "exchange_location_encrypted",
     ] {
         check_one("contacts", col, "id = ?1", by_contact);
     }
+
+    // ── tags and places (keyed by id) ────────────────────────
+    check_one("tags", "name_encrypted", "id = 't1'", id_eq_1);
+    check_one("places", "data_encrypted", "id = 'p1'", id_eq_1);
 
     // ── identity (3 columns, singleton) ─────────────────────
     for col in [
@@ -717,6 +764,10 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         ("ux_state", "demo_contact_json_encrypted"),
         ("ux_state", "onboarding_progress_encrypted"),
         ("ux_state", "backup_reminder_encrypted"),
+        ("ux_state", "settings_flags_encrypted"),
+        ("ux_state", "relay_url_encrypted"),
+        ("ux_state", "own_card_repropagate_encrypted"),
+        ("ux_state", "exchange_defaults_encrypted"),
     ] {
         check_one(table, col, "id = 1", id_eq_1);
     }
@@ -914,4 +965,51 @@ fn rekey_is_idempotent_under_repeated_calls() {
     storage.rekey(key3.clone()).unwrap();
 
     assert_every_column_round_trips(&storage, &key3);
+}
+
+/// Columns this file does not populate, each covered elsewhere. A column added
+/// to `ENCRYPTED_COLUMNS` must join the fixtures above or this list, so the
+/// "every column" claim cannot silently go stale again (it had, for seven
+/// columns, until vauchi/private#522).
+const COVERED_ELSEWHERE: &[(&str, &str)] = &[
+    // test_rekey_preserves_label_bio_and_avatar_overrides in
+    // rekey_coverage_tests.rs.
+    ("visibility_labels", "avatar_override_encrypted"),
+    ("visibility_labels", "bio_override_encrypted"),
+    // Recomputed (not re-encrypted) during rekey; populated and checked in
+    // this file through label_hmac rather than through the fixtures.
+    ("visibility_labels", "name_hmac"),
+];
+
+// @internal
+#[test]
+fn the_fixtures_cover_every_registered_encrypted_column() {
+    let fixtures: Vec<(&str, &str)> = fixtures().iter().map(|(t, c, _)| (*t, *c)).collect();
+
+    let missing: Vec<&(&str, &str)> = vauchi_core::storage::ENCRYPTED_COLUMNS
+        .iter()
+        .filter(|column| !fixtures.contains(column) && !COVERED_ELSEWHERE.contains(column))
+        .collect();
+
+    assert!(missing.is_empty(), "{missing:?}");
+}
+
+// @internal
+#[test]
+fn rekey_reports_progress_one_table_at_a_time() {
+    let (_dir, mut storage, _key) = open_storage();
+    let seen = std::sync::Mutex::new(Vec::new());
+
+    storage
+        .rekey_with_progress(
+            SymmetricKey::generate(),
+            Some(&|done: u32, total: u32, _table: &str| seen.lock().unwrap().push((done, total))),
+        )
+        .unwrap();
+
+    let seen = seen.into_inner().unwrap();
+    assert!(!seen.is_empty());
+    for (step, (done, total)) in seen.iter().enumerate() {
+        assert_eq!((*done, *total), (step as u32 + 1, 32));
+    }
 }

@@ -651,8 +651,7 @@ fn a_revocation_certificate_rejects_other_keys_and_edited_fields() {
     }
 }
 
-// Certificates are valid for 90 days after revocation; legacy ones without
-// an expiry never lapse.
+// Certificates are valid for 90 days after revocation.
 // @internal
 #[test]
 fn a_revocation_certificate_expires_ninety_days_after_it_was_made() {
@@ -664,6 +663,29 @@ fn a_revocation_certificate_expires_ninety_days_after_it_was_made() {
     assert_eq!(certificate.expires_at(), expiry);
     assert!(!certificate.is_expired(expiry));
     assert!(certificate.is_expired(expiry + 1));
-    let legacy = edited(&certificate, "expires_at", serde_json::json!(0));
-    assert!(!legacy.is_expired(u64::MAX));
+}
+
+// A zero expiry is not a "never expires" marker (vauchi/private#569).
+// @internal
+#[test]
+fn a_revocation_certificate_with_a_zero_expiry_has_expired() {
+    let signing_key = test_signing_keypair();
+    let certificate =
+        DeviceRevocationCertificate::create(&[7u8; 32], "stolen".into(), &signing_key, 1_000);
+
+    let zero = edited(&certificate, "expires_at", serde_json::json!(0));
+
+    assert!(zero.is_expired(1));
+}
+
+// @internal
+#[test]
+fn a_revocation_certificate_without_an_expiry_does_not_parse() {
+    let signing_key = test_signing_keypair();
+    let certificate =
+        DeviceRevocationCertificate::create(&[7u8; 32], "stolen".into(), &signing_key, 1_000);
+    let mut json = serde_json::to_value(&certificate).unwrap();
+    json.as_object_mut().unwrap().remove("expires_at");
+
+    assert!(DeviceRevocationCertificate::from_json(&json.to_string()).is_err());
 }

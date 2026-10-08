@@ -210,3 +210,18 @@ proptest! {
         prop_assert!(parsed.verify_signature());
     }
 }
+
+// @internal
+#[test]
+fn an_oob_qr_carries_its_time_and_the_nonce_derived_from_its_token() {
+    let qr = OobBootstrapQr::generate_with_timestamp(
+        &Identity::create("Alice", 0),
+        &X3DHKeyPair::generate(),
+        [0x42; 32],
+        1_700_000_123,
+    );
+
+    assert_eq!(qr.timestamp(), 1_700_000_123);
+    assert_eq!(qr.oob_nonce(), derive_oob_nonce(&[0x42; 32]));
+    assert_ne!(qr.oob_nonce(), [0u8; OOB_NONCE_SIZE]);
+}

@@ -606,3 +606,19 @@ fn before_any_fetch_a_transport_carries_no_gateway_key() {
             .has_ohttp()
     );
 }
+
+// Debug output names the type and the config size, never key material.
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn ohttp_debug_output_names_the_type_and_hides_key_material() {
+    let client = make_test_ohttp_client();
+    let (_, decryptor) = client.encapsulate(b"request").unwrap();
+    let config_len = make_test_ohttp_key().len();
+
+    assert_eq!(
+        format!("{client:?}"),
+        format!("OhttpClient {{ encoded_config_len: {config_len}, .. }}")
+    );
+    assert_eq!(format!("{decryptor:?}"), "ResponseDecryptor { .. }");
+}

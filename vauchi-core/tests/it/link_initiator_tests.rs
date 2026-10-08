@@ -554,3 +554,33 @@ enum EventKind {
     Cancel,
     Blob(u8),
 }
+
+// Once retrieving, only the session's own escrow gate triggers a retrieve;
+// a ready signal for any other gate is ignored.
+// @internal
+#[test]
+fn only_our_escrow_gate_triggers_the_card_retrieve() {
+    let (mut session, url) = make_session(NOW + 300);
+    assert_eq!(session.share_url(), url);
+    let _ = session.drain_pending_commands();
+    let (epk, _card) = responder_side(&url, b"responder card");
+    session.apply_hardware_event(Event::LinkOpened {
+        peer_public_key: epk,
+    });
+    let _ = session.drain_pending_commands();
+    let escrow_gate = session.escrow_gate_bytes().unwrap().to_vec();
+
+    session.apply_hardware_event(Event::RelayEscrowReady {
+        gate_hash: vec![0xEE; escrow_gate.len()],
+    });
+    assert!(session.drain_pending_commands().is_empty());
+
+    session.apply_hardware_event(Event::RelayEscrowReady {
+        gate_hash: escrow_gate.clone(),
+    });
+    let cmds = session.drain_pending_commands();
+    assert!(
+        matches!(&cmds[..], [Command::RelayEscrowRetrieve { gate_hash, .. }] if *gate_hash == escrow_gate),
+        "{cmds:?}"
+    );
+}

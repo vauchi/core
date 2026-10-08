@@ -10,6 +10,8 @@
 use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 
+mod heirloom;
+
 /// Summary of what will be deleted, shown on the confirmation screen.
 #[derive(Clone, Debug, Default)]
 pub struct DeletionSummary {
@@ -404,45 +406,6 @@ impl GdprEngine {
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: Some(A11y::labeled(self.t("privacy.delete_now.keep"))),
-                },
-            ],
-            progress: None,
-            ..Default::default()
-        }
-    }
-
-    /// The export leaves the encryption envelope, so nothing is written
-    /// until the person confirms the warning (private#363).
-    fn build_confirm_heirloom(&self) -> ScreenModel {
-        ScreenModel {
-            screen_id: "confirm_heirloom".into(),
-            title: self.t("privacy.heirloom.title"),
-            subtitle: Some(self.t("privacy.heirloom.subtitle")),
-            components: vec![Component::InfoPanel {
-                id: "heirloom_warning".into(),
-                icon: Some("warning".into()),
-                title: self.t("privacy.heirloom.warning_title"),
-                items: vec![InfoItem {
-                    icon: Some("warning".into()),
-                    title: self.t("privacy.heirloom.warning_title"),
-                    detail: self.t("privacy.heirloom.warning_detail"),
-                }],
-                a11y: None,
-            }],
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "confirm_heirloom".into(),
-                    label: self.t("privacy.heirloom.confirm"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("privacy.heirloom.confirm"))),
-                },
-                ScreenAction {
-                    id: "cancel".into(),
-                    label: self.t("action.cancel"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
                 },
             ],
             progress: None,

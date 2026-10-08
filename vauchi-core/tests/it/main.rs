@@ -452,6 +452,7 @@ mod sp22_contact_enrichment_tests;
 mod sp33_mailbox_send_path_tests;
 mod sp9_security_coverage_tests;
 mod storage_anti_pattern_tests;
+mod storage_bootstrap_key_tests;
 mod storage_encryption_tests;
 mod storage_encryption_v14_tests;
 mod storage_encryption_v15_tests;

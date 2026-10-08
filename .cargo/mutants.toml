@@ -180,6 +180,12 @@ exclude_re = [
     # verify_with_freshness's `now > timestamp &&` only guards the
     # subtraction; at now == timestamp the age is 0, never over the limit.
     "vauchi-core/src/identity/device\\.rs:726:21: replace > with >= in RegistryBroadcast::verify_with_freshness$",
+    # import_backup_v2's minimum length (93 bytes, the smallest real backup,
+    # pinned by identity_backup_parse_tests): these mutants only lower it, and
+    # anything shorter then fails authenticated decryption anyway.
+    "vauchi-core/src/identity/mod\\.rs:399:28: replace \\+ with [-*] in Identity::import_backup_v2$",
+    "vauchi-core/src/identity/mod\\.rs:399:32: replace \\+ with \\* in Identity::import_backup_v2$",
+    "vauchi-core/src/identity/mod\\.rs:399:(37|42|46): replace \\+ with - in Identity::import_backup_v2$",
 
     # duress_settings.created_at / updated_at are written but never read by
     # any API, so the time stamped there is unobservable (vauchi/private#522).

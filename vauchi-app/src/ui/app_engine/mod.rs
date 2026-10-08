@@ -863,34 +863,20 @@ impl AppEngine {
         // One second is this command's floor, not the right cadence: the frame
         // dwell core already computes cannot be expressed in whole seconds.
         if self.multi_stage_session_active() {
-            return vauchi_core::Command::ScheduleWakeup {
-                earliest_secs: 1,
-                deadline_secs: 1,
-                min_interval_secs: 1,
-                // The frame currently on screen names its own dwell, so the
-                // display runs at the protocol's cadence rather than the
-                // coarsest interval a whole-second field can express.
-                earliest_millis: Some(self.multi_stage_frame_ms().unwrap_or(300)),
-            };
+            // The frame currently on screen names its own dwell, so the
+            // display runs at the protocol's cadence rather than the
+            // coarsest interval a whole-second field can express.
+            let frame_dwell_ms = self.multi_stage_frame_ms().unwrap_or(300);
+            return vauchi_core::Command::schedule_wakeup(1, 1, 1, Some(frame_dwell_ms));
         }
         // A Link rendezvous is several dependent relay round trips (presence
         // deposit, peer epk, card deposit, peer card), each waiting on one
         // side's heartbeat. At the idle cadence two terminals converged in
         // ~90 s; the escrow phase is meant to poll about once a second.
         if self.link_session_active() {
-            return vauchi_core::Command::ScheduleWakeup {
-                earliest_secs: 1,
-                deadline_secs: 1,
-                min_interval_secs: 1,
-                earliest_millis: None,
-            };
+            return vauchi_core::Command::schedule_wakeup(1, 1, 1, None);
         }
-        vauchi_core::Command::ScheduleWakeup {
-            earliest_secs: 30,
-            deadline_secs: 90,
-            min_interval_secs: 30,
-            earliest_millis: None,
-        }
+        vauchi_core::Command::schedule_wakeup(30, 90, 30, None)
     }
 
     /// A Link-mode rendezvous (initiator on the share screen or responder on

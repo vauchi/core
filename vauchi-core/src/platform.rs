@@ -577,6 +577,22 @@ impl FilePickPurpose {
 }
 
 impl Command {
+    /// A `ScheduleWakeup` built in one place, so every field Core derives
+    /// from the others stays consistent wherever the command is emitted.
+    pub fn schedule_wakeup(
+        earliest_secs: u32,
+        deadline_secs: u32,
+        min_interval_secs: u32,
+        earliest_millis: Option<u32>,
+    ) -> Self {
+        Self::ScheduleWakeup {
+            earliest_secs,
+            deadline_secs,
+            min_interval_secs,
+            earliest_millis,
+        }
+    }
+
     /// Returns the variant name without payload data (safe for diagnostics).
     pub fn variant_name(&self) -> &'static str {
         match self {

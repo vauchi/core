@@ -16,7 +16,7 @@ use crate::storage::SecureStorage;
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
-use super::{SMK_KEY_NAME, Vauchi};
+use super::{SMK_KEY_NAME, Vauchi, storage_keys};
 
 const MAX_IDENTITY_BACKUP_BYTES: usize = 64 * 1024;
 
@@ -78,6 +78,7 @@ impl Vauchi {
             self.storage.rekey(sek).map_err(|e| {
                 VauchiError::Configuration(format!("Failed to rekey storage: {}", e))
             })?;
+            storage_keys::delete_bootstrap_key(ss.as_ref());
         }
 
         // Persist identity to storage so it survives restart
@@ -163,6 +164,7 @@ impl Vauchi {
         self.storage
             .rekey(sek)
             .map_err(|e| VauchiError::Configuration(format!("Failed to rekey storage: {}", e)))?;
+        storage_keys::delete_bootstrap_key(ss.as_ref());
 
         Ok(())
     }

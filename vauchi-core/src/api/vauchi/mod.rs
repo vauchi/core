@@ -41,6 +41,7 @@ mod registry_sibling_apply;
 mod search;
 mod security;
 mod setup;
+mod storage_keys;
 #[cfg(feature = "network-http")]
 mod sync_http;
 mod tags;
@@ -66,7 +67,7 @@ pub use tags::GroupDraft;
 use std::sync::Arc;
 
 use crate::clock::{Clock, SystemClock};
-use crate::crypto::{ShreddingMasterKey, SymmetricKey};
+use crate::crypto::SymmetricKey;
 use crate::identity::Identity;
 use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 use crate::rng::{OsSecureRng, SecureRng};
@@ -314,20 +315,27 @@ impl Vauchi {
         let sleeper = SystemSleeper::shared();
         let monotonic = SystemMonotonicClock::shared();
 
-        // Determine the storage encryption key
-        let storage_key = Self::resolve_storage_key(&config, secure_storage.as_deref())?;
-
-        // Open or create storage
-        let storage = if config.storage_path.exists() {
-            Storage::open(&config.storage_path, storage_key)?.with_clock(clock.clone())
-        } else {
-            // Create parent directories if needed
-            if let Some(parent) = config.storage_path.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| VauchiError::Configuration(e.to_string()))?;
-            }
-            Storage::open(&config.storage_path, storage_key)?.with_clock(clock.clone())
-        };
+        if !config.storage_path.exists()
+            && let Some(parent) = config.storage_path.parent()
+        {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| VauchiError::Configuration(e.to_string()))?;
+        }
+        let storage = match secure_storage.as_deref() {
+            Some(secure) => storage_keys::open_storage(
+                &config.storage_path,
+                config.storage_key.clone(),
+                secure,
+            )?,
+            None => Storage::open(
+                &config.storage_path,
+                config
+                    .storage_key
+                    .clone()
+                    .unwrap_or_else(SymmetricKey::generate),
+            )?,
+        }
+        .with_clock(clock.clone());
 
         // Self-seed config from persisted settings flags so every Vauchi
         // instance (mobile PAE engine, open_vauchi() transients, desktop)
@@ -368,7 +376,7 @@ impl Vauchi {
         };
         let run_visibility_migration = identity.is_some();
 
-        let wb = Vauchi {
+        let mut wb = Vauchi {
             config,
             identity,
             storage,
@@ -397,39 +405,10 @@ impl Vauchi {
         if run_visibility_migration {
             wb.migrate_field_centric_visibility()?;
         }
-        Ok(wb)
-    }
-
-    /// Resolves the storage encryption key from available sources.
-    ///
-    /// Priority:
-    /// 1. SMK from SecureStorage → derive SEK
-    /// 2. Explicit storage_key from config
-    /// 3. Generate random key (ephemeral, not persistent)
-    fn resolve_storage_key(
-        config: &VauchiConfig,
-        secure_storage: Option<&dyn SecureStorage>,
-    ) -> VauchiResult<SymmetricKey> {
-        // Try loading SMK from SecureStorage
-        if let Some(ss) = secure_storage
-            && let Some(smk_bytes) = ss.load_key(SMK_KEY_NAME).map_err(|e| {
-                VauchiError::Configuration(format!("Failed to load SMK from SecureStorage: {}", e))
-            })?
-        {
-            // F5 audit fix: wrap in Zeroizing so the Vec is cleared on drop
-            let smk_bytes = zeroize::Zeroizing::new(smk_bytes);
-            let smk_array: [u8; 32] = smk_bytes.as_slice().try_into().map_err(|_| {
-                VauchiError::Configuration("SMK in SecureStorage has invalid length".into())
-            })?;
-            let smk = ShreddingMasterKey::from_bytes(smk_array);
-            return Ok(smk.derive_sek());
+        if wb.identity.is_some() && wb.secure_storage.is_some() {
+            wb.migrate_to_smk()?;
         }
-
-        // Fall back to config storage key or generate random
-        Ok(config
-            .storage_key
-            .clone()
-            .unwrap_or_else(SymmetricKey::generate))
+        Ok(wb)
     }
 
     /// Borrow the explicit-time seam. Tests pass a `FakeClock`;

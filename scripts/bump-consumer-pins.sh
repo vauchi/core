@@ -6,8 +6,8 @@
 # Open a pin-bump MR in every consumer that ci/consumer-pins.json assigns
 # to bump:consumer-pins (ADR-026 amendment 2026-09-30, #434). The native
 # pin is rewritten by vauchi/scripts' core-pins.py; a Cargo consumer also
-# gets `cargo update -p` for its Core crates, so the MR carries a lockfile
-# its pipeline can build with --locked. Merging stays with the maintainer.
+# gets `cargo update --workspace`, so the MR carries a lockfile its
+# pipeline can build with --locked. Merging stays with the maintainer.
 #
 # One consumer failing never stops the others; the job reports every
 # failure and exits non-zero at the end.
@@ -65,7 +65,7 @@ print(data.get(sys.argv[2]) or "")' "$WORK/response.json" "$1"
 }
 
 bump_one() {
-    local repo=$1 kind=$2 file=$3 dir="$WORK/$1" project="vauchi%2F$1" current crates url status
+    local repo=$1 kind=$2 file=$3 dir="$WORK/$1" project="vauchi%2F$1" current url status
     git clone -q --depth 1 "$GIT_BASE/$repo.git" "$dir"
 
     if git -C "$dir" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
@@ -86,11 +86,12 @@ bump_one() {
         return 0
     fi
 
-    crates=$(python3 "$PINS" bump --kind "$kind" --version "$VERSION" "$dir/$file")
+    python3 "$PINS" bump --kind "$kind" --version "$VERSION" "$dir/$file" >/dev/null
+    # --workspace re-resolves only what the rewritten manifest changed. Not
+    # `-p <crate>`: e2e locks relay's vauchi-protocol beside its own, and a
+    # bare name is ambiguous there (#558).
     if [ "$kind" = cargo ]; then
-        local args=() crate
-        for crate in $crates; do args+=(-p "$crate"); done
-        (cd "$(dirname "$dir/$file")" && cargo update "${args[@]}")
+        (cd "$(dirname "$dir/$file")" && cargo update --workspace)
     fi
 
     git -C "$dir" checkout -q -b "$BRANCH"

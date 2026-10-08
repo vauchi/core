@@ -588,4 +588,114 @@ mod tests {
             "expected SignatureInvalid, got {err:?}"
         );
     }
+
+    // The signature covers every field in this order, so a shared-key holder
+    // cannot change any of them without the sender's key.
+    // @internal
+    #[test]
+    fn the_signed_bytes_are_the_documented_concatenation() {
+        let header = MessageHeader {
+            dh_public: [5u8; 32],
+            dh_generation: 6,
+            message_index: 7,
+            previous_chain_length: 8,
+        };
+
+        let signed = signable_bytes(
+            &[1u8; 32], &[2u8; 32], 9, &header, &[3u8; 32], &[4u8; 32], b"bc", b"inner",
+        );
+
+        let expected = [
+            GENESIS_ENVELOPE_DOMAIN,
+            &[1u8; 32],
+            &[2u8; 32],
+            &9u64.to_be_bytes(),
+            &[5u8; 32],
+            &6u32.to_be_bytes(),
+            &7u32.to_be_bytes(),
+            &8u32.to_be_bytes(),
+            &[3u8; 32],
+            &[4u8; 32],
+            &2u32.to_be_bytes(),
+            b"bc",
+            &5u32.to_be_bytes(),
+            b"inner",
+        ]
+        .concat();
+        assert_eq!(signed, expected);
+    }
+
+    // @internal
+    #[test]
+    fn an_envelope_of_exactly_the_plaintext_limit_decodes() {
+        let fixed = sample_envelope().len() - b"\x04inner-alert".len();
+        let at_limit = encode_envelope(
+            42,
+            &[1u8; 32],
+            &[2u8; 32],
+            &[3u8; 64],
+            b"broadcast-json",
+            &vec![4u8; MAX_GENESIS_PLAINTEXT - fixed],
+        );
+        assert_eq!(at_limit.len(), MAX_GENESIS_PLAINTEXT);
+
+        assert!(decode_envelope(&at_limit).is_ok());
+        let mut over = at_limit;
+        over.push(0);
+        assert!(matches!(
+            decode_envelope(&over),
+            Err(GenesisError::TooLarge)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn sealing_accepts_a_payload_up_to_the_plaintext_limit() {
+        let sender = Identity::create("Alice", 0);
+        let broadcast = RegistryBroadcast::new(
+            &sender.initial_device_registry(),
+            sender.signing_keypair(),
+            0,
+        );
+        let key = SymmetricKey::generate();
+        let fixed = 1 + 8 + 32 + 32 + 64 + 4 + serde_json::to_vec(&broadcast).unwrap().len() + 4;
+        let seal = |len: usize| {
+            GenesisEnvelope::seal(&key, &sender, &[9u8; 32], &broadcast, 0, &vec![1u8; len])
+        };
+
+        assert!(seal(MAX_GENESIS_PLAINTEXT - fixed).is_ok());
+        assert!(matches!(
+            seal(MAX_GENESIS_PLAINTEXT - fixed + 1),
+            Err(GenesisError::TooLarge)
+        ));
+    }
+
+    // @internal
+    #[test]
+    fn a_genesis_message_may_sit_at_most_64_messages_into_its_chain() {
+        let at = |message_index| RatchetMessage {
+            dh_public: [0u8; 32],
+            dh_generation: 0,
+            message_index,
+            previous_chain_length: 0,
+            ciphertext: vec![0u8; 64],
+        };
+        let open = |index| {
+            GenesisEnvelope::open(
+                &SymmetricKey::generate(),
+                &[1u8; 32],
+                &[2u8; 32],
+                &at(index),
+            )
+        };
+
+        assert!(!matches!(
+            open(GENESIS_MAX_CHAIN_INDEX),
+            Err(GenesisError::ChainIndexTooHigh)
+        ));
+        assert!(matches!(
+            open(GENESIS_MAX_CHAIN_INDEX + 1),
+            Err(GenesisError::ChainIndexTooHigh)
+        ));
+    }
 }

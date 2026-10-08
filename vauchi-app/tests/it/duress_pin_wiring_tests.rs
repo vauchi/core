@@ -446,3 +446,41 @@ fn duress_mode_screens_show_no_real_data() {
     }
     assert!(leaks.is_empty(), "real data in duress mode: {leaks:?}");
 }
+
+// The privacy screen works under the duress PIN like every other screen
+// (ADR-032), so its export reads the decoy book (vauchi/private#576).
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
+#[test]
+fn duress_mode_gdpr_export_holds_no_real_contacts() {
+    let mut engine = engine_ready();
+    let real = Contact::from_exchange(
+        [9u8; 32],
+        ContactCard::new("RealRita"),
+        vauchi_core::SymmetricKey::generate(),
+        0,
+    );
+    let real_fingerprint = real.fingerprint();
+    engine.vauchi().add_contact(real).unwrap();
+    engine
+        .vauchi()
+        .add_decoy_contact("decoy-dora", "Dora", &ContactCard::new("Dora"))
+        .unwrap();
+    engine.vauchi_mut().setup_duress_password(PIN).unwrap();
+    let _ = engine.vauchi_mut().authenticate(PIN).unwrap();
+
+    engine.navigate_to(AppScreen::Privacy);
+    let json = match press(&mut engine, "export") {
+        ActionResult::GdprExportComplete { json } => json,
+        other => panic!("expected GdprExportComplete, got {other:?}"),
+    };
+
+    assert!(
+        !json.contains("RealRita"),
+        "export holds a real contact: {json}"
+    );
+    assert!(
+        !json.contains(&real_fingerprint),
+        "export holds a real fingerprint: {json}"
+    );
+    assert!(json.contains("Dora"), "decoy missing from export: {json}");
+}

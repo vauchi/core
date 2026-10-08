@@ -362,3 +362,67 @@ fn test_search_contacts_faceted_duress_covers_decoys_only() {
         ["Decoy Dana"]
     );
 }
+
+// =============================================================================
+// Personal-data export follows the auth mode (private#576)
+// =============================================================================
+
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
+#[test]
+fn test_export_personal_data_duress_holds_decoys_only() {
+    let (wb, bob_id) = setup_duress_with_decoy();
+    wb.storage()
+        .consent()
+        .log_audit_event("real_owner_event", None)
+        .unwrap();
+
+    let export = wb
+        .export_personal_data()
+        .expect("export_personal_data should succeed");
+
+    let names: Vec<&str> = export
+        .contacts
+        .iter()
+        .map(|c| c.display_name.as_str())
+        .collect();
+    assert_eq!(names, ["Decoy Dana"], "only the decoy may be exported");
+    assert!(
+        export.audit_log.is_empty(),
+        "the decoy profile exports no audit log"
+    );
+    assert_eq!(
+        export
+            .recovery_config
+            .as_ref()
+            .map(|r| r.trusted_contacts_count),
+        Some(0),
+        "the trusted-contact count must not come from real contacts"
+    );
+    let json = serde_json::to_string(&export).unwrap();
+    assert!(
+        !json.contains(&bob_id),
+        "export holds a real contact id: {json}"
+    );
+}
+
+// @scenario: privacy_compliance :: Export all my data
+#[test]
+fn test_export_personal_data_normal_mode_holds_real_contacts() {
+    let (alice_wb, _bob_wb, _secret, _bob_id, _alice_id) = setup_alice_bob_exchange();
+    alice_wb
+        .storage()
+        .consent()
+        .log_audit_event("real_owner_event", None)
+        .unwrap();
+
+    let export = alice_wb
+        .export_personal_data()
+        .expect("export_personal_data should succeed");
+
+    assert_eq!(export.contacts.len(), 1, "the real contact is exported");
+    let json = serde_json::to_string(&export.audit_log).unwrap();
+    assert!(
+        json.contains("real_owner_event"),
+        "normal mode keeps the real audit log: {json}"
+    );
+}

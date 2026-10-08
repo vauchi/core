@@ -300,3 +300,16 @@ proptest! {
         );
     }
 }
+
+// The validity window is inclusive at both ends.
+// @internal
+#[test]
+fn an_intermediate_is_valid_on_its_first_and_last_second() {
+    let starts_now = certify(&anchor(), &intermediate(), NOW, NOW + 86_400);
+    let ends_now = certify(&anchor(), &intermediate(), NOW - 86_400, NOW);
+
+    for cert in [starts_now, ends_now] {
+        let record = record_with(current(), key_config(current(), 1), cert, &intermediate());
+        assert!(accept_signed_key(&record, &anchor_key(), NOW, None).is_ok());
+    }
+}

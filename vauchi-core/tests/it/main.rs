@@ -156,6 +156,7 @@ mod delivery_storage_tests;
 mod delta_privacy_tests;
 mod demo_contact_integration_tests;
 mod device_decommission_tests;
+mod device_link_codes_tests;
 mod device_link_invitation_security_tests;
 mod device_link_join_adopt_tests;
 mod device_link_local_invitation_tests;

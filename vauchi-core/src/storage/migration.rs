@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 70] = [
+const MIGRATIONS: [Migration; 71] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -622,7 +622,21 @@ const MIGRATIONS: [Migration; 70] = [
         name: "drop_emptied_plaintext_columns",
         action: MigrationAction::Sql(MIGRATION_V70_DROP_EMPTIED_PLAINTEXT_COLUMNS),
     },
+    Migration {
+        version: 71,
+        name: "drop_device_info_plaintext",
+        action: MigrationAction::Sql(MIGRATION_V71_DROP_DEVICE_INFO_PLAINTEXT),
+    },
 ];
+
+/// Migration v71: drop the plaintext copies of the device id, index and
+/// creation time that `device_info_encrypted` already holds
+/// (vauchi/private#535).
+const MIGRATION_V71_DROP_DEVICE_INFO_PLAINTEXT: &str = "
+    ALTER TABLE device_info DROP COLUMN device_id;
+    ALTER TABLE device_info DROP COLUMN device_index;
+    ALTER TABLE device_info DROP COLUMN created_at;
+";
 
 /// Migration v70: drop the plaintext columns that v14/v15 emptied when
 /// they moved the data into the `*_encrypted` columns (vauchi/private#535).

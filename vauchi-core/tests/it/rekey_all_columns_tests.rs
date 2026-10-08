@@ -406,16 +406,9 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     .unwrap();
 
     // ── device_info (singleton) ───────────────────────────────
-    let dev_id_blob: Vec<u8> = vec![0xABu8; 32];
     conn.execute(
-        "INSERT OR REPLACE INTO device_info \
-         (id, device_id, device_index, device_info_encrypted, created_at) \
-         VALUES (1, ?1, 0, ?2, ?3)",
-        params![
-            dev_id_blob,
-            enc("device_info", "device_info_encrypted"),
-            now
-        ],
+        "INSERT OR REPLACE INTO device_info (id, device_info_encrypted) VALUES (1, ?1)",
+        params![enc("device_info", "device_info_encrypted")],
     )
     .unwrap();
 

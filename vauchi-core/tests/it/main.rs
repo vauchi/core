@@ -120,6 +120,7 @@ mod contact_list_engine_tests;
 mod contact_merge_action_tests;
 mod contact_merge_engine_tests;
 mod contact_merge_tests;
+mod contact_name_at_rest_tests;
 mod contact_relay_metadata_tests;
 mod contact_relay_storage_tests;
 mod contact_statistics_tests;

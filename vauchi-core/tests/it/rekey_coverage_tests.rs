@@ -117,7 +117,7 @@ fn test_rekey_preserves_cek_encrypted() {
     let card_enc = vauchi_core::crypto::encrypt(&key1, b"{\"name\":\"Test\"}").unwrap();
     let sk_enc = vauchi_core::crypto::encrypt(&key1, b"shared-key-placeholder-32bytes!").unwrap();
     storage.connection().execute(
-        "INSERT INTO contacts (id, public_key, display_name, card_encrypted, shared_key_encrypted, cek_encrypted, exchange_timestamp, contact_kind) VALUES ('c1', X'0101010101010101010101010101010101010101010101010101010101010101', '', ?1, ?2, ?3, 1000, 'exchanged')",
+        "INSERT INTO contacts (id, public_key, card_encrypted, shared_key_encrypted, cek_encrypted, exchange_timestamp, contact_kind) VALUES ('c1', X'0101010101010101010101010101010101010101010101010101010101010101', ?1, ?2, ?3, 1000, 'exchanged')",
         rusqlite::params![card_enc, sk_enc, test_cek],
     ).unwrap();
 

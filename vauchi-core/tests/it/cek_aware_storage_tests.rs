@@ -124,50 +124,6 @@ fn test_list_contacts_includes_cek_contacts() {
 
 // === CEK-Protected Display Name ===
 
-// @internal
-#[test]
-fn test_cek_contact_display_name_empty_in_db() {
-    let storage = test_storage();
-    let contact = make_contact_with_cek("Secret Name");
-    storage.contacts().save_contact(&contact).unwrap();
-
-    // Read display_name column directly — should be empty for CEK contacts
-    // (no plaintext personal data in DB; name is inside CEK-encrypted card)
-    let display_name: String = storage
-        .connection()
-        .query_row(
-            "SELECT display_name FROM contacts WHERE id = ?1",
-            rusqlite::params![contact.id()],
-            |row| row.get(0),
-        )
-        .unwrap();
-
-    assert!(
-        display_name.is_empty(),
-        "CEK contacts should have empty display_name in DB, got: {}",
-        display_name
-    );
-}
-
-// @internal
-#[test]
-fn test_legacy_contact_has_plaintext_display_name() {
-    let storage = test_storage();
-    let contact = make_contact("Public Name");
-    storage.contacts().save_contact(&contact).unwrap();
-
-    let display_name: String = storage
-        .connection()
-        .query_row(
-            "SELECT display_name FROM contacts WHERE id = ?1",
-            rusqlite::params![contact.id()],
-            |row| row.get(0),
-        )
-        .unwrap();
-
-    assert_eq!(display_name, "Public Name");
-}
-
 // === Card Encrypted With CEK (not storage key) ===
 
 // @internal

@@ -17,14 +17,13 @@ use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::types::ExchangeTransport;
 
 /// Columns `ContactRow::from_row` reads, for every contact SELECT.
-pub(super) const CONTACT_COLUMNS: &str = "id, public_key, display_name, card_encrypted, shared_key_encrypted, visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted, exchange_transport, has_recovered, card_updated_at, relay_url, trust_metrics, contact_kind, import_source, imported_at, original_uid, deleted_at, archived, archived_at, ignored, ignored_at, reciprocity, confirmation_channel";
+pub(super) const CONTACT_COLUMNS: &str = "id, public_key, card_encrypted, shared_key_encrypted, visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted, exchange_transport, has_recovered, card_updated_at, relay_url, trust_metrics, contact_kind, import_source, imported_at, original_uid, deleted_at, archived, archived_at, ignored, ignored_at, reciprocity, confirmation_channel";
 
 /// Internal struct for database row data.
 #[allow(dead_code)] // Fields are used via destructuring in row_to_contact
 pub(super) struct ContactRow {
     pub id: String,
     pub public_key: Vec<u8>,
-    pub display_name: String,
     pub card_encrypted: Vec<u8>,
     pub shared_key_encrypted: Vec<u8>,
     pub visibility_rules_encrypted: Option<Vec<u8>>,
@@ -59,7 +58,6 @@ impl ContactRow {
         Ok(Self {
             id: row.get("id")?,
             public_key: row.get("public_key")?,
-            display_name: row.get("display_name")?,
             card_encrypted: row.get("card_encrypted")?,
             shared_key_encrypted: row.get("shared_key_encrypted")?,
             visibility_rules_encrypted: row.get("visibility_rules_encrypted")?,
@@ -101,18 +99,17 @@ impl ContactStore<'_> {
         let card_json = serde_json::to_vec(contact.card())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        // Encrypt card + CEK (or storage-key for legacy)
-        let (card_encrypted, display_name, cek_encrypted) = if let Some(cek) = contact.cek() {
+        let (card_encrypted, cek_encrypted) = if let Some(cek) = contact.cek() {
             let card_ct = cek
                 .encrypt(&card_json)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
             let cek_ct = crate::crypto::encrypt(self.key, &cek.to_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
-            (card_ct, String::new(), Some(cek_ct))
+            (card_ct, Some(cek_ct))
         } else {
             let card_ct = crate::crypto::encrypt(self.key, &card_json)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
-            (card_ct, contact.display_name().to_string(), None)
+            (card_ct, None)
         };
 
         // Build kind-specific fields
@@ -215,7 +212,6 @@ impl ContactStore<'_> {
         Ok(ContactRow {
             id: contact.id().to_string(),
             public_key,
-            display_name,
             card_encrypted,
             shared_key_encrypted,
             visibility_rules_encrypted,

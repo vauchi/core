@@ -43,19 +43,16 @@ impl ContactStore<'_> {
     }
     /// Saves a contact to storage.
     ///
-    /// If the contact has a CEK, the card is encrypted with the CEK (not the
-    /// storage key) and the `display_name` column is set to NULL. The CEK itself
-    /// is encrypted with the storage key and stored in `cek_encrypted`.
-    ///
-    /// Legacy contacts (no CEK) use storage-key encryption with plaintext
-    /// display_name (existing behavior).
+    /// If the contact has a CEK, the card is encrypted with the CEK and the
+    /// CEK itself with the storage key (`cek_encrypted`); otherwise the card
+    /// is encrypted with the storage key. The name lives only in the card.
     pub fn save_contact(&self, contact: &Contact) -> Result<(), StorageError> {
         let row = self.contact_to_row(contact)?;
 
         // Upsert (not INSERT OR REPLACE which cascades deletes to field_notes)
         self.conn.execute(
             "INSERT INTO contacts
-             (id, public_key, display_name, card_encrypted, shared_key_encrypted,
+             (id, public_key, card_encrypted, shared_key_encrypted,
               visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, last_sync_at,
               blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted,
               exchange_transport, has_recovered, card_updated_at,
@@ -63,10 +60,9 @@ impl ContactStore<'_> {
               contact_kind, import_source, imported_at, original_uid,
               deleted_at, archived, archived_at, ignored, ignored_at,
               reciprocity, confirmation_channel)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30)
              ON CONFLICT(id) DO UPDATE SET
                public_key              = excluded.public_key,
-               display_name            = excluded.display_name,
                card_encrypted          = excluded.card_encrypted,
                shared_key_encrypted    = excluded.shared_key_encrypted,
                visibility_rules_encrypted = excluded.visibility_rules_encrypted,
@@ -97,7 +93,6 @@ impl ContactStore<'_> {
             params![
                 row.id,
                 row.public_key,
-                row.display_name,
                 row.card_encrypted,
                 row.shared_key_encrypted,
                 row.visibility_rules_encrypted,
@@ -149,8 +144,7 @@ impl ContactStore<'_> {
     pub fn list_contacts(&self) -> Result<Vec<Contact>, StorageError> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {CONTACT_COLUMNS} FROM contacts
-             WHERE deleted_at IS NULL AND archived = 0
-             ORDER BY display_name"
+             WHERE deleted_at IS NULL AND archived = 0"
         ))?;
 
         let rows = stmt.query_map([], ContactRow::from_row)?;
@@ -181,6 +175,7 @@ impl ContactStore<'_> {
             contacts.len()
         );
 
+        sort_by_display_name(&mut contacts);
         Ok(contacts)
     }
     /// Returns true if at least one active contact exists, excluding
@@ -195,8 +190,9 @@ impl ContactStore<'_> {
     }
     /// Lists contacts with pagination support.
     ///
-    /// Returns contacts ordered by display_name, starting from `offset`
-    /// and returning at most `limit` results.
+    /// Returns contacts ordered by display name, starting from `offset`
+    /// and returning at most `limit` results. Names are only readable after
+    /// decryption, so the page is cut from the full sorted list (#570).
     pub fn list_contacts_paginated(
         &self,
         offset: usize,
@@ -205,87 +201,28 @@ impl ContactStore<'_> {
         if limit == 0 {
             return Ok(Vec::new());
         }
-
-        let mut stmt = self.conn.prepare(&format!(
-            "SELECT {CONTACT_COLUMNS} FROM contacts
-             WHERE deleted_at IS NULL AND archived = 0
-             ORDER BY display_name
-             LIMIT ?1 OFFSET ?2"
-        ))?;
-
-        let rows = stmt.query_map(params![limit as i64, offset as i64], ContactRow::from_row)?;
-
-        let mut contacts = Vec::new();
-        for row_result in rows {
-            let row = row_result?;
-            contacts.push(self.row_to_contact(row)?);
-        }
-
-        Ok(contacts)
+        Ok(self
+            .list_contacts()?
+            .into_iter()
+            .skip(offset)
+            .take(limit)
+            .collect())
     }
     /// Searches contacts by display name using case-insensitive matching.
     ///
-    /// Returns all contacts whose display_name contains the query string.
-    /// An empty query returns all contacts.
-    ///
-    /// Hybrid approach for performance:
-    /// - Legacy contacts (non-empty display_name in DB): searched via SQL LIKE
-    /// - CEK-protected contacts (empty display_name in DB): loaded, decrypted,
-    ///   and filtered in memory
+    /// Returns all contacts whose display name contains the query string,
+    /// in display-name order. An empty query returns all contacts.
     pub fn search_contacts(&self, query: &str) -> Result<Vec<Contact>, StorageError> {
-        if query.is_empty() {
-            return self.list_contacts();
-        }
-
-        let pattern = format!("%{}%", query);
         let query_lower = query.to_lowercase();
-
-        // Part 1: SQL search for legacy contacts (non-empty display_name)
-        let mut stmt = self.conn.prepare(&format!(
-            "SELECT {CONTACT_COLUMNS} FROM contacts
-             WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
-               AND deleted_at IS NULL AND archived = 0
-             ORDER BY display_name"
-        ))?;
-
-        let rows = stmt.query_map(params![pattern], ContactRow::from_row)?;
-
-        let mut contacts = Vec::new();
-        for row_result in rows {
-            let row = row_result?;
-            contacts.push(self.row_to_contact(row)?);
-        }
-
-        // Part 2: In-memory search for CEK-protected contacts (empty display_name)
-        let mut cek_stmt = self.conn.prepare(&format!(
-            "SELECT {CONTACT_COLUMNS} FROM contacts
-             WHERE display_name = '' AND deleted_at IS NULL AND archived = 0"
-        ))?;
-
-        let cek_rows = cek_stmt.query_map([], ContactRow::from_row)?;
-
-        for row_result in cek_rows {
-            let row = row_result?;
-            let contact = self.row_to_contact(row)?;
-            if contact.display_name().to_lowercase().contains(&query_lower) {
-                contacts.push(contact);
-            }
-        }
-
-        contacts.sort_by(|a, b| {
-            a.display_name()
-                .to_lowercase()
-                .cmp(&b.display_name().to_lowercase())
-        });
-
+        let mut contacts = self.list_contacts()?;
+        contacts.retain(|contact| contact.display_name().to_lowercase().contains(&query_lower));
         Ok(contacts)
     }
     /// Lists contacts that are archived (but not soft-deleted).
     pub fn list_archived_contacts(&self) -> Result<Vec<Contact>, StorageError> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {CONTACT_COLUMNS} FROM contacts
-             WHERE archived = 1 AND deleted_at IS NULL
-             ORDER BY display_name"
+             WHERE archived = 1 AND deleted_at IS NULL"
         ))?;
 
         let rows = stmt.query_map([], ContactRow::from_row)?;
@@ -296,6 +233,7 @@ impl ContactStore<'_> {
             contacts.push(self.row_to_contact(row)?);
         }
 
+        sort_by_display_name(&mut contacts);
         Ok(contacts)
     }
     /// Finds contact IDs that were soft-deleted before the given timestamp.
@@ -420,4 +358,15 @@ impl ContactStore<'_> {
         self.conn.execute(&sql, params![value, contact_id])?;
         Ok(())
     }
+}
+
+/// Orders contacts by decrypted display name, case-insensitively; names
+/// are not stored in plaintext, so SQL cannot sort them (#570).
+fn sort_by_display_name(contacts: &mut [Contact]) {
+    contacts.sort_by_cached_key(|contact| {
+        (
+            contact.display_name().to_lowercase(),
+            contact.id().to_string(),
+        )
+    });
 }

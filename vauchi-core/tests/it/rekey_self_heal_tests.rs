@@ -37,9 +37,9 @@ fn open_storage_with_contact() -> (tempfile::TempDir, Storage) {
         .connection()
         .execute(
             "INSERT INTO contacts \
-             (id, public_key, display_name, card_encrypted, shared_key_encrypted, \
+             (id, public_key, card_encrypted, shared_key_encrypted, \
               exchange_timestamp, contact_kind) \
-             VALUES (?1, ?2, 'Bob', ?3, ?4, 1000, 'exchanged')",
+             VALUES (?1, ?2, ?3, ?4, 1000, 'exchanged')",
             params![CONTACT_ID, CONTACT_PK, card_enc, sk_enc],
         )
         .unwrap();
@@ -152,9 +152,9 @@ fn rekey_handles_mixed_plaintext_and_ciphertext_in_same_column() {
         .connection()
         .execute(
             "INSERT INTO contacts \
-             (id, public_key, display_name, card_encrypted, shared_key_encrypted, \
+             (id, public_key, card_encrypted, shared_key_encrypted, \
               exchange_timestamp, contact_kind) \
-             VALUES (?1, ?2, 'Carol', ?3, ?4, 1000, 'exchanged')",
+             VALUES (?1, ?2, ?3, ?4, 1000, 'exchanged')",
             params![other_id, &other_pk[..], card_enc, sk_enc],
         )
         .unwrap();

@@ -191,70 +191,39 @@ fn test_existing_database_permissions_preserved() {
 // Display name index tests (Migration V12)
 // ============================================================================
 
-/// The contacts display_name index should exist after migrations.
+// Names are decrypted before sorting and matching (#570), so search and
+// paging cost one decryption per contact: measured 37 ms (release) and
+// 257 ms (debug) for one search plus one page. The 1 s bound catches an
+// algorithmic regression without flaking on a slow debug runner.
 // @internal
 #[test]
-fn test_display_name_index_exists() {
-    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-
-    let index_exists: bool = storage
-        .connection()
-        .query_row(
-            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='index' AND name='idx_contacts_display_name'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-
-    assert!(
-        index_exists,
-        "Expected idx_contacts_display_name index to exist"
-    );
-}
-
-/// Searching 1000 contacts by display_name should complete in under 200ms.
-// @internal
-#[test]
-fn test_search_1000_contacts_under_200ms() {
+fn search_and_paging_over_1000_encrypted_contacts_stay_interactive() {
     use std::time::Instant;
+    use vauchi_core::ContactCard;
+    use vauchi_core::contact::Contact;
 
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-
-    // We use raw SQL to avoid needing encryption for card/key fields
-    // (they're BLOBs, so dummy data works for index benchmarking).
-    let conn = storage.connection();
-    for i in 0..1000 {
-        conn.execute(
-            "INSERT INTO contacts (id, public_key, display_name, card_encrypted, shared_key_encrypted, exchange_timestamp)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            rusqlite::params![
-                format!("contact-{:04}", i),
-                vec![i as u8; 32],
-                format!("User {:04}", i),
-                vec![0u8; 64],
-                vec![0u8; 64],
-                1000 + i as i64,
-            ],
-        ).unwrap();
+    for i in 0..1000u32 {
+        let mut public_key = [0u8; 32];
+        public_key[..4].copy_from_slice(&i.to_be_bytes());
+        let contact = Contact::from_exchange(
+            public_key,
+            ContactCard::new(&format!("User {i:04}")),
+            SymmetricKey::generate(),
+            0,
+        );
+        storage.contacts().save_contact(&contact).unwrap();
     }
 
     let start = Instant::now();
-
-    // Search by display_name prefix (case-insensitive via COLLATE NOCASE index)
-    let count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM contacts WHERE display_name LIKE 'User 05%'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-
+    let found = storage.contacts().search_contacts("user 05").unwrap();
+    let page = storage.contacts().list_contacts_paginated(500, 20).unwrap();
     let elapsed = start.elapsed();
 
-    assert!(count > 0, "Search should find matching contacts");
+    assert_eq!(found.len(), 100);
+    assert_eq!(page.first().map(Contact::display_name), Some("User 0500"));
     assert!(
-        elapsed < std::time::Duration::from_millis(200),
-        "Search took {:?}, expected < 200ms",
-        elapsed
+        elapsed < std::time::Duration::from_secs(1),
+        "search + one page took {elapsed:?}, expected < 1s"
     );
 }

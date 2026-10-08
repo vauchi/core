@@ -258,15 +258,14 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     //     shared_avatars) ────────────────────────────────────────
     conn.execute(
         "INSERT INTO contacts \
-         (id, public_key, display_name, card_encrypted, shared_key_encrypted, \
+         (id, public_key, card_encrypted, shared_key_encrypted, \
           personal_notes_encrypted, avatar_encrypted, cek_encrypted, \
           visibility_rules_encrypted, nickname_encrypted, custom_avatar_encrypted, \
           exchange_timestamp, contact_kind, exchange_location_encrypted) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'exchanged', ?13)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'exchanged', ?12)",
         params![
             CONTACT_ID,
             CONTACT_PK,
-            "Bob",
             enc("contacts", "card_encrypted"),
             enc("contacts", "shared_key_encrypted"),
             enc("contacts", "personal_notes_encrypted"),

@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 72] = [
+const MIGRATIONS: [Migration; 73] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -632,7 +632,19 @@ const MIGRATIONS: [Migration; 72] = [
         name: "drop_label_and_contact_plaintext",
         action: MigrationAction::Sql(MIGRATION_V72_DROP_LABEL_AND_CONTACT_PLAINTEXT),
     },
+    Migration {
+        version: 73,
+        name: "drop_contact_display_name",
+        action: MigrationAction::Sql(MIGRATION_V73_DROP_CONTACT_DISPLAY_NAME),
+    },
 ];
+
+/// Migration v73: contacts no longer keep a plaintext display name; the
+/// name lives only in the encrypted card (vauchi/private#570).
+const MIGRATION_V73_DROP_CONTACT_DISPLAY_NAME: &str = "
+    DROP INDEX IF EXISTS idx_contacts_display_name;
+    ALTER TABLE contacts DROP COLUMN display_name;
+";
 
 /// Migration v72: visibility labels and contacts keep only their encrypted
 /// columns (vauchi/private#535).

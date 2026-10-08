@@ -195,7 +195,7 @@ impl DeviceLinkInitiator {
         }
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
-        self.validate_proximity_proof(proof, &confirmation_code, now)?;
+        validate_proximity_proof(self.qr.link_key(), proof, &confirmation_code, now)?;
 
         let device_index = self.registry.next_device_index();
 
@@ -240,47 +240,6 @@ impl DeviceLinkInitiator {
         );
 
         Ok((encrypted_response, updated_registry, new_device))
-    }
-
-    /// Validates a proximity proof cryptographically.
-    ///
-    /// Checks both freshness (proof age within `PROXIMITY_PROOF_MAX_AGE_SECS`)
-    /// and correctness (challenge-response or confirmation MAC) using
-    /// constant-time comparison.
-    fn validate_proximity_proof(
-        &self,
-        proof: &ProximityProof,
-        confirmation_code: &str,
-        now: u64,
-    ) -> Result<(), ExchangeError> {
-        match proof {
-            ProximityProof::Ultrasonic {
-                challenge_response,
-                verified_at,
-            } => {
-                if now.saturating_sub(*verified_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
-                    return Err(ExchangeError::ProximityExpired);
-                }
-                let expected = derive_proximity_challenge(self.qr.link_key());
-                if !bool::from(challenge_response.ct_eq(&expected)) {
-                    return Err(ExchangeError::ProximityNotVerified);
-                }
-                Ok(())
-            }
-            ProximityProof::ManualConfirmation {
-                confirmation_code_mac,
-                confirmed_at,
-            } => {
-                if now.saturating_sub(*confirmed_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
-                    return Err(ExchangeError::ProximityExpired);
-                }
-                let expected_mac = compute_confirmation_mac(self.qr.link_key(), confirmation_code);
-                if !bool::from(confirmation_code_mac.ct_eq(&expected_mac)) {
-                    return Err(ExchangeError::ProximityNotVerified);
-                }
-                Ok(())
-            }
-        }
     }
 }
 
@@ -442,7 +401,7 @@ impl DeviceLinkInitiatorRestored {
         }
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
-        self.validate_proximity_proof(proof, &confirmation_code, now)?;
+        validate_proximity_proof(self.qr.link_key(), proof, &confirmation_code, now)?;
 
         let device_index = self.registry.next_device_index();
 
@@ -488,51 +447,52 @@ impl DeviceLinkInitiatorRestored {
 
         Ok((encrypted_response, updated_registry, new_device))
     }
-
-    /// Validates a proximity proof cryptographically.
-    ///
-    /// Checks both freshness (proof age within `PROXIMITY_PROOF_MAX_AGE_SECS`)
-    /// and correctness (challenge-response or confirmation MAC) using
-    /// constant-time comparison.
-    fn validate_proximity_proof(
-        &self,
-        proof: &ProximityProof,
-        confirmation_code: &str,
-        now: u64,
-    ) -> Result<(), ExchangeError> {
-        match proof {
-            ProximityProof::Ultrasonic {
-                challenge_response,
-                verified_at,
-            } => {
-                if now.saturating_sub(*verified_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
-                    return Err(ExchangeError::ProximityExpired);
-                }
-                let expected = derive_proximity_challenge(self.qr.link_key());
-                if !bool::from(challenge_response.ct_eq(&expected)) {
-                    return Err(ExchangeError::ProximityNotVerified);
-                }
-                Ok(())
-            }
-            ProximityProof::ManualConfirmation {
-                confirmation_code_mac,
-                confirmed_at,
-            } => {
-                if now.saturating_sub(*confirmed_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
-                    return Err(ExchangeError::ProximityExpired);
-                }
-                let expected_mac = compute_confirmation_mac(self.qr.link_key(), confirmation_code);
-                if !bool::from(confirmation_code_mac.ct_eq(&expected_mac)) {
-                    return Err(ExchangeError::ProximityNotVerified);
-                }
-                Ok(())
-            }
-        }
-    }
 }
 
 impl Drop for DeviceLinkInitiatorRestored {
     fn drop(&mut self) {
         self.master_seed.zeroize();
+    }
+}
+
+/// Validates a proximity proof cryptographically.
+///
+/// Checks both freshness (proof age within `PROXIMITY_PROOF_MAX_AGE_SECS`)
+/// and correctness (challenge-response or confirmation MAC) using
+/// constant-time comparison. Shared by both initiators so the check
+/// cannot drift between them.
+fn validate_proximity_proof(
+    link_key: &[u8; 32],
+    proof: &ProximityProof,
+    confirmation_code: &str,
+    now: u64,
+) -> Result<(), ExchangeError> {
+    match proof {
+        ProximityProof::Ultrasonic {
+            challenge_response,
+            verified_at,
+        } => {
+            if now.saturating_sub(*verified_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
+                return Err(ExchangeError::ProximityExpired);
+            }
+            let expected = derive_proximity_challenge(link_key);
+            if !bool::from(challenge_response.ct_eq(&expected)) {
+                return Err(ExchangeError::ProximityNotVerified);
+            }
+            Ok(())
+        }
+        ProximityProof::ManualConfirmation {
+            confirmation_code_mac,
+            confirmed_at,
+        } => {
+            if now.saturating_sub(*confirmed_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
+                return Err(ExchangeError::ProximityExpired);
+            }
+            let expected_mac = compute_confirmation_mac(link_key, confirmation_code);
+            if !bool::from(confirmation_code_mac.ct_eq(&expected_mac)) {
+                return Err(ExchangeError::ProximityNotVerified);
+            }
+            Ok(())
+        }
     }
 }

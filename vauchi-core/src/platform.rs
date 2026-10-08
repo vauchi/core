@@ -90,6 +90,12 @@ pub enum Command {
         /// a ~300 ms design, and the peer's camera decodes ~30 frames per
         /// second (device-measured 2026-08-19).
         earliest_millis: Option<u32>,
+        /// How long the shell waits before calling `on_wakeup()`, in
+        /// milliseconds: `earliest_millis`, else `earliest_secs`, never past
+        /// `deadline_secs`. Core computes it so shells stop deriving it from
+        /// the fields above, which they did three different ways
+        /// (vauchi/private#548). Set only through `Command::schedule_wakeup`.
+        delay_millis: u32,
     },
 
     /// Start advertising the vauchi BLE service with the given payload.
@@ -585,11 +591,14 @@ impl Command {
         min_interval_secs: u32,
         earliest_millis: Option<u32>,
     ) -> Self {
+        let earliest_ms = earliest_millis.unwrap_or(earliest_secs.saturating_mul(1000));
+        let delay_millis = earliest_ms.min(deadline_secs.saturating_mul(1000));
         Self::ScheduleWakeup {
             earliest_secs,
             deadline_secs,
             min_interval_secs,
             earliest_millis,
+            delay_millis,
         }
     }
 

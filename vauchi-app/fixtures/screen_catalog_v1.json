@@ -16717,7 +16717,8 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": null
+            "earliest_millis": null,
+            "delay_millis": 1000
           }
         }
       ]
@@ -17383,7 +17384,8 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 105
+            "earliest_millis": 105,
+            "delay_millis": 105
           }
         }
       ]

@@ -113,26 +113,17 @@ impl UxStore<'_> {
     /// Loads the demo contact state (decrypted).
     pub fn load_demo_contact_state(&self) -> Result<Option<DemoContactState>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT demo_contact_json_encrypted, demo_contact_json FROM ux_state WHERE id = 1",
+            "SELECT demo_contact_json_encrypted FROM ux_state WHERE id = 1",
             [],
-            |row| {
-                let encrypted: Option<Vec<u8>> = row.get(0)?;
-                let plaintext: Option<String> = row.get(1)?;
-                Ok((encrypted, plaintext))
-            },
+            |row| row.get::<_, Option<Vec<u8>>>(0),
         );
 
         match result {
-            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
                 let decrypted = crate::crypto::decrypt(self.key, &encrypted)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                let state = DemoContactState::from_json(&json)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                Ok(Some(state))
-            }
-            Ok((_, Some(json))) if !json.is_empty() => {
                 let state = DemoContactState::from_json(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some(state))

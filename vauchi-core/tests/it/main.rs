@@ -465,6 +465,7 @@ mod sync_card_update_hardening_tests;
 mod sync_card_update_tests;
 mod sync_card_update_timestamp_tests;
 mod sync_correctness_tests;
+mod sync_delta_nonce_tests;
 mod sync_delta_tests;
 mod sync_device_conflict_tests;
 mod sync_device_convergence_tests;

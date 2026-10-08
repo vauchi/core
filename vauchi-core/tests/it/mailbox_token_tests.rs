@@ -442,3 +442,30 @@ fn the_day_epoch_counts_whole_utc_days() {
     assert_eq!(current_day_epoch(5 * 86_400 - 1), 4);
     assert_eq!(current_day_epoch(5 * 86_400), 5);
 }
+
+// On day 0 there is no yesterday: registration holds today's tokens and
+// reaches for no earlier day.
+// @internal
+#[test]
+fn registration_on_day_zero_has_no_previous_day() {
+    let master_seed = [0xBBu8; 32];
+    let contact = [0x22u8; 32];
+
+    let tokens = batch_register_tokens(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &[contact],
+        &TEST_PUBKEY,
+        &master_seed,
+        0,
+        0,
+    )
+    .concat();
+
+    assert!(tokens.contains(&token_hex(&compute_self_token(&master_seed, 0))));
+    assert!(tokens.contains(&token_hex(&compute_mailbox_token(
+        &contact,
+        &TEST_PUBKEY,
+        0
+    ))));
+    assert_eq!(tokens.len(), 256);
+}

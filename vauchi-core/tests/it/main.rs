@@ -463,6 +463,7 @@ mod storage_error_tests;
 mod storage_identity_tests;
 mod storage_key_check_tests;
 mod storage_pragma_tests;
+mod storage_reset_tests;
 mod storage_shard_edges_tests;
 mod storage_tests;
 mod support_engine_tests;

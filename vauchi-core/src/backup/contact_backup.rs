@@ -189,28 +189,7 @@ mod base64_option {
                 .decode(&s)
                 .map(Some)
                 .map_err(serde::de::Error::custom),
-            Some(Value::Array(arr)) => {
-                let mut bytes = Vec::with_capacity(arr.len());
-                for v in arr {
-                    let b = match v {
-                        Value::Number(n) => {
-                            n.as_u64().and_then(|u| u.try_into().ok()).ok_or_else(|| {
-                                serde::de::Error::custom("avatar byte array contains non-integer")
-                            })?
-                        }
-                        _ => {
-                            return Err(serde::de::Error::custom(
-                                "avatar byte array contains non-integer",
-                            ));
-                        }
-                    };
-                    bytes.push(b);
-                }
-                Ok(Some(bytes))
-            }
-            Some(_) => Err(serde::de::Error::custom(
-                "avatar must be a base64 string or byte array",
-            )),
+            Some(_) => Err(serde::de::Error::custom("avatar must be a base64 string")),
         }
     }
 }

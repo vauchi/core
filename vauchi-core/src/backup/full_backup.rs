@@ -250,9 +250,8 @@ fn compress_backup(plaintext: &[u8]) -> Result<Vec<u8>, BackupError> {
         .map_err(|e| BackupError::Serialization(format!("compression failed: {e}")))
 }
 
-/// Decompresses zlib-compressed plaintext. Falls back to returning the input
-/// unchanged if it does not start with the zlib magic byte, preserving
-/// compatibility with pre-compression v3 backups.
+/// Decompresses zlib-compressed plaintext; anything that is not a zlib
+/// stream is refused.
 fn decompress_backup(data: &[u8]) -> Result<Vec<u8>, BackupError> {
     decompress_backup_with_limit(data, MAX_DECOMPRESSED_BACKUP_BYTES)
 }
@@ -261,11 +260,10 @@ fn decompress_backup_with_limit(
     data: &[u8],
     maximum_output: usize,
 ) -> Result<Vec<u8>, BackupError> {
-    if data.len() > maximum_output && (data.is_empty() || data[0] != ZLIB_MAGIC) {
-        return Err(BackupError::TooLarge);
-    }
-    if data.is_empty() || data[0] != ZLIB_MAGIC {
-        return Ok(data.to_vec());
+    if data.first() != Some(&ZLIB_MAGIC) {
+        return Err(BackupError::Deserialization(
+            "backup is not zlib-compressed".into(),
+        ));
     }
     let decoder = ZlibDecoder::new(data);
     let read_limit = maximum_output.saturating_add(1) as u64;

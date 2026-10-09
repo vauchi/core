@@ -28,13 +28,13 @@ fn restore(plaintext: &[u8]) -> Option<Identity> {
     Identity::import_backup(&sealed(plaintext), PASSWORD, 0).ok()
 }
 
-fn legacy(name: &str) -> Vec<u8> {
+fn name_and_seed(name: &str) -> Vec<u8> {
     [&(name.len() as u32).to_le_bytes(), name.as_bytes(), &SEED].concat()
 }
 
 fn with_device(name: &str, index: u32, device_name: &str) -> Vec<u8> {
     [
-        legacy(name).as_slice(),
+        name_and_seed(name).as_slice(),
         &index.to_le_bytes(),
         &(device_name.len() as u32).to_le_bytes(),
         device_name.as_bytes(),
@@ -44,12 +44,16 @@ fn with_device(name: &str, index: u32, device_name: &str) -> Vec<u8> {
 
 // @internal
 #[test]
-fn the_smallest_backup_is_93_bytes_and_restores() {
-    let smallest = sealed(&legacy(""));
-    assert_eq!(smallest.as_bytes().len(), 1 + 93);
+fn the_smallest_backup_is_101_bytes_and_restores() {
+    let smallest = sealed(&with_device("", 0, ""));
+    assert_eq!(smallest.as_bytes().len(), 1 + 101);
 
     let identity = Identity::import_backup(&smallest, PASSWORD, 0).expect("restores");
     assert_eq!(identity.display_name(), "");
+    assert!(
+        restore(&name_and_seed("")).is_none(),
+        "no device fields, no restore (#571)"
+    );
 }
 
 // @internal
@@ -65,8 +69,8 @@ fn a_backup_restores_its_name_and_device() {
 // @internal
 #[test]
 fn a_plaintext_whose_lengths_overrun_it_is_refused() {
-    let short_of_seed = &legacy("")[..35];
-    let mut name_too_long = legacy("Alice");
+    let short_of_seed = &name_and_seed("")[..35];
+    let mut name_too_long = name_and_seed("Alice");
     name_too_long[0] = 6;
     let full = with_device("Alice", 3, "Laptop");
     let device_name_cut = &full[..full.len() - 1];

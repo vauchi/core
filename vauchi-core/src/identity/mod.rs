@@ -438,10 +438,11 @@ impl Identity {
             .try_into()
             .map_err(|_| IdentityError::RestoreFailed)?;
 
-        // Parse device info (if present, for backward compatibility)
         let base_offset = 4 + name_len + 32;
-        let (device_index, device_name) = if plaintext.len() >= base_offset + 8 {
-            // New format with device info
+        if plaintext.len() < base_offset + 8 {
+            return Err(IdentityError::RestoreFailed);
+        }
+        let (device_index, device_name) = {
             let device_index = u32::from_le_bytes(
                 plaintext[base_offset..base_offset + 4]
                     .try_into()
@@ -464,9 +465,6 @@ impl Identity {
             .map_err(|_| IdentityError::RestoreFailed)?;
 
             (device_index, device_name)
-        } else {
-            // Old format without device info - use defaults
-            (0, "Primary Device".to_string())
         };
 
         Ok(Self::from_seed_with_device(

@@ -17,6 +17,7 @@
 //! | `bench_contact_list_scroll`    | < 16 ms/page    | 60 FPS scroll performance           |
 //! | `bench_memory_500_contacts`    | < 50 MB         | Reasonable memory footprint         |
 //! | `bench_sync_latency_10_devices`| < 5 seconds     | Multi-device sync user experience   |
+//! | `bench_first_boot_key_move`    | measured        | One-time rekey to the SMK (#580)    |
 //!
 //! # Running Benchmarks
 //!
@@ -542,6 +543,34 @@ fn bench_regression_markers(c: &mut Criterion) {
 }
 
 // =============================================================================
+// FIRST-BOOT KEY MOVE (vauchi/private#580)
+// =============================================================================
+
+/// The first boot after the SMK update rekeys every encrypted column once.
+/// Measured to decide whether that move needs a progress surface; scale the
+/// desktop figure by the device-check ratio for the slowest phone.
+fn bench_first_boot_key_move(c: &mut Criterion) {
+    let mut group = c.benchmark_group("first_boot_key_move");
+    group.sample_size(10);
+    for contact_count in [1_000, 10_000] {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(contact_count),
+            &contact_count,
+            |b, &count| {
+                b.iter_batched(
+                    || create_populated_storage(count),
+                    |mut storage| {
+                        storage.rekey(SymmetricKey::generate()).unwrap();
+                        storage
+                    },
+                    criterion::BatchSize::PerIteration,
+                );
+            },
+        );
+    }
+    group.finish();
+}
+
 // MAIN
 // =============================================================================
 
@@ -553,6 +582,7 @@ criterion_group!(
     bench_memory_500_contacts,
     bench_sync_latency_10_devices,
     bench_regression_markers,
+    bench_first_boot_key_move,
 );
 
 criterion_main!(benches);

@@ -250,7 +250,7 @@ impl Vauchi {
         // Ensure the identity row exists in DB (may not yet if create_identity
         // only stored the own_card). Insert a placeholder row if missing.
         if !self.storage.identity().has_identity()? {
-            self.storage.identity().save_identity(b"", "")?;
+            self.storage.identity().save_identity(b"")?;
         }
 
         let config = AppPasswordConfig::create(password)?;

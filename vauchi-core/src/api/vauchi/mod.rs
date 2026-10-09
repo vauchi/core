@@ -369,9 +369,7 @@ impl Vauchi {
 
         // Try to load a persisted identity from storage
         let identity = match storage.identity().load_identity() {
-            Ok(Some((bytes, _display_name))) => {
-                Identity::from_storage_bytes(&bytes, clock.unix_seconds()).ok()
-            }
+            Ok(Some(bytes)) => Identity::from_storage_bytes(&bytes, clock.unix_seconds()).ok(),
             _ => None,
         };
         let run_visibility_migration = identity.is_some();

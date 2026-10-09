@@ -430,7 +430,7 @@ impl DeviceLinkInitiatorMachine {
             let save = (|| -> Result<(), String> {
                 let storage = Storage::open(&ctx.storage_path, ctx.storage_key.clone())
                     .map_err(|error| error.to_string())?;
-                let (identity_bytes, _) = storage
+                let identity_bytes = storage
                     .identity()
                     .load_identity()
                     .map_err(|error| error.to_string())?

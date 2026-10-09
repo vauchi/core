@@ -311,9 +311,9 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     // ── identity (singleton id=1) ──────────────────────────────
     conn.execute(
         "INSERT OR REPLACE INTO identity \
-         (id, backup_data_encrypted, display_name, password_hash_encrypted, \
+         (id, backup_data_encrypted, password_hash_encrypted, \
           duress_hash_encrypted, created_at) \
-         VALUES (1, ?1, 'Alice', ?2, ?3, ?4)",
+         VALUES (1, ?1, ?2, ?3, ?4)",
         params![
             enc("identity", "backup_data_encrypted"),
             enc("identity", "password_hash_encrypted"),

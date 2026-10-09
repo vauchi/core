@@ -37,37 +37,33 @@ impl IdentityStore<'_> {
         self.clock.unix_seconds()
     }
     /// Saves identity backup data (encrypted).
-    pub fn save_identity(
-        &self,
-        backup_data: &[u8],
-        display_name: &str,
-    ) -> Result<(), StorageError> {
+    pub fn save_identity(&self, backup_data: &[u8]) -> Result<(), StorageError> {
         let encrypted = crate::crypto::encrypt(self.key, backup_data)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = self.now_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO identity (id, backup_data_encrypted, display_name, created_at) VALUES (1, ?1, ?2, ?3)",
-            params![encrypted, display_name, now as i64],
+            "INSERT OR REPLACE INTO identity (id, backup_data_encrypted, created_at) VALUES (1, ?1, ?2)",
+            params![encrypted, now as i64],
         )?;
 
         Ok(())
     }
-    /// Loads identity backup data (decrypted).
-    /// Returns (backup_data, display_name) if found.
-    pub fn load_identity(&self) -> Result<Option<(Vec<u8>, String)>, StorageError> {
+    /// Loads identity backup data (decrypted), which carries the display
+    /// name.
+    pub fn load_identity(&self) -> Result<Option<Vec<u8>>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT backup_data_encrypted, display_name FROM identity WHERE id = 1",
+            "SELECT backup_data_encrypted FROM identity WHERE id = 1",
             [],
-            |row| Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, String>(1)?)),
+            |row| row.get::<_, Vec<u8>>(0),
         );
 
         match result {
-            Ok((encrypted, display_name)) => {
+            Ok(encrypted) => {
                 let backup_data = crate::crypto::decrypt(self.key, &encrypted)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                Ok(Some((backup_data, display_name)))
+                Ok(Some(backup_data))
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),

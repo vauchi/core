@@ -265,7 +265,7 @@ fn test_save_load_app_password_roundtrip() {
     let backup_data = b"dummy-backup-data";
     storage
         .identity()
-        .save_identity(backup_data, "Test User")
+        .save_identity(backup_data)
         .expect("save identity should succeed");
 
     let password_config =
@@ -300,7 +300,7 @@ fn test_save_load_duress_password_roundtrip() {
     let backup_data = b"dummy-backup-data";
     storage
         .identity()
-        .save_identity(backup_data, "Test User")
+        .save_identity(backup_data)
         .expect("save identity should succeed");
 
     let mut password_config =
@@ -349,7 +349,7 @@ fn test_disable_duress_clears_data() {
     let backup_data = b"dummy-backup-data";
     storage
         .identity()
-        .save_identity(backup_data, "Test User")
+        .save_identity(backup_data)
         .expect("save identity should succeed");
 
     let mut password_config =

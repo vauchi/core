@@ -38,16 +38,11 @@ fn provider_contract_storage_save_load_identity() {
     let storage = Storage::open(dir.path().join("p.db").to_str().unwrap(), key).unwrap();
 
     let data = b"identity-backup-bytes".to_vec();
-    storage
-        .identity()
-        .save_identity(&data, "ProviderTest")
-        .unwrap();
+    storage.identity().save_identity(&data).unwrap();
 
     let loaded = storage.identity().load_identity().unwrap();
     assert!(loaded.is_some(), "expected Some value");
-    let (loaded_data, loaded_name) = loaded.unwrap();
-    assert_eq!(loaded_data, data);
-    assert_eq!(loaded_name, "ProviderTest");
+    assert_eq!(loaded.unwrap(), data);
 }
 
 // ============================================================

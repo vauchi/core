@@ -84,7 +84,7 @@ impl Vauchi {
         // Persist identity to storage so it survives restart
         self.storage
             .identity()
-            .save_identity(&identity.to_storage_bytes(), identity.display_name())?;
+            .save_identity(&identity.to_storage_bytes())?;
 
         // Fresh installs never need the field-centric grandfathering sweep —
         // every field they ever add starts under the hidden-by-default model
@@ -217,7 +217,7 @@ impl Vauchi {
         // password (2026-06-11-restore-identity-unloadable-after-restart).
         self.storage
             .identity()
-            .save_identity(&identity.to_storage_bytes(), &name)?;
+            .save_identity(&identity.to_storage_bytes())?;
 
         // Create contact card if none exists
         if self.storage.contacts().load_own_card()?.is_none() {
@@ -310,7 +310,7 @@ impl Vauchi {
         // (2026-06-11-restore-identity-unloadable-after-restart).
         self.storage
             .identity()
-            .save_identity(&identity.to_storage_bytes(), identity.display_name())?;
+            .save_identity(&identity.to_storage_bytes())?;
 
         // Restore own card
         if let Some(card) = &envelope.sections.own_card {
@@ -385,7 +385,7 @@ impl Vauchi {
         // encrypts at rest (ADR-015).
         self.storage
             .identity()
-            .save_identity(&identity.to_storage_bytes(), identity.display_name())?;
+            .save_identity(&identity.to_storage_bytes())?;
 
         // Persist the registry from the linking device so sync can address
         // the peer devices.
@@ -492,7 +492,7 @@ impl Vauchi {
         if self.identity.is_some() {
             return;
         }
-        if let Ok(Some((bytes, _display_name))) = self.storage.identity().load_identity()
+        if let Ok(Some(bytes)) = self.storage.identity().load_identity()
             && let Ok(identity) = Identity::from_storage_bytes(&bytes, self.clock.unix_seconds())
         {
             self.identity = Some(identity);

@@ -59,14 +59,14 @@ fn a_database_reopens_under_the_key_that_wrote_it() {
     let key = SymmetricKey::generate();
     {
         let storage = Storage::open(&path, key.clone()).unwrap();
-        storage.identity().save_identity(b"data", "Alice").unwrap();
+        storage.identity().save_identity(b"data").unwrap();
     }
 
     let storage = Storage::open(&path, key).unwrap();
 
     assert_eq!(
         storage.identity().load_identity().unwrap(),
-        Some((b"data".to_vec(), "Alice".to_string()))
+        Some(b"data".to_vec())
     );
 }
 
@@ -98,7 +98,7 @@ fn an_unchecked_database_is_refused_under_a_key_its_identity_does_not_decrypt_un
     let storage = Storage::open(&path, key).unwrap();
     assert_eq!(
         storage.identity().load_identity().unwrap(),
-        Some((b"identity backup".to_vec(), "Alice".to_string())),
+        Some(b"identity backup".to_vec()),
         "the refused key must not have been recorded as the database's key"
     );
 }
@@ -143,7 +143,7 @@ fn a_rekey_moves_the_check_to_the_new_key() {
     let new_key = SymmetricKey::generate();
     {
         let mut storage = Storage::open(&path, old_key.clone()).unwrap();
-        storage.identity().save_identity(b"data", "Alice").unwrap();
+        storage.identity().save_identity(b"data").unwrap();
         storage.rekey(new_key.clone()).unwrap();
     }
 
@@ -151,7 +151,7 @@ fn a_rekey_moves_the_check_to_the_new_key() {
     let storage = Storage::open(&path, new_key).unwrap();
     assert_eq!(
         storage.identity().load_identity().unwrap(),
-        Some((b"data".to_vec(), "Alice".to_string()))
+        Some(b"data".to_vec())
     );
 }
 
@@ -164,7 +164,7 @@ fn a_rekey_whose_commit_fails_leaves_the_old_key_valid() {
     let new_key = SymmetricKey::generate();
     {
         let mut storage = Storage::open(&path, old_key.clone()).unwrap();
-        storage.identity().save_identity(b"data", "Alice").unwrap();
+        storage.identity().save_identity(b"data").unwrap();
         storage.arm_commit_fault();
 
         assert!(matches!(
@@ -177,7 +177,7 @@ fn a_rekey_whose_commit_fails_leaves_the_old_key_valid() {
     let storage = Storage::open(&path, old_key).unwrap();
     assert_eq!(
         storage.identity().load_identity().unwrap(),
-        Some((b"data".to_vec(), "Alice".to_string()))
+        Some(b"data".to_vec())
     );
 }
 

@@ -19,26 +19,24 @@ fn create_test_storage() -> Storage {
 fn test_save_and_load_identity() {
     let storage = create_test_storage();
     let backup_data = b"encrypted identity backup data here";
-    let display_name = "Alice";
 
     assert!(!storage.identity().has_identity().unwrap());
     assert!(storage.identity().load_identity().unwrap().is_none());
 
     storage
         .identity()
-        .save_identity(backup_data, display_name)
+        .save_identity(backup_data)
         .expect("Should save identity");
 
     assert!(storage.identity().has_identity().unwrap());
 
-    let (loaded_data, loaded_name) = storage
+    let loaded_data = storage
         .identity()
         .load_identity()
         .unwrap()
         .expect("Should load identity");
 
     assert_eq!(loaded_data, backup_data);
-    assert_eq!(loaded_name, display_name);
 }
 
 // @internal
@@ -46,24 +44,17 @@ fn test_save_and_load_identity() {
 fn test_identity_replace_on_save() {
     let storage = create_test_storage();
 
-    storage
-        .identity()
-        .save_identity(b"first backup", "First Name")
-        .unwrap();
+    storage.identity().save_identity(b"first backup").unwrap();
 
-    storage
-        .identity()
-        .save_identity(b"second backup", "Second Name")
-        .unwrap();
+    storage.identity().save_identity(b"second backup").unwrap();
 
-    let (loaded_data, loaded_name) = storage
+    let loaded_data = storage
         .identity()
         .load_identity()
         .unwrap()
         .expect("Should load identity");
 
     assert_eq!(loaded_data, b"second backup");
-    assert_eq!(loaded_name, "Second Name");
 }
 
 // @internal
@@ -73,7 +64,7 @@ fn test_has_identity() {
 
     assert!(!storage.identity().has_identity().unwrap());
 
-    storage.identity().save_identity(b"data", "name").unwrap();
+    storage.identity().save_identity(b"data").unwrap();
 
     assert!(storage.identity().has_identity().unwrap());
 }
@@ -84,14 +75,11 @@ fn test_identity_encryption() {
     let storage = create_test_storage();
     let sensitive_data = b"this is very secret identity data";
 
-    storage
-        .identity()
-        .save_identity(sensitive_data, "User")
-        .unwrap();
+    storage.identity().save_identity(sensitive_data).unwrap();
 
     // Data should be encrypted in storage (the Storage implementation
     // encrypts before saving and decrypts on load)
-    let (loaded, _) = storage.identity().load_identity().unwrap().unwrap();
+    let loaded = storage.identity().load_identity().unwrap().unwrap();
     assert_eq!(loaded, sensitive_data);
 }
 
@@ -117,10 +105,7 @@ fn test_load_password_config_no_identity() {
 #[test]
 fn test_load_password_config_no_password_set() {
     let storage = create_test_storage();
-    storage
-        .identity()
-        .save_identity(b"backup data", "Alice")
-        .unwrap();
+    storage.identity().save_identity(b"backup data").unwrap();
 
     // Identity exists but password columns are NULL
     let config = storage.identity().load_password_config().unwrap();
@@ -133,10 +118,7 @@ fn test_load_password_config_no_password_set() {
 #[test]
 fn test_save_load_app_password() {
     let storage = create_test_storage();
-    storage
-        .identity()
-        .save_identity(b"backup data", "Alice")
-        .unwrap();
+    storage.identity().save_identity(b"backup data").unwrap();
 
     let hash = [0x42u8; 32];
     let salt = [0xABu8; 16];
@@ -161,10 +143,7 @@ fn test_save_load_app_password() {
 #[test]
 fn test_save_duress_password() {
     let storage = create_test_storage();
-    storage
-        .identity()
-        .save_identity(b"backup data", "Alice")
-        .unwrap();
+    storage.identity().save_identity(b"backup data").unwrap();
 
     let hash = [0x42u8; 32];
     let salt = [0xABu8; 16];
@@ -195,10 +174,7 @@ fn test_save_duress_password() {
 #[test]
 fn test_disable_duress() {
     let storage = create_test_storage();
-    storage
-        .identity()
-        .save_identity(b"backup data", "Alice")
-        .unwrap();
+    storage.identity().save_identity(b"backup data").unwrap();
 
     storage
         .identity()
@@ -226,10 +202,7 @@ fn test_disable_duress() {
 #[test]
 fn test_update_app_password() {
     let storage = create_test_storage();
-    storage
-        .identity()
-        .save_identity(b"backup data", "Alice")
-        .unwrap();
+    storage.identity().save_identity(b"backup data").unwrap();
 
     let hash1 = [0x11u8; 32];
     let salt1 = [0xAAu8; 16];

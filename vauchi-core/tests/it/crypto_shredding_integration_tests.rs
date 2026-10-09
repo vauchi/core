@@ -219,14 +219,11 @@ fn test_storage_keyed_by_sek() {
     let storage = Storage::open(&db_path, sek).unwrap();
 
     let backup_data = identity.signing_public_key().to_vec();
-    storage
-        .identity()
-        .save_identity(&backup_data, identity.display_name())
-        .unwrap();
+    storage.identity().save_identity(&backup_data).unwrap();
 
     let loaded = storage.identity().load_identity().unwrap();
     assert!(loaded.is_some(), "Identity should be loadable");
-    let (loaded_data, _) = loaded.unwrap();
+    let loaded_data = loaded.unwrap();
     assert_eq!(loaded_data, backup_data, "Loaded data should match saved");
 
     // Different SEK cannot read the same data correctly

@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 75] = [
+const MIGRATIONS: [Migration; 76] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -647,7 +647,17 @@ const MIGRATIONS: [Migration; 75] = [
         name: "storage_key_check",
         action: MigrationAction::Sql(MIGRATION_V75_STORAGE_KEY_CHECK),
     },
+    Migration {
+        version: 76,
+        name: "drop_identity_display_name",
+        action: MigrationAction::Sql(MIGRATION_V76_DROP_IDENTITY_DISPLAY_NAME),
+    },
 ];
+
+/// Migration v76: the identity's display name is already inside
+/// `backup_data_encrypted`, so the plaintext copy goes (vauchi/private#579).
+const MIGRATION_V76_DROP_IDENTITY_DISPLAY_NAME: &str =
+    "ALTER TABLE identity DROP COLUMN display_name;";
 
 /// Migration v75: one row proving which key the data is encrypted with
 /// (vauchi/private#580).

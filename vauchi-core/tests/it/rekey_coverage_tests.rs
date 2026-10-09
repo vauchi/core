@@ -145,7 +145,7 @@ fn test_rekey_preserves_password_hash() {
     let test_hash = vauchi_core::crypto::encrypt(&key1, b"argon2id-hash-placeholder").unwrap();
     let backup_enc = vauchi_core::crypto::encrypt(&key1, b"backup-data").unwrap();
     storage.connection().execute(
-        "INSERT OR REPLACE INTO identity (id, backup_data_encrypted, display_name, password_hash_encrypted, created_at) VALUES (1, ?1, 'test', ?2, 1000)",
+        "INSERT OR REPLACE INTO identity (id, backup_data_encrypted, password_hash_encrypted, created_at) VALUES (1, ?1, ?2, 1000)",
         rusqlite::params![backup_enc, test_hash],
     ).unwrap();
 

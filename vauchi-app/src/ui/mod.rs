@@ -69,6 +69,7 @@ mod rejection;
 pub mod render_context;
 mod screen;
 mod settings;
+mod storage_lock;
 mod support;
 mod tag_promotion;
 mod tags_list;
@@ -119,6 +120,7 @@ pub use deep_link_consent::{
 };
 pub use delivery::{DeliveryItem, DeliveryStatusEngine};
 pub use demo_presentation::DemoPresentationEngine;
+pub use storage_lock::{StorageLockPresentation, StorageLockReason, StorageLockStep};
 
 mod presentation_contract_fixture;
 mod screen_catalog_fixture;

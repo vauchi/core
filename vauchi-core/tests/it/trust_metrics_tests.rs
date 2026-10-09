@@ -91,9 +91,10 @@ fn exchange_transport_audio_serde_roundtrip() {
     assert_eq!(deserialized, ExchangeTransport::Audio);
 }
 
+// The column default `'Qr'` parses only through these aliases.
 // @internal
 #[test]
-fn exchange_transport_legacy_pascal_case_deserializes() {
+fn exchange_transport_pascal_case_deserializes() {
     let qr: ExchangeTransport = serde_json::from_str(r#""Qr""#).expect("legacy Qr");
     assert_eq!(qr, ExchangeTransport::Qr);
     let nfc: ExchangeTransport = serde_json::from_str(r#""Nfc""#).expect("legacy Nfc");

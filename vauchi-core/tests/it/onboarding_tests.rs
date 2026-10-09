@@ -260,52 +260,28 @@ fn test_reset_clears_all_progress() {
     assert!(!progress.is_complete());
 }
 
-// @scenario: onboarding:serde_backward_compat
+// Retired step names are not read back (vauchi/private#573).
+// @internal
 #[test]
-fn test_serde_backward_compat_aliases() {
-    let old_json = r#"{"current_step":"CreateIdentity","completed_steps":["AddFields"],"started_at":1000,"completed_at":null,"skipped_backup":false}"#;
-    let progress = OnboardingProgress::from_json(old_json).expect("Old JSON should deserialize");
-    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
-    assert!(
-        progress
-            .completed_steps
-            .contains(&OnboardingStep::ContactInfo)
-    );
-
-    // Re-serialization must use canonical names, not aliases
-    let re_serialized = progress.to_json().expect("Re-serialization should succeed");
-    assert!(
-        re_serialized.contains("DefaultName"),
-        "Canonical name must be serialized"
-    );
-    assert!(
-        re_serialized.contains("ContactInfo"),
-        "Canonical name must be serialized"
-    );
-    assert!(
-        !re_serialized.contains("CreateIdentity"),
-        "Old alias must not appear in new JSON"
-    );
-    assert!(
-        !re_serialized.contains("AddFields"),
-        "Old alias must not appear in new JSON"
-    );
-}
-
-// @scenario: onboarding:serde_backward_compat_no_identity_check
-#[test]
-fn test_serde_backward_compat_old_json_without_identity_check() {
-    // Users who started onboarding before IdentityCheck was added have
-    // persisted JSON with "current_step": "Welcome". This now maps to
-    // DefaultName after the 5-step flow change.
-    let old_json = r#"{"current_step":"Welcome","completed_steps":[],"started_at":1000,"completed_at":null,"skipped_backup":false}"#;
-    let progress = OnboardingProgress::from_json(old_json).expect("Old JSON should deserialize");
-    assert_eq!(
-        progress.current_step(),
-        OnboardingStep::DefaultName,
-        "Old JSON starting at Welcome must deserialize to DefaultName"
-    );
-    assert!(progress.completed_steps.is_empty());
+fn retired_onboarding_step_names_are_refused() {
+    for retired in [
+        "CreateIdentity",
+        "Welcome",
+        "SkipGate",
+        "AddFields",
+        "PreviewCard",
+        "SecurityExplanation",
+        "BackupPrompt",
+        "Ready",
+    ] {
+        let json = format!(
+            r#"{{"current_step":"{retired}","completed_steps":[],"started_at":1000,"completed_at":null,"skipped_backup":false}}"#
+        );
+        assert!(
+            OnboardingProgress::from_json(&json).is_err(),
+            "{retired} must not parse"
+        );
+    }
 }
 
 // @scenario: onboarding:json_serialization_roundtrip (#25)

@@ -28,6 +28,8 @@ pub enum ExchangeTransport {
     /// QR exchange: both sides display and scan QR codes.
     /// Both use fresh ephemeral X25519 keys for full forward secrecy.
     #[default]
+    // WHY: `contacts.exchange_transport` is `NOT NULL DEFAULT 'Qr'`, so a row
+    // written without the column parses only through these aliases.
     #[serde(alias = "Qr")]
     Qr,
     /// NFC Active (phone-to-phone tap): single tap replaces scan + proximity.

@@ -28,16 +28,13 @@ pub enum OnboardingStep {
     /// identity (scan the QR code or open the invitation link from the
     /// other device). Reached from `IdentityCheck` via `link_device`.
     DeviceLinkInstructions,
-    /// Default display name entry (renamed from CreateIdentity)
-    #[serde(alias = "CreateIdentity", alias = "Welcome", alias = "SkipGate")]
+    /// Default display name entry
     DefaultName,
     /// Groups setup: create contact groups
     GroupsSetup,
-    /// Contact info fields (phone, email) (renamed from AddFields)
-    #[serde(alias = "AddFields", alias = "PreviewCard")]
+    /// Contact info fields (phone, email)
     ContactInfo,
     /// Choose what to do after onboarding
-    #[serde(alias = "SecurityExplanation", alias = "BackupPrompt", alias = "Ready")]
     WhatNext,
     /// Password entry for backup restore (after the user has picked the
     /// encrypted backup file via [`crate::exchange::Command::

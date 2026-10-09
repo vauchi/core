@@ -15,7 +15,6 @@ use super::{Group, GroupError, MAX_LABELS, ResolvedPresentation};
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct GroupManager {
     /// Groups indexed by ID.
-    #[serde(alias = "labels")]
     groups: HashMap<String, Group>,
     /// Per-contact overrides: contact_id -> (field_id -> is_visible).
     /// These take precedence over group-based visibility.

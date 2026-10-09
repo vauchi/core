@@ -157,6 +157,44 @@ fn collect_pae_pub_fn_names(dir: &Path) -> BTreeSet<String> {
     names
 }
 
+/// Like [`collect_pae_pub_fn_names`], but only blocks whose line before
+/// `impl PlatformAppEngine {` is `#[uniffi::export]`: the methods a binding
+/// actually sees (vauchi/private#583).
+fn collect_exported_pae_pub_fn_names(dir: &Path) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let entries = fs::read_dir(dir).unwrap_or_else(|e| panic!("read_dir {}: {e}", dir.display()));
+    for entry in entries {
+        let path = entry.expect("dir entry").path();
+        if path.extension().and_then(|s| s.to_str()) != Some("rs") {
+            continue;
+        }
+        let source =
+            fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let mut in_exported = false;
+        let mut previous = "";
+        for line in source.lines() {
+            if line.starts_with("impl PlatformAppEngine {") {
+                in_exported = previous == "#[uniffi::export]";
+            } else if line.starts_with("impl ") || line.starts_with('}') {
+                in_exported = false;
+            } else if in_exported
+                && line != line.trim_start()
+                && let Some(rest) = line.trim_start().strip_prefix("pub fn ")
+            {
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                    .collect();
+                names.insert(name);
+            }
+            if !line.trim().is_empty() {
+                previous = line;
+            }
+        }
+    }
+    names
+}
+
 fn classify(names: &BTreeSet<String>) -> (Vec<String>, Vec<String>) {
     let allowed: BTreeSet<&str> = HUMBLE_ALLOWLIST.iter().copied().collect();
     let mut humble = Vec::new();
@@ -499,5 +537,25 @@ fn peer_uniffi_objects_count_matches_allowlist() {
          A struct was deleted but the allowlist still references it. \
          Remove the dead entry from PERMITTED_UNIFFI_OBJECTS in this \
          file."
+    );
+}
+
+// @internal
+#[test]
+fn every_allowlisted_method_is_exported_to_the_bindings() {
+    // A `pub fn` that leaves its `#[uniffi::export]` block still counts in
+    // the allowlist checks above, yet vanishes from Kotlin and Swift
+    // (vauchi/private#583).
+    let exported = collect_exported_pae_pub_fn_names(&platform_src_dir());
+
+    let missing: Vec<&str> = HUMBLE_ALLOWLIST
+        .iter()
+        .copied()
+        .filter(|name| !exported.contains(*name))
+        .collect();
+
+    assert!(
+        missing.is_empty(),
+        "allowlisted PlatformAppEngine methods outside any #[uniffi::export] block: {missing:?}"
     );
 }

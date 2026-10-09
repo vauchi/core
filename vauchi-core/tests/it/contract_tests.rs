@@ -69,7 +69,7 @@ fn embedded_networks_json_parses_successfully() {
 // @internal
 #[test]
 fn locale_files_are_valid_json() {
-    let locales_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../locales");
+    let locales_dir = crate::common::locales_dir();
     if !locales_dir.exists() {
         eprintln!("SKIP: locales/ sibling repo not found");
         return;

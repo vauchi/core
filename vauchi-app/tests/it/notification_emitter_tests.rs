@@ -317,7 +317,7 @@ fn card_update_default_prefs_are_on() {
 // @internal
 #[test]
 fn card_update_body_localizes_to_german() {
-    let bytes = std::fs::read("../../locales/de.json")
+    let bytes = std::fs::read(crate::i18n_support::locales_dir().join("de.json"))
         .expect("locales checkout present as sibling repo (CI: .clone-locales)");
     vauchi_app::i18n::load_locale_from_bytes("de", &bytes).expect("German locale parses");
 

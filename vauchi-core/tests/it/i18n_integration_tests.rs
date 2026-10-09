@@ -24,13 +24,9 @@ static INIT: Once = Once::new();
 
 /// Resolves the sibling locales/ repo.
 ///
-/// Prefers `VAUCHI_LOCALES_DIR` (an absolute path exported by CI and the
-/// mutation job) so the path survives cargo-mutants' relocated source tree;
-/// a `CARGO_MANIFEST_DIR`-relative fallback covers plain local runs.
+/// See [`crate::common::locales_dir`].
 fn locales_dir() -> PathBuf {
-    std::env::var_os("VAUCHI_LOCALES_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales"))
+    crate::common::locales_dir()
 }
 
 fn ensure_init() {

@@ -49,7 +49,10 @@ pub fn init_fixture_i18n() {
         .find(|candidate| candidate.join("en.json").is_file())
         .expect("fixture tests require the bundled English locale");
     vauchi_app::i18n::init(&locales_dir).expect("load production locale strings");
-    let german = std::fs::read(manifest_dir.join("../../locales/de.json"))
+    let sibling_locales = std::env::var_os("VAUCHI_LOCALES_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| manifest_dir.join("../../locales"));
+    let german = std::fs::read(sibling_locales.join("de.json"))
         .expect("locales checkout present as sibling repo (CI: .clone-locales)");
     vauchi_app::i18n::load_locale_from_bytes("de", &german).expect("German locale parses");
 }

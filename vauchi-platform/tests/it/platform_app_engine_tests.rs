@@ -431,7 +431,7 @@ fn nav_items_mobile_german_labels_differ_from_english_once_locales_loaded() {
     // the bundled JSON files — without that, `get_string` falls back to
     // the compile-time-bundled English map. This test exercises the
     // intended production path: init locales, then ask for German.
-    let locales_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
+    let locales_dir = crate::support::locales_dir();
     vauchi_platform::init_locales(locales_dir.to_string_lossy().to_string()).expect("init_locales");
 
     let (engine, _dir) = create_engine();

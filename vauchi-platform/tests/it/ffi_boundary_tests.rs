@@ -21,13 +21,7 @@ use vauchi_platform::{
 static INIT: Once = Once::new();
 fn ensure_init() {
     INIT.call_once(|| {
-        // VAUCHI_LOCALES_DIR first, as vauchi-app/build.rs does: cargo-mutants
-        // builds a temp copy where the sibling ../../locales does not exist.
-        let locales_dir = std::env::var_os("VAUCHI_LOCALES_DIR")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| {
-                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales")
-            });
+        let locales_dir = crate::support::locales_dir();
         let _ = vauchi_app::i18n::init(&locales_dir);
     });
 }

@@ -11,7 +11,7 @@ use vauchi_app::i18n::{Locale, load_locale_from_bytes};
 use vauchi_app::ui::{UiFieldVisibility, visibility_label};
 
 fn load_locale(code: &str, file: &str) {
-    let bytes = std::fs::read(format!("../../locales/{file}"))
+    let bytes = std::fs::read(crate::i18n_support::locales_dir().join(file))
         .expect("locales checkout present as sibling repo (CI: .clone-locales)");
     load_locale_from_bytes(code, &bytes).expect("locale parses");
 }

@@ -22,7 +22,7 @@ use vauchi_app::ui::{Component, ScreenModel};
 /// `.clone-locales` template places the checkout as a sibling of core,
 /// at the same relative path `build.rs` bundles English from.
 pub fn load_german() {
-    let bytes = std::fs::read("../../locales/de.json")
+    let bytes = std::fs::read(locales_dir().join("de.json"))
         .expect("locales checkout present as sibling repo (CI: .clone-locales)");
     load_locale_from_bytes("de", &bytes).expect("German locale parses");
 }
@@ -87,4 +87,15 @@ pub fn assert_all_translated(pairs: &[(&str, String, String)]) {
     for (field, translated, english) in pairs {
         assert_translated(field, translated, english);
     }
+}
+
+/// The sibling `locales` checkout. Prefers `VAUCHI_LOCALES_DIR` (exported by
+/// CI and `just mutants-diff`) because cargo-mutants builds a temp copy where
+/// the relative sibling does not exist.
+pub fn locales_dir() -> std::path::PathBuf {
+    std::env::var_os("VAUCHI_LOCALES_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales")
+        })
 }

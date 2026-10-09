@@ -519,3 +519,70 @@ fn the_first_screen_after_unlocking_carries_a_profile_from_the_reported_environm
     );
     assert_eq!(profiled_surface(&opened), Some(surface(&opened)));
 }
+
+/// An onboarded install with an app password and a duress PIN set up.
+fn onboarded_with_duress(dir: &tempfile::TempDir) -> ControlledKeychain {
+    use vauchi_platform::DomainCommand;
+    let keychain = ControlledKeychain::new(SharedKeychain::new());
+    let engine = open(dir, &keychain);
+    drive_onboarding(&engine);
+    engine
+        .dispatch_domain_command(DomainCommand::SetupAppPassword {
+            password: "123456".into(),
+        })
+        .expect("app password");
+    engine
+        .dispatch_domain_command(DomainCommand::SetupDuressPassword {
+            duress_password: "654321".into(),
+        })
+        .expect("duress pin");
+    keychain
+}
+
+fn authentication_requirement(batch: &Value) -> Option<String> {
+    batch["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|c| c.get("SetAuthenticationRequirement"))
+        .and_then(|set| set["requirement"].as_str())
+        .map(str::to_owned)
+}
+
+// @internal
+#[test]
+fn a_prompt_that_opens_storage_asks_for_the_app_password_when_a_duress_pin_is_set_up() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded_with_duress(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine.initial_commands_json().unwrap();
+
+    keychain.locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine);
+
+    assert_eq!(
+        authentication_requirement(&opened).as_deref(),
+        Some("app_password"),
+        "got {opened}"
+    );
+}
+
+// @internal
+#[test]
+fn a_prompt_that_opens_storage_unlocks_when_no_duress_pin_is_set_up() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine.initial_commands_json().unwrap();
+
+    keychain.locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine);
+
+    assert_eq!(
+        authentication_requirement(&opened).as_deref(),
+        Some("unlocked"),
+        "got {opened}"
+    );
+}

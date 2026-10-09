@@ -5,13 +5,10 @@
 //! AppEngine C ABI functions.
 
 use std::os::raw::c_char;
-#[cfg(feature = "secure-storage")]
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use vauchi_app::ui::*;
 use vauchi_core::api::Vauchi;
-#[cfg(feature = "secure-storage")]
 use vauchi_core::storage::SecureStorage;
 use vauchi_core::storage::local_keys::load_or_generate_fallback_key;
 
@@ -24,6 +21,22 @@ pub(crate) fn open_with_file_fallback(
 ) -> Option<Vauchi> {
     let storage_key = load_or_generate_fallback_key(data_path).ok()?;
     Vauchi::new(config.with_storage_key(storage_key)).ok()
+}
+
+/// Opens under the platform keyring when it answers, otherwise under the
+/// durable file-backed key.
+pub(crate) fn open_with_keyring(
+    data_path: &std::path::Path,
+    config: vauchi_core::api::VauchiConfig,
+    keyring: Option<Arc<dyn SecureStorage>>,
+) -> Option<Vauchi> {
+    if let Some(keyring) = keyring
+        && keyring.load_key("_probe").is_ok()
+        && let Ok(vauchi) = Vauchi::with_secure_storage(config.clone(), keyring)
+    {
+        return Some(vauchi);
+    }
+    open_with_file_fallback(data_path, config)
 }
 
 /// Create a new AppEngine with in-memory storage and default relay.
@@ -729,30 +742,20 @@ pub unsafe extern "C" fn vauchi_app_create_with_keyring(
             config = config.with_relay_url(url);
         }
 
-        // Try platform keyring first, then use a durable file-backed key.
         #[cfg(feature = "secure-storage")]
-        {
-            let keyring = Arc::new(vauchi_core::storage::PlatformKeyring::new("vauchi"));
-            // Probe the keyring to see if it's functional
-            if keyring.load_key("_probe").is_ok()
-                && let Ok(vauchi) = Vauchi::with_secure_storage(config.clone(), keyring)
-            {
-                return Box::into_raw(Box::new(VauchiApp {
-                    engine: Mutex::new(AppEngine::new(vauchi)),
-                    event_handler_id: Mutex::new(None),
-                }));
-            }
+        let keyring: Option<Arc<dyn SecureStorage>> = Some(Arc::new(
+            vauchi_core::storage::PlatformKeyring::new("vauchi"),
+        ));
+        #[cfg(not(feature = "secure-storage"))]
+        let keyring: Option<Arc<dyn SecureStorage>> = None;
+
+        match open_with_keyring(&data_path, config, keyring) {
+            Some(vauchi) => Box::into_raw(Box::new(VauchiApp {
+                engine: Mutex::new(AppEngine::new(vauchi)),
+                event_handler_id: Mutex::new(None),
+            })),
+            None => std::ptr::null_mut(),
         }
-
-        let vauchi = match open_with_file_fallback(&data_path, config) {
-            Some(v) => v,
-            None => return std::ptr::null_mut(),
-        };
-
-        Box::into_raw(Box::new(VauchiApp {
-            engine: Mutex::new(AppEngine::new(vauchi)),
-            event_handler_id: Mutex::new(None),
-        }))
     })) {
         Ok(result) => result,
         Err(_) => std::ptr::null_mut(),

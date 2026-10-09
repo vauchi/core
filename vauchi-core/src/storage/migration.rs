@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 79] = [
+const MIGRATIONS: [Migration; 80] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -667,6 +667,11 @@ const MIGRATIONS: [Migration; 79] = [
         name: "encrypt_contact_relay_url",
         action: MigrationAction::Callback(migrate_v79_encrypt_contact_relay_url),
     },
+    Migration {
+        version: 80,
+        name: "encrypt_contact_vcard_uid",
+        action: MigrationAction::Callback(migrate_v80_encrypt_contact_vcard_uid),
+    },
 ];
 
 /// Migration v76: the identity's display name is already inside
@@ -721,6 +726,41 @@ fn migrate_v79_encrypt_contact_relay_url(
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
     encrypt_text_column_in_place(conn, key, "contacts", "relay_url", "relay_url_encrypted")
+}
+
+/// Migration v80: an imported contact's vCard UID moves to
+/// `original_uid_encrypted`, with `original_uid_hmac` for the duplicate-import
+/// lookup (vauchi/private#579).
+fn migrate_v80_encrypt_contact_vcard_uid(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    use super::lookup::{CONTACT_UID_LOOKUP_DOMAIN, lookup_hmac};
+    add_column_if_not_exists(conn, "contacts", "original_uid_hmac", "BLOB")?;
+    let uids: Vec<(String, String)> = conn
+        .prepare("SELECT id, original_uid FROM contacts WHERE original_uid IS NOT NULL")
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .map_err(|e| StorageError::Migration(format!("Read vCard UIDs: {e}")))?;
+    for (id, uid) in &uids {
+        conn.execute(
+            "UPDATE contacts SET original_uid_hmac = ?1 WHERE id = ?2",
+            rusqlite::params![
+                lookup_hmac(key, CONTACT_UID_LOOKUP_DOMAIN, uid.as_bytes()),
+                id
+            ],
+        )
+        .map_err(|e| StorageError::Migration(format!("Hash vCard UID {id}: {e}")))?;
+    }
+    encrypt_text_column_in_place(
+        conn,
+        key,
+        "contacts",
+        "original_uid",
+        "original_uid_encrypted",
+    )
 }
 
 /// from the migration ledger, never input.

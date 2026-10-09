@@ -57,10 +57,10 @@ impl ContactStore<'_> {
               blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted,
               exchange_transport, has_recovered, card_updated_at,
               relay_url_encrypted, trust_metrics,
-              contact_kind, import_source, imported_at, original_uid,
+              contact_kind, import_source, imported_at, original_uid_encrypted, original_uid_hmac,
               deleted_at, archived, archived_at, ignored, ignored_at,
               reciprocity, confirmation_channel)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31)
              ON CONFLICT(id) DO UPDATE SET
                public_key              = excluded.public_key,
                card_encrypted          = excluded.card_encrypted,
@@ -82,7 +82,8 @@ impl ContactStore<'_> {
                contact_kind            = excluded.contact_kind,
                import_source           = excluded.import_source,
                imported_at             = excluded.imported_at,
-               original_uid            = excluded.original_uid,
+               original_uid_encrypted  = excluded.original_uid_encrypted,
+               original_uid_hmac       = excluded.original_uid_hmac,
                deleted_at              = excluded.deleted_at,
                archived                = excluded.archived,
                archived_at             = excluded.archived_at,
@@ -113,7 +114,8 @@ impl ContactStore<'_> {
                 row.contact_kind,
                 row.import_source,
                 row.imported_at,
-                row.original_uid,
+                row.original_uid_encrypted,
+                row.original_uid_hmac,
                 row.deleted_at,
                 row.archived,
                 row.archived_at,
@@ -258,9 +260,14 @@ impl ContactStore<'_> {
     /// Returns `Some(contact_id)` if a contact with the given UID exists,
     /// `None` otherwise. Only searches imported contacts (`contact_kind = 'imported'`).
     pub fn find_imported_by_uid(&self, uid: &str) -> Result<Option<String>, StorageError> {
+        let uid_hmac = crate::storage::lookup::lookup_hmac(
+            self.key,
+            crate::storage::lookup::CONTACT_UID_LOOKUP_DOMAIN,
+            uid.as_bytes(),
+        );
         let result = self.conn.query_row(
-            "SELECT id FROM contacts WHERE original_uid = ?1 AND contact_kind = 'imported' LIMIT 1",
-            params![uid],
+            "SELECT id FROM contacts WHERE original_uid_hmac = ?1 AND contact_kind = 'imported' LIMIT 1",
+            params![uid_hmac],
             |row| row.get::<_, String>(0),
         );
         match result {

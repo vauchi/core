@@ -89,6 +89,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("decoy_contacts", "display_name_encrypted"),
     ("contacts", "last_sent_display_name_encrypted"),
     ("contacts", "relay_url_encrypted"),
+    ("contacts", "original_uid_encrypted"),
+    ("contacts", "original_uid_hmac"),
     // V22 emergency config
     ("emergency_config", "trusted_contact_ids_encrypted"),
     ("emergency_config", "message_encrypted"),
@@ -337,6 +339,7 @@ impl Storage {
                 "last_sent_display_name_encrypted",
             )?;
             self.rekey_nullable_column(old_key, &new_key, "contacts", "relay_url_encrypted")?;
+            self.rekey_contact_vcard_uids(old_key, &new_key)?;
             report(&mut completed, "exchange_location");
 
             super::key_check::rewrite(&self.conn, &new_key)
@@ -554,6 +557,37 @@ impl Storage {
                     params![new_enc, rowid],
                 )
                 .map_err(|e| StorageError::Migration(format!("Update {table}.{column}: {e}")))?;
+        }
+        Ok(())
+    }
+
+    /// Re-encrypt imported contacts' vCard UIDs and recompute their lookup
+    /// hashes under the new key (vauchi/private#579).
+    fn rekey_contact_vcard_uids(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        use super::lookup::{CONTACT_UID_LOOKUP_DOMAIN, lookup_hmac};
+        let rows: Vec<(String, Vec<u8>)> = self
+            .conn
+            .prepare("SELECT id, original_uid_encrypted FROM contacts WHERE original_uid_encrypted IS NOT NULL")
+            .and_then(|mut stmt| {
+                stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .map_err(|e| StorageError::Migration(format!("Read vCard UIDs: {e}")))?;
+        for (id, enc) in &rows {
+            let uid = decrypt(old_key, enc)
+                .map_err(|e| StorageError::Migration(format!("Decrypt vCard UID {id}: {e}")))?;
+            let new_enc = encrypt(new_key, &uid)
+                .map_err(|e| StorageError::Migration(format!("Encrypt vCard UID {id}: {e}")))?;
+            self.conn
+                .execute(
+                    "UPDATE contacts SET original_uid_encrypted = ?1, original_uid_hmac = ?2 WHERE id = ?3",
+                    params![new_enc, lookup_hmac(new_key, CONTACT_UID_LOOKUP_DOMAIN, &uid), id],
+                )
+                .map_err(|e| StorageError::Migration(format!("Update vCard UID {id}: {e}")))?;
         }
         Ok(())
     }

@@ -260,6 +260,16 @@ fn the_vcard_uid_lookup_survives_a_rekey() {
             .as_deref(),
         Some("imp1")
     );
+    let loaded = storage.contacts().load_contact("imp1").unwrap().unwrap();
+    assert_eq!(
+        loaded
+            .kind()
+            .imported_data()
+            .unwrap()
+            .original_uid
+            .as_deref(),
+        Some("uid-123")
+    );
 }
 
 // @internal

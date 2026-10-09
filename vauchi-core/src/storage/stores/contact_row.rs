@@ -17,7 +17,7 @@ use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::types::ExchangeTransport;
 
 /// Columns `ContactRow::from_row` reads, for every contact SELECT.
-pub(super) const CONTACT_COLUMNS: &str = "id, public_key, card_encrypted, shared_key_encrypted, visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted, exchange_transport, has_recovered, card_updated_at, relay_url_encrypted, trust_metrics, contact_kind, import_source, imported_at, original_uid, deleted_at, archived, archived_at, ignored, ignored_at, reciprocity, confirmation_channel";
+pub(super) const CONTACT_COLUMNS: &str = "id, public_key, card_encrypted, shared_key_encrypted, visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted, exchange_transport, has_recovered, card_updated_at, relay_url_encrypted, trust_metrics, contact_kind, import_source, imported_at, original_uid_encrypted, deleted_at, archived, archived_at, ignored, ignored_at, reciprocity, confirmation_channel";
 
 /// Internal struct for database row data.
 #[allow(dead_code)] // Fields are used via destructuring in row_to_contact
@@ -43,7 +43,8 @@ pub(super) struct ContactRow {
     pub contact_kind: String,
     pub import_source: Option<String>,
     pub imported_at: Option<i64>,
-    pub original_uid: Option<String>,
+    pub original_uid_encrypted: Option<Vec<u8>>,
+    pub original_uid_hmac: Option<Vec<u8>>,
     pub deleted_at: Option<i64>,
     pub archived: i32,
     pub archived_at: Option<i64>,
@@ -77,7 +78,8 @@ impl ContactRow {
             contact_kind: row.get("contact_kind")?,
             import_source: row.get("import_source")?,
             imported_at: row.get("imported_at")?,
-            original_uid: row.get("original_uid")?,
+            original_uid_encrypted: row.get("original_uid_encrypted")?,
+            original_uid_hmac: None,
             deleted_at: row.get("deleted_at")?,
             archived: row.get("archived")?,
             archived_at: row.get("archived_at")?,
@@ -175,6 +177,13 @@ impl ContactStore<'_> {
                 None,
             )
         } else if let Some(imp) = contact.kind().imported_data() {
+            let uid = imp.original_uid.as_deref();
+            let uid_encrypted = uid
+                .map(|uid| {
+                    crate::crypto::encrypt(self.key, uid.as_bytes())
+                        .map_err(|e| StorageError::Encryption(e.to_string()))
+                })
+                .transpose()?;
             let source_str = serde_json::to_string(&imp.source)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
@@ -193,7 +202,7 @@ impl ContactStore<'_> {
                 "imported".to_string(),
                 Some(source_str),
                 Some(imp.imported_at as i64),
-                imp.original_uid.clone(),
+                uid_encrypted,
             )
         } else {
             return Err(StorageError::Serialization("Unknown contact kind".into()));
@@ -239,7 +248,18 @@ impl ContactStore<'_> {
             contact_kind,
             import_source,
             imported_at,
-            original_uid,
+            original_uid_encrypted: original_uid,
+            original_uid_hmac: contact
+                .kind()
+                .imported_data()
+                .and_then(|imp| imp.original_uid.as_deref())
+                .map(|uid| {
+                    crate::storage::lookup::lookup_hmac(
+                        self.key,
+                        crate::storage::lookup::CONTACT_UID_LOOKUP_DOMAIN,
+                        uid.as_bytes(),
+                    )
+                }),
             deleted_at: contact.deleted_at().map(|t| t as i64),
             archived: contact.is_archived() as i32,
             archived_at: contact.archived_at().map(|t| t as i64),
@@ -303,8 +323,16 @@ impl ContactStore<'_> {
 
         let imported_at = row.imported_at.unwrap_or(0) as u64;
 
+        let original_uid = row
+            .original_uid_encrypted
+            .map(|ciphertext| {
+                let plain = crate::crypto::decrypt(self.key, &ciphertext)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                String::from_utf8(plain).map_err(|e| StorageError::Serialization(e.to_string()))
+            })
+            .transpose()?;
         let mut contact =
-            Contact::from_import_stored(row.id, card, source, imported_at, row.original_uid);
+            Contact::from_import_stored(row.id, card, source, imported_at, original_uid);
 
         if row.blocked != 0 {
             contact.set_blocked(true);

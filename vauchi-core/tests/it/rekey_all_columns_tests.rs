@@ -1004,6 +1004,10 @@ fn rekey_is_idempotent_under_repeated_calls() {
 /// "every column" claim cannot silently go stale again (it had, for seven
 /// columns, until vauchi/private#522).
 const COVERED_ELSEWHERE: &[(&str, &str)] = &[
+    // the_vcard_uid_lookup_survives_a_rekey in
+    // identifying_columns_at_rest_tests.rs (value and lookup hash).
+    ("contacts", "original_uid_encrypted"),
+    ("contacts", "original_uid_hmac"),
     // test_rekey_preserves_label_bio_and_avatar_overrides in
     // rekey_coverage_tests.rs.
     ("visibility_labels", "avatar_override_encrypted"),

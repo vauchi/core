@@ -171,13 +171,14 @@ impl PlatformAppEngine {
         if matches!(event, Event::PresentationEnvironmentChanged { .. }) {
             start.pending.environment = Some(event.clone());
         }
+        let prompt_succeeded = matches!(event, Event::BiometricUnlockSucceeded);
         let outcome = match start.presentation.dispatch(event) {
             StorageLockStep::Commands(commands) => return Ok(Some(commands)),
-            StorageLockStep::RetryOpen => self.retry_open(&mut locked),
+            StorageLockStep::RetryOpen => self.retry_open(&mut locked, prompt_succeeded),
             StorageLockStep::StartOverConfirmed => start
                 .params
                 .delete_unreadable_data()
-                .and_then(|()| self.retry_open(&mut locked)),
+                .and_then(|()| self.retry_open(&mut locked, false)),
         };
         // ADR-045: Core answers a failure with its own alert; the shell never
         // sees the error value.
@@ -189,7 +190,15 @@ impl PlatformAppEngine {
         })))
     }
 
-    fn retry_open(&self, locked: &mut Option<LockedStart>) -> Result<Vec<Command>, MobileError> {
+    /// Opens storage if the keychain now answers. When the unlock prompt's
+    /// success opened it, the opened engine decides what that unlock means
+    /// (an app password when a duress PIN is set up, ADR-032), as it would
+    /// had it received the prompt itself.
+    fn retry_open(
+        &self,
+        locked: &mut Option<LockedStart>,
+        prompt_succeeded: bool,
+    ) -> Result<Vec<Command>, MobileError> {
         let Some(start) = locked.as_mut() else {
             return Ok(Vec::new());
         };
@@ -218,6 +227,13 @@ impl PlatformAppEngine {
                     detail: format!("Failed to compose initial presentation: {e}"),
                 })?;
                 let mut commands = commands;
+                if prompt_succeeded {
+                    commands.extend(engine.dispatch(Event::BiometricUnlockSucceeded).map_err(
+                        |_| MobileError::Other {
+                            detail: "Failed to decide the unlock".into(),
+                        },
+                    )?);
+                }
                 commands.extend(
                     start
                         .params

@@ -338,6 +338,18 @@ fn bundled_english_cached() -> &'static HashMap<String, String> {
 #[cfg(test)]
 pub(crate) static I18N_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+/// The sibling `locales` checkout for unit tests. Prefers
+/// `VAUCHI_LOCALES_DIR` because cargo-mutants builds a temp copy where the
+/// relative sibling does not exist.
+#[cfg(test)]
+pub(crate) fn test_locales_dir() -> std::path::PathBuf {
+    std::env::var_os("VAUCHI_LOCALES_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales")
+        })
+}
+
 // INLINE_TEST_REQUIRED: tests access private LOCALE_STORE global state and internal init/reset
 #[cfg(test)]
 mod tests {
@@ -401,8 +413,7 @@ mod tests {
     /// Uses the real locale directory instead of clearing to None, so other test modules
     /// (help, aha_moments) that rely on i18n data aren't broken by the reset.
     fn reset_store() {
-        let locales_dir =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
+        let locales_dir = test_locales_dir();
         let _ = init(&locales_dir);
     }
 

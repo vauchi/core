@@ -46,8 +46,7 @@ mod tests {
         let guard = crate::i18n::I18N_TEST_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        let locales_dir =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
+        let locales_dir = crate::i18n::test_locales_dir();
         let _ = crate::i18n::init(&locales_dir);
         guard
     }

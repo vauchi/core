@@ -227,34 +227,84 @@ impl PlatformAppEngine {
         })?;
 
         let storage_path = data_path.join("vauchi.db");
-
-        let key_array: [u8; 32] =
-            storage_key_bytes
-                .try_into()
-                .map_err(|_| MobileError::StorageError {
-                    detail: "Storage key must be exactly 32 bytes".to_string(),
-                })?;
-        let storage_key =
-            SymmetricKey::try_from_bytes(key_array).map_err(|_| MobileError::StorageError {
-                detail: "Degenerate storage key rejected".to_string(),
-            })?;
+        let storage_key = parse_storage_key(storage_key_bytes)?;
 
         let config = VauchiConfig::with_storage_path(&storage_path)
             .with_relay_url(&relay_url)
-            .with_storage_key(storage_key.clone());
+            .with_storage_key(storage_key);
 
         let vauchi = Vauchi::new(config).map_err(|e| MobileError::Other {
             detail: e.to_string(),
         })?;
 
-        Ok(Arc::new(Self {
+        Ok(Self::from_vauchi(vauchi, storage_path, relay_url, None))
+    }
+
+    /// Opens the engine with the platform keychain from the first call, so
+    /// every key that opens the database lives in the keychain and a shred
+    /// deletes them all (ADR-033, vauchi/private#580).
+    ///
+    /// `shell_storage_key` is the storage key a shell kept before keys
+    /// moved to the keychain. Core adopts it; the shell drops its copy once
+    /// this returns. `None` after that.
+    #[uniffi::constructor]
+    pub fn open_with_keychain(
+        data_dir: String,
+        relay_url: String,
+        shell_storage_key: Option<Vec<u8>>,
+        keychain: Box<dyn crate::MobilePlatformKeychain>,
+    ) -> Result<Arc<Self>, MobileError> {
+        let shell_storage_key = shell_storage_key.map(parse_storage_key).transpose()?;
+        let data_path = PathBuf::from(&data_dir);
+        std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
+            detail: e.to_string(),
+        })?;
+        let storage_path = data_path.join("vauchi.db");
+
+        let mut config = VauchiConfig::with_storage_path(&storage_path).with_relay_url(&relay_url);
+        if let Some(key) = shell_storage_key {
+            config = config.with_storage_key(key);
+        }
+        let keychain: Arc<dyn crate::MobilePlatformKeychain> = Arc::from(keychain);
+        let bridge = Arc::new(crate::KeychainBridge {
+            callback: keychain.clone(),
+        });
+        let vauchi = Vauchi::with_secure_storage(config, bridge)?;
+
+        Ok(Self::from_vauchi(
+            vauchi,
+            storage_path,
+            relay_url,
+            Some(keychain),
+        ))
+    }
+}
+
+/// Validates a storage key handed over by a shell: 32 bytes, not all zeros.
+fn parse_storage_key(bytes: Vec<u8>) -> Result<SymmetricKey, MobileError> {
+    let key_array: [u8; 32] = bytes.try_into().map_err(|_| MobileError::StorageError {
+        detail: "Storage key must be exactly 32 bytes".to_string(),
+    })?;
+    SymmetricKey::try_from_bytes(key_array).map_err(|_| MobileError::StorageError {
+        detail: "Degenerate storage key rejected".to_string(),
+    })
+}
+
+impl PlatformAppEngine {
+    fn from_vauchi(
+        vauchi: Vauchi,
+        storage_path: PathBuf,
+        relay_url: String,
+        platform_keychain: Option<Arc<dyn crate::MobilePlatformKeychain>>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
             engine: Mutex::new(AppEngine::new(vauchi)),
             event_handler_id: Mutex::new(None),
             direct_listener: Arc::new(Mutex::new(None)),
             storage_path,
-            platform_keychain: Mutex::new(None),
+            platform_keychain: Mutex::new(platform_keychain),
             relay_url,
-        }))
+        })
     }
 }
 

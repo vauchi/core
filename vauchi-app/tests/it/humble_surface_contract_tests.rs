@@ -57,6 +57,11 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "initial_commands_json",
     "new",
     "on_wakeup",
+    // Keychain-at-construction (ADR-043 Amendment 7, vauchi/private#580):
+    // every key that opens the database lives in the platform keychain
+    // from the first call. Once Android, iOS and macOS construct through
+    // it, `new` and `set_platform_keychain` retire — one method fewer.
+    "open_with_keychain",
     "periodic_sync_tick",
     "poll_notifications",
     "set_device_capabilities_json",
@@ -282,7 +287,12 @@ fn humble_allowlist_size_matches_plan() {
     // moved to encoding hardware events as canonical Event JSON via the
     // exported `hardware_event_json` codec. `dispatch_json` is now the
     // sole hardware-event entry.
-    assert_eq!(HUMBLE_ALLOWLIST.len(), 13);
+    //
+    // `open_with_keychain` addition (ADR-043 Amendment 7, 13 -> 14): the
+    // engine opens with the platform keychain so crypto-shredding destroys
+    // every key that opens the database (vauchi/private#580). `new` and
+    // `set_platform_keychain` retire once the shells move (14 -> 12).
+    assert_eq!(HUMBLE_ALLOWLIST.len(), 14);
 }
 
 // @internal

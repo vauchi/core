@@ -253,3 +253,79 @@ fn data_no_stored_key_opens_shows_recovery() {
     assert_eq!(keychain.store.names(), ["smk"]);
     assert_eq!(empty.store.names(), Vec::<String>::new());
 }
+
+fn has_alert(batch: &Value) -> bool {
+    command_names(batch).contains(&"PresentAlert".to_string())
+}
+
+/// The confirmation screen of an install whose SMK the platform invalidated.
+fn at_start_over_confirmation(
+    dir: &tempfile::TempDir,
+) -> (Arc<PlatformAppEngine>, ControlledKeychain, Value) {
+    let keychain = onboarded(dir);
+    keychain.smk_invalidated.store(true, Ordering::SeqCst);
+    let engine = open(dir, &keychain);
+    let unreadable = parse(engine.initial_commands_json().unwrap());
+    let confirm = choose_start_over(&engine, &unreadable);
+    (engine, keychain, confirm)
+}
+
+// @internal
+#[test]
+fn starting_over_removes_the_old_identity_files_too() {
+    let dir = tempfile::tempdir().unwrap();
+    let (engine, _keychain, confirm) = at_start_over_confirmation(&dir);
+    let identity = dir.path().join("identity.json");
+    let keys = dir.path().join("keys");
+    let pre_signed = vauchi_core::api::PreSignedShredMessages::file_path(dir.path());
+    std::fs::write(&identity, b"old identity").unwrap();
+    std::fs::create_dir_all(&keys).unwrap();
+    std::fs::write(keys.join("old.key"), b"old key").unwrap();
+    std::fs::write(&pre_signed, b"old pre-signed purge").unwrap();
+
+    press_primary(&engine, &confirm);
+
+    assert!(!identity.exists());
+    assert!(!keys.exists());
+    assert!(!pre_signed.exists());
+}
+
+// @internal
+#[test]
+fn a_start_over_that_cannot_remove_a_companion_file_keeps_the_database() {
+    let dir = tempfile::tempdir().unwrap();
+    let (engine, keychain, confirm) = at_start_over_confirmation(&dir);
+    let db = dir.path().join("vauchi.db");
+    let wal = dir.path().join("vauchi.db-wal");
+    let _ = std::fs::remove_file(&wal);
+    std::fs::create_dir(&wal).unwrap();
+
+    let answer = press_primary(&engine, &confirm);
+
+    assert!(has_alert(&answer), "got {answer}");
+    assert!(
+        db.exists(),
+        "the database must not be deleted while its WAL stays"
+    );
+    assert_eq!(keychain.store.names(), ["smk"]);
+}
+
+// @internal
+#[test]
+fn a_retry_that_fails_for_another_reason_answers_with_an_alert() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine.initial_commands_json().unwrap();
+    let db = dir.path().join("vauchi.db");
+    std::fs::remove_file(&db).unwrap();
+    std::fs::create_dir(&db).unwrap();
+    keychain.locked.store(false, Ordering::SeqCst);
+
+    let event = serde_json::to_string(&vauchi_core::Event::BiometricUnlockSucceeded).unwrap();
+    let answer = engine.dispatch_json(event);
+
+    let batch = parse(answer.expect("Core answers with commands, not an error"));
+    assert!(has_alert(&batch), "got {batch}");
+}

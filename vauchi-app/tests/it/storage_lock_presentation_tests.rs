@@ -245,3 +245,20 @@ fn every_storage_lock_screen_has_its_strings() {
         );
     }
 }
+
+// @internal
+#[test]
+fn an_unavailable_keychain_offers_only_try_again() {
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Unavailable, Locale::English);
+
+    let batch = lock.initial_commands();
+
+    assert!(!asks_for_prompt(&batch));
+    let (_, bar) = context_bar(&batch);
+    assert_eq!(bar.secondary, None, "nothing to start over from here");
+    assert_eq!(press_primary(&mut lock, &batch), StorageLockStep::RetryOpen);
+    assert!(matches!(
+        lock.dispatch(Event::BiometricUnlockSucceeded),
+        StorageLockStep::Commands(_)
+    ));
+}

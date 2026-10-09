@@ -118,3 +118,21 @@ fn an_unlocked_keychain_still_boots() {
 
     assert!(vauchi.is_ok(), "{:?}", vauchi.err());
 }
+
+// @internal
+#[test]
+fn a_keychain_that_fails_for_another_reason_is_unavailable_not_misconfigured() {
+    let keychain = Arc::new(FailingKeychain::new(|| {
+        StorageError::Encryption("Keyring error: service not reachable".into())
+    }));
+
+    let (_dir, result) = boot(keychain.clone());
+
+    match result {
+        Err(error @ VauchiError::Storage(StorageError::SecureStorageUnavailable)) => {
+            assert!(!error.is_unreadable_storage());
+        }
+        other => panic!("expected SecureStorageUnavailable, got {:?}", other.err()),
+    }
+    assert_eq!(*keychain.writes.lock().unwrap(), Vec::<String>::new());
+}

@@ -131,16 +131,22 @@ impl MobilePlatformKeychain for BrokenKeychain {
 
 // @internal
 #[test]
-fn a_keychain_that_cannot_be_read_opens_nothing() {
+fn a_keychain_that_cannot_be_read_starts_an_engine_that_offers_try_again() {
     let dir = tempfile::tempdir().unwrap();
-    let result = PlatformAppEngine::open_with_keychain(
+
+    let engine = PlatformAppEngine::open_with_keychain(
         dir.path().to_string_lossy().to_string(),
         RELAY.into(),
         None,
         Box::new(BrokenKeychain),
-    );
+    )
+    .expect("an unavailable keychain still yields an engine");
 
-    assert!(result.is_err());
+    let batch = engine.initial_commands_json().unwrap();
+    assert!(
+        batch.contains("storage_lock.unavailable"),
+        "expected the unavailable screen, got {batch}"
+    );
     assert!(!dir.path().join("vauchi.db").exists());
 }
 

@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The mobile shells start Core through `PlatformStartup` with the platform
-//! keychain from the first call, so every key that opens the database lives
+//! The mobile shells open Core with the platform keychain from the first
+//! call (`PlatformAppEngine::open_with_keychain`), so every key that opens the database lives
 //! in the keychain and a shred deletes them all (ADR-033,
 //! vauchi/private#580). The keychain is platform secure storage, so an
 //! in-memory fake is the right double; the crypto is real (ADR-002).
@@ -13,7 +13,6 @@ use std::sync::Arc;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_platform::{
     DomainCommand, DomainCommandResult, KeychainError, MobilePlatformKeychain, PlatformAppEngine,
-    PlatformStartup,
 };
 
 use crate::support::{SharedKeychain, drive_onboarding};
@@ -25,14 +24,12 @@ fn start(
     shell_key: Option<&SymmetricKey>,
     keychain: &SharedKeychain,
 ) -> Arc<PlatformAppEngine> {
-    PlatformStartup::new(
+    PlatformAppEngine::open_with_keychain(
         dir.path().to_string_lossy().to_string(),
         RELAY.into(),
         shell_key.map(|key| key.as_bytes().to_vec()),
         Box::new(keychain.clone()),
     )
-    .expect("startup")
-    .open_engine()
     .expect("open engine")
 }
 
@@ -97,7 +94,7 @@ fn a_malformed_shell_key_is_refused_before_the_keychain_is_touched() {
         let dir = tempfile::tempdir().unwrap();
         let keychain = SharedKeychain::new();
 
-        let result = PlatformStartup::new(
+        let result = PlatformAppEngine::open_with_keychain(
             dir.path().to_string_lossy().to_string(),
             RELAY.into(),
             Some(bad.clone()),
@@ -129,15 +126,12 @@ impl MobilePlatformKeychain for BrokenKeychain {
 #[test]
 fn a_keychain_that_cannot_be_read_opens_nothing() {
     let dir = tempfile::tempdir().unwrap();
-    let startup = PlatformStartup::new(
+    let result = PlatformAppEngine::open_with_keychain(
         dir.path().to_string_lossy().to_string(),
         RELAY.into(),
         None,
         Box::new(BrokenKeychain),
-    )
-    .unwrap();
-
-    let result = startup.open_engine();
+    );
 
     assert!(result.is_err());
     assert!(!dir.path().join("vauchi.db").exists());

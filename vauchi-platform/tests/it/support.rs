@@ -151,10 +151,6 @@ impl SharedKeychain {
         names.sort();
         names
     }
-
-    pub fn get(&self, name: &str) -> Option<Vec<u8>> {
-        self.0.store.lock().unwrap().get(name).cloned()
-    }
 }
 
 impl MobilePlatformKeychain for SharedKeychain {

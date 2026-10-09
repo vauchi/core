@@ -114,9 +114,18 @@ pub(super) fn open_storage(
     }
 
     let stored_bootstrap = bootstrap.clone();
-    let mut candidates: Vec<SymmetricKey> = bootstrap.into_iter().chain(shell_key).collect();
+    let candidates: Vec<SymmetricKey> = bootstrap.into_iter().chain(shell_key).collect();
     if candidates.is_empty() {
-        candidates.push(SymmetricKey::generate());
+        if path.exists() {
+            return Err(StorageError::WrongKey.into());
+        }
+        // Saved before the database exists, so a failed save leaves no data
+        // under a key nobody holds.
+        let fresh = SymmetricKey::generate();
+        secure
+            .save_key(BOOTSTRAP_KEY_NAME, fresh.as_bytes())
+            .map_err(|e| keychain_error("store the bootstrap key", e))?;
+        return Ok(Storage::open(path, fresh)?);
     }
     let (storage, key) = open_with_first(path, candidates)?;
     if stored_bootstrap.as_ref().map(SymmetricKey::as_bytes) != Some(key.as_bytes()) {

@@ -79,6 +79,16 @@ pub enum StorageError {
     /// The key does not open this database's data (vauchi/private#580).
     #[error("The storage key does not open this database")]
     WrongKey,
+
+    /// Secure storage cannot be read until the user authenticates or the
+    /// device unlocks; the keys are intact (vauchi/private#580).
+    #[error("Secure storage is locked")]
+    SecureStorageLocked,
+
+    /// The platform permanently invalidated the key protecting secure
+    /// storage; what it held cannot be read again (vauchi/private#580).
+    #[error("Secure storage lost its key")]
+    SecureStorageKeyInvalidated,
 }
 
 impl From<rusqlite::Error> for StorageError {

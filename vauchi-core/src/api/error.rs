@@ -113,9 +113,10 @@ impl VauchiError {
             return false;
         };
         match storage_err {
-            StorageError::Encryption(_) | StorageError::InvalidData(_) | StorageError::WrongKey => {
-                true
-            }
+            StorageError::Encryption(_)
+            | StorageError::InvalidData(_)
+            | StorageError::WrongKey
+            | StorageError::SecureStorageKeyInvalidated => true,
             StorageError::Database(rusqlite::Error::SqliteFailure(ffi_err, _)) => {
                 ffi_err.code == rusqlite::ErrorCode::NotADatabase
             }

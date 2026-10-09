@@ -22,10 +22,22 @@ use super::SMK_KEY_NAME;
 
 use crate::api::shred::BOOTSTRAP_KEY_NAME;
 
+/// Keeps a locked or key-invalidated keychain typed, so Core can choose the
+/// unlock or recovery screen (ADR-045); other failures stay configuration
+/// errors.
+fn keychain_error(action: &str, error: StorageError) -> VauchiError {
+    match error {
+        StorageError::SecureStorageLocked | StorageError::SecureStorageKeyInvalidated => {
+            VauchiError::Storage(error)
+        }
+        other => VauchiError::Configuration(format!("Failed to {action}: {other}")),
+    }
+}
+
 fn load_key(secure: &dyn SecureStorage, name: &str) -> VauchiResult<Option<[u8; 32]>> {
-    let Some(bytes) = secure.load_key(name).map_err(|e| {
-        VauchiError::Configuration(format!("Failed to load {name} from SecureStorage: {e}"))
-    })?
+    let Some(bytes) = secure
+        .load_key(name)
+        .map_err(|e| keychain_error(&format!("load {name} from SecureStorage"), e))?
     else {
         return Ok(None);
     };
@@ -110,9 +122,7 @@ pub(super) fn open_storage(
     if stored_bootstrap.as_ref().map(SymmetricKey::as_bytes) != Some(key.as_bytes()) {
         secure
             .save_key(BOOTSTRAP_KEY_NAME, key.as_bytes())
-            .map_err(|e| {
-                VauchiError::Configuration(format!("Failed to store the bootstrap key: {e}"))
-            })?;
+            .map_err(|e| keychain_error("store the bootstrap key", e))?;
     }
     Ok(storage)
 }

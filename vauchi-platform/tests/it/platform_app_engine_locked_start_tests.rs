@@ -118,6 +118,37 @@ fn press_primary(engine: &PlatformAppEngine, batch: &Value) -> Value {
     parse(engine.dispatch_json(event.to_string()).expect("dispatch"))
 }
 
+fn activate(engine: &PlatformAppEngine, surface_id: &Value, interaction_id: &Value) -> Value {
+    let event = serde_json::json!({
+        "ActionActivated": { "surface_id": surface_id, "interaction_id": interaction_id }
+    });
+    parse(engine.dispatch_json(event.to_string()).expect("dispatch"))
+}
+
+/// Opens the action menu and activates its only item, Start over.
+fn choose_start_over(engine: &PlatformAppEngine, batch: &Value) -> Value {
+    let bar = batch["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|c| c.get("SetContextBar"))
+        .expect("a context bar")
+        .clone();
+    let menu = activate(
+        engine,
+        &bar["surface_id"],
+        &bar["bar"]["secondary"]["interaction_id"],
+    );
+    let item = menu["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|c| c.get("PresentOverlay"))
+        .expect("the action menu")["overlay"]["items"][0]
+        .clone();
+    activate(engine, &bar["surface_id"], &item["interaction_id"])
+}
+
 fn prompt_succeeded(engine: &PlatformAppEngine) -> Value {
     let event = serde_json::to_string(&vauchi_core::Event::BiometricUnlockSucceeded).unwrap();
     parse(engine.dispatch_json(event).expect("dispatch"))
@@ -155,9 +186,10 @@ fn storage_opens_once_the_prompt_succeeds() {
     engine.initial_commands_json().unwrap();
 
     let still_locked = prompt_succeeded(&engine);
+    assert_eq!(surface(&still_locked), "storage_lock.locked");
     assert!(
-        asks_for_prompt(&still_locked),
-        "a retry while locked prompts again"
+        !asks_for_prompt(&still_locked),
+        "a prompt that did not unlock storage must not loop"
     );
 
     keychain.locked.store(false, Ordering::SeqCst);
@@ -183,7 +215,7 @@ fn a_lost_key_shows_recovery_and_deletes_nothing_until_confirmed() {
     let unreadable = parse(engine.initial_commands_json().unwrap());
     assert_eq!(surface(&unreadable), "storage_lock.unreadable");
     assert!(!asks_for_prompt(&unreadable));
-    let confirm = press_primary(&engine, &unreadable);
+    let confirm = choose_start_over(&engine, &unreadable);
     assert_eq!(surface(&confirm), "storage_lock.confirm_start_over");
 
     assert_eq!(std::fs::metadata(&db).unwrap().len(), db_before);
@@ -198,7 +230,7 @@ fn starting_over_deletes_the_unreadable_data_and_opens_a_fresh_install() {
     keychain.smk_invalidated.store(true, Ordering::SeqCst);
     let engine = open(&dir, &keychain);
     let unreadable = parse(engine.initial_commands_json().unwrap());
-    let confirm = press_primary(&engine, &unreadable);
+    let confirm = choose_start_over(&engine, &unreadable);
 
     let fresh = press_primary(&engine, &confirm);
 

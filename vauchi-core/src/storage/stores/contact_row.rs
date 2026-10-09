@@ -17,7 +17,7 @@ use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::types::ExchangeTransport;
 
 /// Columns `ContactRow::from_row` reads, for every contact SELECT.
-pub(super) const CONTACT_COLUMNS: &str = "id, public_key, card_encrypted, shared_key_encrypted, visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted, exchange_transport, has_recovered, card_updated_at, relay_url, trust_metrics, contact_kind, import_source, imported_at, original_uid, deleted_at, archived, archived_at, ignored, ignored_at, reciprocity, confirmation_channel";
+pub(super) const CONTACT_COLUMNS: &str = "id, public_key, card_encrypted, shared_key_encrypted, visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted, exchange_transport, has_recovered, card_updated_at, relay_url_encrypted, trust_metrics, contact_kind, import_source, imported_at, original_uid, deleted_at, archived, archived_at, ignored, ignored_at, reciprocity, confirmation_channel";
 
 /// Internal struct for database row data.
 #[allow(dead_code)] // Fields are used via destructuring in row_to_contact
@@ -38,7 +38,7 @@ pub(super) struct ContactRow {
     pub exchange_transport: String,
     pub has_recovered: i32,
     pub card_updated_at: Option<i64>,
-    pub relay_url: Option<String>,
+    pub relay_url_encrypted: Option<Vec<u8>>,
     pub trust_metrics: Option<String>,
     pub contact_kind: String,
     pub import_source: Option<String>,
@@ -72,7 +72,7 @@ impl ContactRow {
             exchange_transport: row.get("exchange_transport")?,
             has_recovered: row.get("has_recovered")?,
             card_updated_at: row.get("card_updated_at")?,
-            relay_url: row.get("relay_url")?,
+            relay_url_encrypted: row.get("relay_url_encrypted")?,
             trust_metrics: row.get("trust_metrics")?,
             contact_kind: row.get("contact_kind")?,
             import_source: row.get("import_source")?,
@@ -123,7 +123,7 @@ impl ContactStore<'_> {
             proposal_trusted,
             exchange_transport,
             has_recovered,
-            relay_url,
+            relay_url_encrypted,
             trust_metrics,
             contact_kind,
             import_source,
@@ -141,6 +141,14 @@ impl ContactStore<'_> {
                 .as_str()
                 .unwrap_or("Qr")
                 .to_string();
+            let relay_encrypted = ex
+                .relay_url
+                .as_deref()
+                .map(|url| {
+                    crate::crypto::encrypt(self.key, url.as_bytes())
+                        .map_err(|e| StorageError::Encryption(e.to_string()))
+                })
+                .transpose()?;
             let tm_json = ex
                 .trust_metrics
                 .as_ref()
@@ -159,7 +167,7 @@ impl ContactStore<'_> {
                 ex.proposal_trusted as i32,
                 transport,
                 ex.has_recovered as i32,
-                ex.relay_url.clone(),
+                relay_encrypted,
                 tm_json,
                 "exchanged".to_string(),
                 None,
@@ -226,7 +234,7 @@ impl ContactStore<'_> {
             exchange_transport,
             has_recovered,
             card_updated_at: contact.card_updated_at().map(|t| t as i64),
-            relay_url,
+            relay_url_encrypted,
             trust_metrics,
             contact_kind,
             import_source,
@@ -411,7 +419,15 @@ impl ContactStore<'_> {
         contact.set_has_recovered(row.has_recovered != 0);
         contact.set_card_updated_at(row.card_updated_at.map(|t| t as u64));
 
-        contact.set_relay_url(row.relay_url);
+        let relay_url = row
+            .relay_url_encrypted
+            .map(|ciphertext| {
+                let plain = crate::crypto::decrypt(self.key, &ciphertext)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                String::from_utf8(plain).map_err(|e| StorageError::Serialization(e.to_string()))
+            })
+            .transpose()?;
+        contact.set_relay_url(relay_url);
 
         // Restore trust metrics from storage (JSON column, NULL for legacy contacts).
         //

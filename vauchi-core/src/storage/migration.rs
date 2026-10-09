@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 78] = [
+const MIGRATIONS: [Migration; 79] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -662,6 +662,11 @@ const MIGRATIONS: [Migration; 78] = [
         name: "encrypt_last_sent_display_name",
         action: MigrationAction::Callback(migrate_v78_encrypt_last_sent_display_name),
     },
+    Migration {
+        version: 79,
+        name: "encrypt_contact_relay_url",
+        action: MigrationAction::Callback(migrate_v79_encrypt_contact_relay_url),
+    },
 ];
 
 /// Migration v76: the identity's display name is already inside
@@ -707,6 +712,15 @@ fn migrate_v78_encrypt_last_sent_display_name(
         "last_sent_display_name",
         "last_sent_display_name_encrypted",
     )
+}
+
+/// Migration v79: each contact's relay moves to `relay_url_encrypted`
+/// (vauchi/private#579).
+fn migrate_v79_encrypt_contact_relay_url(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    encrypt_text_column_in_place(conn, key, "contacts", "relay_url", "relay_url_encrypted")
 }
 
 /// from the migration ledger, never input.

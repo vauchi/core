@@ -395,7 +395,7 @@ impl Identity {
     /// Data format: `salt (16 bytes) || ciphertext`
     fn import_backup_v2(data: &[u8], password: &str, now: u64) -> Result<Self, IdentityError> {
         // salt (16) + at least some ciphertext
-        if data.len() < 16 + 1 + 24 + 16 + 4 + 32 {
+        if data.len() < 16 + 1 + 24 + 16 + 4 + 32 + 8 {
             return Err(IdentityError::RestoreFailed);
         }
 

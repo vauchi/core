@@ -329,3 +329,75 @@ fn a_retry_that_fails_for_another_reason_answers_with_an_alert() {
     let batch = parse(answer.expect("Core answers with commands, not an error"));
     assert!(has_alert(&batch), "got {batch}");
 }
+
+struct SilentListener;
+
+impl vauchi_platform::PlatformEventListener for SilentListener {
+    fn on_presentation_invalidated(&self) {}
+}
+
+fn german(key: &str) -> String {
+    vauchi_platform::init_locales(crate::support::locales_dir().to_string_lossy().into_owned())
+        .expect("locales");
+    vauchi_app::i18n::get_string(vauchi_app::i18n::Locale::German, key)
+}
+
+const GERMAN_CONTEXT: &str = r#"{"locale":"de","theme_id":null}"#;
+
+// @internal
+#[test]
+fn setup_calls_made_while_locked_succeed() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+
+    engine
+        .set_render_context_json(GERMAN_CONTEXT.into())
+        .expect("render context while locked");
+    engine
+        .set_device_capabilities_json("{}".into())
+        .expect("capabilities while locked");
+    engine
+        .set_network_online(false)
+        .expect("network state while locked");
+    engine
+        .set_event_listener(Box::new(SilentListener))
+        .expect("listener while locked");
+}
+
+// @internal
+#[test]
+fn the_lock_screen_speaks_the_render_context_language() {
+    let title = german("storage_lock.locked_title");
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+
+    engine
+        .set_render_context_json(GERMAN_CONTEXT.into())
+        .unwrap();
+    let batch = engine.initial_commands_json().unwrap();
+
+    assert!(batch.contains(&title), "expected {title:?} in {batch}");
+}
+
+// @internal
+#[test]
+fn a_render_context_set_while_locked_reaches_the_opened_engine() {
+    let more = german("nav.more");
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine
+        .set_render_context_json(GERMAN_CONTEXT.into())
+        .unwrap();
+    engine.initial_commands_json().unwrap();
+
+    keychain.locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine).to_string();
+
+    assert!(opened.contains(&more), "expected {more:?} in {opened}");
+}

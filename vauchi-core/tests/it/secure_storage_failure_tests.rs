@@ -116,7 +116,8 @@ fn an_unlocked_keychain_still_boots() {
 
     let vauchi = Vauchi::with_secure_storage(config, Arc::new(MemoryKeyStorage::new()));
 
-    assert!(vauchi.is_ok(), "{:?}", vauchi.err());
+    let vauchi = vauchi.expect("an unlocked keychain boots");
+    assert!(!vauchi.has_identity());
 }
 
 // @internal

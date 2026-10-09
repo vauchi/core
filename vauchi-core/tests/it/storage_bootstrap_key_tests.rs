@@ -355,8 +355,8 @@ fn storage_in_a_directory_that_does_not_exist_yet_is_created() {
             .with_storage_key(SymmetricKey::generate()),
     );
 
-    assert!(with_keychain.is_ok(), "{:?}", with_keychain.err());
-    assert!(without_keychain.is_ok(), "{:?}", without_keychain.err());
+    assert!(!with_keychain.expect("opens with a keychain").has_identity());
+    assert!(!without_keychain.expect("opens without one").has_identity());
     assert!(path.exists());
 }
 
@@ -403,6 +403,6 @@ fn a_fresh_install_that_could_not_save_its_key_starts_cleanly_next_time() {
 
     let second = Vauchi::with_secure_storage(config(), secure.clone());
 
-    assert!(second.is_ok(), "{:?}", second.err());
+    assert!(!second.expect("the second start opens").has_identity());
     assert!(secure.inner.has_key(BOOTSTRAP_KEY_NAME).unwrap());
 }

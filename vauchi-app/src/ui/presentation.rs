@@ -101,7 +101,6 @@ impl PresentationCoordinator {
         });
     }
 
-    #[cfg(feature = "network-rustls")]
     pub(crate) fn current_profile_command(&self) -> Option<Command> {
         self.profile()
             .ok()

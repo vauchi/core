@@ -15,7 +15,7 @@ use vauchi_core::{Command, Event, SurfaceId};
 use super::rejection;
 use super::{
     ActionStyle, ContextualSurface, ContextualSurfaceRoute, PreparedSurface, PreparedSurfaceError,
-    ScreenAction, ScreenModel, UserAction,
+    PresentationCoordinator, ScreenAction, ScreenModel, UserAction,
 };
 use crate::i18n::{Locale, get_string};
 
@@ -63,6 +63,9 @@ pub struct StorageLockPresentation {
     /// prompt that cannot unlock storage does not loop.
     prompt_on_render: bool,
     retry_from_tap: bool,
+    /// Set once the shell reports its environment: a shell lays out only
+    /// with a presentation profile.
+    coordinator: Option<PresentationCoordinator>,
 }
 
 impl StorageLockPresentation {
@@ -73,6 +76,7 @@ impl StorageLockPresentation {
             revision: 0,
             prompt_on_render: true,
             retry_from_tap: false,
+            coordinator: None,
         }
     }
 
@@ -105,8 +109,25 @@ impl StorageLockPresentation {
                     None => StorageLockStep::Commands(self.rejection()),
                 }
             }
+            Event::PresentationEnvironmentChanged { .. } => {
+                StorageLockStep::Commands(self.environment_changed(event))
+            }
             _ => StorageLockStep::Commands(Vec::new()),
         }
+    }
+
+    fn environment_changed(&mut self, event: Event) -> Vec<Command> {
+        let coordinator = match self.coordinator.as_mut() {
+            Some(coordinator) => coordinator,
+            None => {
+                let Ok(surface_id) = SurfaceId::new(self.current_screen().screen_id) else {
+                    return self.rejection();
+                };
+                self.coordinator
+                    .insert(PresentationCoordinator::new(surface_id))
+            }
+        };
+        coordinator.handle_event(event).unwrap_or_default()
     }
 
     fn handle_action(&mut self, action_id: &str) -> StorageLockStep {
@@ -171,11 +192,15 @@ impl StorageLockPresentation {
         else {
             return self.rejection();
         };
-        let Ok(contextual) = self.contextual(surface_id, &screen) else {
+        let Ok(contextual) = self.contextual(surface_id.clone(), &screen) else {
             return self.rejection();
         };
         let mut commands = vec![prepared.command()];
         commands.extend(contextual.initial_commands());
+        if let Some(coordinator) = self.coordinator.as_mut() {
+            coordinator.set_primary_surface(surface_id);
+            commands.extend(coordinator.current_profile_command());
+        }
         if self.screen == Screen::Locked && self.prompt_on_render {
             commands.push(Command::RequestBiometricUnlock);
         }

@@ -83,6 +83,8 @@ pub(crate) struct PendingSetup {
     pub(crate) render_context: Option<RenderContext>,
     pub(crate) capabilities: Option<DeviceCapabilities>,
     pub(crate) network_online: Option<bool>,
+    /// The shell reports its window once; the opened engine needs it too.
+    pub(crate) environment: Option<Event>,
     pub(crate) listener: Option<Box<dyn PlatformEventListener>>,
 }
 
@@ -166,6 +168,9 @@ impl PlatformAppEngine {
         let Some(start) = locked.as_mut() else {
             return Ok(None);
         };
+        if matches!(event, Event::PresentationEnvironmentChanged { .. }) {
+            start.pending.environment = Some(event.clone());
+        }
         let outcome = match start.presentation.dispatch(event) {
             StorageLockStep::Commands(commands) => return Ok(Some(commands)),
             StorageLockStep::RetryOpen => self.retry_open(&mut locked),
@@ -201,6 +206,13 @@ impl PlatformAppEngine {
                 }
                 if let Some(online) = pending.network_online {
                     engine.set_network_online(online);
+                }
+                if let Some(environment) = pending.environment {
+                    engine
+                        .dispatch(environment)
+                        .map_err(|_| MobileError::Other {
+                            detail: "Failed to apply the reported environment".into(),
+                        })?;
                 }
                 let commands = engine.initial_commands().map_err(|e| MobileError::Other {
                     detail: format!("Failed to compose initial presentation: {e}"),

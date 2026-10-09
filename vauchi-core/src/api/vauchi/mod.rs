@@ -29,7 +29,6 @@ mod onboarding;
 mod personal_data;
 mod places;
 mod propagation;
-mod propagation_cek;
 #[cfg(feature = "network-http")]
 mod receive_routing;
 mod reciprocity_send;
@@ -372,7 +371,6 @@ impl Vauchi {
             Ok(Some(bytes)) => Identity::from_storage_bytes(&bytes, clock.unix_seconds()).ok(),
             _ => None,
         };
-        let run_visibility_migration = identity.is_some();
 
         let mut wb = Vauchi {
             config,
@@ -396,13 +394,6 @@ impl Vauchi {
             last_sync_unix_seconds: None,
             last_emergency_broadcast_unix_seconds: None,
         };
-        // Existing installs grandfather their visibility state before any
-        // propagation can run under the field-centric hidden default
-        // (2026-07-05-ungrouped-contacts-default-open). Fresh installs are
-        // marker-gated at create_identity and skip in O(1).
-        if run_visibility_migration {
-            wb.migrate_field_centric_visibility()?;
-        }
         if wb.identity.is_some() && wb.secure_storage.is_some() {
             wb.migrate_to_smk()?;
         }

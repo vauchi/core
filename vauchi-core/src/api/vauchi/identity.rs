@@ -86,13 +86,6 @@ impl Vauchi {
             .identity()
             .save_identity(&identity.to_storage_bytes())?;
 
-        // Fresh installs never need the field-centric grandfathering sweep —
-        // every field they ever add starts under the hidden-by-default model
-        // (2026-07-05-ungrouped-contacts-default-open).
-        let mut flags = self.load_settings_flags()?;
-        flags.field_centric_visibility_migrated = true;
-        self.save_settings_flags(&flags)?;
-
         self.identity = Some(identity);
         Ok(())
     }

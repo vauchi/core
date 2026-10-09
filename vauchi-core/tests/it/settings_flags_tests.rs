@@ -161,7 +161,7 @@ fn card_update_notification_defaults_on_and_toggle_off_persists() {
 fn merging_config_toggles_takes_every_toggle_and_keeps_other_flags() {
     let vauchi = Vauchi::in_memory().unwrap();
     let mut flags = vauchi.load_settings_flags().unwrap();
-    flags.field_centric_visibility_migrated = true;
+    flags.first_group_education_shown = true;
     let mut config = VauchiConfig::default();
     config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
     config.suppress_presence = !config.suppress_presence;
@@ -196,5 +196,5 @@ fn merging_config_toggles_takes_every_toggle_and_keeps_other_flags() {
             config.new_field_default_visible,
         ]
     );
-    assert!(flags.field_centric_visibility_migrated);
+    assert!(flags.first_group_education_shown);
 }

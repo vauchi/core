@@ -54,12 +54,6 @@ pub struct SettingsFlags {
     /// stored before this field existed showing them.
     #[serde(default = "default_true")]
     pub show_help_icons: bool,
-    /// One-time field-centric visibility grandfathering ran (or the install
-    /// is fresh enough to never need it). `#[serde(default)]` = false is the
-    /// trigger for installs that predate the model
-    /// (2026-07-05-ungrouped-contacts-default-open).
-    #[serde(default)]
-    pub field_centric_visibility_migrated: bool,
     /// New contact-card entries start Visible (explicit `Everyone`
     /// materialized at `add_own_field` time). Defaults to false = hidden
     /// (2026-07-05-ungrouped-contacts-default-open, Decision 2).
@@ -81,7 +75,6 @@ impl Default for SettingsFlags {
             reduce_motion: false,
             large_touch: false,
             show_help_icons: true,
-            field_centric_visibility_migrated: false,
             new_field_default_visible: false,
             first_group_education_shown: false,
         }

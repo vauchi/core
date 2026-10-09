@@ -447,3 +447,75 @@ fn a_handed_over_key_is_not_released_while_storage_is_locked() {
     assert_eq!(released(&opened), ["legacy-storage-key"]);
     assert_eq!(keychain.store.names(), ["smk"]);
 }
+
+/// The shell reports its window once, as it does when it first lays out.
+fn report_environment(engine: &PlatformAppEngine) -> Value {
+    let event = serde_json::json!({"PresentationEnvironmentChanged": {
+        "available_width": 411, "available_height": 891,
+        "input_modes": ["touch"], "motion": "full",
+    }});
+    parse(engine.dispatch_json(event.to_string()).expect("dispatch"))
+}
+
+/// The surface the batch's presentation profile makes active, if it has one.
+fn profiled_surface(batch: &Value) -> Option<String> {
+    batch["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|c| c.get("SetPresentationProfile"))
+        .and_then(|set| set["profile"]["active_surface"].as_str())
+        .map(str::to_owned)
+}
+
+// @internal
+#[test]
+fn a_locked_start_answers_the_shells_environment_with_a_profile_for_its_screen() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine.initial_commands_json().unwrap();
+
+    let answer = report_environment(&engine);
+
+    assert_eq!(
+        profiled_surface(&answer).as_deref(),
+        Some("storage_lock.locked")
+    );
+}
+
+// @internal
+#[test]
+fn the_confirmation_screen_carries_a_profile_for_itself() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.smk_invalidated.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    let unreadable = parse(engine.initial_commands_json().unwrap());
+    report_environment(&engine);
+
+    let confirm = choose_start_over(&engine, &unreadable);
+
+    assert_eq!(profiled_surface(&confirm), Some(surface(&confirm)));
+}
+
+// @internal
+#[test]
+fn the_first_screen_after_unlocking_carries_a_profile_from_the_reported_environment() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine.initial_commands_json().unwrap();
+    report_environment(&engine);
+
+    keychain.locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine);
+
+    assert!(
+        !surface(&opened).starts_with("storage_lock"),
+        "got {opened}"
+    );
+    assert_eq!(profiled_surface(&opened), Some(surface(&opened)));
+}

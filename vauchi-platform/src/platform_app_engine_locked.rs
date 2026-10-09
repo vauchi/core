@@ -32,6 +32,7 @@ pub(crate) struct OpenParams {
     pub(crate) storage_path: PathBuf,
     pub(crate) relay_url: String,
     pub(crate) shell_storage_key: Option<SymmetricKey>,
+    pub(crate) release_handle: Option<String>,
     pub(crate) keychain: Arc<dyn MobilePlatformKeychain>,
 }
 
@@ -176,6 +177,19 @@ impl PlatformAppEngine {
         }
     }
 
+    /// The release of a handed-over secret, once, after storage opened.
+    pub(crate) fn take_release(&self) -> Result<Option<Command>, MobileError> {
+        let mut release = self
+            .pending_release
+            .lock()
+            .map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+        Ok(release
+            .take()
+            .map(|handle| Command::ForgetStoredSecret { handle }))
+    }
+
     /// The locked start's first batch, or `None` once storage is open.
     pub(crate) fn locked_initial_commands(&self) -> Result<Option<Vec<Command>>, MobileError> {
         let mut locked = self.lock_locked_start()?;
@@ -243,6 +257,14 @@ impl PlatformAppEngine {
                 let commands = engine.initial_commands().map_err(|e| MobileError::Other {
                     detail: format!("Failed to compose initial presentation: {e}"),
                 })?;
+                let mut commands = commands;
+                commands.extend(
+                    start
+                        .params
+                        .release_handle
+                        .take()
+                        .map(|handle| Command::ForgetStoredSecret { handle }),
+                );
                 *self.lock_engine()? = Some(engine);
                 *locked = None;
                 if let Some(listener) = pending.listener {

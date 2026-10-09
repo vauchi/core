@@ -77,7 +77,7 @@ pub use mobile_contact_detail::{
 };
 pub use mobile_import::{MobileImportResult, MobileImportWarning};
 pub use multipart_qr::{MultipartDecoder, encode_multipart};
-pub use platform_app_engine::{PlatformAppEngine, PlatformEventListener};
+pub use platform_app_engine::{HandedOverSecret, PlatformAppEngine, PlatformEventListener};
 #[doc(hidden)]
 pub use platform_app_engine_test_helpers::PlatformAppEngineTestHelpers;
 pub use policies::{

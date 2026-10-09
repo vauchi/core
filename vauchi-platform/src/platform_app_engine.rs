@@ -100,6 +100,9 @@ pub struct PlatformAppEngine {
     /// Core's storage-lock screens until storage opens (vauchi/private#580);
     /// `None` once it has.
     pub(crate) locked: Mutex<Option<crate::platform_app_engine_locked::LockedStart>>,
+    /// The handle of a handed-over secret to release in the next batch,
+    /// once storage is open (vauchi/private#580).
+    pub(crate) pending_release: Mutex<Option<String>>,
     /// Active event listener handler ID, used to unregister on replacement.
     event_handler_id: Mutex<Option<HandlerId>>,
     /// Direct handle to the active `PlatformEventListener`. The
@@ -249,18 +252,26 @@ impl PlatformAppEngine {
     /// deletes them all (ADR-033, vauchi/private#580).
     ///
     /// `shell_storage_key` is the storage key a shell kept before keys
-    /// moved to the keychain. Core adopts it; the shell drops its copy once
-    /// this returns. `None` after that.
+    /// moved to the keychain, with the shell's name for it. Core adopts it
+    /// and emits `ForgetStoredSecret { handle }` in the first batch after
+    /// storage opened; the shell deletes its copy then, never earlier — a
+    /// locked start has not stored the key yet.
     #[uniffi::constructor]
     pub fn open_with_keychain(
         data_dir: String,
         relay_url: String,
-        shell_storage_key: Option<Vec<u8>>,
+        shell_storage_key: Option<HandedOverSecret>,
         keychain: Box<dyn crate::MobilePlatformKeychain>,
     ) -> Result<Arc<Self>, MobileError> {
         use crate::platform_app_engine_locked::{LockedStart, OpenParams, Opened};
 
-        let shell_storage_key = shell_storage_key.map(parse_storage_key).transpose()?;
+        let (release_handle, shell_storage_key) = match shell_storage_key {
+            Some(handed_over) => (
+                Some(handed_over.handle),
+                Some(parse_storage_key(handed_over.secret)?),
+            ),
+            None => (None, None),
+        };
         let data_path = PathBuf::from(&data_dir);
         std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
             detail: e.to_string(),
@@ -270,12 +281,17 @@ impl PlatformAppEngine {
             storage_path: data_path.join("vauchi.db"),
             relay_url: relay_url.clone(),
             shell_storage_key,
+            release_handle,
             keychain: keychain.clone(),
         };
         let storage_path = params.storage_path.clone();
         Ok(match params.open()? {
             Opened::Engine(vauchi) => {
-                Self::from_vauchi(*vauchi, storage_path, relay_url, Some(keychain))
+                let engine = Self::from_vauchi(*vauchi, storage_path, relay_url, Some(keychain));
+                if let Ok(mut release) = engine.pending_release.lock() {
+                    *release = params.release_handle;
+                }
+                engine
             }
             Opened::Locked(reason) => Self::build(
                 None,
@@ -286,6 +302,15 @@ impl PlatformAppEngine {
             ),
         })
     }
+}
+
+/// A secret the shell kept itself, handed over to Core with the shell's own
+/// opaque name for it. Core answers `ForgetStoredSecret { handle }` once it
+/// holds what the secret protected (vauchi/private#580).
+#[derive(uniffi::Record)]
+pub struct HandedOverSecret {
+    pub handle: String,
+    pub secret: Vec<u8>,
 }
 
 /// Validates a storage key handed over by a shell: 32 bytes, not all zeros.
@@ -324,6 +349,7 @@ impl PlatformAppEngine {
         Arc::new(Self {
             engine: Mutex::new(engine),
             locked: Mutex::new(locked),
+            pending_release: Mutex::new(None),
             event_handler_id: Mutex::new(None),
             direct_listener: Arc::new(Mutex::new(None)),
             storage_path,
@@ -343,9 +369,11 @@ impl PlatformAppEngine {
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         self_heal_post_auth(engine);
-        let commands = engine.initial_commands().map_err(|e| MobileError::Other {
+        let mut commands = engine.initial_commands().map_err(|e| MobileError::Other {
             detail: format!("Failed to compose initial presentation: {e}"),
         })?;
+        drop(engine_slot);
+        commands.extend(self.take_release()?);
         commands_envelope_to_json(&commands)
     }
 

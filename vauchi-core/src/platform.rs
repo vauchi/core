@@ -459,6 +459,10 @@ pub enum Command {
     /// [`Event::BiometricUnlockSucceeded`]; a shell without the hardware
     /// answers [`Event::HardwareUnavailable`].
     RequestBiometricUnlock,
+    /// Delete the secret the shell handed over under `handle`: Core now
+    /// holds what it protected in secure storage (vauchi/private#580). The
+    /// handle is the shell's own opaque name, echoed back unchanged.
+    ForgetStoredSecret { handle: String },
 }
 
 /// Authentication state the native startup shell must present.
@@ -657,6 +661,7 @@ impl Command {
             Self::PostNotification { .. } => "PostNotification",
             Self::SetAuthenticationRequirement { .. } => "SetAuthenticationRequirement",
             Self::RequestBiometricUnlock => "RequestBiometricUnlock",
+            Self::ForgetStoredSecret { .. } => "ForgetStoredSecret",
         }
     }
 }

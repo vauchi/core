@@ -65,9 +65,12 @@ pub unsafe extern "C" fn vauchi_exchange_create(app: *mut VauchiApp) -> *mut Vau
                 return std::ptr::null_mut();
             }
             let app_ref = &*app;
-            let engine = match app_ref.engine.lock() {
-                Ok(e) => e,
-                Err(_) => return std::ptr::null_mut(),
+            let Ok(mut engine_slot) = app_ref.engine.lock() else {
+                return std::ptr::null_mut();
+            };
+            let engine = match engine_slot.as_mut() {
+                Some(e) => e,
+                None => return std::ptr::null_mut(),
             };
 
             let vauchi = engine.vauchi();

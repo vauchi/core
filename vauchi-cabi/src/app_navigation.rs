@@ -79,9 +79,15 @@ pub unsafe extern "C" fn vauchi_app_tab_info(
             }
             let app = &*handle;
             let locale = resolve_locale(locale_code);
-            match app.engine.lock() {
-                Ok(engine) => to_c_string(&tabs_to_json(&engine.tab_info(locale))),
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            match app
+                .engine
+                .lock()
+                .ok()
+                .as_mut()
+                .and_then(|slot| slot.as_mut())
+            {
+                Some(engine) => to_c_string(&tabs_to_json(&engine.tab_info(locale))),
+                None => to_c_string(r#"{"error":"lock poisoned"}"#),
             }
         })) {
             Ok(result) => result,
@@ -116,9 +122,15 @@ pub unsafe extern "C" fn vauchi_app_sidebar_items(
             }
             let app = &*handle;
             let locale = resolve_locale(locale_code);
-            match app.engine.lock() {
-                Ok(engine) => to_c_string(&tabs_to_json(&engine.sidebar_items(locale))),
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            match app
+                .engine
+                .lock()
+                .ok()
+                .as_mut()
+                .and_then(|slot| slot.as_mut())
+            {
+                Some(engine) => to_c_string(&tabs_to_json(&engine.sidebar_items(locale))),
+                None => to_c_string(r#"{"error":"lock poisoned"}"#),
             }
         })) {
             Ok(result) => result,

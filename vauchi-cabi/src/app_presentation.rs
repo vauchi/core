@@ -31,8 +31,17 @@ pub unsafe extern "C" fn vauchi_app_initial_commands(handle: *mut VauchiApp) -> 
                 return std::ptr::null_mut();
             }
             let app = &*handle;
-            match app.engine.lock() {
-                Ok(mut engine) => match engine.initial_commands() {
+            if let Some(commands) = app.locked_initial_commands() {
+                return to_c_string(&serde_json::json!({ "commands": commands }).to_string());
+            }
+            match app
+                .engine
+                .lock()
+                .ok()
+                .as_mut()
+                .and_then(|slot| slot.as_mut())
+            {
+                Some(engine) => match engine.initial_commands() {
                     Ok(commands) => {
                         to_c_string(&serde_json::json!({ "commands": commands }).to_string())
                     }
@@ -40,7 +49,7 @@ pub unsafe extern "C" fn vauchi_app_initial_commands(handle: *mut VauchiApp) -> 
                         to_c_string(&serde_json::json!({ "error": error.to_string() }).to_string())
                     }
                 },
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+                None => to_c_string(r#"{"error":"lock poisoned"}"#),
             }
         }))
         .unwrap_or(std::ptr::null_mut())
@@ -67,7 +76,21 @@ pub unsafe extern "C" fn vauchi_app_dispatch(
                 return to_c_string(r#"{"error":"null event JSON"}"#);
             }
             let app = &*handle;
-            let Ok(mut engine) = app.engine.lock() else {
+            let locked_event = CStr::from_ptr(event_json)
+                .to_str()
+                .map_err(|_| vauchi_core::EventJsonError::Malformed)
+                .and_then(vauchi_core::event_from_json);
+            let locked_answer = match locked_event {
+                Ok(event) => app.locked_dispatch(event),
+                Err(error) => app.locked_reject_event_json(&error),
+            };
+            if let Some(commands) = locked_answer {
+                return to_c_string(&serde_json::json!({ "commands": commands }).to_string());
+            }
+            let Ok(mut engine_slot) = app.engine.lock() else {
+                return to_c_string(r#"{"error":"lock poisoned"}"#);
+            };
+            let Some(engine) = engine_slot.as_mut() else {
                 return to_c_string(r#"{"error":"lock poisoned"}"#);
             };
             let decoded = CStr::from_ptr(event_json)

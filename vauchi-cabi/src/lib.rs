@@ -19,6 +19,7 @@ mod app;
 mod app_import_warnings;
 #[cfg(test)]
 mod app_keyring_tests;
+mod app_locked;
 #[cfg(test)]
 mod app_navigation;
 mod app_presentation;
@@ -41,9 +42,22 @@ use config::CabiConfig;
 
 /// Opaque handle to an AppEngine instance.
 pub struct VauchiApp {
-    pub(crate) engine: Mutex<AppEngine>,
+    /// `None` while the locked start below holds storage closed.
+    pub(crate) engine: Mutex<Option<AppEngine>>,
+    /// Core's storage-lock screens until storage opens (vauchi/private#581).
+    pub(crate) locked: Mutex<Option<app_locked::LockedStart>>,
     /// Active event handler ID for cleanup on replacement or destroy.
     pub(crate) event_handler_id: Mutex<Option<vauchi_core::api::HandlerId>>,
+}
+
+impl VauchiApp {
+    pub(crate) fn opened(engine: AppEngine) -> Self {
+        Self {
+            engine: Mutex::new(Some(engine)),
+            locked: Mutex::new(None),
+            event_handler_id: Mutex::new(None),
+        }
+    }
 }
 
 /// Opaque handle to an exchange session.
@@ -162,10 +176,7 @@ pub unsafe extern "C" fn vauchi_app_create_from_config(config: *mut CabiConfig) 
                 return std::ptr::null_mut();
             };
 
-            Box::into_raw(Box::new(VauchiApp {
-                engine: Mutex::new(AppEngine::new(vauchi)),
-                event_handler_id: Mutex::new(None),
-            }))
+            Box::into_raw(Box::new(VauchiApp::opened(AppEngine::new(vauchi))))
         })) {
             Ok(result) => result,
             Err(_) => std::ptr::null_mut(),

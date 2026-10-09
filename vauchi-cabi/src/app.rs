@@ -5,7 +5,7 @@
 //! AppEngine C ABI functions.
 
 use std::os::raw::c_char;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use vauchi_app::ui::*;
 use vauchi_core::api::Vauchi;
@@ -19,25 +19,19 @@ pub(crate) fn open_with_file_fallback(
     data_path: &std::path::Path,
     config: vauchi_core::api::VauchiConfig,
 ) -> Option<Vauchi> {
-    let storage_key = load_or_generate_fallback_key(data_path).ok()?;
-    Vauchi::new(config.with_storage_key(storage_key)).ok()
+    open_with_file_key(data_path, config).ok()
 }
 
-/// Opens under the platform keyring when it answers, otherwise under the
-/// durable file-backed key.
-pub(crate) fn open_with_keyring(
+/// Opens under the durable file-backed key in `data_path`.
+pub(crate) fn open_with_file_key(
     data_path: &std::path::Path,
     config: vauchi_core::api::VauchiConfig,
-    keyring: Option<Arc<dyn SecureStorage>>,
-) -> Option<Vauchi> {
-    if let Some(keyring) = keyring
-        && keyring.load_key("_probe").is_ok()
-        && let Ok(vauchi) = Vauchi::with_secure_storage(config.clone(), keyring)
-    {
-        return Some(vauchi);
-    }
-    open_with_file_fallback(data_path, config)
+) -> Result<Vauchi, vauchi_core::VauchiError> {
+    let storage_key = load_or_generate_fallback_key(data_path)?;
+    Vauchi::new(config.with_storage_key(storage_key))
 }
+
+pub(crate) use crate::app_locked::open_app;
 
 /// Create a new AppEngine with in-memory storage and default relay.
 ///
@@ -78,10 +72,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_relay(relay_url: *const c_char) 
         if let Some(url) = from_c_str(relay_url) {
             engine.vauchi_mut().config_mut().relay.server_url = url;
         }
-        Box::into_raw(Box::new(VauchiApp {
-            engine: Mutex::new(engine),
-            event_handler_id: Mutex::new(None),
-        }))
+        Box::into_raw(Box::new(VauchiApp::opened(engine)))
     })) {
         Ok(result) => result,
         Err(_) => std::ptr::null_mut(),
@@ -129,10 +120,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_config(
             None => return std::ptr::null_mut(),
         };
 
-        Box::into_raw(Box::new(VauchiApp {
-            engine: Mutex::new(AppEngine::new(vauchi)),
-            event_handler_id: Mutex::new(None),
-        }))
+        Box::into_raw(Box::new(VauchiApp::opened(AppEngine::new(vauchi))))
     })) {
         Ok(result) => result,
         Err(_) => std::ptr::null_mut(),
@@ -197,10 +185,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_key(
                 Err(_) => return std::ptr::null_mut(),
             };
 
-            Box::into_raw(Box::new(VauchiApp {
-                engine: Mutex::new(AppEngine::new(vauchi)),
-                event_handler_id: Mutex::new(None),
-            }))
+            Box::into_raw(Box::new(VauchiApp::opened(AppEngine::new(vauchi))))
         })) {
             Ok(result) => result,
             Err(_) => std::ptr::null_mut(),
@@ -240,9 +225,11 @@ pub unsafe extern "C" fn vauchi_app_poll_notifications(app: *mut VauchiApp) -> *
         }
 
         let app = unsafe { &*app };
-        let mut engine = match app.engine.lock() {
-            Ok(lock) => lock,
-            Err(_) => return std::ptr::null_mut(),
+        let Ok(mut engine_slot) = app.engine.lock() else {
+            return std::ptr::null_mut();
+        };
+        let Some(engine) = engine_slot.as_mut() else {
+            return std::ptr::null_mut();
         };
 
         let notifications = engine.poll_notifications();
@@ -278,9 +265,11 @@ pub unsafe extern "C" fn vauchi_app_on_wakeup(app: *mut VauchiApp) -> *mut c_cha
         }
 
         let app = unsafe { &*app };
-        let mut engine = match app.engine.lock() {
-            Ok(lock) => lock,
-            Err(_) => return std::ptr::null_mut(),
+        let Ok(mut engine_slot) = app.engine.lock() else {
+            return std::ptr::null_mut();
+        };
+        let Some(engine) = engine_slot.as_mut() else {
+            return std::ptr::null_mut();
         };
 
         let notifications = engine.on_wakeup();
@@ -355,12 +344,18 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
                 None => return to_c_string(&format!(r#"{{"error":"unknown screen: {}"}}"#, name)),
             };
             let app = &*handle;
-            match app.engine.lock() {
-                Ok(mut engine) => {
+            match app
+                .engine
+                .lock()
+                .ok()
+                .as_mut()
+                .and_then(|slot| slot.as_mut())
+            {
+                Some(engine) => {
                     engine.navigate_to(screen);
-                    batch_after_navigation(&mut engine)
+                    batch_after_navigation(engine)
                 }
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+                None => to_c_string(r#"{"error":"lock poisoned"}"#),
             }
         })) {
             Ok(result) => result,
@@ -388,12 +383,18 @@ pub unsafe extern "C" fn vauchi_app_navigate_back(handle: *mut VauchiApp) -> *mu
                 return std::ptr::null_mut();
             }
             let app = &*handle;
-            match app.engine.lock() {
-                Ok(mut engine) => {
+            match app
+                .engine
+                .lock()
+                .ok()
+                .as_mut()
+                .and_then(|slot| slot.as_mut())
+            {
+                Some(engine) => {
                     engine.navigate_back();
-                    batch_after_navigation(&mut engine)
+                    batch_after_navigation(engine)
                 }
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+                None => to_c_string(r#"{"error":"lock poisoned"}"#),
             }
         })) {
             Ok(result) => result,
@@ -416,8 +417,14 @@ pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) ->
                 return std::ptr::null_mut();
             }
             let app = &*handle;
-            match app.engine.lock() {
-                Ok(engine) => {
+            match app
+                .engine
+                .lock()
+                .ok()
+                .as_mut()
+                .and_then(|slot| slot.as_mut())
+            {
+                Some(engine) => {
                     let screens: Vec<&str> = engine
                         .available_screens()
                         .iter()
@@ -428,7 +435,7 @@ pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) ->
                         |j| to_c_string(&j),
                     )
                 }
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+                None => to_c_string(r#"{"error":"lock poisoned"}"#),
             }
         })) {
             Ok(result) => result,
@@ -451,9 +458,15 @@ pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *m
                 return std::ptr::null_mut();
             }
             let app = &*handle;
-            match app.engine.lock() {
-                Ok(engine) => to_c_string(engine.default_screen().screen_id()),
-                Err(_) => to_c_string("my_info"),
+            match app
+                .engine
+                .lock()
+                .ok()
+                .as_mut()
+                .and_then(|slot| slot.as_mut())
+            {
+                Some(engine) => to_c_string(engine.default_screen().screen_id()),
+                None => to_c_string("my_info"),
             }
         })) {
             Ok(result) => result,
@@ -495,7 +508,10 @@ pub unsafe extern "C" fn vauchi_app_current_tab_id(
                 _ => return std::ptr::null_mut(),
             };
             let app = &*handle;
-            let Ok(engine) = app.engine.lock() else {
+            let Ok(mut engine_slot) = app.engine.lock() else {
+                return std::ptr::null_mut();
+            };
+            let Some(engine) = engine_slot.as_mut() else {
                 return std::ptr::null_mut();
             };
             match engine.current_tab_id(layout) {
@@ -524,7 +540,11 @@ pub unsafe extern "C" fn vauchi_app_has_identity(handle: *mut VauchiApp) -> i32 
             let app = &*handle;
             app.engine
                 .lock()
-                .map(|engine| i32::from(engine.vauchi().has_identity()))
+                .ok()
+                .and_then(|slot| {
+                    slot.as_ref()
+                        .map(|engine| i32::from(engine.vauchi().has_identity()))
+                })
                 .unwrap_or(-1)
         }))
         .unwrap_or(-1)
@@ -558,15 +578,18 @@ pub unsafe extern "C" fn vauchi_app_create_identity(
             };
             app.engine
                 .lock()
-                .map(|mut engine| {
-                    if engine.vauchi().has_identity() {
-                        return 0; // Already has identity — true no-op
-                    }
-                    engine
-                        .vauchi_mut()
-                        .create_identity(&name)
-                        .map(|()| 0)
-                        .unwrap_or(-1)
+                .ok()
+                .and_then(|mut slot| {
+                    slot.as_mut().map(|engine| {
+                        if engine.vauchi().has_identity() {
+                            return 0; // Already has identity — true no-op
+                        }
+                        engine
+                            .vauchi_mut()
+                            .create_identity(&name)
+                            .map(|()| 0)
+                            .unwrap_or(-1)
+                    })
                 })
                 .unwrap_or(-1)
         }))
@@ -592,15 +615,21 @@ pub unsafe extern "C" fn vauchi_app_handle_app_backgrounded(handle: *mut VauchiA
                 return std::ptr::null_mut();
             }
             let app = &*handle;
-            match app.engine.lock() {
-                Ok(mut engine) => match engine.handle_app_backgrounded() {
+            match app
+                .engine
+                .lock()
+                .ok()
+                .as_mut()
+                .and_then(|slot| slot.as_mut())
+            {
+                Some(engine) => match engine.handle_app_backgrounded() {
                     Some(screen) => serde_json::to_string(&screen).map_or_else(
                         |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
                         |j| to_c_string(&j),
                     ),
                     None => std::ptr::null_mut(),
                 },
-                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+                None => to_c_string(r#"{"error":"lock poisoned"}"#),
             }
         })) {
             Ok(result) => result,
@@ -651,7 +680,20 @@ pub unsafe extern "C" fn vauchi_app_set_event_callback(
     let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         // SAFETY: handle is checked for null above
         let app = unsafe { &*handle };
-        let Ok(engine) = app.engine.lock() else {
+        let Some(handler) = app.keep_event_callback_while_locked(handler) else {
+            return;
+        };
+        register_event_callback(app, handler);
+    }));
+}
+
+/// Registers `handler` on the open engine (or clears it with `None`).
+pub(crate) fn register_event_callback(app: &VauchiApp, handler: Option<EventCallbackHandler>) {
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let Ok(mut engine_slot) = app.engine.lock() else {
+            return;
+        };
+        let Some(engine) = engine_slot.as_mut() else {
             return;
         };
         let Ok(mut handler_id_slot) = app.event_handler_id.lock() else {
@@ -679,7 +721,7 @@ pub unsafe extern "C" fn vauchi_app_set_event_callback(
 /// The caller of `vauchi_app_set_event_callback` guarantees that both the
 /// callback and `user_data` remain valid and thread-safe for the lifetime
 /// of the registration.
-struct EventCallbackHandler {
+pub(crate) struct EventCallbackHandler {
     cb: unsafe extern "C" fn(*const c_char, *mut std::ffi::c_void),
     user_data: *mut std::ffi::c_void,
 }
@@ -749,13 +791,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_keyring(
         #[cfg(not(feature = "secure-storage"))]
         let keyring: Option<Arc<dyn SecureStorage>> = None;
 
-        match open_with_keyring(&data_path, config, keyring) {
-            Some(vauchi) => Box::into_raw(Box::new(VauchiApp {
-                engine: Mutex::new(AppEngine::new(vauchi)),
-                event_handler_id: Mutex::new(None),
-            })),
-            None => std::ptr::null_mut(),
-        }
+        open_app(&data_path, config, keyring)
     })) {
         Ok(result) => result,
         Err(_) => std::ptr::null_mut(),
@@ -802,8 +838,14 @@ pub unsafe extern "C" fn vauchi_app_import_contacts_from_vcf(
         // SAFETY: caller guarantees data points to data_len valid bytes
         let bytes = unsafe { std::slice::from_raw_parts(data, data_len) };
         let app = unsafe { &*handle };
-        match app.engine.lock() {
-            Ok(engine) => match engine.vauchi().import_contacts_from_vcf(bytes) {
+        match app
+            .engine
+            .lock()
+            .ok()
+            .as_mut()
+            .and_then(|slot| slot.as_mut())
+        {
+            Some(engine) => match engine.vauchi().import_contacts_from_vcf(bytes) {
                 Ok(result) => {
                     let json = serde_json::json!({
                         "imported": result.imported,
@@ -814,7 +856,7 @@ pub unsafe extern "C" fn vauchi_app_import_contacts_from_vcf(
                 }
                 Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
             },
-            Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            None => to_c_string(r#"{"error":"lock poisoned"}"#),
         }
     })) {
         Ok(result) => result,
@@ -844,15 +886,21 @@ pub unsafe extern "C" fn vauchi_app_drain_notifications(handle: *mut VauchiApp) 
                 return std::ptr::null_mut();
             }
             let app = &*handle;
-            match app.engine.lock() {
-                Ok(mut engine) => {
+            match app
+                .engine
+                .lock()
+                .ok()
+                .as_mut()
+                .and_then(|slot| slot.as_mut())
+            {
+                Some(engine) => {
                     let notifications = engine.drain_pending_notifications();
                     match serde_json::to_string(&notifications) {
                         Ok(json) => to_c_string(&json),
                         Err(_) => to_c_string("[]"),
                     }
                 }
-                Err(_) => std::ptr::null_mut(),
+                None => std::ptr::null_mut(),
             }
         })) {
             Ok(result) => result,

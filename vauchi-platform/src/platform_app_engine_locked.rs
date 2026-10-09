@@ -59,6 +59,9 @@ impl OpenParams {
             Err(VauchiError::Storage(
                 StorageError::SecureStorageKeyInvalidated | StorageError::WrongKey,
             )) => Ok(Opened::Locked(StorageLockReason::Unreadable)),
+            Err(VauchiError::Storage(StorageError::SecureStorageUnavailable)) => {
+                Ok(Opened::Locked(StorageLockReason::Unavailable))
+            }
             Err(other) => Err(other.into()),
         }
     }

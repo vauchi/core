@@ -232,11 +232,13 @@ fn every_storage_lock_screen_has_its_strings() {
     let locked = lock.initial_commands();
     let unreadable = lock.show(StorageLockReason::Unreadable);
     let confirm = choose_start_over(&mut lock, &unreadable);
+    let unavailable = lock.show(StorageLockReason::Unavailable);
 
     for (name, batch) in [
         ("locked", locked),
         ("unreadable", unreadable),
         ("confirm", confirm),
+        ("unavailable", unavailable),
     ] {
         let rendered = format!("{batch:?}");
         assert!(

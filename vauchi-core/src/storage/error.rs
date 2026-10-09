@@ -89,6 +89,11 @@ pub enum StorageError {
     /// storage; what it held cannot be read again (vauchi/private#580).
     #[error("Secure storage lost its key")]
     SecureStorageKeyInvalidated,
+
+    /// Secure storage failed for another reason (I/O, a service not
+    /// reachable); a later attempt may succeed (vauchi/private#580).
+    #[error("Secure storage is unavailable")]
+    SecureStorageUnavailable,
 }
 
 impl From<rusqlite::Error> for StorageError {

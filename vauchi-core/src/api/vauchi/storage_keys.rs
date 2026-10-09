@@ -22,23 +22,18 @@ use super::SMK_KEY_NAME;
 
 use crate::api::shred::BOOTSTRAP_KEY_NAME;
 
-/// Keeps a locked or key-invalidated keychain typed, so Core can choose the
-/// unlock or recovery screen (ADR-045); other failures stay configuration
-/// errors.
-fn keychain_error(action: &str, error: StorageError) -> VauchiError {
-    match error {
-        StorageError::SecureStorageLocked | StorageError::SecureStorageKeyInvalidated => {
-            VauchiError::Storage(error)
-        }
-        other => VauchiError::Configuration(format!("Failed to {action}: {other}")),
-    }
+/// Keeps every keychain failure typed, so Core can choose the unlock,
+/// recovery or try-again screen (ADR-045). The platform's message is
+/// dropped: it is for logs, and may name paths.
+fn keychain_error(error: StorageError) -> VauchiError {
+    VauchiError::Storage(match error {
+        StorageError::SecureStorageLocked | StorageError::SecureStorageKeyInvalidated => error,
+        _ => StorageError::SecureStorageUnavailable,
+    })
 }
 
 fn load_key(secure: &dyn SecureStorage, name: &str) -> VauchiResult<Option<[u8; 32]>> {
-    let Some(bytes) = secure
-        .load_key(name)
-        .map_err(|e| keychain_error(&format!("load {name} from SecureStorage"), e))?
-    else {
+    let Some(bytes) = secure.load_key(name).map_err(keychain_error)? else {
         return Ok(None);
     };
     let bytes = zeroize::Zeroizing::new(bytes);
@@ -124,14 +119,14 @@ pub(super) fn open_storage(
         let fresh = SymmetricKey::generate();
         secure
             .save_key(BOOTSTRAP_KEY_NAME, fresh.as_bytes())
-            .map_err(|e| keychain_error("store the bootstrap key", e))?;
+            .map_err(keychain_error)?;
         return Ok(Storage::open(path, fresh)?);
     }
     let (storage, key) = open_with_first(path, candidates)?;
     if stored_bootstrap.as_ref().map(SymmetricKey::as_bytes) != Some(key.as_bytes()) {
         secure
             .save_key(BOOTSTRAP_KEY_NAME, key.as_bytes())
-            .map_err(|e| keychain_error("store the bootstrap key", e))?;
+            .map_err(keychain_error)?;
     }
     Ok(storage)
 }

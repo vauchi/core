@@ -32,6 +32,8 @@ pub enum StorageLockReason {
     Locked,
     /// No key opens the data: the keychain lost it, or none was ever stored.
     Unreadable,
+    /// The keychain failed for another reason; a later attempt may succeed.
+    Unavailable,
 }
 
 /// What the caller does next.
@@ -48,6 +50,7 @@ pub enum StorageLockStep {
 enum Screen {
     Locked,
     Unreadable,
+    Unavailable,
     ConfirmStartOver,
 }
 
@@ -112,7 +115,7 @@ impl StorageLockPresentation {
                 self.retry_from_tap = true;
                 StorageLockStep::RetryOpen
             }
-            (Screen::Unreadable, TRY_AGAIN) => {
+            (Screen::Unreadable | Screen::Unavailable, TRY_AGAIN) => {
                 self.retry_from_tap = false;
                 StorageLockStep::RetryOpen
             }
@@ -233,6 +236,14 @@ impl StorageLockPresentation {
                 Some((START_OVER, "storage_lock.start_over")),
                 false,
             ),
+            Screen::Unavailable => (
+                "storage_lock.unavailable",
+                "storage_lock.unavailable_title",
+                "storage_lock.unavailable_body",
+                (TRY_AGAIN, "storage_lock.try_again"),
+                None,
+                false,
+            ),
             Screen::ConfirmStartOver => (
                 "storage_lock.confirm_start_over",
                 "storage_lock.confirm_title",
@@ -286,5 +297,6 @@ fn screen_for(reason: StorageLockReason) -> Screen {
     match reason {
         StorageLockReason::Locked => Screen::Locked,
         StorageLockReason::Unreadable => Screen::Unreadable,
+        StorageLockReason::Unavailable => Screen::Unavailable,
     }
 }

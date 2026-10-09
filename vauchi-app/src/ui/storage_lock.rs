@@ -196,6 +196,12 @@ impl StorageLockPresentation {
         rejection::event_json_rejection(self.locale, error)
     }
 
+    /// Core's alert for a retry or start-over that failed for a reason
+    /// other than a lock (ADR-045 Am1).
+    pub fn failure(&self) -> Vec<Command> {
+        self.rejection()
+    }
+
     fn rejection(&self) -> Vec<Command> {
         rejection::dispatch_rejection(self.locale)
     }

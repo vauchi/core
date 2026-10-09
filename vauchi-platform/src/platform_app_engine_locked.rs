@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{AppEngine, StorageLockPresentation, StorageLockReason, StorageLockStep};
-use vauchi_core::api::{Vauchi, VauchiConfig};
+use vauchi_core::api::{PreSignedShredMessages, Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::{Command, Event, StorageError, VauchiError};
 
@@ -59,14 +59,23 @@ impl OpenParams {
         }
     }
 
-    /// Deletes the database and every key that opened it. Called only after
-    /// the person confirmed on Core's start-over screen.
+    /// Deletes the database, the lost identity's files and every key that
+    /// opened the database. Called only after the person confirmed on Core's
+    /// start-over screen.
+    ///
+    /// Companion files go first: if one cannot be removed, the database
+    /// stays, so a fresh database never starts next to an old WAL.
     fn delete_unreadable_data(&self) -> Result<(), MobileError> {
-        for path in database_files(&self.storage_path) {
-            if path.exists() {
-                std::fs::remove_file(&path).map_err(|e| MobileError::StorageError {
-                    detail: e.to_string(),
-                })?;
+        for path in companion_files(&self.storage_path) {
+            remove_file_if_present(&path)?;
+        }
+        remove_file_if_present(&self.storage_path)?;
+        if let Some(dir) = self.storage_path.parent() {
+            remove_file_if_present(&dir.join("identity.json"))?;
+            remove_file_if_present(&PreSignedShredMessages::file_path(dir))?;
+            let keys = dir.join("keys");
+            if keys.exists() {
+                std::fs::remove_dir_all(&keys).map_err(storage_error)?;
             }
         }
         for name in STORAGE_KEY_NAMES {
@@ -80,9 +89,22 @@ impl OpenParams {
     }
 }
 
-/// The database, its WAL and shared-memory files, and pre-migration backups.
-fn database_files(storage_path: &Path) -> Vec<PathBuf> {
-    let mut files = vec![storage_path.to_path_buf()];
+fn storage_error(error: std::io::Error) -> MobileError {
+    MobileError::StorageError {
+        detail: error.to_string(),
+    }
+}
+
+fn remove_file_if_present(path: &Path) -> Result<(), MobileError> {
+    if path.exists() {
+        std::fs::remove_file(path).map_err(storage_error)?;
+    }
+    Ok(())
+}
+
+/// The database's WAL and shared-memory files and pre-migration backups.
+fn companion_files(storage_path: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
     let Some(name) = storage_path.file_name().and_then(|n| n.to_str()) else {
         return files;
     };
@@ -145,14 +167,22 @@ impl PlatformAppEngine {
         let Some(start) = locked.as_mut() else {
             return Ok(None);
         };
-        match start.presentation.dispatch(event) {
-            StorageLockStep::Commands(commands) => Ok(Some(commands)),
-            StorageLockStep::RetryOpen => self.retry_open(&mut locked).map(Some),
-            StorageLockStep::StartOverConfirmed => {
-                start.params.delete_unreadable_data()?;
-                self.retry_open(&mut locked).map(Some)
-            }
-        }
+        let outcome = match start.presentation.dispatch(event) {
+            StorageLockStep::Commands(commands) => return Ok(Some(commands)),
+            StorageLockStep::RetryOpen => self.retry_open(&mut locked),
+            StorageLockStep::StartOverConfirmed => start
+                .params
+                .delete_unreadable_data()
+                .and_then(|()| self.retry_open(&mut locked)),
+        };
+        // ADR-045: Core answers a failure with its own alert; the shell never
+        // sees the error value.
+        Ok(Some(outcome.unwrap_or_else(|_| {
+            locked
+                .as_ref()
+                .map(|start| start.presentation.failure())
+                .unwrap_or_default()
+        })))
     }
 
     fn retry_open(&self, locked: &mut Option<LockedStart>) -> Result<Vec<Command>, MobileError> {

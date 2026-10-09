@@ -166,3 +166,24 @@ fn a_locked_start_that_turns_out_unreadable_stops_asking_for_the_prompt() {
         StorageLockStep::Commands(_)
     ));
 }
+
+// @internal
+#[test]
+fn every_storage_lock_screen_has_its_strings() {
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::English);
+    let locked = lock.initial_commands();
+    let unreadable = lock.show(StorageLockReason::Unreadable);
+    let confirm = commands(press_primary(&mut lock, &unreadable));
+
+    for (name, batch) in [
+        ("locked", locked),
+        ("unreadable", unreadable),
+        ("confirm", confirm),
+    ] {
+        let rendered = format!("{batch:?}");
+        assert!(
+            !rendered.contains("Missing:"),
+            "{name} screen renders a missing string: {rendered}"
+        );
+    }
+}

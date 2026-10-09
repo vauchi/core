@@ -191,3 +191,16 @@ fn identity_from_storage_bytes_rejects_severely_truncated_input() {
         "severely truncated storage bytes must Err so the caller can log the contract violation (site 3 of silent-failures audit)"
     );
 }
+
+// Identity bytes always carry the device index and name; the old layout
+// without them is refused rather than defaulted (vauchi/private#571).
+// @internal
+#[test]
+fn identity_bytes_without_the_device_fields_are_refused() {
+    let full = Identity::create("Alice", 0).to_storage_bytes();
+    let name_len = u32::from_le_bytes(full[..4].try_into().unwrap()) as usize;
+    let without_device = &full[..4 + name_len + 32];
+
+    assert!(Identity::from_storage_bytes(without_device, 0).is_err());
+    assert!(Identity::from_storage_bytes(&full, 0).is_ok());
+}

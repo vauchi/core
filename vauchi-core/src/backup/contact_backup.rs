@@ -450,10 +450,15 @@ mod tests {
 
     // @internal
     #[test]
-    fn backup_contact_card_deserializes_legacy_byte_array_avatar() {
+    fn backup_contact_card_refuses_a_byte_array_avatar() {
         let json = r#"{"schema_version":1,"id":"abc","display_name":"Test","fields":[],"avatar":[0,1,2,255,254,128]}"#;
-        let backup: BackupContactCard = serde_json::from_str(json).unwrap();
-        assert_eq!(backup.avatar, Some(vec![0u8, 1, 2, 255, 254, 128]));
+
+        let err = serde_json::from_str::<BackupContactCard>(json).unwrap_err();
+
+        assert!(
+            err.to_string().contains("base64"),
+            "unexpected error: {err}"
+        );
     }
 
     // @scenario: security :: Every successful contact backup export is importable

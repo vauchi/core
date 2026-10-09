@@ -770,21 +770,16 @@ mod tests {
 
     // @internal
     #[test]
-    fn uncompressed_backup_bytes_pass_through_up_to_the_limit() {
-        let at_limit = vec![b'{'; 8];
-
-        assert_eq!(
-            decompress_backup_with_limit(&at_limit, 8).unwrap(),
-            at_limit
-        );
-        assert!(matches!(
-            decompress_backup_with_limit(&[b'{'; 9], 8),
-            Err(BackupError::TooLarge)
-        ));
-        assert_eq!(
-            decompress_backup_with_limit(&[], 8).unwrap(),
-            Vec::<u8>::new()
-        );
+    fn backup_bytes_that_are_not_zlib_are_refused() {
+        for not_zlib in [&[b'{'; 8][..], &[][..], &[b'{'; 9][..]] {
+            assert!(
+                matches!(
+                    decompress_backup_with_limit(not_zlib, 8),
+                    Err(BackupError::Deserialization(_))
+                ),
+                "{not_zlib:?} must be refused"
+            );
+        }
     }
 
     // The input-size shortcut applies only to uncompressed bytes: a zlib

@@ -135,3 +135,36 @@ pub fn drive_onboarding(engine: &PlatformAppEngine) {
     batch = dispatch_primary(engine, &batch); // contact_info → what_next
     let _ = dispatch_primary(engine, &batch); // what_next → complete → home
 }
+
+/// A handle to a [`FakeKeychain`] the test keeps reading after handing it
+/// to Core, which takes the keychain by value.
+#[derive(Clone)]
+pub struct SharedKeychain(pub std::sync::Arc<FakeKeychain>);
+
+impl SharedKeychain {
+    pub fn new() -> Self {
+        Self(std::sync::Arc::new(FakeKeychain::new()))
+    }
+
+    pub fn names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.0.store.lock().unwrap().keys().cloned().collect();
+        names.sort();
+        names
+    }
+
+    pub fn get(&self, name: &str) -> Option<Vec<u8>> {
+        self.0.store.lock().unwrap().get(name).cloned()
+    }
+}
+
+impl MobilePlatformKeychain for SharedKeychain {
+    fn save_key(&self, name: String, key: Vec<u8>) -> Result<(), KeychainError> {
+        self.0.save_key(name, key)
+    }
+    fn load_key(&self, name: String) -> Result<Option<Vec<u8>>, KeychainError> {
+        self.0.load_key(name)
+    }
+    fn delete_key(&self, name: String) -> Result<(), KeychainError> {
+        self.0.delete_key(name)
+    }
+}

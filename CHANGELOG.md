@@ -6,6 +6,30 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.78.0] — 2026-10-09
+
+### Fixed
+
+- A locked start answers the shell's environment with a presentation
+  profile, and the engine it opens after the unlock gets the environment the
+  shell reported, so shells that wait for a profile no longer show a spinner
+  on a locked start or right after the unlock (vauchi/private#580).
+- When the unlock prompt opens a locked start, the first batch carries
+  `SetAuthenticationRequirement`: `app_password` when a duress PIN is set
+  up, so the app-password screen is no longer skipped (ADR-032,
+  vauchi/private#580).
+- Rekey works with imported contacts and with contacts whose card is under
+  a CEK; either one used to fail the whole rekey, including the boot path
+  that finishes the SMK move (vauchi/private#585).
+- An imported contact's vCard UID is stored encrypted, with a keyed hash for
+  the duplicate-import lookup (migration v80, vauchi/private#579).
+
+### Removed
+
+- `Vauchi::migrate_contacts_to_cek` and
+  `Vauchi::migrate_field_centric_visibility`, one-shot upgrade routines for
+  installs that predate them; no consumer called them (vauchi/private#572).
+
 ## [0.77.0] — 2026-10-09
 
 Crypto-shredding now holds on mobile and desktop (vauchi/private#580 and

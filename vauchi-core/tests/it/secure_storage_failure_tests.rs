@@ -66,13 +66,18 @@ fn a_keychain_failure_reaches_core_as_its_own_kind() {
     for (name, failure) in failures() {
         let (_dir, result) = boot(Arc::new(FailingKeychain::new(failure)));
 
-        let expected = failure();
-        match result {
-            Err(VauchiError::Storage(actual))
-                if std::mem::discriminant(&actual) == std::mem::discriminant(&expected) => {}
-            Err(other) => panic!("{name}: expected {expected:?}, got {other:?}"),
-            Ok(_) => panic!("{name}: expected {expected:?}, the database opened"),
-        }
+        let expected = std::mem::discriminant(&failure());
+        let actual = match &result {
+            Err(VauchiError::Storage(error)) => Some(std::mem::discriminant(error)),
+            _ => None,
+        };
+
+        assert_eq!(
+            actual,
+            Some(expected),
+            "{name}: got {:?}",
+            result.map(|_| ())
+        );
     }
 }
 

@@ -219,10 +219,13 @@ fn a_tampered_check_fails_closed_under_the_right_key() {
         drop(Storage::open(&path, key.clone()).unwrap());
         tamper_check(&path, tamper);
 
-        match Storage::open(&path, key) {
-            Err(StorageError::WrongKey) => {}
-            other => panic!("{name}: expected WrongKey, got {:?}", other.map(|_| ())),
-        }
+        let result = Storage::open(&path, key);
+
+        assert!(
+            matches!(result, Err(StorageError::WrongKey)),
+            "{name}: expected WrongKey, got {:?}",
+            result.map(|_| ())
+        );
     }
 }
 

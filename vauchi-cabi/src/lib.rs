@@ -18,6 +18,8 @@ use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 mod app;
 mod app_import_warnings;
 #[cfg(test)]
+mod app_keyring_tests;
+#[cfg(test)]
 mod app_navigation;
 mod app_presentation;
 mod config;

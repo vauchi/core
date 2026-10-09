@@ -150,3 +150,56 @@ fn a_last_sent_name_stored_before_v78_survives_encryption() {
         Some("Ada")
     );
 }
+
+// @internal
+#[test]
+fn a_contacts_relay_round_trips_without_a_plaintext_column() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let mut contact = vauchi_core::contact::Contact::from_exchange(
+        [8u8; 32],
+        vauchi_core::ContactCard::new("Cleo"),
+        SymmetricKey::generate(),
+        0,
+    );
+    contact.set_relay_url(Some("https://relay.example.org".into()));
+
+    storage.contacts().save_contact(&contact).unwrap();
+    let loaded = storage
+        .contacts()
+        .load_contact(contact.id())
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(loaded.relay_url(), Some("https://relay.example.org"));
+    assert!(!columns(&storage, "contacts").contains(&"relay_url".to_string()));
+}
+
+// @internal
+#[test]
+fn a_contacts_relay_stored_before_v79_survives_encryption() {
+    use vauchi_core::crypto::encrypt;
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("vauchi.db");
+    let key = SymmetricKey::generate();
+    {
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        migrate_to(&conn, &key, 78);
+        let card = serde_json::to_vec(&vauchi_core::ContactCard::new("Dora")).unwrap();
+        conn.execute(
+            "INSERT INTO contacts (id, public_key, card_encrypted, shared_key_encrypted,
+                                   exchange_timestamp, relay_url)
+             VALUES ('c1', ?1, ?2, ?3, 0, 'https://old.example.org')",
+            rusqlite::params![
+                [9u8; 32].as_slice(),
+                encrypt(&key, &card).unwrap(),
+                encrypt(&key, &[5u8; 32]).unwrap()
+            ],
+        )
+        .unwrap();
+    }
+
+    let storage = Storage::open(&db_path, key).unwrap();
+    let loaded = storage.contacts().load_contact("c1").unwrap().unwrap();
+
+    assert_eq!(loaded.relay_url(), Some("https://old.example.org"));
+}

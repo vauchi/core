@@ -359,3 +359,50 @@ fn storage_in_a_directory_that_does_not_exist_yet_is_created() {
     assert!(without_keychain.is_ok(), "{:?}", without_keychain.err());
     assert!(path.exists());
 }
+
+/// Secure storage whose first save fails as if the keychain were locked.
+struct FirstSaveLocked {
+    inner: MemoryKeyStorage,
+    failed_once: std::sync::atomic::AtomicBool,
+}
+
+impl SecureStorage for FirstSaveLocked {
+    fn save_key(&self, name: &str, key: &[u8]) -> Result<(), StorageError> {
+        if !self
+            .failed_once
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(StorageError::SecureStorageLocked);
+        }
+        self.inner.save_key(name, key)
+    }
+    fn load_key(&self, name: &str) -> Result<Option<Vec<u8>>, StorageError> {
+        self.inner.load_key(name)
+    }
+    fn delete_key(&self, name: &str) -> Result<(), StorageError> {
+        self.inner.delete_key(name)
+    }
+}
+
+// @internal
+#[test]
+fn a_fresh_install_that_could_not_save_its_key_starts_cleanly_next_time() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("vauchi.db");
+    let secure = Arc::new(FirstSaveLocked {
+        inner: MemoryKeyStorage::new(),
+        failed_once: std::sync::atomic::AtomicBool::new(false),
+    });
+    let config = || VauchiConfig::with_storage_path(&path);
+
+    let first = Vauchi::with_secure_storage(config(), secure.clone());
+    assert!(matches!(
+        first,
+        Err(VauchiError::Storage(StorageError::SecureStorageLocked))
+    ));
+
+    let second = Vauchi::with_secure_storage(config(), secure.clone());
+
+    assert!(second.is_ok(), "{:?}", second.err());
+    assert!(secure.inner.has_key(BOOTSTRAP_KEY_NAME).unwrap());
+}

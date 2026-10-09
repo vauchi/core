@@ -446,3 +446,57 @@ fn test_rekey_preserves_label_bio_and_avatar_overrides() {
     assert_eq!(bio_plain, b"Group bio");
     assert_eq!(avatar_plain, b"avatar-webp-bytes");
 }
+
+// An imported contact has no shared key; its empty column must not stop
+// the rekey (vauchi/private#585).
+// @internal
+#[test]
+fn rekey_keeps_an_imported_contact() {
+    use vauchi_core::ContactCard;
+    use vauchi_core::contact::Contact;
+    use vauchi_core::contact::kind::ImportSource;
+
+    let (_dir, mut storage) = open_storage();
+    let imported = Contact::from_import(
+        "imp1".into(),
+        ContactCard::new("Eve"),
+        ImportSource::VcardFile,
+        None,
+        0,
+    );
+    storage.contacts().save_contact(&imported).unwrap();
+
+    storage.rekey(SymmetricKey::generate()).unwrap();
+
+    let loaded = storage.contacts().load_contact("imp1").unwrap().unwrap();
+    assert_eq!(loaded.display_name(), "Eve");
+}
+
+// A contact with a CEK has its card under the CEK, not the storage key;
+// rekey re-wraps the CEK and must leave the card as it is (#585).
+// @internal
+#[test]
+fn rekey_keeps_a_contact_with_a_cek() {
+    use vauchi_core::ContactCard;
+    use vauchi_core::contact::Contact;
+    use vauchi_core::crypto::cek::ContentEncryptionKey;
+
+    let (_dir, mut storage) = open_storage();
+    let mut contact = Contact::from_exchange(
+        [3u8; 32],
+        ContactCard::new("Cara"),
+        SymmetricKey::generate(),
+        0,
+    );
+    contact.set_cek(ContentEncryptionKey::generate());
+    storage.contacts().save_contact(&contact).unwrap();
+
+    storage.rekey(SymmetricKey::generate()).unwrap();
+
+    let loaded = storage
+        .contacts()
+        .load_contact(contact.id())
+        .unwrap()
+        .unwrap();
+    assert_eq!(loaded.display_name(), "Cara");
+}

@@ -33,6 +33,10 @@ diagnostic-yolo = ["diagnostic-scanner", "vauchi-core/diagnostic-yolo"]
 # forbids it in release builds. Required so the Argon2-heavy duress/auth
 # platform tests don't hit nextest's 180s slow-timeout; mirrors test:core.
 test-kdf = ["vauchi-core/test-kdf"]
+# The mutation build passes `--features testing` to every package
+# (.cargo/mutants.toml); without it here, a mutation run on this crate alone
+# fails its baseline before testing any mutant.
+testing = ["vauchi-app/testing"]
 # Dev/debug-only native log backend (Android Logcat / iOS+macOS os_log).
 # OFF in release: a shipped binary registers no backend, so the existing
 # vauchi-app `log::` call sites are silent no-ops (the `log` facade

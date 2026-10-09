@@ -286,6 +286,7 @@ mod http_transport_signed_key_tests;
 mod i18n_cache_tests;
 mod i18n_integration_tests;
 mod identifiers_tests;
+mod identifying_columns_at_rest_tests;
 mod identity_backup_parse_tests;
 mod identity_device_tests;
 mod identity_password_coverage_tests;

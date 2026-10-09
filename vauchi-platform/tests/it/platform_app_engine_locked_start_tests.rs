@@ -167,7 +167,7 @@ fn storage_opens_once_the_prompt_succeeds() {
         !surface(&opened).starts_with("storage_lock"),
         "got {opened}"
     );
-    assert_eq!(engine.has_identity().unwrap(), true);
+    assert!(engine.has_identity().unwrap());
 }
 
 // @internal
@@ -203,7 +203,7 @@ fn starting_over_deletes_the_unreadable_data_and_opens_a_fresh_install() {
     let fresh = press_primary(&engine, &confirm);
 
     assert!(!surface(&fresh).starts_with("storage_lock"), "got {fresh}");
-    assert_eq!(engine.has_identity().unwrap(), false);
+    assert!(!engine.has_identity().unwrap());
     assert_eq!(keychain.store.names(), ["storage_bootstrap"]);
 }
 

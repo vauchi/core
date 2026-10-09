@@ -165,6 +165,11 @@ impl StorageLockPresentation {
         )
     }
 
+    /// Core's answer to event JSON that does not decode (ADR-045 Am1).
+    pub fn reject_event_json(&self, error: &vauchi_core::EventJsonError) -> Vec<Command> {
+        rejection::event_json_rejection(self.locale, error)
+    }
+
     fn rejection(&self) -> Vec<Command> {
         rejection::dispatch_rejection(self.locale)
     }

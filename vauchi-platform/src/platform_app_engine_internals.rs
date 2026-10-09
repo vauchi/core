@@ -300,3 +300,32 @@ impl PlatformAppEngine {
         })
     }
 }
+
+/// The open engine, or "storage locked" while Core's storage-lock screens
+/// hold storage closed (vauchi/private#580).
+pub(crate) fn open_engine(slot: &mut Option<AppEngine>) -> Result<&mut AppEngine, MobileError> {
+    slot.as_mut().ok_or_else(|| MobileError::StorageError {
+        detail: "Storage is locked".into(),
+    })
+}
+
+impl PlatformAppEngine {
+    pub(crate) fn lock_engine(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, Option<AppEngine>>, MobileError> {
+        self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })
+    }
+
+    pub(crate) fn lock_locked_start(
+        &self,
+    ) -> Result<
+        std::sync::MutexGuard<'_, Option<crate::platform_app_engine_locked::LockedStart>>,
+        MobileError,
+    > {
+        self.locked.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })
+    }
+}

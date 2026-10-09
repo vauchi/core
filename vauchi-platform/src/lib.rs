@@ -36,6 +36,7 @@ mod multipart_qr;
 mod pae_dispatch;
 mod platform_app_engine;
 mod platform_app_engine_internals;
+mod platform_app_engine_locked;
 mod platform_app_engine_test_helpers;
 mod policies;
 mod sync_presentation;
@@ -186,19 +187,19 @@ impl vauchi_core::storage::SecureStorage for KeychainBridge {
     fn save_key(&self, name: &str, key: &[u8]) -> Result<(), vauchi_core::StorageError> {
         self.callback
             .save_key(name.to_string(), key.to_vec())
-            .map_err(|e| vauchi_core::StorageError::Encryption(e.to_string()))
+            .map_err(vauchi_core::StorageError::from)
     }
 
     fn load_key(&self, name: &str) -> Result<Option<Vec<u8>>, vauchi_core::StorageError> {
         self.callback
             .load_key(name.to_string())
-            .map_err(|e| vauchi_core::StorageError::Encryption(e.to_string()))
+            .map_err(vauchi_core::StorageError::from)
     }
 
     fn delete_key(&self, name: &str) -> Result<(), vauchi_core::StorageError> {
         self.callback
             .delete_key(name.to_string())
-            .map_err(|e| vauchi_core::StorageError::Encryption(e.to_string()))
+            .map_err(vauchi_core::StorageError::from)
     }
 }
 

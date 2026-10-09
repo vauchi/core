@@ -95,7 +95,11 @@ pub struct PlatformAppEngine {
     /// session lifecycle). The `Mutex` serializes these mutations on the
     /// frontend thread. There is no background thread access — the
     /// cycle-thread bridge was retired in Slice 32m.
-    pub(crate) engine: Mutex<AppEngine>,
+    /// `None` while the locked start below holds storage closed.
+    pub(crate) engine: Mutex<Option<AppEngine>>,
+    /// Core's storage-lock screens until storage opens (vauchi/private#580);
+    /// `None` once it has.
+    pub(crate) locked: Mutex<Option<crate::platform_app_engine_locked::LockedStart>>,
     /// Active event listener handler ID, used to unregister on replacement.
     event_handler_id: Mutex<Option<HandlerId>>,
     /// Direct handle to the active `PlatformEventListener`. The
@@ -254,29 +258,33 @@ impl PlatformAppEngine {
         shell_storage_key: Option<Vec<u8>>,
         keychain: Box<dyn crate::MobilePlatformKeychain>,
     ) -> Result<Arc<Self>, MobileError> {
+        use crate::platform_app_engine_locked::{LockedStart, OpenParams, Opened};
+
         let shell_storage_key = shell_storage_key.map(parse_storage_key).transpose()?;
         let data_path = PathBuf::from(&data_dir);
         std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
             detail: e.to_string(),
         })?;
-        let storage_path = data_path.join("vauchi.db");
-
-        let mut config = VauchiConfig::with_storage_path(&storage_path).with_relay_url(&relay_url);
-        if let Some(key) = shell_storage_key {
-            config = config.with_storage_key(key);
-        }
         let keychain: Arc<dyn crate::MobilePlatformKeychain> = Arc::from(keychain);
-        let bridge = Arc::new(crate::KeychainBridge {
-            callback: keychain.clone(),
-        });
-        let vauchi = Vauchi::with_secure_storage(config, bridge)?;
-
-        Ok(Self::from_vauchi(
-            vauchi,
-            storage_path,
-            relay_url,
-            Some(keychain),
-        ))
+        let params = OpenParams {
+            storage_path: data_path.join("vauchi.db"),
+            relay_url: relay_url.clone(),
+            shell_storage_key,
+            keychain: keychain.clone(),
+        };
+        let storage_path = params.storage_path.clone();
+        Ok(match params.open()? {
+            Opened::Engine(vauchi) => {
+                Self::from_vauchi(*vauchi, storage_path, relay_url, Some(keychain))
+            }
+            Opened::Locked(reason) => Self::build(
+                None,
+                Some(LockedStart::new(reason, params)),
+                storage_path,
+                relay_url,
+                Some(keychain),
+            ),
+        })
     }
 }
 
@@ -297,8 +305,25 @@ impl PlatformAppEngine {
         relay_url: String,
         platform_keychain: Option<Arc<dyn crate::MobilePlatformKeychain>>,
     ) -> Arc<Self> {
+        Self::build(
+            Some(AppEngine::new(vauchi)),
+            None,
+            storage_path,
+            relay_url,
+            platform_keychain,
+        )
+    }
+
+    fn build(
+        engine: Option<AppEngine>,
+        locked: Option<crate::platform_app_engine_locked::LockedStart>,
+        storage_path: PathBuf,
+        relay_url: String,
+        platform_keychain: Option<Arc<dyn crate::MobilePlatformKeychain>>,
+    ) -> Arc<Self> {
         Arc::new(Self {
-            engine: Mutex::new(AppEngine::new(vauchi)),
+            engine: Mutex::new(engine),
+            locked: Mutex::new(locked),
             event_handler_id: Mutex::new(None),
             direct_listener: Arc::new(Mutex::new(None)),
             storage_path,
@@ -312,10 +337,12 @@ impl PlatformAppEngine {
 impl PlatformAppEngine {
     /// Return Core's complete initial presentation command batch.
     pub fn initial_commands_json(&self) -> Result<String, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        self_heal_post_auth(&mut engine);
+        if let Some(commands) = self.locked_initial_commands()? {
+            return commands_envelope_to_json(&commands);
+        }
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
+        self_heal_post_auth(engine);
         let commands = engine.initial_commands().map_err(|e| MobileError::Other {
             detail: format!("Failed to compose initial presentation: {e}"),
         })?;
@@ -335,17 +362,21 @@ impl PlatformAppEngine {
         let event = match vauchi_core::event_from_json(&event_json) {
             Ok(event) => event,
             Err(error) => {
-                let engine = self.engine.lock().map_err(|e| MobileError::Other {
-                    detail: format!("Lock failed: {e}"),
-                })?;
+                if let Some(commands) = self.locked_reject_event_json(&error)? {
+                    return commands_envelope_to_json(&commands);
+                }
+                let mut engine_slot = self.lock_engine()?;
+                let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
                 return commands_envelope_to_json(&engine.reject_event_json(&error));
             }
         };
+        if let Some(commands) = self.locked_dispatch(event.clone())? {
+            return commands_envelope_to_json(&commands);
+        }
         let (commands, fire_invalidation) = {
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            self_heal_post_auth(&mut engine);
+            let mut engine_slot = self.lock_engine()?;
+            let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
+            self_heal_post_auth(engine);
             let commands = engine
                 .dispatch(event)
                 .unwrap_or_else(|rejection| engine.reject_dispatch(&rejection));
@@ -374,10 +405,9 @@ impl PlatformAppEngine {
         layout: MobileTabLayout,
         locale: MobileLocale,
     ) -> Result<Vec<MobileTabInfo>, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        self_heal_post_auth(&mut engine);
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
+        self_heal_post_auth(engine);
         let items = match layout {
             MobileTabLayout::Mobile => engine.tab_info(locale.into()),
             MobileTabLayout::Desktop => engine.sidebar_items(locale.into()),
@@ -393,9 +423,8 @@ impl PlatformAppEngine {
     /// queued so the next canonical batch carries them, the same way
     /// `AppEngine::initial_commands` drains them for a real shell.
     pub(crate) fn navigate_back_for_test(&self) -> Result<(), MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         engine.navigate_back();
         Ok(())
     }
@@ -407,9 +436,8 @@ impl PlatformAppEngine {
     ///
     /// Used by frontends to decide between onboarding and main UI.
     pub fn has_identity(&self) -> Result<bool, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         Ok(engine.has_identity())
     }
 
@@ -427,9 +455,8 @@ impl PlatformAppEngine {
     ///
     /// Audit `2026-04-28-lifecycle-session-residue-umbrella` P2-C.
     pub fn periodic_sync_tick(&self) -> Result<String, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         let outcome = engine
             .vauchi_mut()
             .periodic_sync_tick()
@@ -461,9 +488,8 @@ impl PlatformAppEngine {
             serde_json::from_str(&json).map_err(|e| MobileError::Other {
                 detail: format!("Invalid render context JSON: {e}"),
             })?;
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         engine.set_render_context(ctx);
         Ok(())
     }
@@ -477,9 +503,8 @@ impl PlatformAppEngine {
     ///
     /// Audit `2026-04-28-lifecycle-session-residue-umbrella` P2-D.
     pub fn set_network_online(&self, online: bool) -> Result<(), MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         engine.set_network_online(online);
         Ok(())
     }
@@ -496,9 +521,8 @@ impl PlatformAppEngine {
 
     /// Poll core for pending OS notifications to render.
     pub fn poll_notifications(&self) -> Result<Vec<MobilePendingNotification>, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         let items = engine.poll_notifications();
         // T1.2c: the multi-stage machine just advanced inside
         // `engine.poll_notifications`. The cycle-thread bridge that
@@ -518,8 +542,8 @@ impl PlatformAppEngine {
         // the engine, but the resulting screen change must also be surfaced.
         // Fire one here so the listener's unconditional `loadScreen()`
         // re-fetches the post-timeout screen.
-        let invalidation_targets = self.poll_tick_invalidation_targets(&engine);
-        drop(engine);
+        let invalidation_targets = self.poll_tick_invalidation_targets(engine);
+        drop(engine_slot);
         if invalidation_targets.is_some() {
             self.fire_presentation_invalidated();
         }
@@ -570,11 +594,10 @@ impl PlatformAppEngine {
     /// method again when it fires.
     pub fn on_wakeup(&self) -> Result<String, MobileError> {
         let (items, pending_commands, invalidation_targets) = {
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
+            let mut engine_slot = self.lock_engine()?;
+            let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
             let items = engine.on_wakeup();
-            let invalidation_targets = self.poll_tick_invalidation_targets(&engine);
+            let invalidation_targets = self.poll_tick_invalidation_targets(engine);
             let pending_commands = engine.drain_pending_commands();
             (items, pending_commands, invalidation_targets)
         };
@@ -626,9 +649,8 @@ impl PlatformAppEngine {
             serde_json::from_str(&capabilities_json).map_err(|e| MobileError::Other {
                 detail: format!("Invalid capabilities JSON: {e}"),
             })?;
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         engine.set_device_capabilities(caps);
         Ok(())
     }
@@ -678,9 +700,8 @@ impl PlatformAppEngine {
     ) -> Result<(), MobileError> {
         let listener = Arc::new(listener);
 
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
 
         let mut handler_id_slot = self
             .event_handler_id
@@ -745,9 +766,8 @@ impl PlatformAppEngine {
     ) -> Result<crate::domain_command::DomainCommandResult, MobileError> {
         use crate::domain_command::DomainCommand;
 
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
 
         match command {
             cmd @ (DomainCommand::GrantConsent { .. }
@@ -769,7 +789,7 @@ impl PlatformAppEngine {
             | DomainCommand::TriggerDemoUpdate
             | DomainCommand::DismissDemoContact
             | DomainCommand::AutoRemoveDemoContact
-            | DomainCommand::RestoreDemoContact) => self.dispatch_engagement(&mut engine, cmd),
+            | DomainCommand::RestoreDemoContact) => self.dispatch_engagement(engine, cmd),
             cmd @ (DomainCommand::GetOwnCard
             | DomainCommand::AddField { .. }
             | DomainCommand::UpdateField { .. }
@@ -787,9 +807,7 @@ impl PlatformAppEngine {
             | DomainCommand::CurrentOnboardingStep
             | DomainCommand::IsOnboardingComplete
             | DomainCommand::AdvanceOnboarding
-            | DomainCommand::SkipOnboardingStep) => {
-                self.dispatch_own_card_identity(&mut engine, cmd)
-            }
+            | DomainCommand::SkipOnboardingStep) => self.dispatch_own_card_identity(engine, cmd),
             cmd @ (DomainCommand::ListContacts
             | DomainCommand::GetContact { .. }
             | DomainCommand::SearchContacts { .. }
@@ -830,7 +848,7 @@ impl PlatformAppEngine {
             | DomainCommand::GetContactDisplayOptions { .. }
             | DomainCommand::ListContactsPaginated { .. }
             | DomainCommand::ContactDetailViewState { .. }
-            | DomainCommand::ListSocialNetworks) => self.dispatch_contacts(&mut engine, cmd),
+            | DomainCommand::ListSocialNetworks) => self.dispatch_contacts(engine, cmd),
             cmd @ (DomainCommand::ListLabels
             | DomainCommand::CreateLabel { .. }
             | DomainCommand::GetLabel { .. }
@@ -845,9 +863,7 @@ impl PlatformAppEngine {
             | DomainCommand::HideFieldFromContact { .. }
             | DomainCommand::ShowFieldToContact { .. }
             | DomainCommand::IsFieldVisibleToContact { .. }
-            | DomainCommand::GetSuggestedLabels) => {
-                self.dispatch_groups_visibility(&mut engine, cmd)
-            }
+            | DomainCommand::GetSuggestedLabels) => self.dispatch_groups_visibility(engine, cmd),
             cmd @ (DomainCommand::ExportGdprData
             | DomainCommand::ScheduleIdentityDeletion
             | DomainCommand::CancelIdentityDeletion
@@ -874,7 +890,7 @@ impl PlatformAppEngine {
             | DomainCommand::ConfigureEmergencyBroadcast { .. }
             | DomainCommand::SendEmergencyBroadcast
             | DomainCommand::GetEmergencyConfig
-            | DomainCommand::DisableEmergencyBroadcast) => self.dispatch_security(&mut engine, cmd),
+            | DomainCommand::DisableEmergencyBroadcast) => self.dispatch_security(engine, cmd),
             cmd @ (DomainCommand::VerifyRecoveryProof { .. }
             | DomainCommand::UploadGuardianEntries
             | DomainCommand::SaveRecoveryResponse { .. }
@@ -892,7 +908,7 @@ impl PlatformAppEngine {
             | DomainCommand::CreateRecoveryVoucher { .. }
             | DomainCommand::AddRecoveryVoucher { .. }
             | DomainCommand::CreateRecoveryClaim { .. }) => {
-                self.dispatch_recovery_backup(&mut engine, cmd)
+                self.dispatch_recovery_backup(engine, cmd)
             }
             cmd @ (DomainCommand::Sync
             | DomainCommand::PendingUpdateCount
@@ -915,16 +931,14 @@ impl PlatformAppEngine {
             | DomainCommand::ClearPendingUpdatesForContact { .. }
             | DomainCommand::GetDeliverySummary { .. }
             | DomainCommand::GetDeviceDeliveries { .. }
-            | DomainCommand::GetPendingDeviceDeliveries) => {
-                self.dispatch_delivery(&mut engine, cmd)
-            }
+            | DomainCommand::GetPendingDeviceDeliveries) => self.dispatch_delivery(engine, cmd),
             cmd @ (DomainCommand::IsPrimaryDevice
             | DomainCommand::GetDeviceCount
             | DomainCommand::GetDevices
             | DomainCommand::UnlinkDevice { .. }
             | DomainCommand::GenerateDeviceLinkQr
             | DomainCommand::ParseDeviceLinkQr { .. }
-            | DomainCommand::EncodeMultipartQr { .. }) => self.dispatch_devices(&mut engine, cmd),
+            | DomainCommand::EncodeMultipartQr { .. }) => self.dispatch_devices(engine, cmd),
         }
     }
 }

@@ -21,6 +21,24 @@
 pub enum KeychainError {
     #[error("{msg}")]
     OperationFailed { msg: String },
+    /// The keychain is readable only after the person authenticates or the
+    /// device unlocks; the keys are intact.
+    #[error("Keychain requires authentication")]
+    AuthenticationRequired,
+    /// The platform permanently invalidated the key protecting the keychain
+    /// (for example after the screen lock was removed).
+    #[error("Keychain key invalidated")]
+    KeyInvalidated,
+}
+
+impl From<KeychainError> for vauchi_core::StorageError {
+    fn from(error: KeychainError) -> Self {
+        match error {
+            KeychainError::AuthenticationRequired => Self::SecureStorageLocked,
+            KeychainError::KeyInvalidated => Self::SecureStorageKeyInvalidated,
+            KeychainError::OperationFailed { msg } => Self::Encryption(msg),
+        }
+    }
 }
 
 /// Mobile-friendly error type surfaced across the UniFFI boundary.

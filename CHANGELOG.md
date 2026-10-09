@@ -6,6 +6,43 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.77.0] — 2026-10-09
+
+Crypto-shredding now holds on mobile and desktop (vauchi/private#580 and
+vauchi/private#581): every key that opens the database lives in the
+platform keychain, and a shred deletes them all.
+
+### Added
+
+- Storage key check (migration v75): storage opens only under the key its
+  data is encrypted with; `StorageError::WrongKey` otherwise.
+- `PlatformAppEngine::open_with_keychain(data_dir, relay_url,
+  shell_storage_key, keychain)` with `HandedOverSecret { handle, secret }`
+  (ADR-043 Amendment 7); `Command::ForgetStoredSecret { handle }` tells the
+  shell when it may delete a handed-over key.
+- Locked start: a keychain that needs authentication, is unavailable, or no
+  longer opens the data starts on Core's storage-lock screens (unlock, Try
+  again, confirmed Start over) instead of failing construction — on mobile
+  and in `vauchi_app_create_with_keyring` (desktop).
+- `KeychainError::AuthenticationRequired` / `KeyInvalidated`;
+  `StorageError::SecureStorageLocked` / `SecureStorageKeyInvalidated` /
+  `SecureStorageUnavailable`.
+- `vauchi_core::api::storage_reset::delete_unreadable_data`.
+
+### Changed
+
+- With secure storage, boot keeps a bootstrap key before an identity
+  exists, moves the data to the SMK-derived key at identity creation or the
+  first boot after an upgrade, and finishes a move a crash interrupted.
+- Every shred deletes the bootstrap key with the SMK.
+
+### Fixed
+
+- A shred uses stored pre-signed messages only if the current identity
+  signed them (vauchi/private#582).
+
+Entries for 0.52–0.76 were not kept; see the git history.
+
 ## [0.51.21] — 2026-05-28
 
 ### Added

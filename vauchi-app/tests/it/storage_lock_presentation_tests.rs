@@ -51,12 +51,9 @@ fn press_primary(lock: &mut StorageLockPresentation, batch: &[Command]) -> Stora
     ))
 }
 
-fn press_secondary(lock: &mut StorageLockPresentation, batch: &[Command]) -> StorageLockStep {
+fn press_back(lock: &mut StorageLockPresentation, batch: &[Command]) -> StorageLockStep {
     let (surface, bar) = context_bar(batch);
-    lock.dispatch(activate(
-        &surface,
-        bar.secondary.as_ref().expect("secondary action"),
-    ))
+    lock.dispatch(activate(&surface, bar.back.as_ref().expect("back action")))
 }
 
 // @internal
@@ -118,7 +115,7 @@ fn cancelling_the_confirmation_goes_back_without_starting_over() {
     let unreadable = lock.initial_commands();
     let confirm = commands(press_primary(&mut lock, &unreadable));
 
-    let back = commands(press_secondary(&mut lock, &confirm));
+    let back = commands(press_back(&mut lock, &confirm));
 
     assert_eq!(context_bar(&back).1, context_bar(&unreadable).1);
     assert!(matches!(

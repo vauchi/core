@@ -117,7 +117,7 @@ fn cancelling_the_confirmation_goes_back_without_starting_over() {
 
     let back = commands(press_back(&mut lock, &confirm));
 
-    assert_eq!(context_bar(&back).1, context_bar(&unreadable).1);
+    assert_eq!(context_bar(&back).0, context_bar(&unreadable).0);
     assert!(matches!(
         press_primary(&mut lock, &back),
         StorageLockStep::Commands(_)

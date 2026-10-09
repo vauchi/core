@@ -83,3 +83,70 @@ fn a_decoy_name_stored_before_v77_survives_encryption() {
 
     assert_eq!(loaded[0].1, "Old Decoy");
 }
+
+fn saved_contact(storage: &Storage) -> String {
+    let contact = vauchi_core::contact::Contact::from_exchange(
+        [7u8; 32],
+        vauchi_core::ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
+    storage.contacts().save_contact(&contact).unwrap();
+    contact.id().to_string()
+}
+
+// @internal
+#[test]
+fn the_name_last_sent_to_a_contact_round_trips_without_a_plaintext_column() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let id = saved_contact(&storage);
+
+    assert_eq!(
+        storage.contacts().load_last_sent_display_name(&id).unwrap(),
+        None
+    );
+    storage
+        .contacts()
+        .save_last_sent_display_name(&id, "Ada Lovelace")
+        .unwrap();
+
+    assert_eq!(
+        storage
+            .contacts()
+            .load_last_sent_display_name(&id)
+            .unwrap()
+            .as_deref(),
+        Some("Ada Lovelace")
+    );
+    assert!(!columns(&storage, "contacts").contains(&"last_sent_display_name".to_string()));
+}
+
+// @internal
+#[test]
+fn a_last_sent_name_stored_before_v78_survives_encryption() {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("vauchi.db");
+    let key = SymmetricKey::generate();
+    {
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        migrate_to(&conn, &key, 77);
+        conn.execute(
+            "INSERT INTO contacts (id, public_key, card_encrypted, shared_key_encrypted,
+                                   exchange_timestamp, last_sent_display_name)
+             VALUES ('c1', X'07', X'00', X'00', 0, 'Ada')",
+            [],
+        )
+        .unwrap();
+    }
+
+    let storage = Storage::open(&db_path, key).unwrap();
+
+    assert_eq!(
+        storage
+            .contacts()
+            .load_last_sent_display_name("c1")
+            .unwrap()
+            .as_deref(),
+        Some("Ada")
+    );
+}

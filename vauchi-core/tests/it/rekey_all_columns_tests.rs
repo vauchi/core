@@ -267,11 +267,11 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     conn.execute(
         "INSERT INTO contacts \
          (id, public_key, card_encrypted, shared_key_encrypted, \
-          personal_notes_encrypted, avatar_encrypted, cek_encrypted, \
+          personal_notes_encrypted, avatar_encrypted, \
           visibility_rules_encrypted, nickname_encrypted, custom_avatar_encrypted, \
           exchange_timestamp, contact_kind, exchange_location_encrypted, \
           last_sent_display_name_encrypted, relay_url_encrypted) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'exchanged', ?12, ?13, ?14)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'exchanged', ?11, ?12, ?13)",
         params![
             CONTACT_ID,
             CONTACT_PK,
@@ -279,7 +279,6 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
             enc("contacts", "shared_key_encrypted"),
             enc("contacts", "personal_notes_encrypted"),
             enc("contacts", "avatar_encrypted"),
-            enc("contacts", "cek_encrypted"),
             enc("contacts", "visibility_rules_encrypted"),
             enc("contacts", "nickname_encrypted"),
             enc("contacts", "custom_avatar_encrypted"),
@@ -287,6 +286,26 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
             enc("contacts", "exchange_location_encrypted"),
             enc("contacts", "last_sent_display_name_encrypted"),
             enc("contacts", "relay_url_encrypted"),
+        ],
+    )
+    .unwrap();
+
+    // A second contact holds the CEK: its card is under that CEK, not the
+    // storage key, as the app writes it (#585).
+    let cek = vauchi_core::crypto::cek::ContentEncryptionKey::from_bytes(
+        fx("contacts", "cek_encrypted").try_into().unwrap(),
+    );
+    conn.execute(
+        "INSERT INTO contacts \
+         (id, public_key, card_encrypted, shared_key_encrypted, cek_encrypted, \
+          exchange_timestamp, contact_kind) \
+         VALUES ('c2', ?1, ?2, ?3, ?4, ?5, 'exchanged')",
+        params![
+            [0x02u8; 32].as_slice(),
+            cek.encrypt(&fx("contacts", "card_encrypted")).unwrap(),
+            enc("contacts", "shared_key_encrypted"),
+            enc("contacts", "cek_encrypted"),
+            now,
         ],
     )
     .unwrap();
@@ -687,13 +706,12 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     let id_eq_1: &[&dyn rusqlite::ToSql] = &[];
     let by_contact: &[&dyn rusqlite::ToSql] = &[&CONTACT_ID];
 
-    // ── contacts (11 columns, keyed by id) ────────────────────
+    // ── contacts (10 columns on c1, the CEK on c2) ────────────────────
     for col in [
         "card_encrypted",
         "shared_key_encrypted",
         "personal_notes_encrypted",
         "avatar_encrypted",
-        "cek_encrypted",
         "visibility_rules_encrypted",
         "nickname_encrypted",
         "custom_avatar_encrypted",
@@ -703,6 +721,7 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     ] {
         check_one("contacts", col, "id = ?1", by_contact);
     }
+    check_one("contacts", "cek_encrypted", "id = 'c2'", id_eq_1);
 
     // ── tags and places (keyed by id) ────────────────────────
     check_one("tags", "name_encrypted", "id = 't1'", id_eq_1);

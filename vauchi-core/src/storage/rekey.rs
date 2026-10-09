@@ -365,7 +365,11 @@ impl Storage {
     // inside its EXCLUSIVE transaction.
     // ---------------------------------------------------------------------
 
-    /// Re-encrypt contacts: card_encrypted and shared_key_encrypted
+    /// Re-encrypt contacts: card_encrypted and shared_key_encrypted.
+    ///
+    /// A card under a CEK stays as it is (its CEK is re-wrapped with
+    /// `cek_encrypted`), and an imported contact has no shared key to
+    /// re-encrypt (#585).
     fn rekey_contacts(
         &self,
         old_key: &SymmetricKey,
@@ -373,25 +377,34 @@ impl Storage {
     ) -> Result<(), StorageError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, card_encrypted, shared_key_encrypted FROM contacts")
+            .prepare("SELECT id, card_encrypted, shared_key_encrypted, cek_encrypted IS NOT NULL FROM contacts")
             .map_err(|e| StorageError::Migration(format!("Read contacts: {}", e)))?;
 
-        let rows: Vec<(String, Vec<u8>, Vec<u8>)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        let rows: Vec<(String, Vec<u8>, Vec<u8>, bool)> = stmt
+            .query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
             .map_err(|e| StorageError::Migration(format!("Query contacts: {}", e)))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| StorageError::Migration(format!("Collect contacts: {}", e)))?;
 
-        for (id, card_enc, key_enc) in &rows {
-            let card_plain = decrypt(old_key, card_enc)
-                .map_err(|e| StorageError::Migration(format!("Decrypt card {}: {}", id, e)))?;
-            let key_plain = decrypt(old_key, key_enc)
-                .map_err(|e| StorageError::Migration(format!("Decrypt key {}: {}", id, e)))?;
-
-            let card_new = encrypt(new_key, &card_plain)
-                .map_err(|e| StorageError::Migration(format!("Encrypt card {}: {}", id, e)))?;
-            let key_new = encrypt(new_key, &key_plain)
-                .map_err(|e| StorageError::Migration(format!("Encrypt key {}: {}", id, e)))?;
+        for (id, card_enc, key_enc, card_under_cek) in &rows {
+            let card_new = if *card_under_cek {
+                card_enc.clone()
+            } else {
+                let card_plain = decrypt(old_key, card_enc)
+                    .map_err(|e| StorageError::Migration(format!("Decrypt card {}: {}", id, e)))?;
+                encrypt(new_key, &card_plain)
+                    .map_err(|e| StorageError::Migration(format!("Encrypt card {}: {}", id, e)))?
+            };
+            let key_new = if key_enc.is_empty() {
+                Vec::new()
+            } else {
+                let key_plain = decrypt(old_key, key_enc)
+                    .map_err(|e| StorageError::Migration(format!("Decrypt key {}: {}", id, e)))?;
+                encrypt(new_key, &key_plain)
+                    .map_err(|e| StorageError::Migration(format!("Encrypt key {}: {}", id, e)))?
+            };
 
             self.conn.execute(
                 "UPDATE contacts SET card_encrypted = ?1, shared_key_encrypted = ?2 WHERE id = ?3",

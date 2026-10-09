@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 77] = [
+const MIGRATIONS: [Migration; 78] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -657,6 +657,11 @@ const MIGRATIONS: [Migration; 77] = [
         name: "encrypt_decoy_names",
         action: MigrationAction::Callback(migrate_v77_encrypt_decoy_names),
     },
+    Migration {
+        version: 78,
+        name: "encrypt_last_sent_display_name",
+        action: MigrationAction::Callback(migrate_v78_encrypt_last_sent_display_name),
+    },
 ];
 
 /// Migration v76: the identity's display name is already inside
@@ -689,6 +694,21 @@ fn migrate_v77_encrypt_decoy_names(
 
 /// Encrypts every non-NULL value of `plain` into the new BLOB column
 /// `encrypted`, then drops `plain`. `table` and both columns are constants
+/// Migration v78: the user's own name as last sent to each contact moves
+/// to `last_sent_display_name_encrypted` (vauchi/private#579).
+fn migrate_v78_encrypt_last_sent_display_name(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    encrypt_text_column_in_place(
+        conn,
+        key,
+        "contacts",
+        "last_sent_display_name",
+        "last_sent_display_name_encrypted",
+    )
+}
+
 /// from the migration ledger, never input.
 fn encrypt_text_column_in_place(
     conn: &Connection,

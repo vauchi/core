@@ -87,6 +87,7 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     // V21 decoy contacts
     ("decoy_contacts", "card_encrypted"),
     ("decoy_contacts", "display_name_encrypted"),
+    ("contacts", "last_sent_display_name_encrypted"),
     // V22 emergency config
     ("emergency_config", "trusted_contact_ids_encrypted"),
     ("emergency_config", "message_encrypted"),
@@ -328,6 +329,12 @@ impl Storage {
             report(&mut completed, "places");
 
             self.rekey_exchange_location(old_key, &new_key)?;
+            self.rekey_nullable_column(
+                old_key,
+                &new_key,
+                "contacts",
+                "last_sent_display_name_encrypted",
+            )?;
             report(&mut completed, "exchange_location");
 
             super::key_check::rewrite(&self.conn, &new_key)

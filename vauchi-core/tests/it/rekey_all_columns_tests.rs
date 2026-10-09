@@ -86,6 +86,7 @@ fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
         ("contacts", "visibility_rules_encrypted", b"{\"hidden\":[]}"),
         ("contacts", "nickname_encrypted", b"Bobby"),
         ("contacts", "custom_avatar_encrypted", b"CUSTOMAVATAR"),
+        ("contacts", "last_sent_display_name_encrypted", b"Ada"),
         ("identity", "backup_data_encrypted", b"backup-blob"),
         ("identity", "password_hash_encrypted", b"argon2id$..."),
         ("identity", "duress_hash_encrypted", b"argon2id$duress"),
@@ -263,8 +264,9 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
          (id, public_key, card_encrypted, shared_key_encrypted, \
           personal_notes_encrypted, avatar_encrypted, cek_encrypted, \
           visibility_rules_encrypted, nickname_encrypted, custom_avatar_encrypted, \
-          exchange_timestamp, contact_kind, exchange_location_encrypted) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'exchanged', ?12)",
+          exchange_timestamp, contact_kind, exchange_location_encrypted, \
+          last_sent_display_name_encrypted) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'exchanged', ?12, ?13)",
         params![
             CONTACT_ID,
             CONTACT_PK,
@@ -278,6 +280,7 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
             enc("contacts", "custom_avatar_encrypted"),
             now,
             enc("contacts", "exchange_location_encrypted"),
+            enc("contacts", "last_sent_display_name_encrypted"),
         ],
     )
     .unwrap();
@@ -678,7 +681,7 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     let id_eq_1: &[&dyn rusqlite::ToSql] = &[];
     let by_contact: &[&dyn rusqlite::ToSql] = &[&CONTACT_ID];
 
-    // ── contacts (9 columns, keyed by id) ────────────────────
+    // ── contacts (10 columns, keyed by id) ────────────────────
     for col in [
         "card_encrypted",
         "shared_key_encrypted",
@@ -689,6 +692,7 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         "nickname_encrypted",
         "custom_avatar_encrypted",
         "exchange_location_encrypted",
+        "last_sent_display_name_encrypted",
     ] {
         check_one("contacts", col, "id = ?1", by_contact);
     }

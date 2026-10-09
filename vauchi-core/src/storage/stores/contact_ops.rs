@@ -368,9 +368,10 @@ impl ContactStore<'_> {
         &self,
         contact_id: &str,
     ) -> Result<Option<String>, StorageError> {
-        self.conn
+        let encrypted: Option<Vec<u8>> = self
+            .conn
             .query_row(
-                "SELECT last_sent_display_name FROM contacts WHERE id = ?1",
+                "SELECT last_sent_display_name_encrypted FROM contacts WHERE id = ?1",
                 params![contact_id],
                 |row| row.get(0),
             )
@@ -379,7 +380,14 @@ impl ContactStore<'_> {
                     StorageError::NotFound("Contact not found".to_string())
                 }
                 other => StorageError::Database(other),
+            })?;
+        encrypted
+            .map(|ciphertext| {
+                let plain = crate::crypto::decrypt(self.key, &ciphertext)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                String::from_utf8(plain).map_err(|e| StorageError::Serialization(e.to_string()))
             })
+            .transpose()
     }
     /// Records the display name last sent (repropagated) to a contact.
     pub fn save_last_sent_display_name(
@@ -387,9 +395,11 @@ impl ContactStore<'_> {
         contact_id: &str,
         name: &str,
     ) -> Result<(), StorageError> {
+        let encrypted = crate::crypto::encrypt(self.key, name.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
         self.conn.execute(
-            "UPDATE contacts SET last_sent_display_name = ?1 WHERE id = ?2",
-            params![name, contact_id],
+            "UPDATE contacts SET last_sent_display_name_encrypted = ?1 WHERE id = ?2",
+            params![encrypted, contact_id],
         )?;
         Ok(())
     }

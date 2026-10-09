@@ -20,6 +20,7 @@ use super::{
 use crate::i18n::{Locale, get_string};
 
 const UNLOCK: &str = "unlock";
+const TRY_AGAIN: &str = "try_again";
 const START_OVER: &str = "start_over";
 const CONFIRM_START_OVER: &str = "confirm_start_over";
 const BACK: &str = "go_back";
@@ -54,6 +55,11 @@ pub struct StorageLockPresentation {
     screen: Screen,
     locale: Locale,
     revision: u64,
+    /// The next locked render asks for the platform prompt. Set at start and
+    /// after a tapped Unlock; never after a prompt-triggered retry, so a
+    /// prompt that cannot unlock storage does not loop.
+    prompt_on_render: bool,
+    retry_from_tap: bool,
 }
 
 impl StorageLockPresentation {
@@ -62,6 +68,8 @@ impl StorageLockPresentation {
             screen: screen_for(reason),
             locale,
             revision: 0,
+            prompt_on_render: true,
+            retry_from_tap: false,
         }
     }
 
@@ -72,25 +80,37 @@ impl StorageLockPresentation {
     /// Shows `reason` after a retry did not open storage.
     pub fn show(&mut self, reason: StorageLockReason) -> Vec<Command> {
         self.screen = screen_for(reason);
+        self.prompt_on_render = self.retry_from_tap;
         self.render()
     }
 
     pub fn dispatch(&mut self, event: Event) -> StorageLockStep {
         match event {
             Event::BiometricUnlockSucceeded if self.screen == Screen::Locked => {
+                self.retry_from_tap = false;
                 StorageLockStep::RetryOpen
             }
-            Event::ActionActivated { .. } | Event::BackRequested { .. } => self
-                .action_for(event)
-                .map(|action| self.handle_action(&action))
-                .unwrap_or_else(|| StorageLockStep::Commands(self.rejection())),
+            Event::ActionActivated { .. } | Event::BackRequested { .. } => {
+                match self.route(event) {
+                    Some(Routed::Action(action)) => self.handle_action(&action),
+                    Some(Routed::Commands(commands)) => StorageLockStep::Commands(commands),
+                    None => StorageLockStep::Commands(self.rejection()),
+                }
+            }
             _ => StorageLockStep::Commands(Vec::new()),
         }
     }
 
     fn handle_action(&mut self, action_id: &str) -> StorageLockStep {
         match (self.screen, action_id) {
-            (Screen::Locked, UNLOCK) => StorageLockStep::RetryOpen,
+            (Screen::Locked, UNLOCK) => {
+                self.retry_from_tap = true;
+                StorageLockStep::RetryOpen
+            }
+            (Screen::Unreadable, TRY_AGAIN) => {
+                self.retry_from_tap = false;
+                StorageLockStep::RetryOpen
+            }
             (Screen::Unreadable, START_OVER) => {
                 self.screen = Screen::ConfirmStartOver;
                 StorageLockStep::Commands(self.render())
@@ -104,8 +124,10 @@ impl StorageLockPresentation {
         }
     }
 
-    /// The action an activation names, only if the current screen offers it.
-    fn action_for(&self, event: Event) -> Option<String> {
+    /// What an activation means on the current screen: one of its actions,
+    /// or commands such as opening the action menu. `None` for anything the
+    /// screen does not offer.
+    fn route(&self, event: Event) -> Option<Routed> {
         let screen = self.current_screen();
         let surface_id = SurfaceId::new(screen.screen_id.clone()).ok()?;
         let prepared =
@@ -121,9 +143,12 @@ impl StorageLockPresentation {
         };
         match route {
             ContextualSurfaceRoute::UserAction(UserAction::ActionPressed { action_id }) => {
-                Some(action_id)
+                Some(Routed::Action(action_id))
             }
-            ContextualSurfaceRoute::UserAction(UserAction::NavigateBack) => Some(BACK.into()),
+            ContextualSurfaceRoute::UserAction(UserAction::NavigateBack) => {
+                Some(Routed::Action(BACK.into()))
+            }
+            ContextualSurfaceRoute::Commands(commands) => Some(Routed::Commands(commands)),
             _ => None,
         }
     }
@@ -143,9 +168,10 @@ impl StorageLockPresentation {
         };
         let mut commands = vec![prepared.command()];
         commands.extend(contextual.initial_commands());
-        if self.screen == Screen::Locked {
+        if self.screen == Screen::Locked && self.prompt_on_render {
             commands.push(Command::RequestBiometricUnlock);
         }
+        self.prompt_on_render = false;
         commands
     }
 
@@ -179,19 +205,21 @@ impl StorageLockPresentation {
     }
 
     fn current_screen(&self) -> ScreenModel {
-        let (id, title, body, action, back) = match self.screen {
+        let (id, title, body, action, menu_action, back) = match self.screen {
             Screen::Locked => (
                 "storage_lock.locked",
                 "storage_lock.locked_title",
                 "storage_lock.locked_body",
                 (UNLOCK, "storage_lock.unlock"),
+                None,
                 false,
             ),
             Screen::Unreadable => (
                 "storage_lock.unreadable",
                 "storage_lock.unreadable_title",
                 "storage_lock.unreadable_body",
-                (START_OVER, "storage_lock.start_over"),
+                (TRY_AGAIN, "storage_lock.try_again"),
+                Some((START_OVER, "storage_lock.start_over")),
                 false,
             ),
             Screen::ConfirmStartOver => (
@@ -199,6 +227,7 @@ impl StorageLockPresentation {
                 "storage_lock.confirm_title",
                 "storage_lock.confirm_body",
                 (CONFIRM_START_OVER, "storage_lock.confirm_start_over"),
+                None,
                 true,
             ),
         };
@@ -206,13 +235,21 @@ impl StorageLockPresentation {
             screen_id: id.into(),
             title: self.t(title),
             subtitle: Some(self.t(body)),
-            contextual_actions: vec![ScreenAction {
+            contextual_actions: std::iter::once(ScreenAction {
                 id: action.0.into(),
                 label: self.t(action.1),
                 style: ActionStyle::Primary,
                 enabled: true,
                 a11y: None,
-            }],
+            })
+            .chain(menu_action.map(|(id, label)| ScreenAction {
+                id: id.into(),
+                label: self.t(label),
+                style: ActionStyle::Destructive,
+                enabled: true,
+                a11y: None,
+            }))
+            .collect(),
             nav_actions: if back {
                 vec![ScreenAction {
                     id: BACK.into(),
@@ -227,6 +264,11 @@ impl StorageLockPresentation {
             ..Default::default()
         }
     }
+}
+
+enum Routed {
+    Action(String),
+    Commands(Vec<Command>),
 }
 
 fn screen_for(reason: StorageLockReason) -> Screen {

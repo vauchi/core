@@ -14,13 +14,16 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use vauchi_app::i18n::Locale;
-use vauchi_app::ui::{AppEngine, StorageLockPresentation, StorageLockReason, StorageLockStep};
+use vauchi_app::ui::{
+    AppEngine, RenderContext, StorageLockPresentation, StorageLockReason, StorageLockStep,
+};
 use vauchi_core::api::{PreSignedShredMessages, Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::{Command, Event, StorageError, VauchiError};
 
 use crate::error::MobileError;
-use crate::{KeychainBridge, MobilePlatformKeychain, PlatformAppEngine};
+use crate::{KeychainBridge, MobilePlatformKeychain, PlatformAppEngine, PlatformEventListener};
 
 /// Every keychain name that holds a key opening the database.
 const STORAGE_KEY_NAMES: [&str; 2] = ["smk", "storage_bootstrap"];
@@ -124,9 +127,20 @@ fn companion_files(storage_path: &Path) -> Vec<PathBuf> {
     files
 }
 
+/// Setup calls a shell makes right after construction, kept while storage
+/// is closed and applied to the engine once it opens.
+#[derive(Default)]
+pub(crate) struct PendingSetup {
+    pub(crate) render_context: Option<RenderContext>,
+    pub(crate) capabilities: Option<DeviceCapabilities>,
+    pub(crate) network_online: Option<bool>,
+    pub(crate) listener: Option<Box<dyn PlatformEventListener>>,
+}
+
 pub(crate) struct LockedStart {
     presentation: StorageLockPresentation,
     params: OpenParams,
+    pub(crate) pending: PendingSetup,
 }
 
 impl LockedStart {
@@ -134,11 +148,34 @@ impl LockedStart {
         Self {
             presentation: StorageLockPresentation::new(reason, Locale::English),
             params,
+            pending: PendingSetup::default(),
         }
+    }
+
+    pub(crate) fn keep_render_context(&mut self, context: RenderContext) {
+        self.presentation.set_locale(context.resolved_locale());
+        self.pending.render_context = Some(context);
     }
 }
 
 impl PlatformAppEngine {
+    /// Hands `value` to the locked start while storage is closed (`None`),
+    /// or back to the caller once it is open.
+    pub(crate) fn keep_while_locked<T>(
+        &self,
+        value: T,
+        keep: impl FnOnce(&mut LockedStart, T),
+    ) -> Result<Option<T>, MobileError> {
+        let mut locked = self.lock_locked_start()?;
+        match locked.as_mut() {
+            Some(start) => {
+                keep(start, value);
+                Ok(None)
+            }
+            None => Ok(Some(value)),
+        }
+    }
+
     /// The locked start's first batch, or `None` once storage is open.
     pub(crate) fn locked_initial_commands(&self) -> Result<Option<Vec<Command>>, MobileError> {
         let mut locked = self.lock_locked_start()?;
@@ -193,11 +230,24 @@ impl PlatformAppEngine {
             Opened::Locked(reason) => Ok(start.presentation.show(reason)),
             Opened::Engine(vauchi) => {
                 let mut engine = AppEngine::new(*vauchi);
+                let pending = std::mem::take(&mut start.pending);
+                if let Some(context) = pending.render_context {
+                    engine.set_render_context(context);
+                }
+                if let Some(capabilities) = pending.capabilities {
+                    engine.set_device_capabilities(capabilities);
+                }
+                if let Some(online) = pending.network_online {
+                    engine.set_network_online(online);
+                }
                 let commands = engine.initial_commands().map_err(|e| MobileError::Other {
                     detail: format!("Failed to compose initial presentation: {e}"),
                 })?;
                 *self.lock_engine()? = Some(engine);
                 *locked = None;
+                if let Some(listener) = pending.listener {
+                    self.register_event_listener(listener)?;
+                }
                 Ok(commands)
             }
         }

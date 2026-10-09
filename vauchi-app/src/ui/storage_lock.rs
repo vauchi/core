@@ -73,6 +73,11 @@ impl StorageLockPresentation {
         }
     }
 
+    /// The language of the next render (from the shell's render context).
+    pub fn set_locale(&mut self, locale: Locale) {
+        self.locale = locale;
+    }
+
     pub fn initial_commands(&mut self) -> Vec<Command> {
         self.render()
     }

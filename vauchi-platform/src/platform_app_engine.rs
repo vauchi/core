@@ -488,6 +488,10 @@ impl PlatformAppEngine {
             serde_json::from_str(&json).map_err(|e| MobileError::Other {
                 detail: format!("Invalid render context JSON: {e}"),
             })?;
+        let Some(ctx) = self.keep_while_locked(ctx, |start, ctx| start.keep_render_context(ctx))?
+        else {
+            return Ok(());
+        };
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         engine.set_render_context(ctx);
@@ -503,6 +507,12 @@ impl PlatformAppEngine {
     ///
     /// Audit `2026-04-28-lifecycle-session-residue-umbrella` P2-D.
     pub fn set_network_online(&self, online: bool) -> Result<(), MobileError> {
+        let Some(online) = self.keep_while_locked(online, |start, online| {
+            start.pending.network_online = Some(online)
+        })?
+        else {
+            return Ok(());
+        };
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         engine.set_network_online(online);
@@ -649,6 +659,11 @@ impl PlatformAppEngine {
             serde_json::from_str(&capabilities_json).map_err(|e| MobileError::Other {
                 detail: format!("Invalid capabilities JSON: {e}"),
             })?;
+        let Some(caps) =
+            self.keep_while_locked(caps, |start, caps| start.pending.capabilities = Some(caps))?
+        else {
+            return Ok(());
+        };
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         engine.set_device_capabilities(caps);
@@ -698,6 +713,23 @@ impl PlatformAppEngine {
         &self,
         listener: Box<dyn PlatformEventListener>,
     ) -> Result<(), MobileError> {
+        let Some(listener) = self.keep_while_locked(listener, |start, listener| {
+            start.pending.listener = Some(listener)
+        })?
+        else {
+            return Ok(());
+        };
+        self.register_event_listener(listener)
+    }
+}
+
+impl PlatformAppEngine {
+    /// Registers the listener on the open engine; called directly once a
+    /// locked start opens storage.
+    pub(crate) fn register_event_listener(
+        &self,
+        listener: Box<dyn PlatformEventListener>,
+    ) -> Result<(), MobileError> {
         let listener = Arc::new(listener);
 
         let mut engine_slot = self.lock_engine()?;
@@ -738,7 +770,10 @@ impl PlatformAppEngine {
         *direct = Some(listener);
         Ok(())
     }
+}
 
+#[uniffi::export]
+impl PlatformAppEngine {
     // ── Recovery (Phase B2 — collapse-vauchi-platform-into-app-engine) ──
     //
     // Wraps the recovery domain that previously only lived on

@@ -203,3 +203,94 @@ fn a_contacts_relay_stored_before_v79_survives_encryption() {
 
     assert_eq!(loaded.relay_url(), Some("https://old.example.org"));
 }
+
+fn imported_with_uid(uid: &str) -> vauchi_core::contact::Contact {
+    vauchi_core::contact::Contact::from_import(
+        "imp1".into(),
+        vauchi_core::ContactCard::new("Eve"),
+        vauchi_core::contact::kind::ImportSource::VcardFile,
+        Some(uid.into()),
+        0,
+    )
+}
+
+// @internal
+#[test]
+fn an_imported_contacts_vcard_uid_is_found_without_a_plaintext_column() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    storage
+        .contacts()
+        .save_contact(&imported_with_uid("uid-123"))
+        .unwrap();
+
+    let found = storage.contacts().find_imported_by_uid("uid-123").unwrap();
+    let missing = storage.contacts().find_imported_by_uid("uid-999").unwrap();
+    let loaded = storage.contacts().load_contact("imp1").unwrap().unwrap();
+
+    assert_eq!(found.as_deref(), Some("imp1"));
+    assert_eq!(missing, None);
+    assert_eq!(
+        loaded
+            .kind()
+            .imported_data()
+            .unwrap()
+            .original_uid
+            .as_deref(),
+        Some("uid-123")
+    );
+    assert!(!columns(&storage, "contacts").contains(&"original_uid".to_string()));
+}
+
+// @internal
+#[test]
+fn the_vcard_uid_lookup_survives_a_rekey() {
+    let mut storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    storage
+        .contacts()
+        .save_contact(&imported_with_uid("uid-123"))
+        .unwrap();
+
+    storage.rekey(SymmetricKey::generate()).unwrap();
+
+    assert_eq!(
+        storage
+            .contacts()
+            .find_imported_by_uid("uid-123")
+            .unwrap()
+            .as_deref(),
+        Some("imp1")
+    );
+}
+
+// @internal
+#[test]
+fn a_vcard_uid_stored_before_v80_is_still_found() {
+    use vauchi_core::crypto::encrypt;
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("vauchi.db");
+    let key = SymmetricKey::generate();
+    {
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        migrate_to(&conn, &key, 79);
+        let card = serde_json::to_vec(&vauchi_core::ContactCard::new("Eve")).unwrap();
+        conn.execute(
+            "INSERT INTO contacts (id, public_key, card_encrypted, shared_key_encrypted,
+                                   exchange_timestamp, contact_kind, import_source,
+                                   imported_at, original_uid)
+             VALUES ('imp1', X'', ?1, X'', 0, 'imported', '\"VcardFile\"', 0, 'uid-old')",
+            [encrypt(&key, &card).unwrap()],
+        )
+        .unwrap();
+    }
+
+    let storage = Storage::open(&db_path, key).unwrap();
+
+    assert_eq!(
+        storage
+            .contacts()
+            .find_imported_by_uid("uid-old")
+            .unwrap()
+            .as_deref(),
+        Some("imp1")
+    );
+}

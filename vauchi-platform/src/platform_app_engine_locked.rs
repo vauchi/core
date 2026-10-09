@@ -10,23 +10,20 @@
 //! Core's storage-lock screens; a retry or a confirmed start-over opens
 //! storage and swaps the real engine in.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{
     AppEngine, RenderContext, StorageLockPresentation, StorageLockReason, StorageLockStep,
 };
-use vauchi_core::api::{PreSignedShredMessages, Vauchi, VauchiConfig};
+use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::{Command, Event, StorageError, VauchiError};
 
 use crate::error::MobileError;
 use crate::{KeychainBridge, MobilePlatformKeychain, PlatformAppEngine, PlatformEventListener};
-
-/// Every keychain name that holds a key opening the database.
-const STORAGE_KEY_NAMES: [&str; 2] = ["smk", "storage_bootstrap"];
 
 pub(crate) struct OpenParams {
     pub(crate) storage_path: PathBuf,
@@ -66,69 +63,17 @@ impl OpenParams {
         }
     }
 
-    /// Deletes the database, the lost identity's files and every key that
-    /// opened the database. Called only after the person confirmed on Core's
-    /// start-over screen.
-    ///
-    /// Companion files go first: if one cannot be removed, the database
-    /// stays, so a fresh database never starts next to an old WAL.
+    /// Deletes the unreadable data; called only after the person confirmed
+    /// on Core's start-over screen.
     fn delete_unreadable_data(&self) -> Result<(), MobileError> {
-        for path in companion_files(&self.storage_path) {
-            remove_file_if_present(&path)?;
-        }
-        remove_file_if_present(&self.storage_path)?;
-        if let Some(dir) = self.storage_path.parent() {
-            remove_file_if_present(&dir.join("identity.json"))?;
-            remove_file_if_present(&PreSignedShredMessages::file_path(dir))?;
-            let keys = dir.join("keys");
-            if keys.exists() {
-                std::fs::remove_dir_all(&keys).map_err(storage_error)?;
-            }
-        }
-        for name in STORAGE_KEY_NAMES {
-            self.keychain
-                .delete_key(name.to_string())
-                .map_err(|e| MobileError::StorageError {
-                    detail: e.to_string(),
-                })?;
-        }
-        Ok(())
+        let bridge = KeychainBridge {
+            callback: self.keychain.clone(),
+        };
+        vauchi_core::api::storage_reset::delete_unreadable_data(&self.storage_path, &bridge)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })
     }
-}
-
-fn storage_error(error: std::io::Error) -> MobileError {
-    MobileError::StorageError {
-        detail: error.to_string(),
-    }
-}
-
-fn remove_file_if_present(path: &Path) -> Result<(), MobileError> {
-    if path.exists() {
-        std::fs::remove_file(path).map_err(storage_error)?;
-    }
-    Ok(())
-}
-
-/// The database's WAL and shared-memory files and pre-migration backups.
-fn companion_files(storage_path: &Path) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    let Some(name) = storage_path.file_name().and_then(|n| n.to_str()) else {
-        return files;
-    };
-    let Some(dir) = storage_path.parent() else {
-        return files;
-    };
-    files.push(dir.join(format!("{name}-wal")));
-    files.push(dir.join(format!("{name}-shm")));
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        let backup_prefix = format!("{name}.pre-migration-");
-        files.extend(entries.flatten().map(|entry| entry.path()).filter(|path| {
-            path.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with(&backup_prefix))
-        }));
-    }
-    files
 }
 
 /// Setup calls a shell makes right after construction, kept while storage

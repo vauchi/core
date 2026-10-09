@@ -8,7 +8,6 @@
 //! They live in a separate binary from `i18n_integration_tests` so they don't
 //! corrupt shared state for tests that read real locale keys in parallel.
 
-use std::path::PathBuf;
 use std::sync::Once;
 use vauchi_app::i18n::{Locale, get_string, load_locale_from_bytes};
 

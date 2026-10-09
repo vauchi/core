@@ -49,6 +49,7 @@
 pub mod app_password;
 pub mod duress;
 pub mod emergency;
+pub mod storage_reset;
 
 #[cfg(feature = "testing")]
 pub mod deletion;

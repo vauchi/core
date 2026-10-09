@@ -302,3 +302,60 @@ fn a_shred_is_not_verified_clear_while_a_bootstrap_key_remains() {
     assert!(!verification.bootstrap_key_absent);
     assert!(!verification.all_clear);
 }
+
+/// Secure storage whose delete of one key name fails.
+struct UndeletableKey {
+    inner: MemoryKeyStorage,
+    undeletable: &'static str,
+}
+
+impl SecureStorage for UndeletableKey {
+    fn save_key(&self, name: &str, key: &[u8]) -> Result<(), StorageError> {
+        self.inner.save_key(name, key)
+    }
+    fn load_key(&self, name: &str) -> Result<Option<Vec<u8>>, StorageError> {
+        self.inner.load_key(name)
+    }
+    fn delete_key(&self, name: &str) -> Result<(), StorageError> {
+        if name == self.undeletable {
+            return Err(StorageError::SecureStorageLocked);
+        }
+        self.inner.delete_key(name)
+    }
+}
+
+// @internal
+#[test]
+fn a_shred_that_could_not_delete_every_storage_key_does_not_report_them_destroyed() {
+    for undeletable in [SMK_KEY_NAME, BOOTSTRAP_KEY_NAME] {
+        let dir = tempfile::tempdir().unwrap();
+        let secure = UndeletableKey {
+            inner: keys_with_leftover_bootstrap(),
+            undeletable,
+        };
+
+        let report = widget_panic_shred(dir.path(), &secure).unwrap();
+
+        assert!(
+            !report.smk_destroyed,
+            "{undeletable} survived but the report says the keys are destroyed"
+        );
+    }
+}
+
+// @internal
+#[test]
+fn storage_in_a_directory_that_does_not_exist_yet_is_created() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("not").join("yet").join("vauchi.db");
+
+    let with_keychain = boot(&path, &Arc::new(MemoryKeyStorage::new()));
+    let without_keychain = Vauchi::new(
+        VauchiConfig::with_storage_path(dir.path().join("other").join("vauchi.db"))
+            .with_storage_key(SymmetricKey::generate()),
+    );
+
+    assert!(with_keychain.is_ok(), "{:?}", with_keychain.err());
+    assert!(without_keychain.is_ok(), "{:?}", without_keychain.err());
+    assert!(path.exists());
+}

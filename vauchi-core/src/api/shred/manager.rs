@@ -121,17 +121,10 @@ impl<'a> ShredManager<'a> {
 
         // Send relay purge if sender provided (before point-of-no-return)
         if let Some(sender) = purge_sender {
-            let pre_signed = PreSignedShredMessages::load(&self.data_dir).or_else(|_| {
-                Ok::<_, ShredError>(PreSignedShredMessages::generate(
-                    self.identity,
-                    self.storage.clock().unix_seconds(),
-                ))
-            });
-            if let Ok(msgs) = pre_signed {
-                report.relay_purge_sent = sender
-                    .send_purge(&msgs.purge_request, self.storage.clock().unix_seconds())
-                    .unwrap_or(false);
-            }
+            let msgs = self.pre_signed_messages();
+            report.relay_purge_sent = sender
+                .send_purge(&msgs.purge_request, self.storage.clock().unix_seconds())
+                .unwrap_or(false);
         }
 
         // ═══ POINT OF NO RETURN ═══
@@ -173,18 +166,9 @@ impl<'a> ShredManager<'a> {
 
         // ── Phase A: Prepare outbound messages while keys available ──
 
-        // 1. Load pre-signed messages from file (unencrypted per DP-3)
-        let pre_signed = match PreSignedShredMessages::load(&self.data_dir) {
-            Ok(msgs) => Some(msgs),
-            Err(_) => {
-                // 2. Fallback: sign fresh messages now (keys still available)
-                let msgs = PreSignedShredMessages::generate(
-                    self.identity,
-                    self.storage.clock().unix_seconds(),
-                );
-                Some(msgs)
-            }
-        };
+        // 1. Pre-signed messages from file (unencrypted per DP-3), or signed
+        //    now while the keys are still available
+        let pre_signed = Some(self.pre_signed_messages());
 
         // Build revocation deliveries (token + blob) for each contact while
         // keys + shared secrets are still available — the relay actually
@@ -295,6 +279,18 @@ impl<'a> ShredManager<'a> {
     }
 
     // ── Internal helpers ──
+
+    /// The stored pre-signed messages if this identity signed them;
+    /// otherwise fresh ones signed now. A file left by an earlier identity
+    /// would purge that identity's relay data instead (vauchi/private#582).
+    fn pre_signed_messages(&self) -> PreSignedShredMessages {
+        PreSignedShredMessages::load(&self.data_dir)
+            .ok()
+            .filter(|msgs| msgs.purge_request.public_key == *self.identity.signing_public_key())
+            .unwrap_or_else(|| {
+                PreSignedShredMessages::generate(self.identity, self.storage.clock().unix_seconds())
+            })
+    }
 
     fn destroy_smk(&self) -> bool {
         destroy_storage_keys(self.secure_storage)

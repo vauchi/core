@@ -12,7 +12,8 @@ use std::sync::Arc;
 
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_platform::{
-    DomainCommand, DomainCommandResult, KeychainError, MobilePlatformKeychain, PlatformAppEngine,
+    DomainCommand, DomainCommandResult, HandedOverSecret, KeychainError, MobilePlatformKeychain,
+    PlatformAppEngine,
 };
 
 use crate::support::{SharedKeychain, drive_onboarding};
@@ -27,7 +28,10 @@ fn start(
     PlatformAppEngine::open_with_keychain(
         dir.path().to_string_lossy().to_string(),
         RELAY.into(),
-        shell_key.map(|key| key.as_bytes().to_vec()),
+        shell_key.map(|key| HandedOverSecret {
+            handle: "legacy-storage-key".into(),
+            secret: key.as_bytes().to_vec(),
+        }),
         Box::new(keychain.clone()),
     )
     .expect("open engine")
@@ -97,7 +101,10 @@ fn a_malformed_shell_key_is_refused_before_the_keychain_is_touched() {
         let result = PlatformAppEngine::open_with_keychain(
             dir.path().to_string_lossy().to_string(),
             RELAY.into(),
-            Some(bad.clone()),
+            Some(HandedOverSecret {
+                handle: "legacy-storage-key".into(),
+                secret: bad.clone(),
+            }),
             Box::new(keychain.clone()),
         );
 
@@ -135,4 +142,51 @@ fn a_keychain_that_cannot_be_read_opens_nothing() {
 
     assert!(result.is_err());
     assert!(!dir.path().join("vauchi.db").exists());
+}
+
+fn forgets(batch: &str) -> Vec<String> {
+    let batch: serde_json::Value = serde_json::from_str(batch).expect("batch json");
+    batch["commands"]
+        .as_array()
+        .expect("commands")
+        .iter()
+        .filter_map(|command| command.get("ForgetStoredSecret"))
+        .map(|forget| forget["handle"].as_str().unwrap_or_default().to_owned())
+        .collect()
+}
+
+// @internal
+#[test]
+fn a_handed_over_key_is_released_once_and_only_after_storage_opened() {
+    let dir = tempfile::tempdir().unwrap();
+    let shell_key = SymmetricKey::generate();
+    drop(
+        PlatformAppEngine::new(
+            dir.path().to_string_lossy().to_string(),
+            RELAY.into(),
+            shell_key.as_bytes().to_vec(),
+        )
+        .unwrap(),
+    );
+    let keychain = SharedKeychain::new();
+    let engine = start(&dir, Some(&shell_key), &keychain);
+
+    let first = engine.initial_commands_json().unwrap();
+    let second = engine.initial_commands_json().unwrap();
+
+    assert_eq!(forgets(&first), ["legacy-storage-key"]);
+    assert_eq!(forgets(&second), Vec::<String>::new());
+    assert_eq!(keychain.names(), ["storage_bootstrap"]);
+}
+
+// @internal
+#[test]
+fn without_a_handed_over_key_nothing_is_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = start(&dir, None, &SharedKeychain::new());
+
+    assert_eq!(
+        forgets(&engine.initial_commands_json().unwrap()),
+        Vec::<String>::new()
+    );
 }

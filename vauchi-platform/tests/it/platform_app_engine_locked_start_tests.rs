@@ -401,3 +401,49 @@ fn a_render_context_set_while_locked_reaches_the_opened_engine() {
 
     assert!(opened.contains(&more), "expected {more:?} in {opened}");
 }
+
+fn released(batch: &Value) -> Vec<String> {
+    batch["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|command| command.get("ForgetStoredSecret"))
+        .map(|forget| forget["handle"].as_str().unwrap_or_default().to_owned())
+        .collect()
+}
+
+// @internal
+#[test]
+fn a_handed_over_key_is_not_released_while_storage_is_locked() {
+    let dir = tempfile::tempdir().unwrap();
+    let shell_key = vauchi_core::crypto::SymmetricKey::generate();
+    drive_onboarding(
+        &PlatformAppEngine::new(
+            dir.path().to_string_lossy().to_string(),
+            RELAY.into(),
+            shell_key.as_bytes().to_vec(),
+        )
+        .unwrap(),
+    );
+    let keychain = ControlledKeychain::new(SharedKeychain::new());
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = PlatformAppEngine::open_with_keychain(
+        dir.path().to_string_lossy().to_string(),
+        RELAY.into(),
+        Some(vauchi_platform::HandedOverSecret {
+            handle: "legacy-storage-key".into(),
+            secret: shell_key.as_bytes().to_vec(),
+        }),
+        Box::new(keychain.clone()),
+    )
+    .unwrap();
+
+    let locked = parse(engine.initial_commands_json().unwrap());
+    assert_eq!(released(&locked), Vec::<String>::new());
+
+    keychain.locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine);
+
+    assert_eq!(released(&opened), ["legacy-storage-key"]);
+    assert_eq!(keychain.store.names(), ["smk"]);
+}

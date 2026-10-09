@@ -34,6 +34,9 @@ fn generic_shell_effects_round_trip_without_domain_results() {
         Command::PerformNativeBack,
         Command::ResetApplication,
         Command::RequestBiometricUnlock,
+        Command::ForgetStoredSecret {
+            handle: "legacy-storage-key".into(),
+        },
     ];
 
     let encoded = serde_json::to_vec(&commands).expect("serialize generic effects");

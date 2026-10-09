@@ -438,6 +438,7 @@ mod safety_alert_receive_tests;
 mod safety_alert_tests;
 mod schema_compat_tests;
 mod sealed_box_tests;
+mod secure_storage_failure_tests;
 mod security_hardening_tests;
 mod security_tests;
 mod send_phase_outcome_tests;

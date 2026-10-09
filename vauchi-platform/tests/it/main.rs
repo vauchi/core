@@ -24,6 +24,7 @@ mod platform_app_engine_emergency_broadcast_tests;
 mod platform_app_engine_input_bound_tests;
 mod platform_app_engine_keychain_open_tests;
 mod platform_app_engine_link_responder_tests;
+mod platform_app_engine_locked_start_tests;
 mod platform_app_engine_recovery_tests;
 mod platform_app_engine_shred_tests;
 mod platform_app_engine_tests;

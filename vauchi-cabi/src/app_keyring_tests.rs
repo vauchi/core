@@ -181,3 +181,55 @@ fn data_under_the_file_key_still_opens_with_a_keyring() {
     assert!(!surface(&initial(app)).starts_with("storage_lock"));
     destroy(app);
 }
+
+/// Opens the action menu and activates its only item, Start over.
+fn choose_start_over(app: *mut VauchiApp, batch: &serde_json::Value) -> serde_json::Value {
+    let bar = batch["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|c| c.get("SetContextBar"))
+        .expect("a context bar")
+        .clone();
+    let dispatch = |interaction: &serde_json::Value| {
+        let event = serde_json::json!({
+            "ActionActivated": { "surface_id": bar["surface_id"], "interaction_id": interaction }
+        });
+        let event = CString::new(event.to_string()).unwrap();
+        // SAFETY: `app` is live and `event` is NUL-terminated.
+        let reply = take_string(unsafe { vauchi_app_dispatch(app, event.as_ptr()) });
+        serde_json::from_str::<serde_json::Value>(&reply).unwrap()
+    };
+    let menu = dispatch(&bar["bar"]["secondary"]["interaction_id"]);
+    let item = menu["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|c| c.get("PresentOverlay"))
+        .expect("the action menu")["overlay"]["items"][0]["interaction_id"]
+        .clone();
+    dispatch(&item)
+}
+
+// @internal
+#[test]
+fn starting_over_on_the_desktop_opens_a_fresh_install() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = open(&dir, SwitchableKeyring::new());
+    // SAFETY: `first` is live; a null display name means the default.
+    assert_eq!(
+        unsafe { crate::vauchi_app_create_identity(first, std::ptr::null()) },
+        0
+    );
+    destroy(first);
+    let app = open(&dir, SwitchableKeyring::new());
+    let confirm = choose_start_over(app, &initial(app));
+    assert_eq!(surface(&confirm), "storage_lock.confirm_start_over");
+
+    let fresh = press_primary(app, &confirm);
+
+    assert!(!surface(&fresh).starts_with("storage_lock"), "got {fresh}");
+    // SAFETY: `app` is live.
+    assert_eq!(unsafe { crate::vauchi_app_has_identity(app) }, 0);
+    destroy(app);
+}

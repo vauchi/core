@@ -171,7 +171,10 @@ pub trait MobilePlatformKeychain: Send + Sync {
     /// Returns None if the key doesn't exist.
     fn load_key(&self, name: String) -> Result<Option<Vec<u8>>, KeychainError>;
 
-    /// Deletes a key from the platform keychain.
+    /// Deletes a key from the platform keychain. Deleting a key that does
+    /// not exist succeeds: shred deletes every storage key whether or not a
+    /// boot already removed it, and reports a failed delete as a key that
+    /// survived.
     fn delete_key(&self, name: String) -> Result<(), KeychainError>;
 }
 

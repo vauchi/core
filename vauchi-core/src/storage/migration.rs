@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 76] = [
+const MIGRATIONS: [Migration; 77] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -652,6 +652,11 @@ const MIGRATIONS: [Migration; 76] = [
         name: "drop_identity_display_name",
         action: MigrationAction::Sql(MIGRATION_V76_DROP_IDENTITY_DISPLAY_NAME),
     },
+    Migration {
+        version: 77,
+        name: "encrypt_decoy_names",
+        action: MigrationAction::Callback(migrate_v77_encrypt_decoy_names),
+    },
 ];
 
 /// Migration v76: the identity's display name is already inside
@@ -667,6 +672,53 @@ const MIGRATION_V75_STORAGE_KEY_CHECK: &str = "
         sealed_label BLOB NOT NULL
     );
 ";
+/// Migration v77: decoy contact names move to `display_name_encrypted`
+/// (vauchi/private#579).
+fn migrate_v77_encrypt_decoy_names(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    encrypt_text_column_in_place(
+        conn,
+        key,
+        "decoy_contacts",
+        "display_name",
+        "display_name_encrypted",
+    )
+}
+
+/// Encrypts every non-NULL value of `plain` into the new BLOB column
+/// `encrypted`, then drops `plain`. `table` and both columns are constants
+/// from the migration ledger, never input.
+fn encrypt_text_column_in_place(
+    conn: &Connection,
+    key: &SymmetricKey,
+    table: &str,
+    plain: &str,
+    encrypted: &str,
+) -> Result<(), StorageError> {
+    add_column_if_not_exists(conn, table, encrypted, "BLOB")?;
+    let rows: Vec<(i64, String)> = conn
+        .prepare(&format!(
+            "SELECT rowid, {plain} FROM {table} WHERE {plain} IS NOT NULL"
+        ))
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .map_err(|e| StorageError::Migration(format!("Read {table}.{plain}: {e}")))?;
+    for (rowid, value) in &rows {
+        let ciphertext = encrypt_and_verify(key, value.as_bytes(), &format!("{table}.{plain}"))?;
+        conn.execute(
+            &format!("UPDATE {table} SET {encrypted} = ?1 WHERE rowid = ?2"),
+            rusqlite::params![ciphertext, rowid],
+        )
+        .map_err(|e| StorageError::Migration(format!("Update {table}.{encrypted}: {e}")))?;
+    }
+    conn.execute(&format!("ALTER TABLE {table} DROP COLUMN {plain}"), [])
+        .map_err(|e| StorageError::Migration(format!("Drop {table}.{plain}: {e}")))?;
+    Ok(())
+}
 
 /// Migration v73: contacts no longer keep a plaintext display name; the
 /// name lives only in the encrypted card (vauchi/private#570).

@@ -202,9 +202,10 @@ fn test_rekey_preserves_decoy_contacts() {
     let key1 = storage.key().clone();
 
     let card_enc = vauchi_core::crypto::encrypt(&key1, b"{\"name\":\"Decoy\"}").unwrap();
+    let name_enc = vauchi_core::crypto::encrypt(&key1, b"Decoy").unwrap();
     storage.connection().execute(
-        "INSERT INTO decoy_contacts (id, display_name, card_encrypted, created_at, updated_at) VALUES ('d1', 'Decoy', ?1, 1000, 1000)",
-        [&card_enc],
+        "INSERT INTO decoy_contacts (id, display_name_encrypted, card_encrypted, created_at, updated_at) VALUES ('d1', ?1, ?2, 1000, 1000)",
+        [&name_enc, &card_enc],
     ).unwrap();
 
     let key2 = SymmetricKey::generate();
@@ -221,6 +222,18 @@ fn test_rekey_preserves_decoy_contacts() {
     assert_eq!(
         vauchi_core::crypto::decrypt(&key2, &loaded).unwrap(),
         b"{\"name\":\"Decoy\"}"
+    );
+    let loaded_name: Vec<u8> = storage
+        .connection()
+        .query_row(
+            "SELECT display_name_encrypted FROM decoy_contacts WHERE id = 'd1'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        vauchi_core::crypto::decrypt(&key2, &loaded_name).unwrap(),
+        b"Decoy"
     );
 }
 

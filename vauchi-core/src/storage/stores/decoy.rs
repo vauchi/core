@@ -52,13 +52,15 @@ impl DecoyStore<'_> {
 
         let encrypted = crate::crypto::encrypt(self.key, &card_json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let name_encrypted = crate::crypto::encrypt(self.key, display_name.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = self.now_secs();
         let (created_at, updated_at) = decoy_timestamps(id, now);
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO decoy_contacts (id, display_name, card_encrypted, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![id, display_name, encrypted, created_at as i64, updated_at as i64],
+            "INSERT OR REPLACE INTO decoy_contacts (id, display_name_encrypted, card_encrypted, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, name_encrypted, encrypted, created_at as i64, updated_at as i64],
         )?;
 
         Ok(())
@@ -68,20 +70,24 @@ impl DecoyStore<'_> {
     /// Returns a list of (id, display_name, card) tuples.
     pub fn load_decoy_contacts(&self) -> Result<Vec<(String, String, ContactCard)>, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, display_name, card_encrypted FROM decoy_contacts ORDER BY created_at",
+            "SELECT id, display_name_encrypted, card_encrypted FROM decoy_contacts ORDER BY created_at",
         )?;
 
         let rows = stmt.query_map([], |row| {
             Ok((
                 row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
+                row.get::<_, Vec<u8>>(1)?,
                 row.get::<_, Vec<u8>>(2)?,
             ))
         })?;
 
         let mut contacts = Vec::new();
         for row in rows {
-            let (id, display_name, encrypted) = row?;
+            let (id, name_encrypted, encrypted) = row?;
+            let name_bytes = crate::crypto::decrypt(self.key, &name_encrypted)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            let display_name = String::from_utf8(name_bytes)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?;
             let card_json = crate::crypto::decrypt(self.key, &encrypted)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
             let card: ContactCard = serde_json::from_slice(&card_json)

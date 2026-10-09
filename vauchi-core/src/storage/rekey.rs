@@ -86,6 +86,7 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("duress_settings", "alert_message_encrypted"),
     // V21 decoy contacts
     ("decoy_contacts", "card_encrypted"),
+    ("decoy_contacts", "display_name_encrypted"),
     // V22 emergency config
     ("emergency_config", "trusted_contact_ids_encrypted"),
     ("emergency_config", "message_encrypted"),
@@ -294,6 +295,12 @@ impl Storage {
             report(&mut completed, "duress_settings");
 
             self.rekey_decoy_contacts(old_key, &new_key)?;
+            self.rekey_nullable_column(
+                old_key,
+                &new_key,
+                "decoy_contacts",
+                "display_name_encrypted",
+            )?;
             report(&mut completed, "decoy_contacts");
 
             self.rekey_emergency_config(old_key, &new_key)?;
@@ -493,6 +500,38 @@ impl Storage {
                     params![new_enc, id],
                 )
                 .map_err(|e| StorageError::Migration(format!("Update tag {}: {}", id, e)))?;
+        }
+        Ok(())
+    }
+
+    /// Re-encrypts one nullable encrypted column row by row. `table` and
+    /// `column` are constants from this module, never input.
+    fn rekey_nullable_column(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+        table: &str,
+        column: &str,
+    ) -> Result<(), StorageError> {
+        let rows: Vec<(i64, Vec<u8>)> = self
+            .conn
+            .prepare(&format!(
+                "SELECT rowid, {column} FROM {table} WHERE {column} IS NOT NULL"
+            ))
+            .and_then(|mut stmt| {
+                stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .map_err(|e| StorageError::Migration(format!("Read {table}.{column}: {e}")))?;
+        for (rowid, enc) in &rows {
+            let new_enc = rekey_or_heal(new_key, old_key, enc)
+                .map_err(|e| StorageError::Migration(format!("Rekey {table}.{column}: {e}")))?;
+            self.conn
+                .execute(
+                    &format!("UPDATE {table} SET {column} = ?1 WHERE rowid = ?2"),
+                    params![new_enc, rowid],
+                )
+                .map_err(|e| StorageError::Migration(format!("Update {table}.{column}: {e}")))?;
         }
         Ok(())
     }

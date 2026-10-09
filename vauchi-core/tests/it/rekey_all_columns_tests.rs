@@ -202,6 +202,7 @@ fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
         ),
         ("duress_settings", "alert_message_encrypted", b"help me"),
         ("decoy_contacts", "card_encrypted", b"{\"name\":\"Decoy\"}"),
+        ("decoy_contacts", "display_name_encrypted", b"Decoy"),
         (
             "emergency_config",
             "trusted_contact_ids_encrypted",
@@ -595,9 +596,14 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     // ── decoy_contacts ───────────────────────────────────────
     conn.execute(
         "INSERT INTO decoy_contacts \
-         (id, display_name, card_encrypted, created_at, updated_at) \
-         VALUES ('d1', 'Decoy', ?1, ?2, ?3)",
-        params![enc("decoy_contacts", "card_encrypted"), now, now],
+         (id, display_name_encrypted, card_encrypted, created_at, updated_at) \
+         VALUES ('d1', ?1, ?2, ?3, ?4)",
+        params![
+            enc("decoy_contacts", "display_name_encrypted"),
+            enc("decoy_contacts", "card_encrypted"),
+            now,
+            now
+        ],
     )
     .unwrap();
 
@@ -904,6 +910,7 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
 
     // ── decoy_contacts ──────────────────────────────────────
     check_one("decoy_contacts", "card_encrypted", "id = 'd1'", &[]);
+    check_one("decoy_contacts", "display_name_encrypted", "id = 'd1'", &[]);
 
     // ── exchange_states ─────────────────────────────────────
     check_one(

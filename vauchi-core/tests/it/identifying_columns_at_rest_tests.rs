@@ -47,3 +47,39 @@ fn a_decoy_contact_keeps_its_name_without_a_plaintext_column() {
         ("d1", "Decoy Alice")
     );
 }
+
+fn migrate_to(conn: &rusqlite::Connection, key: &SymmetricKey, version: u32) {
+    use vauchi_core::storage::migration::{MigrationRunner, all_migrations};
+    let subset: Vec<_> = all_migrations()
+        .iter()
+        .filter(|m| m.version <= version)
+        .copied()
+        .collect();
+    MigrationRunner::run(conn, key, &subset, None, 0).unwrap();
+}
+
+// @internal
+#[test]
+fn a_decoy_name_stored_before_v77_survives_encryption() {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("vauchi.db");
+    let key = SymmetricKey::generate();
+    let card = vauchi_core::ContactCard::new("Card");
+    {
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        migrate_to(&conn, &key, 76);
+        let card_enc =
+            vauchi_core::crypto::encrypt(&key, &serde_json::to_vec(&card).unwrap()).unwrap();
+        conn.execute(
+            "INSERT INTO decoy_contacts (id, display_name, card_encrypted, created_at, updated_at)
+             VALUES ('d1', 'Old Decoy', ?1, 1, 1)",
+            [card_enc],
+        )
+        .unwrap();
+    }
+
+    let storage = Storage::open(&db_path, key).unwrap();
+    let loaded = storage.decoy().load_decoy_contacts().unwrap();
+
+    assert_eq!(loaded[0].1, "Old Decoy");
+}

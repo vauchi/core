@@ -443,94 +443,42 @@ fn test_ohttp_cache_roundtrip_via_storage() {
 
 // @feature: release_privacy_multidevice_certification
 // @rg-8 @fail-closed
-// @scenario: release_privacy_multidevice_certification :: replace invalid cached OHTTP keys
+// @scenario: release_privacy_multidevice_certification :: reject malformed fetched OHTTP keys
+/// A relay without an OHTTP anchor gets no key at all (#288 plan 7.5): no
+/// unsigned `/v2/ohttp-key` fetch, and no unsigned key a previous version
+/// cached, however fresh.
 #[test]
-#[cfg(feature = "testing")]
-fn test_connect_replaces_invalid_fresh_ohttp_cache() {
+fn test_connect_without_an_anchor_fails_closed_without_fetching() {
     let application_relay = MockRelay::start();
     let outer_relay = MockRelay::start();
-    let valid_key = make_test_ohttp_key();
     outer_relay.queue(
         "ohttp-key",
         CannedResponse {
             status: 200,
             headers: vec![("Content-Type".into(), "application/ohttp-keys".into())],
-            body: valid_key.clone(),
+            body: make_test_ohttp_key(),
         },
     );
     let (mut vauchi, _dir) = vauchi_with_split_relays(&application_relay, &outer_relay);
     vauchi
         .storage()
         .ohttp_cache()
-        .save_ohttp_key(&outer_relay.url(), b"invalid-key")
-        .expect("save invalid cache fixture");
-    vauchi
-        .create_identity("Test User")
-        .expect("create identity");
-
-    vauchi
-        .connect()
-        .expect("invalid cache must be evicted and refetched");
-
-    let (cached, _) = vauchi
-        .storage()
-        .ohttp_cache()
-        .load_ohttp_key(&outer_relay.url())
-        .expect("load replacement cache")
-        .expect("replacement cache exists");
-    assert_eq!(cached, valid_key);
-    assert_eq!(
-        outer_relay
-            .received()
-            .iter()
-            .map(|request| (request.method.as_str(), request.path.as_str()))
-            .collect::<Vec<_>>(),
-        vec![("GET", "/v2/ohttp-key")]
-    );
-    assert!(application_relay.received().is_empty());
-}
-
-// @feature: release_privacy_multidevice_certification
-// @rg-8 @fail-closed
-// @scenario: release_privacy_multidevice_certification :: reject malformed fetched OHTTP keys
-#[test]
-fn test_connect_never_caches_malformed_fetched_ohttp_key() {
-    let application_relay = MockRelay::start();
-    let outer_relay = MockRelay::start();
-    outer_relay.queue(
-        "ohttp-key",
-        CannedResponse {
-            status: 200,
-            headers: vec![("Content-Type".into(), "application/ohttp-keys".into())],
-            body: b"invalid-key".to_vec(),
-        },
-    );
-    let dir = tempfile::tempdir().expect("temp dir");
-    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
-        .with_storage_key(SymmetricKey::generate())
-        .with_relay_url(application_relay.url())
-        .with_ohttp_relay_url(outer_relay.url());
-    let mut vauchi = Vauchi::new(config).expect("create Vauchi");
+        .save_ohttp_key(&outer_relay.url(), &make_test_ohttp_key())
+        .expect("save cache fixture");
     vauchi
         .create_identity("Test User")
         .expect("create identity");
 
     let error = vauchi
         .connect()
-        .expect_err("malformed fetched key must fail closed");
+        .expect_err("a relay without an anchor must fail closed");
 
     assert_eq!(
         error.to_string(),
-        "network error: Connection failed: no OHTTP key available: cache expired, fetch failed/disabled"
+        "network error: Connection failed: relay has no OHTTP anchor; unsigned gateway keys are not accepted"
     );
-    assert!(
-        vauchi
-            .storage()
-            .ohttp_cache()
-            .load_ohttp_key(&outer_relay.url())
-            .expect("load cache")
-            .is_none()
-    );
+    assert!(!vauchi.has_ohttp_key());
+    assert!(outer_relay.received().is_empty(), "nothing is fetched");
     assert!(application_relay.received().is_empty());
 }
 

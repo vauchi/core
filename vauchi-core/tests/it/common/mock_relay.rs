@@ -119,15 +119,16 @@ struct State {
     /// (ADR-049 two-party Link). Maps `gate_hash → [(slot_hash, blob)]`,
     /// at most `MAX_SLOTS_PER_GATE` slots per gate.
     escrow: Option<std::collections::HashMap<String, Vec<(String, String)>>>,
-    /// When `Some`, `/v2/ohttp-key` and `/v2/ohttp` are served by a real
-    /// OHTTP gateway, so a client's encapsulated round trip can succeed.
+    /// When `Some`, `/v2/ohttp-key-signed` and `/v2/ohttp` are served by a
+    /// real OHTTP gateway, so a client's encapsulated round trip can succeed.
     gateway: Option<MockGateway>,
 }
 
 /// A real OHTTP gateway (RFC 9458) answering `fetch` with no blobs.
 struct MockGateway {
     server: ohttp::Server,
-    encoded_config: Vec<u8>,
+    /// The encoded signed record of the gateway's key (#288).
+    signed_record: Vec<u8>,
     /// Inner actions decapsulated so far, in arrival order.
     actions: Vec<String>,
 }
@@ -188,13 +189,14 @@ impl MockRelay {
         self.state.lock().unwrap().escrow = Some(std::collections::HashMap::new());
     }
 
-    /// Serve `/v2/ohttp-key` and `/v2/ohttp` from a real OHTTP gateway.
-    /// Queued responses for those paths still win, so a test can inject a
-    /// gateway failure on one request.
-    pub fn enable_ohttp_gateway(&self) {
+    /// Serve `/v2/ohttp-key-signed` and `/v2/ohttp` from a real OHTTP
+    /// gateway whose `window` key is signed under `signer`'s anchor. Queued
+    /// responses for those paths still win, so a test can inject a gateway
+    /// failure on one request.
+    pub fn enable_ohttp_gateway(&self, signer: &super::signed_gateway::SignedGateway, window: u64) {
         use ohttp::{KeyConfig, SymmetricSuite, hpke};
         let config = KeyConfig::new(
-            1,
+            vauchi_protocol::ohttp_key::key_id_for_window(window),
             hpke::Kem::X25519Sha256,
             vec![SymmetricSuite::new(
                 hpke::Kdf::HkdfSha256,
@@ -203,10 +205,11 @@ impl MockRelay {
         )
         .expect("KeyConfig::new");
         let encoded_config = config.encode().expect("encode key config");
+        let signed_record = signer.record_for(window, encoded_config).encode();
         let server = ohttp::Server::new(config).expect("ohttp::Server::new");
         self.state.lock().unwrap().gateway = Some(MockGateway {
             server,
-            encoded_config,
+            signed_record,
             actions: Vec::new(),
         });
     }
@@ -419,12 +422,9 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<State>>) -> std::io
             serve_escrow(s.escrow.as_mut().unwrap(), &body)
         } else if let Some(queued) = s.queues.get_mut(&path).and_then(|q| q.pop_front()) {
             queued
-        } else if let (Some(gateway), "/v2/ohttp-key") = (s.gateway.as_ref(), path.as_str()) {
-            CannedResponse {
-                status: 200,
-                headers: vec![("Content-Type".into(), "application/ohttp-keys".into())],
-                body: gateway.encoded_config.clone(),
-            }
+        } else if let (Some(gateway), "/v2/ohttp-key-signed") = (s.gateway.as_ref(), path.as_str())
+        {
+            super::signed_gateway::signed_response(gateway.signed_record.clone())
         } else if let (Some(gateway), "/v2/ohttp") = (s.gateway.as_mut(), path.as_str()) {
             serve_ohttp(gateway, &body)
         } else {

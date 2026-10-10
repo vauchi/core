@@ -82,3 +82,20 @@ fn a_wipe_whose_keys_cannot_be_deleted_reports_failure() {
     );
     assert!(keychain.keys.lock().unwrap().contains_key("smk"));
 }
+
+// @internal
+#[test]
+fn a_wipe_without_secure_storage_deletes_the_data_directory() {
+    let root = tempfile::tempdir().unwrap();
+    let data_dir = root.path().join("data");
+    std::fs::create_dir_all(&data_dir).unwrap();
+    let config = VauchiConfig::with_storage_path(data_dir.join("vauchi.db"))
+        .with_storage_key(vauchi_core::crypto::SymmetricKey::generate());
+    let mut vauchi = Vauchi::new(config).unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    assert!(vauchi.perform_emergency_wipe(true).is_ok());
+
+    assert!(!data_dir.exists(), "the data directory survived");
+    assert!(vauchi.identity().is_none());
+}

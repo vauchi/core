@@ -27,6 +27,9 @@ struct ControlledKeychain {
     /// old storage key is not bound to authentication and the keychain's
     /// own key is.
     saves_locked: Arc<AtomicBool>,
+    /// Writes fail for another reason, as a desktop keyring that does not
+    /// answer does.
+    saves_fail: Arc<AtomicBool>,
     smk_invalidated: Arc<AtomicBool>,
 }
 
@@ -36,6 +39,7 @@ impl ControlledKeychain {
             store,
             locked: Arc::new(AtomicBool::new(false)),
             saves_locked: Arc::new(AtomicBool::new(false)),
+            saves_fail: Arc::new(AtomicBool::new(false)),
             smk_invalidated: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -45,6 +49,11 @@ impl MobilePlatformKeychain for ControlledKeychain {
     fn save_key(&self, name: String, key: Vec<u8>) -> Result<(), KeychainError> {
         if self.locked.load(Ordering::SeqCst) || self.saves_locked.load(Ordering::SeqCst) {
             return Err(KeychainError::AuthenticationRequired);
+        }
+        if self.saves_fail.load(Ordering::SeqCst) {
+            return Err(KeychainError::OperationFailed {
+                msg: "keyring did not answer".into(),
+            });
         }
         self.store.save_key(name, key)
     }
@@ -656,4 +665,23 @@ fn the_unlock_finishes_the_upgrade_the_locked_keychain_held_up() {
     );
     assert!(engine.has_identity().unwrap());
     assert_eq!(keychain.store.names(), ["smk"]);
+}
+
+// @internal
+#[test]
+fn an_upgrade_whose_keychain_fails_the_smk_for_another_reason_offers_try_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = installed_before_with_its_key_as_bootstrap(&dir);
+    keychain.saves_fail.store(true, Ordering::SeqCst);
+
+    let engine = PlatformAppEngine::open_with_keychain(
+        dir.path().to_string_lossy().to_string(),
+        RELAY.into(),
+        None,
+        Box::new(keychain.clone()),
+    )
+    .expect("a keychain that fails the SMK still yields an engine");
+
+    let batch = parse(engine.initial_commands_json().unwrap());
+    assert_eq!(surface(&batch), "storage_lock.unavailable");
 }

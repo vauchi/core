@@ -53,19 +53,16 @@ fn v2_round_trips_with_all_bootstrap_fields() {
 
 // @internal
 #[test]
-fn v1_payload_parses_as_v1_via_versioned() {
+fn a_v1_payload_is_refused() {
     let (_, identity, _, card) = sample();
-    let v1 = serialize_card_payload(&identity, &card);
-    match parse_card_payload_versioned(&v1).expect("v1 parse") {
-        LinkCardPayload::V1 {
-            identity_pubkey,
-            card,
-        } => {
-            assert_eq!(identity_pubkey, identity);
-            assert_eq!(card.display_name(), "Alice");
-        }
-        other => panic!("expected V1, got {other:?}"),
-    }
+    let v1 = [&[1u8][..], &identity, &serde_json::to_vec(&card).unwrap()].concat();
+
+    let err = parse_card_payload_versioned(&v1).expect_err("v1 is retired (#574)");
+
+    assert!(
+        err.to_string().contains("version"),
+        "unexpected error: {err}"
+    );
 }
 
 // @internal

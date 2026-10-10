@@ -120,6 +120,30 @@ fn after_the_biometric_unlock_the_duress_pin_opens_the_same_screen_as_the_passwo
 
 // @scenario: duress_mode.feature :: Biometric unlock with duress
 #[test]
+fn the_offered_biometric_action_asks_the_shell_for_the_prompt() {
+    let mut engine = locked_engine(true);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "unlock_biometric".into(),
+    });
+
+    assert!(
+        format!("{result:?}").contains("RequestBiometricUnlock"),
+        "the biometric action did not request the prompt: {result:?}",
+    );
+}
+
+// @internal
+#[test]
+fn the_biometric_pass_is_logged_by_its_variant_name() {
+    assert_eq!(
+        vauchi_app::ui::EngineUpdate::BiometricUnlockPassed.name(),
+        "BiometricUnlockPassed"
+    );
+}
+
+// @scenario: duress_mode.feature :: Biometric unlock with duress
+#[test]
 fn a_forged_biometric_press_after_the_unlock_stays_inert() {
     let mut engine = locked_engine(true);
     let _ = engine.dispatch(Event::BiometricUnlockSucceeded).unwrap();

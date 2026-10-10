@@ -138,6 +138,10 @@ fn retry_from_expired_emits_device_link_retry_and_advances_to_pending() {
 // nothing ever cleared it. Observed on a Pixel 3a as "Generating link..."
 // past 150s (2026-08-13-device-link-generation-never-completes).
 // @scenario: pair5_device_link_bridge :: a session that cannot start reports instead of spinning
+// The session is only built with these features (`device_link.rs`); without
+// them there is no build to fail, and the mutation build (`--features
+// testing`) does not enable `network-http`.
+#[cfg(all(feature = "network-http", feature = "storage"))]
 #[test]
 fn a_session_that_cannot_start_renders_the_failure_not_the_spinner() {
     // No identity, so `build_device_link_initiator` fails on its first step.

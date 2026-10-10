@@ -13,8 +13,7 @@ use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::mailbox_token::{
-    compute_device_sync_token, compute_mailbox_token, compute_self_token, current_day_epoch,
-    token_hex,
+    compute_device_sync_token, compute_mailbox_token, current_day_epoch, token_hex,
 };
 use vauchi_core::network::message::IdentityRevoked;
 use vauchi_core::network::*;
@@ -134,7 +133,6 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
     let mut client = RelayClient::new(transport, create_test_config(), "sender-id".into());
     client.connect().unwrap();
 
-    let master_seed = [0xAA; 32];
     let contact_keys = [[0xBB; 32], [0xCC; 32]];
     let own_pubkey = [0x11u8; 32];
 
@@ -142,7 +140,6 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
         .register_mailbox_tokens(
             &contact_keys,
             &own_pubkey,
-            &master_seed,
             0,
             0,
             &vauchi_core::rng::OsSecureRng::new(),
@@ -156,13 +153,7 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
     if let MessagePayload::RegisterMailbox(rm) = &sent[0].payload {
         assert_eq!(rm.tokens.len(), 256, "Must send exactly 256 padded tokens");
 
-        // Self-token for today must be present
         let day = current_day_epoch(0);
-        let self_token = token_hex(&compute_self_token(&master_seed, day));
-        assert!(
-            rm.tokens.contains(&self_token),
-            "Self-token for today must be in registration batch"
-        );
 
         // Contact RECEIVE tokens (keyed to our own pubkey) must be present
         for key in &contact_keys {
@@ -184,13 +175,11 @@ fn test_register_mailbox_tokens_with_no_contacts() {
     let mut client = RelayClient::new(transport, create_test_config(), "sender-id".into());
     client.connect().unwrap();
 
-    let master_seed = [0xDD; 32];
     let own_pubkey = [0x22u8; 32];
     let msg_id = client
         .register_mailbox_tokens(
             &[],
             &own_pubkey,
-            &master_seed,
             0,
             0,
             &vauchi_core::rng::OsSecureRng::new(),
@@ -239,11 +228,6 @@ fn test_register_mailbox_tokens_with_device_sync_keeps_recipient_mailbox() {
         panic!("Expected RegisterMailbox");
     };
     let day = current_day_epoch(0);
-    assert!(
-        registration
-            .tokens
-            .contains(&token_hex(&compute_self_token(master_seed, day,)))
-    );
     assert!(
         registration
             .tokens

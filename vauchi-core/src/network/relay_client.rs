@@ -340,20 +340,12 @@ impl<T: Transport> RelayClient<T> {
         &mut self,
         contact_keys: &[[u8; 32]],
         own_pubkey: &[u8; 32],
-        master_seed: &[u8; 32],
         days_offline: u64,
         now: u64,
         rng: &dyn crate::rng::SecureRng,
     ) -> Result<MessageId, NetworkError> {
         let day = current_day_epoch(now);
-        let batches = batch_register_tokens(
-            rng,
-            contact_keys,
-            own_pubkey,
-            master_seed,
-            day,
-            days_offline,
-        );
+        let batches = batch_register_tokens(rng, contact_keys, own_pubkey, day, days_offline);
         self.send_mailbox_registration_batches(batches, now)
     }
 

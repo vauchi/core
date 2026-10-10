@@ -26,11 +26,12 @@
 //! 2. **Determinism across the swap**: same `(shared_key, day)` →
 //!    same token hex, before and after the newtype migration.
 
-use vauchi_core::network::mailbox_token::{compute_mailbox_token, compute_self_token, token_hex};
+use vauchi_core::network::mailbox_token::{
+    compute_device_sync_token, compute_mailbox_token, token_hex,
+};
 
 // All-bytes-equal sentinels — easy to read in failing diffs.
 const SHARED_KEY: [u8; 32] = [0x55; 32];
-const MASTER_SEED: [u8; 32] = [0x66; 32];
 // Fixed recipient pubkey for these pure shape/determinism tests — the
 // directional `compute_mailbox_token` recipient is arbitrary here, so one
 // constant used consistently keeps the comparisons meaningful.
@@ -42,14 +43,6 @@ const DAY: u64 = 19_864; // arbitrary fixed day epoch
 fn compute_mailbox_token_is_deterministic_for_same_inputs() {
     let a = compute_mailbox_token(&SHARED_KEY, &RECIPIENT_PUBKEY, DAY);
     let b = compute_mailbox_token(&SHARED_KEY, &RECIPIENT_PUBKEY, DAY);
-    assert_eq!(a, b);
-}
-
-// @internal
-#[test]
-fn compute_self_token_is_deterministic_for_same_inputs() {
-    let a = compute_self_token(&MASTER_SEED, DAY);
-    let b = compute_self_token(&MASTER_SEED, DAY);
     assert_eq!(a, b);
 }
 
@@ -82,11 +75,11 @@ fn token_hex_byte_identity_via_pinned_inputs() {
 #[test]
 fn mailbox_token_distinct_from_self_token_for_same_seed_and_day() {
     // Different HKDF info strings (`Vauchi_Mailbox_v1` vs
-    // `Vauchi_DeviceSync_v1`) → different token bytes, even when
+    // `Vauchi_DeviceSyncRecipient_v1`) → different token bytes, even when
     // the seed and day are byte-identical. Guards against the
     // newtype swap accidentally unifying the two derivation paths.
     let seed = [0x77u8; 32];
     let mailbox = compute_mailbox_token(&seed, &RECIPIENT_PUBKEY, DAY);
-    let self_tok = compute_self_token(&seed, DAY);
+    let self_tok = compute_device_sync_token(&seed, &[0x01u8; 32], DAY);
     assert_ne!(mailbox, self_tok);
 }

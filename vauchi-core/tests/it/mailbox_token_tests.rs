@@ -5,7 +5,7 @@
 use proptest::prelude::*;
 use vauchi_core::network::mailbox_token::{
     batch_register_tokens, batch_register_tokens_with_device_sync, compute_device_mailbox_token,
-    compute_device_sync_token, compute_mailbox_token, compute_self_token, token_hex,
+    compute_device_sync_token, compute_mailbox_token, token_hex,
 };
 
 // Directional tokens are keyed to the recipient. These tests assert only
@@ -79,16 +79,6 @@ fn test_different_contacts_produce_different_tokens() {
     assert_ne!(t_a, t_b);
 }
 
-// @internal
-#[test]
-fn test_self_token_deterministic_across_devices() {
-    let master_seed = [0xAAu8; 32];
-    let day = 19804u64;
-    let t1 = compute_self_token(&master_seed, day);
-    let t2 = compute_self_token(&master_seed, day);
-    assert_eq!(t1, t2);
-}
-
 /// Device-sync delivery is one-recipient-per-fetch: two linked devices must
 /// never poll the same opaque mailbox token or one can consume the other's
 /// encrypted envelope from the relay.
@@ -140,8 +130,6 @@ fn test_device_sync_registration_preserves_legacy_and_own_receive_tokens() {
         &device_id,
         day - 1,
     ))));
-    assert!(batches[0].contains(&token_hex(&compute_self_token(&master_seed, day,))));
-    assert!(batches[0].contains(&token_hex(&compute_self_token(&master_seed, day - 1,))));
 }
 
 // @scenario: multi_device_sync :: A per-device copy reaches only its own sibling
@@ -211,7 +199,7 @@ fn test_self_token_differs_from_contact_token() {
     let key = [0x42u8; 32];
     let day = 19804u64;
     let contact = compute_mailbox_token(&key, &TEST_PUBKEY, day);
-    let self_tok = compute_self_token(&key, day);
+    let self_tok = compute_device_sync_token(&key, &[0x01u8; 32], day);
     assert_ne!(contact, self_tok);
 }
 
@@ -228,12 +216,10 @@ fn test_token_hex_produces_64_char_hex() {
 #[test]
 fn test_batch_tokens_padded_to_256() {
     let contacts: Vec<[u8; 32]> = (0..5).map(|i| [i as u8; 32]).collect();
-    let master_seed = [0xBBu8; 32];
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
-        &master_seed,
         19804,
         0,
     );
@@ -247,12 +233,10 @@ fn test_batch_tokens_padded_to_256() {
 #[test]
 fn test_batch_tokens_no_duplicates() {
     let contacts: Vec<[u8; 32]> = (0..5).map(|i| [i as u8; 32]).collect();
-    let master_seed = [0xBBu8; 32];
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
-        &master_seed,
         19804,
         0,
     );
@@ -267,12 +251,10 @@ fn test_batch_tokens_no_duplicates() {
 #[test]
 fn test_batch_tokens_historical_catchup() {
     let contacts: Vec<[u8; 32]> = vec![[0x01; 32]];
-    let master_seed = [0xBBu8; 32];
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
-        &master_seed,
         19804,
         3,
     );
@@ -295,12 +277,10 @@ fn test_batch_tokens_many_contacts_splits() {
             k
         })
         .collect();
-    let master_seed = [0xCCu8; 32];
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
-        &master_seed,
         19804,
         0,
     );
@@ -322,12 +302,10 @@ fn test_batch_tokens_shuffled() {
     // verify that the first-position token differs between calls, which is
     // overwhelmingly likely (probability of collision ≈ 1/2^256 per token).
     let contacts: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
-    let master_seed = [0xDDu8; 32];
     let batches_a = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
-        &master_seed,
         19804,
         0,
     );
@@ -335,7 +313,6 @@ fn test_batch_tokens_shuffled() {
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
-        &master_seed,
         19804,
         0,
     );
@@ -353,12 +330,10 @@ fn test_batch_tokens_shuffled() {
 // @internal
 #[test]
 fn test_batch_tokens_no_contacts_returns_one_batch() {
-    let master_seed = [0xEEu8; 32];
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &[],
         &TEST_PUBKEY,
-        &master_seed,
         19804,
         0,
     );
@@ -404,7 +379,6 @@ fn registration_covers_yesterday_and_pads_every_batch_to_256() {
     let tokens: Vec<String> = register(&[contact]).concat();
 
     for d in [day - 1, day] {
-        assert!(tokens.contains(&token_hex(&compute_self_token(&master_seed, d))));
         assert!(tokens.contains(&token_hex(&compute_mailbox_token(
             &contact,
             &TEST_PUBKEY,
@@ -417,7 +391,6 @@ fn registration_covers_yesterday_and_pads_every_batch_to_256() {
             d,
         ))));
     }
-    assert!(!tokens.contains(&token_hex(&compute_self_token(&master_seed, day + 1))));
     assert!(!tokens.contains(&token_hex(&compute_mailbox_token(
         &contact,
         &TEST_PUBKEY,
@@ -448,20 +421,17 @@ fn the_day_epoch_counts_whole_utc_days() {
 // @internal
 #[test]
 fn registration_on_day_zero_has_no_previous_day() {
-    let master_seed = [0xBBu8; 32];
     let contact = [0x22u8; 32];
 
     let tokens = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &[contact],
         &TEST_PUBKEY,
-        &master_seed,
         0,
         0,
     )
     .concat();
 
-    assert!(tokens.contains(&token_hex(&compute_self_token(&master_seed, 0))));
     assert!(tokens.contains(&token_hex(&compute_mailbox_token(
         &contact,
         &TEST_PUBKEY,

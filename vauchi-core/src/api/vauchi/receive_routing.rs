@@ -19,10 +19,10 @@
 //!
 //! ## Scope: contact updates only
 //!
-//! Device-sync inbound (blobs sent to `compute_self_token(master_seed)`,
-//! see `network/relay_client.rs::send_device_sync_message`) is **not**
-//! handled here. The recipient registers self-tokens via
-//! `batch_register_tokens`, so the relay may return self-token blobs in
+//! Device-sync inbound (blobs sent to `compute_device_sync_token`, see
+//! `network/relay_client.rs::send_device_sync_message`) is **not** handled
+//! here. The recipient registers those tokens via
+//! `batch_register_tokens_with_device_sync`, so the relay may return self-token blobs in
 //! the same fetch response — this function returns `TokenUnresolved`
 //! for them and the receive loop ACKs them as `Stored`. A separate path
 //! (`send_phase::process_device_sync` /

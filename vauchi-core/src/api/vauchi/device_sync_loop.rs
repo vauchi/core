@@ -32,8 +32,7 @@ use crate::api::sync::DeviceSyncOrchestrator;
 use crate::contact::Contact;
 use crate::identity::Identity;
 use crate::network::mailbox_token::{
-    batch_register_tokens_with_device_sync, compute_device_sync_token, compute_self_token,
-    current_day_epoch, token_hex,
+    batch_register_tokens_with_device_sync, compute_device_sync_token, current_day_epoch, token_hex,
 };
 use crate::network::{
     HttpTransportAdapter, MessagePayload, RegisterMailbox, Transport, create_envelope,
@@ -91,19 +90,13 @@ impl Vauchi {
     /// Self-token hexes for today and ±1 day (clock-drift tolerance).
     ///
     /// These identify inbound device-sync blobs sent to this device's opaque
-    /// recipient-specific mailbox, and the legacy shared mailbox while
-    /// rolling out the recipient-specific route.
+    /// recipient-specific mailbox.
     pub(super) fn self_token_hexes(&self, identity: &Identity) -> HashSet<String> {
         let day = current_day_epoch(self.clock.unix_seconds());
         let seed = identity.master_seed();
         [day.saturating_sub(1), day, day.saturating_add(1)]
             .iter()
-            .flat_map(|d| {
-                [
-                    token_hex(&compute_self_token(seed, *d)),
-                    token_hex(&compute_device_sync_token(seed, identity.device_id(), *d)),
-                ]
-            })
+            .map(|d| token_hex(&compute_device_sync_token(seed, identity.device_id(), *d)))
             .collect()
     }
 
@@ -297,17 +290,16 @@ mod tests {
         }
     }
 
-    /// `self_token_hexes` accepts legacy and recipient-specific today/±1-day
-    /// tokens during the mailbox migration window.
+    /// `self_token_hexes` accepts the recipient-specific today/±1-day tokens.
     // @internal
     #[test]
-    fn self_token_hexes_covers_legacy_and_recipient_specific_days() {
+    fn self_token_hexes_covers_recipient_specific_days() {
         let mut b = Vauchi::in_memory().unwrap();
         b.create_identity("Alice").unwrap();
         let identity = b.identity().unwrap();
 
         let tokens = b.self_token_hexes(identity);
-        assert_eq!(tokens.len(), 6, "legacy + recipient-specific today/±1 days");
+        assert_eq!(tokens.len(), 3, "recipient-specific today/±1 days");
 
         let day = current_day_epoch(b.clock.unix_seconds());
         let seed = identity.master_seed();
@@ -316,11 +308,6 @@ mod tests {
             assert!(
                 tokens.contains(&device_token),
                 "missing device-specific self-token for day {d}"
-            );
-            let legacy_token = token_hex(&compute_self_token(seed, d));
-            assert!(
-                tokens.contains(&legacy_token),
-                "missing legacy self-token for day {d}"
             );
         }
         // Each hex token is 64 chars (32 bytes).

@@ -25,7 +25,6 @@ const CONTACT_DOMAIN: &[u8] = b"Vauchi_Mailbox_v1";
 /// 2026-07-25). Distinct domain so a device-scoped token can never collide
 /// with the identity-scoped `CONTACT_DOMAIN` token for the same inputs.
 const CONTACT_DEVICE_DOMAIN: &[u8] = b"Vauchi_MailboxDevice_v1";
-const DEVICE_SYNC_DOMAIN: &[u8] = b"Vauchi_DeviceSync_v1";
 const DEVICE_SYNC_RECIPIENT_DOMAIN: &[u8] = b"Vauchi_DeviceSyncRecipient_v1";
 
 /// Compute a 32-byte mailbox token for one **direction** of a contact channel.
@@ -86,25 +85,9 @@ pub fn compute_device_mailbox_token(
     MailboxToken::from_bytes(*HKDF::derive_key(None, shared_key, &info))
 }
 
-/// Compute a 32-byte self-token for device sync.
-///
-/// All devices sharing the same `master_seed` derive the same token for a
-/// given day, allowing the relay to deliver device-sync messages without a
-/// persistent identity identifier.
-///
-/// - `master_seed`: the identity master seed (32 bytes).
-/// - `day_epoch`: current day as Unix timestamp / 86400 (UTC).
-pub fn compute_self_token(master_seed: &[u8; 32], day_epoch: u64) -> MailboxToken {
-    let mut info = Vec::with_capacity(DEVICE_SYNC_DOMAIN.len() + 8);
-    info.extend_from_slice(DEVICE_SYNC_DOMAIN);
-    info.extend_from_slice(&day_epoch.to_be_bytes());
-    MailboxToken::from_bytes(*HKDF::derive_key(None, master_seed, &info))
-}
-
 /// Compute a daily device-sync receive token for one linked device.
 ///
-/// Unlike the legacy identity-wide self token, this includes the target device
-/// id. Relay fetch is destructive, so every device needs an independent opaque
+/// It includes the target device id. Relay fetch is destructive, so every device needs an independent opaque
 /// mailbox; otherwise one sibling can consume an envelope encrypted for
 /// another. The device id is inside HKDF input only and is never sent to the
 /// relay.
@@ -156,7 +139,6 @@ pub fn batch_register_tokens(
     rng: &dyn crate::rng::SecureRng,
     contact_keys: &[[u8; 32]],
     own_pubkey: &[u8; 32],
-    master_seed: &[u8; 32],
     current_day: u64,
     days_offline: u64,
 ) -> Vec<Vec<String>> {
@@ -165,23 +147,15 @@ pub fn batch_register_tokens(
         // Legacy path with no device context — identity-scoped receive tokens
         // only. The device-scoped variant is registered via
         // `batch_register_tokens_with_device_sync`, which carries the device id.
-        registration_tokens(
-            contact_keys,
-            own_pubkey,
-            None,
-            master_seed,
-            current_day,
-            days_offline,
-        ),
+        registration_tokens(contact_keys, own_pubkey, None, current_day, days_offline),
     )
 }
 
-/// Build contact and legacy shared-device mailbox registration tokens.
+/// Build contact mailbox registration tokens.
 fn registration_tokens(
     contact_keys: &[[u8; 32]],
     own_pubkey: &[u8; 32],
     own_device_id: Option<&[u8; 32]>,
-    master_seed: &[u8; 32],
     current_day: u64,
     days_offline: u64,
 ) -> Vec<String> {
@@ -189,11 +163,6 @@ fn registration_tokens(
     let start_day = current_day.saturating_sub(days_offline);
 
     for day in start_day..=current_day {
-        // Self-tokens (current + previous day for clock skew)
-        all_tokens.push(token_hex(&compute_self_token(master_seed, day)));
-        if day > 0 {
-            all_tokens.push(token_hex(&compute_self_token(master_seed, day - 1)));
-        }
         // Our own RECEIVE token per contact (keyed to our identity), so the
         // relay routes the peer's sends to us without us also polling the token
         // we send to (directional tokens, 2026-06-30).
@@ -241,10 +210,17 @@ fn padded_registration_batches(
     all_tokens.sort_unstable();
     all_tokens.dedup();
 
-    // Split into 256-token batches, each padded and shuffled
+    // Split into 256-token batches, each padded and shuffled. An install with
+    // nothing to receive still sends one all-padding batch, so it looks like
+    // every other install to the relay (owner decision 2026-10-10, #574).
     let mut batches = Vec::new();
+    let chunks: Vec<&[String]> = if all_tokens.is_empty() {
+        vec![&[]]
+    } else {
+        all_tokens.chunks(256).collect()
+    };
 
-    for chunk in all_tokens.chunks(256) {
+    for chunk in chunks {
         let mut batch = chunk.to_vec();
         // Pad to 256 with random tokens
         while batch.len() < 256 {
@@ -264,10 +240,9 @@ fn padded_registration_batches(
 /// device's recipient-specific sync mailbox.
 ///
 /// Device-sync envelopes are encrypted to a single target device and relay
-/// fetch consumes blobs, so this mailbox must be unique to that target. The
-/// legacy shared self-token remains registered during rollout so envelopes
-/// sent before this change can still be received. All tokens stay in the same
-/// padded, shuffled registration batches as contact mailboxes.
+/// fetch consumes blobs, so this mailbox must be unique to that target. All
+/// tokens stay in the same padded, shuffled registration batches as contact
+/// mailboxes.
 pub fn batch_register_tokens_with_device_sync(
     rng: &dyn crate::rng::SecureRng,
     contact_keys: &[[u8; 32]],
@@ -282,7 +257,6 @@ pub fn batch_register_tokens_with_device_sync(
         contact_keys,
         own_pubkey,
         Some(device_id),
-        master_seed,
         current_day,
         days_offline,
     );

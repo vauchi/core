@@ -101,7 +101,8 @@ impl Vauchi {
         let max_contacts = self.storage.contacts().get_contact_limit()?;
         let mut remaining_budget = max_contacts.saturating_sub(current_count);
 
-        for (card, uid) in entries {
+        for entry in entries {
+            let (card, uid) = (entry.card, entry.uid);
             // W7: Skip if a contact with this original_uid already exists.
             if let Some(ref uid_val) = uid
                 && self
@@ -131,6 +132,9 @@ impl Vauchi {
             let contact = Contact::from_import(id, card, ImportSource::VcardFile, uid, 0);
             match self.storage.contacts().save_contact(&contact) {
                 Ok(_) => {
+                    if let Some(nickname) = &entry.nickname {
+                        self.set_contact_nickname(contact.id(), nickname)?;
+                    }
                     imported += 1;
                     remaining_budget = remaining_budget.saturating_sub(1);
                 }

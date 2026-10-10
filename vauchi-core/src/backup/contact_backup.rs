@@ -125,8 +125,6 @@ pub(crate) struct BackupContactCard {
     )]
     avatar: Option<Vec<u8>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    nickname: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     bio: Option<String>,
     #[serde(default, skip_serializing_if = "VisibilityRules::is_empty")]
     field_visibility: VisibilityRules,
@@ -140,7 +138,6 @@ impl From<&ContactCard> for BackupContactCard {
             display_name: card.display_name().to_string(),
             fields: card.fields().to_vec(),
             avatar: card.avatar().map(|a| a.to_vec()),
-            nickname: card.nickname().map(|n| n.to_string()),
             bio: card.bio().map(|b| b.to_string()),
             field_visibility: card.field_visibility().clone(),
         }
@@ -155,7 +152,6 @@ impl From<BackupContactCard> for ContactCard {
             card.display_name,
             card.fields,
             card.avatar,
-            card.nickname,
             card.bio,
             card.field_visibility,
         )
@@ -401,7 +397,6 @@ mod tests {
             display_name: "Test".to_string(),
             fields: Vec::new(),
             avatar,
-            nickname: None,
             bio: None,
             field_visibility: VisibilityRules::new(),
         }
@@ -463,7 +458,6 @@ mod tests {
                     format!("card-{i}"),
                     format!("Contact {i}"),
                     fields.clone(),
-                    None,
                     None,
                     None,
                     VisibilityRules::new(),

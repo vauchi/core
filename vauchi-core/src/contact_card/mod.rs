@@ -97,7 +97,6 @@ pub fn normalize_avatar(data: &[u8]) -> Result<Vec<u8>, ContactCardError> {
 
 /// Current ContactCard schema version.
 /// Incremented when the serialized format changes.
-/// v0 = legacy (no schema_version field), v1 = first versioned format.
 pub const CURRENT_CARD_SCHEMA_VERSION: u32 = 1;
 
 /// Contact card errors.
@@ -129,9 +128,7 @@ pub enum ContactCardError {
 /// A user's contact card containing personal information fields.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ContactCard {
-    /// Schema version for forward/backward compatibility.
-    /// Legacy data (pre-versioning) defaults to 0 via `#[serde(default)]`.
-    #[serde(default)]
+    /// Schema version of the serialized card; required.
     schema_version: u32,
     /// Unique identifier for this card.
     id: String,
@@ -143,12 +140,8 @@ pub struct ContactCard {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     avatar: Option<Vec<u8>>,
-    /// Optional local nickname annotation (max 100 chars, never shared).
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    nickname: Option<String>,
     /// Optional short self-description (ADR-054 D2, max 160 chars). Unlike the
-    /// local `nickname`, the bio is part of the shared card.
+    /// contact-level nickname, the bio is part of the shared card.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     bio: Option<String>,
@@ -172,7 +165,6 @@ impl ContactCard {
             display_name: normalize_text(display_name),
             fields: Vec::new(),
             avatar: None,
-            nickname: None,
             bio: None,
             field_visibility: VisibilityRules::new(),
         }
@@ -190,7 +182,6 @@ impl ContactCard {
         display_name: String,
         fields: Vec<ContactField>,
         avatar: Option<Vec<u8>>,
-        nickname: Option<String>,
         bio: Option<String>,
         field_visibility: VisibilityRules,
     ) -> Self {
@@ -200,7 +191,6 @@ impl ContactCard {
             display_name,
             fields,
             avatar,
-            nickname,
             bio,
             field_visibility,
         }
@@ -233,32 +223,6 @@ impl ContactCard {
         }
         self.display_name = normalized;
         Ok(())
-    }
-
-    /// Returns the optional nickname annotation stored in the card blob.
-    ///
-    /// **Deprecated:** This field lives inside the serialized card and risks
-    /// overwrite on card updates. Use the contact-level nickname instead:
-    /// `Vauchi::get_contact_nickname()` / `Vauchi::set_contact_nickname()`.
-    pub fn nickname(&self) -> Option<&str> {
-        self.nickname.as_deref()
-    }
-
-    /// Sets the local nickname annotation in the card blob (max 100 chars).
-    ///
-    /// **Deprecated:** Use `Vauchi::set_contact_nickname()` instead.
-    /// Card-level nickname risks overwrite on card updates.
-    pub fn set_nickname(&mut self, nickname: &str) {
-        let normalized = normalize_text(nickname);
-        if normalized.is_empty() {
-            self.nickname = None;
-        } else {
-            let truncated = normalized
-                .chars()
-                .take(MAX_DISPLAY_NAME_LENGTH)
-                .collect::<String>();
-            self.nickname = Some(truncated);
-        }
     }
 
     /// Returns the optional shared bio (ADR-054 D2).

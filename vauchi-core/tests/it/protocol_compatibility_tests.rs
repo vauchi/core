@@ -28,6 +28,7 @@ const RATCHET_MESSAGE_V1: &str = r#"{
 /// ContactCard V1 golden fixture.
 /// Core data model for contact information.
 const CONTACT_CARD_V1: &str = r#"{
+    "schema_version": 1,
     "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
     "display_name": "Alice Smith",
     "fields": [

@@ -28,23 +28,17 @@ fn test_avatar_png() -> Vec<u8> {
 /// V0 fixture: ContactCard serialized WITHOUT schema_version.
 /// This is the format from all app versions before schema versioning.
 /// The v1 parser MUST accept this data without loss.
-// @scenario: schema_compat :: Contact card from older app version displays correctly
+// Pre-versioning cards are not read back (vauchi/private#574).
+// @internal
 #[test]
-fn test_v0_fixture_loads_in_current_parser() {
+fn a_v0_card_without_a_schema_version_is_refused() {
     let fixture = include_str!("../fixtures/content/contact_card_v0.json");
-    let card: ContactCard =
-        serde_json::from_str(fixture).expect("v0 fixture must deserialize in current parser");
 
-    assert_eq!(card.display_name(), "Alice Fixture");
-    assert_eq!(card.fields().len(), 2);
-    assert_eq!(card.fields()[0].label(), "Mobile");
-    assert_eq!(card.fields()[0].value(), "+1-555-0100");
-    assert_eq!(card.fields()[1].label(), "Work");
-    assert_eq!(card.fields()[1].value(), "alice@example.com");
-    assert_eq!(
-        card.schema_version(),
-        0,
-        "v0 data has no schema_version → defaults to 0"
+    let err = serde_json::from_str::<ContactCard>(fixture).unwrap_err();
+
+    assert!(
+        err.to_string().contains("schema_version"),
+        "unexpected error: {err}"
     );
 }
 
@@ -70,14 +64,12 @@ fn test_v1_roundtrip_preserves_all_fields() {
         0,
     ))
     .unwrap();
-    card.set_nickname("Bobby");
     card.set_avatar(test_avatar_png()).unwrap();
 
     let json = serde_json::to_string(&card).expect("serialize should succeed");
     let loaded: ContactCard = serde_json::from_str(&json).expect("deserialize should succeed");
 
     assert_eq!(loaded.display_name(), "Bob Roundtrip");
-    assert_eq!(loaded.nickname(), Some("Bobby"));
     let avatar = loaded.avatar().expect("avatar should be present");
     assert_eq!(
         &avatar[0..4],
@@ -190,21 +182,14 @@ mod proptest_compat {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(200))]
 
-        // @scenario: schema_compat :: v0 data always parseable by v1 parser
+        // A card without its schema_version never parses (#574).
+        // @internal
         #[test]
-        fn v0_data_loads_in_v1_parser(card in arb_contact_card()) {
-            // Serialize current card, strip schema_version (simulate v0)
+        fn a_card_without_a_schema_version_never_parses(card in arb_contact_card()) {
             let mut value: serde_json::Value = serde_json::to_value(&card).expect("serialize");
-            if let Some(map) = value.as_object_mut() {
-                map.remove("schema_version");
-            }
-            let v0_json = serde_json::to_vec(&value).expect("re-serialize v0");
+            value.as_object_mut().expect("object").remove("schema_version");
 
-            // v1 parser must accept v0 data
-            let loaded: ContactCard = serde_json::from_slice(&v0_json).expect("v0 must load in v1");
-            prop_assert_eq!(loaded.schema_version(), 0, "stripped data has no version → 0");
-            prop_assert_eq!(card.display_name(), loaded.display_name());
-            prop_assert_eq!(card.fields().len(), loaded.fields().len());
+            prop_assert!(serde_json::from_value::<ContactCard>(value).is_err());
         }
     }
 }

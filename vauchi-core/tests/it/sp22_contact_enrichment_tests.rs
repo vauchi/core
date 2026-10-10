@@ -12,42 +12,6 @@ use vauchi_core::contact_card::{ContactCard, FieldType};
 
 // @internal
 #[test]
-fn test_contact_card_nickname_field_add_and_retrieve() {
-    // RED: ContactCard doesn't have nickname() method yet
-    let mut card = ContactCard::new("Alice");
-
-    card.set_nickname("Al");
-
-    assert_eq!(card.nickname(), Some("Al"));
-}
-
-// @internal
-#[test]
-fn test_contact_card_nickname_field_empty_clears() {
-    // RED: ContactCard doesn't support clearing nickname
-    let mut card = ContactCard::new("Alice");
-    card.set_nickname("Al");
-
-    card.set_nickname("");
-
-    assert_eq!(card.nickname(), None);
-}
-
-// @internal
-#[test]
-fn test_contact_card_nickname_field_max_length() {
-    let mut card = ContactCard::new("Alice");
-
-    // Max length should be 100 chars (or similar)
-    let long_nickname = "a".repeat(101);
-    card.set_nickname(&long_nickname);
-
-    let nickname = card.nickname().unwrap();
-    assert!(nickname.len() <= 100);
-}
-
-// @internal
-#[test]
 fn test_birthday_field_type_exists() {
     let field_type = FieldType::Birthday;
     assert_eq!(format!("{field_type:?}"), "Birthday");

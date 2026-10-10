@@ -57,19 +57,26 @@ fn decode_to_string(data: &[u8]) -> String {
         .collect()
 }
 
+/// One contact parsed from a vCard file.
+#[derive(Debug, Clone)]
+pub struct ImportedVCard {
+    /// The card built from the vCard's name, fields and photo.
+    pub card: ContactCard,
+    /// The vCard UID, used for re-import dedup.
+    pub uid: Option<String>,
+    /// The vCard NICKNAME, saved as the contact's own local nickname.
+    pub nickname: Option<String>,
+}
+
 /// Import contacts from a vCard file (supports 2.1, 3.0, 4.0).
 ///
-/// Returns a list of `(ContactCard, Option<uid>)` tuples.
-/// The uid is the vCard UID property, used for re-import dedup.
+/// Returns one [`ImportedVCard`] per vCard block that has a name.
 ///
 /// `now` is the Unix-seconds timestamp stamped on every freshly
 /// constructed `ContactField`. Production callers route it through
 /// `Vauchi::clock.unix_seconds()` (ADR-021 functional core); tests
 /// pin a deterministic value.
-pub fn import_vcf(
-    data: &[u8],
-    now: u64,
-) -> Result<Vec<(ContactCard, Option<String>)>, VCardImportError> {
+pub fn import_vcf(data: &[u8], now: u64) -> Result<Vec<ImportedVCard>, VCardImportError> {
     if data.len() > MAX_FILE_SIZE {
         return Err(VCardImportError::FileTooLarge {
             size: data.len(),
@@ -317,7 +324,7 @@ impl VCardFields {
 }
 
 /// Parse a single vCard block (content between BEGIN/END, exclusive).
-fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<String>)> {
+fn parse_single_vcard(block: &str, now: u64) -> Option<ImportedVCard> {
     let version = detect_version(block);
     let lines = unfold_lines(block, version);
 
@@ -334,10 +341,6 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<Stri
     }
 
     let mut card = ContactCard::new(&name);
-
-    if let Some(nick) = acc.nickname {
-        card.set_nickname(&nick);
-    }
 
     if let Some(avatar) = acc.avatar_data
         && let Err(e) = card.set_avatar(avatar)
@@ -369,7 +372,11 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<Stri
         }
     }
 
-    Some((card, acc.uid))
+    Some(ImportedVCard {
+        card,
+        uid: acc.uid,
+        nickname: acc.nickname,
+    })
 }
 
 /// Detect vCard version from content. Defaults to 3.0.

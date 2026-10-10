@@ -1533,8 +1533,7 @@ fn list_decoy_contacts_is_empty_initially() {
 #[test]
 fn add_decoy_contact_returns_id_and_lists() {
     let (engine, _dir) = create_engine_with_identity();
-    let card_json =
-        r#"{"id":"x","display_name":"Decoy Friend","fields":[],"avatar":null,"public_key":null}"#;
+    let card_json = r#"{"schema_version":1,"id":"x","display_name":"Decoy Friend","fields":[],"avatar":null,"public_key":null}"#;
 
     let id = match engine
         .dispatch_domain_command(DomainCommand::AddDecoyContact {
@@ -1567,8 +1566,7 @@ fn add_decoy_contact_returns_id_and_lists() {
 #[test]
 fn delete_decoy_contact_removes_from_list() {
     let (engine, _dir) = create_engine_with_identity();
-    let card_json =
-        r#"{"id":"x","display_name":"Doomed Decoy","fields":[],"avatar":null,"public_key":null}"#;
+    let card_json = r#"{"schema_version":1,"id":"x","display_name":"Doomed Decoy","fields":[],"avatar":null,"public_key":null}"#;
 
     let id = match engine
         .dispatch_domain_command(DomainCommand::AddDecoyContact {

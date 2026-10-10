@@ -84,8 +84,8 @@ proptest! {
     /// slices.
     // @internal
     #[test]
-    fn parse_card_payload_rejects_arbitrary(bytes in prop::collection::vec(any::<u8>(), 0..256)) {
-        prop_assert!(link_mode::parse_card_payload(&bytes).is_err());
+    fn parse_card_payload_versioned_rejects_arbitrary(bytes in prop::collection::vec(any::<u8>(), 0..256)) {
+        prop_assert!(link_mode::parse_card_payload_versioned(&bytes).is_err());
     }
 
     /// Arbitrary byte buffers into the relay message decoder are rejected

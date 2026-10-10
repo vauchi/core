@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::ImportSource;
 use crate::contact::Contact;
-use crate::contact_card::ContactCard;
 use crate::contact_card::vcard_import::import_vcf;
 use crate::rng::SecureRngExt;
 
@@ -151,42 +150,6 @@ impl Vauchi {
         })
     }
 
-    /// Save a contact card received via a **legacy v1** link-mode payload,
-    /// returning the stored contact id.
-    ///
-    /// A v1 payload swaps the card over an ephemeral escrow key and
-    /// establishes no persistent update channel (no shared comms key,
-    /// no relay routing), so the result is an **imported** contact
-    /// ([`ImportSource::LinkExchange`]) — not exchanged: there is no
-    /// `shared_key`/relay to populate `ExchangedData` (HR-1). Idempotent:
-    /// re-receiving the same card (matched by its card id) returns the
-    /// existing contact id without duplicating.
-    ///
-    /// Since ADR-050 (T5b) this is the **fallback** path:
-    /// [`Self::complete_link_exchange`] dispatches v2 bootstraps to a live
-    /// `Exchanged` Link contact and only routes v1 payloads here. Slice
-    /// `2026-05-24-core-exchange-completion-contact-save`.
-    pub fn import_received_link_card(&self, card: ContactCard) -> VauchiResult<String> {
-        let uid = card.id().to_string();
-        // Idempotent dedup: the card id is the key.
-        if let Some(existing_id) = self.storage.contacts().find_imported_by_uid(&uid)? {
-            return Ok(existing_id);
-        }
-        // C3 — enforce the per-identity contact limit.
-        let count = self.storage.contacts().count_contacts()?;
-        let limit = self.storage.contacts().get_contact_limit()?;
-        if count >= limit {
-            return Err(VauchiError::InvalidState(format!(
-                "contact limit reached ({limit})"
-            )));
-        }
-        let now = self.clock.unix_seconds();
-        let id = self.rng.uuid_v4();
-        let contact = Contact::from_import(id, card, ImportSource::LinkExchange, Some(uid), now);
-        self.storage.contacts().save_contact(&contact)?;
-        Ok(contact.id().to_string())
-    }
-
     /// Complete a link-mode exchange from a received card payload (ADR-050
     /// Phase 2, T5b). For a **v2** symmetric bootstrap this establishes a
     /// *live, updatable* `Exchanged` contact: it derives the symmetric link
@@ -194,8 +157,7 @@ impl Vauchi {
     /// public half we deposited) and the peer's signed X3DH key, saves the
     /// contact with `ExchangeTransport::Link` + the peer's relay routing,
     /// and initializes the Double Ratchet with a deterministic role. A
-    /// **v1** payload carries no exchange key, so it falls back to
-    /// [`Self::import_received_link_card`] (a frozen import, no channel).
+    /// **v1** payload is refused (vauchi/private#574).
     ///
     /// **Ratchet role:** the smaller identity key is the initiator — the
     /// same rule as in-person exchange
@@ -223,17 +185,12 @@ impl Vauchi {
         let payload = parse_card_payload_versioned(card_bytes)
             .map_err(|e| VauchiError::Exchange(ExchangeError::InvalidState(e.to_string())))?;
 
-        let (identity_pubkey, x3dh_pubkey, relay_url, card) = match payload {
-            // Legacy v1 has no exchange key — frozen import, no channel.
-            LinkCardPayload::V1 { card, .. } => return self.import_received_link_card(card),
-            LinkCardPayload::V2 {
-                identity_pubkey,
-                x3dh_pubkey,
-                relay_url,
-                card,
-                ..
-            } => (identity_pubkey, x3dh_pubkey, relay_url, card),
-        };
+        let LinkCardPayload {
+            identity_pubkey,
+            x3dh_pubkey,
+            relay_url,
+            card,
+        } = payload;
 
         let our_identity = *self
             .identity()

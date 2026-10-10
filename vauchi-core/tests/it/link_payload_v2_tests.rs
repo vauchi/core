@@ -8,7 +8,7 @@
 
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::exchange::link_mode::{
-    LinkCardPayload, derive_link_shared_key, parse_card_payload_versioned, serialize_card_payload,
+    LinkCardPayload, derive_link_shared_key, parse_card_payload_versioned,
     serialize_card_payload_v2,
 };
 use vauchi_core::{Contact, ContactCard, ExchangeTransport, SigningKeyPair};
@@ -35,20 +35,17 @@ fn v2_round_trips_with_all_bootstrap_fields() {
     let payload =
         serialize_card_payload_v2(&identity, &keypair, &x3dh, "https://relay.example", &card);
 
-    match parse_card_payload_versioned(&payload).expect("v2 parse") {
-        LinkCardPayload::V2 {
-            identity_pubkey,
-            x3dh_pubkey,
-            relay_url,
-            card,
-        } => {
-            assert_eq!(identity_pubkey, identity);
-            assert_eq!(x3dh_pubkey, x3dh);
-            assert_eq!(relay_url, "https://relay.example");
-            assert_eq!(card.display_name(), "Alice");
-        }
-        other => panic!("expected V2, got {other:?}"),
-    }
+    let LinkCardPayload {
+        identity_pubkey,
+        x3dh_pubkey,
+        relay_url,
+        card,
+    } = parse_card_payload_versioned(&payload).expect("v2 parse");
+
+    assert_eq!(identity_pubkey, identity);
+    assert_eq!(x3dh_pubkey, x3dh);
+    assert_eq!(relay_url, "https://relay.example");
+    assert_eq!(card.display_name(), "Alice");
 }
 
 // @internal

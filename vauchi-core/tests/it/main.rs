@@ -297,7 +297,6 @@ mod imported_contact_storage_tests;
 mod imported_contact_sync_tests;
 mod info_key_proptest;
 mod install_id_tests;
-mod link_card_import_tests;
 mod link_exchange_update_propagation_tests;
 mod link_initiator_poll_tests;
 mod link_initiator_tests;

@@ -188,8 +188,13 @@ impl AppEngine {
             LinkInitiatorState::Finalized { card_bytes } => {
                 let completed = match self.link_initiator_x3dh.as_ref() {
                     Some(x3dh) => self.complete_link_card_bytes(&card_bytes, x3dh),
-                    // No retained key (v1 peer / pre-T5b session) — frozen import.
-                    None => self.import_link_card_bytes(&card_bytes),
+                    // The key is stored with the session, so a finalized
+                    // session without one is a broken state, not a v1 peer (#574).
+                    None => Err(vauchi_core::VauchiError::Exchange(
+                        vauchi_core::ExchangeError::InvalidState(
+                            "link session has no exchange key".into(),
+                        ),
+                    )),
                 };
                 match completed {
                     Ok(contact_id) => {

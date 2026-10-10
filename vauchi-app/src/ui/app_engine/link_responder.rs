@@ -30,8 +30,7 @@ use vauchi_core::Event;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::exchange::link_mode::{
-    DeepLinkPayload, parse_card_payload, responder_respond_with_card_bytes,
-    serialize_card_payload_v2,
+    DeepLinkPayload, responder_respond_with_card_bytes, serialize_card_payload_v2,
 };
 use vauchi_core::exchange::link_responder::{
     LinkResponderFailureReason, LinkResponderSession, LinkResponderState,
@@ -207,8 +206,11 @@ impl AppEngine {
             LinkResponderState::Finalized { card_bytes } => {
                 let completed = match self.link_responder_x3dh.as_ref() {
                     Some(x3dh) => self.complete_link_card_bytes(&card_bytes, x3dh),
-                    // No retained key (v1 peer / pre-T5b session) — frozen import.
-                    None => self.import_link_card_bytes(&card_bytes),
+                    // The key is stored with the session, so a finalized
+                    // session without one is a broken state, not a v1 peer (#574).
+                    None => Err(VauchiError::Exchange(ExchangeError::InvalidState(
+                        "link session has no exchange key".into(),
+                    ))),
                 };
                 match completed {
                     Ok(contact_id) => {
@@ -239,20 +241,10 @@ impl AppEngine {
         }
     }
 
-    /// Decode a finalized card payload (`[version][pubkey][card]`) and
-    /// persist it via the core import path (ADR-034 trust derivation +
-    /// idempotent dedup live there). The frontend never sees the bytes.
-    /// Returns the persisted contact id (for building the success summary).
-    pub(super) fn import_link_card_bytes(&self, card_bytes: &[u8]) -> Result<String, VauchiError> {
-        let (_signing_key, card) = parse_card_payload(card_bytes)
-            .map_err(|e| VauchiError::Exchange(ExchangeError::InvalidState(e.to_string())))?;
-        self.vauchi.import_received_link_card(card)
-    }
-
     /// Complete a link exchange from the peer's finalized payload using the
     /// retained X3DH secret (ADR-050 T5b): a v2 bootstrap yields a live,
-    /// updatable `Exchanged` contact + Double Ratchet; a v1 payload falls
-    /// back to a frozen import inside `complete_link_exchange`. The frontend
+    /// updatable `Exchanged` contact + Double Ratchet; a v1 payload is
+    /// refused. The frontend
     /// never sees the bytes. Shared by both link finalize paths.
     /// Returns the persisted contact id (for building the success summary).
     pub(super) fn complete_link_card_bytes(

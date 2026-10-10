@@ -27,9 +27,6 @@ use crate::crypto::x3dh::X3DHKeyPair;
 use crate::exchange::escrow::{EscrowKeys, EscrowRole};
 use crate::platform::Command;
 
-/// Version byte prefixing a serialized link-mode card payload.
-const CARD_PAYLOAD_VERSION: u8 = 1;
-
 /// Payload version for the symmetric, updatable exchange (ADR-050). In
 /// addition to the v1 `[identity_pubkey][card]`, a v2 payload carries the
 /// depositor's fresh X3DH exchange public key, its relay routing, and an
@@ -479,67 +476,19 @@ pub fn responder_complete(
         .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))
 }
 
-/// Serialize an identity signing key + contact card into the link-mode
-/// card payload both sides swap over escrow.
-///
-/// Format: `[version: 1 byte][public_key: 32 bytes][card_json: rest]`.
-/// This is the plaintext fed to [`responder_respond_with_card_bytes`]
-/// (which encrypts it) and recovered by [`parse_card_payload`] after
-/// [`responder_complete`] decrypts the peer's deposit.
-pub fn serialize_card_payload(public_key: &[u8; 32], card: &ContactCard) -> Vec<u8> {
-    let card_json = serde_json::to_vec(card).expect("ContactCard serialization should not fail");
-    let mut payload = Vec::with_capacity(1 + 32 + card_json.len());
-    payload.push(CARD_PAYLOAD_VERSION);
-    payload.extend_from_slice(public_key);
-    payload.extend_from_slice(&card_json);
-    payload
-}
-
-/// Parse a link-mode card payload into `(signing_public_key, card)`.
-///
-/// Inverse of [`serialize_card_payload`]. Rejects payloads shorter than
-/// the 33-byte header, an unrecognized version byte, or invalid card
-/// JSON with [`LinkModeError::MalformedCardPayload`].
-pub fn parse_card_payload(data: &[u8]) -> Result<([u8; 32], ContactCard), LinkModeError> {
-    if data.len() < 33 {
-        return Err(LinkModeError::MalformedCardPayload(format!(
-            "payload too short: {} bytes",
-            data.len()
-        )));
-    }
-    if data[0] != CARD_PAYLOAD_VERSION {
-        return Err(LinkModeError::MalformedCardPayload(format!(
-            "unsupported version byte: {}",
-            data[0]
-        )));
-    }
-    let mut public_key = [0u8; 32];
-    public_key.copy_from_slice(&data[1..33]);
-    let card: ContactCard = serde_json::from_slice(&data[33..])
-        .map_err(|e| LinkModeError::MalformedCardPayload(e.to_string()))?;
-    Ok((public_key, card))
-}
-
-/// A parsed link-mode card payload — either the legacy v1
-/// (`[identity_pubkey][card]`, which yields an *import*) or the v2
-/// symmetric-exchange bootstrap (ADR-050), which additionally carries the
-/// peer's X3DH exchange key + relay routing for establishing a live update
-/// channel. [`parse_card_payload_versioned`] dispatches on the version byte
-/// and, for v2, verifies the identity signature before returning.
+/// A parsed link-mode card payload: the v2 symmetric-exchange bootstrap
+/// (ADR-050), carrying the peer's X3DH exchange key and relay routing for a
+/// live update channel. Its identity signature is verified on parse.
 #[derive(Debug, Clone)]
-pub enum LinkCardPayload {
-    /// Legacy import payload — no update channel.
-    V1 {
-        identity_pubkey: [u8; 32],
-        card: ContactCard,
-    },
-    /// Symmetric exchange bootstrap — signature already verified.
-    V2 {
-        identity_pubkey: [u8; 32],
-        x3dh_pubkey: [u8; 32],
-        relay_url: String,
-        card: ContactCard,
-    },
+pub struct LinkCardPayload {
+    /// The peer's identity signing key.
+    pub identity_pubkey: [u8; 32],
+    /// The peer's X3DH exchange key.
+    pub x3dh_pubkey: [u8; 32],
+    /// The peer's relay.
+    pub relay_url: String,
+    /// The peer's card.
+    pub card: ContactCard,
 }
 
 /// Serde body of a v2 payload (the bytes after the version byte).
@@ -597,18 +546,10 @@ pub fn serialize_card_payload_v2(
     payload
 }
 
-/// Parse a link-mode card payload of either version, dispatching on the
-/// leading version byte. For v2 the bootstrap signature is verified against
+/// Parse a link-mode card payload; only the v2 bootstrap is accepted. For v2 the bootstrap signature is verified against
 /// the embedded identity key; a bad signature is rejected (fail-closed).
 pub fn parse_card_payload_versioned(data: &[u8]) -> Result<LinkCardPayload, LinkModeError> {
     match data.first() {
-        Some(&CARD_PAYLOAD_VERSION) => {
-            let (identity_pubkey, card) = parse_card_payload(data)?;
-            Ok(LinkCardPayload::V1 {
-                identity_pubkey,
-                card,
-            })
-        }
         Some(&CARD_PAYLOAD_VERSION_V2) => {
             let body: CardPayloadV2Body = serde_json::from_slice(&data[1..])
                 .map_err(|e| LinkModeError::MalformedCardPayload(e.to_string()))?;
@@ -628,7 +569,7 @@ pub fn parse_card_payload_versioned(data: &[u8]) -> Result<LinkCardPayload, Link
                     "bootstrap signature verification failed".to_string(),
                 ));
             }
-            Ok(LinkCardPayload::V2 {
+            Ok(LinkCardPayload {
                 identity_pubkey: body.identity_pubkey,
                 x3dh_pubkey: body.x3dh_pubkey,
                 relay_url: body.relay_url,

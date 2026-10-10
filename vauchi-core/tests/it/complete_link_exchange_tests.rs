@@ -16,8 +16,8 @@
 
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::X3DHKeyPair;
-use vauchi_core::exchange::link_mode::{serialize_card_payload, serialize_card_payload_v2};
-use vauchi_core::{ExchangeTransport, ImportSource, Vauchi, VauchiError};
+use vauchi_core::exchange::link_mode::serialize_card_payload_v2;
+use vauchi_core::{ExchangeTransport, Vauchi, VauchiError};
 
 fn vauchi_with_identity(name: &str) -> Vauchi {
     let mut v = Vauchi::in_memory().expect("in-memory vauchi");
@@ -191,30 +191,6 @@ fn v2_completion_is_idempotent_and_keeps_the_existing_channel() {
         ratchet_after.our_public_key(),
         "the ratchet must be preserved, not re-keyed, on re-exchange",
     );
-}
-
-// @internal
-#[test]
-fn v1_payload_falls_back_to_a_frozen_import() {
-    let alice = vauchi_with_identity("Alice");
-    let (_, alice_x3dh, _) = build_v2(&alice, "https://relay.alice.example");
-
-    // A legacy v1 payload carries no exchange key.
-    let peer = vauchi_with_identity("LegacyBob");
-    let peer_identity = peer.identity().unwrap();
-    let card = ContactCard::new("LegacyBob");
-    let v1_payload = serialize_card_payload(peer_identity.signing_public_key(), &card);
-
-    let id = alice
-        .complete_link_exchange(&v1_payload, &alice_x3dh)
-        .expect("v1 completes via the import fallback");
-
-    let contact = alice.get_contact(&id).unwrap().unwrap();
-    let imported = contact
-        .kind()
-        .imported_data()
-        .expect("a v1 link payload must yield a frozen Import, not an Exchange");
-    assert_eq!(imported.source, ImportSource::LinkExchange);
 }
 
 // @internal

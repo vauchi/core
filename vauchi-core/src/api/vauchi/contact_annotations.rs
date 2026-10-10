@@ -55,6 +55,9 @@ impl Vauchi {
     pub fn read_personal_note(&self, contact_id: &str) -> VauchiResult<Option<String>> {
         use crate::crypto::decrypt;
 
+        if self.conceals_contact(contact_id)? {
+            return Ok(None);
+        }
         let encrypted = match self.storage.contacts().load_personal_notes(contact_id)? {
             Some(data) => data,
             None => return Ok(None),
@@ -92,6 +95,9 @@ impl Vauchi {
     ///
     /// Low-level API for sync/migration. Prefer `read_personal_note()`.
     pub fn load_personal_notes(&self, contact_id: &str) -> VauchiResult<Option<Vec<u8>>> {
+        if self.conceals_contact(contact_id)? {
+            return Ok(None);
+        }
         Ok(self.storage.contacts().load_personal_notes(contact_id)?)
     }
 
@@ -172,6 +178,9 @@ impl Vauchi {
 
     /// Returns the local nickname for a contact, or None if unset.
     pub fn get_contact_nickname(&self, contact_id: &str) -> VauchiResult<Option<String>> {
+        if self.conceals_contact(contact_id)? {
+            return Ok(None);
+        }
         Ok(self.storage.contacts().load_contact_nickname(contact_id)?)
     }
 
@@ -212,6 +221,9 @@ impl Vauchi {
 
     /// Returns the custom avatar for a contact, or None if unset.
     pub fn get_contact_custom_avatar(&self, contact_id: &str) -> VauchiResult<Option<Vec<u8>>> {
+        if self.conceals_contact(contact_id)? {
+            return Ok(None);
+        }
         Ok(self
             .storage
             .contacts()
@@ -300,6 +312,9 @@ impl Vauchi {
     ) -> VauchiResult<ContactDisplayOptions> {
         use crate::contact::display::*;
 
+        if self.conceals_contact(contact_id)? {
+            return Err(VauchiError::ContactNotFound(contact_id.to_string()));
+        }
         let _contact = self
             .storage
             .contacts()

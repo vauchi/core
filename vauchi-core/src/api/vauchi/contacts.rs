@@ -583,6 +583,9 @@ impl Vauchi {
         &self,
         contact_id: &str,
     ) -> VauchiResult<Vec<crate::contact::display::SharedName>> {
+        if self.conceals_contact(contact_id)? {
+            return Ok(Vec::new());
+        }
         Ok(self.storage.contacts().list_shared_names(contact_id)?)
     }
 
@@ -618,6 +621,9 @@ impl Vauchi {
         &self,
         contact_id: &str,
     ) -> VauchiResult<Vec<crate::contact::display::SharedAvatar>> {
+        if self.conceals_contact(contact_id)? {
+            return Ok(Vec::new());
+        }
         Ok(self.storage.contacts().list_shared_avatars(contact_id)?)
     }
 

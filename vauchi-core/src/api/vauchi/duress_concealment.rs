@@ -35,6 +35,22 @@ impl Vauchi {
         self.auth_mode == AuthMode::Duress
     }
 
+    /// Whether `contact_id` names a contact the duress session hides: in
+    /// duress mode only decoy ids resolve, as in `get_contact`, so reads keyed
+    /// by a real id answer as if it were unknown (ADR-032, private#388).
+    pub(super) fn conceals_contact(
+        &self,
+        contact_id: &str,
+    ) -> crate::api::error::VauchiResult<bool> {
+        if !self.in_duress_mode() {
+            return Ok(false);
+        }
+        Ok(!self
+            .decoy_contacts_as_contacts()?
+            .iter()
+            .any(|decoy| decoy.id() == contact_id))
+    }
+
     /// Poisoning cannot leave this state half-written in a way that
     /// matters: it holds nothing real, so a poisoned lock is recovered.
     pub(super) fn concealed_duress(&self) -> MutexGuard<'_, ConcealedDuress> {

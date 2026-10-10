@@ -189,6 +189,90 @@ fn a_corrected_digit_is_replaced_not_kept() {
     }
 }
 
+mod both_shells_agree {
+    use proptest::prelude::*;
+    use vauchi_app::i18n::Locale;
+    use vauchi_app::ui::{
+        ActionResult, Component, DuressConfig, DuressPinEngine, UserAction, WorkflowEngine,
+    };
+
+    fn filled(engine: &DuressPinEngine, id: &str) -> usize {
+        engine
+            .current_screen()
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::PinInput {
+                    id: pin, filled, ..
+                } if pin == id => Some(*filled),
+                _ => None,
+            })
+            .expect("PIN field")
+    }
+
+    fn edit(engine: &mut DuressPinEngine, id: &str, value: String) {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: id.into(),
+            value,
+        });
+    }
+
+    fn press_continue(engine: &mut DuressPinEngine) -> ActionResult {
+        engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        })
+    }
+
+    proptest! {
+        /// Any keystrokes (`None` is a backspace) typed into the PIN by a
+        /// shell sending its own text, and into the confirmation by a shell
+        /// echoing Core's bullets, leave the same PIN in both fields.
+        // @scenario: duress_mode.feature :: Enable duress PIN in settings
+        #[test]
+        fn keystrokes_give_the_same_pin_either_way(
+            keys in prop::collection::vec(prop::option::weighted(0.8, 0u8..10), 6..20),
+        ) {
+            let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::English);
+            let _ = engine.handle_action(UserAction::ListItemSelected {
+                component_id: "duress_actions".into(),
+                item_id: "set_up".into(),
+            });
+            // Both shells honor the field's `max_length` (six), as Core
+            // sends it, so a full field takes no further digit.
+            let mut own_text = String::new();
+            let mut lengths = Vec::new();
+            for key in &keys {
+                match key {
+                    Some(d) if own_text.len() < 6 => own_text.push(char::from(b'0' + d)),
+                    Some(_) => {}
+                    None => { own_text.pop(); }
+                }
+                edit(&mut engine, "pin", own_text.clone());
+                lengths.push(filled(&engine, "pin"));
+            }
+            let entered = filled(&engine, "pin");
+            prop_assume!(entered == 6);
+            prop_assert!(matches!(press_continue(&mut engine), ActionResult::NavigateTo(_)));
+
+            for (key, expected) in keys.iter().zip(&lengths) {
+                let shown = "•".repeat(filled(&engine, "confirm_pin"));
+                let value = match key {
+                    Some(d) if shown.chars().count() < 6 => format!("{shown}{}", char::from(b'0' + d)),
+                    Some(_) => shown,
+                    None => shown.chars().skip(1).collect(),
+                };
+                edit(&mut engine, "confirm_pin", value);
+                prop_assert_eq!(filled(&engine, "confirm_pin"), *expected);
+            }
+
+            match press_continue(&mut engine) {
+                ActionResult::NavigateTo(screen) => prop_assert_eq!(screen.screen_id, "duress_alerts"),
+                other => prop_assert!(false, "the two PINs differ: {:?}", other),
+            }
+        }
+    }
+}
+
 // @scenario: duress_mode.feature :: Enable duress PIN in settings
 #[test]
 fn the_pin_field_never_carries_the_digits_back_to_the_shell() {

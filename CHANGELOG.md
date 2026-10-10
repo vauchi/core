@@ -6,6 +6,19 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.78.1] — 2026-10-10
+
+### Fixed
+
+- An upgrade whose keychain takes a write only after the person unlocks
+  starts on Core's unlock screen, and the unlock finishes the move to the
+  SMK. Storing the SMK used to turn the keychain's answer into a
+  configuration error, so the app failed to start (found on a device,
+  vauchi/private#580).
+- Storing the SMK classifies keychain failures as loading keys does: any
+  failure other than a lock or a lost key offers Try again, including a
+  desktop keyring that does not answer (ADR-045).
+
 ## [0.78.0] — 2026-10-09
 
 ### Fixed

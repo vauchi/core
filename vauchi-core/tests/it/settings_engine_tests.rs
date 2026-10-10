@@ -146,79 +146,6 @@ fn settings_reflects_config_values() {
     assert_eq!(relay_detail.as_deref(), Some("https://relay.vauchi.app"));
 }
 
-// ADR-022: irrevocable actions use InlineConfirm, not ShowAlert
-// @internal
-// @internal
-#[test]
-fn settings_emergency_wipe_shows_inline_confirm() {
-    // M6 D6.1: the emergency wipe lives on the Advanced sub-screen.
-    let mut engine = SettingsEngine::new_advanced(sample_config());
-    let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "danger".into(),
-        item_id: "emergency_wipe".into(),
-    });
-    let ActionResult::UpdateScreen(screen) = result else {
-        panic!("Expected UpdateScreen with InlineConfirm, got {result:?}");
-    };
-    let has_inline_confirm = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::InlineConfirm { destructive, .. } if *destructive));
-    assert!(
-        has_inline_confirm,
-        "emergency_wipe should show a destructive InlineConfirm"
-    );
-}
-
-// @internal
-// @internal
-#[test]
-fn settings_confirm_emergency_wipe_completes() {
-    let mut engine = SettingsEngine::new_advanced(sample_config());
-    // Trigger wipe to enter pending state (advanced sub-screen, M6 D6.1)
-    let trigger = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "danger".into(),
-        item_id: "emergency_wipe".into(),
-    });
-    assert!(
-        matches!(trigger, ActionResult::UpdateScreen(_)),
-        "trigger should show inline confirm, got {trigger:?}"
-    );
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "confirm_emergency_wipe".into(),
-    });
-    assert!(
-        matches!(result, ActionResult::Complete),
-        "confirm_emergency_wipe should return Complete, got {result:?}"
-    );
-}
-
-// @internal
-// @internal
-#[test]
-fn settings_cancel_emergency_wipe_removes_inline_confirm() {
-    let mut engine = SettingsEngine::new_advanced(sample_config());
-    let trigger = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "danger".into(),
-        item_id: "emergency_wipe".into(),
-    });
-    assert!(
-        matches!(trigger, ActionResult::UpdateScreen(_)),
-        "trigger should show inline confirm, got {trigger:?}"
-    );
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "cancel_emergency_wipe".into(),
-    });
-    let ActionResult::UpdateScreen(screen) = result else {
-        panic!("Expected UpdateScreen, got {result:?}");
-    };
-    let has_inline_confirm = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::InlineConfirm { .. }));
-    assert!(!has_inline_confirm, "cancel should remove InlineConfirm");
-}
-
 // @internal
 #[test]
 fn settings_device_count_in_detail() {
@@ -532,21 +459,6 @@ fn settings_items_have_a11y_labels() {
                     );
                 }
             }
-        }
-    }
-
-    let mut engine = SettingsEngine::new_advanced(sample_config());
-
-    // Also check InlineConfirm a11y when pending_wipe is active (Advanced
-    // owns the emergency wipe).
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "danger".into(),
-        item_id: "emergency_wipe".into(),
-    });
-    let wipe_screen = engine.current_screen();
-    for component in &wipe_screen.components {
-        if let Component::InlineConfirm { id, a11y, .. } = component {
-            assert!(a11y.is_some(), "InlineConfirm '{}' missing a11y label", id);
         }
     }
 }

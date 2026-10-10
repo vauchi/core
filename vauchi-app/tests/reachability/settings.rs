@@ -8,9 +8,7 @@
 //! `SettingsGroup` toggles and dropdowns - all `SettingsToggled` /
 //! dropdown / `ListItemSelected` pass-throughs. The engine renders
 //! `actions: vec![]` (no standalone `ScreenAction`). The
-//! `emergency_wipe` row opens an `InlineConfirm` behind the same
-//! `screen_id` (BFS dedup collapses it); `confirm_emergency_wipe` /
-//! `cancel_emergency_wipe` are covered by the engine's inline tests.
+//! `emergency_wipe` row opens the shred screen (vauchi/private#598).
 
 use vauchi_app::ui::testing::assert_reachability;
 use vauchi_app::ui::{DropdownOption, SettingsConfig, SettingsEngine, WorkflowEngine};

@@ -86,7 +86,6 @@ pub enum SettingsMode {
 pub struct SettingsEngine {
     config: SettingsConfig,
     mode: SettingsMode,
-    pending_wipe: bool,
 }
 
 impl SettingsEngine {
@@ -107,11 +106,7 @@ impl SettingsEngine {
     }
 
     pub fn with_mode(config: SettingsConfig, mode: SettingsMode) -> Self {
-        Self {
-            config,
-            mode,
-            pending_wipe: false,
-        }
+        Self { config, mode }
     }
 
     fn locale(&self) -> Locale {
@@ -171,7 +166,7 @@ impl SettingsEngine {
     /// reached only by deliberate navigation. Back is the generic
     /// nav-stack pop (parent stamped by the overlay layer).
     fn advanced_screen(&self) -> ScreenModel {
-        let mut components = vec![
+        let components = vec![
             self.security_group(),
             self.backup_group(),
             self.network_group(),
@@ -179,23 +174,6 @@ impl SettingsEngine {
             self.about_group(),
             self.danger_group(),
         ];
-
-        if self.pending_wipe {
-            components.push(Component::InlineConfirm {
-                id: "emergency_wipe".into(),
-                warning: self.t("settings.emergency_wipe_confirm_warning"),
-                confirm_text: self.t("shred.wipe.wipe_all"),
-                cancel_text: self.t("action.cancel"),
-                confirm_action_id: "confirm_emergency_wipe".into(),
-                cancel_action_id: "cancel_emergency_wipe".into(),
-                destructive: true,
-                a11y: Some(A11y {
-                    label: Some(self.t("settings.emergency_wipe_confirm_a11y")),
-                    hint: Some(self.t("settings.emergency_wipe_confirm_hint")),
-                    role: None,
-                }),
-            });
-        }
 
         self.screen("settings_advanced", "settings.advanced_title", components)
     }
@@ -285,20 +263,6 @@ impl WorkflowEngine for SettingsEngine {
                 let title = self.t("about.what_is_vauchi.title");
                 let body = self.t("about.what_is_vauchi.body");
                 ActionResult::ShowInfoOverlay { title, body }
-            }
-            UserAction::ListItemSelected { ref item_id, .. } if item_id == "emergency_wipe" => {
-                self.pending_wipe = true;
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-            UserAction::ActionPressed { ref action_id }
-                if action_id == "confirm_emergency_wipe" =>
-            {
-                self.pending_wipe = false;
-                ActionResult::Complete
-            }
-            UserAction::ActionPressed { ref action_id } if action_id == "cancel_emergency_wipe" => {
-                self.pending_wipe = false;
-                ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected { .. } => ActionResult::NavigateTo(self.current_screen()),
             _ => ActionResult::UpdateScreen(self.current_screen()),

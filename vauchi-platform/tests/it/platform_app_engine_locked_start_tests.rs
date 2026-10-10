@@ -23,6 +23,10 @@ const RELAY: &str = "https://relay.test";
 struct ControlledKeychain {
     store: SharedKeychain,
     locked: Arc<AtomicBool>,
+    /// Reads still work and writes need an unlock, as on Android when the
+    /// old storage key is not bound to authentication and the keychain's
+    /// own key is.
+    saves_locked: Arc<AtomicBool>,
     smk_invalidated: Arc<AtomicBool>,
 }
 
@@ -31,6 +35,7 @@ impl ControlledKeychain {
         Self {
             store,
             locked: Arc::new(AtomicBool::new(false)),
+            saves_locked: Arc::new(AtomicBool::new(false)),
             smk_invalidated: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -38,7 +43,7 @@ impl ControlledKeychain {
 
 impl MobilePlatformKeychain for ControlledKeychain {
     fn save_key(&self, name: String, key: Vec<u8>) -> Result<(), KeychainError> {
-        if self.locked.load(Ordering::SeqCst) {
+        if self.locked.load(Ordering::SeqCst) || self.saves_locked.load(Ordering::SeqCst) {
             return Err(KeychainError::AuthenticationRequired);
         }
         self.store.save_key(name, key)
@@ -585,4 +590,70 @@ fn a_prompt_that_opens_storage_unlocks_when_no_duress_pin_is_set_up() {
         Some("unlocked"),
         "got {opened}"
     );
+}
+
+/// An install from before #580 whose old key reaches Core as the bootstrap
+/// key, as the Android and iOS keychain bridges serve it.
+fn installed_before_with_its_key_as_bootstrap(dir: &tempfile::TempDir) -> ControlledKeychain {
+    let old_key = vauchi_core::crypto::SymmetricKey::generate();
+    drive_onboarding(
+        &PlatformAppEngine::new(
+            dir.path().to_string_lossy().to_string(),
+            RELAY.into(),
+            old_key.as_bytes().to_vec(),
+        )
+        .unwrap(),
+    );
+    let keychain = ControlledKeychain::new(SharedKeychain::new());
+    keychain
+        .store
+        .save_key("storage_bootstrap".into(), old_key.as_bytes().to_vec())
+        .unwrap();
+    keychain
+}
+
+// @internal
+#[test]
+fn an_upgrade_whose_keychain_refuses_writes_until_unlocked_starts_locked() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = installed_before_with_its_key_as_bootstrap(&dir);
+    keychain.saves_locked.store(true, Ordering::SeqCst);
+
+    let engine = PlatformAppEngine::open_with_keychain(
+        dir.path().to_string_lossy().to_string(),
+        RELAY.into(),
+        None,
+        Box::new(keychain.clone()),
+    )
+    .expect("a keychain that refuses the SMK still yields an engine");
+
+    let batch = parse(engine.initial_commands_json().unwrap());
+    assert_eq!(surface(&batch), "storage_lock.locked");
+    assert!(asks_for_prompt(&batch));
+}
+
+// @internal
+#[test]
+fn the_unlock_finishes_the_upgrade_the_locked_keychain_held_up() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = installed_before_with_its_key_as_bootstrap(&dir);
+    keychain.saves_locked.store(true, Ordering::SeqCst);
+    let engine = PlatformAppEngine::open_with_keychain(
+        dir.path().to_string_lossy().to_string(),
+        RELAY.into(),
+        None,
+        Box::new(keychain.clone()),
+    )
+    .unwrap();
+    engine.initial_commands_json().unwrap();
+
+    keychain.saves_locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine);
+
+    assert!(
+        !surface(&opened).starts_with("storage_lock"),
+        "got {opened}"
+    );
+    assert!(engine.has_identity().unwrap());
+    assert_eq!(keychain.store.names(), ["smk"]);
 }
